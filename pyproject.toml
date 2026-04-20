@@ -1,0 +1,38 @@
+[project]
+name = "agentbox"
+version = "0.1.0"
+description = "Reusable agent orchestration: scoped runners, observability, sessions"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "jinja2>=3.1",
+  "typer>=0.12",
+  "httpx>=0.27",
+  "tomlkit>=0.13",
+  "sqlalchemy>=2.0",
+]
+
+[project.scripts]
+agentbox = "agentbox.cli:app"
+
+[project.entry-points."agentbox.runners"]
+claude_code = "agentbox.core.runners.claude_code:ClaudeCodeRunner"
+opencode = "agentbox.core.runners.opencode:OpenCodeRunner"
+pydantic_ai = "agentbox.core.runners.pydantic_ai:PydanticAiRunner"
+
+
+# Register guardrails and adapters by adding entries here or in a plugin package:
+# [project.entry-points."agentbox.guardrails"]
+# my_guardrail = "mypackage.guardrails:MyGuardrail"
+#
+# [project.entry-points."agentbox.adapters"]
+# my_adapter = "mypackage.adapters:MyAdapter"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentbox"]
