@@ -1,0 +1,88 @@
+"""/agents endpoints — list definitions, fetch one, workspace info."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from agentbox.api.deps import get_loader, get_settings
+from agentbox.core import workspaces as ws
+
+router = APIRouter(prefix="/api/agents", tags=["agents"])
+
+
+@router.get("")
+def list_agents() -> list[dict]:
+    loader = get_loader()
+    settings = get_settings()
+    agents = loader.load().agents
+    # Include resolved workspace info for each agent
+    return [
+        {
+            **a.model_dump(),
+            "resolved_workspace": str(
+                ws.resolve_path(a, settings, loader)[0]
+            ),
+        }
+        for a in agents
+    ]
+
+
+@router.get("/{agent_id}")
+def get_agent(agent_id: str) -> dict:
+    loader = get_loader()
+    settings = get_settings()
+    agent = loader.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    prompt = ""
+    if agent.prompt_path:
+        try:
+            prompt = agent.load_prompt(settings.project_root)
+        except FileNotFoundError:
+            prompt = ""
+    workspace_path, ephemeral = ws.resolve_path(agent, settings, loader)
+    generated = ws.get_generated_paths(workspace_path)
+    return {
+        "agent": agent.model_dump(),
+        "prompt": prompt,
+        "workspace": {
+            "path": str(workspace_path),
+            "ephemeral": ephemeral,
+            "generated_configs": {
+                k: {"path": str(v), "exists": v.exists()}
+                for k, v in generated.items()
+            },
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Workspace assignment
+# ---------------------------------------------------------------------------
+
+
+class WorkspaceBody(BaseModel):
+    workspace: str | None = None
+
+
+@router.patch("/{agent_id}/workspace")
+def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
+    """Update an agent's workspace assignment in agentbox.toml.
+
+    This edits the TOML file on disk. Requires the agent to be declared
+    inline (``[[agents]]`` block), not directory-discovered.
+    """
+    # For v1, we return what the workspace *would* be.
+    # Editing agentbox.toml programmatically is fragile; the UI can
+    # display the effective workspace and guide the user to edit the file.
+    loader = get_loader()
+    agent = loader.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    # TODO: implement TOML editing via tomlkit
+    return {
+        "agent_id": agent_id,
+        "workspace": body.workspace,
+        "note": "Edit agentbox.toml manually to persist workspace changes",
+    }
