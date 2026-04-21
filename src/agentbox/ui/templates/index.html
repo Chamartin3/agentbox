@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}runs · agentbox{% endblock %}
+{% block content %}
+<h1>Runs</h1>
+<div id="usage"></div>
+<table id="runs">
+  <thead><tr><th>id</th><th>agent</th><th>status</th><th>created</th><th>finished</th></tr></thead>
+  <tbody></tbody>
+</table>
+<script>
+async function load() {
+  const [runs, usage] = await Promise.all([
+    fetch('/runs').then(r => r.json()),
+    fetch('/usage').then(r => r.json()),
+  ]);
+  document.getElementById('usage').innerHTML =
+    `<p>${usage.runs} runs · ${usage.input_tokens} in · ${usage.output_tokens} out · $${(usage.cost_usd||0).toFixed(4)}</p>`;
+  const tbody = document.querySelector('#runs tbody');
+  tbody.innerHTML = runs.map(r => `
+    <tr>
+      <td><a href="/runs/${r.id}/view">${r.id.slice(0,12)}</a></td>
+      <td>${r.agent_id}</td>
+      <td><span class="pill ${r.status}">${r.status}</span></td>
+      <td>${r.created_at}</td>
+      <td>${r.finished_at || ''}</td>
+    </tr>`).join('');
+}
+load();
+setInterval(load, 4000);
+</script>
+{% endblock %}

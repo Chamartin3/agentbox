@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}run · agentbox{% endblock %}
+{% block content %}
+<h1>Run <code>{{ run_id }}</code></h1>
+<div class="grid">
+  <div>
+    <h2>Meta</h2>
+    <pre id="meta">…</pre>
+    <h2>Usage</h2>
+    <pre id="usage">…</pre>
+    <h2>Guardrails</h2>
+    <pre id="guardrails">…</pre>
+  </div>
+  <div>
+    <h2>Stream</h2>
+    <pre id="stream" style="max-height:70vh;overflow:auto"></pre>
+  </div>
+</div>
+<script>
+const runId = "{{ run_id }}";
+async function loadMeta() {
+  const r = await fetch(`/runs/${runId}`).then(r => r.json());
+  document.getElementById('meta').textContent = JSON.stringify(r.run, null, 2);
+  document.getElementById('usage').textContent = JSON.stringify(r.usage, null, 2);
+  document.getElementById('guardrails').textContent = JSON.stringify(r.guardrails, null, 2);
+}
+loadMeta();
+
+const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${proto}://${location.host}/runs/${runId}/stream`);
+const out = document.getElementById('stream');
+ws.onmessage = (e) => {
+  const ev = JSON.parse(e.data);
+  out.textContent += `[${ev.type}] ${JSON.stringify(ev)}\n`;
+  out.scrollTop = out.scrollHeight;
+};
+ws.onclose = () => { loadMeta(); };
+</script>
+{% endblock %}
