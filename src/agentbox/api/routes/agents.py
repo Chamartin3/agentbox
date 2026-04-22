@@ -42,17 +42,13 @@ def get_agent(agent_id: str) -> dict:
         except FileNotFoundError:
             prompt = ""
     workspace_path, ephemeral = ws.resolve_path(agent, settings, loader)
-    generated = ws.get_generated_paths(workspace_path)
     return {
         "agent": agent.model_dump(),
         "prompt": prompt,
         "workspace": {
             "path": str(workspace_path),
             "ephemeral": ephemeral,
-            "generated_configs": {
-                k: {"path": str(v), "exists": v.exists()}
-                for k, v in generated.items()
-            },
+            "generated_configs": {},
         },
     }
 

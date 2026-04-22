@@ -12,7 +12,7 @@ import tomllib
 from pathlib import Path
 from typing import TypedDict
 
-from .constants import CLAUDE_MCP_PREFIX
+from agentbox.core.mcp import McpToolManifest
 
 
 class DiscoveredAgent(TypedDict):
@@ -40,8 +40,13 @@ class AgentDiscovery:
     agentbox_toml:
         Path to the single-source-of-truth manifest (default
         ``<project_root>/agentbox.toml``).
+    mcp_manifest:
+        The runtime MCP tool manifest (introspected from MCP servers).
+        When *None* falls back to the legacy ``manifest_path`` for
+        backward compatibility.
     manifest_path:
-        Path to the tool manifest JSON.
+        Legacy path to tool_manifest.json. Only consulted when
+        ``mcp_manifest`` is *None*.
     verbose:
         When *True* (default) prints progress to stdout.
     """
@@ -49,8 +54,9 @@ class AgentDiscovery:
     def __init__(
         self,
         agentbox_toml: Path,
-        manifest_path: Path,
+        manifest_path: Path | None = None,
         *,
+        mcp_manifest: McpToolManifest | None = None,
         mcp_server_name: str | None = None,
         verbose: bool = True,
     ) -> None:
@@ -58,17 +64,36 @@ class AgentDiscovery:
         self.project_root = agentbox_toml.parent
         self.manifest_path = manifest_path
         self.verbose = verbose
-        self._manifest: dict[str, list[str]] | None = None
+        self._manifest_data: dict[str, list[str]] | None = None
+        self._mcp_manifest = mcp_manifest
+        self._mcp_server_name = mcp_server_name
         self.claude_mcp_prefix = (
-            f"mcp__{mcp_server_name}__" if mcp_server_name else CLAUDE_MCP_PREFIX
+            f"mcp__{mcp_server_name}__" if mcp_server_name else "mcp__"
         )
 
     @property
     def manifest(self) -> dict[str, list[str]]:
-        if self._manifest is None:
+        if self._mcp_manifest is not None:
+            groups = self._mcp_manifest.groups
+            result: dict[str, list[str]] = {}
+            for key, tool_names in groups.items():
+                _, _, suffix = key.partition(".")
+                dot = suffix.find(".")
+                if dot == -1:
+                    result[suffix] = tool_names
+                else:
+                    prefix = suffix[:dot]
+                    sub = suffix[dot + 1 :]
+                    if sub == "read" or sub == "write":
+                        group_name = f"{prefix}.{sub}"
+                    else:
+                        group_name = prefix
+                    result[group_name] = result.get(group_name, []) + tool_names
+            return result
+        if self._manifest_data is None and self.manifest_path is not None:
             with open(self.manifest_path) as f:
-                self._manifest = json.load(f)
-        return self._manifest
+                self._manifest_data = json.load(f)
+        return self._manifest_data or {}
 
     def resolve_tools(self, raw_tools: list[str]) -> list[str]:
         result: list[str] = []

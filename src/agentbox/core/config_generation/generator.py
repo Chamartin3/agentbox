@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from .constants import (
     CLAUDE_MCP_PREFIX,
@@ -22,6 +22,9 @@ from .constants import (
     READ_PREFIXES,
 )
 from .discovery import AgentDiscovery, DiscoveredAgent
+
+if TYPE_CHECKING:
+    from agentbox.core.mcp import McpToolManifest
 
 Permission = Literal["allow", "ask"]
 
@@ -277,7 +280,9 @@ class ConfigGenerator:
     agentbox_toml:
         Path to agentbox.toml (single source of truth).
     manifest_path:
-        Path to tool_manifest.json.
+        Legacy path to tool_manifest.json (deprecated).
+    mcp_manifest:
+        Runtime MCP tool manifest (preferred over manifest_path).
     mcp_server_name:
         MCP server name for OpenCode config.
     mcp_command:
@@ -287,8 +292,9 @@ class ConfigGenerator:
     def __init__(
         self,
         agentbox_toml: Path,
-        manifest_path: Path,
+        manifest_path: Path | None = None,
         *,
+        mcp_manifest: McpToolManifest | None = None,
         mcp_server_name: str = "mcp",
         mcp_command: list[str] | None = None,
         mcp_url: str | None = None,
@@ -298,6 +304,7 @@ class ConfigGenerator:
         self.discovery = AgentDiscovery(
             agentbox_toml=agentbox_toml,
             manifest_path=manifest_path,
+            mcp_manifest=mcp_manifest,
             mcp_server_name=mcp_server_name,
             verbose=verbose,
         )
@@ -439,6 +446,74 @@ class ConfigGenerator:
             "claude_settings": claude_settings_path,
             "claude_mcp": claude_mcp_config_path,
             "opencode": opencode_path,
+        }
+
+    def generate_configs_into(
+        self,
+        target_dir: Path,
+        allowed_builtin_tools: list[str] | None = None,
+        files: list[dict] | None = None,
+        project_root: Path | None = None,
+    ) -> dict[str, Path]:
+        """Generate all configs as flat files into ``target_dir``.
+
+        Unlike ``generate_for_workspace`` this writes directly to an
+        arbitrary directory without a ``.agentbox/generated/`` subdirectory.
+        Used by the executor to populate per-run tmpfs directories.
+        """
+        agents = self.discovery.discover_mcp_agents()
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        claude_agents_data = build_claude_agents(agents)
+        ca_path = target_dir / "claude_agents.json"
+        ca_path.write_text(
+            json.dumps(claude_agents_data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        claude_settings_data = build_claude_settings(
+            agents, allowed_builtin_tools, self.discovery.claude_mcp_prefix
+        )
+        cs_path = target_dir / "claude_settings.json"
+        cs_path.write_text(
+            json.dumps(claude_settings_data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        claude_mcp_data = build_claude_mcp_config(
+            mcp_server_name=self.mcp_server_name,
+            mcp_url=self.mcp_url,
+            mcp_transport=self.mcp_transport,
+            mcp_command=self.mcp_command,
+        )
+        cm_path = target_dir / "claude_mcp.json"
+        cm_path.write_text(
+            json.dumps(claude_mcp_data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        opencode_data = build_opencode_config(
+            agents,
+            mcp_server_name=self.mcp_server_name,
+            mcp_command=self.mcp_command,
+            mcp_url=self.mcp_url,
+            mcp_transport=self.mcp_transport,
+        )
+        oc_path = target_dir / "opencode.json"
+        oc_path.write_text(
+            json.dumps(opencode_data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        if files and project_root is not None:
+            _materialize_workspace_files(target_dir, files, project_root)
+
+        return {
+            "claude_agents": ca_path,
+            "claude_settings": cs_path,
+            "claude_mcp": cm_path,
+            "opencode": oc_path,
         }
 
     def get_generated_paths(self, workspace_path: Path) -> dict[str, Path]:

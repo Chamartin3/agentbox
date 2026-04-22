@@ -9,15 +9,12 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_executor, get_loader, get_settings
+from agentbox.api.deps import get_loader, get_mcp_registry, get_settings
 from agentbox.core import workspaces as ws
 from agentbox.core.config_generation import ConfigGenerator
 from agentbox.core.config_generation.constants import (
-    CLAUDE_MCP_PREFIX,
-    OPENCODE_MCP_PREFIX,
     READ_PREFIXES,
 )
-from agentbox.core.definitions.models import WorkspaceDef
 from agentbox.core.skills import discover_skills
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
@@ -61,7 +58,6 @@ def list_workspaces() -> list[dict]:
             for p in ws_path.rglob("*"):
                 if p.is_file() and _is_user_file(str(p.relative_to(ws_path))):
                     file_count += 1
-            from agentbox.core.skills import discover_skills
             skill_count = len(discover_skills(ws_path))
 
         result.append({
@@ -98,16 +94,22 @@ def _make_generator(project_root: Path, loader) -> ConfigGenerator:
     """Build a ConfigGenerator from the manifest (generic, not cvman-hardcoded)."""
     manifest = loader.load()
     agentbox_toml = project_root / "agentbox.toml"
-    manifest_path = project_root / manifest.tool_manifest_path
+    mcp_server_name = (
+        manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+    )
     return ConfigGenerator(
         agentbox_toml=agentbox_toml,
-        manifest_path=manifest_path,
-        mcp_server_name=manifest.mcp_server_name,
-        mcp_command=manifest.mcp_command,
-        mcp_url=manifest.mcp_url,
-        mcp_transport=manifest.mcp_transport,
+        mcp_manifest=_try_get_mcp_manifest(),
+        mcp_server_name=mcp_server_name,
         verbose=True,
     )
+
+
+def _try_get_mcp_manifest():
+    try:
+        return get_mcp_registry().manifest
+    except Exception:
+        return None
 
 
 _FILE_HIDE_PREFIXES = (".agentbox/", ".claude/", ".opencode/", "permissions/", "skills/")
@@ -136,16 +138,12 @@ def get_workspace_by_name(name: str) -> dict:
                     "path": rel,
                     "size": p.stat().st_size,
                 })
-    generated = ws.get_generated_paths(ws_path)
     return {
         "name": name,
         "path": str(ws_path),
         "exists": ws_path.exists(),
         "files": files,
-        "generated_configs": {
-            k: {"path": str(v), "exists": v.exists()}
-            for k, v in generated.items()
-        },
+        "generated_configs": {},
     }
 
 
@@ -230,6 +228,21 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
 
 
 def _load_tool_manifest(project_root: Path) -> dict[str, list[str]]:
+    mcp_manifest = _try_get_mcp_manifest()
+    if mcp_manifest is not None:
+        groups = mcp_manifest.groups
+        result: dict[str, list[str]] = {}
+        for key, tool_names in groups.items():
+            _, _, suffix = key.partition(".")
+            dot = suffix.find(".")
+            if dot == -1:
+                result[suffix] = tool_names
+            else:
+                prefix = suffix[:dot]
+                sub = suffix[dot + 1 :]
+                group_name = f"{prefix}.{sub}" if sub in ("read", "write") else prefix
+                result[group_name] = result.get(group_name, []) + tool_names
+        return result
     manifest_path = project_root / "bin" / "_generated" / "tool_manifest.json"
     if not manifest_path.is_file():
         return {}
@@ -255,7 +268,9 @@ def get_workspace_mcp_tools(name: str) -> dict:
     manifest = loader.load()
 
     # Determine MCP server name from manifest (project-specific, e.g. "cvman-mcp")
-    mcp_server_name = manifest.mcp_server_name
+    mcp_server_name = (
+        manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+    )
     claude_prefix = f"mcp__{mcp_server_name}__"
     opencode_prefix = f"{mcp_server_name}_"
 
@@ -478,17 +493,13 @@ def get_workspace(agent_id: str) -> dict:
                 if not _is_user_file(rel):
                     continue
                 files.append({"path": rel, "size": p.stat().st_size})
-    generated = ws.get_generated_paths(w.path)
     return {
         "agent_id": w.agent_id,
         "path": str(w.path),
         "exists": w.exists,
         "ephemeral": w.ephemeral,
         "files": files,
-        "generated_configs": {
-            k: {"path": str(v), "exists": v.exists()}
-            for k, v in generated.items()
-        },
+        "generated_configs": {},
     }
 
 

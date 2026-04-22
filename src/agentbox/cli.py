@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 
 import httpx
 import typer
@@ -16,12 +15,15 @@ from rich.text import Text
 
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core import workspaces as ws
+from agentbox.core.migrations import migrate_capabilities_to_manifest
 
 app = typer.Typer(help="agentbox — agent orchestration", rich_markup_mode="rich")
 workspace_app = typer.Typer(help="Manage per-agent workspaces.")
 runs_app = typer.Typer(help="Inspect run history.")
+migrate_app = typer.Typer(help="Migrate configurations between versions.")
 app.add_typer(workspace_app, name="workspace")
 app.add_typer(runs_app, name="runs")
+app.add_typer(migrate_app, name="migrate")
 
 _console = Console()
 
@@ -346,6 +348,50 @@ def runs_show(run_id: str) -> None:
             result = Text("✓ ok", style="green") if ok else Text("✗ fail", style="red")
             gt.add_row(str(g["attempt"]), g["name"], result, (g["message"] or "")[:80])
         _console.print(Panel(gt, title="guardrails", border_style="magenta"))
+
+
+# ---------------------------------------------------------------------------
+# migrate
+# ---------------------------------------------------------------------------
+
+
+@migrate_app.command("workspace-permissions")
+def migrate_workspace_permissions() -> None:
+    """Migrate workspace permissions from capabilities.json to agentbox.toml.
+
+    Reads each workspace's permissions/capabilities.json and patches the
+    corresponding [[workspaces]] block in the manifest. Original JSON files
+    are backed up with a timestamp.
+
+    See docs/plans/05-workspace-inlining.md for details.
+    """
+    settings = get_settings()
+    results = migrate_capabilities_to_manifest(settings.project_root)
+
+    if not results:
+        _console.print("[yellow]No workspaces found or no migration needed.[/yellow]")
+        return
+
+    table = Table(
+        title="Workspace Permissions Migration",
+        title_style="bold",
+        header_style="bold cyan",
+        padding=(0, 1),
+    )
+    table.add_column("Workspace", style="bold")
+    table.add_column("Migrated", justify="center")
+    table.add_column("Backup", justify="center")
+
+    for ws_name, result in results.items():
+        migrated = Text("✓", style="green") if result["migrated"] else Text("·", style="dim")
+        backed_up = Text("✓", style="green") if result["backed_up"] else Text("·", style="dim")
+        table.add_row(ws_name, migrated, backed_up)
+
+    _console.print(table)
+    migrated_count = sum(1 for r in results.values() if r["migrated"])
+    _console.print(
+        f"\n[green]✓[/green] migrated [bold]{migrated_count}[/bold] workspace(s)"
+    )
 
 
 if __name__ == "__main__":

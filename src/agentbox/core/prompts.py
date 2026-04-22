@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from agentbox.core.definitions import AgentDef
 
 if TYPE_CHECKING:
-    from agentbox.core.session_store import SessionStore
+    from agentbox.core.data import SessionStore
 
 
 @dataclass(frozen=True)

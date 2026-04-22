@@ -13,6 +13,7 @@ run. Each fragment records `source` (who supplied the text) and `injected_by`
 
 from __future__ import annotations
 
+import contextlib
 import json
 import shlex
 from dataclasses import asdict, dataclass
@@ -23,7 +24,7 @@ from agentbox.core.constants import RunnerKind
 from agentbox.core.definitions import AgentDef
 
 if TYPE_CHECKING:
-    from agentbox.core.session_store import SessionStore
+    from agentbox.core.data import SessionStore
 
 
 @dataclass
@@ -182,10 +183,8 @@ def _read_file_fragment(
         content = path.read_text(encoding="utf-8")
         # Pretty-print JSON if it parses, to make the UI easier to read.
         if path.suffix == ".json":
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 content = json.dumps(json.loads(content), indent=2)
-            except json.JSONDecodeError:
-                pass
         return PromptFragment(
             name=name, source=source, injected_by=injected_by, content=content
         )

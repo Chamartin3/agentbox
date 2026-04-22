@@ -20,9 +20,6 @@ from .discovery import AgentDiscovery, DiscoveredAgent
 from .generator import ConfigGenerator
 
 __all__ = [
-    "AgentDiscovery",
-    "ConfigGenerator",
-    "DiscoveredAgent",
     "CLAUDE_MCP_PREFIX",
     "CLAUDE_TO_OPENCODE_TOOLS",
     "DENIED_BUILTIN_TOOLS",
@@ -32,4 +29,7 @@ __all__ = [
     "OPENCODE_SCHEMA",
     "OPENCODE_THEME",
     "READ_PREFIXES",
+    "AgentDiscovery",
+    "ConfigGenerator",
+    "DiscoveredAgent",
 ]

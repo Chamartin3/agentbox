@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from agentbox.api.deps import get_executor, get_loader, get_store
 from agentbox.api.webhooks import schedule_webhook
-from agentbox.core.session_store import read_transcript
+from agentbox.core.data import read_transcript
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -31,9 +31,13 @@ class CreateRunBody(BaseModel):
     for this invocation only. Set to empty string to suppress the webhook."""
 
     runner: str | None = None
-    """Per-run runner kind override. Overrides the agent's ``runner.kind``
-    for this invocation only. E.g. ``"pydantic_ai"``, ``"claude_code"``,
-    ``"opencode"``."""
+    """Per-run runner kind override (deprecated — use ``backend``).
+    Overrides the agent's ``runner.kind`` for this invocation only."""
+
+    backend: str | None = None
+    """Per-run backend override. Overrides the agent's backend selection
+    for this invocation only. E.g. ``"claude_code"``, ``"opencode"``,
+    ``"pydantic_ai"``."""
 
 
 @router.post("")
@@ -51,6 +55,7 @@ async def create_run(body: CreateRunBody) -> dict:
         timeout_seconds=body.timeout_seconds,
         webhook_url=body.webhook_url,
         runner_override=body.runner,
+        backend=body.backend,
     )
     return {"run_id": run_id, "agent": agent.id}
 
@@ -129,7 +134,7 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
     if body.usage:
         try:
             store.record_usage(run_id, body.usage)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Usage is supplementary — never fail the finalisation on it.
             import logging
 

@@ -26,7 +26,7 @@ def _since(range_: ActivityRange) -> str:
 def summary(
     range: ActivityRange = Query(default="30d"),
     action: str | None = Query(default=None),
-    executor: str | None = Query(default=None),  # noqa: ARG001 - reserved
+    executor: str | None = Query(default=None),
 ) -> dict:
     return get_store().activity_summary(_since(range), agent=action)
 

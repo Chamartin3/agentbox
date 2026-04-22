@@ -2,7 +2,7 @@
 
 Responsibilities:
 - materialize a tmp or persistent workdir for the run
-- instantiate the requested Runner plugin
+- select and configure a BackendAdapter
 - stream RunEvents into both an in-memory broadcast queue and the on-disk
   transcript JSONL
 - aggregate usage events into the SessionStore
@@ -13,11 +13,16 @@ Responsibilities:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import logging
+import os
 import shutil
 import tempfile
+import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from agentbox.api.events import (
     DoneEvent,
@@ -27,24 +32,61 @@ from agentbox.api.events import (
     TextEvent,
     UsageEvent,
 )
+from agentbox.api.webhooks import schedule_webhook
 from agentbox.config import Settings
+from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.config_generation import ConfigGenerator
+from agentbox.core.data import SessionStore
+from agentbox.core.data.schema import runs as _runs_table
 from agentbox.core.definitions import AgentDef, DefinitionLoader
 from agentbox.core.guardrails.base import GuardrailContext
-from agentbox.core.plugins import get_guardrail, get_runner
+from agentbox.core.plugins import get_backend, get_guardrail
 from agentbox.core.prompt_capture import build_fragments, fragments_to_json
+from agentbox.core.render import materialize_rendered_config
 from agentbox.core.runners.base import RunRequest
-from agentbox.core.session_store import SessionStore
+from agentbox.core.versioning.drift import check_drift, startup_sweep
 from agentbox.core.workspaces import (
-    get_generated_paths,
     load_capabilities,
     resolve_path,
 )
 
+try:
+    import jsonschema as _jsonschema
+except ImportError:
+    _jsonschema = None  # type: ignore[assignment]
 
-def _load_workspace_permissions(workdir: Path) -> dict:
-    """Best-effort capabilities read for executor's pre-run config generation."""
+if TYPE_CHECKING:
+    from agentbox.core.backends.base import BackendAdapter
+    from agentbox.core.mcp.registry import McpRegistry
+
+logger = logging.getLogger(__name__)
+
+
+def _load_workspace_permissions(
+    workdir: Path, agent: AgentDef, loader: DefinitionLoader, settings: Settings
+) -> dict:
+    """Load workspace permissions from WorkspaceDef or capabilities.json (deprecated).
+
+    Resolution order:
+    1. Try to resolve the agent's workspace and get permissions from WorkspaceDef.
+    2. Fall back to loading from capabilities.json (deprecated).
+    """
     try:
+        # Try to get WorkspaceDef first
+        if agent.workspace:
+            if agent.workspace == "<ephemeral>":
+                return {}
+            ws_def = loader.get_workspace(agent.workspace)
+            if ws_def is not None:
+                return {
+                    "allowed_tools": ws_def.allowed_tools,
+                    "allowed_builtin_tools": ws_def.allowed_builtin_tools,
+                    "files": [f.model_dump() for f in ws_def.files],
+                    "max_tokens": ws_def.max_tokens,
+                    "allow_file_write": ws_def.allow_file_write,
+                    "allow_network": ws_def.allow_network,
+                }
+        # Fall back to loading from JSON (deprecated)
         return load_capabilities(workdir)
     except Exception:
         return {}
@@ -80,36 +122,94 @@ class RunBroadcaster:
         self._subscribers.clear()
 
 
+class _LegacyRunnerAdapter:
+    """Wraps a legacy ``Runner`` subclass so it satisfies the
+    ``BackendAdapter`` protocol (has ``render()`` + ``run()``).
+
+    ``render()`` produces a minimal ``RenderedConfig`` with agent metadata
+    encoded in ``agent_meta`` so ``run()`` can reconstruct the
+    ``RunRequest`` the legacy runner expects.
+    """
+
+    name = "_legacy"
+
+    def __init__(self, runner: Any, agent: AgentDef, project_root: Path):
+        self._runner = runner
+        self._agent = agent
+        self._project_root = project_root
+
+    def render(
+        self,
+        agent: Any,
+        workdir: Path,
+        mcp_tools: list[Any] | None = None,
+        creds: dict[str, str] | None = None,
+    ) -> RenderedConfig:
+        files = {}
+        claude_md = workdir / "CLAUDE.md"
+        if claude_md.exists():
+            files["CLAUDE.md"] = claude_md.read_bytes()
+        return RenderedConfig(
+            files=files,
+            cwd=Path("."),
+            agent_meta={
+                "agent_id": agent.id,
+                "project_root": str(self._project_root),
+            },
+        )
+
+    async def run(
+        self,
+        rendered: RenderedConfig,
+        input: str,
+        run_id: str,
+    ) -> AsyncIterator[RunEvent]:
+        req = RunRequest(
+            run_id=run_id,
+            agent=self._agent,
+            input=input,
+            workdir=rendered.cwd,
+            project_root=self._project_root,
+        )
+        async for ev in self._runner.run(req):
+            yield ev
+
+
 class RunExecutor:
     def __init__(
         self,
         store: SessionStore,
         settings: Settings,
         loader: DefinitionLoader,
+        mcp_registry: McpRegistry | None = None,
     ):
         self.store = store
         self.settings = settings
         self.loader = loader
+        self._mcp_registry = mcp_registry
         self._broadcasters: dict[str, RunBroadcaster] = {}
-        self._generator: ConfigGenerator | None = None
 
-    @property
-    def generator(self) -> ConfigGenerator:
-        if self._generator is None:
-            project_root = self.settings.project_root
-            manifest = self.loader.load()
-            agentbox_toml = project_root / "agentbox.toml"
-            manifest_path = project_root / manifest.tool_manifest_path
-            self._generator = ConfigGenerator(
-                agentbox_toml=agentbox_toml,
-                manifest_path=manifest_path,
-                mcp_server_name=manifest.mcp_server_name,
-                mcp_command=manifest.mcp_command,
-                mcp_url=manifest.mcp_url,
-                mcp_transport=manifest.mcp_transport,
-                verbose=False,
-            )
-        return self._generator
+    def _make_generator(self) -> ConfigGenerator:
+        manifest = self.loader.load()
+        agentbox_toml = self.settings.project_root / "agentbox.toml"
+        mcp_manifest = self._try_get_mcp_manifest()
+        mcp_server_name = (
+            manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+        )
+        return ConfigGenerator(
+            agentbox_toml=agentbox_toml,
+            mcp_manifest=mcp_manifest,
+            mcp_server_name=mcp_server_name,
+            verbose=False,
+        )
+
+    def _try_get_mcp_manifest(self):
+        if self._mcp_registry is None:
+            return None
+        try:
+            return self._mcp_registry.manifest
+        except Exception:
+            return None
 
     def broadcaster(self, run_id: str) -> RunBroadcaster | None:
         return self._broadcasters.get(run_id)
@@ -123,33 +223,37 @@ class RunExecutor:
         timeout_seconds: int | None = None,
         webhook_url: str | None = None,
         runner_override: str | None = None,
+        backend: str | None = None,
     ) -> str:
         workdir, session_id = self._prepare_workdir(
             agent, session_id, workspace_override
         )
-        # Ensure workspace configs are generated before the run.
-        self._ensure_workspace_configs(workdir)
 
-        # Apply per-run overrides to a copy of the agent.
         agent = self._apply_overrides(
             agent, timeout_seconds, webhook_url, runner_override
         )
 
-        # Transcript lives outside the workdir so it survives headless cleanup.
+        # Select backend adapter and render into run dir
+        adapter, rendered = self._select_backend(agent, workdir, backend)
+        rendered, run_dir = self._render_for_run(adapter, agent, workdir, rendered)
+
         transcripts_dir = self.settings.data_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)
-        import uuid as _uuid
-        transcript_path = transcripts_dir / f"{_uuid.uuid4().hex}.jsonl"
+        transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
         run_id = self.store.create_run(
             agent_id=agent.id,
             input_=input_,
             workdir=str(workdir),
             transcript_path=str(transcript_path),
             session_id=session_id,
+            config_digest=rendered.digest,
         )
+
+        # Stamp run with current agent version
+        self._stamp_run_agent_version(run_id, agent)
+
         broadcaster = RunBroadcaster()
         self._broadcasters[run_id] = broadcaster
-        # Capture the assembled prompt fragments before the runner starts.
         try:
             frags = build_fragments(
                 agent=agent,
@@ -158,13 +262,65 @@ class RunExecutor:
                 store=self.store,
             )
             self.store.save_run_prompt(run_id, fragments_to_json(frags))
-        except Exception:  # noqa: BLE001 - capture is best-effort
+        except Exception:
             pass
-        # Fire and forget — the WS endpoint subscribes; callers can also `await`.
-        asyncio.create_task(
-            self._run(run_id, agent, input_, workdir, transcript_path, broadcaster)
+        task = asyncio.create_task(
+            self._run(
+                run_id, adapter, rendered, agent, input_, workdir, run_dir, transcript_path, broadcaster
+            )
         )
+        task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
         return run_id
+
+    def _select_backend(
+        self,
+        agent: AgentDef,
+        workdir: Path,
+        backend_override: str | None = None,
+    ) -> tuple[BackendAdapter, RenderedConfig]:
+        """Pick a backend adapter and render its config.
+
+        Algorithm:
+        1. Explicit ``backend`` from the request (highest priority).
+        2. ``backend_preference`` list from the project manifest; skip any
+           in ``agent.unsupported_backends``.
+        3. Fall back to ``agent.runner.kind`` (deprecated).
+        4. ``NO_BACKEND_AVAILABLE`` error.
+        """
+        manifest = self.loader.load()
+
+        def _try_backend(name: str) -> BackendAdapter | None:
+            try:
+                cls = get_backend(name)
+                inst = cls()
+            except KeyError:
+                return None
+            # Legacy Runner subclasses don't have render() — wrap them.
+            if not hasattr(inst, "render"):
+                inst = _LegacyRunnerAdapter(inst, agent, self.settings.project_root)
+            return inst  # type: ignore[return-value]
+
+        candidates: list[str] = []
+
+        if backend_override:
+            candidates = [backend_override]
+        elif manifest.backend_preference:
+            candidates = [
+                n for n in manifest.backend_preference
+                if n not in agent.unsupported_backends
+            ]
+        else:
+            kind = agent.runner.kind
+            if kind is not None:
+                candidates = [str(kind)]
+
+        for name in candidates:
+            adapter = _try_backend(name)
+            if adapter is not None:
+                rendered = adapter.render(agent, workdir)
+                return adapter, rendered
+
+        raise KeyError("NO_BACKEND_AVAILABLE")
 
     @staticmethod
     def _apply_overrides(
@@ -173,7 +329,6 @@ class RunExecutor:
         webhook_url: str | None,
         runner_override: str | None = None,
     ) -> AgentDef:
-        """Return a copy of ``agent`` with per-run overrides applied."""
         runner_updates: dict = {}
         if timeout_seconds is not None:
             runner_updates["timeout_seconds"] = timeout_seconds
@@ -195,9 +350,7 @@ class RunExecutor:
         session_id: str | None,
         workspace_override: str | None = None,
     ) -> tuple[Path, str | None]:
-        # Workspace resolution with optional override.
         if workspace_override:
-            # Temporarily swap workspace for resolution
             original = agent.workspace
             agent.workspace = workspace_override
             try:
@@ -207,9 +360,7 @@ class RunExecutor:
             if not ephemeral:
                 path.mkdir(parents=True, exist_ok=True)
                 return path, session_id
-            # If the override resolves to ephemeral, fall through to normal ephemeral handling
 
-        # Normal resolution
         path, ephemeral = resolve_path(agent, self.settings, self.loader)
         if not ephemeral:
             path.mkdir(parents=True, exist_ok=True)
@@ -226,34 +377,64 @@ class RunExecutor:
             wd.mkdir(parents=True, exist_ok=True)
             self.store.set_session_workdir(sid, str(wd))
             return wd, sid
-        # headless ephemeral
         self.settings.runs_dir.mkdir(parents=True, exist_ok=True)
         wd = Path(tempfile.mkdtemp(prefix="run-", dir=self.settings.runs_dir)) / "workdir"
         wd.mkdir(parents=True, exist_ok=True)
         return wd, None
 
-    def _ensure_workspace_configs(self, workdir: Path) -> None:
-        """Generate runner configs for a workspace if they don't exist."""
-        paths = get_generated_paths(workdir)
-        if not paths["claude_agents"].exists():
-            try:
-                permissions = _load_workspace_permissions(workdir)
-                self.generator.generate_for_workspace(
-                    workdir,
-                    allowed_builtin_tools=permissions.get("allowed_builtin_tools") or [],
-                    files=permissions.get("files") or [],
-                    project_root=self.settings.project_root,
-                )
-            except Exception:
-                # Best-effort: don't block the run if generation fails.
-                pass
+    def _render_for_run(
+        self,
+        adapter: BackendAdapter,
+        agent: AgentDef,
+        workdir: Path,
+        rendered: RenderedConfig,
+    ) -> tuple[RenderedConfig, Path]:
+        run_dir = self.settings.runs_tmpfs_dir / uuid.uuid4().hex
+
+        # materialize_rendered_config owns the exclusive mkdir (mode 0o700).
+        materialize_rendered_config(rendered, run_dir)
+
+        permissions = _load_workspace_permissions(workdir, agent, self.loader, self.settings)
+        generator = self._make_generator()
+        generator.generate_configs_into(
+            run_dir,
+            allowed_builtin_tools=permissions.get("allowed_builtin_tools") or [],
+            files=permissions.get("files") or [],
+            project_root=self.settings.project_root,
+        )
+
+        effective_cwd = rendered.cwd
+        if not effective_cwd.is_absolute():
+            effective_cwd = run_dir / effective_cwd
+
+        return (
+            RenderedConfig(
+                files=rendered.files,
+                argv=rendered.argv,
+                env=rendered.env,
+                cwd=effective_cwd,
+                agent_meta=rendered.agent_meta,
+            ),
+            run_dir,
+        )
+
+    @staticmethod
+    def _cleanup_run_dir(run_dir: Path | None) -> None:
+        if run_dir is None:
+            return
+        if os.environ.get("AGENTBOX_KEEP_RUN_DIRS") == "1":
+            return
+        shutil.rmtree(run_dir, ignore_errors=True)
 
     async def _run(
         self,
         run_id: str,
+        adapter: BackendAdapter,
+        rendered: RenderedConfig,
         agent: AgentDef,
         input_: str,
         workdir: Path,
+        run_dir: Path,
         transcript_path: Path,
         broadcaster: RunBroadcaster,
     ) -> None:
@@ -263,45 +444,31 @@ class RunExecutor:
         output_text: list[str] = []
         final_ok = False
         final_error: str | None = None
+        final_status: str | None = None
         output: str | None = None
 
-        # finish_run must always run, otherwise the row stays as 'running'
-        # forever (orphaned). Wrap everything below in try/finally — guardrail
-        # bugs, cancellation, or unexpected exceptions must not strand the row.
         try:
             transcript_path.parent.mkdir(parents=True, exist_ok=True)
             for attempt in range(max_attempts):
                 output_text.clear()
-                runner_cls = get_runner(agent.runner.kind)
-                runner = runner_cls()
-                req = RunRequest(
-                    run_id=run_id,
-                    agent=agent,
-                    input=current_input,
-                    workdir=workdir,
-                    project_root=self.settings.project_root,
-                    session_id=None,
-                )
 
                 with transcript_path.open("a", encoding="utf-8") as tf:
                     try:
-                        async for ev in runner.run(req):
+                        async for ev in adapter.run(rendered, current_input, run_id):
                             self._handle_event(run_id, ev, output_text, tf)
                             broadcaster.publish(ev)
                             if isinstance(ev, DoneEvent):
                                 final_ok = ev.ok
                                 final_error = ev.error
-                    except Exception as exc:  # noqa: BLE001 - surface to client
-                        final_error = f"executor error: {exc}"
+                                final_status = ev.status
+                    except Exception as exc:
+                        final_error = f"executor error: {type(exc).__name__}: {exc}"
                         final_ok = False
 
                 output = "\n".join(output_text).strip() or None
-
-                # If the agent itself failed, stop retrying.
                 if not final_ok:
                     break
 
-                # Validate output against schema if configured.
                 if (
                     attempt < max_attempts - 1
                     and agent.runner.output_schema_path
@@ -312,7 +479,6 @@ class RunExecutor:
                     )
                     if is_valid:
                         break
-                    # Build retry prompt with the validation error.
                     current_input = self._build_retry_prompt(
                         input_, output, v_error
                     )
@@ -328,36 +494,34 @@ class RunExecutor:
                     )
                     continue
 
-                break  # No schema or last attempt
+                break
             try:
                 await self._run_guardrails(
                     run_id, agent, input_, output or "", transcript_path, broadcaster
                 )
-            except Exception as exc:  # noqa: BLE001
-                # Guardrail failures must not block the run from finishing.
+            except Exception as exc:
                 suffix = f"guardrail error: {exc}"
                 final_error = f"{final_error} | {suffix}" if final_error else suffix
         finally:
             self.store.finish_run(
-                run_id, ok=final_ok, output=output, error=final_error
+                run_id,
+                ok=final_ok,
+                output=output,
+                error=final_error,
+                status=final_status,
             )
             try:
-                from agentbox.api.webhooks import schedule_webhook
-
                 refreshed = self.store.get_run(run_id)
                 if refreshed is not None:
                     schedule_webhook(agent, refreshed, self.store)
-            except Exception:  # noqa: BLE001
-                # Webhook delivery is best-effort; never strand the run.
+            except Exception:
                 pass
-            try:
+            with contextlib.suppress(Exception):
                 broadcaster.close()
-            except Exception:  # noqa: BLE001
-                pass
-            try:
+            with contextlib.suppress(Exception):
+                self._cleanup_run_dir(run_dir)
+            with contextlib.suppress(Exception):
                 self._cleanup_workdir(agent, workdir)
-            except Exception:  # noqa: BLE001
-                pass
 
     def _handle_event(
         self,
@@ -375,10 +539,6 @@ class RunExecutor:
     def _validate_output(
         self, output: str, agent: AgentDef, workdir: Path
     ) -> tuple[bool, str]:
-        """Validate ``output`` against the agent's output JSON Schema.
-        
-        Returns ``(valid, error_message)``.
-        """
         if not agent.runner.output_schema_path:
             return True, ""
 
@@ -393,27 +553,21 @@ class RunExecutor:
         except (json.JSONDecodeError, OSError) as exc:
             return False, f"cannot load schema: {exc}"
 
-        # Parse output as JSON first.
         try:
             instance = json.loads(output)
         except json.JSONDecodeError as exc:
             return False, f"output is not valid JSON: {exc}"
 
-        # Validate using jsonschema if available, otherwise do basic shape check.
-        try:
-            import jsonschema
-
-            jsonschema.validate(instance=instance, schema=schema)
-            return True, ""
-        except ImportError:
-            # Basic shape check fallback.
+        if _jsonschema is None:
             return self._basic_shape_check(instance, schema)
-        except jsonschema.ValidationError as exc:
+        try:
+            _jsonschema.validate(instance=instance, schema=schema)
+            return True, ""
+        except _jsonschema.ValidationError as exc:
             return False, str(exc)
 
     @staticmethod
     def _basic_shape_check(instance: dict, schema: dict) -> tuple[bool, str]:
-        """Minimal validation when ``jsonschema`` is not installed."""
         props = schema.get("properties", {})
         required = schema.get("required", [])
 
@@ -438,7 +592,6 @@ class RunExecutor:
                         f"field {field!r}: expected {expected_type}, "
                         f"got {type(instance[field]).__name__}",
                     )
-            # Check string length constraints.
             if isinstance(instance[field], str):
                 min_len = field_schema.get("minLength")
                 max_len = field_schema.get("maxLength")
@@ -453,7 +606,6 @@ class RunExecutor:
                         False,
                         f"field {field!r}: max length {max_len}, got {len(val)}",
                     )
-            # Check enum constraint.
             enum_vals = field_schema.get("enum")
             if enum_vals and instance[field] not in enum_vals:
                 return (
@@ -468,8 +620,6 @@ class RunExecutor:
     def _build_retry_prompt(
         original_input: str, previous_output: str, validation_error: str
     ) -> str:
-        """Build a retry prompt that includes the original input, previous
-        output, and validation error for the agent to fix."""
         return (
             f"{original_input}\n\n"
             f"--- PREVIOUS ATTEMPT FAILED VALIDATION ---\n"
@@ -522,16 +672,31 @@ class RunExecutor:
                 )
             )
 
+    def _stamp_run_agent_version(self, run_id: str, agent: AgentDef) -> None:
+        try:
+            status = check_drift(agent, self.store)
+            if status in ("drifted", "new"):
+                startup_sweep([agent], self.store)
+            latest = self.store.latest_version(agent.id)
+            if latest is not None:
+                with self.store.engine.begin() as conn:
+                    conn.execute(
+                        _runs_table.update()
+                        .where(_runs_table.c.id == run_id)
+                        .values(agent_version_id=latest["id"])
+                    )
+        except Exception:
+            logger.exception(
+                "failed to stamp agent version for run %s", run_id
+            )
+
     def _cleanup_workdir(self, agent: AgentDef, workdir: Path) -> None:
-        # Workspaces are persistent unless explicitly ephemeral.
         if agent.workspace != "<ephemeral>":
             return
         if agent.session_mode == "persistent":
             return
-        try:
+        with contextlib.suppress(OSError):
             shutil.rmtree(workdir.parent, ignore_errors=True)
-        except OSError:
-            pass
 
 
 __all__ = ["RunBroadcaster", "RunExecutor"]

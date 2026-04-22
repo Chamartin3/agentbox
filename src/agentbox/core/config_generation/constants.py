@@ -6,8 +6,6 @@ Claude Code and OpenCode config generators.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 # Read-only tool action prefixes — tools matching these are auto-allowed
 READ_PREFIXES: frozenset[str] = frozenset(
     {"list_", "get_", "search_", "check_", "select_", "find_"}

@@ -2,21 +2,32 @@
 
 Preserves comments and formatting; rejects patches that would produce
 an invalid AgentDef. Writes are atomic (tmp + rename).
+
+Dispatch by ``source_format``:
+- ``INLINE_TOML``: edit the ``[[agents]]`` block in ``agentbox.toml``.
+- ``STANDALONE_TOML``: write a standalone ``.toml`` file.
+- ``MARKDOWN``: write a markdown file with YAML frontmatter.
+- ``LEGACY_DIR``: write agent.toml + prompts/system.md.
 """
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import frontmatter
 import tomlkit
 from tomlkit.items import AoT, Table
 
-from .loader import ProjectManifest
-from .models import AgentDef
-
+from agentbox.core.data.manifest import AgentDef, AgentSource, ProjectManifest
+from agentbox.core.definitions.manifest_writer_toml import (
+    _atomic_write,
+    _build_runner_table,
+    write_legacy_dir,
+    write_standalone_toml,
+)
+from agentbox.core.definitions.markdown import write_markdown_agent
 
 # Fields that may be edited via PATCH /manifest/agents/{id}.
 _AGENT_PATCHABLE = {
@@ -72,6 +83,70 @@ class ManifestWriter:
         data = tomlkit.parse(self.read_text())
         return ProjectManifest.model_validate(_to_plain(data))
 
+    def save_agent(self, agent: AgentDef) -> Path:
+        """Persist an ``AgentDef`` to its source file, dispatching by format.
+
+        Returns the path written to.
+        """
+        fmt = agent.source_format
+
+        if fmt == AgentSource.MARKDOWN:
+            return self._save_markdown(agent)
+        if fmt == AgentSource.STANDALONE_TOML:
+            return self._save_standalone_toml(agent)
+        if fmt == AgentSource.LEGACY_DIR:
+            return self._save_legacy_dir(agent)
+
+        # INLINE_TOML or unknown → fall back to inline edit
+        return self._save_inline(agent)
+
+    def _save_markdown(self, agent: AgentDef) -> Path:
+        path = agent.source_path or self.project_root / "agents.d" / f"{agent.id}.md"
+        existing_metadata = None
+        if path.exists():
+            existing_metadata = dict(frontmatter.load(str(path)).metadata)
+        write_markdown_agent(path, agent, preserve_unknown_keys=True, existing_metadata=existing_metadata)
+        return path
+
+    def _save_standalone_toml(self, agent: AgentDef) -> Path:
+        path = agent.source_path or self.project_root / "agents.d" / f"{agent.id}.toml"
+        write_standalone_toml(path, agent)
+        return path
+
+    def _save_legacy_dir(self, agent: AgentDef) -> Path:
+        if agent.source_path:
+            agent_dir = agent.source_path.parent if agent.source_path.suffix == ".toml" else agent.source_path
+        else:
+            agent_dir = self.project_root / "agents" / agent.id
+        write_legacy_dir(agent_dir, agent)
+        return agent_dir / "agent.toml"
+
+    def _save_inline(self, agent: AgentDef) -> Path:
+        """Write or update an inline ``[[agents]]`` block in ``agentbox.toml``."""
+        path = self.path
+        if not path.exists():
+            doc = tomlkit.document()
+            doc["agents"] = tomlkit.array()
+            doc["agents"].multiline(True)
+        else:
+            doc = tomlkit.parse(path.read_text(encoding="utf-8"))
+
+        agents = doc.get("agents")
+        if not isinstance(agents, AoT):
+            agents = tomlkit.aot()
+            doc["agents"] = agents
+
+        existing = _find_agent_table(agents, agent.id)
+        if existing is not None:
+            idx = agents.index(existing)
+            agents[idx] = _agent_to_table(agent)
+        else:
+            agents.append(_agent_to_table(agent))
+
+        new_text = tomlkit.dumps(doc)
+        _atomic_write(path, new_text)
+        return path
+
     def patch_agent(self, agent_id: str, patch: dict[str, Any]) -> AgentDef:
         """Apply a patch to one agent. Returns the updated AgentDef.
 
@@ -95,7 +170,7 @@ class ManifestWriter:
         # If it fails, do NOT write — surface the validation error.
         try:
             parsed = ProjectManifest.model_validate(_to_plain(doc))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise PatchError("validation_failed", str(exc)) from exc
 
         # Atomic write.
@@ -144,6 +219,40 @@ def _apply_patch(table: Table, patch: dict[str, Any]) -> None:
                 runner_tbl[k] = v
 
 
+def _agent_to_table(agent: AgentDef) -> Table:
+    """Convert an ``AgentDef`` to a tomlkit ``Table`` for inline storage."""
+    t = tomlkit.table()
+    t["id"] = agent.id
+    if agent.description:
+        t["description"] = agent.description
+    if agent.workspace:
+        t["workspace"] = agent.workspace
+    if agent.tools:
+        t["tools"] = tomlkit.array()
+        t["tools"].extend(agent.tools)
+    if agent.tags:
+        t["tags"] = tomlkit.array()
+        t["tags"].extend(agent.tags)
+    if agent.session_mode != "headless":
+        t["session_mode"] = agent.session_mode
+    if not agent.claude_agent:
+        t["claude_agent"] = False
+    if agent.headless:
+        t["headless"] = True
+    if agent.webhook_url:
+        t["webhook_url"] = agent.webhook_url
+    if agent.unsupported_backends:
+        t["unsupported_backends"] = tomlkit.array()
+        t["unsupported_backends"].extend(agent.unsupported_backends)
+    if agent.prompt:
+        t["prompt"] = agent.prompt
+    elif agent.prompt_path:
+        t["prompt_path"] = agent.prompt_path
+
+    t["runner"] = _build_runner_table(agent.runner)
+    return t
+
+
 def _to_plain(doc: Any) -> Any:
     """Convert a tomlkit document to plain dict/list for pydantic validation."""
     if isinstance(doc, dict):
@@ -154,9 +263,3 @@ def _to_plain(doc: Any) -> Any:
     if hasattr(doc, "unwrap"):
         return doc.unwrap()
     return doc
-
-
-def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)

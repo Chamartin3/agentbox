@@ -19,6 +19,7 @@ in the agent definition.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
@@ -27,8 +28,11 @@ from pathlib import Path
 
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.constants import RunnerKind
+from agentbox.core.runners._rate_limit import detect_in_opencode_event
 from agentbox.core.runners.base import Runner, RunRequest
 from agentbox.core.workspaces import opencode_config_path
+
+_DEFAULT_OPENCODE_MODEL = "opencode-go/deepseek-v4-pro"
 
 
 class OpenCodeRunner(Runner):
@@ -73,9 +77,27 @@ class OpenCodeRunner(Runner):
         # Extra args from the agent definition (e.g. --agent, --model).
         argv += spec.extra_args
 
+        # Inject a default ``--model`` if neither the agent's runner spec
+        # nor extra_args already pin one. Without this, opencode falls back
+        # to its built-in default (zen-free), which is aggressively
+        # rate-limited and causes spurious 429 failures.
+        if "--model" not in spec.extra_args and not spec.model:
+            argv += ["--model", _DEFAULT_OPENCODE_MODEL]
+
         # Message is piped via stdin instead of a positional arg to avoid
         # "Argument list too long" (E2BIG) for large prompts.
         stdin_data = req.input.encode("utf-8")
+
+        # Register the configured model up-front so it's persisted even if
+        # the run fails before opencode emits its usage summary (e.g. on
+        # a rate-limit kill or a timeout). The real UsageEvent at the end
+        # will add token counts; the model column won't be overwritten
+        # with NULL thanks to the COALESCE in record_usage.
+        early_model = spec.model or (
+            _DEFAULT_OPENCODE_MODEL if "--model" not in spec.extra_args else None
+        )
+        if early_model:
+            yield UsageEvent(run_id=req.run_id, model=early_model)
 
         yield LogEvent(run_id=req.run_id, message=f"$ opencode run --stdin ... (cwd={req.workdir})")
 
@@ -116,21 +138,85 @@ class OpenCodeRunner(Runner):
 
         assert proc.stdout is not None and proc.stderr is not None
 
+        # Stream stdout line-by-line so we can fail fast on rate-limit /
+        # auth errors instead of waiting for ``timeout_seconds``. Opencode
+        # retries 429s internally and only emits the final error event
+        # when it gives up, so we still have to inspect each event — but
+        # at least we don't block on ``communicate()``.
+        if stdin_data is not None and proc.stdin is not None:
+            try:
+                proc.stdin.write(stdin_data)
+                await proc.stdin.drain()
+            except (BrokenPipeError, ConnectionResetError):
+                # The child exited before we could send the prompt
+                # (e.g. immediate auth/credit failure). Continue and let
+                # the stdout reader surface the error event.
+                pass
+            with contextlib.suppress(BrokenPipeError, ConnectionResetError, OSError):
+                proc.stdin.close()
+
+        stderr_lines: list[str] = []
+
+        async def _drain_stderr() -> None:
+            assert proc.stderr is not None
+            while True:
+                line = await proc.stderr.readline()
+                if not line:
+                    return
+                stderr_lines.append(line.decode(errors="replace").rstrip())
+
+        stderr_task = asyncio.create_task(_drain_stderr())
+
+        stdout_chunks: list[str] = []
+        rate_limit_error: str | None = None
+
         try:
             async with asyncio.timeout(timeout):
-                stdout, stderr = await proc.communicate(input=stdin_data)
+                while True:
+                    line_bytes = await proc.stdout.readline()
+                    if not line_bytes:
+                        break
+                    line = line_bytes.decode(errors="replace")
+                    stdout_chunks.append(line)
+                    s = line.strip()
+                    if not s:
+                        continue
+                    try:
+                        evt = json.loads(s)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(evt, dict):
+                        detected = detect_in_opencode_event(evt)
+                        if detected is not None:
+                            rate_limit_error = detected
+                            break
+                await proc.wait()
         except TimeoutError:
-            proc.kill()
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
             await proc.wait()
-            yield DoneEvent(run_id=run_id, ok=False, error=f"timeout after {timeout}s")
+            stderr_task.cancel()
+            yield DoneEvent(
+                run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout"
+            )
             return
 
-        if stderr:
-            for line in stderr.decode(errors="replace").splitlines():
-                if line.strip():
-                    yield LogEvent(run_id=run_id, level="warn", message=line.rstrip())
+        if rate_limit_error is not None:
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+            await proc.wait()
+            stderr_task.cancel()
+            yield DoneEvent(run_id=run_id, ok=False, error=rate_limit_error)
+            return
 
-        raw = stdout.decode(errors="replace").strip()
+        with contextlib.suppress(asyncio.CancelledError):
+            await stderr_task
+
+        for sl in stderr_lines:
+            if sl.strip():
+                yield LogEvent(run_id=run_id, level="warn", message=sl)
+
+        raw = "".join(stdout_chunks).strip()
         if not raw:
             yield DoneEvent(
                 run_id=run_id,

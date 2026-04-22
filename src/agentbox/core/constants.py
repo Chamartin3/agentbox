@@ -6,10 +6,10 @@ Avoids magic strings and makes refactoring safer.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class RunnerKind(str, Enum):
+class RunnerKind(StrEnum):
     """Supported agent runner implementations."""
 
     CLAUDE_CODE = "claude_code"
@@ -19,15 +19,9 @@ class RunnerKind(str, Enum):
     SUBPROCESS = "subprocess"
     ADAPTER = "adapter"
 
-    def __str__(self) -> str:
-        return self.value
 
-
-class SessionMode(str, Enum):
+class SessionMode(StrEnum):
     """Session lifetime modes."""
 
     HEADLESS = "headless"
     PERSISTENT = "persistent"
-
-    def __str__(self) -> str:
-        return self.value

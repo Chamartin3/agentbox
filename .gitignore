@@ -25,3 +25,6 @@ dist/
 *.sqlite
 *.sqlite3
 workspaces/
+
+# Planning docs (local only)
+docs/

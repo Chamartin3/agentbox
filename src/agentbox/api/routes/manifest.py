@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -67,6 +66,20 @@ def list_runner_models(kind: str) -> dict:
     return {"kind": kind, "models": []}
 
 
+class RunnerPatch(BaseModel):
+    """Editable subset of a RunnerSpec. All fields optional."""
+
+    kind: str | None = None
+    model: str | None = None
+    mcp_config_path: str | None = None
+    allowed_tools: list[str] | None = None
+    extra_args: list[str] | None = None
+    timeout_seconds: int | None = None
+    agent_module: str | None = None
+    output_schema_path: str | None = None
+    max_validation_retries: int | None = None
+
+
 class AgentPatch(BaseModel):
     """Editable subset of an AgentDef.
 
@@ -77,7 +90,7 @@ class AgentPatch(BaseModel):
     session_mode: str | None = None
     workspace: str | None = None
     tags: list[str] | None = None
-    runner: dict[str, Any] | None = None
+    runner: RunnerPatch | None = None
 
 
 @router.patch("/agents/{agent_id}")

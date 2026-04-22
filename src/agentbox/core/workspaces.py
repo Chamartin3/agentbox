@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import shutil
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.config import Settings
+from agentbox.core.skills import discover_skills
 
 if TYPE_CHECKING:
-    from agentbox.core.definitions import AgentDef, DefinitionLoader, WorkspaceDef
+    from agentbox.core.definitions import AgentDef, DefinitionLoader
 
 
 @dataclass(frozen=True)
@@ -53,7 +56,6 @@ def resolve_path(
 def info(agent: AgentDef, settings: Settings, loader: DefinitionLoader) -> WorkspaceInfo:
     path, ephemeral = resolve_path(agent, settings, loader)
     has_claude_md = (path / "CLAUDE.md").exists() if path.exists() else False
-    from agentbox.core.skills import discover_skills
     skill_count = len(discover_skills(path)) if path.exists() else 0
     return WorkspaceInfo(
         agent_id=agent.id,
@@ -109,41 +111,25 @@ def list_all(
 
 
 # ---------------------------------------------------------------------------
-# Generated config paths
+# Deprecated generated config paths — kept for legacy runner compatibility.
+# Generated configs are now written to per-run tmpfs dirs by the executor.
 # ---------------------------------------------------------------------------
 
 
-def generated_dir(workspace_path: Path) -> Path:
-    """Return the generated configs directory for a workspace."""
+def _generated_dir(workspace_path: Path) -> Path:
     return workspace_path / ".agentbox" / "generated"
 
 
 def claude_agents_path(workspace_path: Path) -> Path:
-    return generated_dir(workspace_path) / "claude_agents.json"
+    return _generated_dir(workspace_path) / "claude_agents.json"
 
 
 def claude_settings_path(workspace_path: Path) -> Path:
-    return generated_dir(workspace_path) / "claude_settings.json"
+    return _generated_dir(workspace_path) / "claude_settings.json"
 
 
 def opencode_config_path(workspace_path: Path) -> Path:
-    return generated_dir(workspace_path) / "opencode.json"
-
-
-def claude_mcp_path(workspace_path: Path) -> Path:
-    """Path to the generated Claude MCP config (only written when the
-    project declares ``mcp_url`` in ``agentbox.toml``)."""
-    return generated_dir(workspace_path) / "claude_mcp.json"
-
-
-def get_generated_paths(workspace_path: Path) -> dict[str, Path]:
-    """Return all expected generated config paths for a workspace."""
-    return {
-        "claude_agents": claude_agents_path(workspace_path),
-        "claude_settings": claude_settings_path(workspace_path),
-        "claude_mcp": claude_mcp_path(workspace_path),
-        "opencode": opencode_config_path(workspace_path),
-    }
+    return _generated_dir(workspace_path) / "opencode.json"
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +143,13 @@ def capabilities_path(workspace_path: Path) -> Path:
 
 
 def load_capabilities(workspace_path: Path) -> dict:
-    """Read workspace capabilities.json, returning {} if missing/unparseable.
+    """Deprecated: read workspace capabilities.json, returning {} if missing/unparseable.
+
+    This is a compatibility shim. Permissions are now inlined in the manifest
+    via WorkspaceDef.allowed_tools, allowed_builtin_tools, etc.
+
+    This function is kept for backwards compatibility and will be removed
+    in a future release.
 
     Schema (all optional):
       - allowed_tools: list[str]
@@ -166,12 +158,18 @@ def load_capabilities(workspace_path: Path) -> dict:
       - allow_file_write: bool
       - allow_network: bool
     """
-    import json
-
     path = capabilities_path(workspace_path)
-    if not path.is_file():
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+    if path.is_file():
+        warnings.warn(
+            f"Found deprecated capabilities.json at {path}. "
+            "Permissions are now inlined in agentbox.toml. "
+            "Run `agentbox migrate workspace-permissions` to migrate. "
+            "See docs/plans/05-workspace-inlining.md",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+    return {}

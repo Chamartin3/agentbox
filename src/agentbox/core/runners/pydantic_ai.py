@@ -34,7 +34,7 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
+from agentbox.api.events import DoneEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.runners.base import Runner, RunRequest
 
 
@@ -100,7 +100,7 @@ class PydanticAiRunner(Runner):
                 error=f"agent execution error: {exc}",
             )
             return
-        elapsed = time.monotonic() - start
+        _elapsed = time.monotonic() - start
 
         # Serialize output.
         try:

@@ -4,6 +4,7 @@ import RunsPage from './pages/RunsPage';
 import RunDetailPage from './pages/RunDetailPage';
 import AgentsPage from './pages/AgentsPage';
 import AgentDetailPage from './pages/AgentDetailPage';
+import AgentNew from './pages/AgentNew';
 import WorkspacesPage from './pages/WorkspacesPage';
 import WorkspaceDetailPage from './pages/WorkspaceDetailPage';
 
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/runs" element={<RunsPage />} />
           <Route path="/runs/:id" element={<RunDetailPage />} />
           <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/agents/new" element={<AgentNew />} />
           <Route path="/agents/:id" element={<AgentDetailPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />

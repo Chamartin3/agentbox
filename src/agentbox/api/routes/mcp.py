@@ -1,53 +1,69 @@
-"""/mcp endpoints — tool manifest and server configuration."""
+"""/mcp endpoints — introspection of connected MCP servers and their tools."""
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException
 
-from agentbox.api.deps import get_settings
+from agentbox.api.deps import get_mcp_registry
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
 
-@router.get("/manifest")
-def get_mcp_manifest() -> dict:
-    """Return the tool manifest with all available MCP tool groups."""
-    settings = get_settings()
-    manifest_path = settings.project_root / "bin" / "_generated" / "tool_manifest.json"
-    if not manifest_path.is_file():
-        raise HTTPException(404, "tool manifest not found")
-    with open(manifest_path) as f:
-        manifest = json.load(f)
-    return {"manifest": manifest}
-
-
-@router.get("/tool-groups")
-def get_tool_groups() -> dict:
-    """Return categorized tool groups for UI display."""
-    settings = get_settings()
-    manifest_path = settings.project_root / "bin" / "_generated" / "tool_manifest.json"
-    if not manifest_path.is_file():
-        raise HTTPException(404, "tool manifest not found")
-    with open(manifest_path) as f:
-        manifest = json.load(f)
-
-    # Categorize by prefix
-    categories: dict[str, list[dict]] = {}
-    for group_name, tools in manifest.items():
-        prefix = group_name.split(".")[0] if "." in group_name else "general"
-        if prefix not in categories:
-            categories[prefix] = []
-        categories[prefix].append({
-            "name": group_name,
-            "tools": tools,
-            "tool_count": len(tools),
-        })
-
+@router.get("/servers")
+def list_mcp_servers() -> dict:
+    """Return all configured MCP servers with their health and tool counts."""
+    registry = get_mcp_registry()
+    report = registry.health_report()
+    servers: list[dict] = []
+    for name, health in report.servers.items():
+        entry = health.to_dict()
+        entry["name"] = name
+        servers.append(entry)
     return {
-        "categories": categories,
-        "total_groups": len(manifest),
-        "total_tools": sum(len(tools) for tools in manifest.values()),
+        "servers": servers,
+        "overall_status": report.overall,
+    }
+
+
+@router.get("/servers/{name}/tools")
+def get_server_tools(name: str) -> dict:
+    """Return tools for a specific MCP server."""
+    registry = get_mcp_registry()
+    tools = registry.manifest.server_tools(name)
+    health = registry.server_health(name)
+    if not tools and (health is None or health.status == "unavailable"):
+        raise HTTPException(404, f"MCP server {name!r} not found or unavailable")
+    return {
+        "server": name,
+        "status": health.to_dict() if health else {"status": "unknown"},
+        "tools": [
+            {
+                "name": t.name,
+                "description": t.description,
+                "input_schema": t.input_schema,
+            }
+            for t in tools
+        ],
+        "tool_count": len(tools),
+    }
+
+
+@router.get("/servers/{name}/groups")
+def get_server_groups(name: str) -> dict:
+    """Return derived tool groups for a specific MCP server."""
+    registry = get_mcp_registry()
+    health = registry.server_health(name)
+    if health is None or health.status == "unavailable":
+        raise HTTPException(404, f"MCP server {name!r} not found or unavailable")
+    groups = {
+        k: v for k, v in registry.manifest.groups.items()
+        if k.startswith(f"{name}.")
+    }
+    return {
+        "server": name,
+        "groups": [
+            {"name": k, "tools": v, "tool_count": len(v)}
+            for k, v in sorted(groups.items())
+        ],
+        "group_count": len(groups),
     }

@@ -13,6 +13,7 @@ JSON envelope on completion. We parse it into structured events:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
@@ -22,13 +23,13 @@ from typing import Any
 
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.constants import RunnerKind
+from agentbox.core.runners._rate_limit import detect_in_text_line
 from agentbox.core.runners.base import Runner, RunRequest
 from agentbox.core.workspaces import (
     claude_agents_path,
     claude_settings_path,
     load_capabilities,
 )
-
 
 _FILENAME_SAFE = str.maketrans({"/": "_", "\\": "_", ":": "_"})
 
@@ -134,6 +135,11 @@ class ClaudeCodeRunner(Runner):
             message=f"$ claude -p ... (model={spec.model or 'default'})",
         )
 
+        # Register the configured model up-front so it's persisted even if
+        # the run fails before claude emits its usage envelope.
+        if spec.model:
+            yield UsageEvent(run_id=req.run_id, model=spec.model)
+
         # Strip Anthropic API auth so the CLI uses its own subscription
         # OAuth instead of the parent process's API key.
         env = dict(os.environ)
@@ -174,19 +180,68 @@ async def _run_claude(
 
     assert proc.stdout is not None and proc.stderr is not None
 
+    # Watch stderr concurrently for rate-limit / auth errors so we can
+    # fail fast instead of waiting for the full ``timeout_seconds``.
+    # Claude Code's ``--output-format json`` only emits its single
+    # envelope at exit, so stderr is the only realtime signal we have.
+    if stdin_data is not None and proc.stdin is not None:
+        try:
+            proc.stdin.write(stdin_data)
+            await proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError, OSError):
+            proc.stdin.close()
+
+    stderr_lines: list[str] = []
+    rate_limit_error: str | None = None
+
+    async def _watch_stderr() -> None:
+        nonlocal rate_limit_error
+        assert proc.stderr is not None
+        while True:
+            line_bytes = await proc.stderr.readline()
+            if not line_bytes:
+                return
+            text = line_bytes.decode(errors="replace").rstrip()
+            stderr_lines.append(text)
+            if rate_limit_error is None:
+                detected = detect_in_text_line(text)
+                if detected is not None:
+                    rate_limit_error = detected
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.kill()
+                    return
+
+    stderr_task = asyncio.create_task(_watch_stderr())
+
     try:
         async with asyncio.timeout(timeout):
-            stdout, stderr = await proc.communicate(input=stdin_data)
+            stdout = await proc.stdout.read()
+            await proc.wait()
     except TimeoutError:
-        proc.kill()
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
         await proc.wait()
-        yield DoneEvent(run_id=run_id, ok=False, error=f"timeout after {timeout}s")
+        stderr_task.cancel()
+        yield DoneEvent(
+            run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout"
+        )
         return
 
-    if stderr:
-        for line in stderr.decode(errors="replace").splitlines():
-            if line.strip():
-                yield LogEvent(run_id=run_id, level="warn", message=line.rstrip())
+    with contextlib.suppress(asyncio.CancelledError):
+        await stderr_task
+
+    if rate_limit_error is not None:
+        for sl in stderr_lines:
+            if sl.strip():
+                yield LogEvent(run_id=run_id, level="warn", message=sl)
+        yield DoneEvent(run_id=run_id, ok=False, error=rate_limit_error)
+        return
+
+    for sl in stderr_lines:
+        if sl.strip():
+            yield LogEvent(run_id=run_id, level="warn", message=sl)
 
     raw = stdout.decode(errors="replace").strip()
     if not raw:

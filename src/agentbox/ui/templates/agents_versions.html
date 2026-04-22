@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{{ agent_id }} Versions — agentbox{% endblock %}
+
+{% block content %}
+<h1>{{ agent_id }} — Versions</h1>
+
+<p>
+  <a href="/agents-ui/{{ agent_id }}">← back to agent</a>
+</p>
+
+{% if versions %}
+<table>
+  <thead>
+    <tr>
+      <th>Version</th>
+      <th>Author</th>
+      <th>Created</th>
+      <th>Changelog</th>
+      <th>Rating</th>
+      <th>Comments</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for version in versions %}
+    <tr>
+      <td>v{{ version.version }}{% if version.is_legacy %}<span class="pill">legacy</span>{% endif %}</td>
+      <td>{{ version.author }}</td>
+      <td>{{ version.created_at }}</td>
+      <td>{{ version.changelog or "—" }}</td>
+      <td>{% if version.rating %}{{ version.rating }}/5{% endif %}</td>
+      <td>{% if version.has_comments %}💬{% endif %}</td>
+      <td>
+        <a href="/agents-ui/{{ agent_id }}/versions/{{ version.id }}">view</a>
+        {% if not version.is_legacy %}
+        | <a href="/agents-ui/{{ agent_id }}/versions/{{ version.id }}/rollback" onclick="return confirm('Rollback to this version?')">rollback</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No versions yet.</p>
+{% endif %}
+{% endblock %}

@@ -15,12 +15,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime
 from typing import Any
 
 import httpx
 
-from agentbox.core.definitions.models import AgentDef
-from agentbox.core.session_store import RunRecord, SessionStore
+from agentbox.core.data import AgentDef, RunRecord, SessionStore
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ def _resolve_webhook_url(agent: AgentDef | None) -> str | None:
         from agentbox.api.deps import get_settings
 
         settings = get_settings()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
     return getattr(settings, "completion_webhook_url", None)
 
@@ -128,12 +128,11 @@ def schedule_webhook(
     duration_ms: int | None = None
     if run.created_at and run.finished_at:
         try:
-            from datetime import datetime
-
             started = datetime.fromisoformat(run.created_at)
             ended = datetime.fromisoformat(run.finished_at)
             duration_ms = int((ended - started).total_seconds() * 1000)
         except (ValueError, TypeError):
             duration_ms = None
     payload = webhook_payload(run, usage=usage, duration_ms=duration_ms)
-    loop.create_task(deliver_webhook(url, payload))
+    task = loop.create_task(deliver_webhook(url, payload))
+    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)

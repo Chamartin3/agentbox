@@ -1,0 +1,35 @@
+.rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.rating-stars .star {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: color 0.2s, transform 0.2s;
+  color: #d4af37;
+}
+
+.rating-stars .star.empty {
+  color: #e0e0e0;
+}
+
+.rating-stars .star:hover {
+  transform: scale(1.2);
+}
+
+.rating-stars .star:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rating-value {
+  margin-left: 8px;
+  font-size: 0.875rem;
+  color: #666;
+  font-weight: 500;
+}

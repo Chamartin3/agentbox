@@ -6,26 +6,36 @@
 #     - libs/agentbox/docker-compose.yml
 #
 # Required env (in the project's .env):
-#   AGENTBOX_PROJECT_DIR    absolute host path mounted into /project
-#                           (the project root, must contain agentbox.toml)
+#   AGENTBOX_MANIFEST       host path to the project's agentbox.toml,
+#                           bind-mounted read-only into the container as
+#                           /agentbox/manifest.toml.  The container will
+#                           refuse to start if this file is absent.
 #
-# Optional env:
+# Optional env — add the corresponding volumes block to your override file
+#   when you need these mounts (see "Optional bind-mounts" in README):
+#   AGENTBOX_AGENTS_DIR     host dir → /agentbox/agents.d (ro)
+#   AGENTBOX_PROMPTS_DIR    host dir → /agentbox/prompts.d (ro)
+#   AGENTBOX_SKILLS_DIR     host dir → /agentbox/skills.d (ro)
+#   AGENTBOX_OUTPUTS_DIR    host dir → /agentbox/outputs (rw)
+#   AGENTBOX_OPENCODE_AUTH  host path to opencode auth.json (ro)
+#                           default: ~/.local/share/opencode/auth.json
 #   AGENTBOX_PORT           host port to publish (default 8765)
 #   AGENTBOX_CONTAINER_NAME container name override (default "agentbox")
 #   AGENTBOX_NETWORK        docker network to join (default "agentbox-network",
 #                           must be declared by the parent compose)
-#   AGENTBOX_WORKSPACES_ROOT default workspaces root inside the container
-#                           (default /project/workdir/agentbox/workspaces)
-#   AGENTBOX_CLAUDE_USER_CONFIG
-#                           host path to a JSON file copied into the
-#                           container as /home/appuser/.claude.json on every
-#                           start (theme, hasCompletedOnboarding, trusted
-#                           projects). Default: ./claude-user-config.json
-#                           (ships with the lib).
 #
-# Auth: Claude OAuth credentials live inside the container in a named volume
-# (`agentbox-claude`) under /home/appuser/.claude. Authenticate once with
-# `claude /login` inside the container — tokens persist across recreations.
+# Named volumes (persisted across recreations, owned by this stack):
+#   agentbox-data           SQLite DB and run artefacts (/data)  [always mounted]
+#   agentbox-claude         Claude OAuth credentials (/agentbox/creds/claude)  [always mounted]
+#
+# Optional named volumes — declare in an override file for persistence:
+#   agentbox-workspaces     per-agent workspace trees (/agentbox/workspaces)
+#   agentbox-opencode       opencode internal data (/home/appuser/.local/share/opencode)
+#   agentbox-npm            npm global cache (internal)
+#
+# Auth: Claude OAuth credentials live in the agentbox-claude named volume.
+# Authenticate once with `claude /login` inside the container — tokens
+# persist across recreations.
 
 services:
   agentbox:
@@ -40,23 +50,20 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "${AGENTBOX_PORT:-8765}:8765"
+    tmpfs:
+      - /run/agentbox:size=256m,mode=0700
     volumes:
-      - ${AGENTBOX_PROJECT_DIR}:/project
+      # Required: project manifest (agentbox.toml on host → manifest.toml in container)
+      - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml:ro
+      # Named volumes — persisted, container-owned
       - agentbox-data:/data
-      - agentbox-npm:/opt/npm-global
-      # Container-owned Claude config dir. OAuth credentials persist here
-      # across recreations; nothing is copied from the host machine.
-      - agentbox-claude:/home/appuser/.claude
-      # The entrypoint copies this to /home/appuser/.claude.json on every
-      # start, so the file always reflects the project's checked-in settings.
-      - ${AGENTBOX_CLAUDE_USER_CONFIG:-./claude-user-config.json}:/agentbox/claude-user-config.json:ro
+      - agentbox-claude:/agentbox/creds/claude
     environment:
       - AGENTBOX_DATA_DIR=/data
-      - AGENTBOX_PROJECT_ROOT=/project
+      - AGENTBOX_MANIFEST=/agentbox/manifest.toml
       - AGENTBOX_PORT=8765
-      - AGENTBOX_WORKSPACES_ROOT=${AGENTBOX_WORKSPACES_ROOT:-/project/workdir/agentbox/workspaces}
       - HOME=/home/appuser
-      - CLAUDE_CONFIG_DIR=/home/appuser/.claude
+      - CLAUDE_CONFIG_DIR=/agentbox/creds/claude
     networks:
       - default
     logging:
@@ -99,9 +106,12 @@ services:
 
 volumes:
   agentbox-data:
-  agentbox-npm:
   agentbox-claude:
   agentbox-web-node-modules:
+  # Optional — declare these in an override file for persistence across recreations:
+  # agentbox-workspaces:
+  # agentbox-opencode:
+  # agentbox-npm:
 
 # Default network alias — parent compose can override by setting
 # `networks.default.name` to the project's network.

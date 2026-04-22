@@ -69,6 +69,10 @@ class DoneEvent(_EventBase):
     ok: bool
     exit_code: int | None = None
     error: str | None = None
+    # Specific failure category. ``"timeout"`` means the runner's
+    # ``timeout_seconds`` expired before the process exited. Any other
+    # non-ok run is recorded as ``"error"``. None when ``ok=True``.
+    status: Literal["ok", "error", "timeout"] | None = None
 
 
 RunEvent = Annotated[
