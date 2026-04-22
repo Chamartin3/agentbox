@@ -1,0 +1,95 @@
+# Multi-stage: build the React SPA, then assemble the Python runtime.
+
+FROM node:20-alpine AS web
+WORKDIR /web
+COPY web/package.json ./
+RUN npm install --no-audit --no-fund
+COPY web/ ./
+# Vite builds into /opt/agentbox/src/agentbox/ui/static/dist via vite.config.ts;
+# we redirect the output here instead.
+RUN npx vite build --outDir /web/dist
+
+FROM python:3.12-slim AS base
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+ENV AGENTBOX_DATA_DIR=/data AGENTBOX_PROJECT_ROOT=/project AGENTBOX_PORT=8765
+
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g ${GID} appuser \
+ && useradd -m -u ${UID} -g ${GID} -s /bin/bash appuser
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl ca-certificates git jq nodejs npm tini \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV NPM_CONFIG_PREFIX=/opt/npm-global
+ENV PATH=/opt/npm-global/bin:$PATH
+RUN mkdir -p /opt/npm-global \
+ && chown -R appuser:appuser /opt/npm-global
+
+WORKDIR /opt/agentbox
+COPY pyproject.toml ./
+COPY src ./src
+
+# Drop the SPA into the place FastAPI expects.
+COPY --from=web /web/dist /opt/agentbox/src/agentbox/ui/static/dist
+
+RUN pip install --no-cache-dir -e . websockets
+
+RUN mkdir -p /data /project /home/appuser/.claude \
+ && chown -R appuser:appuser /data /opt/agentbox /home/appuser/.claude
+
+COPY <<'EOF' /usr/local/bin/agentbox-entrypoint
+#!/usr/bin/env bash
+set -e
+if [[ ! -x /opt/npm-global/bin/claude ]]; then
+  echo "agentbox: installing @anthropic-ai/claude-code into /opt/npm-global..."
+  npm install -g @anthropic-ai/claude-code
+fi
+if [[ ! -x /opt/npm-global/bin/opencode ]]; then
+  echo "agentbox: installing opencode into /opt/npm-global (best-effort)..."
+  npm install -g opencode-ai || npm install -g @opencode-ai/opencode || echo "WARN: opencode install failed"
+fi
+
+# Apply the project-supplied user config to Claude Code's state file at
+# $CLAUDE_CONFIG_DIR/.claude.json. We MERGE on top of whatever Claude already
+# wrote so OAuth state (userID, oauthAccount) is preserved across restarts.
+# `projects` entries are merged so the project can add trusted workspace
+# paths without dropping any the user has accepted manually.
+PROJECT_CLAUDE_USER_CONFIG="/agentbox/claude-user-config.json"
+CLAUDE_STATE="${CLAUDE_CONFIG_DIR:-/home/appuser/.claude}/.claude.json"
+if [[ -f "$PROJECT_CLAUDE_USER_CONFIG" ]]; then
+  mkdir -p "$(dirname "$CLAUDE_STATE")"
+  python3 - "$CLAUDE_STATE" "$PROJECT_CLAUDE_USER_CONFIG" <<'PY'
+import json, sys
+from pathlib import Path
+state_path, project_path = (Path(p) for p in sys.argv[1:3])
+state = {}
+if state_path.exists():
+    try:
+        state = json.loads(state_path.read_text())
+    except Exception:
+        state = {}
+project = json.loads(project_path.read_text())
+merged_projects = dict(state.get("projects", {}))
+merged_projects.update(project.get("projects", {}))
+overlay = {k: v for k, v in project.items() if k != "projects"}
+state.update(overlay)
+if merged_projects:
+    state["projects"] = merged_projects
+state_path.write_text(json.dumps(state, indent=2) + "\n")
+PY
+  echo "agentbox: applied project user config to $CLAUDE_STATE"
+fi
+
+exec "$@"
+EOF
+RUN chmod +x /usr/local/bin/agentbox-entrypoint
+
+USER appuser
+VOLUME ["/data", "/project", "/opt/npm-global"]
+EXPOSE 8765
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/agentbox-entrypoint"]
+CMD ["agentbox", "serve", "--host", "0.0.0.0", "--port", "8765"]

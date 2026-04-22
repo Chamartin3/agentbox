@@ -1,0 +1,111 @@
+# agentbox — reusable compose fragment, project-agnostic.
+#
+# Include from a project's main docker-compose.yml:
+#
+#   include:
+#     - libs/agentbox/docker-compose.yml
+#
+# Required env (in the project's .env):
+#   AGENTBOX_PROJECT_DIR    absolute host path mounted into /project
+#                           (the project root, must contain agentbox.toml)
+#
+# Optional env:
+#   AGENTBOX_PORT           host port to publish (default 8765)
+#   AGENTBOX_CONTAINER_NAME container name override (default "agentbox")
+#   AGENTBOX_NETWORK        docker network to join (default "agentbox-network",
+#                           must be declared by the parent compose)
+#   AGENTBOX_WORKSPACES_ROOT default workspaces root inside the container
+#                           (default /project/workdir/agentbox/workspaces)
+#   AGENTBOX_CLAUDE_USER_CONFIG
+#                           host path to a JSON file copied into the
+#                           container as /home/appuser/.claude.json on every
+#                           start (theme, hasCompletedOnboarding, trusted
+#                           projects). Default: ./claude-user-config.json
+#                           (ships with the lib).
+#
+# Auth: Claude OAuth credentials live inside the container in a named volume
+# (`agentbox-claude`) under /home/appuser/.claude. Authenticate once with
+# `claude /login` inside the container — tokens persist across recreations.
+
+services:
+  agentbox:
+    build:
+      # Paths in included compose files resolve relative to *this* file.
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    container_name: ${AGENTBOX_CONTAINER_NAME:-agentbox}
+    user: "${UID:-1000}:${GID:-1000}"
+    ports:
+      - "${AGENTBOX_PORT:-8765}:8765"
+    volumes:
+      - ${AGENTBOX_PROJECT_DIR}:/project
+      - agentbox-data:/data
+      - agentbox-npm:/opt/npm-global
+      # Container-owned Claude config dir. OAuth credentials persist here
+      # across recreations; nothing is copied from the host machine.
+      - agentbox-claude:/home/appuser/.claude
+      # The entrypoint copies this to /home/appuser/.claude.json on every
+      # start, so the file always reflects the project's checked-in settings.
+      - ${AGENTBOX_CLAUDE_USER_CONFIG:-./claude-user-config.json}:/agentbox/claude-user-config.json:ro
+    environment:
+      - AGENTBOX_DATA_DIR=/data
+      - AGENTBOX_PROJECT_ROOT=/project
+      - AGENTBOX_PORT=8765
+      - AGENTBOX_WORKSPACES_ROOT=${AGENTBOX_WORKSPACES_ROOT:-/project/workdir/agentbox/workspaces}
+      - HOME=/home/appuser
+      - CLAUDE_CONFIG_DIR=/home/appuser/.claude
+    networks:
+      - default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  # Dev-only: Vite with HMR. Opt-in via `--profile dev`.
+  # Start with:  UID=$(id -u) GID=$(id -g) docker compose --profile dev up agentbox-web
+  # Browse to:   http://localhost:5174
+  agentbox-web:
+    profiles: ["dev"]
+    image: node:20-alpine
+    container_name: ${AGENTBOX_WEB_CONTAINER_NAME:-agentbox-web}
+    working_dir: /web
+    # No `user:` — node_modules ownership in the volume is irrelevant and
+    # forcing UID 1000 trips on the empty named volume created as root.
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "${AGENTBOX_WEB_PORT:-5174}:5173"
+    volumes:
+      - ./web:/web
+      - agentbox-web-node-modules:/web/node_modules
+    environment:
+      # Vite dev server proxies /api here. Inside the network, hit the
+      # agentbox service by its container name.
+      - AGENTBOX_API_URL=http://${AGENTBOX_CONTAINER_NAME:-agentbox}:8765
+      # HMR websocket needs to reach the *browser* — that's localhost:5174
+      # on the host machine.
+      - VITE_HMR_HOST=localhost
+      - VITE_HMR_PORT=${AGENTBOX_WEB_PORT:-5174}
+    networks:
+      - default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+volumes:
+  agentbox-data:
+  agentbox-npm:
+  agentbox-claude:
+  agentbox-web-node-modules:
+
+# Default network alias — parent compose can override by setting
+# `networks.default.name` to the project's network.
+networks:
+  default:
+    name: ${AGENTBOX_NETWORK:-agentbox-network}
+    external: true
