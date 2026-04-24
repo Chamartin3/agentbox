@@ -91,7 +91,7 @@ def _resolve_workspace(name: str) -> tuple[Path, Path]:
 
 
 def _make_generator(project_root: Path, loader) -> ConfigGenerator:
-    """Build a ConfigGenerator from the manifest (generic, not cvman-hardcoded)."""
+    """Build a ConfigGenerator from the manifest."""
     manifest = loader.load()
     agentbox_toml = project_root / "agentbox.toml"
     mcp_server_name = (
@@ -267,7 +267,7 @@ def get_workspace_mcp_tools(name: str) -> dict:
     settings = _get_settings()
     manifest = loader.load()
 
-    # Determine MCP server name from manifest (project-specific, e.g. "cvman-mcp")
+    # Determine MCP server name from manifest.
     mcp_server_name = (
         manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
     )

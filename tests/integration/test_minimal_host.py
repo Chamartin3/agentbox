@@ -66,8 +66,8 @@ headless = true
 
 _NOOP_MCP_SERVER_TOML = """\
 [[mcp_servers]]
-name = "cvman-mcp"
-url = "http://cvagents-mcp:8001/mcp/"
+name = "my-mcp"
+url = "http://mcp-server:8001/mcp/"
 transport = "http"
 cache_ttl = 300
 """
@@ -182,6 +182,6 @@ def test_mcp_servers_in_manifest_parse(isolated_data_dir: Path) -> None:
     loader = DefinitionLoader(isolated_data_dir)
     m = loader.load()
     assert len(m.mcp_servers) == 1
-    assert m.mcp_servers[0].name == "cvman-mcp"
-    assert m.mcp_servers[0].url == "http://cvagents-mcp:8001/mcp/"
+    assert m.mcp_servers[0].name == "my-mcp"
+    assert m.mcp_servers[0].url == "http://mcp-server:8001/mcp/"
     assert m.mcp_servers[0].cache_ttl == 300

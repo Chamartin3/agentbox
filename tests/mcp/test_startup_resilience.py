@@ -12,7 +12,7 @@ from agentbox.core.mcp.registry import McpRegistry
 def test_all_servers_ok(tmp_path: Path) -> None:
     cache_dir = tmp_path / "mcp_cache"
     registry = McpRegistry(cache_dir)
-    registry._health["cvman"] = ServerHealth(
+    registry._health["primary"] = ServerHealth(
         status="ok", tool_count=5, fetched_at="2024-01-01T00:00:00Z"
     )
     registry._health["search"] = ServerHealth(
@@ -26,7 +26,7 @@ def test_all_servers_ok(tmp_path: Path) -> None:
 def test_one_server_down_with_cache_becomes_degraded(tmp_path: Path) -> None:
     cache_dir = tmp_path / "mcp_cache"
     registry = McpRegistry(cache_dir)
-    registry._health["cvman"] = ServerHealth(
+    registry._health["primary"] = ServerHealth(
         status="ok", tool_count=5, fetched_at="2024-01-01T00:00:00Z"
     )
     registry._health["search"] = ServerHealth(
@@ -42,7 +42,7 @@ def test_one_server_down_with_cache_becomes_degraded(tmp_path: Path) -> None:
 def test_all_servers_down_with_cache_becomes_degraded(tmp_path: Path) -> None:
     cache_dir = tmp_path / "mcp_cache"
     registry = McpRegistry(cache_dir)
-    registry._health["cvman"] = ServerHealth(
+    registry._health["primary"] = ServerHealth(
         status="degraded",
         tool_count=5,
         fetched_at="2024-01-01T00:00:00Z",
@@ -61,7 +61,7 @@ def test_all_servers_down_with_cache_becomes_degraded(tmp_path: Path) -> None:
 def test_all_servers_unavailable(tmp_path: Path) -> None:
     cache_dir = tmp_path / "mcp_cache"
     registry = McpRegistry(cache_dir)
-    registry._health["cvman"] = ServerHealth(
+    registry._health["primary"] = ServerHealth(
         status="unavailable", last_error="connection refused"
     )
     report = registry.health_report()
@@ -78,7 +78,7 @@ def test_no_servers_unavailable(tmp_path: Path) -> None:
 def test_cache_is_loaded_on_startup(tmp_path: Path) -> None:
     cache_dir = tmp_path / "mcp_cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / "cvman.json"
+    cache_file = cache_dir / "my-mcp.json"
     cache_file.write_text(
         json.dumps({
             "tools": [
@@ -89,7 +89,7 @@ def test_cache_is_loaded_on_startup(tmp_path: Path) -> None:
         })
     )
     registry = McpRegistry(cache_dir)
-    cached = registry._load_cache("cvman")
+    cached = registry._load_cache("my-mcp")
     assert cached is not None
     assert len(cached) == 2
 
@@ -97,10 +97,10 @@ def test_cache_is_loaded_on_startup(tmp_path: Path) -> None:
 def test_cache_corrupted_returns_none(tmp_path: Path) -> None:
     cache_dir = tmp_path / "mcp_cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / "cvman.json"
+    cache_file = cache_dir / "my-mcp.json"
     cache_file.write_text("not-json")
     registry = McpRegistry(cache_dir)
-    assert registry._load_cache("cvman") is None
+    assert registry._load_cache("my-mcp") is None
 
 
 def test_cache_missing_returns_none(tmp_path: Path) -> None:
@@ -131,9 +131,9 @@ def test_health_report_to_dict_minimal() -> None:
 
 def test_mcp_health_report_to_dict() -> None:
     servers = {
-        "cvman": ServerHealth(status="ok", tool_count=5, fetched_at="2024-01-01T00:00:00Z"),
+        "my-mcp": ServerHealth(status="ok", tool_count=5, fetched_at="2024-01-01T00:00:00Z"),
     }
     report = McpHealthReport(overall="ok", servers=servers)
     d = report.to_dict()
     assert d["status"] == "ok"
-    assert "cvman" in d["mcp_servers"]
+    assert "my-mcp" in d["mcp_servers"]

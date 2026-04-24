@@ -43,4 +43,4 @@ docker run --rm \
     && chmod 600 /dst/.credentials.json"
 
 echo "Imported credentials from $HOST_CLAUDE_DIR into volume $VOLUME."
-echo "Run ./cvman.sh — Claude should start authenticated."
+echo "Claude should now start authenticated inside the agentbox container."

@@ -40,7 +40,7 @@ class McpServerSpec(BaseModel):
     """
 
     name: str = "mcp"
-    """Unique identifier for this MCP server (e.g. ``cvman``)."""
+    """Unique identifier for this MCP server (e.g. ``my-mcp``)."""
 
     url: str | None = None
     """HTTP/SSE endpoint for a remote MCP server."""

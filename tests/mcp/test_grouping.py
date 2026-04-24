@@ -17,9 +17,9 @@ def _tool(name: str) -> Tool:
 
 def test_get_prefix_becomes_read() -> None:
     tools = [_tool("jobpost_get_all")]
-    groups = derive_groups("cvman", tools)
-    assert "cvman.jobpost.read" in groups
-    assert groups["cvman.jobpost.read"] == ["jobpost_get_all"]
+    groups = derive_groups("my-mcp", tools)
+    assert "my-mcp.jobpost.read" in groups
+    assert groups["my-mcp.jobpost.read"] == ["jobpost_get_all"]
 
 
 def test_list_prefix_becomes_read() -> None:
@@ -45,16 +45,16 @@ def test_check_prefix_becomes_read() -> None:
 
 def test_write_action_goes_to_write() -> None:
     tools = [_tool("jobpost_create")]
-    groups = derive_groups("cvman", tools)
-    assert "cvman.jobpost.write" in groups
-    assert groups["cvman.jobpost.write"] == ["jobpost_create"]
+    groups = derive_groups("my-mcp", tools)
+    assert "my-mcp.jobpost.write" in groups
+    assert groups["my-mcp.jobpost.write"] == ["jobpost_create"]
 
 
 def test_write_action_with_underscore_prefix() -> None:
     tools = [_tool("jobpost_update_status")]
-    groups = derive_groups("cvman", tools)
-    assert "cvman.jobpost.write" in groups
-    assert groups["cvman.jobpost.write"] == ["jobpost_update_status"]
+    groups = derive_groups("my-mcp", tools)
+    assert "my-mcp.jobpost.write" in groups
+    assert groups["my-mcp.jobpost.write"] == ["jobpost_update_status"]
 
 
 def test_mixed_read_write_split() -> None:
@@ -63,9 +63,9 @@ def test_mixed_read_write_split() -> None:
         _tool("jobpost_create"),
         _tool("jobpost_delete"),
     ]
-    groups = derive_groups("cvman", tools)
-    assert groups["cvman.jobpost.read"] == ["jobpost_get_all"]
-    assert set(groups["cvman.jobpost.write"]) == {"jobpost_create", "jobpost_delete"}
+    groups = derive_groups("my-mcp", tools)
+    assert groups["my-mcp.jobpost.read"] == ["jobpost_get_all"]
+    assert set(groups["my-mcp.jobpost.write"]) == {"jobpost_create", "jobpost_delete"}
 
 
 def test_all_prefix_contains_everything() -> None:
@@ -73,8 +73,8 @@ def test_all_prefix_contains_everything() -> None:
         _tool("jobpost_get_all"),
         _tool("jobpost_create"),
     ]
-    groups = derive_groups("cvman", tools)
-    assert set(groups["cvman.jobpost"]) == {"jobpost_get_all", "jobpost_create"}
+    groups = derive_groups("my-mcp", tools)
+    assert set(groups["my-mcp.jobpost"]) == {"jobpost_get_all", "jobpost_create"}
 
 
 def test_multiple_prefixes() -> None:
@@ -119,8 +119,8 @@ def test_find_prefix_becomes_read() -> None:
 
 
 def test_resolve_explicit_server_group() -> None:
-    groups = {"cvman.jobpost.read": ["jobpost_get_all", "jobpost_list"]}
-    result = resolve_group_ref("@cvman:jobpost.read", groups)
+    groups = {"my-mcp.jobpost.read": ["jobpost_get_all", "jobpost_list"]}
+    result = resolve_group_ref("@my-mcp:jobpost.read", groups)
     assert result == ["jobpost_get_all", "jobpost_list"]
 
 
@@ -132,7 +132,7 @@ def test_resolve_implicit_group() -> None:
 
 def test_resolve_mcp_tool_ref() -> None:
     groups = {}
-    result = resolve_group_ref("mcp:cvman/cv_get", groups)
+    result = resolve_group_ref("mcp:my-mcp/cv_get", groups)
     assert result == ["cv_get"]
 
 

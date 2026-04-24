@@ -128,7 +128,7 @@ class AnalyticsMixin:
         since_iso: str,
         agent: str | None = None,
     ) -> dict:
-        """Roll up runs in a date range into the cvman /activity shape."""
+        """Roll up runs in a date range into the /activity endpoint shape."""
         base_filters = [runs.c.created_at >= since_iso]
         if agent:
             base_filters.append(runs.c.agent_id == agent)

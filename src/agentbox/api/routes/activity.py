@@ -1,7 +1,4 @@
-"""/api/activity endpoints — KPIs, time series, breakdowns, recent runs.
-
-Shaped to be a drop-in for cvman's /config/activity page.
-"""
+"""/api/activity endpoints — KPIs, time series, breakdowns, recent runs."""
 
 from __future__ import annotations
 
