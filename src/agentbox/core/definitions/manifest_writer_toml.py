@@ -6,6 +6,7 @@ Extracted from manifest_writer.py to keep that module under 400 lines.
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 import tomlkit
@@ -118,6 +119,11 @@ def write_legacy_dir(agent_dir: Path, agent: AgentDef) -> None:
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = Path(tempfile.gettempdir()) / f"{path.name}.tmp"
     tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        os.replace(tmp, path)
+    except PermissionError:
+        # Parent directory isn't writable (e.g. single-file bind mount
+        # where the dir is root-owned).  Fall back to direct overwrite.
+        path.write_text(text, encoding="utf-8")

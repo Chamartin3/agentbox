@@ -53,7 +53,9 @@ def test_session_store(tmp_path: Path) -> None:
 
     store = SessionStore(tmp_path / "db.sqlite")
     rid = store.create_run("a", "in", str(tmp_path), str(tmp_path / "t.jsonl"))
-    store.record_usage(rid, {"input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001})
+    store.record_usage(
+        rid, {"input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001}
+    )
     store.record_usage(rid, {"input_tokens": 5})
     u = store.get_usage(rid)
     assert u and u["input_tokens"] == 15 and u["output_tokens"] == 20

@@ -5,9 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from agentbox.config import Settings, _optional_dir, load_settings
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -81,7 +79,9 @@ def test_workspaces_root_derived_from_project_root(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_optional_dirs_default_none_when_devnull(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_optional_dirs_default_none_when_devnull(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("AGENTBOX_AGENTS_DIR", "/dev/null")
     assert _optional_dir("AGENTBOX_AGENTS_DIR") is None
 
@@ -91,7 +91,9 @@ def test_optional_dirs_none_when_env_absent(monkeypatch: pytest.MonkeyPatch) -> 
     assert _optional_dir("AGENTBOX_AGENTS_DIR") is None
 
 
-def test_optional_dirs_set_when_valid_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_optional_dirs_set_when_valid_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("AGENTBOX_AGENTS_DIR", str(tmp_path / "agents.d"))
     result = _optional_dir("AGENTBOX_AGENTS_DIR")
     assert result == tmp_path / "agents.d"
@@ -102,18 +104,32 @@ def test_optional_dirs_set_when_valid_path(monkeypatch: pytest.MonkeyPatch, tmp_
 # ---------------------------------------------------------------------------
 
 
-def test_load_settings_manifest_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_settings_manifest_from_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "my.toml"))
     # Clear optional dir env vars so defaults don't create Path("/agentbox/...")
-    for var in ("AGENTBOX_AGENTS_DIR", "AGENTBOX_PROMPTS_DIR", "AGENTBOX_SKILLS_DIR", "AGENTBOX_OUTPUTS_DIR"):
+    for var in (
+        "AGENTBOX_AGENTS_DIR",
+        "AGENTBOX_PROMPTS_DIR",
+        "AGENTBOX_SKILLS_DIR",
+        "AGENTBOX_OUTPUTS_DIR",
+    ):
         monkeypatch.setenv(var, "/dev/null")
     s = load_settings()
     assert s.manifest_path == tmp_path / "my.toml"
 
 
-def test_load_settings_all_optional_unset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_settings_all_optional_unset(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "manifest.toml"))
-    for var in ("AGENTBOX_AGENTS_DIR", "AGENTBOX_PROMPTS_DIR", "AGENTBOX_SKILLS_DIR", "AGENTBOX_OUTPUTS_DIR"):
+    for var in (
+        "AGENTBOX_AGENTS_DIR",
+        "AGENTBOX_PROMPTS_DIR",
+        "AGENTBOX_SKILLS_DIR",
+        "AGENTBOX_OUTPUTS_DIR",
+    ):
         monkeypatch.setenv(var, "/dev/null")
     s = load_settings()
     assert s.agents_dir is None
@@ -122,7 +138,9 @@ def test_load_settings_all_optional_unset(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert s.outputs_dir is None
 
 
-def test_load_settings_all_optional_set(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_settings_all_optional_set(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "manifest.toml"))
     monkeypatch.setenv("AGENTBOX_AGENTS_DIR", str(tmp_path / "agents.d"))
     monkeypatch.setenv("AGENTBOX_PROMPTS_DIR", str(tmp_path / "prompts.d"))

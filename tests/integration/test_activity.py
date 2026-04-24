@@ -11,10 +11,16 @@ from agentbox.core.data import SessionStore
 def _seed(store: SessionStore, agent: str, status: str, model: str = "haiku") -> str:
     rid = store.create_run(agent, "in", "/tmp/wd", "/tmp/t.jsonl")
     store.record_usage(
-        rid, {"model": model, "input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001}
+        rid,
+        {"model": model, "input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001},
     )
     if status != "running":
-        store.finish_run(rid, ok=(status == "ok"), output=None, error=None if status == "ok" else "boom")
+        store.finish_run(
+            rid,
+            ok=(status == "ok"),
+            output=None,
+            error=None if status == "ok" else "boom",
+        )
     return rid
 
 

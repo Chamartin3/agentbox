@@ -49,7 +49,9 @@ def put_prompt(agent_id: str, body: PromptBody) -> dict:
     existing = store.get_latest_committed_prompt(agent_id)
     if not existing:
         store.save_prompt_draft(agent_id, body.content, author="system")
-        store.publish_prompt(agent_id, changelog="Initial version from disk", author="system")
+        store.publish_prompt(
+            agent_id, changelog="Initial version from disk", author="system"
+        )
 
     return doc.__dict__
 
@@ -172,7 +174,9 @@ def rollback_prompt(agent_id: str, body: RollbackBody) -> dict:
             author=body.author,
         )
     except ValueError as exc:
-        raise HTTPException(400, {"code": "rollback_error", "detail": str(exc)}) from exc
+        raise HTTPException(
+            400, {"code": "rollback_error", "detail": str(exc)}
+        ) from exc
     except prompts.PromptError as exc:
         raise HTTPException(400, {"code": exc.code, "detail": exc.detail}) from exc
     return doc.__dict__

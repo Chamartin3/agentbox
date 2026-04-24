@@ -80,13 +80,19 @@ def test_cache_is_loaded_on_startup(tmp_path: Path) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_file = cache_dir / "my-mcp.json"
     cache_file.write_text(
-        json.dumps({
-            "tools": [
-                {"name": "jobpost_get_all", "description": "", "input_schema": None},
-                {"name": "jobpost_create", "description": "", "input_schema": None},
-            ],
-            "cached_at": "2024-01-01T00:00:00Z",
-        })
+        json.dumps(
+            {
+                "tools": [
+                    {
+                        "name": "jobpost_get_all",
+                        "description": "",
+                        "input_schema": None,
+                    },
+                    {"name": "jobpost_create", "description": "", "input_schema": None},
+                ],
+                "cached_at": "2024-01-01T00:00:00Z",
+            }
+        )
     )
     registry = McpRegistry(cache_dir)
     cached = registry._load_cache("my-mcp")
@@ -131,7 +137,9 @@ def test_health_report_to_dict_minimal() -> None:
 
 def test_mcp_health_report_to_dict() -> None:
     servers = {
-        "my-mcp": ServerHealth(status="ok", tool_count=5, fetched_at="2024-01-01T00:00:00Z"),
+        "my-mcp": ServerHealth(
+            status="ok", tool_count=5, fetched_at="2024-01-01T00:00:00Z"
+        ),
     }
     report = McpHealthReport(overall="ok", servers=servers)
     d = report.to_dict()

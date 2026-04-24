@@ -90,4 +90,6 @@ def recent_runs(
 
 
 def _state_label(status: str) -> str:
-    return {"ok": "succeeded", "error": "failed", "running": "running"}.get(status, status)
+    return {"ok": "succeeded", "error": "failed", "running": "running"}.get(
+        status, status
+    )

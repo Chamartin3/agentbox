@@ -7,10 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
-
 from agentbox.api.app import create_app
+from fastapi.testclient import TestClient
 
 
 def _setup(tmp_path: Path):
@@ -31,7 +29,13 @@ def _app(tmp_path):
     """
     import agentbox.api.deps as deps
 
-    for fn in (deps.get_settings, deps.get_store, deps.get_loader, deps.get_executor, deps.get_mcp_registry):
+    for fn in (
+        deps.get_settings,
+        deps.get_store,
+        deps.get_loader,
+        deps.get_executor,
+        deps.get_mcp_registry,
+    ):
         fn.cache_clear()
     client = TestClient(create_app())
     client.__enter__()
@@ -59,7 +63,7 @@ class TestListVersions:
 
     def test_list_with_rating(self, isolated_data_dir) -> None:
         _setup(isolated_data_dir)
-        client, store = _app(isolated_data_dir)
+        _client, store = _app(isolated_data_dir)
         v = store.latest_version("test-agent")
         store.set_rating(v["id"], 5, "reviewer")
         # Verify via store directly (avoids cross-connection staleness)

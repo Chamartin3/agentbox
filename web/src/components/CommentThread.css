@@ -1,8 +1,8 @@
 .comment-thread {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
-  background: #fafafa;
+  background: var(--bg-elevated);
 }
 
 .comment-thread h3 {
@@ -12,7 +12,7 @@
 }
 
 .no-comments {
-  color: #999;
+  color: var(--fg-muted);
   font-style: italic;
   margin: 12px 0;
 }
@@ -24,11 +24,11 @@
 }
 
 .comment {
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px;
   margin-bottom: 8px;
-  background: white;
+  background: var(--bg);
 }
 
 .comment-header {
@@ -40,16 +40,16 @@
 
 .comment-header strong {
   font-weight: 600;
-  color: #333;
+  color: var(--fg);
 }
 
 .comment-date {
   font-size: 0.85rem;
-  color: #999;
+  color: var(--fg-muted);
 }
 
 .comment-body {
-  color: #555;
+  color: var(--fg-muted);
   line-height: 1.5;
   word-break: break-word;
 }
@@ -62,17 +62,19 @@
 
 .comment-form textarea {
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-family: inherit;
   font-size: 0.95rem;
   resize: vertical;
+  background: var(--bg);
+  color: var(--fg);
 }
 
 .comment-form textarea:focus {
   outline: none;
-  border-color: #0066cc;
-  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.15);
 }
 
 .comment-form .btn-primary {
@@ -80,8 +82,8 @@
 }
 
 .error-message {
-  background: #fee;
-  color: #c33;
+  background: rgba(248, 81, 73, 0.1);
+  color: var(--red);
   padding: 10px 12px;
   border-radius: 4px;
   margin-bottom: 12px;

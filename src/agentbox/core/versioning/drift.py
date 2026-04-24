@@ -34,9 +34,7 @@ def _compute_file_hash(path: Path | None) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def check_drift(
-    agent: AgentDef, store: AgentVersionsMixin
-) -> AgentDriftStatus:
+def check_drift(agent: AgentDef, store: AgentVersionsMixin) -> AgentDriftStatus:
     """Compare current agent file hash to the latest stored version."""
     if agent.source_path is None:
         return AgentDriftStatus.UNKNOWN_SOURCE
@@ -72,9 +70,7 @@ def startup_sweep(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
                     source_format=(
-                        agent.source_format.value
-                        if agent.source_format
-                        else "unknown"
+                        agent.source_format.value if agent.source_format else "unknown"
                     ),
                     content_snapshot=_build_snapshot(agent),
                     prompt_snapshot=agent.load_prompt(
@@ -86,18 +82,14 @@ def startup_sweep(
                     author="filesystem",
                     changelog="initial import",
                 )
-                logger.info(
-                    "versioning: created v1 for new agent %r", agent.id
-                )
+                logger.info("versioning: created v1 for new agent %r", agent.id)
             elif status == AgentDriftStatus.DRIFTED:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
                 store.create_version(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
                     source_format=(
-                        agent.source_format.value
-                        if agent.source_format
-                        else "unknown"
+                        agent.source_format.value if agent.source_format else "unknown"
                     ),
                     content_snapshot=_build_snapshot(agent),
                     prompt_snapshot="",
@@ -110,6 +102,4 @@ def startup_sweep(
                     agent.id,
                 )
         except Exception:
-            logger.exception(
-                "versioning: drift check failed for agent %r", agent.id
-            )
+            logger.exception("versioning: drift check failed for agent %r", agent.id)

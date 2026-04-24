@@ -17,7 +17,13 @@ router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 class CreateRunBody(BaseModel):
     agent: str
-    input: str
+    input: str | None = None
+    """Legacy free-text input. Mutually exclusive with ``variables``."""
+
+    variables: dict[str, str] | None = None
+    """Variable map for prompt composition. Required when the agent
+    declares a ``[composition]`` block."""
+
     session_id: str | None = None
     workspace: str | None = None
     """Optional workspace override (named workspace or explicit path)."""
@@ -39,23 +45,57 @@ class CreateRunBody(BaseModel):
     for this invocation only. E.g. ``"claude_code"``, ``"opencode"``,
     ``"pydantic_ai"``."""
 
+    runner_embedded: bool = False
+    """When ``True``, the caller will run the agent itself (e.g. pydantic-ai
+    in-process) and POST a snapshot back via ``/runs/{run_id}/snapshot``."""
+
 
 @router.post("")
 async def create_run(body: CreateRunBody) -> dict:
+    import logging
+
+    logger = logging.getLogger(__name__)
     loader = get_loader()
     agent = loader.get(body.agent)
     if agent is None:
         raise HTTPException(404, f"unknown agent {body.agent!r}")
+
+    # Legacy grace period: warn when using old string input
+    if body.input is not None and body.variables is None:
+        if agent.composition is not None:
+            logger.warning(
+                "run for agent %r uses legacy 'input' but agent has [composition]; "
+                "migrate to 'variables' with 'user_message'",
+                agent.id,
+            )
+        executor = get_executor()
+        run_id = await executor.execute(
+            agent,
+            body.input,
+            session_id=body.session_id,
+            workspace_override=body.workspace,
+            timeout_seconds=body.timeout_seconds,
+            webhook_url=body.webhook_url,
+            runner_override=body.runner,
+            backend=body.backend,
+        )
+        return {"run_id": run_id, "agent": agent.id}
+
+    if body.variables is None:
+        raise HTTPException(422, "either 'input' or 'variables' must be provided")
+
     executor = get_executor()
     run_id = await executor.execute(
         agent,
-        body.input,
+        "",  # input is derived from composition
+        variables=body.variables,
         session_id=body.session_id,
         workspace_override=body.workspace,
         timeout_seconds=body.timeout_seconds,
         webhook_url=body.webhook_url,
         runner_override=body.runner,
         backend=body.backend,
+        runner_embedded=body.runner_embedded,
     )
     return {"run_id": run_id, "agent": agent.id}
 
@@ -128,9 +168,7 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
     if existing is None:
         raise HTTPException(404, f"unknown run {run_id!r}")
     if existing.status not in {"ok", "error"}:
-        store.finish_run(
-            run_id, ok=body.ok, output=body.output, error=body.error
-        )
+        store.finish_run(run_id, ok=body.ok, output=body.output, error=body.error)
     if body.usage:
         try:
             store.record_usage(run_id, body.usage)
@@ -147,6 +185,62 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
     agent = loader.get(refreshed.agent_id)
     schedule_webhook(agent, refreshed, store)
     return {"ok": True, "run_id": run_id, "status": refreshed.status}
+
+
+class SnapshotBody(BaseModel):
+    """Payload posted by a caller after running an embedded agent."""
+
+    rendered_prompt: dict
+    variables: dict
+    response_raw: str
+    validation_status: str = "ok"
+    validation_errors: list[str] = []
+    composition_snapshot: dict | None = None
+
+
+@router.post("/{run_id}/snapshot")
+async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
+    """Store a snapshot for an embedded run.
+
+    Idempotent: a second snapshot for the same run_id replaces the first
+    and logs a warning.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    store = get_store()
+    existing = store.get_run(run_id)
+    if existing is None:
+        raise HTTPException(404, f"unknown run {run_id!r}")
+
+    if existing.rendered_prompt is not None:
+        logger.warning("snapshot_run: overwriting existing snapshot for %s", run_id)
+
+    store.save_run_snapshot(
+        run_id=run_id,
+        rendered_prompt=body.rendered_prompt,
+        variables=body.variables,
+        validation_status=body.validation_status,
+        validation_errors=body.validation_errors,
+        composition_snapshot=body.composition_snapshot,
+    )
+
+    # Also finalize the run if not already terminal
+    if existing.status not in {"ok", "error"}:
+        store.finish_run(
+            run_id,
+            ok=body.validation_status != "fail",
+            output=body.response_raw,
+            error=None if body.validation_status != "fail" else "validation failed",
+        )
+
+    refreshed = store.get_run(run_id) or existing
+    loader = get_loader()
+    agent = loader.get(refreshed.agent_id)
+    if agent:
+        schedule_webhook(agent, refreshed, store)
+
+    return {"ok": True, "run_id": run_id}
 
 
 @router.get("/_facets")

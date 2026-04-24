@@ -47,6 +47,11 @@ runs = Table(
     Column("finished_at", String),
     Column("config_digest", String),
     Column("agent_version_id", Integer, ForeignKey("agent_versions.id")),
+    Column("composition_snapshot", String),
+    Column("rendered_prompt", String),
+    Column("variables", String),
+    Column("validation_status", String),
+    Column("validation_errors", String),
     Index("runs_by_agent", "agent_id", "created_at"),
     Index("runs_by_status", "status", "created_at"),
 )

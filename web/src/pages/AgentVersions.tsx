@@ -1,16 +1,19 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { versionsApi, VersionSummary } from '../api/versions';
 import RatingStars from '../components/RatingStars';
 import './AgentVersions.css';
 
 interface AgentVersionsProps {
-  agentId: string;
+  agentId?: string;
   onSelectVersion?: (versionId: string, versionNumber: number) => void;
 }
 
 type FilterType = 'all' | 'has-comments' | 'has-rating';
 
-export default function AgentVersions({ agentId, onSelectVersion }: AgentVersionsProps) {
+export default function AgentVersions({ agentId: propAgentId, onSelectVersion }: AgentVersionsProps) {
+  const { id } = useParams<{ id: string }>();
+  const agentId = propAgentId || id || '';
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

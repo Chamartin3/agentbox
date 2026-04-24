@@ -9,6 +9,7 @@ import pytest
 
 def _settings(tmp_path):
     from agentbox.config import Settings
+
     return Settings(
         manifest_path=tmp_path / "manifest.toml",
         data_dir=tmp_path,
@@ -27,6 +28,7 @@ def _executor(tmp_path):
     from agentbox.core.data import SessionStore
     from agentbox.core.definitions import DefinitionLoader
     from agentbox.core.executor import RunExecutor
+
     settings = _settings(tmp_path)
     store = SessionStore(settings.db_path)
     loader = DefinitionLoader(settings.project_root)
@@ -124,7 +126,9 @@ def test_cleanup_run_dir_none_no_error() -> None:
     RunExecutor._cleanup_run_dir(None)
 
 
-def test_render_for_run_creates_run_dir_and_generates_configs(tmp_path: Path, monkeypatch) -> None:
+def test_render_for_run_creates_run_dir_and_generates_configs(
+    tmp_path: Path, monkeypatch
+) -> None:
     from agentbox.core.backends.claude_code import ClaudeCodeBackend
     from agentbox.core.data.manifest import AgentDef, RunnerSpec
 

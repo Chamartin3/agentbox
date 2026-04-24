@@ -1,23 +1,50 @@
 import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { versionsApi, VersionSummary, DiffResponse } from '../api/versions';
 import './AgentVersionDiff.css';
 
 interface AgentVersionDiffProps {
-  agentId: string;
-  latestVersion: number;
-  versions: VersionSummary[];
+  agentId?: string;
+  latestVersion?: number;
+  versions?: VersionSummary[];
 }
 
 export default function AgentVersionDiff({
-  agentId,
-  latestVersion,
-  versions,
+  agentId: propAgentId,
+  latestVersion: propLatestVersion,
+  versions: propVersions,
 }: AgentVersionDiffProps) {
-  const [fromVersion, setFromVersion] = useState<number>(latestVersion - 1);
-  const [toVersion, setToVersion] = useState<number>(latestVersion);
+  const { id } = useParams<{ id: string }>();
+  const agentId = propAgentId || id || '';
+  const [loadedVersions, setLoadedVersions] = useState<VersionSummary[]>(propVersions || []);
+  const [loadedLatest, setLoadedLatest] = useState<number>(propLatestVersion || 0);
+  const [versionsLoaded, setVersionsLoaded] = useState(!!propVersions);
+
+  useEffect(() => {
+    if (!propVersions && agentId) {
+      versionsApi.listVersions(agentId).then((data) => {
+        setLoadedVersions(data.versions);
+        setLoadedLatest(data.latest_version || 0);
+        setVersionsLoaded(true);
+      }).catch(() => setVersionsLoaded(true));
+    }
+  }, [agentId, propVersions]);
+
+  const versions = propVersions || loadedVersions;
+  const latestVersion = propLatestVersion || loadedLatest;
+
+  const [fromVersion, setFromVersion] = useState<number>(1);
+  const [toVersion, setToVersion] = useState<number>(1);
   const [diff, setDiff] = useState<DiffResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (latestVersion > 1) {
+      setFromVersion(latestVersion - 1);
+      setToVersion(latestVersion);
+    }
+  }, [latestVersion]);
 
   useEffect(() => {
     if (fromVersion >= 0 && toVersion > fromVersion) {

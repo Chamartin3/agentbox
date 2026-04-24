@@ -35,8 +35,12 @@ class PydanticAiBackend:
         spec = agent.runner
 
         # Resolve the prompt — stored in agent_meta for run() to use.
-        prompt_text = getattr(agent, "load_prompt", None)
-        prompt = prompt_text(workdir.parent) if prompt_text else ""
+        composed_system = getattr(agent, "_composed_system", None)
+        if composed_system is not None:
+            prompt = composed_system
+        else:
+            prompt_text = getattr(agent, "load_prompt", None)
+            prompt = prompt_text(workdir.parent) if prompt_text else ""
 
         agent_meta: dict[str, Any] = {
             "agent_module": spec.agent_module,
@@ -45,9 +49,12 @@ class PydanticAiBackend:
         }
 
         files: dict[Path, bytes] = {}
-        claude_md = workdir / "CLAUDE.md"
-        if claude_md.exists():
-            files[Path("CLAUDE.md")] = claude_md.read_bytes()
+        if composed_system is not None:
+            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
+        else:
+            claude_md = workdir / "CLAUDE.md"
+            if claude_md.exists():
+                files[Path("CLAUDE.md")] = claude_md.read_bytes()
 
         return RenderedConfig(
             cwd=Path("."),
@@ -80,9 +87,7 @@ class PydanticAiBackend:
         try:
             input_data = json.loads(input) if input else {}
         except json.JSONDecodeError as exc:
-            yield DoneEvent(
-                run_id=run_id, ok=False, error=f"invalid input JSON: {exc}"
-            )
+            yield DoneEvent(run_id=run_id, ok=False, error=f"invalid input JSON: {exc}")
             return
 
         # Build the request model.

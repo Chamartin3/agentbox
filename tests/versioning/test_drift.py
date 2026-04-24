@@ -30,9 +30,7 @@ class TestCheckDrift:
         status = check_drift(agent, session_store)
         assert status == AgentDriftStatus.NEW
 
-    def test_new_when_latest_exists_but_file_missing(
-        self, session_store
-    ) -> None:
+    def test_new_when_latest_exists_but_file_missing(self, session_store) -> None:
         agent = _agent(source_path=Path("/tmp/nonexistent.toml"))
         # Seed a version so latest_version returns something
         session_store.create_version(
@@ -97,9 +95,7 @@ class TestStartupSweep:
         assert latest["author"] == "filesystem"
         assert "initial" in latest["changelog"]
 
-    def test_creates_version_for_drifted_agent(
-        self, session_store, tmp_path
-    ) -> None:
+    def test_creates_version_for_drifted_agent(self, session_store, tmp_path) -> None:
         f = tmp_path / "agent.toml"
         f.write_text("original")
         agent = _agent(agent_id="sweep-drift", source_path=f)

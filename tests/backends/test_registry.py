@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from agentbox.core.backends import get_backend, list_backends
 from agentbox.core.plugins import backends
 
@@ -40,7 +39,7 @@ def test_backend_adapter_has_name_attr() -> None:
 
 
 def test_fake_adapter_can_be_registered(monkeypatch) -> None:
-    from agentbox.core.backends.base import BackendAdapter, RenderedConfig
+    from agentbox.core.backends.base import RenderedConfig
 
     class FakeBackend:
         name = "fake"

@@ -67,7 +67,8 @@ def scan_agents_dir(agents_d_path: Path) -> list[AgentDef]:
 
     # 1. *.toml files
     toml_files = sorted(
-        p for p in agents_d_path.iterdir()
+        p
+        for p in agents_d_path.iterdir()
         if p.is_file() and p.suffix == ".toml" and not _is_hidden(p)
     )
     for p in toml_files:
@@ -80,8 +81,12 @@ def scan_agents_dir(agents_d_path: Path) -> list[AgentDef]:
 
     # 2. *.md files
     md_files = sorted(
-        p for p in agents_d_path.iterdir()
-        if p.is_file() and p.suffix == ".md" and p.name not in _SKIP and not _is_hidden(p)
+        p
+        for p in agents_d_path.iterdir()
+        if p.is_file()
+        and p.suffix == ".md"
+        and p.name not in _SKIP
+        and not _is_hidden(p)
     )
     for p in md_files:
         try:
@@ -92,8 +97,7 @@ def scan_agents_dir(agents_d_path: Path) -> list[AgentDef]:
 
     # 3. Legacy subdirectories with agent.toml
     dirs = sorted(
-        p for p in agents_d_path.iterdir()
-        if p.is_dir() and not _is_hidden(p)
+        p for p in agents_d_path.iterdir() if p.is_dir() and not _is_hidden(p)
     )
     for d in dirs:
         try:
@@ -126,6 +130,7 @@ def _load_standalone_toml(path: Path) -> AgentDef | None:
         id=manifest.id,
         description=manifest.description,
         prompt_path=resolved_prompt,
+        composition=manifest.composition,
         workspace=manifest.workspace or "default",
         session_mode=manifest.session_mode,
         webhook_url=manifest.webhook_url,
@@ -157,6 +162,7 @@ def _load_legacy_dir_agent(agent_dir: Path) -> AgentDef | None:
             id=manifest.id,
             description=manifest.description,
             prompt_path=resolved_prompt,
+            composition=manifest.composition,
             workspace=manifest.workspace or "default",
             session_mode=manifest.session_mode,
             webhook_url=manifest.webhook_url,

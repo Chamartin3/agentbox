@@ -120,9 +120,7 @@ class AgentDiscovery:
 
             prompt = self._load_prompt(entry)
             if not prompt:
-                self._log(
-                    f"  WARNING: No prompt for {entry.get('id', '?')}, skipping"
-                )
+                self._log(f"  WARNING: No prompt for {entry.get('id', '?')}, skipping")
                 continue
 
             name = entry["id"]
@@ -137,9 +135,7 @@ class AgentDiscovery:
                     mcp_tools=mcp_tools,
                 )
             )
-            self._log(
-                f"  Loaded: {name} ({len(prompt)} chars, {len(mcp_tools)} tools)"
-            )
+            self._log(f"  Loaded: {name} ({len(prompt)} chars, {len(mcp_tools)} tools)")
 
         return agents
 

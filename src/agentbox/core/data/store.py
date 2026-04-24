@@ -22,6 +22,7 @@ from sqlalchemy.engine import Engine
 
 from agentbox.core.data.agent_versions import AgentVersionsMixin
 from agentbox.core.data.analytics import AnalyticsMixin
+from agentbox.core.data.prompts import PromptVersionsMixin
 from agentbox.core.data.records import RunRecord, now_iso, row_to_run
 from agentbox.core.data.schema import (
     guardrail_results,
@@ -149,6 +150,8 @@ class _CoreStore:
         output: str | None = None,
         error: str | None = None,
         status: str | None = None,
+        validation_status: str | None = None,
+        validation_errors: list[str] | None = None,
     ) -> None:
         """Mark a run terminal. Idempotent on already-terminal rows.
 
@@ -157,6 +160,18 @@ class _CoreStore:
         call becomes a no-op so we don't overwrite a real output/error
         with the wrapper's empty result.
         """
+        import json as _json
+
+        values: dict = {
+            "status": status if status else ("ok" if ok else "error"),
+            "output": output,
+            "error": error,
+            "finished_at": now_iso(),
+        }
+        if validation_status is not None:
+            values["validation_status"] = validation_status
+        if validation_errors is not None:
+            values["validation_errors"] = _json.dumps(validation_errors)
         with self.engine.begin() as conn:
             conn.execute(
                 runs.update()
@@ -164,12 +179,7 @@ class _CoreStore:
                     runs.c.id == run_id,
                     runs.c.status.in_(("running",)),
                 )
-                .values(
-                    status=status if status else ("ok" if ok else "error"),
-                    output=output,
-                    error=error,
-                    finished_at=now_iso(),
-                )
+                .values(**values)
             )
 
     def get_run(self, run_id: str) -> RunRecord | None:
@@ -218,9 +228,7 @@ class _CoreStore:
 
     def get_usage(self, run_id: str) -> dict | None:
         with self.engine.connect() as conn:
-            row = conn.execute(
-                usage.select().where(usage.c.run_id == run_id)
-            ).first()
+            row = conn.execute(usage.select().where(usage.c.run_id == run_id)).first()
             return dict(row._mapping) if row else None
 
     def record_guardrail(
@@ -263,12 +271,55 @@ class _CoreStore:
     def get_run_prompt(self, run_id: str) -> str | None:
         with self.engine.connect() as conn:
             row = conn.execute(
-                select(run_prompts.c.fragments).where(
-                    run_prompts.c.run_id == run_id
-                )
+                select(run_prompts.c.fragments).where(run_prompts.c.run_id == run_id)
             ).first()
             return row[0] if row else None
 
+    # ----- composition snapshot -------------------------------------------
 
-class SessionStore(AgentVersionsMixin, AnalyticsMixin, _CoreStore):
-    """Public store façade. Composes core CRUD + analytics + agent versions."""
+    def save_run_snapshot(
+        self,
+        run_id: str,
+        rendered_prompt: dict,
+        variables: dict,
+        validation_status: str,
+        validation_errors: list[str],
+        composition_snapshot: dict | None = None,
+    ) -> None:
+        import json as _json
+
+        values: dict = {
+            "rendered_prompt": _json.dumps(rendered_prompt),
+            "variables": _json.dumps(variables),
+            "validation_status": validation_status,
+            "validation_errors": _json.dumps(validation_errors),
+        }
+        if composition_snapshot is not None:
+            values["composition_snapshot"] = _json.dumps(composition_snapshot)
+        with self.engine.begin() as conn:
+            conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
+
+    def save_run_composition(
+        self,
+        run_id: str,
+        composition_snapshot: dict | None,
+        rendered_prompt: dict | None,
+        variables: dict | None,
+    ) -> None:
+        import json as _json
+
+        values: dict = {}
+        if composition_snapshot is not None:
+            values["composition_snapshot"] = _json.dumps(composition_snapshot)
+        if rendered_prompt is not None:
+            values["rendered_prompt"] = _json.dumps(rendered_prompt)
+        if variables is not None:
+            values["variables"] = _json.dumps(variables)
+
+        if values:
+            with self.engine.begin() as conn:
+                conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
+
+
+class SessionStore(PromptVersionsMixin, AgentVersionsMixin, AnalyticsMixin, _CoreStore):
+    """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions."""

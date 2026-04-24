@@ -86,7 +86,9 @@ def write(agent: AgentDef, project_root: Path, content: str) -> PromptDoc:
 # ---------------------------------------------------------------------------
 
 
-def read_versioned(agent: AgentDef, project_root: Path, store: SessionStore) -> PromptDoc:
+def read_versioned(
+    agent: AgentDef, project_root: Path, store: SessionStore
+) -> PromptDoc:
     """Return the active prompt for this agent.
 
     Priority:
@@ -139,7 +141,14 @@ def save_draft(
     )
 
 
-def publish(agent_id: str, store: SessionStore, project_root: Path, agent: AgentDef | None = None, changelog: str = "", author: str = "system") -> PromptDoc:
+def publish(
+    agent_id: str,
+    store: SessionStore,
+    project_root: Path,
+    agent: AgentDef | None = None,
+    changelog: str = "",
+    author: str = "system",
+) -> PromptDoc:
     """Publish the current draft as a committed version and sync to disk."""
     committed = store.publish_prompt(agent_id, changelog, author)
     if agent and agent.prompt_path:

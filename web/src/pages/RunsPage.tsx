@@ -191,6 +191,7 @@ export default function RunsPage() {
           <tr>
             <th>Run</th>
             <th>Agent</th>
+            <th>Version</th>
             <th>Status</th>
             <th>Started</th>
             <th>Finished</th>
@@ -205,6 +206,18 @@ export default function RunsPage() {
                   {r.agent_id}
                 </Link>
               </td>
+              <td>
+                {r.agent_version_id ? (
+                  <Link
+                    to={`/agents/${encodeURIComponent(r.agent_id)}/versions?highlight=${r.agent_version_id}`}
+                    className="version-chip"
+                  >
+                    v{r.agent_version_id}
+                  </Link>
+                ) : (
+                  <span className="dim">—</span>
+                )}
+              </td>
               <td><span className={`pill ${r.status}`}>{r.status}</span></td>
               <td className="dim">{r.created_at}</td>
               <td className="dim">{r.finished_at || ''}</td>
@@ -212,7 +225,7 @@ export default function RunsPage() {
           ))}
           {!items.length && !loading && (
             <tr>
-              <td colSpan={5} className="dim">
+              <td colSpan={6} className="dim">
                 {anyFilter ? 'no runs match these filters' : 'no runs yet'}
               </td>
             </tr>

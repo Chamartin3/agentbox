@@ -41,7 +41,9 @@ async def stream_subprocess(
             line = await proc.stdout.readline()
             if not line:
                 break
-            yield LogEvent(run_id=run_id, message=line.decode(errors="replace").rstrip())
+            yield LogEvent(
+                run_id=run_id, message=line.decode(errors="replace").rstrip()
+            )
 
     try:
         async with asyncio.timeout(timeout):

@@ -41,7 +41,9 @@ def test_explicit_backend_is_honored(tmp_path: Path) -> None:
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    adapter, rendered = executor._select_backend(agent, workdir, backend_override="claude_code")
+    adapter, rendered = executor._select_backend(
+        agent, workdir, backend_override="claude_code"
+    )
     assert adapter.name == "claude_code"
     assert rendered.cwd == Path(".")
 
@@ -78,7 +80,7 @@ def test_fallback_to_kind_when_no_preference(tmp_path: Path) -> None:
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    adapter, rendered = executor._select_backend(agent, workdir)
+    adapter, _rendered = executor._select_backend(agent, workdir)
     assert adapter.name == "claude_code"
 
 

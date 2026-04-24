@@ -51,9 +51,13 @@ class OpenCodeBackend:
         env["PWD"] = str(workdir)
 
         files: dict[Path, bytes] = {}
-        claude_md = workdir / "CLAUDE.md"
-        if claude_md.exists():
-            files[Path("CLAUDE.md")] = claude_md.read_bytes()
+        composed_system = getattr(agent, "_composed_system", None)
+        if composed_system is not None:
+            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
+        else:
+            claude_md = workdir / "CLAUDE.md"
+            if claude_md.exists():
+                files[Path("CLAUDE.md")] = claude_md.read_bytes()
 
         return RenderedConfig(
             argv=argv,
@@ -170,7 +174,10 @@ class OpenCodeBackend:
             await proc.wait()
             stderr_task.cancel()
             yield DoneEvent(
-                run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout"
+                run_id=run_id,
+                ok=False,
+                error=f"timeout after {timeout}s",
+                status="timeout",
             )
             return
 

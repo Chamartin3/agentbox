@@ -20,7 +20,6 @@ from typing import Any
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Noop backend registration
 # ---------------------------------------------------------------------------
@@ -91,9 +90,7 @@ def test_agents_list_empty_with_minimal_manifest(client: Any) -> None:
     assert resp.json() == []
 
 
-def test_agents_list_with_noop_agent(
-    isolated_data_dir: Path, client: Any
-) -> None:
+def test_agents_list_with_noop_agent(isolated_data_dir: Path, client: Any) -> None:
     """Agents defined in the manifest are listed after the cache is re-warmed."""
     _register_noop_backend()
 
@@ -164,6 +161,7 @@ def test_missing_manifest_emits_clear_error(
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
 
     import agentbox.config as _config
+
     importlib.reload(_config)
 
     from agentbox.config import SETTINGS

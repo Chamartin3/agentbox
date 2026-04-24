@@ -44,6 +44,7 @@ _AGENT_PATCHABLE = {
 _RUNNER_PATCHABLE = {
     "kind",
     "model",
+    "agent_module",
     "mcp_config_path",
     "agents_config_path",
     "settings_path",
@@ -52,6 +53,8 @@ _RUNNER_PATCHABLE = {
     "extra_args",
     "timeout_seconds",
     "command",
+    "output_schema_path",
+    "max_validation_retries",
 }
 
 
@@ -70,6 +73,9 @@ class ManifestWriter:
 
     @property
     def path(self) -> Path:
+        new = self.project_root / "manifest.toml"
+        if new.exists():
+            return new
         return self.project_root / "agentbox.toml"
 
     def read_text(self) -> str:
@@ -105,7 +111,9 @@ class ManifestWriter:
         existing_metadata = None
         if path.exists():
             existing_metadata = dict(frontmatter.load(str(path)).metadata)
-        write_markdown_agent(path, agent, preserve_unknown_keys=True, existing_metadata=existing_metadata)
+        write_markdown_agent(
+            path, agent, preserve_unknown_keys=True, existing_metadata=existing_metadata
+        )
         return path
 
     def _save_standalone_toml(self, agent: AgentDef) -> Path:
@@ -115,7 +123,11 @@ class ManifestWriter:
 
     def _save_legacy_dir(self, agent: AgentDef) -> Path:
         if agent.source_path:
-            agent_dir = agent.source_path.parent if agent.source_path.suffix == ".toml" else agent.source_path
+            agent_dir = (
+                agent.source_path.parent
+                if agent.source_path.suffix == ".toml"
+                else agent.source_path
+            )
         else:
             agent_dir = self.project_root / "agents" / agent.id
         write_legacy_dir(agent_dir, agent)

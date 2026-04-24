@@ -48,9 +48,7 @@ async def test_close_idempotent() -> None:
     import httpx
 
     async with httpx.AsyncClient() as http:
-        client = McpClient(
-            "test", url="http://localhost:9999/mcp", http_client=http
-        )
+        client = McpClient("test", url="http://localhost:9999/mcp", http_client=http)
         await client.close()
 
 

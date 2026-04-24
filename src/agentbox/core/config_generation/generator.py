@@ -80,9 +80,7 @@ def _materialize_workspace_files(
             continue
         src = (project_root / src_rel).resolve()
         if not src.exists():
-            raise FileNotFoundError(
-                f"workspace files: source does not exist: {src}"
-            )
+            raise FileNotFoundError(f"workspace files: source does not exist: {src}")
         dst = workspace_path / dst_rel
         if dst.is_symlink() or dst.exists():
             if dst.is_dir() and not dst.is_symlink():

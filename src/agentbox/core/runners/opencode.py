@@ -99,7 +99,9 @@ class OpenCodeRunner(Runner):
         if early_model:
             yield UsageEvent(run_id=req.run_id, model=early_model)
 
-        yield LogEvent(run_id=req.run_id, message=f"$ opencode run --stdin ... (cwd={req.workdir})")
+        yield LogEvent(
+            run_id=req.run_id, message=f"$ opencode run --stdin ... (cwd={req.workdir})"
+        )
 
         async for ev in self._run_opencode(
             req.run_id, argv, req.workdir, spec.timeout_seconds, stdin_data=stdin_data
@@ -197,7 +199,10 @@ class OpenCodeRunner(Runner):
             await proc.wait()
             stderr_task.cancel()
             yield DoneEvent(
-                run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout"
+                run_id=run_id,
+                ok=False,
+                error=f"timeout after {timeout}s",
+                status="timeout",
             )
             return
 
@@ -374,5 +379,3 @@ async def _fetch_session_usage(
         cost_usd=cost_f,
         model=model,
     )
-
-

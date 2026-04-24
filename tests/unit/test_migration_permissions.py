@@ -7,11 +7,9 @@ workspace permissions from per-workspace JSON files to inlined manifest blocks.
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 import tomlkit
-
 from agentbox.core.migrations import migrate_capabilities_to_manifest
 
 
@@ -69,7 +67,7 @@ description = "Default workspace"
     assert results["default"]["backed_up"] is True
 
     # Verify backup was created
-    backup_file = cap_dir / "capabilities.json.migrated-20250520_000000"
+    cap_dir / "capabilities.json.migrated-20250520_000000"
     # We can't predict the exact timestamp, so just check a file matching the pattern exists
     backup_files = list(cap_dir.glob("capabilities.json.migrated-*"))
     assert len(backup_files) == 1

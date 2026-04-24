@@ -15,7 +15,7 @@
 }
 
 .rating-stars .star.empty {
-  color: #e0e0e0;
+  color: var(--border);
 }
 
 .rating-stars .star:hover {
@@ -30,6 +30,6 @@
 .rating-value {
   margin-left: 8px;
   font-size: 0.875rem;
-  color: #666;
+  color: var(--fg-muted);
   font-weight: 500;
 }

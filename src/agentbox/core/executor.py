@@ -191,7 +191,7 @@ class RunExecutor:
 
     def _make_generator(self) -> ConfigGenerator:
         manifest = self.loader.load()
-        agentbox_toml = self.settings.project_root / "agentbox.toml"
+        agentbox_toml = self.loader.manifest_path
         mcp_manifest = self._try_get_mcp_manifest()
         mcp_server_name = (
             manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
@@ -224,6 +224,8 @@ class RunExecutor:
         webhook_url: str | None = None,
         runner_override: str | None = None,
         backend: str | None = None,
+        variables: dict[str, Any] | None = None,
+        runner_embedded: bool = False,
     ) -> str:
         workdir, session_id = self._prepare_workdir(
             agent, session_id, workspace_override
@@ -232,6 +234,50 @@ class RunExecutor:
         agent = self._apply_overrides(
             agent, timeout_seconds, webhook_url, runner_override
         )
+
+        # --- composition path ------------------------------------------------
+        composed_result = None
+        if agent.composition is not None and variables is not None:
+            from agentbox.core.composition.loader import load_bundle
+
+            manifest = self.loader.load()
+            shared_roots = {
+                k: self.settings.project_root / v
+                for k, v in (manifest.shared_assets or {}).items()
+            }
+
+            # Find the agent bundle path
+            bundle_path = self._resolve_bundle_path(agent)
+            bundle = load_bundle(
+                agent_id=agent.id,
+                root=bundle_path,
+                manifest_composition=agent.composition,
+                legacy_prompt_path=agent.prompt_path,
+            )
+            composed_result = bundle.compose(variables, shared_roots)
+            # Attach composed metadata so backend adapters can read it
+            agent = agent.model_copy(deep=True)
+            agent.__dict__["_composed_system"] = composed_result.system
+            agent.__dict__["_composed_user"] = composed_result.user
+            agent.__dict__["_composed_schema"] = composed_result.schema
+            agent.__dict__["_composed_bundle_sha"] = composed_result.bundle_sha
+            input_ = composed_result.user
+
+            # Wire output schema into runner spec for the executor's retry loop
+            comp = agent.composition
+            if comp and comp.output_schema and comp.output_validation != "off":
+                schema_path = bundle_path / comp.output_schema
+                runner_updates: dict = {
+                    "output_schema_path": str(schema_path),
+                }
+                if comp.output_validation == "warn":
+                    runner_updates["max_validation_retries"] = 0
+                agent = agent.model_copy(
+                    update={"runner": agent.runner.model_copy(update=runner_updates)}
+                )
+            agent.__dict__["_composed_validation_mode"] = (
+                comp.output_validation if comp else "strict"
+            )
 
         # Select backend adapter and render into run dir
         adapter, rendered = self._select_backend(agent, workdir, backend)
@@ -249,8 +295,40 @@ class RunExecutor:
             config_digest=rendered.digest,
         )
 
+        # Save composition metadata
+        if composed_result is not None:
+            snapshot = {
+                "bundle_sha": composed_result.bundle_sha,
+                "schema_sha": composed_result.schema_sha,
+                "references": [
+                    {"path": str(r) if isinstance(r, str) else r["path"]}
+                    for r in (agent.composition.references if agent.composition else [])
+                ],
+            }
+            self.store.save_run_composition(
+                run_id=run_id,
+                composition_snapshot=snapshot,
+                rendered_prompt={
+                    "system": composed_result.system,
+                    "user": composed_result.user,
+                    "schema": composed_result.schema,
+                },
+                variables=variables or {},
+            )
+
         # Stamp run with current agent version
         self._stamp_run_agent_version(run_id, agent)
+
+        # Embedded runner: caller will post snapshot later
+        if runner_embedded:
+            if variables:
+                self.store.save_run_composition(
+                    run_id=run_id,
+                    composition_snapshot=None,
+                    rendered_prompt=None,
+                    variables=variables,
+                )
+            return run_id
 
         broadcaster = RunBroadcaster()
         self._broadcasters[run_id] = broadcaster
@@ -266,11 +344,28 @@ class RunExecutor:
             pass
         task = asyncio.create_task(
             self._run(
-                run_id, adapter, rendered, agent, input_, workdir, run_dir, transcript_path, broadcaster
+                run_id,
+                adapter,
+                rendered,
+                agent,
+                input_,
+                workdir,
+                run_dir,
+                transcript_path,
+                broadcaster,
             )
         )
         task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
         return run_id
+
+    def _resolve_bundle_path(self, agent: AgentDef) -> Path:
+        """Resolve the filesystem path for an agent's bundle."""
+        if agent.source_path and agent.source_path.is_dir():
+            return agent.source_path
+        if agent.source_path and agent.source_path.is_file():
+            return agent.source_path.parent
+        # Fallback: agents_dir / agent.id
+        return self.settings.project_root / "agents" / agent.id
 
     def _select_backend(
         self,
@@ -306,7 +401,8 @@ class RunExecutor:
             candidates = [backend_override]
         elif manifest.backend_preference:
             candidates = [
-                n for n in manifest.backend_preference
+                n
+                for n in manifest.backend_preference
                 if n not in agent.unsupported_backends
             ]
         else:
@@ -378,7 +474,10 @@ class RunExecutor:
             self.store.set_session_workdir(sid, str(wd))
             return wd, sid
         self.settings.runs_dir.mkdir(parents=True, exist_ok=True)
-        wd = Path(tempfile.mkdtemp(prefix="run-", dir=self.settings.runs_dir)) / "workdir"
+        wd = (
+            Path(tempfile.mkdtemp(prefix="run-", dir=self.settings.runs_dir))
+            / "workdir"
+        )
         wd.mkdir(parents=True, exist_ok=True)
         return wd, None
 
@@ -394,7 +493,9 @@ class RunExecutor:
         # materialize_rendered_config owns the exclusive mkdir (mode 0o700).
         materialize_rendered_config(rendered, run_dir)
 
-        permissions = _load_workspace_permissions(workdir, agent, self.loader, self.settings)
+        permissions = _load_workspace_permissions(
+            workdir, agent, self.loader, self.settings
+        )
         generator = self._make_generator()
         generator.generate_configs_into(
             run_dir,
@@ -446,6 +547,8 @@ class RunExecutor:
         final_error: str | None = None
         final_status: str | None = None
         output: str | None = None
+        validation_status: str | None = None
+        validation_errors: list[str] | None = None
 
         try:
             transcript_path.parent.mkdir(parents=True, exist_ok=True)
@@ -469,30 +572,37 @@ class RunExecutor:
                 if not final_ok:
                     break
 
-                if (
-                    attempt < max_attempts - 1
-                    and agent.runner.output_schema_path
-                    and output
-                ):
-                    is_valid, v_error = self._validate_output(
-                        output, agent, workdir
-                    )
+                if agent.runner.output_schema_path and output:
+                    is_valid, v_error = self._validate_output(output, agent, workdir)
                     if is_valid:
+                        validation_status = "ok"
+                        validation_errors = None
                         break
-                    current_input = self._build_retry_prompt(
-                        input_, output, v_error
-                    )
-                    broadcaster.publish(
-                        LogEvent(
-                            run_id=run_id,
-                            level="warn",
-                            message=(
-                                f"Validation failed (attempt {attempt + 1}): "
-                                f"{v_error} — retrying"
-                            ),
+                    validation_status = "fail"
+                    validation_errors = [v_error]
+                    if attempt < max_attempts - 1:
+                        current_input = self._build_retry_prompt(
+                            input_, output, v_error
                         )
-                    )
-                    continue
+                        broadcaster.publish(
+                            LogEvent(
+                                run_id=run_id,
+                                level="warn",
+                                message=(
+                                    f"Validation failed (attempt {attempt + 1}): "
+                                    f"{v_error} — retrying"
+                                ),
+                            )
+                        )
+                        continue
+                    # Final attempt failed validation
+                    mode = getattr(agent, "_composed_validation_mode", "strict")
+                    if mode == "strict":
+                        final_ok = False
+                        final_error = f"output validation failed: {v_error}"
+                    elif mode == "warn":
+                        validation_status = "warn"
+                    break
 
                 break
             try:
@@ -509,6 +619,8 @@ class RunExecutor:
                 output=output,
                 error=final_error,
                 status=final_status,
+                validation_status=validation_status,
+                validation_errors=validation_errors,
             )
             try:
                 refreshed = self.store.get_run(run_id)
@@ -645,7 +757,9 @@ class RunExecutor:
                 cls = get_guardrail(ref.name)
             except KeyError as exc:
                 broadcaster.publish(
-                    GuardrailEvent(run_id=run_id, name=ref.name, ok=False, message=str(exc))
+                    GuardrailEvent(
+                        run_id=run_id, name=ref.name, ok=False, message=str(exc)
+                    )
                 )
                 continue
             instance = cls()
@@ -686,9 +800,7 @@ class RunExecutor:
                         .values(agent_version_id=latest["id"])
                     )
         except Exception:
-            logger.exception(
-                "failed to stamp agent version for run %s", run_id
-            )
+            logger.exception("failed to stamp agent version for run %s", run_id)
 
     def _cleanup_workdir(self, agent: AgentDef, workdir: Path) -> None:
         if agent.workspace != "<ephemeral>":

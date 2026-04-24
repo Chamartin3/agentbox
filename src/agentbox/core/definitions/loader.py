@@ -102,7 +102,11 @@ class DefinitionLoader:
         agents_d = self.agents_d_path
         if agents_d.is_dir():
             for a in scan_agents_dir(agents_d):
-                _merge_agent(merged, a, f"agents.d/{a.source_path.name}" if a.source_path else "agents.d")
+                _merge_agent(
+                    merged,
+                    a,
+                    f"agents.d/{a.source_path.name}" if a.source_path else "agents.d",
+                )
 
         # 3. Inline [[agents]] (highest priority)
         for a in manifest.agents:

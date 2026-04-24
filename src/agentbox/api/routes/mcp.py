@@ -56,8 +56,7 @@ def get_server_groups(name: str) -> dict:
     if health is None or health.status == "unavailable":
         raise HTTPException(404, f"MCP server {name!r} not found or unavailable")
     groups = {
-        k: v for k, v in registry.manifest.groups.items()
-        if k.startswith(f"{name}.")
+        k: v for k, v in registry.manifest.groups.items() if k.startswith(f"{name}.")
     }
     return {
         "server": name,

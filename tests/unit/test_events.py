@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-from pydantic import TypeAdapter
-
 from agentbox.api.events import (
     DoneEvent,
     GuardrailEvent,
@@ -17,6 +15,7 @@ from agentbox.api.events import (
     ToolResultEvent,
     UsageEvent,
 )
+from pydantic import TypeAdapter, ValidationError
 
 RUN_ID = "r1"
 _ADAPTER: TypeAdapter[RunEvent] = TypeAdapter(RunEvent)
@@ -58,5 +57,5 @@ def test_text_event_default_role_is_assistant() -> None:
 
 def test_unknown_type_rejected() -> None:
     payload = json.dumps({"type": "bogus", "run_id": RUN_ID})
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         _ADAPTER.validate_json(payload)

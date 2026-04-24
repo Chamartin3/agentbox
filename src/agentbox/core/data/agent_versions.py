@@ -89,9 +89,7 @@ class AgentVersionsMixin:
             )
             return [self._row_dict(r) for r in rows]
 
-    def diff_versions(
-        self, agent_id: str, a: int, b: int
-    ) -> dict[str, Any]:
+    def diff_versions(self, agent_id: str, a: int, b: int) -> dict[str, Any]:
         va = self.get_version(agent_id, a)
         vb = self.get_version(agent_id, b)
         if va is None or vb is None:
@@ -99,21 +97,15 @@ class AgentVersionsMixin:
         return {
             "from_version": a,
             "to_version": b,
-            "prompt_diff": _text_diff(
-                va["prompt_snapshot"], vb["prompt_snapshot"]
-            ),
-            "content_diff": _json_diff(
-                va["content_snapshot"], vb["content_snapshot"]
-            ),
+            "prompt_diff": _text_diff(va["prompt_snapshot"], vb["prompt_snapshot"]),
+            "content_diff": _json_diff(va["content_snapshot"], vb["content_snapshot"]),
         }
 
     # ------------------------------------------------------------------
     # Comments
     # ------------------------------------------------------------------
 
-    def add_comment(
-        self, version_id: int, author: str, body: str
-    ) -> dict:
+    def add_comment(self, version_id: int, author: str, body: str) -> dict:
         with self.engine.begin() as conn:
             conn.execute(
                 agent_version_comments.insert().values(
@@ -147,9 +139,7 @@ class AgentVersionsMixin:
     # Ratings
     # ------------------------------------------------------------------
 
-    def set_rating(
-        self, version_id: int, rating: int, rater: str
-    ) -> dict:
+    def set_rating(self, version_id: int, rating: int, rater: str) -> dict:
         if not (1 <= rating <= 5):
             raise ValueError(f"rating must be 1-5, got {rating}")
         with self.engine.begin() as conn:
@@ -203,9 +193,7 @@ def _text_diff(a: str, b: str) -> str:
     except ImportError:
         return f"<{len(lines_a)} lines → {len(lines_b)} lines>"
 
-    return "".join(
-        difflib.unified_diff(lines_a, lines_b, lineterm="")
-    )
+    return "".join(difflib.unified_diff(lines_a, lines_b, lineterm=""))
 
 
 def _json_diff(a: str, b: str) -> dict:

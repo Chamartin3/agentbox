@@ -42,9 +42,7 @@ def test_intersection_preserves_agent_order() -> None:
 
 def test_workspace_narrower_than_agent() -> None:
     # Workspace clamps the agent's allow list.
-    result = _intersect_allowed_tools(
-        ["Read", "Grep", "Write", "Bash"], ["Read"]
-    )
+    result = _intersect_allowed_tools(["Read", "Grep", "Write", "Bash"], ["Read"])
     assert result == ["Read"]
 
 

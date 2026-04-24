@@ -165,9 +165,7 @@ def create_agent_version(agent_id: str, body: NewVersionBody) -> dict:
     return store.create_version(
         agent_id=agent_id,
         source_path=str(agent.source_path) if agent.source_path else "",
-        source_format=(
-            agent.source_format.value if agent.source_format else "unknown"
-        ),
+        source_format=(agent.source_format.value if agent.source_format else "unknown"),
         content_snapshot=body.content_snapshot,
         prompt_snapshot=body.prompt_snapshot,
         content_hash="",

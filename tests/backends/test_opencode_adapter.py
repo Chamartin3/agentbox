@@ -8,7 +8,6 @@ from agentbox.core.backends.opencode import OpenCodeBackend
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 
-
 DEFAULT_RUNNER = RunnerSpec(
     kind=RunnerKind.OPENCODE,
     extra_args=["--agent", "test-agent"],
@@ -16,10 +15,10 @@ DEFAULT_RUNNER = RunnerSpec(
 
 
 def _make_agent(**overrides: object) -> AgentDef:
-    kwargs = dict(
-        id="test_agent",
-        runner=DEFAULT_RUNNER,
-    )
+    kwargs = {
+        "id": "test_agent",
+        "runner": DEFAULT_RUNNER,
+    }
     kwargs.update(overrides)
     return AgentDef(**kwargs)  # type: ignore[arg-type]
 
@@ -54,9 +53,7 @@ def test_render_includes_extra_args() -> None:
 
 
 def test_render_applies_default_model_when_missing() -> None:
-    agent = _make_agent(
-        runner=RunnerSpec(kind=RunnerKind.OPENCODE, extra_args=[])
-    )
+    agent = _make_agent(runner=RunnerSpec(kind=RunnerKind.OPENCODE, extra_args=[]))
     adapter = OpenCodeBackend()
     rendered = adapter.render(agent, Path("/tmp/workdir"))
 

@@ -8,15 +8,14 @@ from agentbox.core.backends.pydantic_ai import PydanticAiBackend
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 
-
 DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.PYDANTIC_AI)
 
 
 def _make_agent(**overrides: object) -> AgentDef:
-    kwargs = dict(
-        id="test_agent",
-        runner=DEFAULT_RUNNER,
-    )
+    kwargs = {
+        "id": "test_agent",
+        "runner": DEFAULT_RUNNER,
+    }
     kwargs.update(overrides)
     return AgentDef(**kwargs)  # type: ignore[arg-type]
 

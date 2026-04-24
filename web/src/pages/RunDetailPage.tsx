@@ -626,6 +626,56 @@ export default function RunDetailPage() {
         </div>
       </div>
 
+      {/* ── Validation badge ─────────────────────────────────────────── */}
+      {run.validation_status && (
+        <section className="section">
+          <div className="row between" style={{ marginBottom: 6 }}>
+            <h2 style={{ border: 'none', margin: 0 }}>
+              Validation{' '}
+              <span className={`pill ${run.validation_status === 'ok' ? 'ok' : run.validation_status === 'warn' ? 'running' : 'error'}`}>
+                {run.validation_status}
+              </span>
+            </h2>
+          </div>
+          {run.validation_errors && (
+            <CodeBlock value={run.validation_errors} language="json" />
+          )}
+        </section>
+      )}
+
+      {/* ── Rendered Prompt ──────────────────────────────────────────── */}
+      {run.rendered_prompt && (
+        <section className="section">
+          <h2 style={{ border: 'none', margin: 0, marginBottom: 8 }}>
+            Rendered Prompt <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· composed for this run</span>
+          </h2>
+          <details className="code-block" style={{ marginBottom: 8 }}>
+            <summary className="code-block-bar">System prompt</summary>
+            <pre style={{ margin: 0, padding: 10 }}>{run.rendered_prompt.system}</pre>
+          </details>
+          <details className="code-block" style={{ marginBottom: 8 }}>
+            <summary className="code-block-bar">User message</summary>
+            <pre style={{ margin: 0, padding: 10 }}>{run.rendered_prompt.user}</pre>
+          </details>
+          {run.rendered_prompt.schema && (
+            <details className="code-block">
+              <summary className="code-block-bar">Output schema</summary>
+              <pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(run.rendered_prompt.schema, null, 2)}</pre>
+            </details>
+          )}
+        </section>
+      )}
+
+      {/* ── Variables ────────────────────────────────────────────────── */}
+      {run.variables && (
+        <section className="section">
+          <h2 style={{ border: 'none', margin: 0, marginBottom: 6 }}>
+            Variables <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· what the caller sent</span>
+          </h2>
+          <CodeBlock value={JSON.stringify(run.variables, null, 2)} language="json" />
+        </section>
+      )}
+
       {/* ── Input ────────────────────────────────────────────────────── */}
       <section className="section">
         <div className="row between" style={{ marginBottom: 6 }}>
@@ -707,6 +757,35 @@ export default function RunDetailPage() {
           </table>
         )}
       </section>
+
+      {/* ── Composition snapshot ───────────────────────────────────── */}
+      {run.composition_snapshot && (
+        <section className="section">
+          <h2 style={{ border: 'none', margin: 0, marginBottom: 6 }}>
+            Composition Snapshot <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· recipe version</span>
+          </h2>
+          <dl className="dl">
+            {run.composition_snapshot.bundle_sha && (
+              <><dt>Bundle SHA</dt><dd><code>{String(run.composition_snapshot.bundle_sha)}</code></dd></>
+            )}
+            {run.composition_snapshot.schema_sha && (
+              <><dt>Schema SHA</dt><dd><code>{String(run.composition_snapshot.schema_sha)}</code></dd></>
+            )}
+            {Array.isArray(run.composition_snapshot.references) && (
+              <>
+                <dt>References</dt>
+                <dd>
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {run.composition_snapshot.references.map((ref: unknown, i: number) => (
+                      <li key={i}><code>{typeof ref === 'string' ? ref : JSON.stringify(ref)}</code></li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
 
       {/* ── Plumbing details (collapsed by default) ─────────────────── */}
       <details className="section" style={{ padding: '12px 16px' }}>

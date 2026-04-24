@@ -52,7 +52,11 @@ def _sweep_legacy_generated(workspaces_root: Path) -> None:
             shutil.rmtree(legacy, ignore_errors=True)
             swept += 1
     if swept:
-        _log.info("swept %d legacy .agentbox/generated/ directories under %s", swept, workspaces_root)
+        _log.info(
+            "swept %d legacy .agentbox/generated/ directories under %s",
+            swept,
+            workspaces_root,
+        )
 
 
 def _on_startup() -> None:
@@ -79,7 +83,9 @@ def _on_startup() -> None:
             registry = _deps.get_mcp_registry()
             specs = [s.model_dump() for s in loaded_manifest.mcp_servers]
             task = asyncio.ensure_future(registry.sync_servers(specs))
-            task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+            task.add_done_callback(
+                lambda t: t.exception() if not t.cancelled() else None
+            )
     except Exception:
         pass
 

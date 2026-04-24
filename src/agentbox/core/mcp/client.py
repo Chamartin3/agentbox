@@ -51,16 +51,21 @@ class McpClient:
 
     async def initialize(self) -> dict:
         if self._transport in ("http", "sse") and self._url:
-            result = await self._jsonrpc("initialize", {
-                "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {},
-                "clientInfo": _CLIENT_INFO,
-            })
+            result = await self._jsonrpc(
+                "initialize",
+                {
+                    "protocolVersion": MCP_PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": _CLIENT_INFO,
+                },
+            )
             self._initialized = True
             return result
         if self._transport == "stdio":
             raise NotImplementedError("stdio transport not yet implemented")
-        raise McpError(f"unsupported transport: {self._transport} for server {self.server_name}")
+        raise McpError(
+            f"unsupported transport: {self._transport} for server {self.server_name}"
+        )
 
     async def list_tools(self) -> list[McpRawTool]:
         if not self._initialized:
@@ -68,12 +73,12 @@ class McpClient:
         result = await self._jsonrpc("tools/list", {})
         return result.get("tools", [])
 
-    async def subscribe_changes(
-        self, callback: Callable[[], None]
-    ) -> None:
+    async def subscribe_changes(self, callback: Callable[[], None]) -> None:
         if self._transport == "sse" and self._url:
             task = asyncio.create_task(self._sse_listen(callback))
-            task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+            task.add_done_callback(
+                lambda t: t.exception() if not t.cancelled() else None
+            )
 
     async def _jsonrpc(self, method: str, params: dict) -> dict:
         self._request_id += 1
@@ -127,7 +132,10 @@ class McpClient:
                 async for line in response.aiter_lines():
                     if line.startswith("event: "):
                         event_type = line[7:].strip()
-                    elif line.startswith("data: ") and event_type == "notifications/tools/list_changed":
+                    elif (
+                        line.startswith("data: ")
+                        and event_type == "notifications/tools/list_changed"
+                    ):
                         callback()
         except Exception:
             pass

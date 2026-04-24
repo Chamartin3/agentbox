@@ -152,18 +152,12 @@ class AnalyticsMixin:
                 func.sum(case((runs.c.status == "running", 1), else_=0)).label(
                     "running"
                 ),
-                func.sum(case((runs.c.status == "ok", 1), else_=0)).label(
-                    "successes"
-                ),
+                func.sum(case((runs.c.status == "ok", 1), else_=0)).label("successes"),
                 func.sum(case((runs.c.status == "error", 1), else_=0)).label(
                     "failures"
                 ),
-                func.coalesce(func.sum(duration_or_zero), 0).label(
-                    "total_duration_ms"
-                ),
-                func.coalesce(func.avg(duration_or_null), 0).label(
-                    "avg_duration_ms"
-                ),
+                func.coalesce(func.sum(duration_or_zero), 0).label("total_duration_ms"),
+                func.coalesce(func.avg(duration_or_null), 0).label("avg_duration_ms"),
             )
             .select_from(runs)
             .where(*base_filters)
@@ -171,9 +165,7 @@ class AnalyticsMixin:
 
         usage_stmt = (
             select(
-                func.coalesce(func.sum(usage.c.input_tokens), 0).label(
-                    "input_tokens"
-                ),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
                 func.coalesce(func.sum(usage.c.output_tokens), 0).label(
                     "output_tokens"
                 ),
@@ -256,9 +248,7 @@ class AnalyticsMixin:
                 totals[k] = int(totals.get(k) or 0)
             total_runs = totals["runs"]
             totals["failure_rate_pct"] = (
-                round(100 * totals["failures"] / total_runs, 1)
-                if total_runs
-                else 0.0
+                round(100 * totals["failures"] / total_runs, 1) if total_runs else 0.0
             )
 
             usage_row = conn.execute(usage_stmt).first()

@@ -65,8 +65,28 @@ def build_fragments(
         ),
     ]
 
-    # Agent system prompt (markdown). Prefer versioned store, fall back to disk.
-    if agent.prompt_path:
+    # Composed prompts take precedence over legacy prompt_path.
+    composed_system = getattr(agent, "_composed_system", None)
+    if composed_system is not None:
+        frags.append(
+            PromptFragment(
+                name="agent_system_prompt",
+                source="agent_def",
+                injected_by="agentbox",
+                content=composed_system,
+            )
+        )
+        composed_schema = getattr(agent, "_composed_schema", None)
+        if composed_schema is not None:
+            frags.append(
+                PromptFragment(
+                    name="output_schema",
+                    source="agent_def",
+                    injected_by="agentbox",
+                    content=json.dumps(composed_schema, indent=2),
+                )
+            )
+    elif agent.prompt_path:
         text: str | None = None
         if store is not None:
             committed = store.get_latest_committed_prompt(agent.id)
@@ -127,52 +147,64 @@ def _claude_code_fragments(
     out: list[PromptFragment] = []
 
     if spec.agents_config_path:
-        out.append(_read_file_fragment(
-            name="agents_config",
-            path=project_root / spec.agents_config_path,
-            source="project",
-            injected_by="claude_cli",
-        ))
+        out.append(
+            _read_file_fragment(
+                name="agents_config",
+                path=project_root / spec.agents_config_path,
+                source="project",
+                injected_by="claude_cli",
+            )
+        )
     if spec.mcp_config_path:
-        out.append(_read_file_fragment(
-            name="mcp_config",
-            path=project_root / spec.mcp_config_path,
-            source="project",
-            injected_by="claude_cli",
-        ))
+        out.append(
+            _read_file_fragment(
+                name="mcp_config",
+                path=project_root / spec.mcp_config_path,
+                source="project",
+                injected_by="claude_cli",
+            )
+        )
     if spec.settings_path:
-        out.append(_read_file_fragment(
-            name="settings",
-            path=project_root / spec.settings_path,
-            source="project",
-            injected_by="claude_cli",
-        ))
+        out.append(
+            _read_file_fragment(
+                name="settings",
+                path=project_root / spec.settings_path,
+                source="project",
+                injected_by="claude_cli",
+            )
+        )
     if spec.allowed_tools:
-        out.append(PromptFragment(
-            name="allowed_tools",
-            source="agent_def",
-            injected_by="claude_cli",
-            content="\n".join(spec.allowed_tools),
-        ))
+        out.append(
+            PromptFragment(
+                name="allowed_tools",
+                source="agent_def",
+                injected_by="claude_cli",
+                content="\n".join(spec.allowed_tools),
+            )
+        )
     if argv:
-        out.append(PromptFragment(
-            name="argv",
-            source="agentbox",
+        out.append(
+            PromptFragment(
+                name="argv",
+                source="agentbox",
+                injected_by="claude_cli",
+                content=shlex.join(argv),
+            )
+        )
+    out.append(
+        PromptFragment(
+            name="claude_cli_envelope",
+            source="claude_cli",
             injected_by="claude_cli",
-            content=shlex.join(argv),
-        ))
-    out.append(PromptFragment(
-        name="claude_cli_envelope",
-        source="claude_cli",
-        injected_by="claude_cli",
-        content=(
-            "Claude CLI also injects an environment description (cwd, platform, "
-            "git status, date), built-in tool definitions, and the MCP tool "
-            "schemas resolved from mcp_config. These are not visible to "
-            "agentbox — only their inputs (the configs above) are."
-        ),
-        inspectable=False,
-    ))
+            content=(
+                "Claude CLI also injects an environment description (cwd, platform, "
+                "git status, date), built-in tool definitions, and the MCP tool "
+                "schemas resolved from mcp_config. These are not visible to "
+                "agentbox — only their inputs (the configs above) are."
+            ),
+            inspectable=False,
+        )
+    )
     return out
 
 

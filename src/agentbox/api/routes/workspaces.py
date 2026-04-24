@@ -60,17 +60,19 @@ def list_workspaces() -> list[dict]:
                     file_count += 1
             skill_count = len(discover_skills(ws_path))
 
-        result.append({
-            "name": w.name,
-            "path": str(ws_path),
-            "description": w.description,
-            "kind": "named",
-            "agents": agents,
-            "agent_count": len(agents),
-            "file_count": file_count,
-            "skill_count": skill_count,
-            "exists": ws_path.exists(),
-        })
+        result.append(
+            {
+                "name": w.name,
+                "path": str(ws_path),
+                "description": w.description,
+                "kind": "named",
+                "agents": agents,
+                "agent_count": len(agents),
+                "file_count": file_count,
+                "skill_count": skill_count,
+                "exists": ws_path.exists(),
+            }
+        )
 
     return result
 
@@ -94,9 +96,7 @@ def _make_generator(project_root: Path, loader) -> ConfigGenerator:
     """Build a ConfigGenerator from the manifest."""
     manifest = loader.load()
     agentbox_toml = project_root / "agentbox.toml"
-    mcp_server_name = (
-        manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
-    )
+    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
     return ConfigGenerator(
         agentbox_toml=agentbox_toml,
         mcp_manifest=_try_get_mcp_manifest(),
@@ -112,7 +112,13 @@ def _try_get_mcp_manifest():
         return None
 
 
-_FILE_HIDE_PREFIXES = (".agentbox/", ".claude/", ".opencode/", "permissions/", "skills/")
+_FILE_HIDE_PREFIXES = (
+    ".agentbox/",
+    ".claude/",
+    ".opencode/",
+    "permissions/",
+    "skills/",
+)
 
 
 def _is_user_file(rel_path: str) -> bool:
@@ -121,7 +127,9 @@ def _is_user_file(rel_path: str) -> bool:
     Generated configs, capabilities.json, and skill packs each have their
     own UI section, so excluding them from the Files list avoids noise.
     """
-    return not any(rel_path == p.rstrip("/") or rel_path.startswith(p) for p in _FILE_HIDE_PREFIXES)
+    return not any(
+        rel_path == p.rstrip("/") or rel_path.startswith(p) for p in _FILE_HIDE_PREFIXES
+    )
 
 
 @router.get("/by-name/{name}")
@@ -134,10 +142,12 @@ def get_workspace_by_name(name: str) -> dict:
                 rel = str(p.relative_to(ws_path))
                 if not _is_user_file(rel):
                     continue
-                files.append({
-                    "path": rel,
-                    "size": p.stat().st_size,
-                })
+                files.append(
+                    {
+                        "path": rel,
+                        "size": p.stat().st_size,
+                    }
+                )
     return {
         "name": name,
         "path": str(ws_path),
@@ -172,7 +182,9 @@ def _save_permissions(ws_path: Path, permissions: dict) -> None:
     perm_dir = ws_path / "permissions"
     perm_dir.mkdir(parents=True, exist_ok=True)
     perm_file = perm_dir / "capabilities.json"
-    perm_file.write_text(json.dumps(permissions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    perm_file.write_text(
+        json.dumps(permissions, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 @router.get("/by-name/{name}/permissions")
@@ -268,9 +280,7 @@ def get_workspace_mcp_tools(name: str) -> dict:
     manifest = loader.load()
 
     # Determine MCP server name from manifest.
-    mcp_server_name = (
-        manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
-    )
+    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
     claude_prefix = f"mcp__{mcp_server_name}__"
     opencode_prefix = f"{mcp_server_name}_"
 
@@ -282,17 +292,26 @@ def get_workspace_mcp_tools(name: str) -> dict:
     for group_name, tools in tool_manifest.items():
         claude_tools = [f"{claude_prefix}{t}" for t in tools]
         opencode_tools = [f"{opencode_prefix}{t}" for t in tools]
-        groups.append({
-            "name": group_name,
-            "tools": tools,
-            "claude_tools": claude_tools,
-            "opencode_tools": opencode_tools,
-            "tool_count": len(tools),
-            "kind": "read" if all(_is_read_tool(t) for t in tools) else "mixed",
-        })
+        groups.append(
+            {
+                "name": group_name,
+                "tools": tools,
+                "claude_tools": claude_tools,
+                "opencode_tools": opencode_tools,
+                "tool_count": len(tools),
+                "kind": "read" if all(_is_read_tool(t) for t in tools) else "mixed",
+            }
+        )
 
     # Also include built-in tools that are always available
-    builtin_tools = ["AskUserQuestion", "Task", "TodoRead", "TodoWrite", "WebFetch", "WebSearch"]
+    builtin_tools = [
+        "AskUserQuestion",
+        "Task",
+        "TodoRead",
+        "TodoWrite",
+        "WebFetch",
+        "WebSearch",
+    ]
 
     # Current workspace permissions (to show which are already enabled)
     ws_path, _ = _resolve_workspace(name)

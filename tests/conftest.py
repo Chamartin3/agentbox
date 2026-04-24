@@ -17,7 +17,6 @@ from typing import Any
 
 import pytest
 
-
 # --------------------------------------------------------------------------- #
 # Marker auto-tagging by directory
 # --------------------------------------------------------------------------- #
@@ -45,9 +44,7 @@ def pytest_collection_modifyitems(
 
 
 @pytest.fixture
-def isolated_data_dir(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Path:
+def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point ``AGENTBOX_DATA_DIR`` at a per-test tmp dir.
 
     Reloads ``agentbox.config`` so the SETTINGS singleton picks up the
@@ -101,18 +98,29 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
     the entire test session. Clear those caches per test so each
     ``client`` sees the per-test ``AGENTBOX_DATA_DIR``.
     """
-    from fastapi.testclient import TestClient
-
     import agentbox.api.deps as deps
     from agentbox.api.app import create_app
+    from fastapi.testclient import TestClient
 
-    for fn in (deps.get_settings, deps.get_store, deps.get_loader, deps.get_executor, deps.get_mcp_registry):
+    for fn in (
+        deps.get_settings,
+        deps.get_store,
+        deps.get_loader,
+        deps.get_executor,
+        deps.get_mcp_registry,
+    ):
         fn.cache_clear()
 
     with TestClient(create_app()) as c:
         yield c
 
-    for fn in (deps.get_settings, deps.get_store, deps.get_loader, deps.get_executor, deps.get_mcp_registry):
+    for fn in (
+        deps.get_settings,
+        deps.get_store,
+        deps.get_loader,
+        deps.get_executor,
+        deps.get_mcp_registry,
+    ):
         fn.cache_clear()
 
 

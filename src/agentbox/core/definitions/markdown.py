@@ -179,7 +179,17 @@ class _OrderedYAMLHandler(YAMLHandler):
 
 def _known_frontmatter_keys() -> set[str]:
     return {
-        "id", "description", "workspace", "tools", "tags",
-        "session_mode", "claude_agent", "headless", "webhook_url",
-        "unsupported_backends", "runner", "prompt", "prompt_path",
+        "id",
+        "description",
+        "workspace",
+        "tools",
+        "tags",
+        "session_mode",
+        "claude_agent",
+        "headless",
+        "webhook_url",
+        "unsupported_backends",
+        "runner",
+        "prompt",
+        "prompt_path",
     }

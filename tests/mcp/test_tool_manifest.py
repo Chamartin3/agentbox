@@ -8,18 +8,20 @@ from agentbox.core.mcp.tool_manifest import McpToolManifest, Tool
 
 def _manifest() -> McpToolManifest:
     m = McpToolManifest()
-    m.set_servers({
-        "my-mcp": [
-            Tool(name="jobpost_get_all"),
-            Tool(name="jobpost_create"),
-            Tool(name="cv_upload"),
-            Tool(name="cv_get"),
-        ],
-        "search": [
-            Tool(name="search_query"),
-            Tool(name="search_index"),
-        ],
-    })
+    m.set_servers(
+        {
+            "my-mcp": [
+                Tool(name="jobpost_get_all"),
+                Tool(name="jobpost_create"),
+                Tool(name="cv_upload"),
+                Tool(name="cv_get"),
+            ],
+            "search": [
+                Tool(name="search_query"),
+                Tool(name="search_index"),
+            ],
+        }
+    )
     return m
 
 
@@ -73,10 +75,12 @@ def test_resolve_tool_not_found() -> None:
 
 def test_ambiguous_group_raises() -> None:
     m = McpToolManifest()
-    m.set_servers({
-        "srv1": [Tool(name="data_get")],
-        "srv2": [Tool(name="data_get")],
-    })
+    m.set_servers(
+        {
+            "srv1": [Tool(name="data_get")],
+            "srv2": [Tool(name="data_get")],
+        }
+    )
     with pytest.raises(ValueError, match="ambiguous"):
         m.resolve_group("@data.read")
 

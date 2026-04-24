@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_loader, get_settings
+from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core import workspaces as ws
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -20,9 +20,7 @@ def list_agents() -> list[dict]:
     return [
         {
             **a.model_dump(),
-            "resolved_workspace": str(
-                ws.resolve_path(a, settings, loader)[0]
-            ),
+            "resolved_workspace": str(ws.resolve_path(a, settings, loader)[0]),
         }
         for a in agents
     ]
@@ -42,6 +40,27 @@ def get_agent(agent_id: str) -> dict:
         except FileNotFoundError:
             prompt = ""
     workspace_path, ephemeral = ws.resolve_path(agent, settings, loader)
+
+    store = get_store()
+    versions = store.list_versions(agent_id)
+    enriched = []
+    for v in versions:
+        comments = store.list_comments(v["id"])
+        rating = store.get_rating(v["id"])
+        enriched.append(
+            {
+                "id": v["id"],
+                "version": v["version"],
+                "author": v["author"],
+                "changelog": v["changelog"],
+                "is_legacy": v["is_legacy"],
+                "created_at": v["created_at"],
+                "has_comments": len(comments) > 0,
+                "rating": rating["rating"] if rating else None,
+            }
+        )
+    latest = store.latest_version(agent_id)
+
     return {
         "agent": agent.model_dump(),
         "prompt": prompt,
@@ -50,6 +69,8 @@ def get_agent(agent_id: str) -> dict:
             "ephemeral": ephemeral,
             "generated_configs": {},
         },
+        "current_version": latest["version"] if latest else None,
+        "versions": enriched,
     }
 
 

@@ -197,6 +197,36 @@ class WorkspaceDef(BaseModel):
     """Whether agents can make network requests."""
 
 
+class CompositionConfig(BaseModel):
+    """Prompt-composition recipe for an agent bundle.
+
+    When present, agentbox owns prompt rendering via
+    ``agentbox.core.composition.compose()``.
+    """
+
+    system: str = "prompts/system.md"
+    """Bundle-relative path to the system prompt markdown."""
+
+    references: list[str | dict] = Field(default_factory=list)
+    """Paths to reference files. Each entry is either a string path or a dict
+    with ``path`` and optional ``heading``. ``shared://<root>/...`` paths
+    are resolved via ``ProjectManifest.shared_assets``."""
+
+    user_template: str | None = None
+    """Bundle-relative path to a user-message template. When unset,
+    ``variables["user_message"]`` is used verbatim."""
+
+    output_schema: str | None = None
+    """Bundle-relative path to a JSON Schema file for output validation."""
+
+    transport: str = "system_message"
+    """How the composed system prompt is delivered to the runner.
+    E.g. ``system_message``, ``file`` (CLAUDE.md), etc."""
+
+    output_validation: str = "strict"
+    """One of ``strict`` | ``warn`` | ``off``."""
+
+
 class AgentDef(BaseModel):
     id: str
     """Stable identifier (e.g. `myproject.draft_writer`)."""
@@ -207,11 +237,18 @@ class AgentDef(BaseModel):
 
     For ``pydantic_ai`` runners without an explicit ``agent_module``,
     this markdown is used to auto-generate a minimal agent.
+
+    .. deprecated::
+       Use ``[composition]`` instead.
     """
 
     prompt: str | None = None
     """Inline system prompt text. Mutually exclusive with ``prompt_path`` —
     when both are set, ``prompt`` wins."""
+
+    composition: CompositionConfig | None = None
+    """Prompt-composition recipe. When present, takes precedence over
+    ``prompt_path`` / ``prompt``."""
 
     workspace: str | None = None
     """Workspace reference.
@@ -321,7 +358,13 @@ class AgentManifest(BaseModel):
 
     Resolved relative to the agent directory. When omitted, falls back to
     ``prompts/system.md`` if that file exists; otherwise no prompt is set.
+
+    .. deprecated::
+       Use ``[composition]`` instead.
     """
+
+    composition: CompositionConfig | None = None
+    """Prompt-composition recipe. When present, takes precedence."""
 
     workspace: str | None = None
     session_mode: SessionMode = "headless"
@@ -380,6 +423,11 @@ class ProjectManifest(BaseModel):
     """Ordered list of backend adapter names to try when an agent does
     not pin a backend explicitly. Empty list means fall back to the
     agent's ``runner.kind``."""
+
+    shared_assets: dict[str, str] = Field(default_factory=dict)
+    """Named shared-asset roots for ``shared://`` resolution in
+    prompt composition. Keys are root names; values are project-relative
+    directory paths."""
 
     @model_validator(mode="after")
     def _migrate_legacy_mcp(self) -> ProjectManifest:

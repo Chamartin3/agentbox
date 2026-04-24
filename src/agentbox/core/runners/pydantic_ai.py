@@ -74,9 +74,7 @@ class PydanticAiRunner(Runner):
             return
 
         # Resolve MCP URL from env or config.
-        mcp_url = os.environ.get(
-            "MCP_SERVER_URL", "http://localhost:8001/mcp/"
-        )
+        mcp_url = os.environ.get("MCP_SERVER_URL", "http://localhost:8001/mcp/")
 
         # Instantiate the agent.
         try:

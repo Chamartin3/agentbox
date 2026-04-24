@@ -8,7 +8,6 @@ from agentbox.core.backends.claude_code import ClaudeCodeBackend
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 
-
 DEFAULT_RUNNER = RunnerSpec(
     kind=RunnerKind.CLAUDE_CODE,
     model="claude-sonnet-4-20250514",
@@ -18,10 +17,10 @@ DEFAULT_RUNNER = RunnerSpec(
 
 
 def _make_agent(**overrides: object) -> AgentDef:
-    kwargs = dict(
-        id="test_agent",
-        runner=DEFAULT_RUNNER,
-    )
+    kwargs = {
+        "id": "test_agent",
+        "runner": DEFAULT_RUNNER,
+    }
     kwargs.update(overrides)
     return AgentDef(**kwargs)  # type: ignore[arg-type]
 
@@ -42,7 +41,9 @@ def test_render_produces_expected_argv() -> None:
 
 
 def test_render_excludes_model_when_not_set() -> None:
-    agent = _make_agent(runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, allowed_tools=[]))
+    agent = _make_agent(
+        runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, allowed_tools=[])
+    )
     adapter = ClaudeCodeBackend()
     rendered = adapter.render(agent, Path("/tmp/workdir"))
 

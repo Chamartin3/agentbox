@@ -26,6 +26,15 @@ export class ApiError extends Error {
 
 // ---- types --------------------------------------------------------------
 
+export interface CompositionConfig {
+  system: string;
+  references: Array<string | { path: string; heading?: string }>;
+  user_template: string | null;
+  output_schema: string | null;
+  transport: string;
+  output_validation: string;
+}
+
 export interface RunRecord {
   id: string;
   agent_id: string;
@@ -38,6 +47,13 @@ export interface RunRecord {
   transcript_path: string | null;
   created_at: string;
   finished_at: string | null;
+  config_digest: string | null;
+  agent_version_id: number | null;
+  composition_snapshot: Record<string, unknown> | null;
+  rendered_prompt: { system: string; user: string; schema: unknown } | null;
+  variables: Record<string, string> | null;
+  validation_status: string | null;
+  validation_errors: string | null;
 }
 
 export interface UsageRecord {
@@ -82,6 +98,7 @@ export interface AgentDef {
   id: string;
   description: string;
   prompt_path: string | null;
+  composition: CompositionConfig | null;
   workspace: string | null;
   runner: RunnerSpec;
   session_mode: 'headless' | 'persistent';

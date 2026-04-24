@@ -54,7 +54,7 @@ services:
       - /run/agentbox:size=256m,mode=0700
     volumes:
       # Required: project manifest (agentbox.toml on host → manifest.toml in container)
-      - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml:ro
+      - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml
       # Named volumes — persisted, container-owned
       - agentbox-data:/data
       - agentbox-claude:/agentbox/creds/claude

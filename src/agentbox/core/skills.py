@@ -24,8 +24,9 @@ class SkillPack:
 
 def skill_roots(workspace_path: Path) -> list[Path]:
     """Return every existing skill-pack root inside the workspace."""
-    return [workspace_path / rel for rel in _SKILL_ROOTS
-            if (workspace_path / rel).is_dir()]
+    return [
+        workspace_path / rel for rel in _SKILL_ROOTS if (workspace_path / rel).is_dir()
+    ]
 
 
 def discover_skills(workspace_path: Path) -> list[SkillPack]:

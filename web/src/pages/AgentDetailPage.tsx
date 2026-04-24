@@ -240,6 +240,41 @@ export default function AgentDetailPage() {
         onError={(msg) => flash('error', msg)}
       />
 
+      {/* Composition section */}
+      {agent.composition && (
+        <section className="section">
+          <h2 style={{ border: 'none', margin: 0, marginBottom: 8 }}>
+            Composition <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· prompt recipe</span>
+          </h2>
+          <dl className="dl">
+            <dt>System prompt</dt><dd><code>{agent.composition.system}</code></dd>
+            <dt>Transport</dt><dd><code>{agent.composition.transport}</code></dd>
+            {agent.composition.user_template && (
+              <><dt>User template</dt><dd><code>{agent.composition.user_template}</code></dd></>
+            )}
+            {agent.composition.output_schema && (
+              <><dt>Output schema</dt><dd><code>{agent.composition.output_schema}</code></dd></>
+            )}
+            <dt>Validation</dt><dd><code>{agent.composition.output_validation}</code></dd>
+            {agent.composition.references.length > 0 && (
+              <>
+                <dt>References</dt>
+                <dd>
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {agent.composition.references.map((ref, i) => (
+                      <li key={i}>
+                        <code>{typeof ref === 'string' ? ref : ref.path}</code>
+                        {typeof ref !== 'string' && ref.heading && ` → ${ref.heading}`}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
+
       {/* Run dashboard */}
       <section className="section">
         <div className="row between" style={{ marginBottom: 8 }}>

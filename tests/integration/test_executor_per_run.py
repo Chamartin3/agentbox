@@ -6,8 +6,6 @@ import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-import pytest
-
 from agentbox.api.events import DoneEvent, RunEvent, TextEvent
 from agentbox.config import Settings
 from agentbox.core.backends.base import RenderedConfig
@@ -142,7 +140,9 @@ class TestRunDirLifecycle:
         assert len(seen) == 1
         assert seen[0].exists()
 
-    def test_two_concurrent_runs_use_disjoint_dirs(self, tmp_path: Path, monkeypatch) -> None:
+    def test_two_concurrent_runs_use_disjoint_dirs(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
         monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
         monkeypatch.setenv("AGENTBOX_KEEP_RUN_DIRS", "1")
         _register("echo_per_run", _EchoAdapter)

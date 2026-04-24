@@ -87,7 +87,10 @@ def test_patch_validation_failure(tmp_path: Path) -> None:
         w.patch_agent("main", {"session_mode": "nonsense"})
     assert exc.value.code == "validation_failed"
     # File untouched after rejected patch.
-    assert "session_mode" not in w.read_text() or 'session_mode = "headless"' not in w.read_text()
+    assert (
+        "session_mode" not in w.read_text()
+        or 'session_mode = "headless"' not in w.read_text()
+    )
 
 
 def test_patch_removes_field_when_null(tmp_path: Path) -> None:

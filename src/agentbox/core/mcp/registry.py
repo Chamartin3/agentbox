@@ -27,6 +27,7 @@ class McpServerConfig(TypedDict, total=False):
     command: list[str]
     cache_ttl: int
 
+
 _CACHE_TTL = 300
 
 
@@ -72,9 +73,7 @@ class McpRegistry:
             return "degraded"
         return "unavailable"
 
-    async def sync_servers(
-        self, servers: list[McpServerConfig]
-    ) -> None:
+    async def sync_servers(self, servers: list[McpServerConfig]) -> None:
         all_tools: dict[str, list[Tool]] = {}
         for spec in servers:
             name = spec.get("name", "mcp")
@@ -101,19 +100,24 @@ class McpRegistry:
         command: list[str] | None,
         ttl: int,
     ) -> ServerHealth:
-        client = McpClient(
-            name, url=url, transport=transport, command=command
-        )
+        client = McpClient(name, url=url, transport=transport, command=command)
         self._clients[name] = client
         try:
             tools_data = await client.list_tools()
-            tools = [Tool(
-                name=t["name"],
-                description=t.get("description", ""),
-                input_schema=t.get("inputSchema"),
-            ) for t in tools_data]
+            tools = [
+                Tool(
+                    name=t["name"],
+                    description=t.get("description", ""),
+                    input_schema=t.get("inputSchema"),
+                )
+                for t in tools_data
+            ]
             cache_entries: list[CachedTool] = [
-                {"name": t.name, "description": t.description, "input_schema": t.input_schema}
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "input_schema": t.input_schema,
+                }
                 for t in tools
             ]
             self._save_cache(name, cache_entries)

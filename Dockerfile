@@ -83,6 +83,23 @@ PY
   echo "agentbox: applied project user config to $CLAUDE_STATE"
 fi
 
+# Memory symlink: if host-memory is mounted, link Claude's expected memory path
+# to it so containerized agents share MEMORY.md with the host Claude session.
+# HOST_PROJECT_DIR must be set (by docker-compose.override.yml) to the host
+# project root so we can derive Claude's project-path-encoding (dashes for
+# slashes) — e.g. /home/omidev/Code/ai/cv_agents → -home-omidev-Code-ai-cv-agents.
+HOST_MEMORY_DIR="/agentbox/host-memory/projects"
+if [[ -d "$HOST_MEMORY_DIR" && -n "${HOST_PROJECT_DIR:-}" ]]; then
+  PROJECT_PATH="$(echo "$HOST_PROJECT_DIR" | tr '/' '-')"
+  PROJECT_MEMORY_SRC="${HOST_MEMORY_DIR}/${PROJECT_PATH}/memory"
+  CLAUDE_MEMORY_DST="${CLAUDE_CONFIG_DIR:-/home/appuser/.claude}/projects/${PROJECT_PATH}/memory"
+  if [[ -d "$PROJECT_MEMORY_SRC" && ! -e "$CLAUDE_MEMORY_DST" ]]; then
+    mkdir -p "$(dirname "$CLAUDE_MEMORY_DST")"
+    ln -sf "$PROJECT_MEMORY_SRC" "$CLAUDE_MEMORY_DST"
+    echo "agentbox: linked host memory → $CLAUDE_MEMORY_DST"
+  fi
+fi
+
 exec "$@"
 EOF
 RUN chmod +x /usr/local/bin/agentbox-entrypoint

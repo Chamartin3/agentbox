@@ -66,7 +66,9 @@ def migrate_capabilities_to_manifest(project_root: Path) -> dict[str, dict]:
             ws_table["allowed_tools"] = item(capabilities["allowed_tools"])
 
         if "allowed_builtin_tools" in capabilities:
-            ws_table["allowed_builtin_tools"] = item(capabilities["allowed_builtin_tools"])
+            ws_table["allowed_builtin_tools"] = item(
+                capabilities["allowed_builtin_tools"]
+            )
 
         if capabilities.get("max_tokens") is not None:
             ws_table["max_tokens"] = item(capabilities["max_tokens"])
@@ -82,15 +84,19 @@ def migrate_capabilities_to_manifest(project_root: Path) -> dict[str, dict]:
             for file_entry in capabilities["files"]:
                 if isinstance(file_entry, dict):
                     # tomlkit will handle conversion to proper format via item()
-                    files_list.append({
-                        "src": file_entry.get("src", ""),
-                        "dst": file_entry.get("dst", ""),
-                    })
+                    files_list.append(
+                        {
+                            "src": file_entry.get("src", ""),
+                            "dst": file_entry.get("dst", ""),
+                        }
+                    )
             if files_list:
                 ws_table["files"] = item(files_list)
 
         # Write backup
-        backup_path = capabilities_path.parent / f"capabilities.json.migrated-{timestamp}"
+        backup_path = (
+            capabilities_path.parent / f"capabilities.json.migrated-{timestamp}"
+        )
         try:
             backup_path.write_text(capabilities_path.read_text(encoding="utf-8"))
             results[ws_name]["backed_up"] = True

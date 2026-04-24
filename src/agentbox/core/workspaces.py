@@ -53,7 +53,9 @@ def resolve_path(
     return settings.workspaces_root / agent.id, False
 
 
-def info(agent: AgentDef, settings: Settings, loader: DefinitionLoader) -> WorkspaceInfo:
+def info(
+    agent: AgentDef, settings: Settings, loader: DefinitionLoader
+) -> WorkspaceInfo:
     path, ephemeral = resolve_path(agent, settings, loader)
     has_claude_md = (path / "CLAUDE.md").exists() if path.exists() else False
     skill_count = len(discover_skills(path)) if path.exists() else 0
@@ -94,9 +96,7 @@ def ensure(
     return path
 
 
-def reset(
-    agent: AgentDef, settings: Settings, loader: DefinitionLoader
-) -> Path:
+def reset(agent: AgentDef, settings: Settings, loader: DefinitionLoader) -> Path:
     """Delete and recreate the workspace (drops everything inside)."""
     path, _ = resolve_path(agent, settings, loader)
     if path.exists():
@@ -104,9 +104,7 @@ def reset(
     return ensure(agent, settings, loader, scaffold=True)
 
 
-def list_all(
-    loader: DefinitionLoader, settings: Settings
-) -> list[WorkspaceInfo]:
+def list_all(loader: DefinitionLoader, settings: Settings) -> list[WorkspaceInfo]:
     return [info(a, settings, loader) for a in loader.load().agents]
 
 

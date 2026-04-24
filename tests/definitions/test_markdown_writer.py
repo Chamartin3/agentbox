@@ -97,7 +97,9 @@ Body
     assert agent.id == "unknown-keys"
     existing_metadata = dict(frontmatter.load(str(path)).metadata)
     # Write with preserve_unknown_keys=True
-    write_markdown_agent(path, agent, preserve_unknown_keys=True, existing_metadata=existing_metadata)
+    write_markdown_agent(
+        path, agent, preserve_unknown_keys=True, existing_metadata=existing_metadata
+    )
     # Re-read and check unknown keys preserved
     content = path.read_text()
     assert "x-custom" in content

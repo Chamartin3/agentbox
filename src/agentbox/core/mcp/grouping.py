@@ -33,7 +33,7 @@ def derive_groups(server_name: str, tools: list[Tool]) -> dict[str, list[str]]:
         read_tools: list[str] = []
         write_tools: list[str] = []
         for n in names:
-            suffix = n[len(prefix):]
+            suffix = n[len(prefix) :]
             stripped = suffix.lstrip("_")
             if _has_read_prefix(stripped):
                 read_tools.append(n)
@@ -53,9 +53,7 @@ def derive_groups(server_name: str, tools: list[Tool]) -> dict[str, list[str]]:
     return groups
 
 
-def resolve_group_ref(
-    ref: str, groups: dict[str, list[str]]
-) -> list[str]:
+def resolve_group_ref(ref: str, groups: dict[str, list[str]]) -> list[str]:
     """Resolve a reference string to a list of tool names.
 
     Reference syntax:

@@ -59,9 +59,13 @@ class ClaudeCodeBackend:
             env.pop(k, None)
 
         files: dict[Path, bytes] = {}
-        claude_md = workdir / "CLAUDE.md"
-        if claude_md.exists():
-            files[Path("CLAUDE.md")] = claude_md.read_bytes()
+        composed_system = getattr(agent, "_composed_system", None)
+        if composed_system is not None:
+            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
+        else:
+            claude_md = workdir / "CLAUDE.md"
+            if claude_md.exists():
+                files[Path("CLAUDE.md")] = claude_md.read_bytes()
 
         return RenderedConfig(
             argv=argv,
