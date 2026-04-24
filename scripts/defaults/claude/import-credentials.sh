@@ -2,16 +2,15 @@
 # One-shot: import Claude Code credentials from the host machine into the
 # agentbox-claude named volume so the containerized Claude starts authenticated.
 #
-# Run this once after first bringing the agentbox stack up. After that, the
-# volume persists OAuth tokens across container recreations.
+# Run once after first bringing the agentbox stack up. The volume persists
+# OAuth tokens across container recreations.
 #
 # Usage:
-#   libs/agentbox/import-host-claude.sh                # uses $HOME/.claude
-#   libs/agentbox/import-host-claude.sh /path/to/.claude
+#   scripts/defaults/claude/import-credentials.sh             # uses $HOME/.claude
+#   scripts/defaults/claude/import-credentials.sh /path/.claude
 #
 # Env:
-#   AGENTBOX_CLAUDE_VOLUME   docker volume name (default: <project>_agentbox-claude)
-#                            Set this if `docker volume ls` shows a different name.
+#   AGENTBOX_CLAUDE_VOLUME   docker volume name (default: auto-detected)
 set -euo pipefail
 
 HOST_CLAUDE_DIR="${1:-$HOME/.claude}"
@@ -23,7 +22,6 @@ if [[ ! -f "$HOST_CLAUDE_DIR/.credentials.json" ]]; then
   exit 1
 fi
 
-# Auto-detect volume if not specified.
 if [[ -z "$VOLUME" ]]; then
   VOLUME=$(docker volume ls --format '{{.Name}}' | grep -E '_agentbox-claude$' | head -n 1 || true)
   if [[ -z "$VOLUME" ]]; then

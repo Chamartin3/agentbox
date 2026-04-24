@@ -22,6 +22,12 @@ from .constants import (
     READ_PREFIXES,
 )
 from .discovery import AgentDiscovery, DiscoveredAgent
+from .schemas import (
+    ClaudeAgentsConfig,
+    ClaudeMcpConfig,
+    ClaudeSettingsConfig,
+    OpenCodeConfig,
+)
 
 if TYPE_CHECKING:
     from agentbox.core.mcp import McpToolManifest
@@ -47,6 +53,7 @@ def build_claude_agents(agents: list[DiscoveredAgent]) -> dict[str, dict]:
             "prompt": agent["prompt"],
             "allowedTools": agent["mcp_tools"],
         }
+    ClaudeAgentsConfig.model_validate(result)
     return result
 
 
@@ -126,12 +133,14 @@ def build_claude_settings(
     allow_builtin = {t for t in (allowed_builtin or []) if isinstance(t, str)}
     deny = sorted(t for t in DENIED_BUILTIN_TOOLS if t not in allow_builtin)
     allow_list = sorted(allow) + sorted(allow_builtin)
-    return {
+    result = {
         "permissions": {
             "allow": allow_list,
             "deny": deny,
         }
     }
+    ClaudeSettingsConfig.model_validate(result)
+    return result
 
 
 def _claude_tool_to_opencode(tool: str) -> str:
@@ -197,7 +206,9 @@ def build_claude_mcp_config(
         entry: dict[str, object] = {"type": mcp_transport, "url": mcp_url}
     else:
         entry = {"command": mcp_command[0], "args": list(mcp_command[1:])}
-    return {"mcpServers": {mcp_server_name: entry}}
+    result = {"mcpServers": {mcp_server_name: entry}}
+    ClaudeMcpConfig.model_validate(result)
+    return result
 
 
 def _opencode_mcp_entry(
@@ -260,7 +271,7 @@ def build_opencode_config(
     for always_allow in _ALWAYS_ON_MCP_TOOLS:
         global_perms[always_allow] = "allow"
 
-    return {
+    result = {
         "$schema": OPENCODE_SCHEMA,
         "theme": OPENCODE_THEME,
         "tools": {"skill": False},
@@ -270,6 +281,8 @@ def build_opencode_config(
             mcp_server_name: _opencode_mcp_entry(mcp_url, mcp_transport, mcp_command),
         },
     }
+    OpenCodeConfig.model_validate(result)
+    return result
 
 
 class ConfigGenerator:
