@@ -37,6 +37,7 @@ from agentbox.api.webhooks import schedule_webhook
 from agentbox.config import Settings
 from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.config_generation import ConfigGenerator
+from agentbox.core.constants import RunStatus
 from agentbox.core.data import SessionStore
 from agentbox.core.data.schema import runs as _runs_table
 from agentbox.core.definitions import AgentDef, DefinitionLoader
@@ -51,10 +52,7 @@ from agentbox.core.workspaces import (
     resolve_path,
 )
 
-try:
-    import jsonschema as _jsonschema
-except ImportError:
-    _jsonschema = None  # type: ignore[assignment]
+import jsonschema as _jsonschema
 
 if TYPE_CHECKING:
     from agentbox.core.backends.base import BackendAdapter
@@ -610,6 +608,7 @@ class RunExecutor:
         output: str | None = None
         validation_status: str | None = None
         validation_errors: list[str] | None = None
+        schema_validated_via: str | None = None
 
         timeout = agent.runner.timeout_seconds
         try:
@@ -630,7 +629,7 @@ class RunExecutor:
                     except TimeoutError:
                         final_error = f"timeout after {timeout}s"
                         final_ok = False
-                        final_status = "timeout"
+                        final_status = RunStatus.TIMEOUT.value
                     except Exception as exc:
                         final_error = f"executor error: {type(exc).__name__}: {exc}"
                         final_ok = False
@@ -641,6 +640,7 @@ class RunExecutor:
 
                 if agent.runner.output_schema_path and output:
                     is_valid, v_error = self._validate_output(output, agent, workdir)
+                    schema_validated_via = "jsonschema"
                     if is_valid:
                         validation_status = "ok"
                         validation_errors = None
@@ -679,6 +679,10 @@ class RunExecutor:
             except Exception as exc:
                 suffix = f"guardrail error: {exc}"
                 final_error = f"{final_error} | {suffix}" if final_error else suffix
+            if schema_validated_via is None:
+                mode = getattr(agent, "_composed_validation_mode", "strict")
+                if mode == "off":
+                    schema_validated_via = "off"
         finally:
             self.store.finish_run(
                 run_id,
@@ -688,6 +692,7 @@ class RunExecutor:
                 status=final_status,
                 validation_status=validation_status,
                 validation_errors=validation_errors,
+                schema_validated_via=schema_validated_via,
             )
             try:
                 refreshed = self.store.get_run(run_id)
@@ -737,63 +742,11 @@ class RunExecutor:
         except json.JSONDecodeError as exc:
             return False, f"output is not valid JSON: {exc}"
 
-        if _jsonschema is None:
-            return self._basic_shape_check(instance, schema)
         try:
             _jsonschema.validate(instance=instance, schema=schema)
             return True, ""
         except _jsonschema.ValidationError as exc:
             return False, str(exc)
-
-    @staticmethod
-    def _basic_shape_check(instance: dict, schema: dict) -> tuple[bool, str]:
-        props = schema.get("properties", {})
-        required = schema.get("required", [])
-
-        for field in required:
-            if field not in instance:
-                return False, f"missing required field: {field}"
-            field_schema = props.get(field, {})
-            expected_type = field_schema.get("type")
-            if expected_type:
-                type_map = {
-                    "string": str,
-                    "integer": int,
-                    "number": (int, float),
-                    "boolean": bool,
-                    "object": dict,
-                    "array": list,
-                }
-                py_type = type_map.get(expected_type)
-                if py_type and not isinstance(instance[field], py_type):
-                    return (
-                        False,
-                        f"field {field!r}: expected {expected_type}, "
-                        f"got {type(instance[field]).__name__}",
-                    )
-            if isinstance(instance[field], str):
-                min_len = field_schema.get("minLength")
-                max_len = field_schema.get("maxLength")
-                val = instance[field]
-                if min_len is not None and len(val) < min_len:
-                    return (
-                        False,
-                        f"field {field!r}: min length {min_len}, got {len(val)}",
-                    )
-                if max_len is not None and len(val) > max_len:
-                    return (
-                        False,
-                        f"field {field!r}: max length {max_len}, got {len(val)}",
-                    )
-            enum_vals = field_schema.get("enum")
-            if enum_vals and instance[field] not in enum_vals:
-                return (
-                    False,
-                    f"field {field!r}: must be one of {enum_vals}, "
-                    f"got {instance[field]!r}",
-                )
-
-        return True, ""
 
     @staticmethod
     def _build_retry_prompt(

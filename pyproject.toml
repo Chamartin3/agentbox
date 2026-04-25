@@ -13,10 +13,13 @@ dependencies = [
   "tomlkit>=0.13",
   "sqlalchemy>=2.0",
   "python-frontmatter>=1.2.0",
+  "fastmcp>=0.2",
+  "jsonschema>=4.0",
 ]
 
 [project.scripts]
 agentbox = "agentbox.cli:app"
+agentbox-mcp = "agentbox.mcp_server.server:main"
 
 [project.entry-points."agentbox.runners"]
 claude_code = "agentbox.core.runners.claude_code:ClaudeCodeRunner"

@@ -20,6 +20,7 @@ from typing import Any
 
 import httpx
 
+from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, RunRecord, SessionStore
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,8 @@ def webhook_payload(
         "finished_at": run.finished_at,
         "duration_ms": duration_ms,
         "usage": usage,
+        "validation_status": run.validation_status,
+        "schema_validated_via": run.schema_validated_via,
     }
 
 
@@ -104,6 +107,54 @@ def _resolve_webhook_url(agent: AgentDef | None) -> str | None:
     return getattr(settings, "completion_webhook_url", None)
 
 
+def _build_payload(
+    run: RunRecord, store: SessionStore
+) -> dict[str, Any]:
+    usage = store.get_usage(run.id)
+    duration_ms: int | None = None
+    if run.created_at and run.finished_at:
+        try:
+            started = datetime.fromisoformat(run.created_at)
+            ended = datetime.fromisoformat(run.finished_at)
+            duration_ms = int((ended - started).total_seconds() * 1000)
+        except (ValueError, TypeError):
+            duration_ms = None
+    return webhook_payload(run, usage=usage, duration_ms=duration_ms)
+
+
+def _on_delivery_done(
+    task: asyncio.Task[bool], run_id: str, store: SessionStore
+) -> None:
+    """Done-callback: flip ``ok`` → ``incomplete`` when delivery failed.
+
+    ``error`` and ``incomplete`` runs are left untouched — we only
+    downgrade a successful run to signal that the consumer never saw
+    the notification.
+    """
+    if task.cancelled():
+        return
+    try:
+        delivered = task.result()
+    except Exception:  # pragma: no cover — deliver_webhook swallows
+        delivered = False
+    if delivered:
+        # If a manual resend through schedule_webhook ever happens for
+        # an ``incomplete`` run, promote it back to ``ok``.
+        try:
+            current = store.get_run(run_id)
+            if current is not None and current.status == RunStatus.INCOMPLETE:
+                store.set_run_status(run_id, RunStatus.OK)
+        except Exception:
+            logger.exception("failed promoting run %s back to ok", run_id)
+        return
+    try:
+        current = store.get_run(run_id)
+        if current is not None and current.status == RunStatus.OK:
+            store.set_run_status(run_id, RunStatus.INCOMPLETE)
+    except Exception:
+        logger.exception("failed marking run %s incomplete", run_id)
+
+
 def schedule_webhook(
     agent: AgentDef | None,
     run: RunRecord,
@@ -113,6 +164,8 @@ def schedule_webhook(
 
     Safe to call from a sync code path — it grabs the running loop and
     queues a task. Silently skips when there's no URL or no event loop.
+    On delivery failure the run is flipped to ``incomplete`` so an
+    operator can resend.
     """
     url = _resolve_webhook_url(agent)
     if not url:
@@ -124,15 +177,33 @@ def schedule_webhook(
             "no running event loop; cannot deliver webhook for run %s", run.id
         )
         return
-    usage = store.get_usage(run.id)
-    duration_ms: int | None = None
-    if run.created_at and run.finished_at:
-        try:
-            started = datetime.fromisoformat(run.created_at)
-            ended = datetime.fromisoformat(run.finished_at)
-            duration_ms = int((ended - started).total_seconds() * 1000)
-        except (ValueError, TypeError):
-            duration_ms = None
-    payload = webhook_payload(run, usage=usage, duration_ms=duration_ms)
+    payload = _build_payload(run, store)
     task = loop.create_task(deliver_webhook(url, payload))
-    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    run_id = run.id
+    task.add_done_callback(lambda t: _on_delivery_done(t, run_id, store))
+
+
+async def resend_webhook(
+    agent: AgentDef | None,
+    run: RunRecord,
+    store: SessionStore,
+) -> tuple[bool, str | None]:
+    """Synchronously re-deliver the webhook for ``run``.
+
+    Returns ``(delivered, reason)``. On success the run's status is
+    promoted from ``incomplete`` back to ``ok``; on failure an ``ok``
+    run is demoted to ``incomplete``. ``error`` runs keep their status.
+    """
+    url = _resolve_webhook_url(agent)
+    if not url:
+        return False, "no webhook_url configured"
+    payload = _build_payload(run, store)
+    delivered = await deliver_webhook(url, payload)
+    current = store.get_run(run.id)
+    if current is None:
+        return delivered, None
+    if delivered and current.status == RunStatus.INCOMPLETE:
+        store.set_run_status(run.id, RunStatus.OK)
+    elif not delivered and current.status == RunStatus.OK:
+        store.set_run_status(run.id, RunStatus.INCOMPLETE)
+    return delivered, None if delivered else "delivery failed; see server logs"

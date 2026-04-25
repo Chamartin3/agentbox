@@ -28,6 +28,9 @@ class RunRecord:
     variables: str | None = None
     validation_status: str | None = None
     validation_errors: str | None = None
+    schema_validated_via: str | None = None
+    post_status: str | None = None
+    post_errors: str | None = None
 
 
 def now_iso() -> str:
@@ -55,4 +58,7 @@ def row_to_run(row: Row) -> RunRecord:
         variables=m.get("variables"),
         validation_status=m.get("validation_status"),
         validation_errors=m.get("validation_errors"),
+        schema_validated_via=m.get("schema_validated_via"),
+        post_status=m.get("post_status"),
+        post_errors=m.get("post_errors"),
     )

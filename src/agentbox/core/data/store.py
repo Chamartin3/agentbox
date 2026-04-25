@@ -20,6 +20,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
+from agentbox.core.constants import RunStatus
 from agentbox.core.data.agent_versions import AgentVersionsMixin
 from agentbox.core.data.analytics import AnalyticsMixin
 from agentbox.core.data.prompts import PromptVersionsMixin
@@ -52,7 +53,30 @@ class _CoreStore:
 
     def _init(self) -> None:
         metadata.create_all(self.engine)
+        self._migrate()
         self._reap_orphaned_runs()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after the initial schema was deployed."""
+        _add_column_if_missing = [
+            ("runs", "validation_status", "TEXT"),
+            ("runs", "validation_errors", "TEXT"),
+            ("runs", "schema_validated_via", "TEXT"),
+            ("runs", "post_status", "TEXT"),
+            ("runs", "post_errors", "TEXT"),
+        ]
+        with self.engine.begin() as conn:
+            for table, col, col_type in _add_column_if_missing:
+                existing = [
+                    row[1]
+                    for row in conn.exec_driver_sql(
+                        f"PRAGMA table_info({table})"
+                    ).fetchall()
+                ]
+                if col not in existing:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"
+                    )
 
     def _reap_orphaned_runs(self) -> None:
         """Mark any pre-existing 'running' rows as errored on startup.
@@ -67,9 +91,12 @@ class _CoreStore:
         with self.engine.begin() as conn:
             conn.execute(
                 runs.update()
-                .where(runs.c.status == "running", runs.c.finished_at.is_(None))
+                .where(
+                    runs.c.status == RunStatus.RUNNING.value,
+                    runs.c.finished_at.is_(None),
+                )
                 .values(
-                    status="error",
+                    status=RunStatus.ERROR.value,
                     error=func.coalesce(runs.c.error, "") + reason,
                     finished_at=now_iso(),
                 )
@@ -133,7 +160,7 @@ class _CoreStore:
                     id=rid,
                     agent_id=agent_id,
                     session_id=session_id,
-                    status="running",
+                    status=RunStatus.RUNNING.value,
                     input=input_,
                     workdir=workdir,
                     transcript_path=transcript_path,
@@ -152,6 +179,7 @@ class _CoreStore:
         status: str | None = None,
         validation_status: str | None = None,
         validation_errors: list[str] | None = None,
+        schema_validated_via: str | None = None,
     ) -> None:
         """Mark a run terminal. Idempotent on already-terminal rows.
 
@@ -163,7 +191,9 @@ class _CoreStore:
         import json as _json
 
         values: dict = {
-            "status": status if status else ("ok" if ok else "error"),
+            "status": status
+            if status
+            else (RunStatus.OK.value if ok else RunStatus.ERROR.value),
             "output": output,
             "error": error,
             "finished_at": now_iso(),
@@ -172,14 +202,69 @@ class _CoreStore:
             values["validation_status"] = validation_status
         if validation_errors is not None:
             values["validation_errors"] = _json.dumps(validation_errors)
+        if schema_validated_via is not None:
+            values["schema_validated_via"] = schema_validated_via
         with self.engine.begin() as conn:
             conn.execute(
                 runs.update()
                 .where(
                     runs.c.id == run_id,
-                    runs.c.status.in_(("running",)),
+                    runs.c.status.in_((RunStatus.RUNNING.value,)),
                 )
                 .values(**values)
+            )
+
+    def set_run_post_outcome(
+        self,
+        run_id: str,
+        ok: bool,
+        error_kind: str | None = None,
+        errors: list[dict] | None = None,
+    ) -> None:
+        """Record the consumer's post-processor outcome for this run.
+
+        Called via ``POST /api/runs/{run_id}/post_outcome`` after the
+        consumer's webhook handler has applied (or failed) its side-effects.
+        Does not modify the run's primary ``status`` — that is the executor's
+        own result. The ``post_status`` column is the consumer's verdict.
+        """
+        import json as _json
+
+        values: dict = {"post_status": "ok" if ok else "fail"}
+        if errors is not None:
+            values["post_errors"] = _json.dumps(
+                {"error_kind": error_kind, "errors": errors}
+            )
+        with self.engine.begin() as conn:
+            conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
+
+    def reap_orphan_runs(self) -> int:
+        """Mark any rows still in ``running`` state as ``incomplete``.
+
+        Called on process startup. Any row left in ``running`` past a
+        restart belongs to a dead executor task — its ``finally`` block
+        never reached ``finish_run``, so the row would otherwise stay
+        orphaned forever (hiding from terminal-status filters and
+        skewing activity rollups).
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                runs.update()
+                .where(runs.c.status == RunStatus.RUNNING.value)
+                .values(
+                    status=RunStatus.INCOMPLETE.value,
+                    error="orphaned: executor process restarted before run completed",
+                    finished_at=now_iso(),
+                )
+            )
+            return result.rowcount or 0
+
+    def set_run_status(self, run_id: str, status: str) -> None:
+        """Update only the status column. Used for post-terminal transitions
+        like flipping ``ok`` ↔ ``incomplete`` based on webhook delivery."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                runs.update().where(runs.c.id == run_id).values(status=status)
             )
 
     def get_run(self, run_id: str) -> RunRecord | None:
