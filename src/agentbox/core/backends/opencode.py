@@ -16,11 +16,11 @@ from typing import Any
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent
 from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.runners.opencode import (
+    _DEFAULT_OPENCODE_MODEL,
     _parse_event_stream,
 )
 
 _NAME = "opencode"
-_DEFAULT_OPENCODE_MODEL = "opencode-go/deepseek-v4-pro"
 
 
 class OpenCodeBackend:
@@ -64,6 +64,7 @@ class OpenCodeBackend:
             env=env,
             cwd=Path("."),
             files=files,
+            agent_meta={"timeout_seconds": spec.timeout_seconds},
         )
 
     async def run(
@@ -90,6 +91,7 @@ class OpenCodeBackend:
             rendered.argv,
             rendered.cwd,
             dict(rendered.env),
+            timeout=rendered.agent_meta.get("timeout_seconds", 1200),
             stdin_data=stdin_data,
         ):
             yield ev
@@ -100,6 +102,7 @@ class OpenCodeBackend:
         argv: list[str],
         cwd: Path,
         env: dict[str, str],
+        timeout: int = 1200,
         stdin_data: bytes | None = None,
     ) -> AsyncIterator[RunEvent]:
         import asyncio
@@ -132,7 +135,6 @@ class OpenCodeBackend:
                 proc.stdin.close()
 
         stderr_lines: list[str] = []
-        timeout = 1200
 
         async def _drain_stderr() -> None:
             assert proc.stderr is not None

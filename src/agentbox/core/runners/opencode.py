@@ -32,7 +32,7 @@ from agentbox.core.runners._rate_limit import detect_in_opencode_event
 from agentbox.core.runners.base import Runner, RunRequest
 from agentbox.core.workspaces import opencode_config_path
 
-_DEFAULT_OPENCODE_MODEL = "opencode-go/deepseek-v4-pro"
+_DEFAULT_OPENCODE_MODEL = "opencode/deepseek-v4-flash-free"
 
 
 class OpenCodeRunner(Runner):

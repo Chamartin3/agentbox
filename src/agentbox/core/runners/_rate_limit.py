@@ -78,7 +78,8 @@ def detect_in_opencode_event(evt: dict[str, Any]) -> str | None:
                     prefix += f" ({_status})"
                 return f"{prefix}: {message}" if message else prefix
         # Couldn't extract structured detail — still surface as fatal.
-        return "opencode emitted error event"
+        raw = str(inner)[:300] if inner is not None else "(no error payload)"
+        return f"opencode emitted error event: {raw}"
 
     found = _walk_for_api_error(evt)
     if found is None:

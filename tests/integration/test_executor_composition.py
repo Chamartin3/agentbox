@@ -16,7 +16,13 @@ from agentbox.core.executor import RunExecutor
 
 
 class _EchoAdapter:
-    """Yields the input text back as output, then DoneEvent(ok=True)."""
+    """Yields the input text back as output, then DoneEvent(ok=True).
+
+    The composer auto-appends an output-schema instruction block when the
+    bundle declares one — a real agent would respond with just the JSON
+    object, so we strip everything from the schema block onward to keep
+    the echoed payload parseable.
+    """
 
     name = "echo_composition"
 
@@ -26,7 +32,8 @@ class _EchoAdapter:
     async def run(
         self, rendered: RenderedConfig, input: str, run_id: str
     ) -> AsyncIterator[RunEvent]:
-        yield TextEvent(run_id=run_id, text=input)
+        text = input.split("\n\n# Required Output", 1)[0]
+        yield TextEvent(run_id=run_id, text=text)
         yield DoneEvent(run_id=run_id, ok=True)
 
 
@@ -42,6 +49,7 @@ def _settings(tmp_path: Path) -> Settings:
         skills_dir=None,
         outputs_dir=None,
         completion_webhook_url=None,
+        creds_dir=Path("/agentbox/creds"),
     )
 
 

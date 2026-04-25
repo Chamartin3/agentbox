@@ -193,9 +193,11 @@ class RunExecutor:
         manifest = self.loader.load()
         agentbox_toml = self.loader.manifest_path
         mcp_manifest = self._try_get_mcp_manifest()
-        mcp_server_name = (
-            manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
-        )
+        mcp_spec = manifest.mcp_servers[0] if manifest.mcp_servers else None
+        mcp_server_name = mcp_spec.name if mcp_spec else "mcp"
+        mcp_url = mcp_spec.url if mcp_spec else None
+        mcp_transport = str(mcp_spec.transport) if mcp_spec else "http"
+        mcp_command = mcp_spec.command if mcp_spec and mcp_spec.command else ["mcp_serve.sh"]
         # Static tool_manifest.json fallback (resolved relative to
         # manifest.toml's parent) — used by discovery when the runtime
         # MCP manifest is empty (server down, transport mismatch, etc.).
@@ -209,6 +211,9 @@ class RunExecutor:
             manifest_path=static_manifest_path,
             mcp_manifest=mcp_manifest,
             mcp_server_name=mcp_server_name,
+            mcp_url=mcp_url,
+            mcp_transport=mcp_transport,
+            mcp_command=mcp_command,
             verbose=False,
         )
 
@@ -559,6 +564,7 @@ class RunExecutor:
         validation_status: str | None = None
         validation_errors: list[str] | None = None
 
+        timeout = agent.runner.timeout_seconds
         try:
             transcript_path.parent.mkdir(parents=True, exist_ok=True)
             for attempt in range(max_attempts):
@@ -566,13 +572,18 @@ class RunExecutor:
 
                 with transcript_path.open("a", encoding="utf-8") as tf:
                     try:
-                        async for ev in adapter.run(rendered, current_input, run_id):
-                            self._handle_event(run_id, ev, output_text, tf)
-                            broadcaster.publish(ev)
-                            if isinstance(ev, DoneEvent):
-                                final_ok = ev.ok
-                                final_error = ev.error
-                                final_status = ev.status
+                        async with asyncio.timeout(timeout):
+                            async for ev in adapter.run(rendered, current_input, run_id):
+                                self._handle_event(run_id, ev, output_text, tf)
+                                broadcaster.publish(ev)
+                                if isinstance(ev, DoneEvent):
+                                    final_ok = ev.ok
+                                    final_error = ev.error
+                                    final_status = ev.status
+                    except TimeoutError:
+                        final_error = f"timeout after {timeout}s"
+                        final_ok = False
+                        final_status = "timeout"
                     except Exception as exc:
                         final_error = f"executor error: {type(exc).__name__}: {exc}"
                         final_ok = False
