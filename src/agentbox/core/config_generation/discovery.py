@@ -75,21 +75,23 @@ class AgentDiscovery:
     def manifest(self) -> dict[str, list[str]]:
         if self._mcp_manifest is not None:
             groups = self._mcp_manifest.groups
-            result: dict[str, list[str]] = {}
-            for key, tool_names in groups.items():
-                _, _, suffix = key.partition(".")
-                dot = suffix.find(".")
-                if dot == -1:
-                    result[suffix] = tool_names
-                else:
-                    prefix = suffix[:dot]
-                    sub = suffix[dot + 1 :]
-                    if sub == "read" or sub == "write":
-                        group_name = f"{prefix}.{sub}"
+            if groups:
+                result: dict[str, list[str]] = {}
+                for key, tool_names in groups.items():
+                    _, _, suffix = key.partition(".")
+                    dot = suffix.find(".")
+                    if dot == -1:
+                        result[suffix] = tool_names
                     else:
-                        group_name = prefix
-                    result[group_name] = result.get(group_name, []) + tool_names
-            return result
+                        prefix = suffix[:dot]
+                        sub = suffix[dot + 1 :]
+                        if sub == "read" or sub == "write":
+                            group_name = f"{prefix}.{sub}"
+                        else:
+                            group_name = prefix
+                        result[group_name] = result.get(group_name, []) + tool_names
+                return result
+            # MCP manifest present but empty — fall through to static file.
         if self._manifest_data is None and self.manifest_path is not None:
             with open(self.manifest_path) as f:
                 self._manifest_data = json.load(f)

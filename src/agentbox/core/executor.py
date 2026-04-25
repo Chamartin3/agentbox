@@ -196,8 +196,17 @@ class RunExecutor:
         mcp_server_name = (
             manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
         )
+        # Static tool_manifest.json fallback (resolved relative to
+        # manifest.toml's parent) — used by discovery when the runtime
+        # MCP manifest is empty (server down, transport mismatch, etc.).
+        static_manifest_path: Path | None = None
+        if manifest.tool_manifest_path:
+            candidate = agentbox_toml.parent / manifest.tool_manifest_path
+            if candidate.exists():
+                static_manifest_path = candidate
         return ConfigGenerator(
             agentbox_toml=agentbox_toml,
+            manifest_path=static_manifest_path,
             mcp_manifest=mcp_manifest,
             mcp_server_name=mcp_server_name,
             verbose=False,

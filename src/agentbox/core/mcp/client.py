@@ -45,7 +45,9 @@ class McpClient:
         self._url = url
         self._transport = transport
         self._command = command
-        self._http = http_client or httpx.AsyncClient(timeout=30.0)
+        self._http = http_client or httpx.AsyncClient(
+            timeout=30.0, follow_redirects=True
+        )
         self._initialized = False
         self._request_id = 0
 
