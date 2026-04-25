@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent
+from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent
 from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.runners.opencode import (
     _DEFAULT_OPENCODE_MODEL,
@@ -215,6 +215,7 @@ class OpenCodeBackend:
                 level="warn",
                 message="opencode --format json output was not parseable; using raw stdout",
             )
+            yield TextEvent(run_id=run_id, text=raw)
             yield DoneEvent(
                 run_id=run_id,
                 ok=proc.returncode == 0,
@@ -222,6 +223,7 @@ class OpenCodeBackend:
             )
             return
 
+        yield TextEvent(run_id=run_id, text="".join(text_parts))
         yield DoneEvent(
             run_id=run_id,
             ok=proc.returncode == 0,
