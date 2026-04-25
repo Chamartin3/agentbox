@@ -277,10 +277,28 @@ class RunExecutor:
             agent.__dict__["_composed_bundle_sha"] = composed_result.bundle_sha
             input_ = composed_result.user
 
-            # Wire output schema into runner spec for the executor's retry loop
+            # Wire output schema into runner spec for the executor's retry loop.
+            # Mirror the composer's auto-detection: when the bundle ships an
+            # output_schema.json (or schema.json) but doesn't declare it in
+            # [composition].output_schema, still engage validation+retry so
+            # behavior matches what the model actually sees in the prompt.
             comp = agent.composition
-            if comp and comp.output_schema and comp.output_validation != "off":
-                schema_path = bundle_path / comp.output_schema
+            schema_rel: str | None = None
+            if comp:
+                if comp.output_schema:
+                    schema_rel = comp.output_schema
+                else:
+                    from agentbox.core.constants import BundleFile
+
+                    for fallback in (
+                        BundleFile.OUTPUT_SCHEMA,
+                        BundleFile.OUTPUT_SCHEMA_ALT,
+                    ):
+                        if (bundle_path / fallback).exists():
+                            schema_rel = fallback
+                            break
+            if comp and schema_rel and comp.output_validation != "off":
+                schema_path = bundle_path / schema_rel
                 runner_updates: dict = {
                     "output_schema_path": str(schema_path),
                 }
