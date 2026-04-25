@@ -17,6 +17,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 import uuid
@@ -60,6 +61,34 @@ if TYPE_CHECKING:
     from agentbox.core.mcp.registry import McpRegistry
 
 logger = logging.getLogger(__name__)
+
+
+_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
+
+
+def _extract_json(text: str) -> str:
+    """Pull a JSON payload out of model output that may include prose / fences.
+
+    Models often wrap the JSON in ```json fences and surrounding prose
+    despite being told not to. Validation should still engage on the JSON
+    they produced, so we extract the first fenced block when present;
+    otherwise we fall back to the first '{...}' / '[...]' slice; otherwise
+    return the raw text unchanged for json.loads to fail on naturally.
+    """
+    if not text:
+        return text
+    m = _FENCED_JSON_RE.search(text)
+    if m:
+        return m.group(1).strip()
+    s = text.strip()
+    if s.startswith(("{", "[")):
+        return s
+    for opener, closer in (("{", "}"), ("[", "]")):
+        i = s.find(opener)
+        j = s.rfind(closer)
+        if 0 <= i < j:
+            return s[i : j + 1]
+    return s
 
 
 def _load_workspace_permissions(
@@ -704,7 +733,7 @@ class RunExecutor:
             return False, f"cannot load schema: {exc}"
 
         try:
-            instance = json.loads(output)
+            instance = json.loads(_extract_json(output))
         except json.JSONDecodeError as exc:
             return False, f"output is not valid JSON: {exc}"
 
