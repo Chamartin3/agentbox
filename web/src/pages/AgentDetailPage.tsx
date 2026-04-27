@@ -1,60 +1,49 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import {
-  api,
-  AgentDef,
-  ApiError,
-  PromptVersionSummary,
-  RunRecord,
-} from '../api/client';
-import MarkdownEditor from '../components/MarkdownEditor';
+import { api, AgentDef, ApiError, PromptVersionSummary } from '../api/client';
+import AgentVersions from './AgentVersions';
+import AgentVersionDiff from './AgentVersionDiff';
+import CommentThread from '../components/CommentThread';
 import ManifestEditor from '../components/ManifestEditor';
-import AgentToolsEditor from '../components/AgentToolsEditor';
+import MarkdownEditor from '../components/MarkdownEditor';
 import Toast from '../components/Toast';
-import { activityApi, AgentRun } from '../api/activity';
+import './AgentDetailPage.css';
+
+type TabType = 'configuration' | 'composition' | 'versions' | 'runs';
+
+type BundleFile = {
+  kind: string;
+  relative_path: string;
+  sha256: string;
+  source_uri: string | null;
+};
 
 export default function AgentDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [agent, setAgent] = useState<AgentDef | null>(null);
   const [agentLoaded, setAgentLoaded] = useState(false);
+  const [composedSystem, setComposedSystem] = useState<string | null>(null);
+  const [composedUser, setComposedUser] = useState<string | null>(null);
+  const [bundleFiles, setBundleFiles] = useState<BundleFile[]>([]);
+  const [currentVersion, setCurrentVersion] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('configuration');
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedVersionNum, setSelectedVersionNum] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
+
   const [prompt, setPrompt] = useState<string>('');
   const [promptDirty, setPromptDirty] = useState(false);
+  const [loadingPrompt, setLoadingPrompt] = useState(false);
   const [versions, setVersions] = useState<PromptVersionSummary[]>([]);
   const [activeVersion, setActiveVersion] = useState<number | null>(null);
   const [draftVersion, setDraftVersion] = useState<number | null>(null);
   const [changelog, setChangelog] = useState('');
-  const [loadingPrompt, setLoadingPrompt] = useState(false);
-  const [loadingVersions, setLoadingVersions] = useState(false);
-  const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
-  const [runs, setRuns] = useState<RunRecord[]>([]);
-  const [runsLoading, setRunsLoading] = useState(false);
-  const [activityRuns, setActivityRuns] = useState<AgentRun[]>([]);
 
-  const flash = (kind: 'ok' | 'error', msg: string) => {
-    setToast({ kind, msg });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  const loadAgent = async () => {
-    try {
-      const list = await api.listAgents();
-      const a = list.find((x) => x.id === id) || null;
-      setAgent(a);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setAgentLoaded(true);
-    }
-  };
+  useEffect(() => {
+    loadAgent();
+    loadPrompt();
+    loadVersions();
+  }, [id]);
 
   const loadPrompt = async () => {
     if (!id) return;
@@ -65,11 +54,8 @@ export default function AgentDetailPage() {
       setPromptDirty(false);
     } catch (e) {
       const err = e as ApiError;
-      if (err.status === 400) {
-        setPrompt('');
-      } else {
-        console.error(e);
-      }
+      if (err.status === 400) setPrompt('');
+      else console.error(e);
     } finally {
       setLoadingPrompt(false);
     }
@@ -77,7 +63,6 @@ export default function AgentDetailPage() {
 
   const loadVersions = async () => {
     if (!id) return;
-    setLoadingVersions(true);
     try {
       const data = await api.listPromptVersions(id);
       setVersions(data.versions);
@@ -85,44 +70,10 @@ export default function AgentDetailPage() {
       setDraftVersion(data.draft_version);
     } catch (e) {
       const err = e as ApiError;
-      if (err.status === 404) {
-        // Agent has no prompt_path — ignore.
-      } else {
-        console.error(e);
-      }
-    } finally {
-      setLoadingVersions(false);
+      if (err.status !== 404) console.error(e);
     }
   };
 
-  const loadRuns = async () => {
-    if (!id) return;
-    setRunsLoading(true);
-    try {
-      const [rows, activity] = await Promise.all([
-        api.listRuns(id),
-        activityApi
-          .runs({ range: '30d', action: id, limit: 200 })
-          .catch(() => ({ results: [] as AgentRun[], total: 0 })),
-      ]);
-      setRuns(rows);
-      setActivityRuns(activity.results);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setRunsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadAgent();
-    loadPrompt();
-    loadVersions();
-    loadRuns();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  // Cmd/Ctrl-S saves a draft.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -132,7 +83,6 @@ export default function AgentDetailPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptDirty, prompt]);
 
   const saveDraft = async () => {
@@ -141,7 +91,7 @@ export default function AgentDetailPage() {
       const doc = await api.savePromptDraft(id, prompt);
       setPrompt(doc.content);
       setPromptDirty(false);
-      flash('ok', `draft saved (v${doc.mtime ? 'draft' : ''})`);
+      flash('ok', 'draft saved');
       loadVersions();
     } catch (e) {
       const err = e as ApiError;
@@ -156,7 +106,7 @@ export default function AgentDetailPage() {
       setPrompt(doc.content);
       setPromptDirty(false);
       setChangelog('');
-      flash('ok', `published v${doc.mtime} (${doc.size} bytes)`);
+      flash('ok', `published (${doc.size} bytes)`);
       loadVersions();
     } catch (e) {
       const err = e as ApiError;
@@ -170,7 +120,7 @@ export default function AgentDetailPage() {
       const doc = await api.rollbackPrompt(id, targetVersion);
       setPrompt(doc.content);
       setPromptDirty(false);
-      flash('ok', `rolled back to v${targetVersion} → new v${doc.mtime}`);
+      flash('ok', `rolled back to v${targetVersion}`);
       loadVersions();
     } catch (e) {
       const err = e as ApiError;
@@ -192,574 +142,355 @@ export default function AgentDetailPage() {
     }
   };
 
-  const stats = useMemo(() => computeRunStats(runs), [runs]);
-  const dailySeries = useMemo(() => buildDailySeries(runs, 14), [runs]);
-  const tokenSeries = useMemo(() => buildTokenSeries(activityRuns, 14), [activityRuns]);
-  const tokenTotals = useMemo(() => sumTokens(activityRuns), [activityRuns]);
+  const loadAgent = async () => {
+    try {
+      const detail = await api.getAgent(id);
+      setAgent(detail.agent);
+      setComposedSystem(detail.composed_system);
+      setComposedUser(detail.composed_user);
+      setBundleFiles(detail.bundle_files || []);
+      setCurrentVersion(detail.current_version);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAgentLoaded(true);
+    }
+  };
+
+  const flash = (kind: 'ok' | 'error', msg: string) => {
+    setToast({ kind, msg });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   if (!agent) {
-    if (!agentLoaded) return <p className="dim">loading…</p>;
+    if (!agentLoaded) return <p>Loading…</p>;
     return (
-      <div className="stack">
+      <div className="agent-detail">
         <h1>
-          <Link to="/agents" className="dim">agents</Link> / {id}
+          <Link to="/agents">agents</Link> / {id}
         </h1>
-        <p className="dim">
-          No agent with id <code>{id}</code> is registered. It may be missing
-          from <code>bin/agentbox_sync.py</code>'s <code>ACTIVE_AGENTS</code>{' '}
-          list, or the agentbox container needs a restart after a sync.
-        </p>
-        <p className="dim">
-          <Link to="/agents">← back to agents</Link>
-        </p>
+        <p>Agent not found. <Link to="/agents">← back to agents</Link></p>
       </div>
     );
   }
 
-  const hasDraft = draftVersion !== null;
-
   return (
-    <div className="stack">
-      <div className="row between">
-        <h1>
-          <Link to="/agents" className="dim">agents</Link> / {agent.id}
-        </h1>
-        <span className="dim">
-          <Link to={`/runs?agent=${encodeURIComponent(agent.id)}`}>view runs →</Link>
-          {' · '}
-          {agent.description}
-        </span>
+    <div className="agent-detail">
+      <header className="agent-header">
+        <div className="agent-title">
+          <h1>{agent.id}</h1>
+          {agent.description && <p className="agent-description">{agent.description}</p>}
+        </div>
+        <div className="agent-metadata">
+          <span className="tag">{agent.source_format || 'unknown'}</span>
+          {currentVersion != null && (
+            <span className="tag">v{currentVersion}</span>
+          )}
+          <Link to={`/runs?agent=${encodeURIComponent(agent.id)}`}>
+            View Runs →
+          </Link>
+        </div>
+      </header>
+
+      <div className="tabs">
+        <button
+          className={`tab-button ${activeTab === 'configuration' ? 'active' : ''}`}
+          onClick={() => setActiveTab('configuration')}
+        >
+          Configuration
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'composition' ? 'active' : ''}`}
+          onClick={() => setActiveTab('composition')}
+        >
+          Composition
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'versions' ? 'active' : ''}`}
+          onClick={() => setActiveTab('versions')}
+        >
+          Versions
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'runs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('runs')}
+        >
+          Runs
+        </button>
       </div>
 
-      <ManifestEditor
-        agent={agent}
-        onSaved={(updated) => {
-          setAgent(updated);
-          flash('ok', 'manifest updated');
-        }}
-        onError={(msg) => flash('error', msg)}
-      />
-
-      {/* Composition section */}
-      {agent.composition && (
-        <section className="section">
-          <h2 style={{ border: 'none', margin: 0, marginBottom: 8 }}>
-            Composition <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· prompt recipe</span>
-          </h2>
-          <dl className="dl">
-            <dt>System prompt</dt><dd><code>{agent.composition.system}</code></dd>
-            <dt>Transport</dt><dd><code>{agent.composition.transport}</code></dd>
-            {agent.composition.user_template && (
-              <><dt>User template</dt><dd><code>{agent.composition.user_template}</code></dd></>
-            )}
-            {agent.composition.output_schema && (
-              <><dt>Output schema</dt><dd><code>{agent.composition.output_schema}</code></dd></>
-            )}
-            <dt>Validation</dt><dd><code>{agent.composition.output_validation}</code></dd>
-            {agent.composition.references.length > 0 && (
-              <>
-                <dt>References</dt>
-                <dd>
-                  <ul style={{ margin: 0, paddingLeft: 16 }}>
-                    {agent.composition.references.map((ref, i) => (
-                      <li key={i}>
-                        <code>{typeof ref === 'string' ? ref : ref.path}</code>
-                        {typeof ref !== 'string' && ref.heading && ` → ${ref.heading}`}
-                      </li>
-                    ))}
-                  </ul>
-                </dd>
-              </>
-            )}
-          </dl>
-        </section>
-      )}
-
-      {/* Run dashboard */}
-      <section className="section">
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <h2 style={{ border: 'none', margin: 0 }}>Runs</h2>
-          <span className="dim" style={{ fontSize: 12 }}>
-            <button onClick={loadRuns} disabled={runsLoading} style={{ fontSize: 12, marginRight: 8 }}>
-              {runsLoading ? 'loading…' : 'refresh'}
-            </button>
-            <Link to={`/runs?agent=${encodeURIComponent(agent.id)}`}>open runs page →</Link>
-          </span>
-        </div>
-
-        {runs.length === 0 ? (
-          <p className="dim" style={{ margin: 0 }}>
-            {runsLoading ? 'loading runs…' : 'no runs recorded for this agent yet'}
-          </p>
-        ) : (
-          <>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                gap: 8,
-                marginBottom: 12,
+      <div className="tab-content">
+        {activeTab === 'configuration' && (
+          <div className="tab-pane stack">
+            <ManifestEditor
+              agent={agent}
+              onSaved={(updated) => {
+                setAgent(updated);
+                flash('ok', 'agent updated');
               }}
-            >
-              <StatTile label="Total" value={String(stats.total)} />
-              <StatTile label="Success" value={String(stats.ok)} tone="ok" />
-              <StatTile label="Errors" value={String(stats.error)} tone="error" />
-              <StatTile label="Running" value={String(stats.running)} tone="running" />
-              <StatTile
-                label="Success rate"
-                value={stats.total ? `${stats.successRate.toFixed(0)}%` : '—'}
-              />
-              <StatTile label="Avg duration" value={fmtMs(stats.avgDurationMs)} />
-              <StatTile label="P95 duration" value={fmtMs(stats.p95DurationMs)} />
-              <StatTile label="Last run" value={fmtRelative(stats.lastRunAt)} />
-              <StatTile label="Tokens (30d)" value={fmtNum(tokenTotals.total)} />
-              <StatTile label="In tokens" value={fmtNum(tokenTotals.input)} />
-              <StatTile label="Out tokens" value={fmtNum(tokenTotals.output)} />
-            </div>
+              onError={(msg) => flash('error', msg)}
+            />
 
-            <div style={{ height: 180 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailySeries} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
-                  <XAxis dataKey="label" stroke="#8b949e" fontSize={11} />
-                  <YAxis allowDecimals={false} stroke="#8b949e" fontSize={11} />
-                  <Tooltip
-                    contentStyle={{
-                      background: '#161b22',
-                      border: '1px solid #30363d',
-                      fontSize: 12,
+            <section className="section">
+              <div className="row between" style={{ marginBottom: 8 }}>
+                <h2 style={{ border: 'none', margin: 0 }}>Prompt</h2>
+                <div className="row" style={{ gap: 6 }}>
+                  {activeVersion != null && (
+                    <span className="dim" style={{ fontSize: 11 }}>
+                      active v{activeVersion}
+                      {draftVersion != null && (
+                        <span className="dirty"> · draft v{draftVersion}</span>
+                      )}
+                    </span>
+                  )}
+                  <button
+                    onClick={saveDraft}
+                    disabled={!promptDirty || loadingPrompt}
+                    className="primary"
+                    style={{ fontSize: 11, padding: '4px 10px' }}
+                  >
+                    Save Draft
+                  </button>
+                </div>
+              </div>
+
+              {loadingPrompt && versions.length === 0 ? (
+                <p className="dim">loading…</p>
+              ) : (
+                <>
+                  <MarkdownEditor
+                    value={prompt}
+                    onChange={(v) => {
+                      setPrompt(v);
+                      setPromptDirty(true);
                     }}
                   />
-                  <Bar dataKey="ok" stackId="s" fill="#3fb950" name="ok" />
-                  <Bar dataKey="error" stackId="s" fill="#f85149" name="error" />
-                  <Bar dataKey="running" stackId="s" fill="#d29922" name="running" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
 
-            {tokenTotals.total > 0 && (
-              <div style={{ height: 180, marginTop: 8 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={tokenSeries} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
-                    <XAxis dataKey="label" stroke="#8b949e" fontSize={11} />
-                    <YAxis allowDecimals={false} stroke="#8b949e" fontSize={11} />
-                    <Tooltip
-                      contentStyle={{
-                        background: '#161b22',
-                        border: '1px solid #30363d',
-                        fontSize: 12,
-                      }}
+                  <div className="row" style={{ gap: 8, marginTop: 10 }}>
+                    <input
+                      type="text"
+                      value={changelog}
+                      onChange={(e) => setChangelog(e.target.value)}
+                      placeholder="Changelog (optional)"
+                      style={{ flex: 1, maxWidth: 300 }}
                     />
-                    <Bar dataKey="input" stackId="t" fill="#58a6ff" name="input tokens" />
-                    <Bar dataKey="output" stackId="t" fill="#bc8cff" name="output tokens" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+                    <button onClick={publish} disabled={loadingPrompt}>
+                      Publish
+                    </button>
+                  </div>
 
-            <div style={{ marginTop: 12 }}>
-              <h3 style={{ marginTop: 0, fontSize: 13 }} className="dim">
-                Recent runs
-              </h3>
-              <table style={{ fontSize: 12, width: '100%' }}>
-                <thead>
-                  <tr className="dim">
-                    <th style={{ textAlign: 'left' }}>When</th>
-                    <th style={{ textAlign: 'left' }}>Status</th>
-                    <th style={{ textAlign: 'right' }}>Duration</th>
-                    <th style={{ textAlign: 'left' }}>Run</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.slice(0, 8).map((r) => (
-                    <tr key={r.id}>
-                      <td className="dim">{fmtRelative(r.created_at)}</td>
-                      <td>
-                        <span className={`pill ${statusPillClass(r.status)}`}>{r.status}</span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>{fmtMs(durationMs(r))}</td>
-                      <td>
-                        <Link to={`/runs/${r.id}`} style={{ fontSize: 12 }}>
-                          {r.id.slice(0, 8)}…
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* Workspace section */}
-      <section className="section">
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <h2 style={{ border: 'none', margin: 0 }}>Workspace</h2>
-          {agent.workspace ? (
-            <Link to={`/workspaces/${agent.workspace}`}>open workspace →</Link>
-          ) : (
-            <span className="dim">no workspace assigned</span>
-          )}
-        </div>
-        <p className="dim" style={{ margin: 0 }}>
-          {agent.workspace || '(auto-resolved at run time)'}
-        </p>
-      </section>
-
-      <AgentToolsEditor
-        workspace={agent.workspace}
-        onSaved={(msg) => flash('ok', msg)}
-        onError={(msg) => flash('error', msg)}
-      />
-
-      <section className="section">
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <h2 style={{ border: 'none', margin: 0 }}>
-            Prompt
-            {agent.prompt_path && (
-              <span className="dim" style={{ marginLeft: 8, fontSize: 12 }}>
-                {agent.prompt_path}
-              </span>
-            )}
-            {hasDraft && (
-              <span
-                className="pill"
-                style={{
-                  marginLeft: 8,
-                  fontSize: 11,
-                  background: '#fef3c7',
-                  color: '#92400e',
-                }}
-              >
-                draft v{draftVersion}
-              </span>
-            )}
-            {promptDirty && (
-              <span className="dirty" style={{ marginLeft: 8 }}>
-                ● unsaved
-              </span>
-            )}
-          </h2>
-          <div className="row" style={{ gap: 8 }}>
-            <button onClick={loadPrompt} disabled={loadingPrompt}>
-              reload
-            </button>
-            <button onClick={saveDraft} disabled={!promptDirty}>
-              save draft (⌘S)
-            </button>
-            <button
-              className="primary"
-              onClick={publish}
-              disabled={!hasDraft}
-              title={hasDraft ? 'Publish draft as new version' : 'No draft to publish'}
-            >
-              publish
-            </button>
-          </div>
-        </div>
-
-        {hasDraft && (
-          <div className="row" style={{ marginBottom: 8, gap: 8 }}>
-            <input
-              type="text"
-              placeholder="changelog (optional)"
-              value={changelog}
-              onChange={(e) => setChangelog(e.target.value)}
-              style={{ flex: 1, padding: '4px 8px', fontSize: 13 }}
-            />
-          </div>
-        )}
-
-        {!agent.prompt_path ? (
-          <p className="dim">
-            This agent has no <code>prompt_path</code> — nothing to edit.
-          </p>
-        ) : (
-          <MarkdownEditor
-            value={prompt}
-            onChange={(v) => {
-              setPrompt(v);
-              setPromptDirty(true);
-            }}
-          />
-        )}
-      </section>
-
-      {versions.length > 0 && (
-        <section className="section">
-          <h3 style={{ marginTop: 0 }}>Versions</h3>
-          {loadingVersions && <p className="dim">loading versions…</p>}
-          <table style={{ fontSize: 13, width: '100%' }}>
-            <thead>
-              <tr className="dim">
-                <th style={{ textAlign: 'left' }}>Ver</th>
-                <th style={{ textAlign: 'left' }}>Status</th>
-                <th style={{ textAlign: 'left' }}>Author</th>
-                <th style={{ textAlign: 'left' }}>Changelog</th>
-                <th style={{ textAlign: 'right' }}>Size</th>
-                <th style={{ textAlign: 'left' }}>Date</th>
-                <th style={{ textAlign: 'right' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {versions.map((v) => (
-                <tr
-                  key={v.version}
-                  style={{
-                    background:
-                      v.version === activeVersion
-                        ? '#ecfdf5'
-                        : v.is_draft
-                          ? '#fef3c7'
-                          : 'transparent',
-                  }}
-                >
-                  <td>v{v.version}</td>
-                  <td>
-                    {v.is_draft ? (
-                      <span className="pill" style={{ background: '#fef3c7', color: '#92400e' }}>
-                        draft
-                      </span>
-                    ) : v.version === activeVersion ? (
-                      <span className="pill" style={{ background: '#d1fae5', color: '#065f46' }}>
-                        active
-                      </span>
-                    ) : (
-                      <span className="pill" style={{ background: '#f3f4f6', color: '#6b7280' }}>
-                        committed
-                      </span>
-                    )}
-                  </td>
-                  <td>{v.author}</td>
-                  <td className="dim">{v.changelog}</td>
-                  <td style={{ textAlign: 'right' }}>{v.size}b</td>
-                  <td className="dim">{new Date(v.created_at).toLocaleString()}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => loadVersionContent(v.version)}
-                        style={{ fontSize: 12 }}
-                      >
-                        load
-                      </button>
-                      {!v.is_draft && v.version !== activeVersion && (
-                        <button
-                          onClick={() => rollback(v.version)}
-                          style={{ fontSize: 12 }}
-                        >
-                          rollback
-                        </button>
-                      )}
+                  {versions.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <h3 style={{ fontSize: 13, color: 'var(--fg-muted)', marginBottom: 8 }}>
+                        Version History
+                      </h3>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Version</th>
+                            <th>Author</th>
+                            <th>Date</th>
+                            <th>Changelog</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {versions.map((v) => (
+                            <tr key={v.version}>
+                              <td>
+                                {v.version === activeVersion && (
+                                  <span className="pill ok" style={{ marginRight: 6 }}>active</span>
+                                )}
+                                {v.is_draft && (
+                                  <span className="pill running" style={{ marginRight: 6 }}>draft</span>
+                                )}
+                                v{v.version}
+                              </td>
+                              <td className="dim">{v.author}</td>
+                              <td className="dim">{new Date(v.created_at).toLocaleDateString()}</td>
+                              <td className="dim">{v.changelog || '—'}</td>
+                              <td>
+                                <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+                                  <button
+                                    className="link-btn"
+                                    onClick={() => loadVersionContent(v.version)}
+                                    style={{ fontSize: 11 }}
+                                  >
+                                    load
+                                  </button>
+                                  {v.version !== activeVersion && !v.is_draft && (
+                                    <button
+                                      className="link-btn"
+                                      onClick={() => rollback(v.version)}
+                                      style={{ fontSize: 11, color: 'var(--red)' }}
+                                    >
+                                      rollback
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+                  )}
+                </>
+              )}
+            </section>
+          </div>
+        )}
 
-      {toast && <Toast kind={toast.kind} msg={toast.msg} />}
-    </div>
-  );
-}
+        {activeTab === 'composition' && (
+          <div className="tab-pane stack">
+            {agent.composition ? (
+              <section className="section">
+                <h2>Recipe <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· declared in agent.toml</span></h2>
+                <dl className="composition-dl">
+                  <dt>System prompt</dt>
+                  <dd><code>{agent.composition.system}</code></dd>
+                  <dt>Transport</dt>
+                  <dd><code>{agent.composition.transport}</code></dd>
+                  {agent.composition.user_template && (
+                    <>
+                      <dt>User template</dt>
+                      <dd><code>{agent.composition.user_template}</code></dd>
+                    </>
+                  )}
+                  {agent.composition.output_schema && (
+                    <>
+                      <dt>Output schema</dt>
+                      <dd><code>{agent.composition.output_schema}</code></dd>
+                    </>
+                  )}
+                  <dt>Validation</dt>
+                  <dd><code>{agent.composition.output_validation}</code></dd>
+                  {agent.composition.references.length > 0 && (
+                    <>
+                      <dt>References</dt>
+                      <dd>
+                        <ul className="reference-list">
+                          {agent.composition.references.map((ref, i) => {
+                            const path = typeof ref === 'string' ? ref : ref.path;
+                            const heading = typeof ref === 'string' ? null : ref.heading;
+                            return (
+                              <li key={i}>
+                                <code>{path}</code>
+                                {heading && <span className="dim"> → {heading}</span>}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </dd>
+                    </>
+                  )}
+                </dl>
+              </section>
+            ) : (
+              <section className="section">
+                <p className="dim">This agent does not declare a <code>[composition]</code> block.</p>
+              </section>
+            )}
 
-// ---------------------------------------------------------------------------
-// Dashboard helpers
-// ---------------------------------------------------------------------------
+            <section className="section">
+              <h2>Bundle Files <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· stored in DB</span></h2>
+              {bundleFiles.length === 0 ? (
+                <p className="dim">No bundle files stored for this agent version. Run <code>agentbox versioning backfill-bundles</code> to import.</p>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kind</th>
+                      <th>Path</th>
+                      <th>Source</th>
+                      <th>SHA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bundleFiles.map((f) => (
+                      <tr key={f.relative_path}>
+                        <td><span className="pill">{f.kind}</span></td>
+                        <td className="mono">{f.relative_path}</td>
+                        <td className="dim mono" style={{ fontSize: 11 }}>
+                          {f.source_uri || '—'}
+                        </td>
+                        <td className="dim mono" style={{ fontSize: 11 }}>
+                          {f.sha256.slice(0, 12)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
 
-interface RunStats {
-  total: number;
-  ok: number;
-  error: number;
-  running: number;
-  successRate: number;
-  avgDurationMs: number | null;
-  p95DurationMs: number | null;
-  lastRunAt: string | null;
-}
+            <section className="section">
+              <h2>Final Composed System Prompt <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· references + schema appended</span></h2>
+              {composedSystem ? (
+                <pre className="composed-block">{composedSystem}</pre>
+              ) : (
+                <p className="dim">
+                  No composition rendered. Bundle files may not be imported yet.
+                </p>
+              )}
+            </section>
 
-function durationMs(r: RunRecord): number | null {
-  if (!r.finished_at) return null;
-  const start = Date.parse(r.created_at);
-  const end = Date.parse(r.finished_at);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-  return Math.max(0, end - start);
-}
+            {composedUser !== null && (
+              <section className="section">
+                <h2>Final Composed User Template</h2>
+                {composedUser ? (
+                  <pre className="composed-block">{composedUser}</pre>
+                ) : (
+                  <p className="dim">(empty)</p>
+                )}
+              </section>
+            )}
+          </div>
+        )}
 
-function computeRunStats(runs: RunRecord[]): RunStats {
-  let ok = 0;
-  let err = 0;
-  let running = 0;
-  const durations: number[] = [];
-  let lastRunAt: string | null = null;
-  for (const r of runs) {
-    if (r.status === 'ok') ok += 1;
-    else if (r.status === 'error') err += 1;
-    else if (r.status === 'running') running += 1;
-    const d = durationMs(r);
-    if (d !== null) durations.push(d);
-    if (!lastRunAt || Date.parse(r.created_at) > Date.parse(lastRunAt)) {
-      lastRunAt = r.created_at;
-    }
-  }
-  const total = runs.length;
-  const terminal = ok + err;
-  const successRate = terminal ? (ok / terminal) * 100 : 0;
-  durations.sort((a, b) => a - b);
-  const avg =
-    durations.length === 0
-      ? null
-      : Math.round(durations.reduce((s, x) => s + x, 0) / durations.length);
-  const p95 =
-    durations.length === 0
-      ? null
-      : durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.95))];
-  return { total, ok, error: err, running, successRate, avgDurationMs: avg, p95DurationMs: p95, lastRunAt };
-}
+        {activeTab === 'versions' && (
+          <div className="tab-pane">
+            <div className="versions-container">
+              <AgentVersions
+                agentId={agent.id}
+                onSelectVersion={(versionId, versionNum) => {
+                  setSelectedVersionId(versionId);
+                  setSelectedVersionNum(versionNum);
+                }}
+              />
 
-interface DayBucket {
-  date: string;
-  label: string;
-  ok: number;
-  error: number;
-  running: number;
-}
+              {selectedVersionNum !== null && (
+                <div className="version-details">
+                  <h3>Version Comparison</h3>
+                  <AgentVersionDiff
+                    agentId={agent.id}
+                    latestVersion={selectedVersionNum}
+                    versions={[]} // Would be populated from AgentVersions state
+                  />
 
-function buildDailySeries(runs: RunRecord[], days: number): DayBucket[] {
-  const buckets = new Map<string, DayBucket>();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    buckets.set(key, {
-      date: key,
-      label: `${d.getMonth() + 1}/${d.getDate()}`,
-      ok: 0,
-      error: 0,
-      running: 0,
-    });
-  }
-  for (const r of runs) {
-    const key = r.created_at.slice(0, 10);
-    const b = buckets.get(key);
-    if (!b) continue;
-    if (r.status === 'ok') b.ok += 1;
-    else if (r.status === 'error') b.error += 1;
-    else if (r.status === 'running') b.running += 1;
-  }
-  return Array.from(buckets.values());
-}
+                  {selectedVersionId && (
+                    <CommentThread versionId={selectedVersionId} />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-interface TokenBucket {
-  date: string;
-  label: string;
-  input: number;
-  output: number;
-}
-
-function buildTokenSeries(rows: AgentRun[], days: number): TokenBucket[] {
-  const buckets = new Map<string, TokenBucket>();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    buckets.set(key, {
-      date: key,
-      label: `${d.getMonth() + 1}/${d.getDate()}`,
-      input: 0,
-      output: 0,
-    });
-  }
-  for (const r of rows) {
-    if (!r.started_at) continue;
-    const key = r.started_at.slice(0, 10);
-    const b = buckets.get(key);
-    if (!b) continue;
-    b.input += r.input_tokens || 0;
-    b.output += r.output_tokens || 0;
-  }
-  return Array.from(buckets.values());
-}
-
-function sumTokens(rows: AgentRun[]): { input: number; output: number; total: number } {
-  let input = 0;
-  let output = 0;
-  for (const r of rows) {
-    input += r.input_tokens || 0;
-    output += r.output_tokens || 0;
-  }
-  return { input, output, total: input + output };
-}
-
-function fmtNum(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  return n.toLocaleString();
-}
-
-function statusPillClass(status: RunRecord['status']): string {
-  if (status === 'ok') return 'ok';
-  if (status === 'error') return 'error';
-  return 'running';
-}
-
-function fmtMs(ms: number | null | undefined): string {
-  if (ms === null || ms === undefined) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  const m = Math.floor(s / 60);
-  const rs = Math.round(s % 60);
-  return `${m}m ${rs}s`;
-}
-
-function fmtRelative(iso: string | null): string {
-  if (!iso) return '—';
-  const then = Date.parse(iso);
-  if (!Number.isFinite(then)) return '—';
-  const diff = Date.now() - then;
-  if (diff < 0) return 'in the future';
-  const s = Math.floor(diff / 1000);
-  if (s < 45) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return `${Math.floor(d / 30)}mo ago`;
-}
-
-function StatTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: 'ok' | 'error' | 'running';
-}) {
-  const toneColor =
-    tone === 'ok' ? '#3fb950' : tone === 'error' ? '#f85149' : tone === 'running' ? '#d29922' : undefined;
-  return (
-    <div
-      style={{
-        border: '1px solid #30363d',
-        borderRadius: 4,
-        padding: '8px 10px',
-        background: '#0d1117',
-      }}
-    >
-      <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-        {label}
+        {activeTab === 'runs' && (
+          <div className="tab-pane">
+            <p className="dim">
+              <Link to={`/runs?agent=${encodeURIComponent(agent.id)}`}>
+                View all runs for this agent →
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 600, color: toneColor }}>{value}</div>
+
+      {toast && (
+        <Toast kind={toast.kind} message={toast.msg} onClose={() => setToast(null)} />
+      )}
     </div>
   );
 }

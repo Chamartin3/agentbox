@@ -23,7 +23,12 @@ def get_store() -> SessionStore:
 
 @lru_cache(maxsize=1)
 def get_loader() -> DefinitionLoader:
-    return DefinitionLoader(get_settings().project_root)
+    settings = get_settings()
+    return DefinitionLoader(
+        settings.project_root,
+        manifest_path=settings.manifest_path,
+        agents_bundle_dir=settings.agents_bundle_dir,
+    )
 
 
 @lru_cache(maxsize=1)

@@ -22,7 +22,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
+from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TimeoutEvent, TextEvent, UsageEvent
 from agentbox.core.constants import RunnerKind
 from agentbox.core.runners._rate_limit import detect_in_text_line
 from agentbox.core.runners.base import Runner, RunRequest
@@ -253,6 +253,9 @@ async def _run_claude(
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await stdout_task
         stderr_task.cancel()
+        yield TimeoutEvent(
+            run_id=run_id, timeout_seconds=timeout, error=f"timeout after {timeout}s"
+        )
         yield DoneEvent(
             run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout"
         )

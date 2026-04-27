@@ -11,7 +11,12 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentbox.core.composition import ComposeResult, compose
+from agentbox.core.composition import (
+    ComposeResult,
+    compose,
+    compose_from_source,
+)
+from agentbox.core.composition.sources import BundleSource, DbBundleSource
 from agentbox.core.data.manifest import CompositionConfig
 
 logger = logging.getLogger(__name__)
@@ -19,20 +24,31 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Bundle:
-    """Self-contained agent bundle ready for composition."""
+    """Self-contained agent bundle ready for composition.
+
+    Carries either a filesystem ``path`` (disk-backed) or a pre-built
+    ``BundleSource`` (DB-backed). When both are present the source wins.
+    """
 
     agent_id: str
-    path: Path
-    composition: CompositionConfig
+    path: Path | None = None
+    composition: CompositionConfig | None = None
     legacy_prompt_path: str | None = None
     """Populated when the source uses the legacy ``prompt_path`` field
     and has no ``[composition]`` block."""
+    source: BundleSource | None = None
 
     def compose(
         self,
         variables: dict[str, str],
         shared_roots: dict[str, Path] | None = None,
     ) -> ComposeResult:
+        if self.source is not None:
+            return compose_from_source(self.source, variables)
+        if self.path is None:
+            raise ValueError(
+                f"Bundle for {self.agent_id!r} has neither a source nor a path"
+            )
         return compose(self.path, variables, shared_roots or {})
 
 
@@ -138,4 +154,43 @@ def load_bundle(
         path=root,
         composition=composition,
         legacy_prompt_path=legacy_prompt_path if composition is None else None,
+    )
+
+
+def load_bundle_from_db(
+    agent_id: str,
+    composition: CompositionConfig | None,
+    files: list[dict],
+    fallback_path: Path | None = None,
+) -> Bundle:
+    """Build a Bundle backed by a versioned DB snapshot.
+
+    Args:
+        agent_id: stable identifier.
+        composition: parsed ``CompositionConfig`` from the version's
+            ``config_json``. ``None`` for legacy versions — a minimal
+            composition is synthesised from the system file row.
+        files: rows from ``SessionStore.list_version_files(version_id)``.
+        fallback_path: optional disk path kept around as a workdir hint.
+            The composer never reads from this path.
+    """
+    if not files:
+        raise ValueError(
+            f"DB bundle for {agent_id!r} has no files — cannot compose"
+        )
+    if composition is None:
+        system_row = next((f for f in files if f.get("kind") == "system"), None)
+        if system_row is None:
+            raise ValueError(
+                f"DB bundle for {agent_id!r} has no kind='system' row"
+            )
+        composition = CompositionConfig(system=system_row["relative_path"])
+
+    composition_dict = composition.model_dump(mode="json")
+    source = DbBundleSource(composition=composition_dict, files=list(files))
+    return Bundle(
+        agent_id=agent_id,
+        path=fallback_path,
+        composition=composition,
+        source=source,
     )

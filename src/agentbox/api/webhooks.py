@@ -16,10 +16,12 @@ import asyncio
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
 
+from agentbox.api.events import LogEvent, RunEvent
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, RunRecord, SessionStore
 
@@ -159,6 +161,8 @@ def schedule_webhook(
     agent: AgentDef | None,
     run: RunRecord,
     store: SessionStore,
+    broadcaster: Any | None = None,
+    transcript_path: Path | None = None,
 ) -> None:
     """Best-effort: schedule webhook delivery if a URL is configured.
 
@@ -170,6 +174,11 @@ def schedule_webhook(
     url = _resolve_webhook_url(agent)
     if not url:
         return
+    _emit(
+        broadcaster,
+        transcript_path,
+        LogEvent(level="info", message=f"webhook scheduled → {url}", run_id=run.id),
+    )
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -178,9 +187,84 @@ def schedule_webhook(
         )
         return
     payload = _build_payload(run, store)
-    task = loop.create_task(deliver_webhook(url, payload))
     run_id = run.id
+    task = loop.create_task(
+        _deliver_with_events(url, payload, run_id, broadcaster, transcript_path)
+    )
     task.add_done_callback(lambda t: _on_delivery_done(t, run_id, store))
+
+
+async def _deliver_with_events(
+    url: str,
+    payload: dict[str, Any],
+    run_id: str,
+    broadcaster: Any | None,
+    transcript_path: Path | None,
+) -> bool:
+    """Wrap deliver_webhook with per-attempt event emission."""
+    body = json.dumps(payload, default=str)
+    last_error: str = ""
+    for attempt, delay in enumerate(_RETRY_DELAYS_S):
+        try:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_S) as client:
+                resp = await client.post(
+                    url,
+                    content=body,
+                    headers={"Content-Type": "application/json"},
+                )
+            if 200 <= resp.status_code < 300:
+                _emit(
+                    broadcaster,
+                    transcript_path,
+                    LogEvent(
+                        level="info",
+                        message=f"webhook delivered (attempt {attempt + 1})",
+                        run_id=run_id,
+                    ),
+                )
+                return True
+            last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+        except httpx.HTTPError as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+        _emit(
+            broadcaster,
+            transcript_path,
+            LogEvent(
+                level="warn",
+                message=f"webhook attempt {attempt + 1} failed: {last_error}",
+                run_id=run_id,
+            ),
+        )
+        await asyncio.sleep(delay)
+    _emit(
+        broadcaster,
+        transcript_path,
+        LogEvent(
+            level="error",
+            message=f"webhook delivery failed after {len(_RETRY_DELAYS_S)} attempts: {last_error}",
+            run_id=run_id,
+        ),
+    )
+    return False
+
+
+def _emit(
+    broadcaster: Any | None,
+    transcript_path: Path | None,
+    ev: RunEvent,
+) -> None:
+    """Publish an event and persist it to the transcript, best-effort."""
+    if broadcaster is not None:
+        try:
+            broadcaster.publish(ev)
+        except Exception:
+            pass
+    if transcript_path is not None:
+        try:
+            with transcript_path.open("a", encoding="utf-8") as tf:
+                tf.write(ev.model_dump_json() + "\n")
+        except OSError:
+            pass
 
 
 async def resend_webhook(

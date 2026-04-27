@@ -26,7 +26,7 @@ import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
+from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TimeoutEvent, TextEvent, UsageEvent
 from agentbox.core.constants import RunnerKind
 from agentbox.core.runners._rate_limit import detect_in_opencode_event
 from agentbox.core.runners.base import Runner, RunRequest
@@ -198,6 +198,11 @@ class OpenCodeRunner(Runner):
                 proc.kill()
             await proc.wait()
             stderr_task.cancel()
+            yield TimeoutEvent(
+                run_id=run_id,
+                timeout_seconds=timeout,
+                error=f"timeout after {timeout}s",
+            )
             yield DoneEvent(
                 run_id=run_id,
                 ok=False,
@@ -251,7 +256,9 @@ class OpenCodeRunner(Runner):
         # Yield the assistant text as TextEvent. The executor collects
         # TextEvent.text into the run output, which the webhook post-processor
         # validates against the Pydantic schema and persists.
-        yield TextEvent(run_id=run_id, text="".join(text_parts))
+        # Strip markdown fences so downstream validation sees clean JSON.
+        full_text = _strip_code_fences("".join(text_parts))
+        yield TextEvent(run_id=run_id, text=full_text)
 
         # Fetch session metadata (model, tokens, cost) via `opencode export`.
         # Best-effort: the run itself succeeded even if export fails.
@@ -379,3 +386,21 @@ async def _fetch_session_usage(
         cost_usd=cost_f,
         model=model,
     )
+
+
+import re as _re
+
+_FENCED_JSON_RE = _re.compile(r"```(?:json)?\s*\n(.*?)\n```", _re.DOTALL)
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove markdown code fences from model output."""
+    if not text:
+        return text
+    m = _FENCED_JSON_RE.search(text)
+    if m:
+        return m.group(1).strip()
+    s = text.strip()
+    if s.startswith(("{", "[")):
+        return s
+    return text

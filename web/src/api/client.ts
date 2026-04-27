@@ -8,7 +8,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   if (!resp.ok) {
     let detail: unknown;
     try {
-      detail = await resp.json();
+      detail = await resp.clone().json();
     } catch {
       detail = await resp.text();
     }
@@ -87,6 +87,9 @@ export interface RunnerSpec {
   allowed_tools: string[];
   extra_args: string[];
   timeout_seconds: number;
+  output_schema_path: string | null;
+  max_validation_retries: number;
+  max_error_retries: number;
 }
 
 export interface GuardrailRef {
@@ -104,6 +107,14 @@ export interface AgentDef {
   session_mode: 'headless' | 'persistent';
   guardrails: GuardrailRef[];
   tags: string[];
+  tools: string[];
+  webhook_url: string | null;
+  claude_agent: boolean;
+  headless: boolean;
+  unsupported_backends: string[];
+  source_format: string | null;
+  updated_at?: string | null;
+  resolved_workspace?: string;
 }
 
 export interface PromptFragment {
@@ -238,7 +249,22 @@ export const api = {
     ),
 
   listAgents: () => req<AgentDef[]>('/api/agents'),
-  getAgent: (id: string) => req<{ agent: AgentDef; prompt: string }>(`/api/agents/${id}`),
+  getAgent: (id: string) =>
+    req<{
+      agent: AgentDef;
+      prompt: string;
+      composed_system: string | null;
+      composed_user: string | null;
+      bundle_files: Array<{
+        kind: string;
+        relative_path: string;
+        sha256: string;
+        source_uri: string | null;
+      }>;
+      workspace: { path: string; ephemeral: boolean; generated_configs: Record<string, string> };
+      current_version: number | null;
+      versions: Array<Record<string, unknown>>;
+    }>(`/api/agents/${id}`),
 
   getManifest: () => req<ManifestDoc>('/api/manifest'),
   listRunnerModels: (kind: string) =>

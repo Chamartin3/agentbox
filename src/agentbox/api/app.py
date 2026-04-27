@@ -92,10 +92,16 @@ def _on_startup() -> None:
     # Phase 3: agent version drift sweep (best-effort, independent)
     try:
         store = _deps.get_store()
+        _project_root = _deps.get_settings().project_root
+        _shared_roots = {
+            k: (_project_root / v).resolve()
+            for k, v in (loaded_manifest.shared_assets or {}).items()
+        }
         startup_sweep(
             loaded_manifest.agents,
             store,
-            project_root=_deps.get_settings().project_root,
+            project_root=_project_root,
+            shared_roots=_shared_roots,
         )
     except Exception:
         pass

@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AgentDef, GuardrailRow, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
+import EventStream from '../components/EventStream';
+import ConversationView from '../components/ConversationView';
 
 interface StreamEvent {
   type: string;
@@ -322,41 +324,7 @@ function ToolCallsSection({ events }: { events: StreamEvent[] }) {
   );
 }
 
-function EventLine({ ev }: { ev: StreamEvent }) {
-  const t = String(ev.type || '');
-  const accent: Record<string, string> = {
-    text: 'var(--fg)',
-    log: 'var(--fg-muted)',
-    tool_call: '#79c0ff',
-    tool_result: 'var(--green)',
-    usage: '#d29922',
-    guardrail: '#d2a8ff',
-    done: 'var(--accent)',
-  };
-  let body = '';
-  switch (t) {
-    case 'text': body = String(ev.text ?? ''); break;
-    case 'log': body = String(ev.message ?? ''); break;
-    case 'tool_call':
-      body = `${ev.tool} ${JSON.stringify(ev.arguments ?? {}).slice(0, 200)}`;
-      break;
-    case 'tool_result': body = `${ev.tool} ok=${ev.ok}`; break;
-    case 'usage':
-      body = `in=${ev.input_tokens ?? 0} out=${ev.output_tokens ?? 0} cost=$${ev.cost_usd ?? 0}`;
-      break;
-    case 'guardrail':
-      body = `${ev.name} ok=${ev.ok} ${ev.message ?? ''}`;
-      break;
-    case 'done': body = `ok=${ev.ok} ${ev.error ?? ''}`; break;
-    default: body = JSON.stringify(ev).slice(0, 200);
-  }
-  return (
-    <div style={{ marginBottom: 2 }}>
-      <span style={{ color: accent[t] ?? 'var(--fg-muted)', marginRight: 6 }}>[{t}]</span>
-      <span style={{ whiteSpace: 'pre-wrap' }}>{body}</span>
-    </div>
-  );
-}
+
 
 // ──────────────────────────────────────────────────────── prompt fragments
 
@@ -474,7 +442,11 @@ export default function RunDetailPage() {
   const [guards, setGuards] = useState<GuardrailRow[]>([]);
   const [agent, setAgent] = useState<AgentDef | null>(null);
   const [events, setEvents] = useState<StreamEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const [promptDoc, setPromptDoc] = useState<RunPromptDoc | null>(null);
+  const [isLive, setIsLive] = useState(false);
+  const [eventView, setEventView] = useState<'conversation' | 'events'>('conversation');
   const wsRef = useRef<WebSocket | null>(null);
   // Re-render every 30s so "5m ago" labels stay fresh.
   const [, setNow] = useState(Date.now());
@@ -495,28 +467,29 @@ export default function RunDetailPage() {
     }
   };
 
-  const loadTranscript = async () => {
-    try {
-      const evs = await api.getTranscript(id);
-      setEvents(evs as StreamEvent[]);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   useEffect(() => {
     loadMeta();
+    // Always load the transcript on mount so we have events even before
+    // the WebSocket connects (or if the run is already finished).
+    setEventsLoading(true);
+    setEventsError(null);
+    api.getTranscript(id)
+      .then((evs) => { setEvents(evs as StreamEvent[]); setEventsLoading(false); })
+      .catch(() => { setEventsError('failed to load transcript'); setEventsLoading(false); });
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}/api/runs/${id}/stream`);
     wsRef.current = ws;
+    ws.onopen = () => setIsLive(true);
     ws.onmessage = (m) => setEvents((evs) => [...evs, JSON.parse(m.data)]);
     ws.onclose = () => {
+      setIsLive(false);
       loadMeta();
+      // Refresh transcript after WS close in case new events
+      // arrived between the initial load and the WS disconnect.
       setTimeout(() => {
-        setEvents((evs) => {
-          if (evs.length === 0) loadTranscript();
-          return evs;
-        });
+        api.getTranscript(id)
+          .then((evs) => setEvents(evs as StreamEvent[]))
+          .catch(() => {});
       }, 100);
     };
     return () => { ws.close(); };
@@ -571,22 +544,23 @@ export default function RunDetailPage() {
         {run.session_id && <Tag label="session_id" value={run.session_id.slice(0, 8)} tone="mono" />}
       </div>
 
-      {/* ── error card ───────────────────────────────────────────────── */}
+      {/* ── error card (collapsed by default) ─────────────────────────── */}
       {run.error && (
-        <section className="section error-card">
-          <h2 style={{ borderBottom: 'none', margin: 0, color: 'var(--red)' }}>
-            {err.headline || 'Run failed'}
-          </h2>
-          {err.detail && (
-            <p style={{ marginTop: 8, marginBottom: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
-              {err.detail}
-            </p>
-          )}
-          <details style={{ marginTop: 10 }}>
-            <summary className="dim" style={{ cursor: 'pointer', fontSize: 12 }}>raw error</summary>
-            <pre style={{ marginTop: 8 }}>{run.error}</pre>
-          </details>
-        </section>
+        <details className="section error-card" style={{ padding: 0 }}>
+          <summary className="error-card-summary">
+            <span style={{ color: 'var(--red)', fontWeight: 500 }}>{err.headline || 'Run failed'}</span>
+            {err.detail && <span className="dim" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 8 }}>{err.detail}</span>}
+          </summary>
+          <div style={{ padding: '0 16px 12px' }}>
+            {err.detail && (
+              <p style={{ margin: '8px 0', whiteSpace: 'pre-wrap', fontSize: 13 }}>{err.detail}</p>
+            )}
+            <details>
+              <summary className="dim" style={{ cursor: 'pointer', fontSize: 12 }}>raw error</summary>
+              <pre style={{ marginTop: 8 }}>{run.error}</pre>
+            </details>
+          </div>
+        </details>
       )}
 
       {/* ── KPI cards ────────────────────────────────────────────────── */}
@@ -708,21 +682,49 @@ export default function RunDetailPage() {
       {/* ── Tool calls ───────────────────────────────────────────────── */}
       <ToolCallsSection events={events} />
 
-      {/* ── Event stream ─────────────────────────────────────────────── */}
+      {/* ── Event stream / Conversation ──────────────────────────────── */}
       <section className="section">
-        <div className="row between" style={{ marginBottom: 6 }}>
-          <h2 style={{ border: 'none', margin: 0 }}>Event stream</h2>
-          <span className="dim">{events.length} events</span>
-        </div>
-        <div className="code-block">
-          {events.length === 0 ? (
-            <p className="dim" style={{ margin: 0, padding: 10 }}>no events captured</p>
-          ) : (
-            <div style={{ padding: 10, maxHeight: '50vh', overflow: 'auto', fontSize: 12 }}>
-              {events.map((e, i) => <EventLine key={i} ev={e} />)}
+        <div className="row between" style={{ marginBottom: 8 }}>
+          <h2 style={{ border: 'none', margin: 0 }}>
+            {eventView === 'conversation' ? 'Conversation' : 'Event stream'}
+          </h2>
+          <div className="row">
+            <div className="range-toggle">
+              <button
+                className={eventView === 'conversation' ? 'active' : ''}
+                onClick={() => setEventView('conversation')}
+              >
+                conversation
+              </button>
+              <button
+                className={eventView === 'events' ? 'active' : ''}
+                onClick={() => setEventView('events')}
+              >
+                events
+              </button>
             </div>
-          )}
+            <button
+              style={{ fontSize: 11, padding: '3px 8px' }}
+              onClick={() => {
+                setEventsLoading(true);
+                api.getTranscript(id)
+                  .then((evs) => { setEvents(evs as StreamEvent[]); setEventsLoading(false); })
+                  .catch(() => { setEventsError('failed to load transcript'); setEventsLoading(false); });
+              }}
+            >
+              refresh
+            </button>
+          </div>
         </div>
+        {eventsLoading ? (
+          <p className="dim" style={{ margin: 0, textAlign: 'center', padding: 20 }}>loading events…</p>
+        ) : eventsError ? (
+          <p className="dim" style={{ margin: 0, textAlign: 'center', padding: 20, color: 'var(--red)' }}>{eventsError}</p>
+        ) : eventView === 'conversation' ? (
+          <ConversationView events={events} />
+        ) : (
+          <EventStream events={events} isLive={isLive} />
+        )}
       </section>
 
       {/* ── Guardrails ───────────────────────────────────────────────── */}

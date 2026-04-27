@@ -12,6 +12,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
+from agentbox.core.constants import EventType
+
 
 class _EventBase(BaseModel):
     ts: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -19,14 +21,14 @@ class _EventBase(BaseModel):
 
 
 class ToolCallEvent(_EventBase):
-    type: Literal["tool_call"] = "tool_call"
+    type: Literal[EventType.TOOL_CALL] = EventType.TOOL_CALL
     tool: str
     arguments: dict
     call_id: str | None = None
 
 
 class ToolResultEvent(_EventBase):
-    type: Literal["tool_result"] = "tool_result"
+    type: Literal[EventType.TOOL_RESULT] = EventType.TOOL_RESULT
     tool: str
     call_id: str | None = None
     ok: bool = True
@@ -35,13 +37,13 @@ class ToolResultEvent(_EventBase):
 
 
 class TextEvent(_EventBase):
-    type: Literal["text"] = "text"
+    type: Literal[EventType.TEXT] = EventType.TEXT
     text: str
     role: Literal["assistant", "user", "system"] = "assistant"
 
 
 class UsageEvent(_EventBase):
-    type: Literal["usage"] = "usage"
+    type: Literal[EventType.USAGE] = EventType.USAGE
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_tokens: int = 0
@@ -51,7 +53,7 @@ class UsageEvent(_EventBase):
 
 
 class GuardrailEvent(_EventBase):
-    type: Literal["guardrail"] = "guardrail"
+    type: Literal[EventType.GUARDRAIL] = EventType.GUARDRAIL
     name: str
     ok: bool
     message: str | None = None
@@ -59,13 +61,35 @@ class GuardrailEvent(_EventBase):
 
 
 class LogEvent(_EventBase):
-    type: Literal["log"] = "log"
+    type: Literal[EventType.LOG] = EventType.LOG
     level: Literal["debug", "info", "warn", "error"] = "info"
     message: str
 
 
+class RetryEvent(_EventBase):
+    type: Literal[EventType.RETRY] = EventType.RETRY
+    attempt: int = 1
+    reason: str = ""
+    """Why the retry happened: 'validation_failed' | 'run_error' | 'timeout'."""
+    error: str | None = None
+    """The error or validation message that triggered the retry."""
+
+
+class ThinkingEvent(_EventBase):
+    type: Literal[EventType.THINKING] = EventType.THINKING
+    text: str
+    """Raw thinking / reasoning content from the model."""
+
+
+class TimeoutEvent(_EventBase):
+    type: Literal[EventType.TIMEOUT] = EventType.TIMEOUT
+    timeout_seconds: int = 0
+    """The configured timeout for this run."""
+    error: str | None = None
+
+
 class DoneEvent(_EventBase):
-    type: Literal["done"] = "done"
+    type: Literal[EventType.DONE] = EventType.DONE
     ok: bool
     exit_code: int | None = None
     error: str | None = None
@@ -82,6 +106,9 @@ RunEvent = Annotated[
     | UsageEvent
     | GuardrailEvent
     | LogEvent
+    | RetryEvent
+    | ThinkingEvent
+    | TimeoutEvent
     | DoneEvent,
     Field(discriminator="type"),
 ]

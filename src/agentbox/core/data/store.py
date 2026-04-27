@@ -21,6 +21,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from agentbox.core.constants import RunStatus
+from agentbox.core.data.agent_sync import AgentSyncMixin
 from agentbox.core.data.agent_versions import AgentVersionsMixin
 from agentbox.core.data.analytics import AnalyticsMixin
 from agentbox.core.data.prompts import PromptVersionsMixin
@@ -52,9 +53,54 @@ class _CoreStore:
         self._init()
 
     def _init(self) -> None:
-        metadata.create_all(self.engine)
+        self._run_alembic_migrations()
         self._migrate()
         self._reap_orphaned_runs()
+
+    def _run_alembic_migrations(self) -> None:
+        """Run pending Alembic migrations on startup."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            from alembic import command
+            from alembic.config import Config
+
+            alembic_cfg = Config()
+            alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
+
+            # Find the migrations directory — check a few candidate paths so
+            # both editable installs and built wheels work.
+            import agentbox
+
+            candidates = [
+                Path(agentbox.__file__).parent.parent / "alembic",
+                Path(agentbox.__file__).parent.parent.parent / "alembic",
+                Path.cwd() / "alembic",
+            ]
+            migrations_dir = None
+            for c in candidates:
+                if c.is_dir():
+                    migrations_dir = c
+                    break
+
+            if migrations_dir is not None:
+                alembic_cfg.set_main_option("script_location", str(migrations_dir))
+                command.upgrade(alembic_cfg, "head")
+                logger.debug("alembic: upgraded to head")
+            else:
+                logger.warning(
+                    "alembic: migrations directory not found in %s — falling back to create_all",
+                    [str(c) for c in candidates],
+                )
+                metadata.create_all(self.engine)
+        except ImportError:
+            logger.debug("alembic: not installed — falling back to create_all")
+            metadata.create_all(self.engine)
+        except Exception:
+            logger.exception("alembic: migration failed, falling back to create_all")
+            metadata.create_all(self.engine)
 
     def _migrate(self) -> None:
         """Add columns introduced after the initial schema was deployed."""
@@ -428,5 +474,11 @@ class _CoreStore:
                 conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
 
 
-class SessionStore(PromptVersionsMixin, AgentVersionsMixin, AnalyticsMixin, _CoreStore):
-    """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions."""
+class SessionStore(
+    PromptVersionsMixin,
+    AgentVersionsMixin,
+    AgentSyncMixin,
+    AnalyticsMixin,
+    _CoreStore,
+):
+    """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + sync."""

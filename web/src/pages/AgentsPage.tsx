@@ -51,31 +51,108 @@ function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void
   );
 }
 
+type SortKey = 'id' | 'runner' | 'model' | 'updated_at';
+type SortDir = 'asc' | 'desc';
+
+const PAGE_SIZE = 20;
+
+function formatUpdated(s?: string | null): string {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleString();
+}
+
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentDef[]>([]);
   const [selected, setSelected] = useState<AgentDef | null>(null);
+  const [query, setQuery] = useState('');
+  const [runnerFilter, setRunnerFilter] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('updated_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     api.listAgents().then(setAgents).catch(console.error);
   }, []);
 
+  const runnerKinds = Array.from(new Set(agents.map((a) => a.runner.kind))).sort();
+
+  const filtered = agents.filter((a) => {
+    if (runnerFilter && a.runner.kind !== runnerFilter) return false;
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return (
+      a.id.toLowerCase().includes(q) ||
+      (a.description || '').toLowerCase().includes(q) ||
+      (a.runner.model || '').toLowerCase().includes(q) ||
+      (a.tags || []).some((t) => t.toLowerCase().includes(q))
+    );
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const pick = (x: AgentDef): string | null =>
+      sortKey === 'id' ? x.id
+      : sortKey === 'runner' ? x.runner.kind
+      : sortKey === 'model' ? (x.runner.model || null)
+      : (x.updated_at || null);
+    const av = pick(a);
+    const bv = pick(b);
+    if (av == null && bv == null) return a.id.localeCompare(b.id);
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return av < bv ? -dir : av > bv ? dir : a.id.localeCompare(b.id);
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(k); setSortDir(k === 'updated_at' ? 'desc' : 'asc'); }
+    setPage(1);
+  }
+
+  const ind = (k: SortKey) => sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+
   return (
     <div className="stack">
       <h1>Agents</h1>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="search id, description, model, tag…"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+          style={{ flex: '1 1 260px', padding: '6px 10px', fontSize: 13 }}
+        />
+        <select
+          value={runnerFilter}
+          onChange={(e) => { setRunnerFilter(e.target.value); setPage(1); }}
+          style={{ padding: '6px 10px', fontSize: 13 }}
+        >
+          <option value="">all runners</option>
+          {runnerKinds.map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+        <span className="dim" style={{ fontSize: 12 }}>{sorted.length} of {agents.length}</span>
+      </div>
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Runner</th>
-            <th>Model</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('id')}>ID{ind('id')}</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('runner')}>Runner{ind('runner')}</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('model')}>Model{ind('model')}</th>
             <th>Session</th>
             <th>Workspace</th>
             <th>Description</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('updated_at')}>Last changed{ind('updated_at')}</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {agents.map((a) => (
+          {pageRows.map((a) => (
             <tr
               key={a.id}
               style={{ cursor: 'pointer' }}
@@ -93,6 +170,9 @@ export default function AgentsPage() {
                   : (a.workspace || <span className="dim">auto</span>)}
               </td>
               <td>{a.description}</td>
+              <td className="dim" style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
+                {formatUpdated(a.updated_at)}
+              </td>
               <td onClick={(e) => e.stopPropagation()}>
                 <Link to={`/runs?agent=${encodeURIComponent(a.id)}`} title="view runs">
                   runs →
@@ -100,8 +180,19 @@ export default function AgentsPage() {
               </td>
             </tr>
           ))}
+          {pageRows.length === 0 && (
+            <tr><td colSpan={8} className="dim" style={{ textAlign: 'center', padding: 24 }}>no agents match</td></tr>
+          )}
         </tbody>
       </table>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' }}>
+          <button onClick={() => setPage(Math.max(1, safePage - 1))} disabled={safePage === 1}>← prev</button>
+          <span className="dim" style={{ fontSize: 12 }}>page {safePage} / {totalPages}</span>
+          <button onClick={() => setPage(Math.min(totalPages, safePage + 1))} disabled={safePage === totalPages}>next →</button>
+        </div>
+      )}
 
       {selected && (
         <PromptDrawer agent={selected} onClose={() => setSelected(null)} />

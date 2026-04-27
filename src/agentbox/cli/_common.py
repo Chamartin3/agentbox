@@ -5,17 +5,21 @@ from rich.console import Console
 from rich.text import Text
 
 from agentbox.api.deps import get_loader
+from agentbox.core.constants import EventType
 
 console = Console()
 
 EVENT_STYLES: dict[str, str] = {
-    "text": "white",
-    "log": "dim",
-    "tool_call": "cyan",
-    "tool_result": "green",
-    "usage": "yellow",
-    "guardrail": "magenta",
-    "done": "bold",
+    EventType.TEXT: "white",
+    EventType.LOG: "dim",
+    EventType.TOOL_CALL: "cyan",
+    EventType.TOOL_RESULT: "green",
+    EventType.USAGE: "yellow",
+    EventType.GUARDRAIL: "magenta",
+    EventType.RETRY: "bright_yellow",
+    EventType.THINKING: "bright_blue",
+    EventType.TIMEOUT: "bright_red",
+    EventType.DONE: "bold",
     "error": "red",
     "warning": "yellow",
 }

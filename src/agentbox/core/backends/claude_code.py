@@ -14,6 +14,7 @@ from typing import Any
 
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent
 from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.runners.claude_code import _run_claude
 from agentbox.core.workspaces import load_capabilities
 
@@ -72,6 +73,7 @@ class ClaudeCodeBackend:
             env=env,
             cwd=Path("."),
             files=files,
+            agent_meta={"timeout_seconds": spec.timeout_seconds},
         )
 
     async def run(
@@ -96,7 +98,7 @@ class ClaudeCodeBackend:
             rendered.argv,
             rendered.cwd,
             dict(rendered.env),
-            120,  # timeout — executor enforces it
+            rendered.agent_meta.get("timeout_seconds", DEFAULT_RUNNER_TIMEOUT_SECONDS),
             stdin_data=input.encode("utf-8"),
         ):
             yield ev

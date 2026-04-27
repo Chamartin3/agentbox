@@ -34,6 +34,7 @@ class Settings:
     host: str
 
     agents_dir: Path | None
+    agents_bundle_dir: Path | None
     prompts_dir: Path | None
     skills_dir: Path | None
     outputs_dir: Path | None
@@ -108,6 +109,7 @@ def load_settings() -> Settings:
     completion_webhook_url = os.environ.get("AGENTBOX_COMPLETION_WEBHOOK_URL") or None
 
     agents_dir = _optional_dir("AGENTBOX_AGENTS_DIR")
+    agents_bundle_dir = _optional_dir("AGENTBOX_AGENTS_BUNDLE_DIR")
     prompts_dir = _optional_dir("AGENTBOX_PROMPTS_DIR")
     skills_dir = _optional_dir("AGENTBOX_SKILLS_DIR")
     outputs_dir = _optional_dir("AGENTBOX_OUTPUTS_DIR")
@@ -119,6 +121,7 @@ def load_settings() -> Settings:
         port=port,
         host=host,
         agents_dir=agents_dir,
+        agents_bundle_dir=agents_bundle_dir,
         prompts_dir=prompts_dir,
         skills_dir=skills_dir,
         outputs_dir=outputs_dir,

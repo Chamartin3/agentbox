@@ -119,11 +119,24 @@ def write_legacy_dir(agent_dir: Path, agent: AgentDef) -> None:
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    tmp = Path(tempfile.gettempdir()) / f"{path.name}.tmp"
-    tmp.write_text(text, encoding="utf-8")
+    # Write the tmp file next to the target so os.replace() stays on the
+    # same filesystem (cross-device replace raises OSError 18 on bind mounts).
+    tmp = path.with_name(f".{path.name}.tmp")
     try:
+        tmp.write_text(text, encoding="utf-8")
         os.replace(tmp, path)
     except PermissionError:
         # Parent directory isn't writable (e.g. single-file bind mount
         # where the dir is root-owned).  Fall back to direct overwrite.
         path.write_text(text, encoding="utf-8")
+    except OSError:
+        # Fall back to a system tmp dir + copy when the target dir is read-only.
+        sys_tmp = Path(tempfile.gettempdir()) / f"{path.name}.tmp"
+        sys_tmp.write_text(text, encoding="utf-8")
+        try:
+            path.write_text(text, encoding="utf-8")
+        finally:
+            sys_tmp.unlink(missing_ok=True)
+    finally:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)

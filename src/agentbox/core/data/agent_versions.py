@@ -6,6 +6,7 @@ Composed into ``SessionStore``. Reads ``self.engine`` and operates on
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
@@ -15,9 +16,19 @@ from sqlalchemy.engine import Engine
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import (
     agent_version_comments,
+    agent_version_files,
     agent_version_ratings,
     agent_versions,
 )
+
+_VALID_FILE_KINDS = {
+    "system",
+    "user_template",
+    "reference",
+    "output_schema",
+    "input_schema",
+    "other",
+}
 
 
 class AgentVersionsMixin:
@@ -40,10 +51,12 @@ class AgentVersionsMixin:
         author: str = "system",
         changelog: str = "",
         is_legacy: bool = False,
+        files: list[dict] | None = None,
     ) -> dict:
+        prepared = _prepare_files(files) if files else []
         version = self._next_version(agent_id)
         with self.engine.begin() as conn:
-            conn.execute(
+            result = conn.execute(
                 agent_versions.insert().values(
                     agent_id=agent_id,
                     version=version,
@@ -58,7 +71,62 @@ class AgentVersionsMixin:
                     created_at=now_iso(),
                 )
             )
+            version_id = int(result.inserted_primary_key[0])
+            if prepared:
+                conn.execute(
+                    agent_version_files.insert(),
+                    [
+                        {**row, "version_id": version_id, "created_at": now_iso()}
+                        for row in prepared
+                    ],
+                )
         return self.get_version(agent_id, version)
+
+    # ------------------------------------------------------------------
+    # Bundle files
+    # ------------------------------------------------------------------
+
+    def insert_version_files(self, version_id: int, files: list[dict]) -> None:
+        prepared = _prepare_files(files)
+        if not prepared:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_version_files.insert(),
+                [
+                    {**row, "version_id": version_id, "created_at": now_iso()}
+                    for row in prepared
+                ],
+            )
+
+    def list_version_files(self, version_id: int) -> list[dict]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                agent_version_files.select()
+                .where(agent_version_files.c.version_id == version_id)
+                .order_by(
+                    agent_version_files.c.position, agent_version_files.c.id
+                )
+            )
+            return [dict(r._mapping) for r in rows]
+
+    def replace_version_files(self, version_id: int, files: list[dict]) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_version_files.delete().where(
+                    agent_version_files.c.version_id == version_id
+                )
+            )
+        if files:
+            self.insert_version_files(version_id, files)
+
+    def delete_version_files(self, version_id: int) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_version_files.delete().where(
+                    agent_version_files.c.version_id == version_id
+                )
+            )
 
     def latest_version(self, agent_id: str) -> dict | None:
         with self.engine.connect() as conn:
@@ -79,6 +147,73 @@ class AgentVersionsMixin:
                 )
             ).first()
             return self._row_dict(row) if row else None
+
+    def get_agent_def(self, agent_id: str):  # -> AgentDef | None
+        """Reconstruct an ``AgentDef`` from the latest version's snapshot.
+
+        Returns ``None`` when the agent has never been versioned. Callers
+        should prefer this over ``DefinitionLoader.get()`` so runtime
+        behavior is driven by the DB, not the filesystem.
+        """
+        import logging
+
+        from agentbox.core.data.manifest import AgentDef
+
+        logger = logging.getLogger(__name__)
+
+        latest = self.latest_version(agent_id)
+        if latest is None:
+            return None
+        snap = latest.get("content_snapshot")
+        if not snap:
+            return None
+        try:
+            data = json.loads(snap)
+        except json.JSONDecodeError:
+            logger.warning(
+                "agent_versions: snapshot for %r v%s is not valid JSON",
+                agent_id,
+                latest.get("version"),
+            )
+            return None
+        try:
+            return AgentDef.model_validate(data)
+        except Exception as exc:
+            logger.warning(
+                "agent_versions: snapshot for %r v%s failed validation: %s",
+                agent_id,
+                latest.get("version"),
+                exc,
+            )
+            return None
+
+    def list_agents_with_latest(self) -> list[dict]:
+        """Return one row per agent_id — the latest version's snapshot.
+
+        DB-as-source-of-truth read path for the agent list. Avoids hitting
+        the filesystem loader so the API surfaces exactly what was imported
+        into ``agent_versions`` (including DB-only agents with no on-disk
+        bundle).
+        """
+        with self.engine.connect() as conn:
+            inner = (
+                select(
+                    agent_versions.c.agent_id,
+                    func.max(agent_versions.c.version).label("max_version"),
+                )
+                .group_by(agent_versions.c.agent_id)
+                .subquery()
+            )
+            rows = conn.execute(
+                agent_versions.select()
+                .join(
+                    inner,
+                    (agent_versions.c.agent_id == inner.c.agent_id)
+                    & (agent_versions.c.version == inner.c.max_version),
+                )
+                .order_by(agent_versions.c.created_at.desc())
+            )
+            return [self._row_dict(r) for r in rows]
 
     def list_versions(self, agent_id: str) -> list[dict]:
         with self.engine.connect() as conn:
@@ -180,6 +315,38 @@ class AgentVersionsMixin:
         d = dict(row._mapping)
         d["is_legacy"] = bool(d.get("is_legacy", False))
         return d
+
+
+def _prepare_files(files: list[dict]) -> list[dict]:
+    prepared: list[dict] = []
+    seen: set[str] = set()
+    for i, f in enumerate(files):
+        relative_path = f.get("relative_path")
+        if not relative_path:
+            raise ValueError("file row missing 'relative_path'")
+        if relative_path in seen:
+            raise ValueError(f"duplicate relative_path in files: {relative_path}")
+        seen.add(relative_path)
+        kind = f.get("kind", "other")
+        if kind not in _VALID_FILE_KINDS:
+            raise ValueError(
+                f"invalid file kind {kind!r}; expected one of {sorted(_VALID_FILE_KINDS)}"
+            )
+        content = f.get("content", "")
+        if content is None:
+            content = ""
+        sha256 = f.get("sha256") or hashlib.sha256(content.encode("utf-8")).hexdigest()
+        prepared.append(
+            {
+                "relative_path": relative_path,
+                "kind": kind,
+                "content": content,
+                "sha256": sha256,
+                "source_uri": f.get("source_uri"),
+                "position": int(f.get("position", i)),
+            }
+        )
+    return prepared
 
 
 def _text_diff(a: str, b: str) -> str:

@@ -29,8 +29,11 @@ from agentbox.api.events import (
     DoneEvent,
     GuardrailEvent,
     LogEvent,
+    RetryEvent,
     RunEvent,
     TextEvent,
+    ThinkingEvent,
+    TimeoutEvent,
     UsageEvent,
 )
 from agentbox.api.webhooks import schedule_webhook
@@ -284,7 +287,10 @@ class RunExecutor:
         # --- composition path ------------------------------------------------
         composed_result = None
         if agent.composition is not None and variables is not None:
-            from agentbox.core.composition.loader import load_bundle
+            from agentbox.core.composition.loader import (
+                load_bundle,
+                load_bundle_from_db,
+            )
 
             manifest = self.loader.load()
             shared_roots = {
@@ -294,12 +300,38 @@ class RunExecutor:
 
             # Find the agent bundle path
             bundle_path = self._resolve_bundle_path(agent)
-            bundle = load_bundle(
-                agent_id=agent.id,
-                root=bundle_path,
-                manifest_composition=agent.composition,
-                legacy_prompt_path=agent.prompt_path,
-            )
+
+            # DB-first composition: when the active version has captured
+            # files, render from the snapshot. ``AGENTBOX_BUNDLE_SOURCE=disk``
+            # forces the legacy filesystem path (useful for debugging a
+            # mismatch between DB content and disk).
+            bundle = None
+            source_pref = os.getenv("AGENTBOX_BUNDLE_SOURCE", "auto").lower()
+            if source_pref != "disk":
+                try:
+                    active = self.store.get_active_version(agent.id)
+                    if active is not None:
+                        files = self.store.list_version_files(active["id"])
+                        if files:
+                            bundle = load_bundle_from_db(
+                                agent_id=agent.id,
+                                composition=agent.composition,
+                                files=files,
+                                fallback_path=bundle_path,
+                            )
+                except Exception:
+                    logger.exception(
+                        "executor: DB bundle load failed for %r — falling back to disk",
+                        agent.id,
+                    )
+                    bundle = None
+            if bundle is None:
+                bundle = load_bundle(
+                    agent_id=agent.id,
+                    root=bundle_path,
+                    manifest_composition=agent.composition,
+                    legacy_prompt_path=agent.prompt_path,
+                )
             composed_result = bundle.compose(variables, shared_roots)
             # Attach composed metadata so backend adapters can read it
             agent = agent.model_copy(deep=True)
@@ -614,7 +646,6 @@ class RunExecutor:
         transcript_path: Path,
         broadcaster: RunBroadcaster,
     ) -> None:
-        max_attempts = 1 + (agent.runner.max_validation_retries or 0)
         current_input = input_
 
         output_text: list[str] = []
@@ -626,11 +657,17 @@ class RunExecutor:
         validation_errors: list[str] | None = None
         schema_validated_via: str | None = None
 
+        error_retries_left = agent.runner.max_error_retries or 0
+        validation_retries_left = agent.runner.max_validation_retries or 0
+        # Cap total attempts to avoid infinite loops.
+        max_attempts = 1 + error_retries_left + validation_retries_left
+
         timeout = agent.runner.timeout_seconds
         try:
             transcript_path.parent.mkdir(parents=True, exist_ok=True)
             for attempt in range(max_attempts):
                 output_text.clear()
+                run_error: str | None = None
 
                 with transcript_path.open("a", encoding="utf-8") as tf:
                     try:
@@ -648,51 +685,110 @@ class RunExecutor:
                                     # the finally block (status persist + webhook).
                                     break
                     except TimeoutError:
-                        final_error = f"timeout after {timeout}s"
+                        run_error = f"timeout after {timeout}s"
+                        final_error = run_error
                         final_ok = False
                         final_status = RunStatus.TIMEOUT.value
+                        if timeout is not None:
+                            to_ev = TimeoutEvent(
+                                run_id=run_id,
+                                timeout_seconds=timeout,
+                                error=run_error,
+                            )
+                            tf.write(to_ev.model_dump_json() + "\n")
+                            broadcaster.publish(to_ev)
                     except Exception as exc:
-                        final_error = f"executor error: {type(exc).__name__}: {exc}"
+                        run_error = f"executor error: {type(exc).__name__}: {exc}"
+                        final_error = run_error
                         final_ok = False
 
-                output = "\n".join(output_text).strip() or None
-                if not final_ok:
-                    break
-
-                if agent.runner.output_schema_path and output:
-                    is_valid, v_error = self._validate_output(output, agent, workdir)
-                    schema_validated_via = "jsonschema"
-                    if is_valid:
-                        validation_status = "ok"
-                        validation_errors = None
-                        break
-                    validation_status = "fail"
-                    validation_errors = [v_error]
-                    if attempt < max_attempts - 1:
-                        current_input = self._build_retry_prompt(
-                            input_, output, v_error
+                    # --- Post-run logic (inside with block so tf is available) ---
+                    if run_error:
+                        ev = LogEvent(
+                            run_id=run_id,
+                            level="error",
+                            message=run_error,
                         )
-                        broadcaster.publish(
-                            LogEvent(
+                        tf.write(ev.model_dump_json() + "\n")
+                        broadcaster.publish(ev)
+
+                    output = "\n".join(output_text).strip() or None
+
+                    # --- Error recovery (any failure including timeout) ----------
+                    if not final_ok:
+                        if error_retries_left > 0:
+                            error_retries_left -= 1
+                            reason = "timeout" if final_status == RunStatus.TIMEOUT.value else "run_error"
+                            current_input = self._build_error_retry_prompt(
+                                input_, output, final_error
+                            )
+                            ev = RetryEvent(
+                                run_id=run_id,
+                                attempt=attempt + 1,
+                                reason=reason,
+                                error=final_error,
+                            )
+                            tf.write(ev.model_dump_json() + "\n")
+                            broadcaster.publish(ev)
+                            ev = LogEvent(
+                                run_id=run_id,
+                                level="warn",
+                                message=(
+                                    f"Run failed (attempt {attempt + 1}): {final_error} — "
+                                    f"retrying ({error_retries_left} left)"
+                                ),
+                            )
+                            tf.write(ev.model_dump_json() + "\n")
+                            broadcaster.publish(ev)
+                            continue
+                        # No retries left — final error is already set.
+                        break
+
+                    # --- Validation retry (output schema check) -----------------
+                    if agent.runner.output_schema_path and output:
+                        is_valid, v_error = self._validate_output(output, agent, workdir)
+                        schema_validated_via = "jsonschema"
+                        if is_valid:
+                            validation_status = "ok"
+                            validation_errors = None
+                            break
+                        validation_status = "fail"
+                        validation_errors = [v_error]
+                        if validation_retries_left > 0:
+                            validation_retries_left -= 1
+                            current_input = self._build_retry_prompt(
+                                input_, output, v_error
+                            )
+                            ev = RetryEvent(
+                                run_id=run_id,
+                                attempt=attempt + 1,
+                                reason="validation_failed",
+                                error=v_error,
+                            )
+                            tf.write(ev.model_dump_json() + "\n")
+                            broadcaster.publish(ev)
+                            ev = LogEvent(
                                 run_id=run_id,
                                 level="warn",
                                 message=(
                                     f"Validation failed (attempt {attempt + 1}): "
-                                    f"{v_error} — retrying"
+                                    f"{v_error} — retrying ({validation_retries_left} left)"
                                 ),
                             )
-                        )
-                        continue
-                    # Final attempt failed validation
-                    mode = getattr(agent, "_composed_validation_mode", "strict")
-                    if mode == "strict":
-                        final_ok = False
-                        final_error = f"output validation failed: {v_error}"
-                    elif mode == "warn":
-                        validation_status = "warn"
-                    break
+                            tf.write(ev.model_dump_json() + "\n")
+                            broadcaster.publish(ev)
+                            continue
+                        # Final attempt failed validation
+                        mode = getattr(agent, "_composed_validation_mode", "strict")
+                        if mode == "strict":
+                            final_ok = False
+                            final_error = f"output validation failed: {v_error}"
+                        elif mode == "warn":
+                            validation_status = "warn"
+                        break
 
-                break
+                    # Success path — no validation configured or passed.
+                    break
             try:
                 await self._run_guardrails(
                     run_id, agent, input_, output or "", transcript_path, broadcaster
@@ -718,7 +814,7 @@ class RunExecutor:
             try:
                 refreshed = self.store.get_run(run_id)
                 if refreshed is not None:
-                    schedule_webhook(agent, refreshed, self.store)
+                    schedule_webhook(agent, refreshed, self.store, broadcaster, transcript_path)
             except Exception:
                 pass
             with contextlib.suppress(Exception):
@@ -784,6 +880,24 @@ class RunExecutor:
             f"Fix the issues above and produce a corrected output that passes validation."
         )
 
+    @staticmethod
+    def _build_error_retry_prompt(
+        original_input: str, previous_output: str | None, error: str | None
+    ) -> str:
+        parts = [
+            f"{original_input}\n\n",
+            "--- PREVIOUS ATTEMPT FAILED ---\n",
+        ]
+        if error:
+            parts.append(f"The run failed with the following error:\n\n{error}\n\n")
+        if previous_output:
+            parts.append(f"--- YOUR PREVIOUS OUTPUT ---\n{previous_output}\n\n")
+        parts.append(
+            "--- FIX IT ---\n"
+            "Review the error above, correct the issue, and produce a new output."
+        )
+        return "".join(parts)
+
     async def _run_guardrails(
         self,
         run_id: str,
@@ -797,11 +911,10 @@ class RunExecutor:
             try:
                 cls = get_guardrail(ref.name)
             except KeyError as exc:
-                broadcaster.publish(
-                    GuardrailEvent(
-                        run_id=run_id, name=ref.name, ok=False, message=str(exc)
-                    )
+                ev = GuardrailEvent(
+                    run_id=run_id, name=ref.name, ok=False, message=str(exc)
                 )
+                broadcaster.publish(ev)
                 continue
             instance = cls()
             ctx = GuardrailContext(
@@ -817,15 +930,19 @@ class RunExecutor:
             self.store.record_guardrail(
                 run_id, ref.name, result.ok, result.message, attempt=idx
             )
-            broadcaster.publish(
-                GuardrailEvent(
-                    run_id=run_id,
-                    name=ref.name,
-                    ok=result.ok,
-                    message=result.message,
-                    attempt=idx,
-                )
+            ev = GuardrailEvent(
+                run_id=run_id,
+                name=ref.name,
+                ok=result.ok,
+                message=result.message,
+                attempt=idx,
             )
+            broadcaster.publish(ev)
+            try:
+                with transcript_path.open("a", encoding="utf-8") as tf:
+                    tf.write(ev.model_dump_json() + "\n")
+            except OSError:
+                pass
 
     def _stamp_run_agent_version(self, run_id: str, agent: AgentDef) -> None:
         try:

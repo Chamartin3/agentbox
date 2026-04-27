@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "agentbox-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/home/omidev/Code/ai/cv_agents/libs/agentbox",
+        "run",
+        "agentbox-mcp"
+      ],
+      "env": {
+        "AGENTBOX_MCP_TRANSPORT": "stdio",
+        "AGENTBOX_DATA_DIR": "/home/omidev/Code/ai/cv_agents/workdir/agentbox/data",
+        "AGENTBOX_PROJECT_ROOT": "/home/omidev/Code/ai/cv_agents",
+        "AGENTBOX_MANIFEST": "/home/omidev/Code/ai/cv_agents/agentbox.toml",
+        "AGENTBOX_AGENTS_BUNDLE_DIR": "/home/omidev/Code/ai/cv_agents/apps/cvman/ai/agents"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
+    }
+  }
+}

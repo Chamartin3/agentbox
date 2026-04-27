@@ -1,4 +1,4 @@
-.agent-detail-v2 {
+.agent-detail {
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -89,6 +89,43 @@
 
 .version-details h3 {
   margin-top: 0;
+}
+
+.composition-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.composition-dl dt {
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.composition-dl dd {
+  margin: 0;
+  font-size: 13px;
+}
+
+.reference-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+
+.composed-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 600px;
+  overflow: auto;
+  margin: 0;
 }
 
 @media (max-width: 1000px) {

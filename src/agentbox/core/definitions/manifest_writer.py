@@ -35,9 +35,10 @@ _AGENT_PATCHABLE = {
     "session_mode",
     "workspace",
     "tags",
-    "claude_agent",
-    "headless",
     "tools",
+    "webhook_url",
+    "headless",
+    "guardrails",
     "prompt",
     "prompt_path",
 }
@@ -163,18 +164,62 @@ class ManifestWriter:
         """Apply a patch to one agent. Returns the updated AgentDef.
 
         Raises PatchError on unknown agent, forbidden field, or validation failure.
+
+        Handles both inline ``[[agents]]`` blocks in the top-level manifest
+        and standalone bundle ``agent.toml`` files. For bundle agents the
+        edit is applied directly to the bundle TOML.
         """
-        if not self.path.exists():
-            raise PatchError("no_manifest", "agentbox.toml not found at project root")
+        if self.path.exists():
+            doc = tomlkit.parse(self.read_text())
+            agents = doc.get("agents")
+            if isinstance(agents, AoT):
+                target_table = _find_agent_table(agents, agent_id)
+                if target_table is not None:
+                    return self._patch_inline(doc, target_table, agent_id, patch)
 
-        doc = tomlkit.parse(self.read_text())
-        agents = doc.get("agents")
-        if not isinstance(agents, AoT):
-            raise PatchError("no_agents", "agentbox.toml has no [[agents]] entries")
+        # Fall back to a bundle agent.toml.
+        return self._patch_bundle(agent_id, patch)
 
-        target_table = _find_agent_table(agents, agent_id)
-        if target_table is None:
+    def _patch_bundle(self, agent_id: str, patch: dict[str, Any]) -> AgentDef:
+        from agentbox.api.deps import get_loader
+
+        loader = get_loader()
+        agent = loader.get(agent_id)
+        if agent is None or not agent.source_path:
             raise PatchError("unknown_agent", f"no agent with id={agent_id!r}")
+        src = Path(agent.source_path)
+        if src.is_dir():
+            src = src / "agent.toml"
+        if not src.exists() or src.suffix != ".toml":
+            raise PatchError(
+                "unsupported_source",
+                f"bundle agent {agent_id!r} has no editable agent.toml at {src}",
+            )
+
+        doc = tomlkit.parse(src.read_text(encoding="utf-8"))
+        _apply_patch(doc, patch)
+
+        # Re-parse the bundle through AgentDef to validate.
+        try:
+            from agentbox.core.data.manifest import AgentDef as _AgentDef
+
+            updated = _AgentDef.model_validate(_to_plain(doc))
+        except Exception as exc:
+            raise PatchError("validation_failed", str(exc)) from exc
+
+        _atomic_write(src, tomlkit.dumps(doc))
+        # Carry over source metadata that wasn't in the bundle TOML.
+        updated.source_path = agent.source_path
+        updated.source_format = agent.source_format
+        return updated
+
+    def _patch_inline(
+        self,
+        doc: Any,
+        target_table: Table,
+        agent_id: str,
+        patch: dict[str, Any],
+    ) -> AgentDef:
 
         _apply_patch(target_table, patch)
 

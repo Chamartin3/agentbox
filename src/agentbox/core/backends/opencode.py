@@ -9,12 +9,21 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent
+from agentbox.api.events import (
+    DoneEvent,
+    LogEvent,
+    RunEvent,
+    TextEvent,
+    ThinkingEvent,
+    TimeoutEvent,
+)
 from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.runners.opencode import (
     _DEFAULT_OPENCODE_MODEL,
     _parse_event_stream,
@@ -91,7 +100,7 @@ class OpenCodeBackend:
             rendered.argv,
             rendered.cwd,
             dict(rendered.env),
-            timeout=rendered.agent_meta.get("timeout_seconds", 1200),
+            timeout=rendered.agent_meta.get("timeout_seconds", DEFAULT_RUNNER_TIMEOUT_SECONDS),
             stdin_data=stdin_data,
         ):
             yield ev
@@ -102,7 +111,7 @@ class OpenCodeBackend:
         argv: list[str],
         cwd: Path,
         env: dict[str, str],
-        timeout: int = 1200,
+        timeout: int = DEFAULT_RUNNER_TIMEOUT_SECONDS,
         stdin_data: bytes | None = None,
     ) -> AsyncIterator[RunEvent]:
         import asyncio
@@ -175,6 +184,23 @@ class OpenCodeBackend:
                 proc.kill()
             await proc.wait()
             stderr_task.cancel()
+            # Yield whatever events we captured before the timeout so the
+            # conversation / transcript shows partial progress.
+            raw = "".join(stdout_chunks).strip()
+            if raw:
+                text_parts, thinking_parts, _session_id, _parse_failed = _parse_event_stream_with_thinking(raw)
+                for tt in thinking_parts:
+                    yield ThinkingEvent(run_id=run_id, text=tt)
+                if text_parts:
+                    yield TextEvent(run_id=run_id, text="".join(text_parts))
+            for sl in stderr_lines:
+                if sl.strip():
+                    yield LogEvent(run_id=run_id, level="warn", message=sl)
+            yield TimeoutEvent(
+                run_id=run_id,
+                timeout_seconds=timeout,
+                error=f"timeout after {timeout}s",
+            )
             yield DoneEvent(
                 run_id=run_id,
                 ok=False,
@@ -208,7 +234,7 @@ class OpenCodeBackend:
             )
             return
 
-        text_parts, _session_id, parse_failed = _parse_event_stream(raw)
+        text_parts, thinking_parts, _session_id, parse_failed = _parse_event_stream_with_thinking(raw)
         if parse_failed and not text_parts:
             yield LogEvent(
                 run_id=run_id,
@@ -223,9 +249,72 @@ class OpenCodeBackend:
             )
             return
 
-        yield TextEvent(run_id=run_id, text="".join(text_parts))
+        for thinking_text in thinking_parts:
+            yield ThinkingEvent(run_id=run_id, text=thinking_text)
+
+        # Strip markdown code fences so downstream consumers (validation,
+        # webhooks, the UI) receive raw JSON instead of fenced blocks.
+        stripped_text = _strip_code_fences("".join(text_parts))
+        yield TextEvent(run_id=run_id, text=stripped_text)
         yield DoneEvent(
             run_id=run_id,
             ok=proc.returncode == 0,
             exit_code=proc.returncode,
         )
+
+
+def _parse_event_stream_with_thinking(raw: str) -> tuple[list[str], list[str], str | None, bool]:
+    """Parse opencode --format json output, extracting text and thinking parts.
+
+    Returns (text_parts, thinking_parts, session_id, parse_failed).
+    """
+    text_parts: list[str] = []
+    thinking_parts: list[str] = []
+    session_id: str | None = None
+    any_json = False
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            evt = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(evt, dict):
+            continue
+        any_json = True
+        if session_id is None:
+            sid = evt.get("sessionID")
+            if isinstance(sid, str) and sid:
+                session_id = sid
+        if evt.get("type") == "text":
+            part = evt.get("part")
+            if isinstance(part, dict):
+                ptype = part.get("type")
+                text = part.get("text")
+                if ptype == "text" and isinstance(text, str):
+                    text_parts.append(text)
+                elif ptype in ("thinking", "reasoning") and isinstance(text, str):
+                    thinking_parts.append(text)
+    return text_parts, thinking_parts, session_id, not any_json
+
+
+_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove markdown code fences from model output.
+
+    Models often wrap JSON in ```json blocks despite being told not to.
+    This strips the outer fences so downstream validation and storage
+    sees clean JSON (or plain text).
+    """
+    if not text:
+        return text
+    m = _FENCED_JSON_RE.search(text)
+    if m:
+        return m.group(1).strip()
+    s = text.strip()
+    if s.startswith(("{", "[")):
+        return s
+    return text

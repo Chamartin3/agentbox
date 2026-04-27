@@ -56,7 +56,8 @@ async def create_run(body: CreateRunBody) -> dict:
 
     logger = logging.getLogger(__name__)
     loader = get_loader()
-    agent = loader.get(body.agent)
+    store = get_store()
+    agent = store.get_agent_def(body.agent) or loader.get(body.agent)
     if agent is None:
         raise HTTPException(404, f"unknown agent {body.agent!r}")
 
@@ -182,7 +183,7 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
 
     refreshed = store.get_run(run_id) or existing
     loader = get_loader()
-    agent = loader.get(refreshed.agent_id)
+    agent = store.get_agent_def(refreshed.agent_id) or loader.get(refreshed.agent_id)
     schedule_webhook(agent, refreshed, store)
     return {"ok": True, "run_id": run_id, "status": refreshed.status}
 

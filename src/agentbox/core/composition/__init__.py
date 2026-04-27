@@ -14,6 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from agentbox.core.composition.sources import (
+    BundleSource,
+    DbBundleSource,
+    FilesystemBundleSource,
+)
 from agentbox.core.constants import BundleFile
 
 
@@ -34,22 +39,34 @@ def _format_template(text: str, variables: dict[str, str]) -> str:
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 _OUTPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "output_schema.md").read_text(encoding="utf-8")
+_INPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "input_schema.md").read_text(encoding="utf-8")
 
 
-def _append_schema_to_user(user_text: str, schema: dict[str, Any]) -> str:
+def _append_input_schema(text: str, schema: dict[str, Any]) -> str:
+    """Append an input-format instruction block describing ``schema``.
+
+    Goes on the system prompt so the agent learns the shape of the
+    incoming payload up-front, before the user message is processed.
+    """
+    block = _INPUT_SCHEMA_TEMPLATE.format(schema=json.dumps(schema, indent=2)).rstrip()
+    base = (text or "").rstrip()
+    return f"{base}\n\n{block}" if base else block
+
+
+def _append_schema(text: str, schema: dict[str, Any]) -> str:
     """Append a structured-output instruction block referencing ``schema``.
 
     Agents that declare an output_schema expect their final reply to be a
-    single JSON object conforming to that schema. Surfacing the schema in
-    the user message — rather than relying on per-bundle prompt prose —
-    keeps the contract in one place (the Pydantic-derived JSON Schema)
-    and prevents drift between validators and prompts.
+    single JSON object conforming to that schema. The schema block is
+    appended to the system prompt (the durable contract), not the user
+    message — that keeps the contract co-located with the agent's role
+    instructions and out of the variable user input.
 
     The instruction text lives in ``prompts/output_schema.md`` so it can be
     edited without code changes.
     """
     block = _OUTPUT_SCHEMA_TEMPLATE.format(schema=json.dumps(schema, indent=2)).rstrip()
-    base = (user_text or "").rstrip()
+    base = (text or "").rstrip()
     return f"{base}\n\n{block}" if base else block
 
 
@@ -208,6 +225,10 @@ def compose(
     with agent_toml.open("rb") as f:
         config = tomllib.load(f)
 
+    if "composition" not in config:
+        raise ValueError(
+            f"agent.toml at {bundle_path} is missing [composition] block"
+        )
     composition = config.get("composition") or {}
 
     # -- system prompt -------------------------------------------------
@@ -248,6 +269,18 @@ def compose(
     if ref_parts:
         system_rendered = system_rendered + "\n\n" + "\n\n".join(ref_parts)
 
+    # -- input schema --------------------------------------------------
+    # Auto-detect input_schema.json at the bundle root and surface it in
+    # the system prompt so the agent knows the shape of the user payload.
+    input_schema_file = bundle_path / BundleFile.INPUT_SCHEMA
+    if input_schema_file.exists():
+        try:
+            input_schema = json.loads(_read_text(input_schema_file))
+        except json.JSONDecodeError:
+            input_schema = None
+        if input_schema is not None:
+            system_rendered = _append_input_schema(system_rendered, input_schema)
+
     # -- user prompt ---------------------------------------------------
     user_template = composition.get("user_template")
     if user_template:
@@ -281,7 +314,7 @@ def compose(
     if schema_file is not None:
         schema = json.loads(_read_text(schema_file))
         schema_sha = _sha256(json.dumps(schema, sort_keys=True, separators=(",", ":")))
-        user_rendered = _append_schema_to_user(user_rendered, schema)
+        system_rendered = _append_schema(system_rendered, schema)
 
     # -- bundle sha ----------------------------------------------------
     # Hash every file we read, in sorted order, as a simple manifest.
@@ -317,3 +350,92 @@ def compose(
         schema_sha=schema_sha,
         bundle_sha=bundle_sha,
     )
+
+
+def _ref_heading_fallback(path: str) -> str:
+    if path.startswith("shared://"):
+        tail = path[len("shared://") :].rsplit("/", 1)[-1]
+    else:
+        tail = path.rsplit("/", 1)[-1]
+    stem, _, _ = tail.partition(".")
+    return stem or tail
+
+
+def compose_from_source(
+    source: BundleSource,
+    variables: dict[str, str],
+    *,
+    render: bool = True,
+) -> ComposeResult:
+    """Storage-agnostic composer.
+
+    Renders system + user + schema from any ``BundleSource`` —
+    ``FilesystemBundleSource`` for disk bundles, ``DbBundleSource`` for a
+    versioned snapshot pulled from ``agent_version_files``. The two
+    sources must yield identical ``ComposeResult`` for the same content
+    so a published version reproduces the on-disk run.
+
+    When ``render=False`` template variable substitution is skipped —
+    suitable for previews where no run-time variables are available
+    (the raw braces and any Jinja-style ``{% %}`` blocks are kept verbatim).
+    """
+    system_raw = source.read_system()
+    system_rendered = _format_template(system_raw, variables) if render else system_raw
+
+    refs = source.references()
+    ref_parts: list[str] = []
+    for ref in refs:
+        content = source.read_reference(ref)
+        heading = ref.heading or _ref_heading_fallback(ref.path)
+        ref_parts.append(f"## {heading}\n\n{content}")
+    if ref_parts:
+        system_rendered = system_rendered + "\n\n" + "\n\n".join(ref_parts)
+
+    input_schema_info = source.read_input_schema()
+    if input_schema_info is not None:
+        system_rendered = _append_input_schema(
+            system_rendered, input_schema_info.schema
+        )
+
+    user_template = source.read_user_template()
+    if user_template is not None:
+        user_rendered = (
+            _format_template(user_template, variables) if render else user_template
+        )
+    else:
+        user_rendered = variables.get("user_message", "") if render else ""
+
+    schema_info = source.read_output_schema()
+    schema: dict[str, Any] | None = None
+    schema_sha: str | None = None
+    if schema_info is not None:
+        schema = schema_info.schema
+        schema_sha = _sha256(json.dumps(schema, sort_keys=True, separators=(",", ":")))
+        system_rendered = _append_schema(system_rendered, schema)
+
+    files_to_hash = source.bundle_files()
+    canonical = "\n".join(
+        f"{path}:{content}" for path, content in sorted(files_to_hash.items())
+    )
+    bundle_sha = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    return ComposeResult(
+        system=system_rendered,
+        user=user_rendered,
+        schema=schema,
+        schema_sha=schema_sha,
+        bundle_sha=bundle_sha,
+    )
+
+
+__all__ = [
+    "BundleSource",
+    "ComposeResult",
+    "CompositionPreview",
+    "DbBundleSource",
+    "FilesystemBundleSource",
+    "ReferencePreview",
+    "compose",
+    "compose_from_source",
+    "preview",
+]

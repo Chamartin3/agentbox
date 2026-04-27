@@ -54,6 +54,21 @@ class TestAgentVersionsMixin:
     def test_get_version_returns_none_for_missing(self, session_store) -> None:
         assert session_store.get_version("test-agent", 99) is None
 
+    def test_list_agents_with_latest_returns_one_row_per_agent(
+        self, session_store
+    ) -> None:
+        _build_version(session_store, agent_id="a")
+        _build_version(session_store, agent_id="a", author="v2")
+        _build_version(session_store, agent_id="b")
+        rows = session_store.list_agents_with_latest()
+        by_id = {r["agent_id"]: r for r in rows}
+        assert set(by_id) == {"a", "b"}
+        assert by_id["a"]["version"] == 2
+        assert by_id["b"]["version"] == 1
+
+    def test_list_agents_with_latest_empty(self, session_store) -> None:
+        assert session_store.list_agents_with_latest() == []
+
     def test_list_versions_ordered_desc(self, session_store) -> None:
         _build_version(session_store, author="first")
         _build_version(session_store, author="second")

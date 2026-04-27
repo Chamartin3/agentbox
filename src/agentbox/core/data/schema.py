@@ -16,6 +16,7 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    UniqueConstraint,
 )
 
 metadata = MetaData()
@@ -52,6 +53,9 @@ runs = Table(
     Column("variables", String),
     Column("validation_status", String),
     Column("validation_errors", String),
+    Column("schema_validated_via", String),
+    Column("post_status", String),
+    Column("post_errors", String),
     Index("runs_by_agent", "agent_id", "created_at"),
     Index("runs_by_status", "status", "created_at"),
 )
@@ -132,6 +136,27 @@ prompt_versions = Table(
     Index("idx_prompt_versions_agent", "agent_id", "version", unique=True),
 )
 
+agent_version_files = Table(
+    "agent_version_files",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column(
+        "version_id",
+        Integer,
+        ForeignKey("agent_versions.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("relative_path", String, nullable=False),
+    Column("kind", String, nullable=False),
+    Column("content", String, nullable=False),
+    Column("sha256", String, nullable=False),
+    Column("source_uri", String, nullable=True),
+    Column("position", Integer, nullable=False, server_default="0"),
+    Column("created_at", String, nullable=False),
+    UniqueConstraint("version_id", "relative_path", name="uq_version_file_path"),
+    Index("idx_agent_version_files_version", "version_id"),
+)
+
 agent_version_ratings = Table(
     "agent_version_ratings",
     metadata,
@@ -140,4 +165,16 @@ agent_version_ratings = Table(
     Column("rater", String, nullable=False),
     Column("rated_at", String, nullable=False),
     CheckConstraint("rating BETWEEN 1 AND 5", name="rating_range"),
+)
+
+agent_sync = Table(
+    "agent_sync",
+    metadata,
+    Column("agent_id", String, primary_key=True),
+    Column("proxy_path", String),
+    Column("sync_mode", String, nullable=False, server_default="manual"),
+    Column("sync_policy", String, nullable=False, server_default="db_wins"),
+    Column("last_file_hash", String),
+    Column("last_file_mtime", String),
+    Column("last_sync_at", String),
 )

@@ -30,6 +30,9 @@ class AgentSource(enum.StrEnum):
     """Agent defined as a markdown file with YAML frontmatter under ``agents.d/``."""
     LEGACY_DIR = "legacy_dir"
     """Agent defined via the legacy ``agents/<name>/agent.toml`` + ``prompts/system.md`` pattern."""
+    BUNDLE = "bundle"
+    """Agent defined as a bundle directory: ``<bundle_dir>/<id>/agent.toml`` with
+    a ``[composition]`` block declaring system prompt, references, and schemas."""
 
 
 class McpServerSpec(BaseModel):
@@ -123,22 +126,17 @@ class RunnerSpec(BaseModel):
     # --- Output validation & retry ---
 
     output_schema_path: str | None = None
-    """Project-relative path to a JSON Schema file for output validation.
-
-    When set, the executor validates the agent's output against this
-    schema after each run attempt. If validation fails, the agent is
-    re-run with the validation error in the prompt (up to
-    ``max_validation_retries`` times).
-    """
-
     max_validation_retries: int = 0
-    """How many times to re-run the agent when output fails schema validation."""
+    max_error_retries: int = 0
+    """How many times to re-run the agent when the run fails with an error
+    (excluding timeouts and validation failures, which have their own retry
+    configuration)."""
 
 
 class GuardrailRef(BaseModel):
-    name: str
     """Entrypoint name registered under `agentbox.guardrails`."""
 
+    name: str
     options: dict = Field(default_factory=dict)
 
 
@@ -344,6 +342,7 @@ class RunnerManifest(BaseModel):
 
     output_schema_path: str | None = None
     max_validation_retries: int = 0
+    max_error_retries: int = 0
 
 
 class AgentManifest(BaseModel):

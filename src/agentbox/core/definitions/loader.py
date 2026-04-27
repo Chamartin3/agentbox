@@ -60,11 +60,20 @@ def _source_label(agent: AgentDef) -> str:
 class DefinitionLoader:
     """Loads agent definitions from ``manifest.toml`` + ``agents.d/`` + legacy ``agents/``."""
 
-    def __init__(self, project_root: Path):
+    def __init__(
+        self,
+        project_root: Path,
+        manifest_path: Path | None = None,
+        agents_bundle_dir: Path | None = None,
+    ):
         self.project_root = project_root
+        self._manifest_override = manifest_path
+        self._agents_bundle_dir = agents_bundle_dir
 
     @property
     def manifest_path(self) -> Path:
+        if self._manifest_override is not None:
+            return self._manifest_override
         # New canonical name (Plan 08 container layout).
         new = self.project_root / "manifest.toml"
         if new.exists():
@@ -77,6 +86,8 @@ class DefinitionLoader:
 
     @property
     def legacy_agents_path(self) -> Path:
+        if self._agents_bundle_dir is not None:
+            return self._agents_bundle_dir
         return self.project_root / "agents"
 
     def load(self) -> ProjectManifest:
