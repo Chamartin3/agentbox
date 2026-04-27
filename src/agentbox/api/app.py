@@ -100,6 +100,33 @@ def _on_startup() -> None:
     except Exception:
         pass
 
+    # Phase 4: reap orphaned 'running' rows from a previous process.
+    try:
+        reaped = _deps.get_store().reap_orphan_runs()
+        if reaped:
+            _log.warning("reaped %d orphaned 'running' run(s) on startup", reaped)
+    except Exception:
+        _log.exception("orphan run sweep failed")
+
+    # Phase 5: fire webhooks for orphan-reaped runs whose post pipeline
+    # never ran. SessionStore._init reaps orphans synchronously at
+    # construction time, before the event loop exists — so schedule_webhook
+    # couldn't have fired then. We do it here, once the loop is up.
+    try:
+        from agentbox.api.webhooks import schedule_webhook
+
+        store = _deps.get_store()
+        agents_by_id = {a.id: a for a in loaded_manifest.agents}
+        pending = store.list_orphaned_unnotified_runs()
+        if pending:
+            _log.warning(
+                "scheduling webhooks for %d orphan-reaped run(s)", len(pending)
+            )
+        for run in pending:
+            schedule_webhook(agents_by_id.get(run.agent_id), run, store)
+    except Exception:
+        _log.exception("orphan webhook dispatch failed")
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title="agentbox", version="1.0.0", on_startup=[_on_startup])

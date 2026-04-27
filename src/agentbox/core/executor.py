@@ -215,6 +215,11 @@ class RunExecutor:
         self.loader = loader
         self._mcp_registry = mcp_registry
         self._broadcasters: dict[str, RunBroadcaster] = {}
+        # Strong references to in-flight run tasks. asyncio only holds
+        # weak references to tasks, so without this set the GC can collect
+        # a long-running run mid-flight, skipping the finally block that
+        # persists final status and fires the webhook.
+        self._tasks: set[asyncio.Task[None]] = set()
 
     def _make_generator(self) -> ConfigGenerator:
         manifest = self.loader.load()
@@ -414,7 +419,18 @@ class RunExecutor:
                 broadcaster,
             )
         )
-        task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+        self._tasks.add(task)
+
+        def _on_task_done(t: asyncio.Task[None]) -> None:
+            self._tasks.discard(t)
+            if not t.cancelled():
+                exc = t.exception()
+                if exc is not None:
+                    logger.exception(
+                        "run task crashed", exc_info=(type(exc), exc, exc.__traceback__)
+                    )
+
+        task.add_done_callback(_on_task_done)
         return run_id
 
     def _resolve_bundle_path(self, agent: AgentDef) -> Path:
@@ -626,6 +642,11 @@ class RunExecutor:
                                     final_ok = ev.ok
                                     final_error = ev.error
                                     final_status = ev.status
+                                    # Finalize as soon as the runner signals done;
+                                    # don't wait for the generator to drain. Any
+                                    # tail-end task can otherwise delay or skip
+                                    # the finally block (status persist + webhook).
+                                    break
                     except TimeoutError:
                         final_error = f"timeout after {timeout}s"
                         final_ok = False

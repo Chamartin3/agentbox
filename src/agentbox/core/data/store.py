@@ -239,6 +239,27 @@ class _CoreStore:
         with self.engine.begin() as conn:
             conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
 
+    def list_orphaned_unnotified_runs(self) -> list[RunRecord]:
+        """Return orphan-reaped runs that never had their webhook fired.
+
+        An orphan is any terminal row whose ``error`` was set by the
+        reaper (contains the literal "orphaned"). ``post_status`` is the
+        column the webhook delivery path stamps after a successful send,
+        so ``post_status IS NULL`` identifies runs that the post pipeline
+        never got to. Used by the API startup hook to fire webhooks for
+        runs whose executor task died before the finally block.
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                runs.select()
+                .where(
+                    runs.c.error.like("%orphaned%"),
+                    runs.c.post_status.is_(None),
+                )
+                .order_by(runs.c.finished_at.asc())
+            ).fetchall()
+        return [row_to_run(r) for r in rows]
+
     def reap_orphan_runs(self) -> int:
         """Mark any rows still in ``running`` state as ``incomplete``.
 
