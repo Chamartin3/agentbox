@@ -28,3 +28,6 @@ workspaces/
 
 # Planning docs (local only)
 docs/
+
+# Playwright MCP scratch
+.playwright-mcp/
