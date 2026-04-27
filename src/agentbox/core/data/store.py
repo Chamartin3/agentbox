@@ -64,6 +64,7 @@ class _CoreStore:
             ("runs", "schema_validated_via", "TEXT"),
             ("runs", "post_status", "TEXT"),
             ("runs", "post_errors", "TEXT"),
+            ("prompt_versions", "content_hash", "TEXT"),
         ]
         with self.engine.begin() as conn:
             for table, col, col_type in _add_column_if_missing:

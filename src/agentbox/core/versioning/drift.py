@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from agentbox.core.data.agent_versions import AgentVersionsMixin
     from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data.prompts import PromptVersionsMixin
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +57,53 @@ def _build_snapshot(agent: AgentDef) -> str:
     return json.dumps(data, sort_keys=True, default=str)
 
 
+def _sync_prompt(
+    agent: AgentDef,
+    store: PromptVersionsMixin,
+    project_root: Path | None,
+) -> None:
+    """Capture the on-disk prompt as a new committed prompt version if it changed.
+
+    Independent of agent-definition drift: editing only ``prompt.md`` should
+    still produce a new entry in ``prompt_versions`` so the history viewer
+    reflects it.
+    """
+    try:
+        if not getattr(agent, "prompt_path", None) and not getattr(
+            agent, "prompt", None
+        ):
+            return
+        root = project_root or (
+            agent.source_path.parent if agent.source_path else Path()
+        )
+        content = agent.load_prompt(root) if hasattr(agent, "load_prompt") else ""
+        if not content:
+            return
+        result = store.sync_prompt_from_disk(agent.id, content, author="filesystem")
+        if result is not None:
+            logger.info(
+                "versioning: captured prompt v%d for agent %r (%s)",
+                result["version"],
+                agent.id,
+                result["changelog"],
+            )
+    except Exception:
+        logger.exception("versioning: prompt sync failed for agent %r", agent.id)
+
+
 def startup_sweep(
     agents: list[AgentDef],
     store: AgentVersionsMixin,
+    project_root: Path | None = None,
 ) -> None:
-    """Check every loaded agent and create versions for NEW / DRIFTED agents."""
+    """Check every loaded agent and create versions for NEW / DRIFTED agents.
+
+    Also captures on-disk prompt content as a new ``prompt_versions`` entry
+    when it differs from the latest committed version. Prompt sync runs for
+    every agent (independent of agent-definition drift status) so that
+    out-of-band edits to ``prompt.md`` get versioned even when the agent's
+    TOML definition is unchanged.
+    """
     for agent in agents:
         try:
             status = check_drift(agent, store)
@@ -103,3 +146,7 @@ def startup_sweep(
                 )
         except Exception:
             logger.exception("versioning: drift check failed for agent %r", agent.id)
+
+        # Always sync prompt content — prompt edits are independent of
+        # agent-definition drift and must be versioned in their own table.
+        _sync_prompt(agent, store, project_root)

@@ -92,7 +92,11 @@ def _on_startup() -> None:
     # Phase 3: agent version drift sweep (best-effort, independent)
     try:
         store = _deps.get_store()
-        startup_sweep(loaded_manifest.agents, store)
+        startup_sweep(
+            loaded_manifest.agents,
+            store,
+            project_root=_deps.get_settings().project_root,
+        )
     except Exception:
         pass
 

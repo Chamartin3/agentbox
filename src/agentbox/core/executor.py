@@ -809,8 +809,17 @@ class RunExecutor:
     def _stamp_run_agent_version(self, run_id: str, agent: AgentDef) -> None:
         try:
             status = check_drift(agent, self.store)
+            # Run the sweep on drift OR always sync prompt content so
+            # out-of-band prompt edits get versioned even when the agent
+            # definition is unchanged.
             if status in ("drifted", "new"):
-                startup_sweep([agent], self.store)
+                startup_sweep(
+                    [agent], self.store, project_root=self.settings.project_root
+                )
+            else:
+                from agentbox.core.versioning.drift import _sync_prompt
+
+                _sync_prompt(agent, self.store, self.settings.project_root)
             latest = self.store.latest_version(agent.id)
             if latest is not None:
                 with self.store.engine.begin() as conn:

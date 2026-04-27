@@ -127,6 +127,7 @@ prompt_versions = Table(
     Column("author", String, nullable=False, server_default="system"),
     Column("changelog", String, nullable=False, server_default=""),
     Column("is_draft", Integer, nullable=False, server_default="0"),
+    Column("content_hash", String, nullable=True),
     Column("created_at", String, nullable=False),
     Index("idx_prompt_versions_agent", "agent_id", "version", unique=True),
 )

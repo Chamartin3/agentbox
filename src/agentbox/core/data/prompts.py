@@ -6,11 +6,17 @@ Composed into ``SessionStore``. Reads ``self.engine`` and operates on
 
 from __future__ import annotations
 
+import hashlib
+
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import prompt_versions
+
+
+def _hash_content(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 class PromptVersionsMixin:
@@ -92,6 +98,7 @@ class PromptVersionsMixin:
                     author=author,
                     changelog="",
                     is_draft=1,
+                    content_hash=_hash_content(content),
                     created_at=now_iso(),
                 )
             )
@@ -145,7 +152,52 @@ class PromptVersionsMixin:
                     author=author,
                     changelog=f"Rollback to version {target_version}",
                     is_draft=0,
+                    content_hash=_hash_content(target["content"]),
                     created_at=now_iso(),
                 )
             )
         return self.get_latest_committed_prompt(agent_id) or {}
+
+    def sync_prompt_from_disk(
+        self,
+        agent_id: str,
+        content: str,
+        author: str = "filesystem",
+        changelog: str | None = None,
+    ) -> dict | None:
+        """Capture an on-disk prompt as a committed version if it changed.
+
+        Compares ``content`` to the latest committed version (by hash). If
+        identical, returns ``None`` and leaves the DB untouched. Otherwise
+        inserts a new committed version directly (no draft) and returns it.
+
+        Used by the drift sweep so out-of-band edits to ``prompt.md`` show
+        up as proper versions in the prompt history.
+        """
+        new_hash = _hash_content(content)
+        latest = self.get_latest_committed_prompt(agent_id)
+        if latest is not None:
+            existing_hash = latest.get("content_hash") or _hash_content(
+                latest["content"]
+            )
+            if existing_hash == new_hash:
+                return None
+            default_changelog = "Out-of-band file edit"
+        else:
+            default_changelog = "Imported from disk"
+
+        with self.engine.begin() as conn:
+            version = self._next_prompt_version(agent_id)
+            conn.execute(
+                prompt_versions.insert().values(
+                    agent_id=agent_id,
+                    version=version,
+                    content=content,
+                    author=author,
+                    changelog=changelog if changelog is not None else default_changelog,
+                    is_draft=0,
+                    content_hash=new_hash,
+                    created_at=now_iso(),
+                )
+            )
+        return self.get_prompt_version(agent_id, version)

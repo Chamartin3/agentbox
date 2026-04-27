@@ -34,7 +34,7 @@ class PromptBody(BaseModel):
 
 @router.put("/agents/{agent_id}/prompt")
 def put_prompt(agent_id: str, body: PromptBody) -> dict:
-    """Write prompt to disk (legacy, non-versioned). Also seeds v1 if none exists."""
+    """Write prompt to disk and create a new committed version if changed."""
     agent = get_loader().get(agent_id)
     if agent is None:
         raise HTTPException(404)
@@ -43,15 +43,9 @@ def put_prompt(agent_id: str, body: PromptBody) -> dict:
     except prompts.PromptError as exc:
         raise HTTPException(400, {"code": exc.code, "detail": exc.detail}) from exc
 
-    # Ensure a committed v1 exists in the versioned store so the UI
-    # has something to show.  Idempotent — safe to call repeatedly.
-    store = get_store()
-    existing = store.get_latest_committed_prompt(agent_id)
-    if not existing:
-        store.save_prompt_draft(agent_id, body.content, author="system")
-        store.publish_prompt(
-            agent_id, changelog="Initial version from disk", author="system"
-        )
+    # Capture every disk write as a versioned entry when content changed.
+    # No-op if the content matches the latest committed version.
+    get_store().sync_prompt_from_disk(agent_id, body.content, author="api")
 
     return doc.__dict__
 
