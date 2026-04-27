@@ -17,6 +17,7 @@ import contextlib
 import json
 import os
 import shutil
+import signal
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,13 @@ from agentbox.core.workspaces import (
 )
 
 _FILENAME_SAFE = str.maketrans({"/": "_", "\\": "_", ":": "_"})
+
+
+def _kill_group(pid: int, sig: int) -> None:
+    # With ``start_new_session=True`` the child's PID is also its PGID,
+    # so we can signal the whole group without an extra ``getpgid`` call.
+    with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+        os.killpg(pid, sig)
 
 
 def _materialize_agents(agents_json_path: Path, target_dir: Path) -> None:
@@ -130,9 +138,15 @@ class ClaudeCodeRunner(Runner):
         argv += ["--output-format", "json", "--permission-mode", "bypassPermissions"]
         argv += spec.extra_args
 
+        import shlex as _shlex
+
         yield LogEvent(
             run_id=req.run_id,
-            message=f"$ claude -p ... (model={spec.model or 'default'})",
+            message="[command] " + _shlex.join(argv),
+        )
+        yield LogEvent(
+            run_id=req.run_id,
+            message=f"[cwd] {req.workdir}",
         )
 
         # Register the configured model up-front so it's persisted even if
@@ -173,6 +187,11 @@ async def _run_claude(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
+            # Put `claude` in its own session/process group so we can reap
+            # MCP server children it spawns. Those children inherit the
+            # stdout pipe and would otherwise keep it open after `claude`
+            # exits, preventing `read()` from ever seeing EOF.
+            start_new_session=True,
         )
     except FileNotFoundError as exc:
         yield DoneEvent(run_id=run_id, ok=False, error=str(exc))
@@ -209,20 +228,30 @@ async def _run_claude(
                 detected = detect_in_text_line(text)
                 if detected is not None:
                     rate_limit_error = detected
-                    with contextlib.suppress(ProcessLookupError):
-                        proc.kill()
+                    _kill_group(proc.pid, signal.SIGKILL)
                     return
 
     stderr_task = asyncio.create_task(_watch_stderr())
+    # Drain stdout concurrently so the kernel pipe buffer never fills up
+    # (which would deadlock `claude` on `write()`).
+    stdout_task: asyncio.Task[bytes] = asyncio.create_task(proc.stdout.read())
 
     try:
         async with asyncio.timeout(timeout):
-            stdout = await proc.stdout.read()
             await proc.wait()
+            # `claude` has exited; nudge any orphaned MCP children in the
+            # process group so they release the stdout pipe and the read
+            # task can hit EOF.
+            _kill_group(proc.pid, signal.SIGTERM)
+            stdout = await stdout_task
     except TimeoutError:
+        _kill_group(proc.pid, signal.SIGKILL)
         with contextlib.suppress(ProcessLookupError):
             proc.kill()
         await proc.wait()
+        stdout_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await stdout_task
         stderr_task.cancel()
         yield DoneEvent(
             run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout"
