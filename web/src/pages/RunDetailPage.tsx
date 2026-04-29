@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { AgentDef, GuardrailRow, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
 import EventStream from '../components/EventStream';
 import ConversationView from '../components/ConversationView';
+import RunsTable from '../components/RunsTable';
 
 interface StreamEvent {
   type: string;
@@ -530,13 +531,31 @@ export default function RunDetailPage() {
         <StatusPill status={run.status} />
       </div>
 
-      {/* ── context tags ─────────────────────────────────────────────── */}
+      {/* ── status + metadata table ──────────────────────────────────── */}
+      <RunsTable
+        items={[{
+          id: run.id,
+          agent_id: run.agent_id,
+          status: run.status,
+          started_at: run.created_at,
+          finished_at: run.finished_at,
+          duration_ms: duration,
+          executor: agent?.runner?.kind ?? null,
+          model: usage?.model ?? null,
+          input_tokens: usage?.input_tokens ?? null,
+          output_tokens: usage?.output_tokens ?? null,
+          cache_read_tokens: usage?.cache_read_tokens ?? null,
+          cache_creation_tokens: usage?.cache_write_tokens ?? null,
+          cost_usd: usage?.cost_usd ?? null,
+        }]}
+        columns={['run', 'agent', 'status', 'model', 'runner', 'duration', 'tokens', 'cost']}
+        emptyMessage=""
+      />
+
+      {/* ── context tags (non-duplicating the RunsTable above) ────────── */}
       <div className="meta-tags">
         <Tag label="started" value={fmtRelative(run.created_at)} tone="accent" />
         {run.finished_at && <Tag label="finished" value={fmtRelative(run.finished_at)} />}
-        <Tag label="duration" value={fmtMs(duration)} />
-        {usage?.model && <Tag label="model" value={usage.model} tone="mono" />}
-        {agent?.runner && <Tag label="runner" value={agent.runner.kind} tone="mono" />}
         {agent?.session_mode && <Tag label="session" value={agent.session_mode} />}
         {agent?.workspace === '<ephemeral>'
           ? <Tag label="workspace" value="ephemeral" />

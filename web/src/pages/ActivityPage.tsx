@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Area,
   AreaChart,
@@ -16,6 +16,7 @@ import {
   AgentRunState,
   activityApi,
 } from '../api/activity';
+import RunsTable, { RunRow } from '../components/RunsTable';
 import RunDetailDrawer from '../components/RunDetailDrawer';
 
 const RANGES: ActivityRange[] = ['7d', '30d', '90d'];
@@ -43,22 +44,6 @@ function fmtDateTick(iso: string): string {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
-function fmtRelative(iso: string | null): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  const diff = Date.now() - then;
-  if (diff < 0) return 'in the future';
-  const s = Math.floor(diff / 1000);
-  if (s < 45) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return `${Math.floor(d / 30)}mo ago`;
-}
-
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="kpi">
@@ -68,17 +53,6 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
     </div>
   );
 }
-
-function StatePill({ state }: { state: AgentRunState }) {
-  const cls =
-    state === 'running' ? 'running' :
-    state === 'succeeded' ? 'ok' :
-    state === 'timeout' ? 'eph' :
-    'error';
-  const label = state === 'succeeded' ? 'ok' : state === 'failed' ? 'fail' : state;
-  return <span className={`pill ${cls}`}>{label}</span>;
-}
-
 export default function ActivityPage() {
   const [range, setRange] = useState<ActivityRange>('30d');
   const [actionFilter, setActionFilter] = useState('');
@@ -317,63 +291,31 @@ export default function ActivityPage() {
           </div>
 
           <section className="section">
-            <div className="row between" style={{ marginBottom: 8 }}>
-              <h2 style={{ border: 'none', margin: 0 }}>Recent runs</h2>
-              <span className="dim">{runs.length} shown</span>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Started</th>
-                  <th>Agent</th>
-                  <th>Runner</th>
-                  <th>Model</th>
-                  <th>State</th>
-                  <th style={{ textAlign: 'right' }}>Duration</th>
-                  <th style={{ textAlign: 'right' }}>Tokens</th>
-                  <th style={{ textAlign: 'right' }}>Cost</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.length === 0 ? (
-                  <tr><td colSpan={9} className="dim">no runs</td></tr>
-                ) : runs.map((r) => {
-                  const tokens =
-                    (r.input_tokens ?? 0) + (r.output_tokens ?? 0) +
-                    (r.cache_read_tokens ?? 0) + (r.cache_creation_tokens ?? 0);
-                  const stop = (e: React.MouseEvent) => e.stopPropagation();
-                  return (
-                    <tr
-                      key={r.id}
-                      onClick={() => navigate(`/runs/${r.id}`)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td className="dim" title={r.started_at || ''}>{fmtRelative(r.started_at)}</td>
-                      <td onClick={stop}>
-                        <Link to={`/agents/${r.action_name}`}><code>{r.action_name}</code></Link>
-                      </td>
-                      <td className="dim"><code>{r.executor}</code></td>
-                      <td className="dim">{r.model ? <code>{r.model}</code> : '—'}</td>
-                      <td><StatePill state={r.state} /></td>
-                      <td style={{ textAlign: 'right' }}>{fmtMs(r.duration_ms)}</td>
-                      <td style={{ textAlign: 'right' }}>{tokens ? fmtNum(tokens) : '—'}</td>
-                      <td style={{ textAlign: 'right' }}>{fmtCost(r.cost_usd)}</td>
-                      <td onClick={stop} style={{ textAlign: 'right' }}>
-                        <button
-                          className="link-btn"
-                          onClick={(e) => { stop(e); setSelected(r); }}
-                          title="quick peek"
-                        >
-                          peek
-                        </button>
-                        <Link to={`/runs/${r.id}`} style={{ marginLeft: 8 }} title="open run">↗</Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <h2 style={{ border: 'none' }}>Recent runs</h2>
+            <RunsTable
+              items={runs.map((r): RunRow => ({
+                id: r.id,
+                agent_id: r.action_name,
+                status: r.state,
+                started_at: r.started_at,
+                finished_at: r.completed_at,
+                duration_ms: r.duration_ms,
+                executor: r.executor,
+                model: r.model,
+                input_tokens: r.input_tokens,
+                output_tokens: r.output_tokens,
+                cache_read_tokens: r.cache_read_tokens,
+                cache_creation_tokens: r.cache_creation_tokens,
+                cost_usd: r.cost_usd,
+              }))}
+              columns={['run', 'agent', 'model', 'runner', 'status', 'duration', 'tokens', 'cost', 'open']}
+              emptyMessage="no runs"
+              loading={loading}
+              onPeek={(row) => {
+                const found = runs.find((r) => r.id === row.id);
+                if (found) setSelected(found);
+              }}
+            />
           </section>
         </>
       )}
