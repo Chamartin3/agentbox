@@ -72,11 +72,10 @@ services:
         max-size: "200k"
         max-file: "10"
 
-  # Dev-only: Vite with HMR. Opt-in via `--profile dev`.
-  # Start with:  UID=$(id -u) GID=$(id -g) docker compose --profile dev up agentbox-web
-  # Browse to:   http://localhost:5174
+  # Vite dev server with HMR. Always on — browse http://localhost:5174 for
+  # instant reloads. The Vite proxy forwards /api to the agentbox service,
+  # so 5174 is a complete app URL. Port 8765 still serves the baked dist.
   agentbox-web:
-    profiles: ["dev"]
     image: node:20-alpine
     container_name: ${AGENTBOX_WEB_CONTAINER_NAME:-agentbox-web}
     working_dir: /web

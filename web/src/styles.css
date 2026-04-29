@@ -61,6 +61,10 @@ tr:hover td { background: var(--bg-elevated); }
 .pill.error { background: #8b1a1a; color: #fff; }
 .pill.running { background: #1f6feb; color: #fff; }
 .pill.eph { background: #4a3a14; color: #f6c453; }
+/* failed = expected agent-level failure (validation, rate-limit,
+   webhook delivery). Softer red than .error so genuine executor
+   crashes still stand out. */
+.pill.failed { background: #7a3a1a; color: #fff; }
 
 pre, code {
   font-family: ui-monospace, Menlo, Consolas, monospace;

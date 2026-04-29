@@ -40,6 +40,11 @@ class TextEvent(_EventBase):
     type: Literal[EventType.TEXT] = EventType.TEXT
     text: str
     role: Literal["assistant", "user", "system"] = "assistant"
+    # True when this event is an incremental chunk emitted live during
+    # the run. The executor skips appending deltas to ``output_text`` —
+    # a non-delta TextEvent with the consolidated/cleaned text is
+    # expected after the runner finishes.
+    delta: bool = False
 
 
 class UsageEvent(_EventBase):
@@ -88,6 +93,16 @@ class TimeoutEvent(_EventBase):
     error: str | None = None
 
 
+class ValidationEvent(_EventBase):
+    type: Literal[EventType.VALIDATION] = EventType.VALIDATION
+    ok: bool
+    attempt: int = 1
+    mode: Literal["strict", "warn", "off"] = "strict"
+    engine: Literal["jsonschema", "pydantic", "both", "none"] = "none"
+    error: str | None = None
+    """Validation error message when ok=False."""
+
+
 class DoneEvent(_EventBase):
     type: Literal[EventType.DONE] = EventType.DONE
     ok: bool
@@ -109,6 +124,7 @@ RunEvent = Annotated[
     | RetryEvent
     | ThinkingEvent
     | TimeoutEvent
+    | ValidationEvent
     | DoneEvent,
     Field(discriminator="type"),
 ]

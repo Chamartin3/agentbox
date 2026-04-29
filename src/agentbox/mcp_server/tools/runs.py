@@ -7,7 +7,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from agentbox.core.data.claude_session import find_session_log, parse_session_log
+from agentbox.core.conversations import get as get_conversation_source
+from agentbox.core.conversations.sources.transcript import TranscriptSource
 from agentbox.core.data.transcripts import read_transcript
 from agentbox.mcp_server.deps import get_context
 from agentbox.mcp_server.schemas import clamp_limit
@@ -77,7 +78,7 @@ def register(mcp: FastMCP) -> None:
             return {"items": [], "total": 0, "limit": limit, "offset": offset,
                     "has_more": False}
         from pathlib import Path
-        events = read_transcript(Path(rec.transcript_path))
+        events = read_transcript(Path(rec.transcript_path), get_context().settings.data_dir)
         total = len(events)
         page = events[offset : offset + limit]
         return {
@@ -95,7 +96,7 @@ def register(mcp: FastMCP) -> None:
         turn_offset: int = 0,
         turn_limit: int = 50,
     ) -> dict:
-        """Parsed Claude CLI session log for a run.
+        """Parsed session log for a run (runner-agnostic).
 
         Returns per-turn ``role``, ``ts``, ``stop_reason``, ``usage``, and a
         compact ``content`` summary listing each part's type and char length
@@ -107,26 +108,46 @@ def register(mcp: FastMCP) -> None:
         ``tool_use`` bodies. Use ``turn_offset``/``turn_limit`` to page when
         there are many turns.
         """
-        from pathlib import Path
         ctx = get_context()
         rec = ctx.store.get_run(run_id)
         if rec is None or not rec.transcript_path:
             return {"error": "not_found", "run_id": run_id}
-        claude_projects = ctx.settings.creds_dir / "claude" / "projects"
-        log_path = find_session_log(Path(rec.transcript_path), claude_projects)
-        if log_path is None:
-            return {"error": "no_session_log", "run_id": run_id,
-                    "hint": "agentbox transcript has no cwd= log line, or "
-                            "Claude CLI hasn't written its session yet"}
-        summary = parse_session_log(log_path, include_bodies=include_bodies)
+
+        # Dispatch on conversation_format. When the format is not set
+        # (pre-migration rows or backends without native logs), fall
+        # back to the agentbox JSONL transcript.
+        fmt = getattr(rec, "conversation_format", None)
         turn_limit = clamp_limit(turn_limit)
-        page = summary.turns[turn_offset : turn_offset + turn_limit]
+        view, fallback_used = _load_conversation_with_fallback(
+            rec,
+            fmt,
+            include_bodies=include_bodies,
+            offset=turn_offset,
+            limit=turn_limit,
+        )
+        if view is None:
+            return {
+                "error": "no_conversation",
+                "run_id": run_id,
+                "format": fmt,
+                "uri": getattr(rec, "conversation_uri", None),
+            }
         return {
             "run_id": run_id,
-            "session_id": summary.session_id,
-            "log_path": summary.log_path,
-            "totals": summary.totals,
-            "total_turns": len(summary.turns),
+            "session_id": view.session_id,
+            "source_format": view.source_format,
+            "source_uri": view.source_uri,
+            "totals": {
+                "input_tokens": view.totals.input_tokens,
+                "output_tokens": view.totals.output_tokens,
+                "cache_read_tokens": view.totals.cache_read_tokens,
+                "cache_write_tokens": view.totals.cache_write_tokens,
+                "thinking_chars": view.totals.thinking_chars,
+                "text_chars": view.totals.text_chars,
+                "stop_max_tokens": view.totals.stop_max_tokens,
+                "stop_end_turn": view.totals.stop_end_turn,
+            },
+            "total_turns": len(view.turns),
             "turn_offset": turn_offset,
             "turn_limit": turn_limit,
             "turns": [
@@ -141,7 +162,7 @@ def register(mcp: FastMCP) -> None:
                         for p in t.content
                     ],
                 }
-                for t in page
+                for t in view.turns
             ],
         }
 
@@ -171,7 +192,7 @@ def register(mcp: FastMCP) -> None:
             return {"items": [], "total": 0, "limit": limit, "offset": offset,
                     "has_more": False}
         from pathlib import Path
-        events = read_transcript(Path(rec.transcript_path))
+        events = read_transcript(Path(rec.transcript_path), get_context().settings.data_dir)
         logs = [e for e in events if e.get("type") == "log"]
         if level:
             logs = [e for e in logs if e.get("level") == level]
@@ -192,6 +213,16 @@ def register(mcp: FastMCP) -> None:
             "offset": offset,
             "has_more": offset + len(items) < total,
         }
+
+    @mcp.tool
+    def get_run_webhook_deliveries(run_id: str) -> dict:
+        """Webhook delivery attempts for a run (each attempt is one row)."""
+        store = get_context().store
+        rec = store.get_run(run_id)
+        if rec is None:
+            return {"error": "not_found", "run_id": run_id}
+        items = store.list_webhook_deliveries(run_id)
+        return {"run_id": run_id, "items": items, "total": len(items)}
 
     @mcp.tool
     def get_run_usage(run_id: str) -> dict:

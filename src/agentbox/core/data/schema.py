@@ -56,6 +56,8 @@ runs = Table(
     Column("schema_validated_via", String),
     Column("post_status", String),
     Column("post_errors", String),
+    Column("conversation_format", String),
+    Column("conversation_uri", String),
     Index("runs_by_agent", "agent_id", "created_at"),
     Index("runs_by_status", "status", "created_at"),
 )
@@ -108,7 +110,37 @@ agent_versions = Table(
     Column("changelog", String, nullable=False, server_default=""),
     Column("is_legacy", Integer, nullable=False, server_default="0"),
     Column("created_at", String, nullable=False),
+    # DB-as-source-of-truth columns:
+    Column("config_json", String, nullable=True),
+    Column("prompt_content", String, nullable=True),
+    Column("source", String, nullable=False, server_default="manifest"),
+    Column("is_draft", Integer, nullable=False, server_default="0"),
     Index("idx_agent_versions_agent", "agent_id", "version", unique=True),
+)
+
+active_agent_versions = Table(
+    "active_agent_versions",
+    metadata,
+    Column("agent_id", String, primary_key=True),
+    Column(
+        "version_id",
+        Integer,
+        ForeignKey("agent_versions.id"),
+        nullable=False,
+    ),
+    Column("activated_at", String, nullable=False),
+)
+
+agent_meta = Table(
+    "agent_meta",
+    metadata,
+    Column("agent_id", String, primary_key=True),
+    Column("sync_mode", String, nullable=False, server_default="watch"),
+    Column("export_to_disk", Integer, nullable=False, server_default="1"),
+    Column("source_path", String, nullable=True),
+    Column("source_format", String, nullable=True),
+    Column("created_at", String, nullable=False),
+    Column("updated_at", String, nullable=False),
 )
 
 agent_version_comments = Table(
@@ -165,6 +197,33 @@ agent_version_ratings = Table(
     Column("rater", String, nullable=False),
     Column("rated_at", String, nullable=False),
     CheckConstraint("rating BETWEEN 1 AND 5", name="rating_range"),
+)
+
+webhook_deliveries = Table(
+    "webhook_deliveries",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("run_id", String, ForeignKey("runs.id"), nullable=False),
+    Column("attempt", Integer, nullable=False),
+    Column("url", String, nullable=False),
+    Column("payload_json", String),
+    Column("response_status", Integer),
+    Column("response_body", String),
+    Column("latency_ms", Integer),
+    Column("error", String),
+    Column("ts", String, nullable=False),
+    Index("idx_webhook_deliveries_run", "run_id"),
+)
+
+run_comments = Table(
+    "run_comments",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("run_id", String, ForeignKey("runs.id"), nullable=False),
+    Column("author", String, nullable=False),
+    Column("body", String, nullable=False),
+    Column("created_at", String, nullable=False),
+    Index("idx_run_comments_run", "run_id"),
 )
 
 agent_sync = Table(

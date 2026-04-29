@@ -123,9 +123,26 @@ class RunnerSpec(BaseModel):
     a minimal agent is auto-generated from the markdown.
     """
 
+    # --- token runner ---
+
+    deps_factory: str | None = None
+    """Dotted import path ``module.path:callable`` for the ``token`` runner.
+
+    Resolved at run time to construct per-call dependencies passed to the
+    underlying token-generating callable."""
+
     # --- Output validation & retry ---
 
     output_schema_path: str | None = None
+
+    output_validation_engine: Literal["jsonschema", "pydantic", "both"] = "both"
+    """Which engine(s) to use when validating output against the schema.
+
+    ``"jsonschema"`` — jsonschema only (legacy behaviour).
+    ``"pydantic"`` — pydantic_core only (stricter type checks).
+    ``"both"`` — jsonschema first, then pydantic (default, strictest).
+    """
+
     max_validation_retries: int = 0
     max_error_retries: int = 0
     """How many times to re-run the agent when the run fails with an error
@@ -213,6 +230,9 @@ class CompositionConfig(BaseModel):
     user_template: str | None = None
     """Bundle-relative path to a user-message template. When unset,
     ``variables["user_message"]`` is used verbatim."""
+
+    input_schema: str | None = None
+    """Bundle-relative path to a JSON Schema file for input validation."""
 
     output_schema: str | None = None
     """Bundle-relative path to a JSON Schema file for output validation."""
@@ -309,6 +329,25 @@ class AgentDef(BaseModel):
         if self.prompt_path:
             return (project_root / self.prompt_path).read_text(encoding="utf-8")
         return ""
+
+    @classmethod
+    def from_db_row(cls, row: dict) -> AgentDef:
+        """Reconstruct an ``AgentDef`` from a stored ``agent_versions`` row.
+
+        Prefers the ``config_json`` column (the DB-as-source-of-truth
+        snapshot); falls back to ``content_snapshot`` for legacy rows.
+        Missing rows raise ``ValueError``.
+        """
+        import json as _json
+
+        raw = row.get("config_json") or row.get("content_snapshot")
+        if raw is None:
+            raise ValueError("agent_versions row has no config payload")
+        if isinstance(raw, str):
+            data = _json.loads(raw)
+        else:
+            data = raw
+        return cls.model_validate(data)
 
 
 # ---------------------------------------------------------------------------

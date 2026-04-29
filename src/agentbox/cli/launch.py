@@ -109,9 +109,15 @@ def _resolve_workspace(
 
 
 def _apply_creds(creds: str | None, settings: Settings) -> None:
-    """Set CLAUDE_CONFIG_DIR or ANTHROPIC_API_KEY based on the creds profile."""
+    """Set CLAUDE_CONFIG_DIR or ANTHROPIC_API_KEY based on the creds profile.
+
+    Credential profiles live under ``AGENTBOX_CREDS_DIR`` (default:
+    ``/agentbox/creds``), not in ``Settings`` — the dataclass no longer
+    carries backend-specific paths.
+    """
+    creds_base = Path(os.environ.get("AGENTBOX_CREDS_DIR", "/agentbox/creds"))
     if not creds or creds == "default":
-        os.environ["CLAUDE_CONFIG_DIR"] = str(settings.creds_dir / "claude")
+        os.environ["CLAUDE_CONFIG_DIR"] = str(creds_base / "claude")
     elif creds.startswith("env:"):
         var = creds[4:]
         os.environ.pop("CLAUDE_CONFIG_DIR", None)
@@ -121,7 +127,7 @@ def _apply_creds(creds: str | None, settings: Settings) -> None:
             raise typer.Exit(1)
         os.environ["ANTHROPIC_API_KEY"] = api_key
     else:
-        os.environ["CLAUDE_CONFIG_DIR"] = str(settings.creds_dir / f"claude-{creds}")
+        os.environ["CLAUDE_CONFIG_DIR"] = str(creds_base / f"claude-{creds}")
 
 
 # ---------------------------------------------------------------------------

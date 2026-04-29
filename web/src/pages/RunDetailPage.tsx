@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AgentDef, GuardrailRow, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
 import EventStream from '../components/EventStream';
 import ConversationView from '../components/ConversationView';
 import RunsTable from '../components/RunsTable';
+import RunCommentThread from '../components/RunCommentThread';
 
 interface StreamEvent {
   type: string;
@@ -102,7 +103,13 @@ function prettyText(s: string): { text: string; isJson: boolean } {
 // ──────────────────────────────────────────────────────────────── components
 
 function StatusPill({ status }: { status: string }) {
-  const cls = status === 'ok' ? 'ok' : status === 'error' ? 'error' : 'running';
+  let cls: string;
+  if (status === 'ok') cls = 'ok';
+  else if (status === 'running') cls = 'running';
+  else if (status === 'timeout' || status === 'stopped' || status === 'incomplete')
+    cls = 'eph';
+  else if (status === 'failed') cls = 'failed';
+  else cls = 'error';
   return <span className={`pill ${cls}`}>{status}</span>;
 }
 
@@ -438,6 +445,8 @@ function PromptFragmentsSection({
 
 export default function RunDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [rerunning, setRerunning] = useState(false);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [usage, setUsage] = useState<UsageRecord | null>(null);
   const [guards, setGuards] = useState<GuardrailRow[]>([]);
@@ -474,22 +483,51 @@ export default function RunDetailPage() {
     // the WebSocket connects (or if the run is already finished).
     setEventsLoading(true);
     setEventsError(null);
+    // Key events by (ts + type + index-of-kind) so merging a freshly
+    // re-fetched transcript with live WS events doesn't drop or
+    // duplicate anything that arrived in between.
+    const eventKey = (ev: StreamEvent, fallbackIdx: number): string => {
+      const ts = String(ev.ts ?? '');
+      const type = String(ev.type ?? '');
+      const text = String(ev.text ?? ev.message ?? '');
+      return `${ts}|${type}|${text.slice(0, 64)}|${fallbackIdx}`;
+    };
+    const mergeEvents = (existing: StreamEvent[], incoming: StreamEvent[]): StreamEvent[] => {
+      const seen = new Set<string>();
+      existing.forEach((ev, i) => seen.add(eventKey(ev, i)));
+      const out = [...existing];
+      incoming.forEach((ev, i) => {
+        const k = eventKey(ev, i);
+        if (!seen.has(k)) {
+          seen.add(k);
+          out.push(ev);
+        }
+      });
+      return out;
+    };
     api.getTranscript(id)
-      .then((evs) => { setEvents(evs as StreamEvent[]); setEventsLoading(false); })
+      .then((evs) => {
+        setEvents((curr) => mergeEvents(curr, evs as StreamEvent[]));
+        setEventsLoading(false);
+      })
       .catch(() => { setEventsError('failed to load transcript'); setEventsLoading(false); });
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}/api/runs/${id}/stream`);
     wsRef.current = ws;
-    ws.onopen = () => setIsLive(true);
-    ws.onmessage = (m) => setEvents((evs) => [...evs, JSON.parse(m.data)]);
+    ws.onopen = () => { setIsLive(true); setEventsError(null); };
+    ws.onmessage = (m) => {
+      const ev = JSON.parse(m.data) as StreamEvent;
+      setEvents((curr) => mergeEvents(curr, [ev]));
+    };
     ws.onclose = () => {
       setIsLive(false);
       loadMeta();
       // Refresh transcript after WS close in case new events
       // arrived between the initial load and the WS disconnect.
+      // Merge (not replace) so any live events still in state survive.
       setTimeout(() => {
         api.getTranscript(id)
-          .then((evs) => setEvents(evs as StreamEvent[]))
+          .then((evs) => setEvents((curr) => mergeEvents(curr, evs as StreamEvent[])))
           .catch(() => {});
       }, 100);
     };
@@ -528,7 +566,27 @@ export default function RunDetailPage() {
             {agent?.description}
           </div>
         </div>
-        <StatusPill status={run.status} />
+        <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+          <button
+            disabled={rerunning}
+            onClick={async () => {
+              setRerunning(true);
+              try {
+                const { run_id } = await api.rerunRun(id);
+                navigate(`/runs/${run_id}`);
+              } catch (e) {
+                console.error(e);
+                alert('rerun failed');
+              } finally {
+                setRerunning(false);
+              }
+            }}
+            title="Re-execute this agent with the same input"
+          >
+            {rerunning ? 'Rerunning…' : '↻ Rerun'}
+          </button>
+          <StatusPill status={run.status} />
+        </div>
       </div>
 
       {/* ── status + metadata table ──────────────────────────────────── */}
@@ -541,7 +599,7 @@ export default function RunDetailPage() {
           finished_at: run.finished_at,
           duration_ms: duration,
           executor: agent?.runner?.kind ?? null,
-          model: usage?.model ?? null,
+          model: usage?.model ?? agent?.runner?.model ?? null,
           input_tokens: usage?.input_tokens ?? null,
           output_tokens: usage?.output_tokens ?? null,
           cache_read_tokens: usage?.cache_read_tokens ?? null,
@@ -807,6 +865,9 @@ export default function RunDetailPage() {
           </dl>
         </section>
       )}
+
+      {/* ── Comments ──────────────────────────────────────────────── */}
+      <RunCommentThread runId={id} />
 
       {/* ── Plumbing details (collapsed by default) ─────────────────── */}
       <details className="section" style={{ padding: '12px 16px' }}>

@@ -40,6 +40,7 @@ from agentbox.core.runners.base import Runner, RunRequest
 
 class PydanticAiRunner(Runner):
     kind = "pydantic_ai"
+    conversation_format = "pydantic-ai-history"
 
     async def run(self, req: RunRequest) -> AsyncIterator[RunEvent]:
         spec = req.agent.runner

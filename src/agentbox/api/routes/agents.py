@@ -112,6 +112,7 @@ def get_agent(agent_id: str) -> dict:
                         "relative_path": f["relative_path"],
                         "sha256": f["sha256"],
                         "source_uri": f.get("source_uri"),
+                        "char_count": len(f.get("content") or ""),
                     }
                     for f in files
                 ]

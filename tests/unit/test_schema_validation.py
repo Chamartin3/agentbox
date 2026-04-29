@@ -46,11 +46,11 @@ def _make_executor(tmp_path: Path):  # type: ignore[no-untyped-def]
         port=0,
         host="127.0.0.1",
         agents_dir=None,
+        agents_bundle_dir=None,
         prompts_dir=None,
         skills_dir=None,
         outputs_dir=None,
         completion_webhook_url=None,
-        creds_dir=tmp_path / "creds",
     )
     store = SessionStore(tmp_path / "db.sqlite")
     loader = DefinitionLoader(tmp_path)
@@ -77,13 +77,13 @@ def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
     )
     executor = _make_executor(tmp_path)
 
-    ok, err = executor._validate_output(
+    ok, err, via = executor._validate_output(
         json.dumps({"name": "test"}), agent, tmp_path  # missing "value"
     )
     assert not ok
     assert "value" in err
 
-    ok, err = executor._validate_output(
+    ok, err, via = executor._validate_output(
         json.dumps({"name": "test", "value": 5}), agent, tmp_path
     )
     assert ok
@@ -109,12 +109,12 @@ def test_validate_output_rejects_enum_violation(tmp_path: Path) -> None:
     )
     executor = _make_executor(tmp_path)
 
-    ok, err = executor._validate_output(
+    ok, err, via = executor._validate_output(
         json.dumps({"status": "unknown"}), agent, tmp_path
     )
     assert not ok
 
-    ok, _ = executor._validate_output(json.dumps({"status": "ok"}), agent, tmp_path)
+    ok, err, via = executor._validate_output(json.dumps({"status": "ok"}), agent, tmp_path)
     assert ok
 
 
@@ -164,3 +164,34 @@ def test_oneof_schemas_are_valid_meta_schemas() -> None:
     # Missing required field fails
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(instance={"role_summary": "foo"}, schema=oneof_schema)
+
+
+def test_empty_output_treated_as_validation_failure(tmp_path: Path) -> None:
+    """When output is empty/None but a schema is required, validation fails.
+
+    Regression: the executor used to skip validation entirely when output
+    was falsy (``if agent.runner.output_schema_path and output``), letting
+    empty responses through to the post-processor which then crashed.
+    """
+    from agentbox.core.data.manifest import AgentDef, RunnerSpec
+
+    schema = {
+        "type": "object",
+        "required": ["name"],
+        "properties": {"name": {"type": "string"}},
+    }
+    (tmp_path / "schema.json").write_text(json.dumps(schema))
+    agent = AgentDef(
+        id="test",
+        description="t",
+        runner=RunnerSpec(kind="claude_code", output_schema_path="schema.json"),
+    )
+    executor = _make_executor(tmp_path)
+
+    # Empty string → validation failure
+    ok, err, via = executor._validate_output("", agent, tmp_path)
+    assert not ok
+
+    # Whitespace-only → validation failure
+    ok, err, via = executor._validate_output("   \n", agent, tmp_path)
+    assert not ok

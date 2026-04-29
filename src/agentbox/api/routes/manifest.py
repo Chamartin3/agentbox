@@ -77,7 +77,21 @@ class RunnerPatch(BaseModel):
     timeout_seconds: int | None = None
     agent_module: str | None = None
     output_schema_path: str | None = None
+    output_validation_engine: str | None = None
     max_validation_retries: int | None = None
+    max_error_retries: int | None = None
+
+
+class CompositionPatch(BaseModel):
+    """Editable subset of a CompositionConfig. All fields optional."""
+
+    system: str | None = None
+    user_template: str | None = None
+    input_schema: str | None = None
+    output_schema: str | None = None
+    transport: str | None = None
+    output_validation: str | None = None
+    references: list[dict | str] | None = None
 
 
 class GuardrailPatch(BaseModel):
@@ -100,6 +114,7 @@ class AgentPatch(BaseModel):
     headless: bool | None = None
     guardrails: list[GuardrailPatch] | None = None
     runner: RunnerPatch | None = None
+    composition: CompositionPatch | None = None
 
 
 _FORBIDDEN_PATCH_KEYS = {"id"}
@@ -118,6 +133,10 @@ def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
             base = dict(out.get("runner") or {})
             base.update({rk: rv for rk, rv in v.items() if rv is not None})
             out["runner"] = base
+        elif k == "composition" and isinstance(v, dict):
+            base = dict(out.get("composition") or {})
+            base.update({ck: cv for ck, cv in v.items() if cv is not None})
+            out["composition"] = base
         else:
             out[k] = v
     return out

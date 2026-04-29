@@ -31,6 +31,8 @@ class RunRecord:
     schema_validated_via: str | None = None
     post_status: str | None = None
     post_errors: str | None = None
+    conversation_format: str | None = None
+    conversation_uri: str | None = None
 
 
 def now_iso() -> str:
@@ -61,4 +63,6 @@ def row_to_run(row: Row) -> RunRecord:
         schema_validated_via=m.get("schema_validated_via"),
         post_status=m.get("post_status"),
         post_errors=m.get("post_errors"),
+        conversation_format=m.get("conversation_format"),
+        conversation_uri=m.get("conversation_uri"),
     )

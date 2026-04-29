@@ -49,7 +49,7 @@ def _settings(tmp_path: Path) -> Settings:
         skills_dir=None,
         outputs_dir=None,
         completion_webhook_url=None,
-        creds_dir=Path("/agentbox/creds"),
+        agents_bundle_dir=None,
     )
 
 
@@ -132,7 +132,10 @@ class TestValidationModes:
         rid = asyncio.run(go())
         rec = executor.store.get_run(rid)
         assert rec is not None
-        assert rec.status == "error"
+        # Strict-mode validation failure is an expected, agent-level
+        # failure — classified as ``failed`` rather than the unexpected
+        # ``error`` bucket.
+        assert rec.status == "failed"
         assert rec.validation_status == "fail"
 
     def test_warn_mode_ok_with_invalid_output(
@@ -248,7 +251,8 @@ class TestValidationModes:
         rid = asyncio.run(go())
         rec = executor.store.get_run(rid)
         assert rec is not None
-        assert rec.status == "error"
+        # Final-attempt strict validation failure → ``failed``.
+        assert rec.status == "failed"
         # Prompt should have been mutated with retry text on second attempt
         assert rec.input is not None
 

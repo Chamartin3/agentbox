@@ -49,12 +49,21 @@ function statusClass(s: string): string {
   if (s === 'succeeded' || s === 'ok') return 'ok';
   if (s === 'running') return 'running';
   if (s === 'timeout') return 'eph';
+  // ``stopped`` and ``incomplete`` are the container-died case — visually
+  // softer than a hard error so they don't read as the agent's fault.
+  if (s === 'stopped' || s === 'incomplete') return 'eph';
+  // ``failed`` is an expected, agent-level failure (validation, rate
+  // limit, webhook delivery). Distinct CSS class so it can be tinted
+  // differently from a hard ``error`` if desired; falls back to the
+  // ``error`` pill style today.
+  if (s === 'failed') return 'failed';
   return 'error';
 }
 
 function statusLabel(s: string): string {
   if (s === 'succeeded') return 'ok';
-  if (s === 'failed') return 'error';
+  // Show the raw status string for everything else so ``failed``,
+  // ``stopped`` and ``error`` are visually distinguishable in the table.
   return s;
 }
 

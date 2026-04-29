@@ -29,10 +29,12 @@ from agentbox.core.data.records import RunRecord, now_iso, row_to_run
 from agentbox.core.data.schema import (
     guardrail_results,
     metadata,
+    run_comments,
     run_prompts,
     runs,
     sessions,
     usage,
+    webhook_deliveries,
 )
 
 
@@ -110,6 +112,8 @@ class _CoreStore:
             ("runs", "schema_validated_via", "TEXT"),
             ("runs", "post_status", "TEXT"),
             ("runs", "post_errors", "TEXT"),
+            ("runs", "conversation_format", "TEXT"),
+            ("runs", "conversation_uri", "TEXT"),
             ("prompt_versions", "content_hash", "TEXT"),
         ]
         with self.engine.begin() as conn:
@@ -126,13 +130,14 @@ class _CoreStore:
                     )
 
     def _reap_orphaned_runs(self) -> None:
-        """Mark any pre-existing 'running' rows as errored on startup.
+        """Mark any pre-existing 'running' rows as stopped on startup.
 
         Why: the in-process executor task that owns a run dies with the
         container. If the process is killed (or `_run` crashes after the
         runner loop but before `finish_run`), the row sits as 'running'
         forever. On startup no executor task can possibly still own those
-        rows, so reap them.
+        rows, so reap them as ``stopped`` — the agent itself didn't
+        fail, the container went away.
         """
         reason = "orphaned: agentbox process restarted before run finished"
         with self.engine.begin() as conn:
@@ -143,7 +148,7 @@ class _CoreStore:
                     runs.c.finished_at.is_(None),
                 )
                 .values(
-                    status=RunStatus.ERROR.value,
+                    status=RunStatus.INCOMPLETE.value,
                     error=func.coalesce(runs.c.error, "") + reason,
                     finished_at=now_iso(),
                 )
@@ -261,6 +266,24 @@ class _CoreStore:
                 .values(**values)
             )
 
+    def set_run_conversation(
+        self,
+        run_id: str,
+        conversation_format: str | None,
+        conversation_uri: str | None = None,
+    ) -> None:
+        """Persist conversation metadata for a run."""
+        values: dict = {}
+        if conversation_format is not None:
+            values["conversation_format"] = conversation_format
+        if conversation_uri is not None:
+            values["conversation_uri"] = conversation_uri
+        if values:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    runs.update().where(runs.c.id == run_id).values(**values)
+                )
+
     def set_run_post_outcome(
         self,
         run_id: str,
@@ -307,13 +330,14 @@ class _CoreStore:
         return [row_to_run(r) for r in rows]
 
     def reap_orphan_runs(self) -> int:
-        """Mark any rows still in ``running`` state as ``incomplete``.
+        """Mark any rows still in ``running`` state as ``stopped``.
 
         Called on process startup. Any row left in ``running`` past a
         restart belongs to a dead executor task — its ``finally`` block
         never reached ``finish_run``, so the row would otherwise stay
         orphaned forever (hiding from terminal-status filters and
-        skewing activity rollups).
+        skewing activity rollups). The agent didn't fail; the process
+        died — so the correct terminal state is ``stopped``.
         """
         with self.engine.begin() as conn:
             result = conn.execute(
@@ -329,7 +353,7 @@ class _CoreStore:
 
     def set_run_status(self, run_id: str, status: str) -> None:
         """Update only the status column. Used for post-terminal transitions
-        like flipping ``ok`` ↔ ``incomplete`` based on webhook delivery."""
+        like flipping ``ok`` ↔ ``failed`` based on webhook delivery."""
         with self.engine.begin() as conn:
             conn.execute(
                 runs.update().where(runs.c.id == run_id).values(status=status)
@@ -348,6 +372,33 @@ class _CoreStore:
             stmt = stmt.where(runs.c.agent_id == agent_id)
         with self.engine.connect() as conn:
             return [row_to_run(r) for r in conn.execute(stmt)]
+
+    # ----- run comments ----------------------------------------------------
+
+    def add_run_comment(self, run_id: str, author: str, body: str) -> dict:
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                run_comments.insert().values(
+                    run_id=run_id,
+                    author=author,
+                    body=body,
+                    created_at=now_iso(),
+                )
+            )
+            new_id = result.inserted_primary_key[0]
+            row = conn.execute(
+                run_comments.select().where(run_comments.c.id == new_id)
+            ).first()
+        return dict(row._mapping) if row else {}
+
+    def list_run_comments(self, run_id: str) -> list[dict]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                run_comments.select()
+                .where(run_comments.c.run_id == run_id)
+                .order_by(run_comments.c.created_at)
+            )
+            return [dict(r._mapping) for r in rows]
 
     # ----- usage / guardrails ----------------------------------------------
 
@@ -405,6 +456,45 @@ class _CoreStore:
                 guardrail_results.select()
                 .where(guardrail_results.c.run_id == run_id)
                 .order_by(guardrail_results.c.id)
+            )
+            return [dict(r._mapping) for r in rows]
+
+    # ----- webhook deliveries ------------------------------------------------
+
+    def record_webhook_delivery(
+        self,
+        run_id: str,
+        attempt: int,
+        url: str,
+        payload: dict | None = None,
+        response_status: int | None = None,
+        response_body: str | None = None,
+        latency_ms: int | None = None,
+        error: str | None = None,
+    ) -> None:
+        import json as _json
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                webhook_deliveries.insert().values(
+                    run_id=run_id,
+                    attempt=attempt,
+                    url=url,
+                    payload_json=_json.dumps(payload) if payload else None,
+                    response_status=response_status,
+                    response_body=response_body,
+                    latency_ms=latency_ms,
+                    error=error,
+                    ts=now_iso(),
+                )
+            )
+
+    def list_webhook_deliveries(self, run_id: str) -> list[dict]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                webhook_deliveries.select()
+                .where(webhook_deliveries.c.run_id == run_id)
+                .order_by(webhook_deliveries.c.id)
             )
             return [dict(r._mapping) for r in rows]
 

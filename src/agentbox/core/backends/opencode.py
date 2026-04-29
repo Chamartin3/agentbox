@@ -8,6 +8,7 @@ subprocess loop.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import re
 from collections.abc import AsyncIterator
@@ -24,16 +25,26 @@ from agentbox.api.events import (
 )
 from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
-from agentbox.core.runners.opencode import (
-    _DEFAULT_OPENCODE_MODEL,
-    _parse_event_stream,
-)
+from agentbox.core.runners.opencode import _DEFAULT_OPENCODE_MODEL
 
 _NAME = "opencode"
 
 
 class OpenCodeBackend:
     name = _NAME
+    conversation_format: str | None = "opencode-session"
+
+    def __init__(self) -> None:
+        # Session id is discovered while parsing the opencode JSON event
+        # stream. Until then there's no native conversation to load.
+        self._session_id: str | None = None
+
+    def conversation_uri(
+        self,
+        run_id: str,
+        transcript_path: str | None = None,
+    ) -> str | None:
+        return self._session_id
 
     def render(
         self,
@@ -105,8 +116,8 @@ class OpenCodeBackend:
         ):
             yield ev
 
-    @staticmethod
     async def _run_opencode(
+        self,
         run_id: str,
         argv: list[str],
         cwd: Path,
@@ -127,6 +138,12 @@ class OpenCodeBackend:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                # asyncio defaults StreamReader's line buffer to 64 KiB.
+                # opencode emits whole tool_result / message parts as a
+                # single JSON line, so a long search result or rendered
+                # prompt easily blows past that and raises
+                # LimitOverrunError mid-stream. Bump to 16 MiB.
+                limit=16 * 1024 * 1024,
             )
         except FileNotFoundError as exc:
             yield DoneEvent(run_id=run_id, ok=False, error=str(exc))
@@ -156,6 +173,7 @@ class OpenCodeBackend:
         stderr_task = asyncio.create_task(_drain_stderr())
 
         stdout_chunks: list[str] = []
+        streamed_text_parts: list[str] = []
         rate_limit_error: str | None = None
 
         try:
@@ -173,11 +191,32 @@ class OpenCodeBackend:
                         evt = json.loads(s)
                     except json.JSONDecodeError:
                         continue
-                    if isinstance(evt, dict):
-                        detected = detect_in_opencode_event(evt)
-                        if detected is not None:
-                            rate_limit_error = detected
-                            break
+                    if not isinstance(evt, dict):
+                        continue
+                    detected = detect_in_opencode_event(evt)
+                    if detected is not None:
+                        rate_limit_error = detected
+                        break
+                    if self._session_id is None:
+                        sid = evt.get("sessionID")
+                        if isinstance(sid, str) and sid:
+                            self._session_id = sid
+                    # Incrementally surface text/thinking parts so the UI
+                    # gets live updates instead of waiting for the
+                    # subprocess to exit.
+                    if evt.get("type") == "text":
+                        part = evt.get("part")
+                        if isinstance(part, dict):
+                            ptype = part.get("type")
+                            text = part.get("text")
+                            if isinstance(text, str) and text:
+                                if ptype == "text":
+                                    streamed_text_parts.append(text)
+                                    yield TextEvent(
+                                        run_id=run_id, text=text, delta=True
+                                    )
+                                elif ptype in ("thinking", "reasoning"):
+                                    yield ThinkingEvent(run_id=run_id, text=text)
                 await proc.wait()
         except TimeoutError:
             with contextlib.suppress(ProcessLookupError):
@@ -185,10 +224,13 @@ class OpenCodeBackend:
             await proc.wait()
             stderr_task.cancel()
             # Yield whatever events we captured before the timeout so the
-            # conversation / transcript shows partial progress.
+            # conversation / transcript shows partial progress. Skip the
+            # replay when streaming already surfaced them live.
             raw = "".join(stdout_chunks).strip()
-            if raw:
-                text_parts, thinking_parts, _session_id, _parse_failed = _parse_event_stream_with_thinking(raw)
+            if raw and not streamed_text_parts:
+                text_parts, thinking_parts, parsed_sid, _parse_failed = _parse_event_stream_with_thinking(raw)
+                if parsed_sid:
+                    self._session_id = parsed_sid
                 for tt in thinking_parts:
                     yield ThinkingEvent(run_id=run_id, text=tt)
                 if text_parts:
@@ -234,7 +276,9 @@ class OpenCodeBackend:
             )
             return
 
-        text_parts, thinking_parts, _session_id, parse_failed = _parse_event_stream_with_thinking(raw)
+        text_parts, thinking_parts, parsed_sid, parse_failed = _parse_event_stream_with_thinking(raw)
+        if parsed_sid:
+            self._session_id = parsed_sid
         if parse_failed and not text_parts:
             yield LogEvent(
                 run_id=run_id,
@@ -249,11 +293,17 @@ class OpenCodeBackend:
             )
             return
 
-        for thinking_text in thinking_parts:
-            yield ThinkingEvent(run_id=run_id, text=thinking_text)
+        # Thinking events were emitted incrementally during streaming —
+        # only replay them here if streaming didn't capture anything
+        # (e.g. opencode buffered output and the loop saw nothing).
+        if not streamed_text_parts:
+            for thinking_text in thinking_parts:
+                yield ThinkingEvent(run_id=run_id, text=thinking_text)
 
         # Strip markdown code fences so downstream consumers (validation,
         # webhooks, the UI) receive raw JSON instead of fenced blocks.
+        # This consolidated event is what populates ``output_text`` in
+        # the executor — the streamed delta events are UI-only.
         stripped_text = _strip_code_fences("".join(text_parts))
         yield TextEvent(run_id=run_id, text=stripped_text)
         yield DoneEvent(

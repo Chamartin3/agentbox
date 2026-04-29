@@ -244,6 +244,68 @@ async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
     return {"ok": True, "run_id": run_id}
 
 
+@router.post("/{run_id}/rerun")
+async def rerun(run_id: str) -> dict:
+    """Re-execute a finished run with the same agent + input/variables.
+
+    Returns the new run id. The original run is not modified.
+    """
+    import json as _json
+
+    store = get_store()
+    rec = store.get_run(run_id)
+    if rec is None:
+        raise HTTPException(404, f"unknown run {run_id!r}")
+    loader = get_loader()
+    agent = store.get_agent_def(rec.agent_id) or loader.get(rec.agent_id)
+    if agent is None:
+        raise HTTPException(404, f"agent {rec.agent_id!r} no longer exists")
+
+    variables: dict[str, str] | None = None
+    if rec.variables:
+        try:
+            parsed = (
+                _json.loads(rec.variables)
+                if isinstance(rec.variables, str)
+                else rec.variables
+            )
+            if isinstance(parsed, dict):
+                variables = {str(k): str(v) for k, v in parsed.items()}
+        except Exception:
+            variables = None
+
+    executor = get_executor()
+    new_id = await executor.execute(
+        agent,
+        rec.input or "",
+        variables=variables,
+        session_id=None,
+        workspace_override=None,
+    )
+    return {"run_id": new_id, "agent": agent.id, "rerun_of": run_id}
+
+
+class RunCommentBody(BaseModel):
+    author: str = "api"
+    body: str
+
+
+@router.get("/{run_id}/comments")
+def list_comments(run_id: str) -> dict:
+    store = get_store()
+    if store.get_run(run_id) is None:
+        raise HTTPException(404, f"unknown run {run_id!r}")
+    return {"run_id": run_id, "comments": store.list_run_comments(run_id)}
+
+
+@router.post("/{run_id}/comments")
+def add_comment(run_id: str, body: RunCommentBody) -> dict:
+    store = get_store()
+    if store.get_run(run_id) is None:
+        raise HTTPException(404, f"unknown run {run_id!r}")
+    return store.add_run_comment(run_id, body.author, body.body)
+
+
 @router.get("/_facets")
 def run_facets() -> dict:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""

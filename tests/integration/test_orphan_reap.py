@@ -13,7 +13,7 @@ from pathlib import Path
 from agentbox.core.data import SessionStore
 
 
-def test_reap_marks_orphaned_running_rows_as_error(tmp_path: Path) -> None:
+def test_reap_marks_orphaned_running_rows_as_stopped(tmp_path: Path) -> None:
     db = tmp_path / "db.sqlite"
     store = SessionStore(db)
     rid = store.create_run("draft_writer", "{}", "/tmp/wd", "/tmp/t.jsonl")
@@ -23,7 +23,9 @@ def test_reap_marks_orphaned_running_rows_as_error(tmp_path: Path) -> None:
     fresh = SessionStore(db)
     rec = fresh.get_run(rid)
     assert rec is not None
-    assert rec.status == "error"
+    # Orphan-reaped rows go to ``stopped`` — the container died, the
+    # agent itself didn't fail (which would be ``error`` / ``failed``).
+    assert rec.status == "stopped"
     assert rec.finished_at is not None
     assert "orphaned" in (rec.error or "")
 

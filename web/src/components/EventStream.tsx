@@ -38,6 +38,7 @@ const EVENT_META: Record<string, { label: string; color: string; bg: string }> =
   retry:      { label: 'retry',      color: '#f0883e', bg: 'rgba(240,136,62,0.10)' },
   thinking:   { label: 'thinking',   color: '#58a6ff', bg: 'rgba(88,166,255,0.10)' },
   timeout:    { label: 'timeout',    color: '#f0883e', bg: 'rgba(240,136,62,0.15)' },
+  validation: { label: 'validation', color: '#d2a8ff', bg: 'rgba(210,168,255,0.10)' },
 };
 
 function getMeta(type: string) {
@@ -67,6 +68,8 @@ function summarizeEvent(ev: StreamEvent): string {
       return String(ev.text ?? '').slice(0, 180);
     case 'timeout':
       return `timeout after ${ev.timeout_seconds ?? '?'}s`;
+    case 'validation':
+      return `ok=${ev.ok} engine=${ev.engine ?? ''} mode=${ev.mode ?? ''} attempt=${ev.attempt ?? ''}${ev.error ? ` — ${String(ev.error).slice(0, 120)}` : ''}`;
     default:
       return JSON.stringify(ev).slice(0, 180);
   }

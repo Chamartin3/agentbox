@@ -149,8 +149,10 @@ export default function AgentVersions({ agentId: propAgentId, onSelectVersion }:
                   />
                 </td>
                 <td className="center-cell">
-                  {version.has_comments && (
+                  {version.has_comments ? (
                     <span className="comment-indicator">💬</span>
+                  ) : (
+                    <span className="empty-cell">—</span>
                   )}
                 </td>
                 <td className="actions-cell">

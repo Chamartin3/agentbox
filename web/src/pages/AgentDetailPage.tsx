@@ -6,17 +6,53 @@ import AgentVersionDiff from './AgentVersionDiff';
 import CommentThread from '../components/CommentThread';
 import ManifestEditor from '../components/ManifestEditor';
 import MarkdownEditor from '../components/MarkdownEditor';
+import AgentRunsList from '../components/AgentRunsList';
 import Toast from '../components/Toast';
 import './AgentDetailPage.css';
 
 type TabType = 'configuration' | 'composition' | 'versions' | 'runs';
+
+function fmtNum(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`;
+  return `${(n / 1_000_000).toFixed(2)}M`;
+}
+
+function SizeBadge({ text }: { text: string }) {
+  const chars = text.length;
+  const tokens = Math.ceil(chars / 4);
+  return (
+    <span
+      className="dim"
+      style={{ fontWeight: 400, fontSize: 12, marginLeft: 10 }}
+      title={`${chars.toLocaleString()} chars · ~${tokens.toLocaleString()} tokens (chars / 4 heuristic)`}
+    >
+      · {fmtNum(chars)} chars · ~{fmtNum(tokens)} tokens
+    </span>
+  );
+}
 
 type BundleFile = {
   kind: string;
   relative_path: string;
   sha256: string;
   source_uri: string | null;
+  char_count?: number;
 };
+
+function CountChip({ chars, label }: { chars: number; label?: string }) {
+  const tokens = Math.ceil(chars / 4);
+  return (
+    <span
+      className="dim"
+      style={{ fontSize: 11, fontFamily: 'var(--mono, monospace)' }}
+      title={`${chars.toLocaleString()} chars · ~${tokens.toLocaleString()} tokens (chars / 4 heuristic)`}
+    >
+      {label ? `${label}: ` : ''}
+      {fmtNum(chars)}c · ~{fmtNum(tokens)}t
+    </span>
+  );
+}
 
 export default function AgentDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -114,34 +150,6 @@ export default function AgentDetailPage() {
     }
   };
 
-  const rollback = async (targetVersion: number) => {
-    if (!id) return;
-    try {
-      const doc = await api.rollbackPrompt(id, targetVersion);
-      setPrompt(doc.content);
-      setPromptDirty(false);
-      flash('ok', `rolled back to v${targetVersion}`);
-      loadVersions();
-    } catch (e) {
-      const err = e as ApiError;
-      flash('error', `rollback failed: ${JSON.stringify(err.detail)}`);
-    }
-  };
-
-  const loadVersionContent = async (version: number) => {
-    if (!id) return;
-    setLoadingPrompt(true);
-    try {
-      const data = await api.getPromptVersion(id, version);
-      setPrompt(data.content);
-      setPromptDirty(false);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingPrompt(false);
-    }
-  };
-
   const loadAgent = async () => {
     try {
       const detail = await api.getAgent(id);
@@ -224,13 +232,19 @@ export default function AgentDetailPage() {
           <div className="tab-pane stack">
             <ManifestEditor
               agent={agent}
+              bundleFiles={bundleFiles}
               onSaved={(updated) => {
                 setAgent(updated);
+                loadAgent();
                 flash('ok', 'agent updated');
               }}
               onError={(msg) => flash('error', msg)}
             />
+          </div>
+        )}
 
+        {activeTab === 'composition' && (
+          <div className="tab-pane stack">
             <section className="section">
               <div className="row between" style={{ marginBottom: 8 }}>
                 <h2 style={{ border: 'none', margin: 0 }}>Prompt</h2>
@@ -279,70 +293,13 @@ export default function AgentDetailPage() {
                     </button>
                   </div>
 
-                  {versions.length > 0 && (
-                    <div style={{ marginTop: 16 }}>
-                      <h3 style={{ fontSize: 13, color: 'var(--fg-muted)', marginBottom: 8 }}>
-                        Version History
-                      </h3>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Version</th>
-                            <th>Author</th>
-                            <th>Date</th>
-                            <th>Changelog</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {versions.map((v) => (
-                            <tr key={v.version}>
-                              <td>
-                                {v.version === activeVersion && (
-                                  <span className="pill ok" style={{ marginRight: 6 }}>active</span>
-                                )}
-                                {v.is_draft && (
-                                  <span className="pill running" style={{ marginRight: 6 }}>draft</span>
-                                )}
-                                v{v.version}
-                              </td>
-                              <td className="dim">{v.author}</td>
-                              <td className="dim">{new Date(v.created_at).toLocaleDateString()}</td>
-                              <td className="dim">{v.changelog || '—'}</td>
-                              <td>
-                                <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
-                                  <button
-                                    className="link-btn"
-                                    onClick={() => loadVersionContent(v.version)}
-                                    style={{ fontSize: 11 }}
-                                  >
-                                    load
-                                  </button>
-                                  {v.version !== activeVersion && !v.is_draft && (
-                                    <button
-                                      className="link-btn"
-                                      onClick={() => rollback(v.version)}
-                                      style={{ fontSize: 11, color: 'var(--red)' }}
-                                    >
-                                      rollback
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  <p className="dim" style={{ marginTop: 12, fontSize: 11 }}>
+                    Full prompt + agent version history lives in the <strong>Versions</strong> tab.
+                  </p>
                 </>
               )}
             </section>
-          </div>
-        )}
 
-        {activeTab === 'composition' && (
-          <div className="tab-pane stack">
             {agent.composition ? (
               <section className="section">
                 <h2>Recipe <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· declared in agent.toml</span></h2>
@@ -355,6 +312,12 @@ export default function AgentDetailPage() {
                     <>
                       <dt>User template</dt>
                       <dd><code>{agent.composition.user_template}</code></dd>
+                    </>
+                  )}
+                  {agent.composition.input_schema && (
+                    <>
+                      <dt>Input schema</dt>
+                      <dd><code>{agent.composition.input_schema}</code></dd>
                     </>
                   )}
                   {agent.composition.output_schema && (
@@ -393,7 +356,18 @@ export default function AgentDetailPage() {
             )}
 
             <section className="section">
-              <h2>Bundle Files <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· stored in DB</span></h2>
+              <h2>
+                Bundle Files{' '}
+                <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· stored in DB</span>
+                {bundleFiles.length > 0 && (
+                  <span style={{ marginLeft: 10 }}>
+                    <CountChip
+                      chars={bundleFiles.reduce((s, f) => s + (f.char_count || 0), 0)}
+                      label="total"
+                    />
+                  </span>
+                )}
+              </h2>
               {bundleFiles.length === 0 ? (
                 <p className="dim">No bundle files stored for this agent version. Run <code>agentbox versioning backfill-bundles</code> to import.</p>
               ) : (
@@ -402,6 +376,7 @@ export default function AgentDetailPage() {
                     <tr>
                       <th>Kind</th>
                       <th>Path</th>
+                      <th>Size</th>
                       <th>Source</th>
                       <th>SHA</th>
                     </tr>
@@ -411,6 +386,13 @@ export default function AgentDetailPage() {
                       <tr key={f.relative_path}>
                         <td><span className="pill">{f.kind}</span></td>
                         <td className="mono">{f.relative_path}</td>
+                        <td className="dim mono" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                          {f.char_count != null ? (
+                            <CountChip chars={f.char_count} />
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td className="dim mono" style={{ fontSize: 11 }}>
                           {f.source_uri || '—'}
                         </td>
@@ -425,7 +407,15 @@ export default function AgentDetailPage() {
             </section>
 
             <section className="section">
-              <h2>Final Composed System Prompt <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· references + schema appended</span></h2>
+              <h2>
+                Final Composed System Prompt{' '}
+                <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>
+                  · references + schema appended
+                </span>
+                {composedSystem && (
+                  <SizeBadge text={composedSystem} />
+                )}
+              </h2>
               {composedSystem ? (
                 <pre className="composed-block">{composedSystem}</pre>
               ) : (
@@ -437,7 +427,10 @@ export default function AgentDetailPage() {
 
             {composedUser !== null && (
               <section className="section">
-                <h2>Final Composed User Template</h2>
+                <h2>
+                  Final Composed User Template
+                  {composedUser && <SizeBadge text={composedUser} />}
+                </h2>
                 {composedUser ? (
                   <pre className="composed-block">{composedUser}</pre>
                 ) : (
@@ -445,6 +438,105 @@ export default function AgentDetailPage() {
                 )}
               </section>
             )}
+
+            {(composedSystem || composedUser) && (() => {
+              const sysChars = (composedSystem || '').length;
+              const userChars = (composedUser || '').length;
+              const promptBodyChars = (prompt || '').length;
+              const bundleTotal = bundleFiles.reduce((s, f) => s + (f.char_count || 0), 0);
+              // Filter bundle files by kind so we can break out schemas etc.
+              const byKind: Record<string, number> = {};
+              for (const f of bundleFiles) {
+                byKind[f.kind] = (byKind[f.kind] || 0) + (f.char_count || 0);
+              }
+              const totalChars = sysChars + userChars;
+              const rows: Array<{ label: string; chars: number; note?: string }> = [
+                { label: 'Prompt body (editable system.md)', chars: promptBodyChars },
+                ...Object.entries(byKind)
+                  .filter(([k]) => k !== 'system')
+                  .map(([k, c]) => ({ label: `Bundle · ${k}`, chars: c })),
+                { label: 'Final composed system prompt', chars: sysChars, note: 'prompt + references + schema instructions' },
+                { label: 'Final composed user template', chars: userChars },
+              ];
+              return (
+                <section className="section">
+                  <h2>
+                    Composed payload breakdown
+                    <span style={{ marginLeft: 10 }}>
+                      <CountChip chars={totalChars} label="payload" />
+                    </span>
+                  </h2>
+                  <table style={{ marginTop: 4 }}>
+                    <thead>
+                      <tr>
+                        <th>Component</th>
+                        <th style={{ textAlign: 'right' }}>Chars</th>
+                        <th style={{ textAlign: 'right' }}>~Tokens</th>
+                        <th style={{ textAlign: 'right' }}>% of payload</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => {
+                        const tokens = Math.ceil(r.chars / 4);
+                        const pct = totalChars > 0 ? Math.round((r.chars / totalChars) * 100) : 0;
+                        return (
+                          <tr key={r.label}>
+                            <td>
+                              {r.label}
+                              {r.note && (
+                                <span className="dim" style={{ fontSize: 11, marginLeft: 6 }}>
+                                  · {r.note}
+                                </span>
+                              )}
+                            </td>
+                            <td className="mono" style={{ textAlign: 'right' }}>
+                              {r.chars.toLocaleString()}
+                            </td>
+                            <td className="mono dim" style={{ textAlign: 'right' }}>
+                              ~{tokens.toLocaleString()}
+                            </td>
+                            <td className="mono dim" style={{ textAlign: 'right' }}>
+                              {pct}%
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      <tr style={{ borderTop: '1px solid var(--border)', fontWeight: 600 }}>
+                        <td>Total sent to model (system + user)</td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          {totalChars.toLocaleString()}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>
+                          ~{Math.ceil(totalChars / 4).toLocaleString()}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right' }}>100%</td>
+                      </tr>
+                      <tr>
+                        <td className="dim" style={{ fontSize: 11 }}>
+                          Raw bundle files (system + references + schemas, before composition)
+                        </td>
+                        <td className="mono dim" style={{ textAlign: 'right', fontSize: 11 }}>
+                          {bundleTotal.toLocaleString()}
+                        </td>
+                        <td className="mono dim" style={{ textAlign: 'right', fontSize: 11 }}>
+                          ~{Math.ceil(bundleTotal / 4).toLocaleString()}
+                        </td>
+                        <td className="mono dim" style={{ textAlign: 'right', fontSize: 11 }}>
+                          —
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p className="dim" style={{ marginTop: 10, fontSize: 11 }}>
+                    Token estimate uses the OpenAI heuristic of ~4 chars per token.
+                    Real tokenization varies by model (Claude / DeepSeek / GPT each
+                    differ by ±15%). The composed totals already include the
+                    references and the schema instruction block appended at
+                    composition time, so they are what the model actually receives.
+                  </p>
+                </section>
+              );
+            })()}
           </div>
         )}
 
@@ -479,11 +571,7 @@ export default function AgentDetailPage() {
 
         {activeTab === 'runs' && (
           <div className="tab-pane">
-            <p className="dim">
-              <Link to={`/runs?agent=${encodeURIComponent(agent.id)}`}>
-                View all runs for this agent →
-              </Link>
-            </p>
+            <AgentRunsList agentId={agent.id} />
           </div>
         )}
       </div>

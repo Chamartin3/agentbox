@@ -24,6 +24,7 @@ class RunnerKind(StrEnum):
     CLAUDE_CODE = "claude_code"
     OPENCODE = "opencode"
     PYDANTIC_AI = "pydantic_ai"
+    TOKEN = "token"
     HTTP = "http"
     SUBPROCESS = "subprocess"
     ADAPTER = "adapter"
@@ -37,11 +38,41 @@ class SessionMode(StrEnum):
 
 
 class RunStatus(StrEnum):
-    """Lifecycle status of a run row."""
+    """Lifecycle status of a run row.
+
+    Terminal status taxonomy (these are NOT overlapping — pick the
+    most specific one):
+
+    - ``ok``         — the run completed and the agent produced a valid
+                       result.
+    - ``failed``     — expected, agent-level task failure: output
+                       validation rejected the result, the upstream
+                       provider returned a rate-limit / quota / auth
+                       error, or the webhook delivering the response
+                       could not be submitted. The agent ran; the work
+                       didn't succeed.
+    - ``timeout``    — the run exceeded its configured ``timeout_seconds``
+                       and was killed by the executor.
+    - ``error``      — unexpected executor or runner crash. Reserve for
+                       genuine bugs in agentbox itself; anything we can
+                       classify as agent-level should go to ``failed``
+                       and anything operator-/infra-level to
+                       ``incomplete``.
+    - ``incomplete`` — the agent was interrupted before it could finish:
+                       the agentbox process / container died mid-run, an
+                       operator cancelled the run, or the executor task
+                       was otherwise torn down. The agent itself did not
+                       fail — the run was simply never allowed to
+                       complete. Reaped on startup.
+
+    ``stopped`` was a transitional alias for ``incomplete``; new code
+    must not emit it.
+    """
 
     RUNNING = "running"
     OK = "ok"
     ERROR = "error"
+    FAILED = "failed"
     TIMEOUT = "timeout"
     INCOMPLETE = "incomplete"
 
@@ -72,4 +103,5 @@ class EventType(StrEnum):
     RETRY = "retry"
     THINKING = "thinking"
     TIMEOUT = "timeout"
+    VALIDATION = "validation"
     DONE = "done"

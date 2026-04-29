@@ -6,11 +6,33 @@ import json
 from pathlib import Path
 
 
-def read_transcript(path: Path) -> list[dict]:
-    if not path.exists():
+def resolve_transcript_path(
+    stored_path: str | Path, data_dir: Path | None = None
+) -> Path:
+    """Resolve a stored transcript path to one that actually exists.
+
+    The DB stores transcript paths as absolute (e.g. ``/data/transcripts/<hex>.jsonl``)
+    — that's the path inside the executor container. Callers in other
+    containers (the MCP server, host-side tooling) may have ``/data``
+    mapped to a different mount or not at all. When the stored path
+    doesn't exist, fall back to ``<data_dir>/transcripts/<basename>``.
+    """
+    p = Path(stored_path)
+    if p.exists():
+        return p
+    if data_dir is not None:
+        candidate = Path(data_dir) / "transcripts" / p.name
+        if candidate.exists():
+            return candidate
+    return p
+
+
+def read_transcript(path: Path, data_dir: Path | None = None) -> list[dict]:
+    resolved = resolve_transcript_path(path, data_dir)
+    if not resolved.exists():
         return []
     out: list[dict] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in resolved.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue

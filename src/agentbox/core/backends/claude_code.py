@@ -23,6 +23,16 @@ _NAME = "claude_code"
 
 class ClaudeCodeBackend:
     name = _NAME
+    conversation_format: str | None = "claude-cli-jsonl"
+
+    def conversation_uri(
+        self,
+        run_id: str,
+        transcript_path: str | None = None,
+    ) -> str | None:
+        # The Claude CLI source uses transcript_path to locate the
+        # native session JSONL under $CLAUDE_CONFIG_DIR/projects/.
+        return transcript_path
 
     def render(
         self,

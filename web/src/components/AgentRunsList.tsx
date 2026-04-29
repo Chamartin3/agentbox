@@ -10,7 +10,10 @@ interface Props {
 const STATUSES = [
   { value: '', label: 'All' },
   { value: 'ok', label: 'OK' },
+  { value: 'failed', label: 'Failed' },
   { value: 'error', label: 'Error' },
+  { value: 'stopped', label: 'Stopped' },
+  { value: 'timeout', label: 'Timeout' },
   { value: 'running', label: 'Running' },
 ];
 

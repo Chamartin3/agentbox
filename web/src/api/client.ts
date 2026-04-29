@@ -30,6 +30,7 @@ export interface CompositionConfig {
   system: string;
   references: Array<string | { path: string; heading?: string }>;
   user_template: string | null;
+  input_schema: string | null;
   output_schema: string | null;
   transport: string;
   output_validation: string;
@@ -39,7 +40,14 @@ export interface RunRecord {
   id: string;
   agent_id: string;
   session_id: string | null;
-  status: 'running' | 'ok' | 'error';
+  status:
+    | 'running'
+    | 'ok'
+    | 'error'
+    | 'failed'
+    | 'timeout'
+    | 'stopped'
+    | 'incomplete';
   input: string;
   output: string | null;
   error: string | null;
@@ -88,6 +96,7 @@ export interface RunnerSpec {
   extra_args: string[];
   timeout_seconds: number;
   output_schema_path: string | null;
+  output_validation_engine: 'jsonschema' | 'pydantic' | 'both';
   max_validation_retries: number;
   max_error_retries: number;
 }
@@ -233,7 +242,11 @@ export const api = {
     } catch {
       const runs = await req<RunRecord[]>('/api/runs?limit=500');
       const agents = Array.from(new Set(runs.map((r) => r.agent_id))).sort();
-      return { agents, executors: [], statuses: ['ok', 'error', 'running'] };
+      return {
+        agents,
+        executors: [],
+        statuses: ['ok', 'error', 'failed', 'stopped', 'timeout', 'running'],
+      };
     }
   },
   getRun: (id: string) =>
@@ -243,6 +256,20 @@ export const api = {
   getTranscript: (id: string) =>
     req<Array<Record<string, unknown>>>(`/api/runs/${id}/transcript`),
   getRunPrompt: (id: string) => req<RunPromptDoc>(`/api/runs/${id}/prompt`),
+  rerunRun: (id: string) =>
+    req<{ run_id: string; agent: string; rerun_of: string }>(
+      `/api/runs/${id}/rerun`,
+      { method: 'POST' },
+    ),
+  listRunComments: (id: string) =>
+    req<{ run_id: string; comments: Array<{ id: number; author: string; body: string; created_at: string }> }>(
+      `/api/runs/${id}/comments`,
+    ),
+  addRunComment: (id: string, body: string, author = 'web') =>
+    req<{ id: number; author: string; body: string; created_at: string }>(
+      `/api/runs/${id}/comments`,
+      { method: 'POST', body: JSON.stringify({ body, author }) },
+    ),
   aggregateUsage: () =>
     req<{ input_tokens: number; output_tokens: number; cost_usd: number; runs: number }>(
       '/api/usage',

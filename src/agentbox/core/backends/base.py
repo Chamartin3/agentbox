@@ -83,6 +83,24 @@ class BackendAdapter(Protocol):
     name: str
     """Stable identifier matching the entry-point name (e.g. ``claude_code``)."""
 
+    conversation_format: str | None
+    """Format string for the ``ConversationSource`` that can load this
+    backend's native conversation log. ``None`` means no native source —
+    the executor falls back to the agentbox JSONL transcript."""
+
+    def conversation_uri(
+        self,
+        run_id: str,
+        transcript_path: str | None = None,
+    ) -> str | None:
+        """Return the storage URI for this run's native conversation log.
+
+        Override in backends that know their storage layout. The URI is
+        opaque to callers — only the matching ``ConversationSource``
+        implementation needs to understand it.
+        """
+        return None
+
     def render(
         self,
         agent: object,  # AgentDef — avoid circular ref at runtime; accept duck

@@ -22,21 +22,64 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TimeoutEvent, TextEvent, UsageEvent
-from agentbox.core.constants import RunnerKind
+from agentbox.api.events import (
+    DoneEvent,
+    LogEvent,
+    RunEvent,
+    TextEvent,
+    TimeoutEvent,
+    UsageEvent,
+)
+from agentbox.core.constants import RunnerKind, SessionMode
 from agentbox.core.runners._rate_limit import detect_in_opencode_event
 from agentbox.core.runners.base import Runner, RunRequest
 from agentbox.core.workspaces import opencode_config_path
 
 _DEFAULT_OPENCODE_MODEL = "opencode/deepseek-v4-flash-free"
 
+# Built-in opencode tools that must be disabled for headless one-shot agents.
+# Headless agents are pure JSON-emitters: they MUST NOT read, write, edit, or
+# shell out — they answer in their reply message, full stop.
+_HEADLESS_DISABLED_TOOLS = (
+    "bash",
+    "edit",
+    "patch",
+    "read",
+    "write",
+    "glob",
+    "grep",
+    "list",
+    "webfetch",
+    "websearch",
+    "todoread",
+    "todowrite",
+    "task",
+)
+
 
 class OpenCodeRunner(Runner):
     kind = RunnerKind.OPENCODE
+    conversation_format = "opencode-session"
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Per-run instance state. The executor constructs a fresh
+        # OpenCodeRunner per run via _try_backend → cls(), so cross-run
+        # leakage isn't possible today; if anyone starts reusing
+        # instances they must reset this between runs.
+        self._session_id: str | None = None
+
+    def conversation_uri(
+        self,
+        run_id: str,
+        transcript_path: str | None = None,
+    ) -> str | None:
+        return self._session_id
 
     async def run(self, req: RunRequest) -> AsyncIterator[RunEvent]:
         if shutil.which("opencode") is None:
@@ -63,8 +106,8 @@ class OpenCodeRunner(Runner):
         # flag in current versions. Copy the generated config into the
         # workdir so opencode picks it up.
         ws_config = opencode_config_path(req.workdir)
+        target = req.workdir / "opencode.json"
         if ws_config.exists():
-            target = req.workdir / "opencode.json"
             try:
                 target.write_bytes(ws_config.read_bytes())
             except OSError as exc:
@@ -73,6 +116,22 @@ class OpenCodeRunner(Runner):
                     level="warn",
                     message=f"failed to stage opencode.json into workdir: {exc}",
                 )
+
+        # Headless agents get every tool disabled — they answer in their
+        # reply message, never via file writes or shell commands. Patch
+        # the staged opencode.json to add a locked-down agent entry and
+        # pass --agent so opencode uses it.
+        if req.agent.session_mode == SessionMode.HEADLESS:
+            try:
+                _harden_opencode_config_for_headless(target, req.agent.id)
+            except OSError as exc:
+                yield LogEvent(
+                    run_id=req.run_id,
+                    level="warn",
+                    message=f"failed to harden opencode.json for headless: {exc}",
+                )
+            if "--agent" not in spec.extra_args:
+                argv += ["--agent", req.agent.id]
 
         # Extra args from the agent definition (e.g. --agent, --model).
         argv += spec.extra_args
@@ -88,16 +147,24 @@ class OpenCodeRunner(Runner):
         # "Argument list too long" (E2BIG) for large prompts.
         stdin_data = req.input.encode("utf-8")
 
-        # Register the configured model up-front so it's persisted even if
-        # the run fails before opencode emits its usage summary (e.g. on
-        # a rate-limit kill or a timeout). The real UsageEvent at the end
-        # will add token counts; the model column won't be overwritten
-        # with NULL thanks to the COALESCE in record_usage.
-        early_model = spec.model or (
-            _DEFAULT_OPENCODE_MODEL if "--model" not in spec.extra_args else None
-        )
-        if early_model:
-            yield UsageEvent(run_id=req.run_id, model=early_model)
+        # Register the model up-front so it's persisted even if the run
+        # fails before opencode emits its usage summary (rate-limit kill,
+        # timeout, parse failure, missing sessionID, etc.). The real
+        # UsageEvent at the end will add token counts; the model column
+        # is preserved by COALESCE in record_usage. Resolution order:
+        #   1. spec.model
+        #   2. value following ``--model`` in extra_args
+        #   3. _DEFAULT_OPENCODE_MODEL (matches the inject above)
+        # We must guarantee a non-empty model — otherwise runs that fail
+        # to capture a sessionID end up with no usage row at all.
+        early_model = spec.model
+        if not early_model and "--model" in spec.extra_args:
+            idx = spec.extra_args.index("--model")
+            if idx + 1 < len(spec.extra_args):
+                early_model = spec.extra_args[idx + 1]
+        if not early_model:
+            early_model = _DEFAULT_OPENCODE_MODEL
+        yield UsageEvent(run_id=req.run_id, model=early_model)
 
         yield LogEvent(
             run_id=req.run_id, message=f"$ opencode run --stdin ... (cwd={req.workdir})"
@@ -108,8 +175,8 @@ class OpenCodeRunner(Runner):
         ):
             yield ev
 
-    @staticmethod
     async def _run_opencode(
+        self,
         run_id: str,
         argv: list[str],
         cwd: Path,
@@ -133,6 +200,10 @@ class OpenCodeRunner(Runner):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                # See backends/opencode.py — default 64 KiB readline limit
+                # truncates large opencode tool_result / message JSON lines
+                # and raises LimitOverrunError.
+                limit=16 * 1024 * 1024,
             )
         except FileNotFoundError as exc:
             yield DoneEvent(run_id=run_id, ok=False, error=str(exc))
@@ -237,6 +308,8 @@ class OpenCodeRunner(Runner):
             return
 
         text_parts, session_id, parse_failed = _parse_event_stream(raw)
+        if session_id:
+            self._session_id = session_id
         if parse_failed and not text_parts:
             # Stream wasn't JSONL — fall back to treating stdout as raw text
             # so we don't lose output on an opencode CLI version change.
@@ -272,12 +345,69 @@ class OpenCodeRunner(Runner):
                     level="warn",
                     message=f"opencode export {session_id} returned no usage info",
                 )
+        else:
+            # No sessionID emitted in the stream — we can't fetch usage
+            # at all. Surface this loudly so it doesn't silently produce
+            # runs with no token counts (the early UsageEvent above still
+            # registers the model, but tokens/cost will be missing).
+            yield LogEvent(
+                run_id=run_id,
+                level="warn",
+                message="opencode stream emitted no sessionID; token/cost data unavailable",
+            )
 
         yield DoneEvent(
             run_id=run_id,
             ok=proc.returncode == 0,
             exit_code=proc.returncode,
         )
+
+
+def _harden_opencode_config_for_headless(target: Path, agent_id: str) -> None:
+    """Lock down ``opencode.json`` so a headless agent has zero tools.
+
+    Adds (or overwrites) an entry for ``agent_id`` with every built-in
+    tool flipped off and a deny-all permission policy. Also flips the
+    same tools off in any other enabled agent entry — defensive: with
+    ``--dangerously-skip-permissions`` set, opencode would otherwise
+    fall back to a different agent's tool list on lookup miss.
+    """
+    if not target.is_file():
+        cfg: dict = {}
+    else:
+        try:
+            cfg = json.loads(target.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            cfg = {}
+
+    disabled_tools = dict.fromkeys(_HEADLESS_DISABLED_TOOLS, False)
+    deny_all = dict.fromkeys(_HEADLESS_DISABLED_TOOLS, "deny")
+    deny_all["*"] = "deny"
+
+    agents = cfg.setdefault("agent", {})
+    agents[agent_id] = {
+        "description": f"Headless one-shot run of {agent_id} (tools disabled)",
+        "tools": dict(disabled_tools),
+        "permission": dict(deny_all),
+    }
+
+    # Belt-and-braces: also blank tools on the other enabled agents so a
+    # stray fallback can't grant filesystem access.
+    for name, entry in list(agents.items()):
+        if name == agent_id or not isinstance(entry, dict):
+            continue
+        if entry.get("disable"):
+            continue
+        existing_tools = entry.get("tools") if isinstance(entry.get("tools"), dict) else {}
+        entry["tools"] = {**existing_tools, **disabled_tools}
+
+    # Global permission deny-all (with --dangerously-skip-permissions
+    # this is best-effort but keeps things sane if that flag changes).
+    cfg.setdefault("permission", {})
+    if isinstance(cfg["permission"], dict):
+        cfg["permission"].update(deny_all)
+
+    target.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
 
 
 def _parse_event_stream(raw: str) -> tuple[list[str], str | None, bool]:
@@ -388,9 +518,7 @@ async def _fetch_session_usage(
     )
 
 
-import re as _re
-
-_FENCED_JSON_RE = _re.compile(r"```(?:json)?\s*\n(.*?)\n```", _re.DOTALL)
+_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
 
 
 def _strip_code_fences(text: str) -> str:

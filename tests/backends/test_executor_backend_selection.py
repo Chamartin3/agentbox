@@ -21,6 +21,7 @@ def _make_settings(tmp_path: Path) -> Settings:
         port=0,
         host="127.0.0.1",
         agents_dir=None,
+        agents_bundle_dir=None,
         prompts_dir=None,
         skills_dir=None,
         outputs_dir=None,

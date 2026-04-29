@@ -7,6 +7,7 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic>=2.7",
+  "pydantic-ai>=0.1.0",
   "jinja2>=3.1",
   "typer>=0.12",
   "httpx>=0.27",
@@ -31,7 +32,14 @@ pydantic_ai = "agentbox.core.runners.pydantic_ai:PydanticAiRunner"
 claude_code = "agentbox.core.backends.claude_code:ClaudeCodeBackend"
 opencode = "agentbox.core.backends.opencode:OpenCodeBackend"
 pydantic_ai = "agentbox.core.backends.pydantic_ai:PydanticAiBackend"
+pydantic_ai_structured = "agentbox.core.backends.pydantic_ai_structured:PydanticAiStructuredBackend"
 
+
+[project.entry-points."agentbox.conversations"]
+claude-cli-jsonl = "agentbox.core.conversations.sources.claude_cli:ClaudeCliJsonlSource"
+opencode-session = "agentbox.core.conversations.sources.opencode:OpencodeSessionSource"
+pydantic-ai-history = "agentbox.core.conversations.sources.pydantic_ai:PydanticAiHistorySource"
+agentbox-transcript = "agentbox.core.conversations.sources.transcript:TranscriptSource"
 
 # Register guardrails by adding entries here or in a plugin package:
 # [project.entry-points."agentbox.guardrails"]

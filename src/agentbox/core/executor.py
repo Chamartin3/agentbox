@@ -25,6 +25,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import jsonschema as _jsonschema
+
 from agentbox.api.events import (
     DoneEvent,
     GuardrailEvent,
@@ -32,9 +34,9 @@ from agentbox.api.events import (
     RetryEvent,
     RunEvent,
     TextEvent,
-    ThinkingEvent,
     TimeoutEvent,
     UsageEvent,
+    ValidationEvent,
 )
 from agentbox.api.webhooks import schedule_webhook
 from agentbox.config import Settings
@@ -54,8 +56,6 @@ from agentbox.core.workspaces import (
     load_capabilities,
     resolve_path,
 )
-
-import jsonschema as _jsonschema
 
 if TYPE_CHECKING:
     from agentbox.core.backends.base import BackendAdapter
@@ -90,6 +90,96 @@ def _extract_json(text: str) -> str:
         if 0 <= i < j:
             return s[i : j + 1]
     return s
+
+
+# Substring markers that identify expected, agent-level failures (vs.
+# unexpected executor/runner crashes). When ``final_error`` matches any
+# of these, the run is classified as ``failed`` rather than ``error``.
+# Mirrors the patterns in ``core/runners/_rate_limit.py`` but operates
+# on the final aggregated error string after the runner has surfaced it.
+_FAILED_ERROR_MARKERS: tuple[str, ...] = (
+    "rate limit",
+    "rate-limit",
+    "rate_limit",
+    "ratelimit",
+    " 429",
+    "429:",
+    "quota",
+    "overloaded",
+    "insufficient_quota",
+    "FreeUsageLimitError",
+    "CreditsError",
+    "AI_APICallError",
+    "AuthError",
+    "UnauthorizedError",
+    "invalid_api_key",
+    "invalid api key",
+    "authentication_error",
+    "authentication error",
+    "ConnectionError",
+    "ConnectionResetError",
+    "ConnectTimeout",
+    "ReadTimeout",
+    "ECONNREFUSED",
+    "ECONNRESET",
+    "output validation failed",
+)
+
+
+def _classify_terminal_error(err: str | None) -> str | None:
+    """Map a final error string to ``failed`` when it matches a known
+    expected-failure marker (rate-limit, auth, connection, validation).
+
+    Returns ``RunStatus.FAILED.value`` on a match, else ``None`` (caller
+    keeps whatever status it already had — typically ``error``).
+    """
+    if not err:
+        return None
+    lower = err.lower()
+    for marker in _FAILED_ERROR_MARKERS:
+        if marker.lower() in lower:
+            return RunStatus.FAILED.value
+    return None
+
+
+def _format_validation_error(exc: _jsonschema.ValidationError) -> str:
+    """Render a jsonschema ValidationError so the agent sees *where* it failed.
+
+    The default ``str(exc)`` dumps the schema and instance but does not say
+    *which JSON pointer path* in the instance the failing validator was
+    anchored at — so when ``oneOf`` is at the root, agents often think it's
+    anchored on a nested object and fix the wrong place.
+    """
+    instance_pointer = "/" + "/".join(str(p) for p in exc.absolute_path) if exc.absolute_path else "/"
+    schema_pointer = "/" + "/".join(str(p) for p in exc.absolute_schema_path) if exc.absolute_schema_path else "/"
+    lines = [
+        f"validation failed at instance path: {instance_pointer}",
+        f"schema rule violated at: {schema_pointer} ({exc.validator})",
+        f"message: {exc.message}",
+    ]
+    if exc.validator == "oneOf" and exc.context:
+        lines.append("")
+        lines.append("oneOf sub-errors (each branch's first failure):")
+        for branch_idx, sub in enumerate(exc.context):
+            title = ""
+            try:
+                title = sub.schema.get("title", "") if isinstance(sub.schema, dict) else ""
+            except AttributeError:
+                title = ""
+            label = f"branch[{branch_idx}]"
+            if title:
+                label += f" ({title})"
+            sub_path = "/" + "/".join(str(p) for p in sub.absolute_path) if sub.absolute_path else "/"
+            lines.append(f"  - {label} at {sub_path}: {sub.message}")
+    try:
+        instance_preview = json.dumps(exc.instance, default=str)
+    except (TypeError, ValueError):
+        instance_preview = repr(exc.instance)
+    if len(instance_preview) > 800:
+        instance_preview = instance_preview[:800] + "...(truncated)"
+    lines.append("")
+    lines.append(f"failing instance ({instance_pointer}): {instance_preview}")
+    return "\n".join(lines)
 
 
 def _load_workspace_permissions(
@@ -167,6 +257,20 @@ class _LegacyRunnerAdapter:
         self._runner = runner
         self._agent = agent
         self._project_root = project_root
+
+    @property
+    def conversation_format(self) -> str | None:
+        return getattr(self._runner, "conversation_format", None)
+
+    def conversation_uri(
+        self,
+        run_id: str,
+        transcript_path: str | None = None,
+    ) -> str | None:
+        meth = getattr(self._runner, "conversation_uri", None)
+        if meth is None:
+            return None
+        return meth(run_id=run_id, transcript_path=transcript_path)
 
     def render(
         self,
@@ -286,6 +390,7 @@ class RunExecutor:
 
         # --- composition path ------------------------------------------------
         composed_result = None
+        bundle_path: Path | None = None
         if agent.composition is not None and variables is not None:
             from agentbox.core.composition.loader import (
                 load_bundle,
@@ -333,35 +438,55 @@ class RunExecutor:
                     legacy_prompt_path=agent.prompt_path,
                 )
             composed_result = bundle.compose(variables, shared_roots)
+
+            # Append validation-engine hint to system prompt when a schema
+            # is present so the LLM knows how strictly its output will be
+            # checked.
+            system_text = composed_result.system
+            if composed_result.schema is not None:
+                engine = getattr(
+                    agent.runner, "output_validation_engine", "both"
+                )
+                from agentbox.core.composition import (
+                    _append_validation_engine_hint,
+                )
+
+                system_text = _append_validation_engine_hint(system_text, engine)
+
             # Attach composed metadata so backend adapters can read it
             agent = agent.model_copy(deep=True)
-            agent.__dict__["_composed_system"] = composed_result.system
+            agent.__dict__["_composed_system"] = system_text
             agent.__dict__["_composed_user"] = composed_result.user
             agent.__dict__["_composed_schema"] = composed_result.schema
             agent.__dict__["_composed_bundle_sha"] = composed_result.bundle_sha
             input_ = composed_result.user
 
-            # Wire output schema into runner spec for the executor's retry loop.
-            # Mirror the composer's auto-detection: when the bundle ships an
-            # output_schema.json (or schema.json) but doesn't declare it in
-            # [composition].output_schema, still engage validation+retry so
-            # behavior matches what the model actually sees in the prompt.
-            comp = agent.composition
+        # Wire output schema into runner spec for the executor's retry loop.
+        # Runs whether or not the composition path executed — callers that
+        # pass a raw `input_` (no `variables`) still get schema validation
+        # when the agent declares an output schema. Mirrors the composer's
+        # auto-detection: bundles shipping output_schema.json without
+        # declaring it in [composition].output_schema still engage validation.
+        comp = agent.composition
+        if comp is not None:
+            if bundle_path is None:
+                bundle_path = self._resolve_bundle_path(agent)
+            if composed_result is None:
+                agent = agent.model_copy(deep=True)
             schema_rel: str | None = None
-            if comp:
-                if comp.output_schema:
-                    schema_rel = comp.output_schema
-                else:
-                    from agentbox.core.constants import BundleFile
+            if comp.output_schema:
+                schema_rel = comp.output_schema
+            else:
+                from agentbox.core.constants import BundleFile
 
-                    for fallback in (
-                        BundleFile.OUTPUT_SCHEMA,
-                        BundleFile.OUTPUT_SCHEMA_ALT,
-                    ):
-                        if (bundle_path / fallback).exists():
-                            schema_rel = fallback
-                            break
-            if comp and schema_rel and comp.output_validation != "off":
+                for fallback in (
+                    BundleFile.OUTPUT_SCHEMA,
+                    BundleFile.OUTPUT_SCHEMA_ALT,
+                ):
+                    if (bundle_path / fallback).exists():
+                        schema_rel = fallback
+                        break
+            if schema_rel and comp.output_validation != "off":
                 schema_path = bundle_path / schema_rel
                 runner_updates: dict = {
                     "output_schema_path": str(schema_path),
@@ -371,9 +496,7 @@ class RunExecutor:
                 agent = agent.model_copy(
                     update={"runner": agent.runner.model_copy(update=runner_updates)}
                 )
-            agent.__dict__["_composed_validation_mode"] = (
-                comp.output_validation if comp else "strict"
-            )
+            agent.__dict__["_composed_validation_mode"] = comp.output_validation
 
         # Select backend adapter and render into run dir
         adapter, rendered = self._select_backend(agent, workdir, backend)
@@ -390,6 +513,17 @@ class RunExecutor:
             session_id=session_id,
             config_digest=rendered.digest,
         )
+
+        # Persist conversation metadata from the backend adapter
+        conv_format: str | None = getattr(adapter, "conversation_format", None)
+        conv_uri: str | None = None
+        if conv_format:
+            conv_meth = getattr(adapter, "conversation_uri", None)
+            if conv_meth is not None:
+                conv_uri = conv_meth(
+                    run_id=run_id, transcript_path=str(transcript_path)
+                )
+        self.store.set_run_conversation(run_id, conv_format, conv_uri)
 
         # Save composition metadata
         if composed_result is not None:
@@ -665,6 +799,15 @@ class RunExecutor:
         timeout = agent.runner.timeout_seconds
         try:
             transcript_path.parent.mkdir(parents=True, exist_ok=True)
+            # Pre-record the declared model so timeouts/early errors still
+            # show up in the runs table with a model name. Runner-emitted
+            # UsageEvents later refine the token/cost columns; the model
+            # column is preserved by COALESCE in record_usage.
+            if agent.runner.model:
+                with contextlib.suppress(Exception):
+                    self.store.record_usage(
+                        run_id, {"model": agent.runner.model}
+                    )
             for attempt in range(max_attempts):
                 output_text.clear()
                 run_error: str | None = None
@@ -698,9 +841,14 @@ class RunExecutor:
                             tf.write(to_ev.model_dump_json() + "\n")
                             broadcaster.publish(to_ev)
                     except Exception as exc:
-                        run_error = f"executor error: {type(exc).__name__}: {exc}"
+                        import traceback as _tb
+                        tb_text = _tb.format_exc()
+                        run_error = f"executor error: {type(exc).__name__}: {exc}\n{tb_text}"
                         final_error = run_error
                         final_ok = False
+                        logging.getLogger("agentbox.executor").exception(
+                            "runner crashed for run %s", run_id
+                        )
 
                     # --- Post-run logic (inside with block so tf is available) ---
                     if run_error:
@@ -713,6 +861,15 @@ class RunExecutor:
                         broadcaster.publish(ev)
 
                     output = "\n".join(output_text).strip() or None
+
+                    # --- workdir/output.json fallback ---------------------------
+                    # When the agent wrote its structured output to a file
+                    # instead of returning it inline (e.g. opencode running
+                    # with write tools), prefer the file content if the text
+                    # output doesn't parse as JSON. Only kicks in when an
+                    # output schema is configured.
+                    if agent.runner.output_schema_path:
+                        output = self._maybe_load_output_file(output, workdir)
 
                     # --- Error recovery (any failure including timeout) ----------
                     if not final_ok:
@@ -745,9 +902,27 @@ class RunExecutor:
                         break
 
                     # --- Validation retry (output schema check) -----------------
-                    if agent.runner.output_schema_path and output:
-                        is_valid, v_error = self._validate_output(output, agent, workdir)
-                        schema_validated_via = "jsonschema"
+                    if agent.runner.output_schema_path:
+                        if not output:
+                            is_valid = False
+                            v_error = "output is empty but an output schema is required"
+                            schema_validated_via = "none"
+                        else:
+                            is_valid, v_error, schema_validated_via = (
+                                self._validate_output(output, agent, workdir)
+                            )
+                        mode = getattr(agent, "_composed_validation_mode", "strict")
+                        engine = schema_validated_via or "none"
+                        v_ev = ValidationEvent(
+                            run_id=run_id,
+                            ok=is_valid,
+                            attempt=attempt + 1,
+                            mode=mode if mode in ("strict", "warn", "off") else "strict",
+                            engine=engine if engine in ("jsonschema", "pydantic", "both", "none") else "none",
+                            error=None if is_valid else v_error,
+                        )
+                        tf.write(v_ev.model_dump_json() + "\n")
+                        broadcaster.publish(v_ev)
                         if is_valid:
                             validation_status = "ok"
                             validation_errors = None
@@ -779,10 +954,14 @@ class RunExecutor:
                             broadcaster.publish(ev)
                             continue
                         # Final attempt failed validation
-                        mode = getattr(agent, "_composed_validation_mode", "strict")
                         if mode == "strict":
                             final_ok = False
                             final_error = f"output validation failed: {v_error}"
+                            # Validation failure is an expected, agent-level
+                            # outcome — classify as ``failed`` so the
+                            # error-status bucket stays reserved for
+                            # unexpected runner crashes.
+                            final_status = RunStatus.FAILED.value
                         elif mode == "warn":
                             validation_status = "warn"
                         break
@@ -800,7 +979,25 @@ class RunExecutor:
                 mode = getattr(agent, "_composed_validation_mode", "strict")
                 if mode == "off":
                     schema_validated_via = "off"
+            # Reclassify expected, agent-level failures (rate-limit /
+            # connection / auth / validation) from ``error`` → ``failed``.
+            # Leaves ``timeout`` and any already-set status alone.
+            if not final_ok and final_status is None:
+                final_status = _classify_terminal_error(final_error)
         finally:
+            # Re-persist conversation_uri for runners that discover
+            # their session ID during execution (e.g. OpenCode).
+            conv_meth = getattr(adapter, "conversation_uri", None)
+            if conv_meth is not None:
+                post_uri = conv_meth(
+                    run_id=run_id, transcript_path=str(transcript_path)
+                )
+                if post_uri:
+                    self.store.set_run_conversation(
+                        run_id,
+                        conversation_format=None,
+                        conversation_uri=post_uri,
+                    )
             self.store.finish_run(
                 run_id,
                 ok=final_ok,
@@ -833,37 +1030,101 @@ class RunExecutor:
     ) -> None:
         tf.write(ev.model_dump_json() + "\n")
         if isinstance(ev, TextEvent):
-            output_text.append(ev.text)
+            # Delta events are UI-only — the runner emits a final
+            # non-delta TextEvent with the consolidated output.
+            if not getattr(ev, "delta", False):
+                output_text.append(ev.text)
         elif isinstance(ev, UsageEvent):
             self.store.record_usage(run_id, ev.model_dump())
 
     def _validate_output(
         self, output: str, agent: AgentDef, workdir: Path
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, str]:
+        """Validate *output* against the agent's output schema.
+
+        Returns ``(is_valid, error_message, validated_via)`` where
+        *validated_via* is ``"jsonschema"``, ``"pydantic"``, or
+        ``"both"``.
+        """
         if not agent.runner.output_schema_path:
-            return True, ""
+            return True, "", "off"
 
         schema_path = workdir / agent.runner.output_schema_path
         if not schema_path.exists():
             schema_path = self.settings.project_root / agent.runner.output_schema_path
         if not schema_path.exists():
-            return False, f"schema file not found: {agent.runner.output_schema_path}"
+            return False, f"schema file not found: {agent.runner.output_schema_path}", "none"
 
         try:
             schema = json.loads(schema_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
-            return False, f"cannot load schema: {exc}"
+            return False, f"cannot load schema: {exc}", "none"
 
+        engine = getattr(agent.runner, "output_validation_engine", "both")
+
+        if engine == "jsonschema":
+            return self._validate_jsonschema(output, schema)
+
+        if engine == "pydantic":
+            return self._validate_pydantic(output, schema)
+
+        # "both" — jsonschema first, then pydantic
+        js_ok, js_err, _ = self._validate_jsonschema(output, schema)
+        if not js_ok:
+            return False, js_err, "jsonschema"
+        py_ok, py_err, _ = self._validate_pydantic(output, schema)
+        if not py_ok:
+            return False, py_err, "pydantic"
+        return True, "", "both"
+
+    @staticmethod
+    def _validate_jsonschema(
+        output: str, schema: dict[str, Any]
+    ) -> tuple[bool, str, str]:
         try:
             instance = json.loads(_extract_json(output))
         except json.JSONDecodeError as exc:
-            return False, f"output is not valid JSON: {exc}"
-
+            return False, f"output is not valid JSON: {exc}", "jsonschema"
         try:
             _jsonschema.validate(instance=instance, schema=schema)
-            return True, ""
+            return True, "", "jsonschema"
         except _jsonschema.ValidationError as exc:
-            return False, str(exc)
+            return False, _format_validation_error(exc), "jsonschema"
+
+    @staticmethod
+    def _validate_pydantic(
+        output: str, schema: dict[str, Any]
+    ) -> tuple[bool, str, str]:
+        from agentbox.core.composition.pydantic_validate import validate_with_pydantic
+
+        ok, err = validate_with_pydantic(output, schema)
+        return ok, err, "pydantic"
+
+    @staticmethod
+    def _maybe_load_output_file(current: str | None, workdir: Path) -> str | None:
+        """Return ``workdir/output.json`` content when ``current`` isn't JSON.
+
+        Agents occasionally write their structured output to disk instead
+        of inlining it. If the runner's text output doesn't parse as JSON
+        and an ``output.json`` file exists in the workdir, swap it in so
+        validation can engage on the file content. Falls back to
+        ``current`` on any IO/decode failure.
+        """
+        if current:
+            try:
+                json.loads(_extract_json(current))
+                return current
+            except (json.JSONDecodeError, ValueError):
+                pass
+        candidate = workdir / "output.json"
+        try:
+            if candidate.is_file():
+                content = candidate.read_text(encoding="utf-8").strip()
+                if content:
+                    return content
+        except OSError:
+            pass
+        return current
 
     @staticmethod
     def _build_retry_prompt(

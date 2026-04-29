@@ -75,12 +75,31 @@
 
 .center-cell {
   text-align: center;
+  width: 70px;
 }
 
 .actions-cell {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.actions-cell .btn-small {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.actions-cell .btn-small:last-child {
+  margin-right: 0;
+}
+
+.versions-table th,
+.versions-table td {
+  vertical-align: middle;
+}
+
+.empty-cell {
+  color: var(--fg-muted);
+  opacity: 0.4;
 }
 
 .btn-small {

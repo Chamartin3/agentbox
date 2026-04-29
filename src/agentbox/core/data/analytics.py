@@ -153,9 +153,17 @@ class AnalyticsMixin:
                     "running"
                 ),
                 func.sum(case((runs.c.status == "ok", 1), else_=0)).label("successes"),
-                func.sum(case((runs.c.status == "error", 1), else_=0)).label(
-                    "failures"
-                ),
+                func.sum(
+                    case(
+                        (
+                            runs.c.status.in_(
+                                ("error", "failed", "timeout", "stopped", "incomplete")
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("failures"),
                 func.coalesce(func.sum(duration_or_zero), 0).label("total_duration_ms"),
                 func.coalesce(func.avg(duration_or_null), 0).label("avg_duration_ms"),
             )
@@ -180,9 +188,17 @@ class AnalyticsMixin:
             select(
                 day,
                 func.count().label("runs"),
-                func.sum(case((runs.c.status == "error", 1), else_=0)).label(
-                    "failures"
-                ),
+                func.sum(
+                    case(
+                        (
+                            runs.c.status.in_(
+                                ("error", "failed", "timeout", "stopped", "incomplete")
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("failures"),
             )
             .select_from(runs)
             .where(*base_filters)
@@ -194,9 +210,17 @@ class AnalyticsMixin:
             select(
                 runs.c.agent_id.label("action_name"),
                 func.count().label("total"),
-                func.sum(case((runs.c.status == "error", 1), else_=0)).label(
-                    "failures"
-                ),
+                func.sum(
+                    case(
+                        (
+                            runs.c.status.in_(
+                                ("error", "failed", "timeout", "stopped", "incomplete")
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("failures"),
                 func.coalesce(func.avg(success_duration_or_null), 0).label(
                     "avg_duration_ms"
                 ),
@@ -218,9 +242,17 @@ class AnalyticsMixin:
             select(
                 executor_col,
                 func.count().label("total"),
-                func.sum(case((runs.c.status == "error", 1), else_=0)).label(
-                    "failures"
-                ),
+                func.sum(
+                    case(
+                        (
+                            runs.c.status.in_(
+                                ("error", "failed", "timeout", "stopped", "incomplete")
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("failures"),
                 func.coalesce(func.sum(usage.c.input_tokens), 0).label(
                     "total_input_tokens"
                 ),

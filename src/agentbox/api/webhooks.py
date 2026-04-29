@@ -127,11 +127,14 @@ def _build_payload(
 def _on_delivery_done(
     task: asyncio.Task[bool], run_id: str, store: SessionStore
 ) -> None:
-    """Done-callback: flip ``ok`` → ``incomplete`` when delivery failed.
+    """Done-callback: flip ``ok`` → ``failed`` when webhook delivery fails.
 
-    ``error`` and ``incomplete`` runs are left untouched — we only
-    downgrade a successful run to signal that the consumer never saw
-    the notification.
+    ``error``, ``failed``, ``stopped``, ``timeout`` runs are left
+    untouched — we only downgrade a successful run to signal that the
+    consumer never saw the notification. Failure to submit the response
+    is an expected, recoverable outcome (network blip, consumer down),
+    so it lives in the ``failed`` bucket alongside other connection
+    failures rather than the unexpected-crash ``error`` bucket.
     """
     if task.cancelled():
         return
@@ -139,22 +142,38 @@ def _on_delivery_done(
         delivered = task.result()
     except Exception:  # pragma: no cover — deliver_webhook swallows
         delivered = False
-    if delivered:
-        # If a manual resend through schedule_webhook ever happens for
-        # an ``incomplete`` run, promote it back to ``ok``.
-        try:
-            current = store.get_run(run_id)
-            if current is not None and current.status == RunStatus.INCOMPLETE:
-                store.set_run_status(run_id, RunStatus.OK)
-        except Exception:
-            logger.exception("failed promoting run %s back to ok", run_id)
-        return
+    _apply_delivery_outcome(store, run_id, delivered)
+
+
+def _apply_delivery_outcome(
+    store: SessionStore, run_id: str, delivered: bool
+) -> None:
+    """Update a run's status based on webhook delivery outcome.
+
+    Shared by the background done-callback and the synchronous
+    ``resend_webhook`` path so both follow the same rules. Treats
+    ``incomplete`` as a legacy synonym of ``failed`` for backwards
+    compatibility with rows written before the status taxonomy split.
+    """
     try:
         current = store.get_run(run_id)
-        if current is not None and current.status == RunStatus.OK:
-            store.set_run_status(run_id, RunStatus.INCOMPLETE)
     except Exception:
-        logger.exception("failed marking run %s incomplete", run_id)
+        logger.exception("failed reading run %s for delivery outcome", run_id)
+        return
+    if current is None:
+        return
+    if delivered:
+        if current.status in (RunStatus.FAILED, RunStatus.INCOMPLETE):
+            try:
+                store.set_run_status(run_id, RunStatus.OK)
+            except Exception:
+                logger.exception("failed promoting run %s back to ok", run_id)
+        return
+    if current.status == RunStatus.OK:
+        try:
+            store.set_run_status(run_id, RunStatus.FAILED)
+        except Exception:
+            logger.exception("failed marking run %s as failed", run_id)
 
 
 def schedule_webhook(
@@ -200,11 +219,14 @@ async def _deliver_with_events(
     run_id: str,
     broadcaster: Any | None,
     transcript_path: Path | None,
+    store: SessionStore | None = None,
 ) -> bool:
-    """Wrap deliver_webhook with per-attempt event emission."""
+    """Wrap deliver_webhook with per-attempt event emission and persistence."""
     body = json.dumps(payload, default=str)
     last_error: str = ""
+    start_time = datetime.now()
     for attempt, delay in enumerate(_RETRY_DELAYS_S):
+        attempt_start = datetime.now()
         try:
             async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_S) as client:
                 resp = await client.post(
@@ -212,7 +234,13 @@ async def _deliver_with_events(
                     content=body,
                     headers={"Content-Type": "application/json"},
                 )
+            latency = int((datetime.now() - attempt_start).total_seconds() * 1000)
             if 200 <= resp.status_code < 300:
+                _record_delivery(
+                    store, run_id, attempt + 1, url, payload,
+                    status=resp.status_code, body=resp.text[:500],
+                    latency=latency,
+                )
                 _emit(
                     broadcaster,
                     transcript_path,
@@ -224,8 +252,18 @@ async def _deliver_with_events(
                 )
                 return True
             last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            _record_delivery(
+                store, run_id, attempt + 1, url, payload,
+                status=resp.status_code, body=resp.text[:500],
+                latency=latency, error=last_error,
+            )
         except httpx.HTTPError as exc:
+            latency = int((datetime.now() - attempt_start).total_seconds() * 1000)
             last_error = f"{type(exc).__name__}: {exc}"
+            _record_delivery(
+                store, run_id, attempt + 1, url, payload,
+                latency=latency, error=last_error,
+            )
         _emit(
             broadcaster,
             transcript_path,
@@ -246,6 +284,34 @@ async def _deliver_with_events(
         ),
     )
     return False
+
+
+def _record_delivery(
+    store: SessionStore | None,
+    run_id: str,
+    attempt: int,
+    url: str,
+    payload: dict[str, Any] | None,
+    status: int | None = None,
+    body: str | None = None,
+    latency: int | None = None,
+    error: str | None = None,
+) -> None:
+    if store is None:
+        return
+    try:
+        store.record_webhook_delivery(
+            run_id=run_id,
+            attempt=attempt,
+            url=url,
+            payload=payload,
+            response_status=status,
+            response_body=body,
+            latency_ms=latency,
+            error=error,
+        )
+    except Exception:
+        logger.exception("failed to record webhook delivery for run %s", run_id)
 
 
 def _emit(
@@ -275,19 +341,14 @@ async def resend_webhook(
     """Synchronously re-deliver the webhook for ``run``.
 
     Returns ``(delivered, reason)``. On success the run's status is
-    promoted from ``incomplete`` back to ``ok``; on failure an ``ok``
-    run is demoted to ``incomplete``. ``error`` runs keep their status.
+    promoted from ``failed`` (or legacy ``incomplete``) back to ``ok``;
+    on failure an ``ok`` run is demoted to ``failed``. Other terminal
+    statuses (``error``, ``stopped``, ``timeout``) keep their status.
     """
     url = _resolve_webhook_url(agent)
     if not url:
         return False, "no webhook_url configured"
     payload = _build_payload(run, store)
     delivered = await deliver_webhook(url, payload)
-    current = store.get_run(run.id)
-    if current is None:
-        return delivered, None
-    if delivered and current.status == RunStatus.INCOMPLETE:
-        store.set_run_status(run.id, RunStatus.OK)
-    elif not delivered and current.status == RunStatus.OK:
-        store.set_run_status(run.id, RunStatus.INCOMPLETE)
+    _apply_delivery_outcome(store, run.id, delivered)
     return delivered, None if delivered else "delivery failed; see server logs"

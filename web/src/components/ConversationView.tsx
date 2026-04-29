@@ -11,6 +11,10 @@ interface ConversationMessage {
   content: React.ReactNode;
   ts?: string;
   meta?: Record<string, unknown>;
+  // True when this message was built from incremental delta TextEvents.
+  // A subsequent non-delta TextEvent for the same role REPLACES it
+  // (the backend emits a consolidated/fence-stripped final text).
+  fromDelta?: boolean;
 }
 
 function fmtDt(iso: string | null | undefined): string {
@@ -51,9 +55,15 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
         const role = String(ev.role || 'assistant');
         const text = String(ev.text || '');
         if (!text.trim()) continue;
-        // If the last message was assistant text, append to it
+        const isDelta = Boolean(ev.delta);
         const last = msgs[msgs.length - 1];
-        if (last && last.role === role && role === 'assistant') {
+        // Non-delta following deltas → consolidated final text, replace
+        // the streamed-in-progress message rather than duplicating it.
+        if (!isDelta && last && last.role === role && role === 'assistant' && last.fromDelta) {
+          last.content = text;
+          last.ts = ts;
+          last.fromDelta = false;
+        } else if (last && last.role === role && role === 'assistant') {
           last.content = (
             <>
               {last.content}
@@ -61,8 +71,15 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
             </>
           );
           last.ts = ts;
+          if (isDelta) last.fromDelta = true;
         } else {
-          msgs.push({ id: `${msgs.length}-text`, role: role as 'assistant' | 'user' | 'system', content: text, ts });
+          msgs.push({
+            id: `${msgs.length}-text`,
+            role: role as 'assistant' | 'user' | 'system',
+            content: text,
+            ts,
+            fromDelta: isDelta,
+          });
         }
         break;
       }

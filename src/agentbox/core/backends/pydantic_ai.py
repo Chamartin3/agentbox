@@ -24,6 +24,16 @@ _NAME = "pydantic_ai"
 
 class PydanticAiBackend:
     name = _NAME
+    conversation_format: str | None = "pydantic-ai-history"
+
+    def conversation_uri(
+        self,
+        run_id: str,
+        transcript_path: str | None = None,
+    ) -> str | None:
+        # PydanticAI has no native session log; the source reconstructs
+        # turns from the agentbox transcript itself.
+        return transcript_path
 
     def render(
         self,

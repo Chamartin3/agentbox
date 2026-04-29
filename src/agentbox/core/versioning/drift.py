@@ -57,6 +57,37 @@ def _build_snapshot(agent: AgentDef) -> str:
     return json.dumps(data, sort_keys=True, default=str)
 
 
+def _build_config_json(agent: AgentDef) -> str:
+    """Serialize an ``AgentDef`` for the ``agent_versions.config_json`` column.
+
+    Distinct from ``_build_snapshot`` (which targets ``content_snapshot``):
+    ``config_json`` is the DB-as-source-of-truth payload consumed by
+    ``AgentDef.from_db_row`` at runtime, so it MUST round-trip every
+    runner field — defaults included — to prevent silent revert to the
+    pydantic default (e.g. ``timeout_seconds=120``).
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        data = agent.model_dump(mode="json", exclude_none=False)
+    return json.dumps(data, sort_keys=True, default=str)
+
+
+def _load_prompt_safe(agent: AgentDef) -> str:
+    """Read the agent's prompt text, returning ``""`` on any error."""
+    try:
+        if getattr(agent, "prompt", None):
+            return agent.prompt or ""
+        if agent.source_path is None:
+            return ""
+        root = agent.source_path.parent
+        if hasattr(agent, "load_prompt"):
+            return agent.load_prompt(root)
+        return ""
+    except Exception:
+        logger.exception("versioning: prompt load failed for agent %r", agent.id)
+        return ""
+
+
 def _sync_prompt(
     agent: AgentDef,
     store: PromptVersionsMixin,
@@ -116,6 +147,35 @@ def _capture_files_safe(
         return []
 
 
+def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
+    """If versions exist but no active pointer, promote the latest committed one.
+
+    Reproduces the 'orphaned versions' state: rows in ``agent_versions``,
+    nothing in ``active_agent_versions``. The runtime resolver would then
+    silently fall back to the disk loader, hiding the active version from
+    the UI. Heal by activating the highest committed (non-draft) version,
+    or the latest row of any kind if all are drafts.
+    """
+    try:
+        existing = store.get_active_version(agent_id)
+        if existing is not None:
+            return
+        versions = store.list_versions(agent_id)
+        if not versions:
+            return
+        # Prefer the highest committed version; fall back to latest of any.
+        committed = [v for v in versions if not v.get("is_draft")]
+        target = committed[0] if committed else versions[0]
+        store.activate_version(agent_id, target["id"])
+        logger.info(
+            "versioning: healed missing active pointer for %r → v%d",
+            agent_id,
+            target["version"],
+        )
+    except Exception:
+        logger.exception("versioning: heal failed for %r", agent_id)
+
+
 def startup_sweep(
     agents: list[AgentDef],
     store: AgentVersionsMixin,
@@ -134,6 +194,7 @@ def startup_sweep(
     for agent in agents:
         try:
             status = check_drift(agent, store)
+            _heal_active_pointer(agent.id, store)
             if status == AgentDriftStatus.NEW:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
                 files = _capture_files_safe(agent, project_root, shared_roots)

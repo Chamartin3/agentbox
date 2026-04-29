@@ -15,6 +15,8 @@ from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import (
+    active_agent_versions,
+    agent_meta,
     agent_version_comments,
     agent_version_files,
     agent_version_ratings,
@@ -52,6 +54,10 @@ class AgentVersionsMixin:
         changelog: str = "",
         is_legacy: bool = False,
         files: list[dict] | None = None,
+        config_json: str | None = None,
+        prompt_content: str | None = None,
+        source: str = "manifest",
+        is_draft: bool = False,
     ) -> dict:
         prepared = _prepare_files(files) if files else []
         version = self._next_version(agent_id)
@@ -69,6 +75,10 @@ class AgentVersionsMixin:
                     changelog=changelog,
                     is_legacy=int(is_legacy),
                     created_at=now_iso(),
+                    config_json=config_json,
+                    prompt_content=prompt_content,
+                    source=source,
+                    is_draft=int(is_draft),
                 )
             )
             version_id = int(result.inserted_primary_key[0])
@@ -137,6 +147,83 @@ class AgentVersionsMixin:
                 .limit(1)
             ).first()
             return self._row_dict(row) if row else None
+
+    def get_active_version(self, agent_id: str) -> dict | None:
+        """Return the active version pointed at by ``active_agent_versions``.
+
+        Returns ``None`` when no pointer is set — callers either fall
+        back to the disk bundle or wait for ``startup_sweep`` to heal
+        the missing pointer. Promotion is explicit via
+        ``activate_version`` so that the UI/CLI never silently picks a
+        version the operator didn't endorse.
+        """
+        with self.engine.connect() as conn:
+            pointer = conn.execute(
+                active_agent_versions.select().where(
+                    active_agent_versions.c.agent_id == agent_id
+                )
+            ).first()
+            if pointer is None:
+                return None
+            row = conn.execute(
+                agent_versions.select().where(
+                    agent_versions.c.id == pointer._mapping["version_id"]
+                )
+            ).first()
+            return self._row_dict(row) if row else None
+
+    def activate_version(self, agent_id: str, version_id: int) -> None:
+        """Pin *version_id* as the active version for *agent_id*."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                active_agent_versions.delete().where(
+                    active_agent_versions.c.agent_id == agent_id
+                )
+            )
+            conn.execute(
+                active_agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version_id=version_id,
+                    activated_at=now_iso(),
+                )
+            )
+
+    # ------------------------------------------------------------------
+    # Agent meta (non-versioned per-agent settings)
+    # ------------------------------------------------------------------
+
+    def get_agent_meta(self, agent_id: str) -> dict | None:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                agent_meta.select().where(agent_meta.c.agent_id == agent_id)
+            ).first()
+            return dict(row._mapping) if row else None
+
+    def init_agent_meta(
+        self,
+        agent_id: str,
+        sync_mode: str = "watch",
+        export_to_disk: bool = True,
+        source_path: str | None = None,
+        source_format: str | None = None,
+    ) -> dict:
+        existing = self.get_agent_meta(agent_id)
+        now = now_iso()
+        if existing is not None:
+            return existing
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_meta.insert().values(
+                    agent_id=agent_id,
+                    sync_mode=sync_mode,
+                    export_to_disk=int(export_to_disk),
+                    source_path=source_path,
+                    source_format=source_format,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        return self.get_agent_meta(agent_id) or {}
 
     def get_version(self, agent_id: str, version: int) -> dict | None:
         with self.engine.connect() as conn:

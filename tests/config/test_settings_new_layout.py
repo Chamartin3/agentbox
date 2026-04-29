@@ -28,6 +28,7 @@ def make_settings(
         port=8765,
         host="0.0.0.0",
         agents_dir=agents_dir,
+        agents_bundle_dir=None,
         prompts_dir=prompts_dir,
         skills_dir=skills_dir,
         outputs_dir=outputs_dir,
