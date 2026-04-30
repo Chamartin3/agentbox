@@ -12,7 +12,7 @@ const STATUSES = [
   { value: 'ok', label: 'OK' },
   { value: 'failed', label: 'Failed' },
   { value: 'error', label: 'Error' },
-  { value: 'stopped', label: 'Stopped' },
+  { value: 'incomplete', label: 'Incomplete' },
   { value: 'timeout', label: 'Timeout' },
   { value: 'running', label: 'Running' },
 ];

@@ -46,7 +46,6 @@ export interface RunRecord {
     | 'error'
     | 'failed'
     | 'timeout'
-    | 'stopped'
     | 'incomplete';
   input: string;
   output: string | null;
@@ -245,7 +244,7 @@ export const api = {
       return {
         agents,
         executors: [],
-        statuses: ['ok', 'error', 'failed', 'stopped', 'timeout', 'running'],
+        statuses: ['ok', 'error', 'failed', 'incomplete', 'timeout', 'running'],
       };
     }
   },

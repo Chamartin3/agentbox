@@ -157,7 +157,7 @@ class AnalyticsMixin:
                     case(
                         (
                             runs.c.status.in_(
-                                ("error", "failed", "timeout", "stopped", "incomplete")
+                                ("error", "failed", "timeout", "incomplete")
                             ),
                             1,
                         ),
@@ -192,7 +192,7 @@ class AnalyticsMixin:
                     case(
                         (
                             runs.c.status.in_(
-                                ("error", "failed", "timeout", "stopped", "incomplete")
+                                ("error", "failed", "timeout", "incomplete")
                             ),
                             1,
                         ),
@@ -214,7 +214,7 @@ class AnalyticsMixin:
                     case(
                         (
                             runs.c.status.in_(
-                                ("error", "failed", "timeout", "stopped", "incomplete")
+                                ("error", "failed", "timeout", "incomplete")
                             ),
                             1,
                         ),
@@ -246,7 +246,7 @@ class AnalyticsMixin:
                     case(
                         (
                             runs.c.status.in_(
-                                ("error", "failed", "timeout", "stopped", "incomplete")
+                                ("error", "failed", "timeout", "incomplete")
                             ),
                             1,
                         ),
