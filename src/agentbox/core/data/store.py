@@ -130,14 +130,20 @@ class _CoreStore:
                     )
 
     def _reap_orphaned_runs(self) -> None:
-        """Mark any pre-existing 'running' rows as stopped on startup.
+        """Mark any pre-existing 'running' rows as ``incomplete`` on startup.
 
         Why: the in-process executor task that owns a run dies with the
         container. If the process is killed (or `_run` crashes after the
         runner loop but before `finish_run`), the row sits as 'running'
         forever. On startup no executor task can possibly still own those
-        rows, so reap them as ``stopped`` — the agent itself didn't
-        fail, the container went away.
+        rows, so reap them as ``incomplete`` — the agent itself didn't
+        fail to do its task; the container went away before the agent
+        could finish, which is the textbook definition of an interrupted
+        / incomplete run.
+
+        Also migrates any pre-existing rows with the transitional
+        ``stopped`` status to ``incomplete`` so the legacy bucket is
+        emptied and dashboards/filters only have to look at one value.
         """
         reason = "orphaned: agentbox process restarted before run finished"
         with self.engine.begin() as conn:
@@ -152,6 +158,11 @@ class _CoreStore:
                     error=func.coalesce(runs.c.error, "") + reason,
                     finished_at=now_iso(),
                 )
+            )
+            conn.execute(
+                runs.update()
+                .where(runs.c.status == "stopped")
+                .values(status=RunStatus.INCOMPLETE.value)
             )
 
     # ----- sessions ---------------------------------------------------------
@@ -330,14 +341,15 @@ class _CoreStore:
         return [row_to_run(r) for r in rows]
 
     def reap_orphan_runs(self) -> int:
-        """Mark any rows still in ``running`` state as ``stopped``.
+        """Mark any rows still in ``running`` state as ``incomplete``.
 
         Called on process startup. Any row left in ``running`` past a
         restart belongs to a dead executor task — its ``finally`` block
         never reached ``finish_run``, so the row would otherwise stay
         orphaned forever (hiding from terminal-status filters and
-        skewing activity rollups). The agent didn't fail; the process
-        died — so the correct terminal state is ``stopped``.
+        skewing activity rollups). The agent didn't fail to do its
+        task; the executor process died before completion — that's an
+        interrupted run, i.e. ``incomplete``.
         """
         with self.engine.begin() as conn:
             result = conn.execute(

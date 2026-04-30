@@ -20,6 +20,57 @@ def _serialize(obj: Any) -> Any:
     return obj
 
 
+def _load_conversation_with_fallback(
+    rec: Any,
+    fmt: str | None,
+    *,
+    include_bodies: bool,
+    offset: int,
+    limit: int,
+) -> tuple[Any | None, str | None]:
+    """Load the runner-native conversation; fall back to the JSONL transcript.
+
+    Returns ``(view, fallback_used)``. ``fallback_used`` is None when the
+    runner-native source produced turns, otherwise the reason the fallback
+    fired (``"no_native_source"`` / ``"native_empty"``). When the JSONL
+    transcript itself is missing we return ``(None, None)`` so the caller
+    can surface ``no_conversation``.
+
+    The fallback ensures timed-out and silent-hang runs still expose
+    whatever the executor streamed (log/text/thinking/timeout events) for
+    every runner — opencode, claude-cli, pydantic-ai, and any plugin.
+    """
+    native_view = None
+    if fmt is not None:
+        try:
+            src_cls = get_conversation_source(fmt)
+        except KeyError:
+            src_cls = None
+        if src_cls is not None:
+            src = src_cls.for_run(rec)
+            if src is not None:
+                native_view = src.load(
+                    include_bodies=include_bodies,
+                    offset=offset,
+                    limit=limit,
+                )
+                if native_view.turns:
+                    return native_view, None
+
+    fb_src = TranscriptSource.for_run(rec)
+    if fb_src is None:
+        return native_view, None
+    fb_view = fb_src.load(
+        include_bodies=include_bodies,
+        offset=offset,
+        limit=limit,
+    )
+    if not fb_view.turns and native_view is not None:
+        return native_view, "native_empty"
+    reason = "native_empty" if native_view is not None else "no_native_source"
+    return fb_view, reason
+
+
 def register(mcp: FastMCP) -> None:
     @mcp.tool
     def get_run(run_id: str) -> dict:
@@ -150,6 +201,7 @@ def register(mcp: FastMCP) -> None:
             "total_turns": len(view.turns),
             "turn_offset": turn_offset,
             "turn_limit": turn_limit,
+            "fallback_used": fallback_used,
             "turns": [
                 {
                     "index": t.index,
