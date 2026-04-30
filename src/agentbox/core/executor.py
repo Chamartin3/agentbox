@@ -50,6 +50,7 @@ from agentbox.core.guardrails.base import GuardrailContext
 from agentbox.core.plugins import get_backend, get_guardrail
 from agentbox.core.prompt_capture import build_fragments, fragments_to_json
 from agentbox.core.render import materialize_rendered_config
+from agentbox.core.runners._rate_limit import detect_in_text_line
 from agentbox.core.runners.base import RunRequest
 from agentbox.core.versioning.drift import check_drift, startup_sweep
 from agentbox.core.workspaces import (
@@ -514,6 +515,19 @@ class RunExecutor:
             config_digest=rendered.digest,
         )
 
+        # Record the effective model immediately at run creation — before
+        # the runner task starts — so every run has a model name in the
+        # usage table regardless of backend, status, or whether the
+        # runner ever emits a UsageEvent. ``rendered.model`` is populated
+        # by the adapter's ``render()`` (spec.model or backend default).
+        if rendered.model:
+            try:
+                self.store.record_usage(run_id, {"model": rendered.model})
+            except Exception:
+                logger.exception(
+                    "failed to pre-record model for run %s", run_id
+                )
+
         # Persist conversation metadata from the backend adapter
         conv_format: str | None = getattr(adapter, "conversation_format", None)
         conv_uri: str | None = None
@@ -756,6 +770,7 @@ class RunExecutor:
                 env=rendered.env,
                 cwd=effective_cwd,
                 agent_meta=rendered.agent_meta,
+                model=rendered.model,
             ),
             run_dir,
         )
@@ -786,6 +801,7 @@ class RunExecutor:
         final_ok = False
         final_error: str | None = None
         final_status: str | None = None
+        done_event_published = False
         output: str | None = None
         validation_status: str | None = None
         validation_errors: list[str] | None = None
@@ -799,20 +815,14 @@ class RunExecutor:
         timeout = agent.runner.timeout_seconds
         try:
             transcript_path.parent.mkdir(parents=True, exist_ok=True)
-            # Pre-record the declared model so timeouts/early errors still
-            # show up in the runs table with a model name. Runner-emitted
-            # UsageEvents later refine the token/cost columns; the model
-            # column is preserved by COALESCE in record_usage.
-            if agent.runner.model:
-                with contextlib.suppress(Exception):
-                    self.store.record_usage(
-                        run_id, {"model": agent.runner.model}
-                    )
+            # Model is pre-recorded at run creation (see ``execute``); no
+            # need to re-record here. UsageEvents from the runner refine
+            # token/cost; model is preserved by COALESCE in record_usage.
             for attempt in range(max_attempts):
                 output_text.clear()
                 run_error: str | None = None
 
-                with transcript_path.open("a", encoding="utf-8") as tf:
+                with transcript_path.open("a", encoding="utf-8", buffering=1) as tf:
                     try:
                         async with asyncio.timeout(timeout):
                             async for ev in adapter.run(rendered, current_input, run_id):
@@ -822,11 +832,26 @@ class RunExecutor:
                                     final_ok = ev.ok
                                     final_error = ev.error
                                     final_status = ev.status
+                                    done_event_published = True
                                     # Finalize as soon as the runner signals done;
                                     # don't wait for the generator to drain. Any
                                     # tail-end task can otherwise delay or skip
                                     # the finally block (status persist + webhook).
                                     break
+                                # Centralised fatal-pattern detection: any
+                                # LogEvent whose message matches a known
+                                # rate-limit / auth / quota signature aborts
+                                # the run immediately instead of waiting for
+                                # the per-run timeout. Applies to every
+                                # backend that surfaces diagnostics as
+                                # LogEvents — no per-runner duplication.
+                                if isinstance(ev, LogEvent):
+                                    fatal = detect_in_text_line(ev.message or "")
+                                    if fatal is not None:
+                                        final_ok = False
+                                        final_error = fatal
+                                        final_status = RunStatus.FAILED.value
+                                        break
                     except TimeoutError:
                         run_error = f"timeout after {timeout}s"
                         final_error = run_error
@@ -1008,6 +1033,24 @@ class RunExecutor:
                 validation_errors=validation_errors,
                 schema_validated_via=schema_validated_via,
             )
+            # Ensure WS clients always see a terminal DoneEvent. The
+            # runner publishes its own DoneEvent on the happy path
+            # (handled in the loop above), but when the executor breaks
+            # out early on timeout / fatal-pattern detection / validation
+            # failure / unexpected crash, no DoneEvent has been
+            # broadcast — clients would hang waiting for one. Synthesize
+            # one here so every terminal path emits exactly one DoneEvent.
+            if not done_event_published:
+                with contextlib.suppress(Exception):
+                    final_done = DoneEvent(
+                        run_id=run_id,
+                        ok=bool(final_ok),
+                        error=final_error,
+                        status=final_status,
+                    )
+                    with transcript_path.open("a", encoding="utf-8", buffering=1) as _tf:
+                        _tf.write(final_done.model_dump_json() + "\n")
+                    broadcaster.publish(final_done)
             try:
                 refreshed = self.store.get_run(run_id)
                 if refreshed is not None:
@@ -1200,7 +1243,7 @@ class RunExecutor:
             )
             broadcaster.publish(ev)
             try:
-                with transcript_path.open("a", encoding="utf-8") as tf:
+                with transcript_path.open("a", encoding="utf-8", buffering=1) as tf:
                     tf.write(ev.model_dump_json() + "\n")
             except OSError:
                 pass

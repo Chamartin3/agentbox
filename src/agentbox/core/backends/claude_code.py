@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent
-from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.runners.claude_code import _run_claude
 from agentbox.core.workspaces import load_capabilities
@@ -21,7 +21,7 @@ from agentbox.core.workspaces import load_capabilities
 _NAME = "claude_code"
 
 
-class ClaudeCodeBackend:
+class ClaudeCodeBackend(BackendAdapter):
     name = _NAME
     conversation_format: str | None = "claude-cli-jsonl"
 
@@ -42,10 +42,11 @@ class ClaudeCodeBackend:
         creds: dict | None = None,
     ) -> RenderedConfig:
         spec = agent.runner
+        model = self._resolve_model(spec)
         argv: list[str] = ["claude", "-p"]
 
-        if spec.model:
-            argv += ["--model", spec.model]
+        if model:
+            argv += ["--model", model]
 
         argv += [
             "--mcp-config",
@@ -69,21 +70,13 @@ class ClaudeCodeBackend:
         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             env.pop(k, None)
 
-        files: dict[Path, bytes] = {}
-        composed_system = getattr(agent, "_composed_system", None)
-        if composed_system is not None:
-            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
-        else:
-            claude_md = workdir / "CLAUDE.md"
-            if claude_md.exists():
-                files[Path("CLAUDE.md")] = claude_md.read_bytes()
-
         return RenderedConfig(
             argv=argv,
             env=env,
             cwd=Path("."),
-            files=files,
+            files=self._collect_system_files(agent, workdir),
             agent_meta={"timeout_seconds": spec.timeout_seconds},
+            model=model,
         )
 
     async def run(

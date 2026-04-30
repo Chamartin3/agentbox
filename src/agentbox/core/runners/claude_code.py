@@ -22,7 +22,14 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TimeoutEvent, TextEvent, UsageEvent
+from agentbox.api.events import (
+    DoneEvent,
+    LogEvent,
+    RunEvent,
+    TextEvent,
+    TimeoutEvent,
+    UsageEvent,
+)
 from agentbox.core.constants import RunnerKind
 from agentbox.core.runners._rate_limit import detect_in_text_line
 from agentbox.core.runners.base import Runner, RunRequest
@@ -33,6 +40,12 @@ from agentbox.core.workspaces import (
 )
 
 _FILENAME_SAFE = str.maketrans({"/": "_", "\\": "_", ":": "_"})
+
+# Heartbeat interval for silent runs — see the matching constant in
+# ``core/backends/opencode.py``. ``claude -p --output-format json`` emits a
+# single envelope at exit, so without heartbeats a hung run produces zero
+# transcript events between start and the hard timeout.
+_HEARTBEAT_INTERVAL_SECONDS = 30.0
 
 
 def _kill_group(pid: int, sig: int) -> None:
@@ -235,10 +248,32 @@ async def _run_claude(
     # Drain stdout concurrently so the kernel pipe buffer never fills up
     # (which would deadlock `claude` on `write()`).
     stdout_task: asyncio.Task[bytes] = asyncio.create_task(proc.stdout.read())
+    wait_task: asyncio.Task[int] = asyncio.create_task(proc.wait())
 
     try:
         async with asyncio.timeout(timeout):
-            await proc.wait()
+            # Poll for child exit with a periodic heartbeat. Without this,
+            # a stuck `claude` produces no transcript events between launch
+            # and the hard timeout. ``shield`` keeps the wait task alive
+            # across heartbeat ticks.
+            elapsed = 0
+            while not wait_task.done():
+                try:
+                    await asyncio.wait_for(
+                        asyncio.shield(wait_task),
+                        _HEARTBEAT_INTERVAL_SECONDS,
+                    )
+                except TimeoutError:
+                    elapsed += int(_HEARTBEAT_INTERVAL_SECONDS)
+                    yield LogEvent(
+                        run_id=run_id,
+                        level="info",
+                        message=(
+                            f"claude silent for {elapsed}s "
+                            f"(pid={proc.pid}); still waiting for child to exit"
+                        ),
+                    )
+                    continue
             # `claude` has exited; nudge any orphaned MCP children in the
             # process group so they release the stdout pipe and the read
             # task can hit EOF.
@@ -252,6 +287,9 @@ async def _run_claude(
         stdout_task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await stdout_task
+        wait_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await wait_task
         stderr_task.cancel()
         yield TimeoutEvent(
             run_id=run_id, timeout_seconds=timeout, error=f"timeout after {timeout}s"

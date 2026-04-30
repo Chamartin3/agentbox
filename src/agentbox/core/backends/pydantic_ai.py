@@ -17,12 +17,12 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
-from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 
 _NAME = "pydantic_ai"
 
 
-class PydanticAiBackend:
+class PydanticAiBackend(BackendAdapter):
     name = _NAME
     conversation_format: str | None = "pydantic-ai-history"
 
@@ -43,33 +43,18 @@ class PydanticAiBackend:
         creds: dict | None = None,
     ) -> RenderedConfig:
         spec = agent.runner
-
-        # Resolve the prompt — stored in agent_meta for run() to use.
-        composed_system = getattr(agent, "_composed_system", None)
-        if composed_system is not None:
-            prompt = composed_system
-        else:
-            prompt_text = getattr(agent, "load_prompt", None)
-            prompt = prompt_text(workdir.parent) if prompt_text else ""
-
+        model = self._resolve_model(spec)
         agent_meta: dict[str, Any] = {
             "agent_module": spec.agent_module,
-            "prompt": prompt,
+            "prompt": self._resolve_prompt(agent, workdir),
             "agent_id": agent.id,
         }
 
-        files: dict[Path, bytes] = {}
-        if composed_system is not None:
-            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
-        else:
-            claude_md = workdir / "CLAUDE.md"
-            if claude_md.exists():
-                files[Path("CLAUDE.md")] = claude_md.read_bytes()
-
         return RenderedConfig(
             cwd=Path("."),
-            files=files,
+            files=self._collect_system_files(agent, workdir),
             agent_meta=agent_meta,
+            model=model,
         )
 
     async def run(

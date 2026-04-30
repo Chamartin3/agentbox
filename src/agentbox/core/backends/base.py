@@ -1,13 +1,27 @@
-"""BackendAdapter Protocol + RenderedConfig dataclass."""
+"""BackendAdapter abstract base + RenderedConfig dataclass.
+
+All backend adapters inherit from :class:`BackendAdapter`. The ABC owns
+the cross-backend plumbing that used to be copy-pasted into each
+subclass: model resolution (with per-backend defaults), CLAUDE.md
+system-file collection, and prompt resolution. Subclasses implement
+only the backend-specific parts: building the command (or in-process
+invocation) and streaming events.
+
+The :attr:`RenderedConfig.model` field is the effective model that will
+actually be used to run the agent. Adapters set it during ``render()``
+so the executor can persist a model name even when the run never emits
+a ``UsageEvent`` (e.g. on timeout).
+"""
 
 from __future__ import annotations
 
 import hashlib
 import json
+from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol, TypedDict, runtime_checkable
+from typing import Any, ClassVar, TypedDict
 
 from agentbox.api.events import RunEvent
 
@@ -45,6 +59,15 @@ class RenderedConfig:
     """Backend-specific agent metadata (e.g. agent_module, prompt for pydantic_ai
     in-process agents). Included in the digest computation."""
 
+    model: str | None = None
+    """Effective model name that will actually be used to run the agent.
+
+    Set by the adapter during ``render()`` — combines ``spec.model`` with
+    the backend's own default. Persisted by the executor so even runs
+    that never emit a ``UsageEvent`` (timeouts, early crashes) keep a
+    model name in the runs table.
+    """
+
     digest: str = ""
     """sha256 over a sorted JSON serialisation of (files, argv, env, cwd, agent_meta).
 
@@ -71,22 +94,32 @@ class RenderedConfig:
         return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-@runtime_checkable
-class BackendAdapter(Protocol):
-    """Backend-agnostic adapter: renders config then runs an agent.
+class BackendAdapter(ABC):
+    """Backend-agnostic adapter base class.
+
+    Subclasses override the abstract :meth:`render` and :meth:`run`
+    methods. Common operations (model defaulting, system-file
+    collection, prompt resolution) are provided as protected helpers so
+    subclasses don't reimplement them.
 
     A single instance is created per-run. Implementations must be cheap
     to construct (no heavy init); the expensive work happens in
     ``render()`` and ``run()``.
     """
 
-    name: str
+    name: ClassVar[str]
     """Stable identifier matching the entry-point name (e.g. ``claude_code``)."""
 
-    conversation_format: str | None
+    conversation_format: ClassVar[str | None] = None
     """Format string for the ``ConversationSource`` that can load this
     backend's native conversation log. ``None`` means no native source —
     the executor falls back to the agentbox JSONL transcript."""
+
+    default_model: ClassVar[str | None] = None
+    """Model used when ``agent.runner.model`` is empty. ``None`` means
+    the backend has no default — the upstream CLI / SDK picks one."""
+
+    # ----- public API ------------------------------------------------------
 
     def conversation_uri(
         self,
@@ -101,6 +134,7 @@ class BackendAdapter(Protocol):
         """
         return None
 
+    @abstractmethod
     def render(
         self,
         agent: object,  # AgentDef — avoid circular ref at runtime; accept duck
@@ -110,12 +144,14 @@ class BackendAdapter(Protocol):
     ) -> RenderedConfig:
         """Analyse ``agent`` and ``workdir``, return a frozen run config.
 
-        This method must be stateless — calling it twice on the same
-        inputs must produce the same ``RenderedConfig`` (same digest).
-        It must NOT write to disk; the executor handles materialisation.
+        Must be stateless: calling it twice on the same inputs must
+        produce the same ``RenderedConfig`` (same digest). Must NOT
+        write to disk; the executor handles materialisation. Must
+        populate :attr:`RenderedConfig.model` with the effective model
+        (use :meth:`_resolve_model`).
         """
-        ...
 
+    @abstractmethod
     async def run(
         self,
         rendered: RenderedConfig,
@@ -124,9 +160,53 @@ class BackendAdapter(Protocol):
     ) -> AsyncIterator[RunEvent]:
         """Execute the agent using ``rendered`` and stream events.
 
-        ``rendered.files`` have already been materialised on disk by the
-        executor. The implementation must yield a terminal ``DoneEvent``.
+        ``rendered.files`` have already been materialised on disk by
+        the executor. The implementation must yield a terminal
+        ``DoneEvent``.
         """
-        ...
         if False:
             yield  # pragma: no cover — signals async generator
+
+    # ----- protected helpers (shared across backends) ----------------------
+
+    def _resolve_model(self, spec: Any) -> str | None:
+        """Return ``spec.model`` if set, otherwise this backend's default.
+
+        Backends override :attr:`default_model` rather than this method.
+        """
+        return getattr(spec, "model", None) or self.default_model
+
+    def _collect_system_files(
+        self, agent: Any, workdir: Path
+    ) -> dict[Path, bytes]:
+        """Collect the CLAUDE.md system-context file for materialisation.
+
+        Prefers the in-memory ``_composed_system`` attached to the agent
+        (set by the prompt composer when fragments are merged) over the
+        on-disk ``CLAUDE.md`` in the workdir. Returns an empty dict when
+        neither exists.
+        """
+        files: dict[Path, bytes] = {}
+        composed_system = getattr(agent, "_composed_system", None)
+        if composed_system is not None:
+            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
+        else:
+            claude_md = workdir / "CLAUDE.md"
+            if claude_md.exists():
+                files[Path("CLAUDE.md")] = claude_md.read_bytes()
+        return files
+
+    def _resolve_prompt(self, agent: Any, workdir: Path) -> str:
+        """Resolve the system prompt for in-process backends.
+
+        Prefers ``agent._composed_system`` (set by the prompt composer)
+        and falls back to ``agent.load_prompt(workdir.parent)`` when
+        available. Returns ``""`` when neither resolves.
+        """
+        composed_system = getattr(agent, "_composed_system", None)
+        if composed_system is not None:
+            return composed_system
+        prompt_text = getattr(agent, "load_prompt", None)
+        if prompt_text is None:
+            return ""
+        return prompt_text(workdir.parent) or ""

@@ -65,8 +65,6 @@ def _load_conversation_with_fallback(
         offset=offset,
         limit=limit,
     )
-    if not fb_view.turns and native_view is not None:
-        return native_view, "native_empty"
     reason = "native_empty" if native_view is not None else "no_native_source"
     return fb_view, reason
 
@@ -158,6 +156,12 @@ def register(mcp: FastMCP) -> None:
         Pass ``include_bodies=True`` to inline full ``text``/``thinking``/
         ``tool_use`` bodies. Use ``turn_offset``/``turn_limit`` to page when
         there are many turns.
+
+        Falls back to the agentbox JSONL transcript when the runner-native
+        source is unavailable or empty (e.g. opencode timed out before
+        emitting a sessionID, claude session log not found). When the
+        fallback fires, ``fallback_used`` in the response is set to
+        ``"no_native_source"`` or ``"native_empty"``.
         """
         ctx = get_context()
         rec = ctx.store.get_run(run_id)

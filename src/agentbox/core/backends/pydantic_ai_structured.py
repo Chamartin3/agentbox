@@ -22,7 +22,7 @@ from typing import Any
 from pydantic import BaseModel, create_model
 
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
-from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 
 _NAME = "pydantic_ai_structured"
 
@@ -98,10 +98,11 @@ def _json_schema_to_pydantic_model(
     return _build_model_from_schema(schema, name=model_name)
 
 
-class PydanticAiStructuredBackend:
+class PydanticAiStructuredBackend(BackendAdapter):
     """Backend that enforces structured output via pydantic-ai."""
 
     name = _NAME
+    default_model = "openai:gpt-4o"
 
     def render(
         self,
@@ -111,13 +112,7 @@ class PydanticAiStructuredBackend:
         creds: dict | None = None,
     ) -> RenderedConfig:
         spec = agent.runner
-
-        composed_system = getattr(agent, "_composed_system", None)
-        if composed_system is not None:
-            prompt = composed_system
-        else:
-            prompt_text = getattr(agent, "load_prompt", None)
-            prompt = prompt_text(workdir.parent) if prompt_text else ""
+        model = self._resolve_model(spec)
 
         # Load output schema for result_type construction.
         output_schema: dict[str, Any] | None = None
@@ -136,25 +131,18 @@ class PydanticAiStructuredBackend:
                     )
 
         agent_meta: dict[str, Any] = {
-            "prompt": prompt,
+            "prompt": self._resolve_prompt(agent, workdir),
             "agent_id": agent.id,
-            "model": spec.model or "openai:gpt-4o",
+            "model": model,
             "output_schema": output_schema,
             "timeout_seconds": spec.timeout_seconds,
         }
 
-        files: dict[Path, bytes] = {}
-        if composed_system is not None:
-            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
-        else:
-            claude_md = workdir / "CLAUDE.md"
-            if claude_md.exists():
-                files[Path("CLAUDE.md")] = claude_md.read_bytes()
-
         return RenderedConfig(
             cwd=Path("."),
-            files=files,
+            files=self._collect_system_files(agent, workdir),
             agent_meta=agent_meta,
+            model=model,
         )
 
     async def run(

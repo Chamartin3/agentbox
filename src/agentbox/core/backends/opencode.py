@@ -23,16 +23,26 @@ from agentbox.api.events import (
     ThinkingEvent,
     TimeoutEvent,
 )
-from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.runners.opencode import _DEFAULT_OPENCODE_MODEL
 
 _NAME = "opencode"
 
+# Emit a heartbeat LogEvent whenever the child produces no stdout for this
+# many seconds. Without this, a silent child (stuck on DNS, in opencode's
+# internal 429 retry loop, model spinning on a tool call, etc.) leaves the
+# transcript empty until the hard timeout fires — operators have no idea
+# what was happening. 30s strikes a balance: long enough that normal
+# inter-event gaps don't spam the transcript, short enough that a hung run
+# logs ~10 heartbeats before a default 5-min timeout.
+_HEARTBEAT_INTERVAL_SECONDS = 30.0
 
-class OpenCodeBackend:
+
+class OpenCodeBackend(BackendAdapter):
     name = _NAME
     conversation_format: str | None = "opencode-session"
+    default_model = _DEFAULT_OPENCODE_MODEL
 
     def __init__(self) -> None:
         # Session id is discovered while parsing the opencode JSON event
@@ -64,27 +74,23 @@ class OpenCodeBackend:
 
         argv += spec.extra_args
 
-        if "--model" not in spec.extra_args and not spec.model:
-            argv += ["--model", _DEFAULT_OPENCODE_MODEL]
+        # `_resolve_model` returns spec.model or the default. We only
+        # inject `--model` when the caller didn't already pass one via
+        # extra_args (preserves the existing escape hatch).
+        model = self._resolve_model(spec)
+        if "--model" not in spec.extra_args and not spec.model and model:
+            argv += ["--model", model]
 
         env = dict(os.environ)
         env["PWD"] = str(workdir)
-
-        files: dict[Path, bytes] = {}
-        composed_system = getattr(agent, "_composed_system", None)
-        if composed_system is not None:
-            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
-        else:
-            claude_md = workdir / "CLAUDE.md"
-            if claude_md.exists():
-                files[Path("CLAUDE.md")] = claude_md.read_bytes()
 
         return RenderedConfig(
             argv=argv,
             env=env,
             cwd=Path("."),
-            files=files,
+            files=self._collect_system_files(agent, workdir),
             agent_meta={"timeout_seconds": spec.timeout_seconds},
+            model=model,
         )
 
     async def run(
@@ -151,6 +157,21 @@ class OpenCodeBackend:
 
         assert proc.stdout is not None and proc.stderr is not None
 
+        # Top-level cleanup: if the executor aborts iteration early
+        # (fatal LogEvent detected, run cancelled, etc.) Python sends
+        # GeneratorExit through ``aclose``. Without this finally the
+        # subprocess would keep running. Inner exit paths set this flag
+        # so cleanup is idempotent.
+        _cleaned_up = False
+
+        def _kill_proc() -> None:
+            nonlocal _cleaned_up
+            if _cleaned_up:
+                return
+            _cleaned_up = True
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+
         if stdin_data is not None and proc.stdin is not None:
             try:
                 proc.stdin.write(stdin_data)
@@ -161,6 +182,60 @@ class OpenCodeBackend:
                 proc.stdin.close()
 
         stderr_lines: list[str] = []
+        stderr_queue: asyncio.Queue[str] = asyncio.Queue()
+
+        # opencode logs upstream API errors (429, AI_APICallError,
+        # maxRetriesExceeded, …) only to its own session log file under
+        # ``~/.local/share/opencode/log/`` — not to stdout/stderr. Tail
+        # that file and route ERROR lines through the same stderr queue
+        # so the executor's central fatal-pattern detector terminates
+        # the run instead of waiting for the per-run timeout.
+        import time as _time
+
+        _proc_start = _time.time()
+        _opencode_log_dir = Path(
+            os.environ.get(
+                "OPENCODE_LOG_DIR",
+                os.path.expanduser("~/.local/share/opencode/log"),
+            )
+        )
+
+        async def _tail_opencode_log() -> None:
+            # Wait briefly for the log file to appear (opencode creates
+            # it within the first few hundred ms of startup).
+            log_path: Path | None = None
+            for _ in range(50):  # ~5s window
+                if _opencode_log_dir.is_dir():
+                    candidates = sorted(
+                        (
+                            p
+                            for p in _opencode_log_dir.iterdir()
+                            if p.is_file() and p.stat().st_mtime >= _proc_start - 1
+                        ),
+                        key=lambda p: p.stat().st_mtime,
+                        reverse=True,
+                    )
+                    if candidates:
+                        log_path = candidates[0]
+                        break
+                await asyncio.sleep(0.1)
+            if log_path is None:
+                return
+            try:
+                with log_path.open("r", encoding="utf-8", errors="replace") as fh:
+                    while True:
+                        line = fh.readline()
+                        if not line:
+                            await asyncio.sleep(0.5)
+                            continue
+                        if line.startswith("ERROR"):
+                            await stderr_queue.put(
+                                f"opencode-log: {line.rstrip()}"
+                            )
+            except (OSError, asyncio.CancelledError):
+                return
+
+        log_tail_task = asyncio.create_task(_tail_opencode_log())
 
         async def _drain_stderr() -> None:
             assert proc.stderr is not None
@@ -168,18 +243,80 @@ class OpenCodeBackend:
                 line = await proc.stderr.readline()
                 if not line:
                     return
-                stderr_lines.append(line.decode(errors="replace").rstrip())
+                decoded = line.decode(errors="replace").rstrip()
+                stderr_lines.append(decoded)
+                if decoded:
+                    await stderr_queue.put(decoded)
 
         stderr_task = asyncio.create_task(_drain_stderr())
+
+        def _drain_stderr_queue() -> list[LogEvent]:
+            out: list[LogEvent] = []
+            while not stderr_queue.empty():
+                try:
+                    msg = stderr_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                out.append(
+                    LogEvent(run_id=run_id, level="warn", message=msg)
+                )
+            return out
 
         stdout_chunks: list[str] = []
         streamed_text_parts: list[str] = []
         rate_limit_error: str | None = None
 
+        # Persistent readline task so heartbeat timeouts don't drop bytes.
+        # ``asyncio.wait_for`` would cancel the in-flight readline on every
+        # heartbeat tick; racing against ``stderr_queue.get`` lets a log
+        # tail entry (e.g. opencode's silent 429 retry log) flush the
+        # queue immediately instead of after the 30s heartbeat tick.
+        read_task: asyncio.Task[bytes] | None = None
+        queue_task: asyncio.Task[str] | None = None
+        silent_since: float = _time.time()
+
         try:
             async with asyncio.timeout(timeout):
                 while True:
-                    line_bytes = await proc.stdout.readline()
+                    if read_task is None:
+                        read_task = asyncio.create_task(proc.stdout.readline())
+                    if queue_task is None:
+                        queue_task = asyncio.create_task(stderr_queue.get())
+                    elapsed = _time.time() - silent_since
+                    wait_for = max(1.0, _HEARTBEAT_INTERVAL_SECONDS - elapsed)
+                    done, _pending = await asyncio.wait(
+                        {read_task, queue_task},
+                        timeout=wait_for,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    if not done:
+                        for log_ev in _drain_stderr_queue():
+                            yield log_ev
+                        yield LogEvent(
+                            run_id=run_id,
+                            level="info",
+                            message=(
+                                f"opencode silent for {int(_HEARTBEAT_INTERVAL_SECONDS)}s "
+                                f"(pid={proc.pid}); waiting for next event"
+                            ),
+                        )
+                        silent_since = _time.time()
+                        continue
+                    if queue_task in done:
+                        msg = queue_task.result()
+                        queue_task = None
+                        yield LogEvent(run_id=run_id, level="warn", message=msg)
+                        for log_ev in _drain_stderr_queue():
+                            yield log_ev
+                        if read_task not in done:
+                            continue
+                    if read_task not in done:
+                        continue
+                    line_bytes = read_task.result()
+                    read_task = None
+                    silent_since = _time.time()
+                    for log_ev in _drain_stderr_queue():
+                        yield log_ev
                     if not line_bytes:
                         break
                     line = line_bytes.decode(errors="replace")
@@ -223,6 +360,15 @@ class OpenCodeBackend:
                 proc.kill()
             await proc.wait()
             stderr_task.cancel()
+            log_tail_task.cancel()
+            if read_task is not None:
+                read_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await read_task
+            if queue_task is not None:
+                queue_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await queue_task
             # Yield whatever events we captured before the timeout so the
             # conversation / transcript shows partial progress. Skip the
             # replay when streaming already surfaced them live.
@@ -256,9 +402,19 @@ class OpenCodeBackend:
                 proc.kill()
             await proc.wait()
             stderr_task.cancel()
+            log_tail_task.cancel()
+            if read_task is not None:
+                read_task.cancel()
+            if queue_task is not None:
+                queue_task.cancel()
             yield DoneEvent(run_id=run_id, ok=False, error=rate_limit_error)
             return
 
+        log_tail_task.cancel()
+        if queue_task is not None:
+            queue_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await queue_task
         with contextlib.suppress(asyncio.CancelledError):
             await stderr_task
 
