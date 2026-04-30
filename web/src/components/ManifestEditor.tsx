@@ -350,7 +350,6 @@ export default function ManifestEditor({ agent, bundleFiles = [], onSaved, onErr
             <option value="claude_code">claude_code</option>
             <option value="opencode">opencode</option>
             <option value="pydantic_ai">pydantic_ai</option>
-            <option value="token">token</option>
           </select>
         </div>
 

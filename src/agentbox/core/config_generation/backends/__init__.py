@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from .base import BackendConfigGenerator
 from .claude_code import ClaudeCodeConfigGenerator
 from .opencode import OpenCodeConfigGenerator
-from .token import TokenConfigGenerator
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 _GENERATORS: dict[str, BackendConfigGenerator] = {
     "opencode": OpenCodeConfigGenerator(),
     "claude_code": ClaudeCodeConfigGenerator(),
-    "token": TokenConfigGenerator(),
 }
 
 
@@ -37,7 +35,6 @@ __all__ = [
     "BackendConfigGenerator",
     "ClaudeCodeConfigGenerator",
     "OpenCodeConfigGenerator",
-    "TokenConfigGenerator",
     "get_generator",
     "list_generators",
 ]

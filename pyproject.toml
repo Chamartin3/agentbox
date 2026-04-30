@@ -33,6 +33,9 @@ claude_code = "agentbox.core.backends.claude_code:ClaudeCodeBackend"
 opencode = "agentbox.core.backends.opencode:OpenCodeBackend"
 pydantic_ai = "agentbox.core.backends.pydantic_ai:PydanticAiBackend"
 pydantic_ai_structured = "agentbox.core.backends.pydantic_ai_structured:PydanticAiStructuredBackend"
+# `token` was a redundant simpler variant of `pydantic_ai` — merged
+# back into the `pydantic_ai` backend (which now also supports the
+# direct ``pydantic_ai.Agent`` flow with ``deps_factory``).
 
 
 [project.entry-points."agentbox.conversations"]

@@ -24,7 +24,6 @@ class RunnerKind(StrEnum):
     CLAUDE_CODE = "claude_code"
     OPENCODE = "opencode"
     PYDANTIC_AI = "pydantic_ai"
-    TOKEN = "token"
     HTTP = "http"
     SUBPROCESS = "subprocess"
     ADAPTER = "adapter"

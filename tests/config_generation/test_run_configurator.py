@@ -154,22 +154,6 @@ class TestPrepareRunDirFresh:
         assert "name: test.agent" in content
         assert "System Instructions" in content
 
-    def test_creates_token_flat_prompt(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
-        agent = _make_agent()
-        cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
-        run_cfg = cfg.prepare_run_dir(
-            workdir=Path("/tmp/workspace"),
-            agent=agent,
-            backend="token",
-            composed=composed,
-        )
-        prompt_txt = run_cfg.backend_dir / "prompt.txt"
-        assert prompt_txt.exists()
-        content = prompt_txt.read_text()
-        assert "System Instructions" in content
-        assert "Task Input" in content
-
-
 # ---------------------------------------------------------------------------
 # Caching
 # ---------------------------------------------------------------------------
@@ -339,7 +323,7 @@ class TestSkillFilter:
 
 class TestGeneratorRegistry:
     def test_all_backends_registered(self) -> None:
-        assert set(list_generators()) == {"opencode", "claude_code", "token"}
+        assert set(list_generators()) == {"opencode", "claude_code"}
 
     def test_get_generator_returns_instance(self) -> None:
         from agentbox.core.config_generation.backends.opencode import OpenCodeConfigGenerator
