@@ -26,6 +26,7 @@ from agentbox.core.data.agent_versions import AgentVersionsMixin
 from agentbox.core.data.analytics import AnalyticsMixin
 from agentbox.core.data.prompts import PromptVersionsMixin
 from agentbox.core.data.records import RunRecord, now_iso, row_to_run
+from agentbox.core.data.shared_resources import SharedResourcesMixin
 from agentbox.core.data.schema import (
     guardrail_results,
     metadata,
@@ -580,7 +581,8 @@ class SessionStore(
     PromptVersionsMixin,
     AgentVersionsMixin,
     AgentSyncMixin,
+    SharedResourcesMixin,
     AnalyticsMixin,
     _CoreStore,
 ):
-    """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + sync."""
+    """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + shared resources + sync."""

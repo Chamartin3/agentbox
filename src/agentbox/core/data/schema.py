@@ -237,3 +237,27 @@ agent_sync = Table(
     Column("last_file_mtime", String),
     Column("last_sync_at", String),
 )
+
+shared_resources = Table(
+    "shared_resources",
+    metadata,
+    Column("id", String, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("kind", String, nullable=False),
+    Column("name", String, nullable=False),
+    Column("description", String, nullable=True),
+    Column("content", String, nullable=True),
+    Column("config_json", String, nullable=True),
+    Column("sha256", String, nullable=False),
+    Column("is_active", Integer, nullable=False, server_default="0"),
+    Column("author", String, nullable=True),
+    Column("changelog", String, nullable=True),
+    Column("tags", String, nullable=True),
+    Column("created_at", String, nullable=False),
+    # Composite primary key: stable id + monotonic version per resource
+    Index("pk_shared_resources", "id", "version", unique=True),
+    # Index for catalog browsing by kind and active status
+    Index("ix_shared_resources_kind_active", "kind", "is_active"),
+    # Index for fast active lookup by resource id
+    Index("ix_shared_resources_id_active", "id", "is_active"),
+)

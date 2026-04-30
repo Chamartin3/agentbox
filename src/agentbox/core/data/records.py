@@ -8,6 +8,25 @@ from datetime import UTC, datetime
 from sqlalchemy.engine import Row
 
 
+@dataclass(frozen=True)
+class SharedResourceRecord:
+    """Frozen record for a shared resource version."""
+
+    id: str
+    version: int
+    kind: str
+    name: str
+    sha256: str
+    created_at: str
+    description: str | None = None
+    content: str | None = None
+    config_json: str | None = None
+    is_active: bool = False
+    author: str | None = None
+    changelog: str | None = None
+    tags: tuple[str, ...] = ()
+
+
 @dataclass
 class RunRecord:
     id: str

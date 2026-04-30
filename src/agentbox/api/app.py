@@ -24,6 +24,7 @@ from agentbox.api.routes import (
     manifest,
     mcp,
     prompts,
+    resources,
     runs,
     usage,
     versions,
@@ -144,6 +145,7 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(manifest.router)
     app.include_router(prompts.router)
+    app.include_router(resources.router)
     app.include_router(activity.router)
     app.include_router(mcp.router)
     app.include_router(health.router)
