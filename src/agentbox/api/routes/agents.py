@@ -6,7 +6,7 @@ import json
 import logging
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core import workspaces as ws
@@ -189,4 +189,118 @@ def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
         "agent_id": agent_id,
         "workspace": body.workspace,
         "note": "Edit agentbox.toml manually to persist workspace changes",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle — publish, branch draft, rollback
+# ---------------------------------------------------------------------------
+
+
+class PublishRequest(BaseModel):
+    reason: str = Field(..., min_length=3)
+
+
+@router.post("/{agent_id}/versions/{version}/publish")
+def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
+    """Publish a draft version (flip is_draft, set as active).
+
+    Returns:
+        {active_version, version_id, is_draft, version, author, changelog}.
+    """
+    store = get_store()
+    loader = get_loader()
+    try:
+        result = store.publish_version(agent_id, version, body.reason)
+    except ValueError as exc:
+        error_msg = str(exc)
+        if "not found" in error_msg:
+            raise HTTPException(404, error_msg) from exc
+        # reason too short (should be caught by pydantic, but defensive)
+        raise HTTPException(422, error_msg) from exc
+
+    # Schedule webhook if agent has a webhook_url configured
+    agent = store.get_agent_def(agent_id) or loader.get(agent_id)
+    if agent and agent.webhook_url:
+        from agentbox.api.webhooks import schedule_agent_event_webhook
+
+        try:
+            schedule_agent_event_webhook(
+                webhook_url=agent.webhook_url,
+                event="agent.published",
+                agent_id=agent_id,
+                version=version,
+                version_id=result.get("id"),
+                reason=body.reason,
+            )
+        except Exception:  # pragma: no cover
+            logger.exception(
+                "failed to schedule agent.published webhook for %s", agent_id
+            )
+
+    return {
+        "active_version": version,
+        "version_id": result.get("id"),
+        "is_draft": result.get("is_draft", False),
+        "version": result.get("version"),
+        "author": result.get("author"),
+        "changelog": result.get("changelog"),
+    }
+
+
+class DraftRequest(BaseModel):
+    author: str = Field(..., min_length=1)
+
+
+@router.post("/{agent_id}/draft", status_code=201)
+def branch_draft(agent_id: str, body: DraftRequest) -> dict:
+    """Create a new draft version by cloning the active version.
+
+    Returns:
+        {version, version_id, is_draft, author, changelog}.
+    """
+    store = get_store()
+    try:
+        result = store.branch_draft(agent_id, author=body.author)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+    return {
+        "version": result.get("version"),
+        "version_id": result.get("id"),
+        "is_draft": result.get("is_draft", True),
+        "author": result.get("author"),
+        "changelog": result.get("changelog"),
+    }
+
+
+class RollbackRequest(BaseModel):
+    reason: str = Field(..., min_length=3)
+    author: str = Field(..., min_length=1)
+
+
+@router.post("/{agent_id}/versions/{version}/rollback", status_code=201)
+def rollback_version(agent_id: str, version: int, body: RollbackRequest) -> dict:
+    """Create a new version rolling back to target_version's config (becomes active).
+
+    Returns:
+        {version, version_id, is_draft, active_version, author, changelog}.
+    """
+    store = get_store()
+    try:
+        result = store.rollback_to(agent_id, version, body.reason, author=body.author)
+    except ValueError as exc:
+        error_msg = str(exc)
+        if "not found" in error_msg:
+            raise HTTPException(404, error_msg) from exc
+        # reason too short (should be caught by pydantic, but defensive)
+        raise HTTPException(422, error_msg) from exc
+
+    return {
+        "version": result.get("version"),
+        "version_id": result.get("id"),
+        "is_draft": result.get("is_draft", False),
+        "active_version": result.get("version"),
+        "author": result.get("author"),
+        "changelog": result.get("changelog"),
     }

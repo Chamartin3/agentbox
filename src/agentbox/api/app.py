@@ -20,6 +20,7 @@ from starlette.requests import Request
 from agentbox.api.routes import (
     activity,
     agents,
+    agents_create,
     health,
     manifest,
     mcp,
@@ -141,6 +142,7 @@ def create_app() -> FastAPI:
     # API routers first.
     app.include_router(runs.router)
     app.include_router(agents.router)
+    app.include_router(agents_create.router)
     app.include_router(usage.router)
     app.include_router(workspaces.router)
     app.include_router(manifest.router)

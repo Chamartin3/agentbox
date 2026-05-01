@@ -174,28 +174,5 @@ def create_agent_version(agent_id: str, body: NewVersionBody) -> dict:
     )
 
 
-class RollbackBody(BaseModel):
-    author: str = "api"
-
-
-@router.post("/{version}/rollback")
-def rollback_agent_version(agent_id: str, version: int, body: RollbackBody) -> dict:
-    """Restore content to a previous version (creates a new version on top)."""
-    loader = get_loader()
-    agent = loader.get(agent_id)
-    if agent is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
-    store = get_store()
-    target = store.get_version(agent_id, version)
-    if target is None:
-        raise HTTPException(404, f"version {version} not found")
-    return store.create_version(
-        agent_id=agent_id,
-        source_path=target["source_path"],
-        source_format=target["source_format"],
-        content_snapshot=target["content_snapshot"],
-        prompt_snapshot=target["prompt_snapshot"],
-        content_hash=target["content_hash"],
-        author=body.author,
-        changelog=f"Rollback to version {version}",
-    )
+# Rollback is handled by the canonical endpoint in agents.py
+# (POST /api/agents/{agent_id}/versions/{version}/rollback with {reason, author}).

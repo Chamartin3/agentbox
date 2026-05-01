@@ -39,6 +39,325 @@ class AgentVersionsMixin:
     engine: Engine
 
     # ------------------------------------------------------------------
+    # Agent lifecycle
+    # ------------------------------------------------------------------
+
+    def create_agent(
+        self,
+        agent_id: str,
+        config_json: dict,
+        *,
+        prompt_content: str | None = None,
+        author: str,
+        changelog: str,
+        source: str = "ui",
+        source_path: str | None = None,
+        source_format: str | None = None,
+        sync_mode: str = "off",
+        export_to_disk: bool = False,
+    ) -> dict:
+        """Create a new agent with its v1 draft and agent_meta row.
+
+        Args:
+            agent_id: Unique agent identifier.
+            config_json: Agent configuration dict.
+            prompt_content: Optional system prompt text.
+            author: Author name.
+            changelog: Version changelog.
+            source: Source type ("ui", "manifest", or "import").
+            source_path: Optional path to source file.
+            source_format: Optional source format.
+            sync_mode: File sync mode ("off", "watch", "manual").
+            export_to_disk: Whether to export to disk.
+
+        Returns:
+            AgentVersionRecord (dict) for the new v1 draft.
+
+        Raises:
+            ValueError: if agent_id already has versions.
+        """
+        existing = self.latest_version(agent_id)
+        if existing is not None:
+            raise ValueError(f"Agent {agent_id!r} already exists")
+
+        content_hash = hashlib.sha256(
+            json.dumps(config_json, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        config_str = json.dumps(config_json, sort_keys=True)
+
+        with self.engine.begin() as conn:
+            # Insert v1 draft
+            result = conn.execute(
+                agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version=1,
+                    source_path=source_path or "",
+                    source_format=source_format or "",
+                    content_snapshot="",
+                    prompt_snapshot="",
+                    content_hash=content_hash,
+                    author=author,
+                    changelog=changelog,
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    config_json=config_str,
+                    prompt_content=prompt_content,
+                    source=source,
+                    is_draft=1,
+                )
+            )
+            version_id = int(result.inserted_primary_key[0])
+
+            # Insert or update agent_meta
+            existing_meta = conn.execute(
+                agent_meta.select().where(agent_meta.c.agent_id == agent_id)
+            ).first()
+            now = now_iso()
+            if existing_meta:
+                conn.execute(
+                    agent_meta.update()
+                    .where(agent_meta.c.agent_id == agent_id)
+                    .values(
+                        sync_mode=sync_mode,
+                        export_to_disk=int(export_to_disk),
+                        source_path=source_path,
+                        source_format=source_format,
+                        updated_at=now,
+                    )
+                )
+            else:
+                conn.execute(
+                    agent_meta.insert().values(
+                        agent_id=agent_id,
+                        sync_mode=sync_mode,
+                        export_to_disk=int(export_to_disk),
+                        source_path=source_path,
+                        source_format=source_format,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+
+        return self.get_version_by_id(version_id) or {}
+
+    def publish_version(
+        self, agent_id: str, version: int, reason: str
+    ) -> dict:
+        """Flip is_draft flag and set as active version.
+
+        Args:
+            agent_id: Agent identifier.
+            version: Version number to publish.
+            reason: Reason for publishing (≥ 3 chars).
+
+        Returns:
+            Updated AgentVersionRecord (dict).
+
+        Raises:
+            ValueError: if reason is empty or < 3 chars, or version not found.
+        """
+        if not reason or len(reason) < 3:
+            raise ValueError("reason must be at least 3 characters")
+
+        # Fetch the version
+        row = self._get_version_row(agent_id, version)
+        if row is None:
+            raise ValueError(f"version {version} not found for agent {agent_id}")
+
+        version_id = row["id"]
+        old_changelog = row.get("changelog") or ""
+        new_changelog = (
+            f"{old_changelog}\n\npublish: {reason}"
+            if old_changelog
+            else reason
+        )
+
+        with self.engine.begin() as conn:
+            # Update version: flip is_draft and append changelog
+            conn.execute(
+                agent_versions.update()
+                .where(agent_versions.c.id == version_id)
+                .values(is_draft=0, changelog=new_changelog)
+            )
+            # Upsert active pointer
+            conn.execute(
+                active_agent_versions.delete().where(
+                    active_agent_versions.c.agent_id == agent_id
+                )
+            )
+            conn.execute(
+                active_agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version_id=version_id,
+                    activated_at=now_iso(),
+                )
+            )
+
+        return self.get_version(agent_id, version) or {}
+
+    def branch_draft(self, agent_id: str, *, author: str) -> dict:
+        """Clone the active version into a new draft.
+
+        Args:
+            agent_id: Agent identifier.
+            author: Author name for the new draft.
+
+        Returns:
+            New draft AgentVersionRecord (dict).
+
+        Raises:
+            ValueError: if no active version exists.
+        """
+        active = self.get_active_version(agent_id)
+        if active is None:
+            raise ValueError(f"No active version for agent {agent_id}")
+
+        next_v = self._next_version(agent_id)
+        active_vid = active["id"]
+
+        with self.engine.begin() as conn:
+            # Insert new draft version
+            result = conn.execute(
+                agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version=next_v,
+                    source_path=active.get("source_path") or "",
+                    source_format=active.get("source_format") or "",
+                    content_snapshot=active.get("content_snapshot") or "",
+                    prompt_snapshot=active.get("prompt_snapshot") or "",
+                    content_hash=active.get("content_hash") or "",
+                    author=author,
+                    changelog=f"branched from v{active['version']}",
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    config_json=active.get("config_json"),
+                    prompt_content=active.get("prompt_content"),
+                    source=active.get("source", "ui"),
+                    is_draft=1,
+                )
+            )
+            new_vid = int(result.inserted_primary_key[0])
+
+            # Copy files
+            files = conn.execute(
+                agent_version_files.select().where(
+                    agent_version_files.c.version_id == active_vid
+                )
+            ).fetchall()
+            if files:
+                conn.execute(
+                    agent_version_files.insert(),
+                    [
+                        {
+                            "version_id": new_vid,
+                            "relative_path": f._mapping["relative_path"],
+                            "kind": f._mapping["kind"],
+                            "content": f._mapping["content"],
+                            "sha256": f._mapping["sha256"],
+                            "source_uri": f._mapping.get("source_uri"),
+                            "position": f._mapping.get("position", 0),
+                            "created_at": now_iso(),
+                        }
+                        for f in files
+                    ],
+                )
+
+        return self.get_version_by_id(new_vid) or {}
+
+    def rollback_to(
+        self, agent_id: str, target_version: int, reason: str, *, author: str
+    ) -> dict:
+        """Create a new version rolling back to target_version's config.
+
+        Args:
+            agent_id: Agent identifier.
+            target_version: Version number to roll back to.
+            reason: Reason for rollback (≥ 3 chars).
+            author: Author name for the new version.
+
+        Returns:
+            New (non-draft) AgentVersionRecord and sets as active.
+
+        Raises:
+            ValueError: if reason < 3 chars or target_version not found.
+        """
+        if not reason or len(reason) < 3:
+            raise ValueError("reason must be at least 3 characters")
+
+        # Fetch target version
+        target_row = self._get_version_row(agent_id, target_version)
+        if target_row is None:
+            raise ValueError(
+                f"target_version {target_version} not found for agent {agent_id}"
+            )
+
+        next_v = self._next_version(agent_id)
+        target_vid = target_row["id"]
+
+        with self.engine.begin() as conn:
+            # Create new version with target's config
+            result = conn.execute(
+                agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version=next_v,
+                    source_path=target_row.get("source_path") or "",
+                    source_format=target_row.get("source_format") or "",
+                    content_snapshot=target_row.get("content_snapshot") or "",
+                    prompt_snapshot=target_row.get("prompt_snapshot") or "",
+                    content_hash=target_row.get("content_hash") or "",
+                    author=author,
+                    changelog=f"rollback to v{target_version}: {reason}",
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    config_json=target_row.get("config_json"),
+                    prompt_content=target_row.get("prompt_content"),
+                    source=target_row.get("source", "ui"),
+                    is_draft=0,  # Rollbacks are immediately active
+                )
+            )
+            new_vid = int(result.inserted_primary_key[0])
+
+            # Copy files from target
+            files = conn.execute(
+                agent_version_files.select().where(
+                    agent_version_files.c.version_id == target_vid
+                )
+            ).fetchall()
+            if files:
+                conn.execute(
+                    agent_version_files.insert(),
+                    [
+                        {
+                            "version_id": new_vid,
+                            "relative_path": f._mapping["relative_path"],
+                            "kind": f._mapping["kind"],
+                            "content": f._mapping["content"],
+                            "sha256": f._mapping["sha256"],
+                            "source_uri": f._mapping.get("source_uri"),
+                            "position": f._mapping.get("position", 0),
+                            "created_at": now_iso(),
+                        }
+                        for f in files
+                    ],
+                )
+
+            # Set as active
+            conn.execute(
+                active_agent_versions.delete().where(
+                    active_agent_versions.c.agent_id == agent_id
+                )
+            )
+            conn.execute(
+                active_agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version_id=new_vid,
+                    activated_at=now_iso(),
+                )
+            )
+
+        return self.get_version_by_id(new_vid) or {}
+
+    # ------------------------------------------------------------------
     # Versions
     # ------------------------------------------------------------------
 
@@ -138,6 +457,15 @@ class AgentVersionsMixin:
                 )
             )
 
+    def delete_version_file(self, file_id: int) -> None:
+        """Delete a single version file by ID."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_version_files.delete().where(
+                    agent_version_files.c.id == file_id
+                )
+            )
+
     def latest_version(self, agent_id: str) -> dict | None:
         with self.engine.connect() as conn:
             row = conn.execute(
@@ -225,6 +553,54 @@ class AgentVersionsMixin:
             )
         return self.get_agent_meta(agent_id) or {}
 
+    def update_agent_meta(
+        self,
+        agent_id: str,
+        sync_mode: str | None = None,
+        export_to_disk: bool | None = None,
+        source_path: str | None = None,
+        source_format: str | None = None,
+    ) -> dict | None:
+        """Update agent_meta fields. Only supplied fields are changed.
+
+        Args:
+            agent_id: Agent identifier.
+            sync_mode: New sync_mode value (None = no change).
+            export_to_disk: New export_to_disk value (None = no change).
+            source_path: New source_path value (None = no change).
+            source_format: New source_format value (None = no change).
+
+        Returns:
+            Updated agent_meta dict, or None if agent_meta doesn't exist.
+        """
+        existing = self.get_agent_meta(agent_id)
+        if existing is None:
+            return None
+        now = now_iso()
+        values = {"updated_at": now}
+        if sync_mode is not None:
+            values["sync_mode"] = sync_mode
+        if export_to_disk is not None:
+            values["export_to_disk"] = int(export_to_disk)
+        if source_path is not None:
+            values["source_path"] = source_path
+        if source_format is not None:
+            values["source_format"] = source_format
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_meta.update()
+                .where(agent_meta.c.agent_id == agent_id)
+                .values(**values)
+            )
+        return self.get_agent_meta(agent_id)
+
+    def get_version_by_id(self, version_id: int) -> dict | None:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                agent_versions.select().where(agent_versions.c.id == version_id)
+            ).first()
+            return self._row_dict(row) if row else None
+
     def get_version(self, agent_id: str, version: int) -> dict | None:
         with self.engine.connect() as conn:
             row = conn.execute(
@@ -234,6 +610,23 @@ class AgentVersionsMixin:
                 )
             ).first()
             return self._row_dict(row) if row else None
+
+    def replace_version_config(self, version_id: int, config_json: str) -> None:
+        """Replace the config_json for a version in-place.
+
+        Used by migrate-to-db-only to populate config_json on versions that
+        predate DB-as-source-of-truth.
+
+        Args:
+            version_id: Version ID to update.
+            config_json: New config_json content (JSON string).
+        """
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_versions.update()
+                .where(agent_versions.c.id == version_id)
+                .values(config_json=config_json)
+            )
 
     def get_agent_def(self, agent_id: str):  # -> AgentDef | None
         """Reconstruct an ``AgentDef`` from the latest version's snapshot.
@@ -251,23 +644,14 @@ class AgentVersionsMixin:
         latest = self.latest_version(agent_id)
         if latest is None:
             return None
-        snap = latest.get("content_snapshot")
-        if not snap:
-            return None
         try:
-            data = json.loads(snap)
-        except json.JSONDecodeError:
-            logger.warning(
-                "agent_versions: snapshot for %r v%s is not valid JSON",
-                agent_id,
-                latest.get("version"),
-            )
+            return AgentDef.from_db_row(latest)
+        except ValueError:
+            # No config_json or content_snapshot — incomplete row.
             return None
-        try:
-            return AgentDef.model_validate(data)
         except Exception as exc:
             logger.warning(
-                "agent_versions: snapshot for %r v%s failed validation: %s",
+                "agent_versions: row for %r v%s failed validation: %s",
                 agent_id,
                 latest.get("version"),
                 exc,
@@ -396,6 +780,17 @@ class AgentVersionsMixin:
                 )
             ).first()
             return int(row[0]) + 1 if row else 1
+
+    def _get_version_row(self, agent_id: str, version: int) -> dict | None:
+        """Low-level: fetch raw version row as dict."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                agent_versions.select().where(
+                    agent_versions.c.agent_id == agent_id,
+                    agent_versions.c.version == version,
+                )
+            ).first()
+            return self._row_dict(row) if row else None
 
     @staticmethod
     def _row_dict(row: Any) -> dict:

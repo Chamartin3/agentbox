@@ -213,9 +213,9 @@ class TestRollback:
         )
         resp = client.post(
             f"/api/agents/test-agent/versions/{v1['version']}/rollback",
-            json={"author": "admin"},
+            json={"author": "admin", "reason": "restore previous content"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         assert resp.json()["version"] == v1["version"] + 2
 
     def test_rollback_missing_version(self, isolated_data_dir) -> None:
@@ -223,6 +223,6 @@ class TestRollback:
         client, _ = _app(isolated_data_dir)
         resp = client.post(
             "/api/agents/test-agent/versions/9999/rollback",
-            json={"author": "admin"},
+            json={"author": "admin", "reason": "restore previous content"},
         )
         assert resp.status_code == 404

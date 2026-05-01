@@ -151,9 +151,11 @@ def _apply_delivery_outcome(
     """Update a run's status based on webhook delivery outcome.
 
     Shared by the background done-callback and the synchronous
-    ``resend_webhook`` path so both follow the same rules. Treats
-    ``incomplete`` as a legacy synonym of ``failed`` for backwards
-    compatibility with rows written before the status taxonomy split.
+    ``resend_webhook`` path so both follow the same rules. Promotes
+    ``failed`` rows back to ``ok`` on a successful resend (the only
+    reason such a row exists is a prior delivery failure). ``incomplete``
+    rows are orphan-reaped: the agent never finished, so a webhook
+    delivery cannot make them ``ok``.
     """
     try:
         current = store.get_run(run_id)
@@ -163,7 +165,7 @@ def _apply_delivery_outcome(
     if current is None:
         return
     if delivered:
-        if current.status in (RunStatus.FAILED, RunStatus.INCOMPLETE):
+        if current.status == RunStatus.FAILED:
             try:
                 store.set_run_status(run_id, RunStatus.OK)
             except Exception:
@@ -187,8 +189,9 @@ def schedule_webhook(
 
     Safe to call from a sync code path — it grabs the running loop and
     queues a task. Silently skips when there's no URL or no event loop.
-    On delivery failure the run is flipped to ``incomplete`` so an
-    operator can resend.
+    On delivery failure the run is flipped to ``failed`` so an
+    operator can resend; the agent itself ran fine, but the pipeline
+    didn't complete end-to-end.
     """
     url = _resolve_webhook_url(agent)
     if not url:
@@ -208,7 +211,9 @@ def schedule_webhook(
     payload = _build_payload(run, store)
     run_id = run.id
     task = loop.create_task(
-        _deliver_with_events(url, payload, run_id, broadcaster, transcript_path)
+        _deliver_with_events(
+            url, payload, run_id, broadcaster, transcript_path, store=store
+        )
     )
     task.add_done_callback(lambda t: _on_delivery_done(t, run_id, store))
 
@@ -352,3 +357,66 @@ async def resend_webhook(
     delivered = await deliver_webhook(url, payload)
     _apply_delivery_outcome(store, run.id, delivered)
     return delivered, None if delivered else "delivery failed; see server logs"
+
+
+def schedule_agent_event_webhook(
+    *,
+    webhook_url: str,
+    event: str,
+    agent_id: str,
+    version: int,
+    version_id: int,
+    reason: str,
+) -> None:
+    """Best-effort: schedule an agent event webhook.
+
+    Spawns a background task to POST a JSON envelope to the webhook URL.
+    Silently skips when there's no event loop (safe for sync code paths).
+
+    Args:
+        webhook_url: URL to POST the event to.
+        event: Event type (e.g. "agent.published").
+        agent_id: Agent identifier.
+        version: Version number.
+        version_id: Version ID in the DB.
+        reason: Reason/changelog for the event.
+    """
+    payload = {
+        "event": event,
+        "agent_id": agent_id,
+        "version": version,
+        "version_id": version_id,
+        "reason": reason,
+        "published_at": datetime.now().isoformat(),
+    }
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        logger.warning(
+            "no running event loop; cannot deliver agent event webhook for %s v%s",
+            agent_id,
+            version,
+        )
+        return
+    task = loop.create_task(deliver_webhook(webhook_url, payload))
+
+    def log_outcome(t: asyncio.Task[bool]) -> None:
+        if t.cancelled():
+            return
+        try:
+            delivered = t.result()
+            level = "info" if delivered else "error"
+            msg = f"agent.published webhook {'delivered' if delivered else 'failed'}"
+        except Exception:  # pragma: no cover
+            delivered = False
+            level = "error"
+            msg = "agent.published webhook delivery error"
+        logger.log(
+            getattr(logging, level.upper()),
+            "%s for %s v%s",
+            msg,
+            agent_id,
+            version,
+        )
+
+    task.add_done_callback(log_outcome)
