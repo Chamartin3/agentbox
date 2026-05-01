@@ -7,17 +7,44 @@ holds metadata, the body is the system prompt.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import frontmatter
 from frontmatter.default_handlers import YAMLHandler
 
 from agentbox.core.constants import RunnerKind
-from agentbox.core.data.manifest import AgentDef, AgentSource, RunnerSpec
+from agentbox.core.data.manifest import (
+    AgentDef,
+    AgentSource,
+    CompositionConfig,
+    RunnerSpec,
+    SharedRef,
+)
 
 
 def _fm_field(metadata: dict, key: str, default=None):
     """Read a key from metadata, supporting both top-level and runner nested."""
     return metadata.get(key, default)
+
+
+def _serialize_composition_ref_yaml(value: Any) -> str | dict:
+    """Serialize a composition ref value for YAML frontmatter.
+
+    Converts SharedRef instances to plain dicts for YAML serialization.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, SharedRef):
+        d: dict = {"shared": value.shared}
+        if value.version is not None:
+            d["version"] = value.version
+        return d
+    if isinstance(value, dict) and "shared" in value:
+        d = {"shared": value["shared"]}
+        if "version" in value and value["version"] is not None:
+            d["version"] = value["version"]
+        return d
+    return value
 
 
 def load_markdown_agent(path: Path) -> AgentDef:
@@ -63,6 +90,13 @@ def load_markdown_agent(path: Path) -> AgentDef:
     tags = meta.pop("tags", None) or []
     unsupported_backends = meta.pop("unsupported_backends", None) or []
 
+    # Composition (optional, takes precedence over prompt)
+    composition = None
+    if "composition" in meta:
+        comp_data = meta.pop("composition")
+        if isinstance(comp_data, dict):
+            composition = CompositionConfig.model_validate(comp_data)
+
     body = (post.content or "").strip()
     if meta.get("prompt"):
         body = meta.pop("prompt")
@@ -75,6 +109,7 @@ def load_markdown_agent(path: Path) -> AgentDef:
         id=str(agent_id),
         description=str(meta.pop("description", "")),
         prompt=body or None,
+        composition=composition,
         workspace=meta.pop("workspace", None),
         session_mode=meta.pop("session_mode", "headless"),
         claude_agent=bool(meta.pop("claude_agent", True)),
@@ -162,6 +197,33 @@ def write_markdown_agent(
     if runner_meta:
         metadata["runner"] = runner_meta
 
+    # Composition in frontmatter
+    if agent.composition:
+        comp = agent.composition
+        comp_meta: dict = {}
+        comp_meta["system"] = _serialize_composition_ref_yaml(comp.system)
+        if comp.references:
+            comp_meta["references"] = [
+                _serialize_composition_ref_yaml(ref) for ref in comp.references
+            ]
+        if comp.user_template:
+            comp_meta["user_template"] = _serialize_composition_ref_yaml(
+                comp.user_template
+            )
+        if comp.input_schema:
+            comp_meta["input_schema"] = _serialize_composition_ref_yaml(
+                comp.input_schema
+            )
+        if comp.output_schema:
+            comp_meta["output_schema"] = _serialize_composition_ref_yaml(
+                comp.output_schema
+            )
+        if comp.transport != "system_message":
+            comp_meta["transport"] = comp.transport
+        if comp.output_validation != "strict":
+            comp_meta["output_validation"] = comp.output_validation
+        metadata["composition"] = comp_meta
+
     body = agent.prompt or ""
     if existing_metadata and preserve_unknown_keys:
         body = body or ""
@@ -192,4 +254,5 @@ def _known_frontmatter_keys() -> set[str]:
         "runner",
         "prompt",
         "prompt_path",
+        "composition",
     }

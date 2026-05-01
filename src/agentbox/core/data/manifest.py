@@ -12,7 +12,7 @@ import warnings
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from agentbox.core.constants import RunnerKind, SessionMode
 
@@ -123,13 +123,12 @@ class RunnerSpec(BaseModel):
     a minimal agent is auto-generated from the markdown.
     """
 
-    # --- token runner ---
+    # --- pydantic_ai direct-Agent dependencies ---
 
     deps_factory: str | None = None
-    """Dotted import path ``module.path:callable`` for the ``token`` runner.
-
-    Resolved at run time to construct per-call dependencies passed to the
-    underlying token-generating callable."""
+    """Dotted import path ``module.path:callable`` that constructs the
+    ``deps`` object passed to a ``pydantic_ai.Agent.run_sync(deps=...)``
+    call. Resolved at run time."""
 
     # --- Output validation & retry ---
 
@@ -155,6 +154,22 @@ class GuardrailRef(BaseModel):
 
     name: str
     options: dict = Field(default_factory=dict)
+
+
+class SharedRef(BaseModel):
+    """Reference to a shared resource (versioned, stored in DB).
+
+    When used in composition references, system prompt, or schemas, the
+    shared resource is resolved at run time via SessionStore.
+    """
+
+    shared: str
+    """Resource id, e.g. 'schema/job-eval-v3', 'guideline/resume-rules'."""
+
+    version: int | None = None
+    """Optional specific version; None = use active version."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class WorkspaceFile(BaseModel):
@@ -217,25 +232,28 @@ class CompositionConfig(BaseModel):
 
     When present, agentbox owns prompt rendering via
     ``agentbox.core.composition.compose()``.
+
+    Supports both filesystem paths and shared resource references:
+    - File paths: ``"prompts/system.md"`` or ``"shared://root/path.md"``
+    - Shared refs: ``{"shared": "resource-id", "version": 2}`` (version optional)
     """
 
-    system: str = "prompts/system.md"
-    """Bundle-relative path to the system prompt markdown."""
+    system: str | SharedRef = "prompts/system.md"
+    """System prompt: bundle-relative path, shared:// path, or SharedRef."""
 
-    references: list[str | dict] = Field(default_factory=list)
-    """Paths to reference files. Each entry is either a string path or a dict
-    with ``path`` and optional ``heading``. ``shared://<root>/...`` paths
-    are resolved via ``ProjectManifest.shared_assets``."""
+    references: list[str | dict | SharedRef] = Field(default_factory=list)
+    """Reference files. Each entry can be a path string, a dict with ``path``
+    and optional ``heading``, or a SharedRef."""
 
-    user_template: str | None = None
-    """Bundle-relative path to a user-message template. When unset,
+    user_template: str | SharedRef | None = None
+    """User template: path string or SharedRef. When unset,
     ``variables["user_message"]`` is used verbatim."""
 
-    input_schema: str | None = None
-    """Bundle-relative path to a JSON Schema file for input validation."""
+    input_schema: str | SharedRef | None = None
+    """Input schema: path string or SharedRef."""
 
-    output_schema: str | None = None
-    """Bundle-relative path to a JSON Schema file for output validation."""
+    output_schema: str | SharedRef | None = None
+    """Output schema: path string or SharedRef."""
 
     transport: str = "system_message"
     """How the composed system prompt is delivered to the runner.

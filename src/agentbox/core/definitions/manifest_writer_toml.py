@@ -8,11 +8,87 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import tomlkit
 from tomlkit.items import Table
 
-from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.data.manifest import AgentDef, RunnerSpec, SharedRef
+
+
+def _serialize_composition_ref(value: Any) -> str | dict | Table:
+    """Serialize a single composition value (str or SharedRef/dict) for TOML output.
+
+    Parameters
+    ----------
+    value:
+        A string (file path), a SharedRef instance, or a dict with ``shared`` key.
+
+    Returns
+    -------
+    str | dict | Table:
+        - Plain string → returned as-is.
+        - SharedRef instance or dict with ``shared`` → tomlkit inline table.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, SharedRef):
+        t = tomlkit.inline_table()
+        t["shared"] = value.shared
+        if value.version is not None:
+            t["version"] = value.version
+        return t
+    if isinstance(value, dict) and "shared" in value:
+        t = tomlkit.inline_table()
+        t["shared"] = value["shared"]
+        if "version" in value and value["version"] is not None:
+            t["version"] = value["version"]
+        return t
+    return value
+
+
+def _build_composition_table(agent: AgentDef) -> Table | None:
+    """Build a [composition] table for an agent if composition is set.
+
+    Returns None if agent has no composition.
+    """
+    comp = agent.composition
+    if not comp:
+        return None
+
+    ct: Table = tomlkit.table()
+
+    # system prompt
+    ct["system"] = _serialize_composition_ref(comp.system)
+
+    # references (list of paths or shared refs)
+    if comp.references:
+        refs_arr = tomlkit.array()
+        for ref in comp.references:
+            refs_arr.append(_serialize_composition_ref(ref))
+        ct["references"] = refs_arr
+
+    # user_template
+    if comp.user_template:
+        ct["user_template"] = _serialize_composition_ref(comp.user_template)
+
+    # input_schema
+    if comp.input_schema:
+        ct["input_schema"] = _serialize_composition_ref(comp.input_schema)
+
+    # output_schema
+    if comp.output_schema:
+        ct["output_schema"] = _serialize_composition_ref(comp.output_schema)
+
+    # transport (non-default)
+    if comp.transport != "system_message":
+        ct["transport"] = comp.transport
+
+    # output_validation (non-default)
+    if comp.output_validation != "strict":
+        ct["output_validation"] = comp.output_validation
+
+    return ct
 
 
 def _build_runner_table(r: RunnerSpec) -> Table:
@@ -69,7 +145,12 @@ def write_standalone_toml(path: Path, agent: AgentDef) -> None:
         arr = tomlkit.array()
         arr.extend(agent.unsupported_backends)
         doc["unsupported_backends"] = arr
-    if agent.prompt:
+
+    # Composition takes precedence over prompt/prompt_path
+    comp_table = _build_composition_table(agent)
+    if comp_table:
+        doc["composition"] = comp_table
+    elif agent.prompt:
         doc["prompt"] = agent.prompt
     elif agent.prompt_path:
         doc["prompt_path"] = agent.prompt_path
@@ -82,7 +163,10 @@ def write_standalone_toml(path: Path, agent: AgentDef) -> None:
 
 
 def write_legacy_dir(agent_dir: Path, agent: AgentDef) -> None:
-    """Write the legacy agent.toml + prompts/system.md format."""
+    """Write the legacy agent.toml + prompts/system.md format.
+
+    When composition is set, it takes precedence over prompt_path/prompt.
+    """
     agent_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = agent_dir / "agent.toml"
     doc = tomlkit.document()
@@ -104,7 +188,12 @@ def write_legacy_dir(agent_dir: Path, agent: AgentDef) -> None:
     if agent.webhook_url:
         doc["webhook_url"] = agent.webhook_url
 
-    doc["prompt_path"] = "prompts/system.md"
+    # Composition takes precedence
+    comp_table = _build_composition_table(agent)
+    if comp_table:
+        doc["composition"] = comp_table
+    else:
+        doc["prompt_path"] = "prompts/system.md"
 
     rt = _build_runner_table(agent.runner)
     if rt:
@@ -112,7 +201,8 @@ def write_legacy_dir(agent_dir: Path, agent: AgentDef) -> None:
 
     _atomic_write(manifest_path, tomlkit.dumps(doc))
 
-    if agent.prompt:
+    if agent.prompt and not agent.composition:
+        # Only write prompt file if no composition is set
         prompts_dir = agent_dir / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
         _atomic_write(prompts_dir / "system.md", agent.prompt)

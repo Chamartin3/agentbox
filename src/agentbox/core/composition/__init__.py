@@ -3,6 +3,9 @@
 This module is intentionally HTTP-free and side-effect-free so that caller
 projects (e.g. cvman) can import it without pulling in the agentbox server
 runtime.
+
+Shared resource references are supported via an optional store parameter:
+use ``compose_with_store()`` to resolve ``{shared: "id", version?: n}`` refs.
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from agentbox.core.composition.sources import (
     BundleSource,
@@ -21,6 +24,9 @@ from agentbox.core.composition.sources import (
     FilesystemBundleSource,
 )
 from agentbox.core.constants import BundleFile
+
+if TYPE_CHECKING:
+    from agentbox.core.data import SessionStore
 
 
 def _read_text(path: Path) -> str:
@@ -61,6 +67,101 @@ def _format_template(text: str, variables: dict[str, str]) -> str:
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 _OUTPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "output_schema.md").read_text(encoding="utf-8")
 _INPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "input_schema.md").read_text(encoding="utf-8")
+
+
+def _is_shared_ref(value: Any) -> bool:
+    """Check if a value is a shared ref (dict or object with 'shared' key)."""
+    if isinstance(value, dict):
+        return "shared" in value and isinstance(value.get("shared"), str)
+    # Handle Pydantic model
+    return hasattr(value, "shared") and isinstance(getattr(value, "shared", None), str)
+
+
+def _resolve_shared_ref(
+    ref: Any, store: SessionStore | None
+) -> tuple[str, int | None]:
+    """Extract shared id and version from a shared ref.
+
+    Args:
+        ref: dict or object with 'shared' and optional 'version' attrs.
+        store: SessionStore (unused here, present for future consistency).
+
+    Returns:
+        Tuple of (shared_id, version_or_none).
+
+    Raises:
+        ValueError: if ref is not a valid shared ref.
+    """
+    if isinstance(ref, dict):
+        shared_id = ref.get("shared")
+        if not isinstance(shared_id, str):
+            raise ValueError(f"shared ref must have 'shared' key with string value: {ref}")
+        version = ref.get("version")
+    else:
+        shared_id = getattr(ref, "shared", None)
+        version = getattr(ref, "version", None)
+        if not isinstance(shared_id, str):
+            raise ValueError(f"shared ref must have 'shared' attribute with string value: {ref}")
+    return (shared_id, version if isinstance(version, int) else None)
+
+
+def _fetch_shared_content(
+    shared_id: str, version: int | None, store: SessionStore, content_type: str = "text"
+) -> str | dict[str, Any]:
+    """Fetch content from a shared resource.
+
+    Args:
+        shared_id: Resource id.
+        version: Specific version, or None for active.
+        store: SessionStore.
+        content_type: 'text' for markdown/plain text, 'json' for schemas.
+
+    Returns:
+        String content (text or JSON-dumped schema).
+
+    Raises:
+        ValueError: if resource not found or content is None.
+    """
+    if version is not None:
+        record = store.get_resource(shared_id, version)
+        if not record:
+            raise ValueError(
+                f"Shared resource {shared_id!r} version {version} not found"
+            )
+    else:
+        record = store.get_active_resource(shared_id)
+        if not record:
+            raise ValueError(
+                f"Shared resource {shared_id!r} (active) not found"
+            )
+
+    if content_type == "json":
+        if record.config_json:
+            return json.loads(record.config_json)
+        elif record.content:
+            # Try parsing as JSON if config_json is not set
+            try:
+                return json.loads(record.content)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"Shared resource {shared_id!r} v{record.version} has no "
+                    "valid JSON config or content"
+                ) from e
+        else:
+            raise ValueError(
+                f"Shared resource {shared_id!r} v{record.version} has no content"
+            )
+    else:
+        # text
+        if record.content:
+            return record.content
+        elif record.config_json:
+            # Fall back to JSON for text if content is None
+            return record.config_json
+        else:
+            raise ValueError(
+                f"Shared resource {shared_id!r} v{record.version} has no content"
+            )
 
 
 def _append_input_schema(text: str, schema: dict[str, Any]) -> str:
@@ -482,6 +583,82 @@ def compose_from_source(
     )
 
 
+def compose_with_store(
+    source: BundleSource,
+    variables: dict[str, str],
+    *,
+    store: SessionStore | None = None,
+    render: bool = True,
+) -> ComposeResult:
+    """Compose a bundle with support for shared resource references.
+
+    Extends ``compose_from_source`` to resolve ``{shared: "id", version?: n}``
+    references via the SessionStore. Falls back to ``compose_from_source`` if
+    store is None (shared refs will fail if encountered).
+
+    Args:
+        source: BundleSource (filesystem or DB).
+        variables: Template variable dict.
+        store: SessionStore for resolving shared refs (optional).
+        render: Whether to perform template variable substitution.
+
+    Returns:
+        ComposeResult with rendered prompts and metadata.
+
+    Raises:
+        ValueError: if a shared ref cannot be resolved.
+    """
+    if store is None or not isinstance(source, DbBundleSource):
+        return compose_from_source(source, variables, render=render)
+
+    resolved_composition = dict(source.composition)
+    resolved_files = list(source.files)
+
+    def _inject(kind: str, shared_id: str, content: str) -> str:
+        path = f"shared://{shared_id}"
+        resolved_files.append(
+            {
+                "kind": kind,
+                "relative_path": path,
+                "content": content,
+                "sha256": _sha256(content),
+                "source_uri": path,
+                "position": len(resolved_files),
+            }
+        )
+        return path
+
+    for slot, kind in (("system", "system"), ("user_template", "user_template")):
+        val = resolved_composition.get(slot)
+        if _is_shared_ref(val):
+            shared_id, version = _resolve_shared_ref(val, store)
+            content = _fetch_shared_content(shared_id, version, store, "text")
+            resolved_composition[slot] = _inject(kind, shared_id, str(content))
+
+    refs = resolved_composition.get("references") or []
+    new_refs: list[Any] = []
+    for ref in refs:
+        if _is_shared_ref(ref):
+            shared_id, version = _resolve_shared_ref(ref, store)
+            content = _fetch_shared_content(shared_id, version, store, "text")
+            path = _inject("reference", shared_id, str(content))
+            new_refs.append(path)
+        else:
+            new_refs.append(ref)
+    resolved_composition["references"] = new_refs
+
+    for slot, kind in (("output_schema", "output_schema"), ("input_schema", "input_schema")):
+        val = resolved_composition.get(slot)
+        if _is_shared_ref(val):
+            shared_id, version = _resolve_shared_ref(val, store)
+            obj = _fetch_shared_content(shared_id, version, store, "json")
+            content = json.dumps(obj) if isinstance(obj, dict) else str(obj)
+            resolved_composition[slot] = _inject(kind, shared_id, content)
+
+    new_source = DbBundleSource(composition=resolved_composition, files=resolved_files)
+    return compose_from_source(new_source, variables, render=render)
+
+
 __all__ = [
     "BundleSource",
     "ComposeResult",
@@ -491,5 +668,6 @@ __all__ = [
     "ReferencePreview",
     "compose",
     "compose_from_source",
+    "compose_with_store",
     "preview",
 ]

@@ -23,6 +23,7 @@ from tomlkit.items import AoT, Table
 from agentbox.core.data.manifest import AgentDef, AgentSource, ProjectManifest
 from agentbox.core.definitions.manifest_writer_toml import (
     _atomic_write,
+    _build_composition_table,
     _build_runner_table,
     write_legacy_dir,
     write_standalone_toml,
@@ -301,7 +302,12 @@ def _agent_to_table(agent: AgentDef) -> Table:
     if agent.unsupported_backends:
         t["unsupported_backends"] = tomlkit.array()
         t["unsupported_backends"].extend(agent.unsupported_backends)
-    if agent.prompt:
+
+    # Composition takes precedence over prompt/prompt_path
+    comp_table = _build_composition_table(agent)
+    if comp_table:
+        t["composition"] = comp_table
+    elif agent.prompt:
         t["prompt"] = agent.prompt
     elif agent.prompt_path:
         t["prompt_path"] = agent.prompt_path
