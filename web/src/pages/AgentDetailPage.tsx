@@ -233,12 +233,18 @@ export default function AgentDetailPage() {
             <ManifestEditor
               agent={agent}
               bundleFiles={bundleFiles}
+              currentVersion={currentVersion}
+              isDraft={versions.some((v) => (v as Record<string, unknown>)['version'] === currentVersion && (v as Record<string, unknown>)['is_draft'])}
               onSaved={(updated) => {
                 setAgent(updated);
                 loadAgent();
                 flash('ok', 'agent updated');
               }}
               onError={(msg) => flash('error', msg)}
+              onLifecycleChange={() => {
+                loadAgent();
+                flash('ok', 'agent updated');
+              }}
             />
           </div>
         )}

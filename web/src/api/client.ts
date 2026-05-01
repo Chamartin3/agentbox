@@ -56,6 +56,7 @@ export interface RunRecord {
   finished_at: string | null;
   config_digest: string | null;
   agent_version_id: number | null;
+  agent_version?: number | null;
   composition_snapshot: Record<string, unknown> | null;
   rendered_prompt: { system: string; user: string; schema: unknown } | null;
   variables: Record<string, string> | null;
@@ -151,6 +152,127 @@ export interface ManifestDoc {
   path: string;
   text: string;
   parsed: { project: string; agents: AgentDef[] };
+}
+
+// ---- agent lifecycle types -----------------------------------------------
+
+export type RunnerKind = 'claude_code' | 'opencode' | 'pydantic_ai';
+
+export type BundleFileKind = 'output_schema' | 'input_schema' | 'user_template' | 'system' | 'reference';
+
+export interface AgentCreatePayload {
+  id: string;
+  description: string;
+  runner: Partial<RunnerSpec> & { kind: RunnerKind };
+  prompt?: string;
+  composition?: Partial<CompositionConfig>;
+  tools?: string[];
+  tags?: string[];
+  workspace?: string;
+  session_mode?: 'fresh' | 'resume';
+  webhook_url?: string;
+  author: string;
+  changelog: string;
+}
+
+export interface AgentCreateResult {
+  agent_id: string;
+  version: number;
+  version_id: number;
+  is_draft: boolean;
+}
+
+export interface VersionFileUpload {
+  kind: BundleFileKind;
+  name: string;
+  content: string;
+}
+
+export interface VersionFileUploadResult {
+  file_id: number;
+  sha256: string;
+  size: number;
+}
+
+export interface ExportRequest {
+  source_format: string;
+  target_path?: string;
+}
+
+export interface ImportRequest {
+  path: string;
+  source_format?: string;
+  strategy?: string;
+  author: string;
+  changelog: string;
+}
+
+// ---- shared resources types -----------------------------------------------
+
+export type ResourceKind =
+  | 'output_schema'
+  | 'input_schema'
+  | 'user_template'
+  | 'system_fragment'
+  | 'reference'
+  | 'mcp_server'
+  | 'skill';
+
+export interface SharedResource {
+  id: string;
+  version: number;
+  kind: string;
+  name: string;
+  description?: string;
+  content?: string;
+  config_json?: string;
+  sha256: string;
+  is_active: boolean;
+  author?: string;
+  changelog?: string;
+  tags: string[];
+  created_at: string;
+}
+
+export interface SharedRef {
+  shared: string;
+  version?: number;
+}
+
+export interface ResourceQuery {
+  kind?: ResourceKind | ResourceKind[];
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ResourcesPage {
+  items: SharedResource[];
+  total?: number;
+}
+
+export interface CreateResourcePayload {
+  id: string;
+  kind: string;
+  name: string;
+  description?: string;
+  content?: string;
+  config_json?: string;
+  author: string;
+  changelog: string;
+  tags?: string[];
+  activate?: boolean;
+}
+
+export interface CreateResourceVersionPayload {
+  content?: string;
+  config_json?: string;
+  author: string;
+  changelog: string;
+  activate?: boolean;
+  name?: string;
+  description?: string;
+  tags?: string[];
 }
 
 // ---- prompt versioning --------------------------------------------------
@@ -356,6 +478,92 @@ export const api = {
     req<Record<string, unknown>>(`/api/workspaces/by-name/${name}/file`, {
       method: 'PUT',
       body: JSON.stringify({ path, content }),
+    }),
+
+  // ---- agent lifecycle (DB-only creation, publish, draft, rollback) --------
+
+  createAgent: (payload: AgentCreatePayload) =>
+    req<AgentCreateResult>('/api/agents', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  uploadVersionFile: (agentId: string, version: number, body: VersionFileUpload) =>
+    req<VersionFileUploadResult>(`/api/agents/${agentId}/versions/${version}/files`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteVersionFile: (agentId: string, version: number, fileId: number) =>
+    req<void>(`/api/agents/${agentId}/versions/${version}/files/${fileId}`, {
+      method: 'DELETE',
+    }),
+
+  publishVersion: (agentId: string, version: number, reason: string) =>
+    req<{ active_version: number; version_id: number; is_draft: boolean }>(
+      `/api/agents/${agentId}/versions/${version}/publish`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+    ),
+
+  branchDraft: (agentId: string, author: string) =>
+    req<{ version: number; version_id: number; is_draft: boolean }>(
+      `/api/agents/${agentId}/draft`,
+      { method: 'POST', body: JSON.stringify({ author }) },
+    ),
+
+  rollbackVersion: (agentId: string, version: number, reason: string, author: string) =>
+    req<{ version: number; version_id: number; is_draft: boolean; active_version: number }>(
+      `/api/agents/${agentId}/versions/${version}/rollback`,
+      { method: 'POST', body: JSON.stringify({ reason, author }) },
+    ),
+
+  exportAgent: (agentId: string, body: ExportRequest) =>
+    req<{ ok: boolean; path?: string }>(`/api/manifest/agents/${agentId}/export`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  importAgent: (body: ImportRequest) =>
+    req<AgentCreateResult>('/api/manifest/agents/import', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // ---- shared resources ----------------------------------------------------
+
+  listResources: (params?: ResourceQuery) => {
+    const p = new URLSearchParams();
+    if (params?.kind) {
+      if (Array.isArray(params.kind)) params.kind.forEach((k) => p.append('kind', k));
+      else p.set('kind', params.kind);
+    }
+    if (params?.q) p.set('q', params.q);
+    if (params?.limit != null) p.set('limit', String(params.limit));
+    if (params?.offset != null) p.set('offset', String(params.offset));
+    const qs = p.toString();
+    return req<ResourcesPage>(`/api/resources${qs ? `?${qs}` : ''}`);
+  },
+
+  getResource: (id: string) => req<SharedResource>(`/api/resources/${id}`),
+
+  getResourceVersions: (id: string) => req<ResourcesPage>(`/api/resources/${id}/versions`),
+
+  createResource: (body: CreateResourcePayload) =>
+    req<SharedResource>('/api/resources', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createResourceVersion: (id: string, body: CreateResourceVersionPayload) =>
+    req<SharedResource>(`/api/resources/${id}/versions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  activateResourceVersion: (id: string, version: number) =>
+    req<SharedResource>(`/api/resources/${id}/activate`, {
+      method: 'POST',
+      body: JSON.stringify({ version }),
     }),
 
   // mcp manifest

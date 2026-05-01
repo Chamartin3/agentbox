@@ -1,152 +1,51 @@
-.agent-new {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 20px;
+/* Wizard step indicator */
+.wizard-steps {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.agent-new h1 {
-  margin-top: 0;
-  margin-bottom: 24px;
-  color: #333;
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  border: 1px solid transparent;
+  transition: all 0.15s;
 }
 
-.new-agent-form {
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 24px;
+.wizard-step.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
 }
 
-.form-group {
-  margin-bottom: 20px;
+.wizard-step.done {
+  color: var(--green);
+  border-color: var(--green);
+  background: rgba(63, 185, 80, 0.06);
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
+.wizard-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 10px;
   font-weight: 600;
-  color: #333;
-  font-size: 0.95rem;
 }
 
-.form-group input[type="text"],
-.form-group textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 0.95rem;
-  box-sizing: border-box;
-}
-
-.form-group input[type="text"]:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #0066cc;
-  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
-}
-
-.form-group input:disabled,
-.form-group textarea:disabled {
-  background: #f5f5f5;
-  color: #999;
-  cursor: not-allowed;
-}
-
-.field-error {
-  display: block;
-  color: #c33;
-  font-size: 0.85rem;
-  margin-top: 4px;
-}
-
-.format-toggle {
-  display: flex;
-  gap: 8px;
-}
-
-.format-btn {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
-}
-
-.format-btn:hover {
-  border-color: #999;
-}
-
-.format-btn.active {
-  background: #0066cc;
-  color: white;
-  border-color: #0066cc;
-}
-
-.form-group textarea {
-  resize: vertical;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  line-height: 1.5;
-}
-
-.form-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 10px 20px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: #0066cc;
-  color: white;
-  border-color: #0066cc;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #0052a3;
-  border-color: #0052a3;
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: white;
-  color: #333;
-  border-color: #ddd;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #999;
-}
-
-.btn-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error-message {
-  background: #fee;
-  color: #c33;
-  padding: 12px;
-  border-radius: 6px;
-  margin-bottom: 16px;
-  border: 1px solid #fcc;
+.wizard-step-label {
+  font-weight: 500;
 }

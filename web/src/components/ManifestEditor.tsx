@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError } from '../api/client';
+import BundleFileEditor from './BundleFileEditor';
 
 type BundleFile = {
   kind: string;
@@ -11,12 +13,33 @@ type BundleFile = {
 interface Props {
   agent: AgentDef;
   bundleFiles?: BundleFile[];
+  currentVersion?: number | null;
+  isDraft?: boolean;
   onSaved: (updated: AgentDef) => void;
   onError: (msg: string) => void;
+  onLifecycleChange?: () => void;
 }
 
-export default function ManifestEditor({ agent, bundleFiles = [], onSaved, onError }: Props) {
+export default function ManifestEditor({ agent, bundleFiles = [], currentVersion, isDraft, onSaved, onError, onLifecycleChange }: Props) {
+  const navigate = useNavigate();
   const [runnerKind, setRunnerKind] = useState(agent.runner.kind);
+
+  // Lifecycle state
+  const [publishReason, setPublishReason] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
+  const [branchingDraft, setBranchingDraft] = useState(false);
+  const [showBranch, setShowBranch] = useState(false);
+  const [branchAuthor, setBranchAuthor] = useState('');
+  const [rollbackReason, setRollbackReason] = useState('');
+  const [rollbackAuthor, setRollbackAuthor] = useState('');
+  const [rolling, setRolling] = useState(false);
+  const [showRollback, setShowRollback] = useState(false);
+  const [exportFormat, setExportFormat] = useState('markdown');
+  const [exportPath, setExportPath] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [workspaceOptions, setWorkspaceOptions] = useState<string[]>([]);
@@ -145,6 +168,77 @@ export default function ManifestEditor({ agent, bundleFiles = [], onSaved, onErr
     compHas('user_template', userTemplate) ||
     compHas('output_validation', outputValidation);
 
+  const handlePublish = async () => {
+    if (!currentVersion) return;
+    if (publishReason.length < 3) return;
+    setPublishing(true);
+    setLifecycleError(null);
+    try {
+      await api.publishVersion(agent.id, currentVersion, publishReason);
+      setPublishReason('');
+      setShowPublish(false);
+      onLifecycleChange?.();
+    } catch (e) {
+      const err = e as ApiError;
+      setLifecycleError(`Publish failed: ${JSON.stringify(err.detail)}`);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleBranchDraft = async () => {
+    if (!branchAuthor) return;
+    setBranchingDraft(true);
+    setLifecycleError(null);
+    try {
+      const result = await api.branchDraft(agent.id, branchAuthor);
+      setBranchAuthor('');
+      setShowBranch(false);
+      onLifecycleChange?.();
+      navigate(`/agents/${agent.id}?draft=1&version=${result.version}`);
+    } catch (e) {
+      const err = e as ApiError;
+      setLifecycleError(`Branch draft failed: ${JSON.stringify(err.detail)}`);
+    } finally {
+      setBranchingDraft(false);
+    }
+  };
+
+  const handleRollback = async () => {
+    if (!currentVersion || rollbackReason.length < 3 || !rollbackAuthor) return;
+    setRolling(true);
+    setLifecycleError(null);
+    try {
+      await api.rollbackVersion(agent.id, currentVersion, rollbackReason, rollbackAuthor);
+      setRollbackReason('');
+      setRollbackAuthor('');
+      setShowRollback(false);
+      onLifecycleChange?.();
+    } catch (e) {
+      const err = e as ApiError;
+      setLifecycleError(`Rollback failed: ${JSON.stringify(err.detail)}`);
+    } finally {
+      setRolling(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setLifecycleError(null);
+    try {
+      await api.exportAgent(agent.id, {
+        source_format: exportFormat,
+        target_path: exportPath.trim() || undefined,
+      });
+      setShowExport(false);
+    } catch (e) {
+      const err = e as ApiError;
+      setLifecycleError(`Export failed: ${JSON.stringify(err.detail)}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const save = async () => {
     const patch: Record<string, unknown> = {};
     const runnerPatch: Record<string, unknown> = {};
@@ -250,9 +344,14 @@ export default function ManifestEditor({ agent, bundleFiles = [], onSaved, onErr
           Configuration
           {dirty && <span className="dirty" style={{ marginLeft: 8 }}>● unsaved</span>}
         </h2>
-        <button className="primary" onClick={save} disabled={!dirty}>
-          save configuration
-        </button>
+        <div className="row" style={{ gap: 6 }}>
+          <button onClick={() => navigate('/agents/new')}>
+            + new agent
+          </button>
+          <button className="primary" onClick={save} disabled={!dirty}>
+            save configuration
+          </button>
+        </div>
       </div>
 
       <p className="dim" style={{ marginTop: 0, fontSize: 12 }}>
@@ -476,6 +575,162 @@ export default function ManifestEditor({ agent, bundleFiles = [], onSaved, onErr
           </p>
         )}
       </fieldset>
+
+      {/* ---- Lifecycle actions ---------------------------------------- */}
+      {currentVersion != null && (
+        <fieldset className="config-fieldset">
+          <legend>lifecycle</legend>
+
+          {lifecycleError && (
+            <p style={{ color: 'var(--red)', fontSize: 12, margin: '0 0 8px' }}>{lifecycleError}</p>
+          )}
+
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {isDraft && (
+              <button onClick={() => { setShowPublish((v) => !v); setLifecycleError(null); }}>
+                publish draft
+              </button>
+            )}
+            {!isDraft && (
+              <button onClick={() => { setShowBranch((v) => !v); setLifecycleError(null); }}>
+                branch draft
+              </button>
+            )}
+            <button onClick={() => { setShowRollback((v) => !v); setLifecycleError(null); }}>
+              rollback
+            </button>
+            <button onClick={() => { setShowExport((v) => !v); setLifecycleError(null); }}>
+              export
+            </button>
+          </div>
+
+          {showPublish && (
+            <div className="stack" style={{ marginTop: 10, gap: 8 }}>
+              <div className="field">
+                <label>reason *</label>
+                <input
+                  value={publishReason}
+                  onChange={(e) => setPublishReason(e.target.value)}
+                  placeholder="Why are you publishing? (min 3 chars)"
+                />
+              </div>
+              <div style={{ gridColumn: '2/-1', display: 'flex', gap: 6 }}>
+                <button
+                  className="primary"
+                  onClick={handlePublish}
+                  disabled={publishing || publishReason.length < 3}
+                >
+                  {publishing ? 'publishing…' : 'confirm publish'}
+                </button>
+                <button onClick={() => setShowPublish(false)}>cancel</button>
+              </div>
+            </div>
+          )}
+
+          {showBranch && (
+            <div className="stack" style={{ marginTop: 10, gap: 8 }}>
+              <div className="field">
+                <label>author *</label>
+                <input
+                  value={branchAuthor}
+                  onChange={(e) => setBranchAuthor(e.target.value)}
+                  placeholder="your handle"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  className="primary"
+                  onClick={handleBranchDraft}
+                  disabled={branchingDraft || !branchAuthor}
+                >
+                  {branchingDraft ? 'branching…' : 'create draft'}
+                </button>
+                <button onClick={() => setShowBranch(false)}>cancel</button>
+              </div>
+            </div>
+          )}
+
+          {showRollback && (
+            <div className="stack" style={{ marginTop: 10, gap: 8 }}>
+              <p className="dim" style={{ fontSize: 11, margin: 0 }}>
+                Rolls back version {currentVersion} — creates a new version with v{currentVersion}&apos;s config as the active version.
+              </p>
+              <div className="field">
+                <label>reason *</label>
+                <input
+                  value={rollbackReason}
+                  onChange={(e) => setRollbackReason(e.target.value)}
+                  placeholder="Reason for rollback (min 3 chars)"
+                />
+              </div>
+              <div className="field">
+                <label>author *</label>
+                <input
+                  value={rollbackAuthor}
+                  onChange={(e) => setRollbackAuthor(e.target.value)}
+                  placeholder="your handle"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  className="primary"
+                  onClick={handleRollback}
+                  disabled={rolling || rollbackReason.length < 3 || !rollbackAuthor}
+                >
+                  {rolling ? 'rolling back…' : 'confirm rollback'}
+                </button>
+                <button onClick={() => setShowRollback(false)}>cancel</button>
+              </div>
+            </div>
+          )}
+
+          {showExport && (
+            <div className="stack" style={{ marginTop: 10, gap: 8 }}>
+              <div className="field">
+                <label>format</label>
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  style={{ width: '100%' }}
+                >
+                  <option value="markdown">markdown</option>
+                  <option value="standalone_toml">standalone_toml</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>target path</label>
+                <input
+                  value={exportPath}
+                  onChange={(e) => setExportPath(e.target.value)}
+                  placeholder="optional — leave blank for default"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  className="primary"
+                  onClick={handleExport}
+                  disabled={exporting}
+                >
+                  {exporting ? 'exporting…' : 'export'}
+                </button>
+                <button onClick={() => setShowExport(false)}>cancel</button>
+              </div>
+            </div>
+          )}
+        </fieldset>
+      )}
+
+      {/* ---- Bundle file editor for draft versions -------------------- */}
+      {currentVersion != null && isDraft && (
+        <fieldset className="config-fieldset">
+          <legend>bundle files (draft v{currentVersion})</legend>
+          <BundleFileEditor
+            agentId={agent.id}
+            version={currentVersion}
+            isDraft={isDraft}
+          />
+        </fieldset>
+      )}
     </section>
   );
 }
