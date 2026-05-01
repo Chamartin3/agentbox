@@ -1,15 +1,23 @@
-"""/manifest endpoints — read the manifest, patch agent fields."""
+"""/manifest endpoints — read the manifest, patch agent fields, export/import agents."""
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 import shutil
 import subprocess
+from pathlib import Path
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_loader, get_settings, get_store
+from agentbox.core.data.manifest import AgentDef, AgentSource
 from agentbox.core.definitions import ManifestWriter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/manifest", tags=["manifest"])
 
@@ -227,3 +235,278 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     )
 
     return {"agent": updated.model_dump()}
+
+
+# ------------------------------------------------------------------
+# Export / Import
+# ------------------------------------------------------------------
+
+
+class ExportRequest(BaseModel):
+    """Export an active agent version to disk."""
+
+    source_format: Literal["markdown", "standalone_toml", "legacy_dir"] = "markdown"
+    target_path: str | None = None
+
+
+class ExportResponse(BaseModel):
+    source_path: str
+    source_format: str
+    written_files: list[str]
+
+
+@router.post("/agents/{agent_id}/export")
+def export_agent(agent_id: str, body: ExportRequest) -> ExportResponse:
+    """Serialize active agent version to disk.
+
+    - Loads the active AgentDef from the DB.
+    - Writes it via ManifestWriter to the specified format.
+    - Updates agent_meta with the new source_path/source_format/export_to_disk=true.
+    - Returns the written file path(s).
+    """
+    store = get_store()
+    settings = get_settings()
+
+    # Load active version
+    active = store.get_active_version(agent_id)
+    if active is None:
+        raise HTTPException(
+            404, {"code": "unknown_agent", "detail": f"Agent {agent_id} not found"}
+        )
+
+    # Reconstruct AgentDef from config_json or content_snapshot
+    try:
+        if active.get("config_json"):
+            data = json.loads(active["config_json"]) if isinstance(active["config_json"], str) else active["config_json"]
+            agent_def = AgentDef.model_validate(data)
+        else:
+            agent_def = AgentDef.from_db_row(active)
+    except Exception as exc:
+        raise HTTPException(
+            400, {"code": "agent_invalid", "detail": str(exc)}
+        ) from exc
+
+    # Determine target path
+    if body.target_path:
+        target_path = Path(body.target_path)
+    else:
+        # Derive from source_format
+        agents_d = settings.project_root / "agents.d"
+        if body.source_format == "legacy_dir":
+            target_path = settings.project_root / "agents" / agent_id / "agent.toml"
+        elif body.source_format == "standalone_toml":
+            target_path = agents_d / f"{agent_id}.toml"
+        else:  # markdown
+            target_path = agents_d / f"{agent_id}.md"
+
+    # Stamp agent with source metadata
+    agent_def.source_path = target_path
+    agent_def.source_format = AgentSource(body.source_format)
+
+    # Write via ManifestWriter
+    writer = ManifestWriter(settings.project_root)
+    written_path = writer.save_agent(agent_def)
+
+    # Update agent_meta (or create if doesn't exist)
+    meta = store.get_agent_meta(agent_id)
+    if meta is None:
+        store.init_agent_meta(
+            agent_id,
+            source_path=str(target_path),
+            source_format=body.source_format,
+            export_to_disk=True,
+        )
+    else:
+        store.update_agent_meta(
+            agent_id,
+            source_path=str(target_path),
+            source_format=body.source_format,
+            export_to_disk=True,
+        )
+
+    return ExportResponse(
+        source_path=str(target_path),
+        source_format=body.source_format,
+        written_files=[str(written_path)],
+    )
+
+
+class ImportRequest(BaseModel):
+    """Import an agent from disk."""
+
+    path: str
+    source_format: Literal[
+        "auto", "markdown", "standalone_toml", "legacy_dir", "inline_toml"
+    ] = "auto"
+    strategy: Literal["new_agent", "new_version", "skip", "overwrite"] = (
+        "new_agent"
+    )
+    author: str = Field(..., min_length=1)
+    changelog: str = Field(..., min_length=3)
+
+
+class ConflictField(BaseModel):
+    field: str
+    db_value: str | None = None
+    file_value: str | None = None
+
+
+class ImportResponse(BaseModel):
+    agent_id: str
+    version: int
+    is_draft: bool
+    skipped: bool = False
+    conflicts: list[ConflictField] = Field(default_factory=list)
+
+
+@router.post("/agents/import")
+def import_agent(body: ImportRequest):
+    """Import an agent from disk, creating a DB version.
+
+    Strategy handling:
+    - new_agent: Create new agent if it doesn't exist; 409 if exists.
+    - new_version: Create new version of existing agent.
+    - skip: Return skipped=true if agent exists.
+    - overwrite: Create new version and publish immediately.
+    """
+    store = get_store()
+    settings = get_settings()
+
+    file_path = Path(body.path)
+    if not file_path.exists():
+        raise HTTPException(400, {"code": "file_not_found", "detail": body.path})
+
+    # Infer source_format if auto
+    inferred_format = body.source_format
+    if inferred_format == "auto":
+        if file_path.suffix == ".md":
+            inferred_format = "markdown"
+        elif file_path.suffix == ".toml":
+            inferred_format = "standalone_toml"
+        elif file_path.is_dir():
+            inferred_format = "legacy_dir"
+        else:
+            inferred_format = "standalone_toml"  # default
+
+    # Parse the file using DefinitionLoader's logic
+    agent_def = None
+    try:
+        if inferred_format == "markdown":
+            from agentbox.core.definitions.markdown import load_markdown_agent
+
+            agent_def = load_markdown_agent(file_path)
+            if not isinstance(agent_def, AgentDef):
+                agent_def = AgentDef.model_validate(agent_def)
+        elif inferred_format == "legacy_dir":
+            from agentbox.core.definitions.agents_dir import _load_legacy_dir_agent
+
+            agent_def = _load_legacy_dir_agent(file_path, file_path.name)
+            if not isinstance(agent_def, AgentDef):
+                agent_def = AgentDef.model_validate(agent_def)
+        else:  # standalone_toml or inline_toml
+            import tomllib
+
+            text = file_path.read_text(encoding="utf-8")
+            data = tomllib.loads(text)
+            agent_def = AgentDef.model_validate(data)
+    except Exception as exc:
+        raise HTTPException(
+            400, {"code": "parse_error", "detail": str(exc)}
+        ) from exc
+
+    if agent_def is None:
+        raise HTTPException(
+            400, {"code": "parse_error", "detail": "Could not parse agent"}
+        )
+
+    agent_id = agent_def.id
+    existing = store.latest_version(agent_id)
+
+    # Build config dict for storage (convert Paths to strings)
+    config_dict = agent_def.model_dump(mode="python", exclude_none=False)
+    # Ensure Path objects are converted to strings
+    if "source_path" in config_dict and isinstance(config_dict["source_path"], Path):
+        config_dict["source_path"] = str(config_dict["source_path"])
+    config_json_str = json.dumps(config_dict, sort_keys=True)
+    content_hash = hashlib.sha256(config_json_str.encode("utf-8")).hexdigest()
+
+    # Load prompt content if needed
+    try:
+        prompt_content = agent_def.load_prompt(settings.project_root)
+    except FileNotFoundError:
+        prompt_content = agent_def.prompt or ""
+
+    # Handle strategy
+    if existing is not None:
+        if body.strategy == "new_agent":
+            raise HTTPException(
+                409,
+                {
+                    "code": "agent_exists",
+                    "detail": f"Agent {agent_id} already exists",
+                    "conflicts": [],
+                },
+            )
+        elif body.strategy == "skip":
+            return Response(
+                content=json.dumps(ImportResponse(
+                    agent_id=agent_id,
+                    version=existing.get("version", 0),
+                    is_draft=bool(existing.get("is_draft", False)),
+                    skipped=True,
+                ).model_dump()),
+                status_code=200,
+                media_type="application/json",
+            )
+        elif body.strategy in ("new_version", "overwrite"):
+            # Create new version
+            version_rec = store.create_version(
+                agent_id=agent_id,
+                source_path=str(file_path),
+                source_format=inferred_format,
+                content_snapshot="",
+                prompt_snapshot=prompt_content or "",
+                content_hash=content_hash,
+                author=body.author,
+                changelog=body.changelog,
+                config_json=config_json_str,
+                prompt_content=prompt_content,
+                source="import",
+                is_draft=(body.strategy == "new_version"),
+            )
+
+            if body.strategy == "overwrite":
+                store.publish_version(agent_id, version_rec["version"], "imported")
+
+            return Response(
+                content=json.dumps(ImportResponse(
+                    agent_id=agent_id,
+                    version=version_rec["version"],
+                    is_draft=version_rec.get("is_draft", False),
+                ).model_dump()),
+                status_code=201,
+                media_type="application/json",
+            )
+    else:
+        # New agent
+        version_rec = store.create_agent(
+            agent_id=agent_id,
+            config_json=config_dict,
+            prompt_content=prompt_content,
+            author=body.author,
+            changelog=body.changelog,
+            source="import",
+            source_path=str(file_path),
+            source_format=inferred_format,
+            export_to_disk=False,
+        )
+
+        return Response(
+            content=json.dumps(ImportResponse(
+                agent_id=agent_id,
+                version=version_rec["version"],
+                is_draft=version_rec.get("is_draft", False),
+            ).model_dump()),
+            status_code=201,
+            media_type="application/json",
+        )
