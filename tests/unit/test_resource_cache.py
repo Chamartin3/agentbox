@@ -8,7 +8,6 @@ from pathlib import Path
 from threading import Thread
 
 import pytest
-
 from agentbox.core.resources.cache import ensure_cached, prune_cache
 
 
@@ -42,7 +41,7 @@ class TestEnsureCached:
         cache = tmp_path / "cache"
         bad_blobs = [{"path": "", "content": b"bad"}]  # empty path causes error
 
-        with pytest.raises(Exception):
+        with pytest.raises((OSError, ValueError)):
             ensure_cached("vbad", bad_blobs, cache)
         # Either the dest doesn't exist or it's clean — no partial entry
         dest = cache / "vbad"

@@ -19,7 +19,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -64,7 +63,7 @@ def _build_tool(cap_module, tool_name: str, ctx_factory):
     if not _tools:
         # The @mcp.tool() decorator registers a FunctionTool; they can be found
         # as attributes on the mcp instance that are tool objects.
-        for v in vars(mcp).values():
+        for _ in vars(mcp).values():
             pass
 
     # Simplest approach: call the module-level function that was decorated
@@ -76,8 +75,9 @@ def _build_tool(cap_module, tool_name: str, ctx_factory):
 # Direct-import approach: import registered function via a thin wrapper
 def _make_fs_fns(ctx_factory):
     """Return (fs_read, fs_list, fs_write) functions with ctx wired in."""
-    from agentbox.core.host_env.permissions import GrantViolation, check_capability
     from pathlib import Path as _Path
+
+    from agentbox.core.host_env.permissions import GrantViolation, check_capability
 
     def fs_read(path: str) -> str:
         ctx = ctx_factory()
@@ -202,6 +202,7 @@ class TestFsCapability:
 
 def _make_shell_fn(ctx_factory):
     import subprocess
+
     from agentbox.core.host_env.permissions import GrantViolation, check_capability
 
     def shell_exec(cmd: str, cwd: str | None = None, timeout: int = 30) -> dict:
@@ -265,7 +266,6 @@ class TestHttpCapability:
         from agentbox.core.host_env.permissions import GrantViolation, check_capability
 
         grants = _make_grants(**{"http.fetch": {"host_allowlist": ["allowed.example.com"]}})
-        ctx = _make_ctx(grants, tmp_path)
 
         with pytest.raises(GrantViolation, match="not allowlisted"):
             check_capability(grants, "http.fetch", {"url": "http://evil.example.com/data", "method": "GET"})
@@ -274,7 +274,6 @@ class TestHttpCapability:
         from agentbox.core.host_env.permissions import GrantViolation, check_capability
 
         grants = _make_grants(**{"http.fetch": {"host_allowlist": ["safe.com"], "methods": ["GET"]}})
-        ctx = _make_ctx(grants, tmp_path)
 
         with pytest.raises(GrantViolation, match="not allowed"):
             check_capability(grants, "http.fetch", {"url": "http://safe.com/data", "method": "DELETE"})
@@ -288,6 +287,7 @@ class TestHttpCapability:
 class TestEnvCapability:
     def test_allowed_var(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         import os
+
         from agentbox.core.host_env.permissions import check_capability
 
         monkeypatch.setenv("MY_VAR", "secret_value")

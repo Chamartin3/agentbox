@@ -47,9 +47,19 @@ from agentbox.core.data import SessionStore
 from agentbox.core.data.schema import runs as _runs_table
 from agentbox.core.definitions import AgentDef, DefinitionLoader
 from agentbox.core.guardrails.base import GuardrailContext
+from agentbox.core.host_env.capabilities import CAPABILITIES as _HOST_ENV_CAPABILITIES
 from agentbox.core.plugins import get_backend, get_guardrail
 from agentbox.core.prompt_capture import build_fragments, fragments_to_json
 from agentbox.core.render import materialize_rendered_config
+from agentbox.core.resources.prompt_resolver import resolve_prompt
+from agentbox.core.resources.workspace_materialize import materialize_workspace
+from agentbox.core.run_prep import (
+    prompt_resolution_to_snapshot,
+    render_env_doc,
+    resolve_agent_prompt_bindings,
+    resolve_workspace_resources,
+    workspace_outcomes_to_snapshot,
+)
 from agentbox.core.runner_profiles import (
     EffectiveRunnerConfig,
     RunnerProfileResolver,
@@ -402,15 +412,6 @@ class RunExecutor:
         _resource_snapshot_entries: list[dict] = []
         _workspace_id = agent.workspace if agent.workspace != "<ephemeral>" else None
         if _workspace_id:
-            from agentbox.core.resources.workspace_materialize import (
-                materialize_workspace,
-            )
-            from agentbox.core.run_prep import (
-                render_env_doc,
-                resolve_workspace_resources,
-                workspace_outcomes_to_snapshot,
-            )
-
             try:
                 ws_bindings = resolve_workspace_resources(self.store, _workspace_id)
                 if ws_bindings:
@@ -546,12 +547,6 @@ class RunExecutor:
 
         # --- prompt resource binding substitution (Plan 08 Phase 1) ----------
         try:
-            from agentbox.core.resources.prompt_resolver import resolve_prompt
-            from agentbox.core.run_prep import (
-                prompt_resolution_to_snapshot,
-                resolve_agent_prompt_bindings,
-            )
-
             prompt_bindings = resolve_agent_prompt_bindings(self.store, agent.id)
             if prompt_bindings:
                 composed_system = agent.__dict__.get("_composed_system")
@@ -601,26 +596,14 @@ class RunExecutor:
                 timeout_seconds=timeout_seconds,
             )
         except ValueError as exc:
-            # Profile resolution failed — create error run record
-            error_msg = str(exc)
-            transcripts_dir = self.settings.data_dir / "transcripts"
-            transcripts_dir.mkdir(parents=True, exist_ok=True)
-            transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
-            run_id = self.store.create_run(
-                agent_id=agent.id,
-                input_=input_,
-                workdir=str(workdir),
-                transcript_path=str(transcript_path),
-                session_id=session_id,
+            return self._fail_pre_run(agent, input_, workdir, session_id, str(exc))
+
+        if effective.source in ("agent_legacy", "backend_default"):
+            error_msg = (
+                f"agent {agent.id!r} has no runner profile bound. "
+                "Assign a runner profile in the UI (Agents → Runner Profile)."
             )
-            self.store.finish_run(run_id, ok=False, error=error_msg)
-            # Publish error events for any connected clients
-            broadcaster = RunBroadcaster()
-            self._broadcasters[run_id] = broadcaster
-            broadcaster.publish(LogEvent(text=f"Error: {error_msg}"))
-            broadcaster.publish(DoneEvent(ok=False, error=error_msg))
-            broadcaster.close()
-            return run_id
+            return self._fail_pre_run(agent, input_, workdir, session_id, error_msg)
 
         # Apply effective timeout if not already overridden
         effective_timeout = timeout_seconds or effective.timeout_seconds
@@ -641,9 +624,7 @@ class RunExecutor:
                 resolved_he = self.store.resolve_workspace_host_env(_workspace_id)
                 grants = resolved_he.get("grants") or {}
                 # Only inject if there's more than the default-granted workspace_info cap
-                from agentbox.core.host_env.capabilities import CAPABILITIES
-
-                non_default = {k for k, v in CAPABILITIES.items() if not v.default_granted}
+                non_default = {k for k, v in _HOST_ENV_CAPABILITIES.items() if not v.default_granted}
                 if grants.keys() & non_default:
                     _host_env_grants = grants
                     self._inject_host_env_mcp(
@@ -806,6 +787,33 @@ class RunExecutor:
         # Fallback: agents_dir / agent.id
         return self.settings.project_root / "agents" / agent.id
 
+    def _fail_pre_run(
+        self,
+        agent: AgentDef,
+        input_: str,
+        workdir: Path,
+        session_id: str | None,
+        error_msg: str,
+    ) -> str:
+        """Create an error run record and broadcast failure events before execution starts."""
+        transcripts_dir = self.settings.data_dir / "transcripts"
+        transcripts_dir.mkdir(parents=True, exist_ok=True)
+        transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
+        run_id = self.store.create_run(
+            agent_id=agent.id,
+            input_=input_,
+            workdir=str(workdir),
+            transcript_path=str(transcript_path),
+            session_id=session_id,
+        )
+        self.store.finish_run(run_id, ok=False, error=error_msg)
+        broadcaster = RunBroadcaster()
+        self._broadcasters[run_id] = broadcaster
+        broadcaster.publish(LogEvent(text=f"Error: {error_msg}"))
+        broadcaster.publish(DoneEvent(ok=False, error=error_msg))
+        broadcaster.close()
+        return run_id
+
     def _select_backend(
         self,
         agent: AgentDef,
@@ -839,6 +847,8 @@ class RunExecutor:
 
         if backend_override:
             candidates = [backend_override]
+        elif runner_config is not None and runner_config.backend:
+            candidates = [runner_config.backend]
         elif manifest.backend_preference:
             candidates = [
                 n
