@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AgentDef, GuardrailRow, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
 import EventStream from '../components/EventStream';
 import ConversationView from '../components/ConversationView';
-import RunsTable from '../components/RunsTable';
 import RunCommentThread from '../components/RunCommentThread';
 
 interface StreamEvent {
@@ -403,44 +402,6 @@ function FragmentRow({ f, total }: { f: PromptFragment; total: number }) {
   );
 }
 
-function PromptFragmentsSection({
-  doc,
-  runnerKind,
-}: {
-  doc: RunPromptDoc | null;
-  runnerKind: string | null;
-}) {
-  if (!doc) {
-    return (
-      <section className="section">
-        <h2 style={{ borderBottom: 'none' }}>Assembled prompt</h2>
-        <p className="dim" style={{ margin: 0 }}>
-          not captured for this run (older run or capture failed)
-        </p>
-      </section>
-    );
-  }
-  const total = doc.total_bytes;
-  return (
-    <section className="section">
-      <div className="row between" style={{ marginBottom: 8 }}>
-        <h2 style={{ border: 'none', margin: 0 }}>
-          Assembled prompt{' '}
-          <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>
-            · {doc.fragments.length} fragments · {fmtBytes(total)} total
-            {runnerKind && <> · runner {runnerKind}</>}
-          </span>
-        </h2>
-      </div>
-      <div className="code-block">
-        {doc.fragments.map((f, i) => (
-          <FragmentRow key={i} f={f} total={total} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 // ──────────────────────────────────────────────────────────────────── page
 
 export default function RunDetailPage() {
@@ -457,6 +418,7 @@ export default function RunDetailPage() {
   const [promptDoc, setPromptDoc] = useState<RunPromptDoc | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [eventView, setEventView] = useState<'conversation' | 'events'>('conversation');
+  const [tab, setTab] = useState<'prompt' | 'conversation' | 'tools' | 'checks' | 'snapshot'>('prompt');
   const wsRef = useRef<WebSocket | null>(null);
   // Re-render every 30s so "5m ago" labels stay fresh.
   const [, setNow] = useState(Date.now());
@@ -546,84 +508,207 @@ export default function RunDetailPage() {
   const outputPretty = useMemo(() => prettyText(run?.output ?? ''), [run?.output]);
   const duration = run ? durationMs(run) : null;
   const tokens = (usage?.input_tokens ?? 0) + (usage?.output_tokens ?? 0);
+  const toolCallCount = useMemo(
+    () => events.filter((e) => e.type === 'tool_call').length,
+    [events],
+  );
 
   if (!run) return <p className="dim">loading…</p>;
 
+  // `rendered_prompt` may arrive as either an object or a JSON-encoded string
+  // (the DB stores it as text and the API doesn't re-parse). Normalize.
+  const renderedPrompt: { system: string; user: string; schema: unknown } | null = (() => {
+    const rp = run.rendered_prompt as unknown;
+    if (!rp) return null;
+    let obj: Record<string, unknown> | null = null;
+    if (typeof rp === 'string') {
+      try {
+        const parsed = JSON.parse(rp);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          obj = parsed as Record<string, unknown>;
+        }
+      } catch { /* fall through */ }
+    } else if (typeof rp === 'object' && !Array.isArray(rp)) {
+      obj = rp as Record<string, unknown>;
+    }
+    if (!obj) return null;
+    return {
+      system: typeof obj.system === 'string' ? obj.system : '',
+      user: typeof obj.user === 'string' ? obj.user : '',
+      schema: obj.schema,
+    };
+  })();
+
+  // Variables can come back as either an object or a JSON-encoded string.
+  // Normalize to a plain record so we can render it as a KV table without
+  // iterating string characters.
+  const variablesObj: Record<string, unknown> | null = (() => {
+    const v = run.variables;
+    if (!v) return null;
+    if (typeof v === 'string') {
+      try {
+        const parsed = JSON.parse(v);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      } catch {
+        return null;
+      }
+    }
+    if (typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+    return null;
+  })();
+  const variablesJson = variablesObj ? JSON.stringify(variablesObj, null, 2) : null;
+  const inputIsSameAsVariables =
+    !!variablesJson && inputPretty.isJson && inputPretty.text === variablesJson;
+  const variablesEntries = variablesObj ? Object.entries(variablesObj) : [];
+
+  const workspace = agent?.workspace ?? null;
+  const isEphemeral = workspace === '<ephemeral>';
+  const runnerKind = agent?.runner?.kind ?? null;
+  const modelName = usage?.model ?? agent?.runner?.model ?? null;
+  const cacheTokens = (usage?.cache_read_tokens ?? 0) + (usage?.cache_write_tokens ?? 0);
+
   return (
     <div className="stack">
-      {/* ── header ───────────────────────────────────────────────────── */}
-      <div className="run-header">
+      {/* ── Compact header ───────────────────────────────────────────── */}
+      <div className="run-header-compact">
         <div>
-          <div className="dim" style={{ fontSize: 11 }}>
+          <div className="crumb">
             <Link to="/" className="dim">runs</Link>
             <span style={{ margin: '0 6px' }}>/</span>
-            <code style={{ fontSize: 11 }}>{id}</code>
+            <code style={{ fontSize: 11 }}>{id.slice(0, 12)}…</code>
           </div>
-          <h1 style={{ margin: '6px 0 0' }}>
+          <h1>
             <Link to={`/agents/${run.agent_id}`}>{run.agent_id}</Link>
+            {run.agent_version != null && (
+              <Link
+                to={`/agents/${run.agent_id}/versions`}
+                style={{ marginLeft: 8, fontSize: 13, color: 'var(--fg-muted)' }}
+                title="View agent versions"
+              >
+                @v{run.agent_version}
+              </Link>
+            )}
           </h1>
-          <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>
-            {agent?.description}
-          </div>
         </div>
-        <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-          <button
-            disabled={rerunning}
-            onClick={async () => {
-              setRerunning(true);
-              try {
-                const { run_id } = await api.rerunRun(id);
-                navigate(`/runs/${run_id}`);
-              } catch (e) {
-                console.error(e);
-                alert('rerun failed');
-              } finally {
-                setRerunning(false);
-              }
-            }}
-            title="Re-execute this agent with the same input"
-          >
-            {rerunning ? 'Rerunning…' : '↻ Rerun'}
-          </button>
-          <StatusPill status={run.status} />
-        </div>
+        <StatusPill status={run.status} />
+        {runnerKind && <span className="stat">runner<strong>{runnerKind}</strong></span>}
+        {modelName && <span className="stat">model<strong>{modelName}</strong></span>}
+        <span className="spacer" />
+        <button
+          disabled={rerunning}
+          onClick={async () => {
+            setRerunning(true);
+            try {
+              const { run_id } = await api.rerunRun(id);
+              navigate(`/runs/${run_id}`);
+            } catch (e) {
+              console.error(e);
+              alert('rerun failed');
+            } finally {
+              setRerunning(false);
+            }
+          }}
+          title="Re-execute this agent with the same input"
+        >
+          {rerunning ? 'Rerunning…' : '↻ Rerun'}
+        </button>
       </div>
 
-      {/* ── status + metadata table ──────────────────────────────────── */}
-      <RunsTable
-        items={[{
-          id: run.id,
-          agent_id: run.agent_id,
-          status: run.status,
-          started_at: run.created_at,
-          finished_at: run.finished_at,
-          duration_ms: duration,
-          executor: agent?.runner?.kind ?? null,
-          model: usage?.model ?? agent?.runner?.model ?? null,
-          input_tokens: usage?.input_tokens ?? null,
-          output_tokens: usage?.output_tokens ?? null,
-          cache_read_tokens: usage?.cache_read_tokens ?? null,
-          cache_creation_tokens: usage?.cache_write_tokens ?? null,
-          cost_usd: usage?.cost_usd ?? null,
-        }]}
-        columns={['run', 'agent', 'status', 'model', 'runner', 'duration', 'tokens', 'cost']}
-        emptyMessage=""
-      />
-
-      {/* ── context tags (non-duplicating the RunsTable above) ────────── */}
+      {/* ── Meta strip + plumbing (folded) ──────────────────────────── */}
       <div className="meta-tags">
         <Tag label="started" value={fmtRelative(run.created_at)} tone="accent" />
         {run.finished_at && <Tag label="finished" value={fmtRelative(run.finished_at)} />}
         {agent?.session_mode && <Tag label="session" value={agent.session_mode} />}
-        {agent?.workspace === '<ephemeral>'
-          ? <Tag label="workspace" value="ephemeral" />
-          : agent?.workspace && <Tag label="workspace" value={agent.workspace} tone="mono" />}
+        {workspace && (
+          isEphemeral ? (
+            <Tag label="workspace" value="ephemeral" />
+          ) : (
+            <span className="meta-tag mono">
+              <span className="meta-tag-label">workspace</span>
+              <span className="meta-tag-value">
+                <Link to={`/workspaces/${workspace}`}>{workspace}</Link>
+              </span>
+            </span>
+          )
+        )}
         {run.session_id && <Tag label="session_id" value={run.session_id.slice(0, 8)} tone="mono" />}
+        {agent?.description && (
+          <span className="meta-tag">
+            <span className="meta-tag-label">about</span>
+            <span className="meta-tag-value" style={{ fontWeight: 400 }}>{agent.description}</span>
+          </span>
+        )}
       </div>
 
-      {/* ── error card (collapsed by default) ─────────────────────────── */}
+      {/* ── Stats row: runtime, tokens, cache, cost, events, tools ─── */}
+      <div className="run-stats-row">
+        <div className="stat-block">
+          <span className="label">Runtime</span>
+          <span className="value">{fmtMs(duration)}</span>
+          <span className="sub" title={run.created_at}>
+            {run.finished_at ? `${fmtRelative(run.created_at)} → ${fmtRelative(run.finished_at)}` : `started ${fmtRelative(run.created_at)}`}
+          </span>
+        </div>
+        <div className="stat-block">
+          <span className="label">Tokens</span>
+          <span className="value">{fmtNum(tokens)}</span>
+          <span className="sub">in {fmtNum(usage?.input_tokens)} · out {fmtNum(usage?.output_tokens)}</span>
+        </div>
+        <div className="stat-block">
+          <span className="label">Cache</span>
+          <span className="value">{fmtNum(cacheTokens)}</span>
+          <span className="sub">read {fmtNum(usage?.cache_read_tokens)} · write {fmtNum(usage?.cache_write_tokens)}</span>
+        </div>
+        <div className="stat-block">
+          <span className="label">Cost</span>
+          <span className="value">{fmtCost(usage?.cost_usd)}</span>
+          <span className="sub">{usage?.model ?? '—'}</span>
+        </div>
+        <div className="stat-block">
+          <span className="label">Events</span>
+          <span className="value">{fmtNum(events.length)}</span>
+          <span className="sub">{toolCallCount} tool calls</span>
+        </div>
+        <div className="stat-block">
+          <span className="label">Checks</span>
+          <span className="value">
+            {run.validation_status ? (
+              <span className={`pill ${run.validation_status === 'ok' ? 'ok' : run.validation_status === 'warn' ? 'running' : 'error'}`}>
+                {run.validation_status}
+              </span>
+            ) : '—'}
+          </span>
+          <span className="sub">{guards.length} guardrails</span>
+        </div>
+      </div>
+
+      <details className="section" style={{ padding: '8px 14px' }}>
+        <summary className="dim" style={{ cursor: 'pointer', fontSize: 12 }}>
+          Plumbing — run id, workdir, transcript, timestamps
+        </summary>
+        <dl className="dl" style={{ marginTop: 10 }}>
+          <dt>Run id</dt><dd><code>{run.id}</code></dd>
+          <dt>Agent version</dt>
+          <dd>
+            {run.agent_version != null ? (
+              <Link to={`/agents/${run.agent_id}/versions`}><code>v{run.agent_version}</code></Link>
+            ) : <span className="dim">—</span>}
+            {run.agent_version_id != null && <span className="dim" style={{ marginLeft: 8 }}>(id {run.agent_version_id})</span>}
+          </dd>
+          <dt>Session</dt><dd>{run.session_id ?? <span className="dim">—</span>}</dd>
+          <dt>Workdir</dt><dd><code style={{ fontSize: 11 }}>{run.workdir ?? '—'}</code></dd>
+          <dt>Transcript</dt><dd><code style={{ fontSize: 11 }}>{run.transcript_path ?? '—'}</code></dd>
+          <dt>Config digest</dt><dd>{run.config_digest ? <code style={{ fontSize: 11 }}>{run.config_digest}</code> : <span className="dim">—</span>}</dd>
+          <dt>Started</dt><dd>{fmtDt(run.created_at)} <span className="dim">({fmtRelative(run.created_at)})</span></dd>
+          <dt>Finished</dt><dd>{fmtDt(run.finished_at)} {run.finished_at && <span className="dim">({fmtRelative(run.finished_at)})</span>}</dd>
+        </dl>
+      </details>
+
+      {/* ── Error card (when present) ───────────────────────────────── */}
       {run.error && (
-        <details className="section error-card" style={{ padding: 0 }}>
+        <details className="section error-card" open style={{ padding: 0 }}>
           <summary className="error-card-summary">
             <span style={{ color: 'var(--red)', fontWeight: 500 }}>{err.headline || 'Run failed'}</span>
             {err.detail && <span className="dim" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 8 }}>{err.detail}</span>}
@@ -640,250 +725,314 @@ export default function RunDetailPage() {
         </details>
       )}
 
-      {/* ── KPI cards ────────────────────────────────────────────────── */}
-      <div className="kpi-grid">
-        <div className="kpi">
-          <div className="kpi-label">Duration</div>
-          <div className="kpi-value">{fmtMs(duration)}</div>
-          <div className="kpi-sub" title={run.created_at}>
-            started {fmtRelative(run.created_at)}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">Tokens</div>
-          <div className="kpi-value">{fmtNum(tokens)}</div>
-          <div className="kpi-sub">
-            in {fmtNum(usage?.input_tokens)} · out {fmtNum(usage?.output_tokens)}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">Cache</div>
-          <div className="kpi-value">
-            {fmtNum((usage?.cache_read_tokens ?? 0) + (usage?.cache_write_tokens ?? 0))}
-          </div>
-          <div className="kpi-sub">
-            read {fmtNum(usage?.cache_read_tokens)} · write {fmtNum(usage?.cache_write_tokens)}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">Cost</div>
-          <div className="kpi-value">{fmtCost(usage?.cost_usd)}</div>
-          <div className="kpi-sub">{usage?.model ?? <span className="dim">no model</span>}</div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">Events</div>
-          <div className="kpi-value">{fmtNum(events.length)}</div>
-          <div className="kpi-sub">{guards.length} guardrails</div>
-        </div>
+      {/* ── Tab bar (sits high — first viewport) ────────────────────── */}
+      <div className="run-tabs">
+        <button className={tab === 'prompt' ? 'active' : ''} onClick={() => setTab('prompt')}>
+          Prompt & I/O
+        </button>
+        <button className={tab === 'conversation' ? 'active' : ''} onClick={() => setTab('conversation')}>
+          Conversation<span className="count">{events.length}</span>
+        </button>
+        <button className={tab === 'tools' ? 'active' : ''} onClick={() => setTab('tools')}>
+          Tool calls<span className="count">{toolCallCount}</span>
+        </button>
+        <button className={tab === 'checks' ? 'active' : ''} onClick={() => setTab('checks')}>
+          Checks<span className="count">
+            {(run.validation_status ? 1 : 0) + guards.length || '—'}
+          </span>
+        </button>
+        <button className={tab === 'snapshot' ? 'active' : ''} onClick={() => setTab('snapshot')}>
+          Snapshot
+        </button>
       </div>
 
-      {/* ── Validation badge ─────────────────────────────────────────── */}
-      {run.validation_status && (
-        <section className="section">
-          <div className="row between" style={{ marginBottom: 6 }}>
-            <h2 style={{ border: 'none', margin: 0 }}>
-              Validation{' '}
-              <span className={`pill ${run.validation_status === 'ok' ? 'ok' : run.validation_status === 'warn' ? 'running' : 'error'}`}>
-                {run.validation_status}
-              </span>
-            </h2>
-          </div>
-          {run.validation_errors && (
-            <CodeBlock value={run.validation_errors} language="json" />
-          )}
-        </section>
-      )}
-
-      {/* ── Rendered Prompt ──────────────────────────────────────────── */}
-      {run.rendered_prompt && (
-        <section className="section">
-          <h2 style={{ border: 'none', margin: 0, marginBottom: 8 }}>
-            Rendered Prompt <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· composed for this run</span>
-          </h2>
-          <details className="code-block" style={{ marginBottom: 8 }}>
-            <summary className="code-block-bar">System prompt</summary>
-            <pre style={{ margin: 0, padding: 10 }}>{run.rendered_prompt.system}</pre>
-          </details>
-          <details className="code-block" style={{ marginBottom: 8 }}>
-            <summary className="code-block-bar">User message</summary>
-            <pre style={{ margin: 0, padding: 10 }}>{run.rendered_prompt.user}</pre>
-          </details>
-          {run.rendered_prompt.schema && (
-            <details className="code-block">
-              <summary className="code-block-bar">Output schema</summary>
-              <pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(run.rendered_prompt.schema, null, 2)}</pre>
+      {tab === 'prompt' && (
+      <section className="section">
+        {/* Rendered system/user prompts (composed for this run) */}
+        {renderedPrompt ? (
+          <>
+            <details className="code-block" style={{ marginBottom: 8 }}>
+              <summary className="code-block-bar">
+                <strong>System prompt</strong>
+                <span className="dim" style={{ marginLeft: 8 }}>
+                  {renderedPrompt.system.length.toLocaleString()} chars
+                </span>
+              </summary>
+              <pre style={{ margin: 0, padding: 10, maxHeight: '50vh', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {renderedPrompt.system}
+              </pre>
             </details>
-          )}
-        </section>
-      )}
+            <details className="code-block" style={{ marginBottom: 8 }} open>
+              <summary className="code-block-bar">
+                <strong>User message</strong>
+                <span className="dim" style={{ marginLeft: 8 }}>
+                  {renderedPrompt.user.length.toLocaleString()} chars
+                </span>
+              </summary>
+              <pre style={{ margin: 0, padding: 10, maxHeight: '50vh', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {renderedPrompt.user}
+              </pre>
+            </details>
+            {renderedPrompt.schema != null && (
+              <details className="code-block" style={{ marginBottom: 8 }}>
+                <summary className="code-block-bar">Output schema</summary>
+                <pre style={{ margin: 0, padding: 10, maxHeight: '40vh', overflow: 'auto' }}>
+                  {JSON.stringify(renderedPrompt.schema, null, 2)}
+                </pre>
+              </details>
+            )}
+          </>
+        ) : (
+          <p className="dim" style={{ margin: '0 0 10px', fontSize: 12 }}>
+            rendered prompt not captured for this run — only embedded runners
+            (pydantic-ai, etc.) post system/user back. The assembled-prompt
+            fragments below show what the runner actually concatenated.
+          </p>
+        )}
 
-      {/* ── Variables ────────────────────────────────────────────────── */}
-      {run.variables && (
-        <section className="section">
-          <h2 style={{ border: 'none', margin: 0, marginBottom: 6 }}>
-            Variables <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· what the caller sent</span>
-          </h2>
-          <CodeBlock value={JSON.stringify(run.variables, null, 2)} language="json" />
-        </section>
-      )}
+        {/* Variables — small KV table */}
+        {variablesEntries.length > 0 && (
+          <details open style={{ marginBottom: 8 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 13, marginBottom: 6 }}>
+              <strong>Variables</strong>
+              <span className="dim" style={{ marginLeft: 6, fontSize: 11 }}>
+                {variablesEntries.length} sent by caller
+              </span>
+            </summary>
+            <table className="kv-table">
+              <tbody>
+                {variablesEntries.map(([k, v]) => {
+                  const str = typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+                  return (
+                    <tr key={k}>
+                      <td>{k} <span className="dim" style={{ fontSize: 10 }}>{str.length.toLocaleString()}</span></td>
+                      <td><div className="clip">{str}</div></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </details>
+        )}
 
-      {/* ── Input ────────────────────────────────────────────────────── */}
-      <section className="section">
-        <div className="row between" style={{ marginBottom: 6 }}>
-          <h2 style={{ border: 'none', margin: 0 }}>
-            Input <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· what the agent received</span>
-          </h2>
-          {inputPretty.isJson && <span className="tag">JSON</span>}
-        </div>
-        {inputPretty.text
-          ? <CodeBlock value={inputPretty.text} language={inputPretty.isJson ? 'json' : 'text'} />
-          : <p className="dim" style={{ margin: 0 }}>(empty)</p>}
-      </section>
+        {/* Input (raw) — collapsed if same as variables */}
+        {inputPretty.text ? (
+          <details
+            className="code-block"
+            style={{ marginBottom: 8 }}
+            open={!inputIsSameAsVariables && variablesEntries.length === 0}
+          >
+            <summary className="code-block-bar">
+              <strong>Input (raw)</strong>
+              <span className="dim" style={{ marginLeft: 8 }}>
+                {inputPretty.isJson ? 'JSON · ' : ''}
+                {inputPretty.text.length.toLocaleString()} chars
+                {inputIsSameAsVariables && ' · same as variables'}
+              </span>
+            </summary>
+            <pre style={{ margin: 0, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {inputPretty.text}
+            </pre>
+          </details>
+        ) : null}
 
-      {/* ── Output ───────────────────────────────────────────────────── */}
-      {run.output && (
-        <section className="section">
-          <div className="row between" style={{ marginBottom: 6 }}>
-            <h2 style={{ border: 'none', margin: 0 }}>
-              Output <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· final assistant text</span>
-            </h2>
-            {outputPretty.isJson && <span className="tag">JSON</span>}
+        {/* Output */}
+        {run.output ? (
+          <details className="code-block" style={{ marginBottom: 8 }} open>
+            <summary className="code-block-bar">
+              <strong>Output</strong>
+              <span className="dim" style={{ marginLeft: 8 }}>
+                {outputPretty.isJson ? 'JSON · ' : ''}
+                {outputPretty.text.length.toLocaleString()} chars
+              </span>
+            </summary>
+            <pre style={{ margin: 0, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {outputPretty.text}
+            </pre>
+          </details>
+        ) : (
+          <p className="dim" style={{ margin: '6px 0 0', fontSize: 12 }}>
+            no output captured{run.status === 'running' ? ' yet' : ''}.
+          </p>
+        )}
+
+        {/* Assembled prompt fragments (collapsed — debugging detail) */}
+        <details style={{ marginTop: 12 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13 }}>
+            <strong>Assembled prompt fragments</strong>
+            <span className="dim" style={{ marginLeft: 6, fontSize: 11 }}>
+              {promptDoc
+                ? `${promptDoc.fragments.length} fragments · ${fmtBytes(promptDoc.total_bytes)}`
+                : 'not captured'}
+              {runnerKind && ` · runner ${runnerKind}`}
+            </span>
+          </summary>
+          <div style={{ marginTop: 8 }}>
+            {promptDoc ? (
+              <div className="code-block">
+                {promptDoc.fragments.map((f, i) => (
+                  <FragmentRow key={i} f={f} total={promptDoc.total_bytes} />
+                ))}
+              </div>
+            ) : (
+              <p className="dim" style={{ margin: 0, fontSize: 12 }}>
+                fragments not captured (older run or capture failed)
+              </p>
+            )}
           </div>
-          <CodeBlock value={outputPretty.text} language={outputPretty.isJson ? 'json' : 'text'} />
-        </section>
+        </details>
+      </section>
       )}
 
-      {/* ── Assembled prompt ─────────────────────────────────────────── */}
-      <PromptFragmentsSection doc={promptDoc} runnerKind={agent?.runner.kind ?? null} />
-
-      {/* ── Tool calls ───────────────────────────────────────────────── */}
-      <ToolCallsSection events={events} />
-
-      {/* ── Event stream / Conversation ──────────────────────────────── */}
-      <section className="section">
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <h2 style={{ border: 'none', margin: 0 }}>
-            {eventView === 'conversation' ? 'Conversation' : 'Event stream'}
-          </h2>
-          <div className="row">
-            <div className="range-toggle">
+      {tab === 'conversation' && (
+        <section className="section">
+          <div className="row between" style={{ marginBottom: 8 }}>
+            <h2 style={{ border: 'none', margin: 0 }}>
+              {eventView === 'conversation' ? 'Conversation' : 'Event stream'}
+              {isLive && <span className="pill running" style={{ marginLeft: 8, fontSize: 10 }}>live</span>}
+            </h2>
+            <div className="row">
+              <div className="range-toggle">
+                <button
+                  className={eventView === 'conversation' ? 'active' : ''}
+                  onClick={() => setEventView('conversation')}
+                >
+                  conversation
+                </button>
+                <button
+                  className={eventView === 'events' ? 'active' : ''}
+                  onClick={() => setEventView('events')}
+                >
+                  raw events
+                </button>
+              </div>
               <button
-                className={eventView === 'conversation' ? 'active' : ''}
-                onClick={() => setEventView('conversation')}
+                style={{ fontSize: 11, padding: '3px 8px' }}
+                onClick={() => {
+                  setEventsLoading(true);
+                  api.getTranscript(id)
+                    .then((evs) => { setEvents(evs as StreamEvent[]); setEventsLoading(false); })
+                    .catch(() => { setEventsError('failed to load transcript'); setEventsLoading(false); });
+                }}
               >
-                conversation
-              </button>
-              <button
-                className={eventView === 'events' ? 'active' : ''}
-                onClick={() => setEventView('events')}
-              >
-                events
+                refresh
               </button>
             </div>
-            <button
-              style={{ fontSize: 11, padding: '3px 8px' }}
-              onClick={() => {
-                setEventsLoading(true);
-                api.getTranscript(id)
-                  .then((evs) => { setEvents(evs as StreamEvent[]); setEventsLoading(false); })
-                  .catch(() => { setEventsError('failed to load transcript'); setEventsLoading(false); });
-              }}
-            >
-              refresh
-            </button>
           </div>
-        </div>
-        {eventsLoading ? (
-          <p className="dim" style={{ margin: 0, textAlign: 'center', padding: 20 }}>loading events…</p>
-        ) : eventsError ? (
-          <p className="dim" style={{ margin: 0, textAlign: 'center', padding: 20, color: 'var(--red)' }}>{eventsError}</p>
-        ) : eventView === 'conversation' ? (
-          <ConversationView events={events} />
-        ) : (
-          <EventStream events={events} isLive={isLive} />
-        )}
-      </section>
-
-      {/* ── Guardrails ───────────────────────────────────────────────── */}
-      <section className="section">
-        <h2 style={{ borderBottom: 'none' }}>
-          Guardrails {guards.length > 0 && <span className="dim">({guards.length})</span>}
-        </h2>
-        {guards.length === 0 ? (
-          <p className="dim" style={{ margin: 0 }}>none ran for this agent</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Result</th>
-                <th>Message</th>
-                <th>At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {guards.map((g) => (
-                <tr key={g.id}>
-                  <td className="dim">{g.attempt}</td>
-                  <td><code>{g.name}</code></td>
-                  <td>{g.ok ? <span className="pill ok">ok</span> : <span className="pill error">fail</span>}</td>
-                  <td style={{ whiteSpace: 'pre-wrap' }}>{g.message ?? ''}</td>
-                  <td className="dim" title={g.created_at}>{fmtRelative(g.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      {/* ── Composition snapshot ───────────────────────────────────── */}
-      {run.composition_snapshot && (
-        <section className="section">
-          <h2 style={{ border: 'none', margin: 0, marginBottom: 6 }}>
-            Composition Snapshot <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· recipe version</span>
-          </h2>
-          <dl className="dl">
-            {run.composition_snapshot.bundle_sha && (
-              <><dt>Bundle SHA</dt><dd><code>{String(run.composition_snapshot.bundle_sha)}</code></dd></>
-            )}
-            {run.composition_snapshot.schema_sha && (
-              <><dt>Schema SHA</dt><dd><code>{String(run.composition_snapshot.schema_sha)}</code></dd></>
-            )}
-            {Array.isArray(run.composition_snapshot.references) && (
-              <>
-                <dt>References</dt>
-                <dd>
-                  <ul style={{ margin: 0, paddingLeft: 16 }}>
-                    {run.composition_snapshot.references.map((ref: unknown, i: number) => (
-                      <li key={i}><code>{typeof ref === 'string' ? ref : JSON.stringify(ref)}</code></li>
-                    ))}
-                  </ul>
-                </dd>
-              </>
-            )}
-          </dl>
+          {eventsLoading ? (
+            <p className="dim" style={{ margin: 0, textAlign: 'center', padding: 20 }}>loading events…</p>
+          ) : eventsError ? (
+            <p className="dim" style={{ margin: 0, textAlign: 'center', padding: 20, color: 'var(--red)' }}>{eventsError}</p>
+          ) : eventView === 'conversation' ? (
+            <ConversationView events={events} />
+          ) : (
+            <EventStream events={events} isLive={isLive} />
+          )}
         </section>
       )}
 
-      {/* ── Comments ──────────────────────────────────────────────── */}
-      <RunCommentThread runId={id} />
+      {tab === 'tools' && <ToolCallsSection events={events} />}
 
-      {/* ── Plumbing details (collapsed by default) ─────────────────── */}
-      <details className="section" style={{ padding: '12px 16px' }}>
-        <summary className="dim" style={{ cursor: 'pointer', fontWeight: 500 }}>
-          Plumbing details
-        </summary>
-        <dl className="dl" style={{ marginTop: 12 }}>
-          <dt>Run id</dt><dd><code>{run.id}</code></dd>
-          <dt>Agent</dt><dd><Link to={`/agents/${run.agent_id}`}><code>{run.agent_id}</code></Link></dd>
-          <dt>Session</dt><dd>{run.session_id ?? <span className="dim">—</span>}</dd>
-          <dt>Workdir</dt><dd><code style={{ fontSize: 11 }}>{run.workdir ?? '—'}</code></dd>
-          <dt>Transcript</dt><dd><code style={{ fontSize: 11 }}>{run.transcript_path ?? '—'}</code></dd>
-          <dt>Started</dt><dd>{fmtDt(run.created_at)} <span className="dim">({fmtRelative(run.created_at)})</span></dd>
-          <dt>Finished</dt><dd>{fmtDt(run.finished_at)} {run.finished_at && <span className="dim">({fmtRelative(run.finished_at)})</span>}</dd>
-        </dl>
-      </details>
+      {tab === 'checks' && (
+        <>
+          <section className="section">
+            <h2 style={{ borderBottom: 'none' }}>
+              Validation{' '}
+              {run.validation_status && (
+                <span className={`pill ${run.validation_status === 'ok' ? 'ok' : run.validation_status === 'warn' ? 'running' : 'error'}`}>
+                  {run.validation_status}
+                </span>
+              )}
+            </h2>
+            {run.validation_status ? (
+              run.validation_errors ? (
+                <CodeBlock value={run.validation_errors} language="json" />
+              ) : (
+                <p className="dim" style={{ margin: 0, fontSize: 12 }}>passed with no errors</p>
+              )
+            ) : (
+              <p className="dim" style={{ margin: 0, fontSize: 12 }}>
+                no output schema configured for this agent — set
+                {' '}<code>runner.output_schema_path</code> in the agent config
+                to enable jsonschema/pydantic validation with retries.
+              </p>
+            )}
+          </section>
+
+          <section className="section">
+            <h2 style={{ borderBottom: 'none' }}>
+              Guardrails {guards.length > 0 && <span className="dim">({guards.length})</span>}
+            </h2>
+            {guards.length === 0 ? (
+              <p className="dim" style={{ margin: 0, fontSize: 12 }}>
+                no guardrails ran for this agent — add a <code>guardrails</code> entry
+                in the agent config to record post-run observational checks here
+                (e.g. cost-bound, schema-shape, custom python).
+              </p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th><th>Name</th><th>Result</th><th>Message</th><th>At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {guards.map((g) => (
+                    <tr key={g.id}>
+                      <td className="dim">{g.attempt}</td>
+                      <td><code>{g.name}</code></td>
+                      <td>{g.ok ? <span className="pill ok">ok</span> : <span className="pill error">fail</span>}</td>
+                      <td style={{ whiteSpace: 'pre-wrap' }}>{g.message ?? ''}</td>
+                      <td className="dim" title={g.created_at}>{fmtRelative(g.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </>
+      )}
+
+      {tab === 'snapshot' && (
+        <section className="section">
+          <h2 style={{ border: 'none', margin: 0, marginBottom: 6 }}>
+            Composition Snapshot <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· recipe + references at run time</span>
+          </h2>
+          {run.composition_snapshot ? (
+            <dl className="dl">
+              {run.composition_snapshot.bundle_sha && (
+                <><dt>Bundle SHA</dt><dd><code>{String(run.composition_snapshot.bundle_sha)}</code></dd></>
+              )}
+              {run.composition_snapshot.schema_sha && (
+                <><dt>Schema SHA</dt><dd><code>{String(run.composition_snapshot.schema_sha)}</code></dd></>
+              )}
+              {Array.isArray(run.composition_snapshot.references) && (
+                <>
+                  <dt>References</dt>
+                  <dd>
+                    <ul style={{ margin: 0, paddingLeft: 16 }}>
+                      {run.composition_snapshot.references.map((ref: unknown, i: number) => (
+                        <li key={i}><code>{typeof ref === 'string' ? ref : JSON.stringify(ref)}</code></li>
+                      ))}
+                    </ul>
+                  </dd>
+                </>
+              )}
+            </dl>
+          ) : (
+            <p className="dim" style={{ margin: 0, fontSize: 12 }}>
+              composition snapshot not captured for this run — populated when
+              the runner uses bundled references (see <code>composition</code>
+              in the agent config). Snapshot pins the exact bundle+schema SHAs
+              used so a rerun is byte-reproducible.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* ── Comments (always at the bottom, across tabs) ─────────────── */}
+      <RunCommentThread runId={id} />
     </div>
   );
 }
+

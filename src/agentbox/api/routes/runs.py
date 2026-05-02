@@ -324,7 +324,12 @@ def get_run(run_id: str) -> dict:
         raise HTTPException(404)
     usage = get_store().get_usage(run_id)
     guardrails = get_store().list_guardrails(run_id)
-    return {"run": rec.__dict__, "usage": usage, "guardrails": guardrails}
+    run_dict = dict(rec.__dict__)
+    if rec.agent_version_id is not None:
+        ver = get_store().get_version_by_id(rec.agent_version_id)
+        if ver is not None:
+            run_dict["agent_version"] = ver.get("version")
+    return {"run": run_dict, "usage": usage, "guardrails": guardrails}
 
 
 @router.get("/{run_id}/prompt")
