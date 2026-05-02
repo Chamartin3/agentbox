@@ -635,6 +635,30 @@ class RunExecutor:
         )
         rendered, run_dir = self._render_for_run(adapter, agent, workdir, rendered)
 
+        # --- host-env MCP server injection (Plan 08 Phase 3) -----------------
+        _host_env_grants: dict | None = None
+        if _workspace_id:
+            try:
+                resolved_he = self.store.resolve_workspace_host_env(_workspace_id)
+                grants = resolved_he.get("grants") or {}
+                # Only inject if there's more than the default-granted workspace_info cap
+                from agentbox.core.host_env.capabilities import CAPABILITIES
+
+                non_default = {k for k, v in CAPABILITIES.items() if not v.default_granted}
+                if grants.keys() & non_default:
+                    _host_env_grants = grants
+                    self._inject_host_env_mcp(
+                        run_dir=run_dir,
+                        grants=grants,
+                        workspace_id=_workspace_id,
+                        workdir=workdir,
+                    )
+            except Exception:
+                logger.exception(
+                    "executor: host-env MCP injection failed for workspace %r",
+                    _workspace_id,
+                )
+
         transcripts_dir = self.settings.data_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)
         transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
@@ -693,7 +717,7 @@ class RunExecutor:
                 variables=variables or {},
             )
 
-        # Persist resource + MCP snapshots (Plan 08 Phase 1)
+        # Persist resource + MCP snapshots (Plan 08 Phase 1+3)
         _mcp_snapshot: dict | None = None
         if _workspace_id:
             try:
@@ -705,6 +729,9 @@ class RunExecutor:
                 _mcp_snapshot = self.store.resolve_workspace_mcp(
                     _workspace_id, manifest_servers
                 )
+                if _host_env_grants:
+                    _mcp_snapshot["host_env_grants"] = list(_host_env_grants.keys())
+                    _mcp_snapshot["host_env_injected"] = True
             except Exception:
                 logger.exception(
                     "executor: MCP snapshot capture failed for workspace %r", _workspace_id
@@ -934,6 +961,50 @@ class RunExecutor:
                 model=rendered.model,
             ),
             run_dir,
+        )
+
+    def _inject_host_env_mcp(
+        self,
+        run_dir: Path,
+        grants: dict,
+        workspace_id: str,
+        workdir: Path,
+    ) -> None:
+        """Patch claude_mcp.json in run_dir to include the host-env stdio server.
+
+        Claude Code / OpenCode spawn the server themselves when they see it in
+        the MCP config. We pass the effective grants + run context via env vars
+        so the server process can enforce them and write to the audit log.
+        """
+        import json as _json
+        import sys
+
+        mcp_path = run_dir / "claude_mcp.json"
+        if not mcp_path.exists():
+            mcp_data: dict = {"mcpServers": {}}
+        else:
+            mcp_data = _json.loads(mcp_path.read_text())
+        mcp_data.setdefault("mcpServers", {})
+
+        env_vars: dict[str, str] = {
+            "AGENTBOX_HOST_ENV_GRANTS_JSON": _json.dumps(grants),
+            "AGENTBOX_HOST_ENV_WORKSPACE_ID": workspace_id,
+            "AGENTBOX_HOST_ENV_WORKDIR": str(workdir),
+            "AGENTBOX_DB_PATH": str(self.settings.db_path),
+        }
+        mcp_data["mcpServers"]["agentbox-host-env"] = {
+            "command": sys.executable,
+            "args": ["-m", "agentbox.mcp_servers.host_env"],
+            "env": env_vars,
+        }
+        mcp_path.write_text(
+            _json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        logger.debug(
+            "executor: injected host-env MCP server for workspace %r with caps: %s",
+            workspace_id,
+            list(grants.keys()),
         )
 
     @staticmethod
