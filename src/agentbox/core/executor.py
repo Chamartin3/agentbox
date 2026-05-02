@@ -414,11 +414,10 @@ class RunExecutor:
             try:
                 ws_bindings = resolve_workspace_resources(self.store, _workspace_id)
                 if ws_bindings:
-                    cache_root: Path | None = None
-                    cache_dir_str = os.environ.get("AGENTBOX_RESOURCE_CACHE_DIR")
-                    if cache_dir_str:
-                        cache_root = Path(cache_dir_str)
-                    outcomes = materialize_workspace(workdir, ws_bindings, cache_root=cache_root)
+                    outcomes = materialize_workspace(
+                        workdir, ws_bindings,
+                        cache_root=self.settings.resource_cache_dir,
+                    )
                     _resource_snapshot_entries.extend(workspace_outcomes_to_snapshot(outcomes))
             except Exception:
                 logger.exception(
