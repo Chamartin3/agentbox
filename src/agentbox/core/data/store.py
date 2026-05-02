@@ -24,9 +24,14 @@ from agentbox.core.constants import RunStatus
 from agentbox.core.data.agent_sync import AgentSyncMixin
 from agentbox.core.data.agent_versions import AgentVersionsMixin
 from agentbox.core.data.analytics import AnalyticsMixin
+from agentbox.core.data.env_docs import EnvDocsMixin
+from agentbox.core.data.host_env import HostEnvMixin
+from agentbox.core.data.mcp_overrides import McpOverridesMixin
 from agentbox.core.data.prompts import PromptVersionsMixin
 from agentbox.core.data.records import RunRecord, now_iso, row_to_run
-from agentbox.core.data.shared_resources import SharedResourcesMixin
+from agentbox.core.data.resource_bindings import ResourceBindingsMixin
+from agentbox.core.data.resources import ResourcesMixin
+from agentbox.core.data.runner_profiles import RunnerProfilesMixin
 from agentbox.core.data.schema import (
     guardrail_results,
     metadata,
@@ -37,6 +42,7 @@ from agentbox.core.data.schema import (
     usage,
     webhook_deliveries,
 )
+from agentbox.core.data.shared_resources import SharedResourcesMixin
 
 
 class _CoreStore:
@@ -115,6 +121,9 @@ class _CoreStore:
             ("runs", "post_errors", "TEXT"),
             ("runs", "conversation_format", "TEXT"),
             ("runs", "conversation_uri", "TEXT"),
+            ("runs", "runner_profile_id", "TEXT"),
+            ("runs", "resource_snapshot", "TEXT"),
+            ("runs", "mcp_snapshot", "TEXT"),
             ("prompt_versions", "content_hash", "TEXT"),
         ]
         with self.engine.begin() as conn:
@@ -129,6 +138,65 @@ class _CoreStore:
                     conn.exec_driver_sql(
                         f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"
                     )
+
+            # Create runner_profiles table if missing
+            try:
+                conn.exec_driver_sql(
+                    """CREATE TABLE IF NOT EXISTS runner_profiles (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        backend TEXT NOT NULL,
+                        provider TEXT,
+                        model TEXT,
+                        timeout_seconds INTEGER,
+                        base_url TEXT,
+                        api_key_env TEXT,
+                        params_json TEXT NOT NULL DEFAULT '{}',
+                        headers_json TEXT NOT NULL DEFAULT '{}',
+                        extra_args_json TEXT NOT NULL DEFAULT '[]',
+                        is_enabled INTEGER NOT NULL DEFAULT 1,
+                        is_system_default INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        CHECK(is_enabled IN (0, 1)),
+                        CHECK(is_system_default IN (0, 1))
+                    )"""
+                )
+                # Create indexes
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS idx_runner_profiles_backend_provider "
+                    "ON runner_profiles(backend, provider)"
+                )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS idx_runner_profiles_enabled "
+                    "ON runner_profiles(is_enabled)"
+                )
+            except Exception:
+                pass
+
+            # Create agent_runner_profiles table if missing
+            try:
+                conn.exec_driver_sql(
+                    """CREATE TABLE IF NOT EXISTS agent_runner_profiles (
+                        agent_id TEXT PRIMARY KEY,
+                        runner_profile_id TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        FOREIGN KEY(runner_profile_id) REFERENCES runner_profiles(id)
+                    )"""
+                )
+            except Exception:
+                pass
+
+            # Create index on runs.runner_profile_id
+            try:
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS idx_runs_runner_profile_id "
+                    "ON runs(runner_profile_id)"
+                )
+            except Exception:
+                pass
 
     def _reap_orphaned_runs(self) -> None:
         """Mark any pre-existing 'running' rows as ``incomplete`` on startup.
@@ -216,6 +284,7 @@ class _CoreStore:
         transcript_path: str,
         session_id: str | None = None,
         config_digest: str | None = None,
+        runner_profile_id: str | None = None,
     ) -> str:
         rid = uuid.uuid4().hex
         with self.engine.begin() as conn:
@@ -230,6 +299,7 @@ class _CoreStore:
                     transcript_path=transcript_path,
                     created_at=now_iso(),
                     config_digest=config_digest,
+                    runner_profile_id=runner_profile_id,
                 )
             )
         return rid
@@ -576,13 +646,37 @@ class _CoreStore:
             with self.engine.begin() as conn:
                 conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
 
+    def save_resource_snapshots(
+        self,
+        run_id: str,
+        *,
+        resource_snapshot: list[dict] | None = None,
+        mcp_snapshot: dict | None = None,
+    ) -> None:
+        import json as _json
+
+        values: dict = {}
+        if resource_snapshot is not None:
+            values["resource_snapshot"] = _json.dumps(resource_snapshot)
+        if mcp_snapshot is not None:
+            values["mcp_snapshot"] = _json.dumps(mcp_snapshot)
+        if values:
+            with self.engine.begin() as conn:
+                conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
+
 
 class SessionStore(
     PromptVersionsMixin,
     AgentVersionsMixin,
     AgentSyncMixin,
     SharedResourcesMixin,
+    ResourcesMixin,
+    ResourceBindingsMixin,
+    EnvDocsMixin,
+    McpOverridesMixin,
+    HostEnvMixin,
+    RunnerProfilesMixin,
     AnalyticsMixin,
     _CoreStore,
 ):
-    """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + shared resources + sync."""
+    """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + shared resources + runner profiles + sync."""

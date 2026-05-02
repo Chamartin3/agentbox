@@ -50,6 +50,10 @@ from agentbox.core.guardrails.base import GuardrailContext
 from agentbox.core.plugins import get_backend, get_guardrail
 from agentbox.core.prompt_capture import build_fragments, fragments_to_json
 from agentbox.core.render import materialize_rendered_config
+from agentbox.core.runner_profiles import (
+    EffectiveRunnerConfig,
+    RunnerProfileResolver,
+)
 from agentbox.core.runners._rate_limit import detect_in_text_line
 from agentbox.core.runners.base import RunRequest
 from agentbox.core.versioning.drift import check_drift, startup_sweep
@@ -279,6 +283,7 @@ class _LegacyRunnerAdapter:
         workdir: Path,
         mcp_tools: list[Any] | None = None,
         creds: dict[str, str] | None = None,
+        runner_config: Any | None = None,
     ) -> RenderedConfig:
         files = {}
         claude_md = workdir / "CLAUDE.md"
@@ -328,6 +333,8 @@ class RunExecutor:
         # a long-running run mid-flight, skipping the finally block that
         # persists final status and fires the webhook.
         self._tasks: set[asyncio.Task[None]] = set()
+        # Runner profile resolver — cheap to instantiate, used on every run.
+        self._profile_resolver = RunnerProfileResolver()
 
     def _make_generator(self) -> ConfigGenerator:
         manifest = self.loader.load()
@@ -380,6 +387,8 @@ class RunExecutor:
         backend: str | None = None,
         variables: dict[str, Any] | None = None,
         runner_embedded: bool = False,
+        runner_profile: str | None = None,
+        runner_config: dict[str, Any] | None = None,
     ) -> str:
         workdir, session_id = self._prepare_workdir(
             agent, session_id, workspace_override
@@ -388,6 +397,43 @@ class RunExecutor:
         agent = self._apply_overrides(
             agent, timeout_seconds, webhook_url, runner_override
         )
+
+        # --- resource prep (Plan 08 Phase 1) ---------------------------------
+        _resource_snapshot_entries: list[dict] = []
+        _workspace_id = agent.workspace if agent.workspace != "<ephemeral>" else None
+        if _workspace_id:
+            from agentbox.core.resources.workspace_materialize import (
+                materialize_workspace,
+            )
+            from agentbox.core.run_prep import (
+                render_env_doc,
+                resolve_workspace_resources,
+                workspace_outcomes_to_snapshot,
+            )
+
+            try:
+                ws_bindings = resolve_workspace_resources(self.store, _workspace_id)
+                if ws_bindings:
+                    cache_root: Path | None = None
+                    cache_dir_str = os.environ.get("AGENTBOX_RESOURCE_CACHE_DIR")
+                    if cache_dir_str:
+                        cache_root = Path(cache_dir_str)
+                    outcomes = materialize_workspace(workdir, ws_bindings, cache_root=cache_root)
+                    _resource_snapshot_entries.extend(workspace_outcomes_to_snapshot(outcomes))
+            except Exception:
+                logger.exception(
+                    "executor: workspace resource materialization failed for workspace %r",
+                    _workspace_id,
+                )
+
+            try:
+                env_doc_entries = render_env_doc(self.store, _workspace_id, workdir)
+                _resource_snapshot_entries.extend(env_doc_entries)
+            except Exception:
+                logger.exception(
+                    "executor: env doc rendering failed for workspace %r",
+                    _workspace_id,
+                )
 
         # --- composition path ------------------------------------------------
         composed_result = None
@@ -499,8 +545,94 @@ class RunExecutor:
                 )
             agent.__dict__["_composed_validation_mode"] = comp.output_validation
 
-        # Select backend adapter and render into run dir
-        adapter, rendered = self._select_backend(agent, workdir, backend)
+        # --- prompt resource binding substitution (Plan 08 Phase 1) ----------
+        try:
+            from agentbox.core.resources.prompt_resolver import resolve_prompt
+            from agentbox.core.run_prep import (
+                prompt_resolution_to_snapshot,
+                resolve_agent_prompt_bindings,
+            )
+
+            prompt_bindings = resolve_agent_prompt_bindings(self.store, agent.id)
+            if prompt_bindings:
+                composed_system = agent.__dict__.get("_composed_system")
+                if composed_system is not None:
+                    resolution = resolve_prompt(composed_system, prompt_bindings)
+                    agent.__dict__["_composed_system"] = resolution.rendered_prompt
+                    _resource_snapshot_entries.extend(
+                        prompt_resolution_to_snapshot(resolution)
+                    )
+                    for marker in resolution.unresolved_markers:
+                        logger.warning(
+                            "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
+                            marker,
+                            agent.id,
+                        )
+                else:
+                    # Non-composition path: resolve against inline/file prompt if present
+                    inline_prompt = agent.prompt
+                    if inline_prompt:
+                        resolution = resolve_prompt(inline_prompt, prompt_bindings)
+                        agent = agent.model_copy(
+                            update={"prompt": resolution.rendered_prompt}
+                        )
+                        _resource_snapshot_entries.extend(
+                            prompt_resolution_to_snapshot(resolution)
+                        )
+                        for marker in resolution.unresolved_markers:
+                            logger.warning(
+                                "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
+                                marker,
+                                agent.id,
+                            )
+        except Exception:
+            logger.exception(
+                "executor: prompt resource binding resolution failed for agent %r",
+                agent.id,
+            )
+
+        # Resolve effective runner config and select backend adapter
+        try:
+            effective = self._profile_resolver.resolve(
+                agent=agent,
+                store=self.store,
+                runner_profile_id=runner_profile,
+                runner_config=runner_config,
+                backend_override=backend,
+                timeout_seconds=timeout_seconds,
+            )
+        except ValueError as exc:
+            # Profile resolution failed — create error run record
+            error_msg = str(exc)
+            transcripts_dir = self.settings.data_dir / "transcripts"
+            transcripts_dir.mkdir(parents=True, exist_ok=True)
+            transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
+            run_id = self.store.create_run(
+                agent_id=agent.id,
+                input_=input_,
+                workdir=str(workdir),
+                transcript_path=str(transcript_path),
+                session_id=session_id,
+            )
+            self.store.finish_run(run_id, ok=False, error=error_msg)
+            # Publish error events for any connected clients
+            broadcaster = RunBroadcaster()
+            self._broadcasters[run_id] = broadcaster
+            broadcaster.publish(LogEvent(text=f"Error: {error_msg}"))
+            broadcaster.publish(DoneEvent(ok=False, error=error_msg))
+            broadcaster.close()
+            return run_id
+
+        # Apply effective timeout if not already overridden
+        effective_timeout = timeout_seconds or effective.timeout_seconds
+        if effective_timeout and not timeout_seconds:
+            agent = self._apply_overrides(
+                agent, effective_timeout, webhook_url, runner_override
+            )
+
+        adapter, rendered = self._select_backend(
+            agent, workdir, backend, runner_config=effective
+        )
         rendered, run_dir = self._render_for_run(adapter, agent, workdir, rendered)
 
         transcripts_dir = self.settings.data_dir / "transcripts"
@@ -513,6 +645,7 @@ class RunExecutor:
             transcript_path=str(transcript_path),
             session_id=session_id,
             config_digest=rendered.digest,
+            runner_profile_id=effective.profile_id,
         )
 
         # Record the effective model immediately at run creation — before
@@ -559,6 +692,31 @@ class RunExecutor:
                 },
                 variables=variables or {},
             )
+
+        # Persist resource + MCP snapshots (Plan 08 Phase 1)
+        _mcp_snapshot: dict | None = None
+        if _workspace_id:
+            try:
+                manifest = self.loader.load()
+                manifest_servers = [
+                    {"name": s.name, "config": {"url": s.url, "transport": str(s.transport)}}
+                    for s in (manifest.mcp_servers or [])
+                ]
+                _mcp_snapshot = self.store.resolve_workspace_mcp(
+                    _workspace_id, manifest_servers
+                )
+            except Exception:
+                logger.exception(
+                    "executor: MCP snapshot capture failed for workspace %r", _workspace_id
+                )
+        try:
+            self.store.save_resource_snapshots(
+                run_id,
+                resource_snapshot=_resource_snapshot_entries if _resource_snapshot_entries else None,
+                mcp_snapshot=_mcp_snapshot,
+            )
+        except Exception:
+            logger.exception("executor: failed to persist snapshots for run %s", run_id)
 
         # Stamp run with current agent version
         self._stamp_run_agent_version(run_id, agent)
@@ -627,6 +785,7 @@ class RunExecutor:
         agent: AgentDef,
         workdir: Path,
         backend_override: str | None = None,
+        runner_config: EffectiveRunnerConfig | None = None,
     ) -> tuple[BackendAdapter, RenderedConfig]:
         """Pick a backend adapter and render its config.
 
@@ -668,7 +827,9 @@ class RunExecutor:
         for name in candidates:
             adapter = _try_backend(name)
             if adapter is not None:
-                rendered = adapter.render(agent, workdir)
+                rendered = adapter.render(
+                    agent, workdir, runner_config=runner_config
+                )
                 return adapter, rendered
 
         raise KeyError("NO_BACKEND_AVAILABLE")
