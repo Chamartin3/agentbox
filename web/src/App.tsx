@@ -6,9 +6,12 @@ import AgentsPage from './pages/AgentsPage';
 import AgentDetailPage from './pages/AgentDetailPage';
 import AgentVersions from './pages/AgentVersions';
 import AgentVersionDiff from './pages/AgentVersionDiff';
+import AgentVersionDetailPage from './pages/AgentVersionDetailPage';
 import AgentNew from './pages/AgentNew';
 import WorkspacesPage from './pages/WorkspacesPage';
 import WorkspaceDetailPage from './pages/WorkspaceDetailPage';
+import RunnerProfilesPage from './pages/RunnerProfilesPage';
+import ResourcesPage from './pages/ResourcesPage';
 
 export default function App() {
   return (
@@ -19,7 +22,9 @@ export default function App() {
           <NavLink to="/" end>activity</NavLink>
           <NavLink to="/runs">runs</NavLink>
           <NavLink to="/agents">agents</NavLink>
+          <NavLink to="/runners">runners</NavLink>
           <NavLink to="/workspaces">workspaces</NavLink>
+          <NavLink to="/resources">resources</NavLink>
           <a href="/health" target="_blank" rel="noreferrer">health</a>
         </nav>
       </header>
@@ -31,10 +36,14 @@ export default function App() {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/agents/new" element={<AgentNew />} />
           <Route path="/agents/:id" element={<AgentDetailPage />} />
+          <Route path="/agents/:id/versions/:vid" element={<AgentVersionDetailPage />} />
           <Route path="/agents/:id/versions" element={<AgentVersions />} />
           <Route path="/agents/:id/versions/diff" element={<AgentVersionDiff />} />
+          <Route path="/runners" element={<RunnerProfilesPage />} />
+          <Route path="/runner-profiles" element={<RunnerProfilesPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
+          <Route path="/resources" element={<ResourcesPage />} />
         </Routes>
       </main>
     </>
