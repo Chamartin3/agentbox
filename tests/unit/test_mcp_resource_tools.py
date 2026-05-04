@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -15,9 +14,14 @@ from fastmcp import FastMCP
 
 
 def _get_tool_fn(mcp: FastMCP, name: str):
-    async def _fetch():
-        return await mcp.get_tool(name)
-    return asyncio.run(_fetch()).fn
+    """Return the underlying Python function for a registered tool by name.
+
+    Accesses FastMCP's _local_provider._components dict which stores
+    FunctionTool objects keyed by "tool:<name>@".
+    """
+    key = f"tool:{name}@"
+    tool = mcp._local_provider._components[key]
+    return tool.fn
 
 
 def _make_mcp() -> FastMCP:
