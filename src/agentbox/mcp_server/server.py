@@ -6,7 +6,7 @@ import os
 
 from fastmcp import FastMCP
 
-from agentbox.mcp_server.tools import agents, prompts, runs, stats, time
+from agentbox.mcp_server.tools import agents, prompts, resources, runs, stats, time
 
 
 def build_server() -> FastMCP:
@@ -23,6 +23,7 @@ def build_server() -> FastMCP:
     agents.register(mcp)
     stats.register(mcp)
     time.register(mcp)
+    resources.register(mcp)
     return mcp
 
 
