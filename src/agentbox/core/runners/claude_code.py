@@ -31,7 +31,7 @@ from agentbox.api.events import (
     UsageEvent,
 )
 from agentbox.core.constants import RunnerKind
-from agentbox.core.runners._rate_limit import detect_in_text_line
+from agentbox.core.streaming.rate_limit import detect_in_text_line
 from agentbox.core.runners.base import Runner, RunRequest
 from agentbox.core.workspaces import (
     claude_agents_path,

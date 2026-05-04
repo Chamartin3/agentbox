@@ -36,7 +36,7 @@ from agentbox.api.events import (
     UsageEvent,
 )
 from agentbox.core.constants import RunnerKind, SessionMode
-from agentbox.core.runners._rate_limit import detect_in_opencode_event
+from agentbox.core.streaming.rate_limit import detect_in_opencode_event
 from agentbox.core.runners.base import Runner, RunRequest
 from agentbox.core.workspaces import opencode_config_path
 

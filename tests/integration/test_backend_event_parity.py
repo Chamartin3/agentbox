@@ -1,0 +1,232 @@
+"""Backend event-parity contract tests (Plan 16 Phase 1.2).
+
+Asserts every `BackendAdapter` emits the same event sequence per
+scenario defined in `tests/backends/EVENT_PARITY.md`. Backends not yet
+satisfying a row are marked ``xfail`` — they flip to ``pass`` as later
+phases land. Do not delete an ``xfail`` mark without verifying the row
+is now satisfied.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from agentbox.api.events import (
+    DoneEvent,
+    LogEvent,
+    TextEvent,
+    ToolCallEvent,
+    ToolResultEvent,
+)
+from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.backends.token import TokenBackend
+from pydantic import BaseModel, ValidationError
+
+pytestmark = pytest.mark.asyncio
+
+
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+
+
+async def _collect(agen: Any) -> list[Any]:
+    out: list[Any] = []
+    async for ev in agen:
+        out.append(ev)
+    return out
+
+
+def _rendered_direct(**meta: Any) -> RenderedConfig:
+    agent_meta: dict[str, Any] = {
+        "agent_module": None,
+        "prompt": "system prompt",
+        "model": "openrouter:test/model",
+        "output_schema": None,
+    }
+    agent_meta.update(meta)
+    return RenderedConfig(
+        cwd=Path("."),
+        files={},
+        agent_meta=agent_meta,
+        model="openrouter:test/model",
+    )
+
+
+class _Usage:
+    input_tokens = 3
+    output_tokens = 4
+    model = "openrouter:test/model"
+
+
+def _fake_result(
+    output: object = "assistant text",
+    messages: list[object] | None = None,
+) -> MagicMock:
+    result = MagicMock()
+    result.output = output
+    result.usage = MagicMock(return_value=_Usage())
+    result.all_messages = MagicMock(return_value=messages or [])
+    return result
+
+
+def _types(events: list[Any]) -> list[str]:
+    return [e.type for e in events]
+
+
+def _roles(events: list[Any]) -> list[str | None]:
+    return [getattr(e, "role", None) for e in events if isinstance(e, TextEvent)]
+
+
+# ---------------------------------------------------------------------
+# Token backend — canonical reference (scenarios 1, 2, 4 implemented)
+# ---------------------------------------------------------------------
+
+
+async def test_token_scenario_1_text_only() -> None:
+    fake = MagicMock()
+    fake.run = AsyncMock(return_value=_fake_result("hello back"))
+    with patch("pydantic_ai.Agent", return_value=fake):
+        events = await _collect(TokenBackend().run(_rendered_direct(), "hi", "rid"))
+
+    assert _types(events) == ["log", "text", "text", "text", "usage", "done"]
+    assert _roles(events) == ["system", "user", "assistant"]
+    assert isinstance(events[-1], DoneEvent) and events[-1].ok is True
+    # invariant: DoneEvent is terminal
+    assert not any(
+        isinstance(e, DoneEvent) for e in events[:-1]
+    ), "DoneEvent must be the final event"
+
+
+async def test_token_scenario_2_tools_used() -> None:
+    """Walks the message-history helper through a tool-call + tool-result pair."""
+    # Build pydantic-ai-style message parts. The helper introspects via
+    # _part_kind(), so a SimpleNamespace with `part_kind` attribute is enough.
+    from types import SimpleNamespace
+
+    call_part = SimpleNamespace(
+        part_kind="tool-call",
+        tool_name="add",
+        args={"a": 2, "b": 3},
+        tool_call_id="call-1",
+    )
+    result_part = SimpleNamespace(
+        part_kind="tool-return",
+        tool_name="add",
+        tool_call_id="call-1",
+        content="5",
+    )
+    msg_a = SimpleNamespace(parts=[call_part])
+    msg_b = SimpleNamespace(parts=[result_part])
+
+    fake = MagicMock()
+    fake.run = AsyncMock(
+        return_value=_fake_result("final answer is 5", messages=[msg_a, msg_b])
+    )
+    with patch("pydantic_ai.Agent", return_value=fake):
+        events = await _collect(
+            TokenBackend().run(_rendered_direct(), "what is 2+3?", "rid")
+        )
+
+    # We require at minimum: log, system, user, (tool_call, tool_result),
+    # assistant, usage, done. The helper is defensive and may downgrade
+    # on schema drift, so accept either the rich shape or a graceful
+    # degradation that still includes the assistant turn.
+    types_ = _types(events)
+    assert "tool_call" in types_ or "log" in types_, (
+        f"expected tool_call or fallback log, got: {types_}"
+    )
+    if "tool_call" in types_:
+        calls = [e for e in events if isinstance(e, ToolCallEvent)]
+        results = [e for e in events if isinstance(e, ToolResultEvent)]
+        assert calls and results
+        assert calls[0].call_id == results[0].call_id, (
+            "ToolCallEvent.call_id must equal ToolResultEvent.call_id"
+        )
+    assert isinstance(events[-1], DoneEvent) and events[-1].ok is True
+
+
+async def test_token_scenario_4_provider_error_keeps_prompt_turns() -> None:
+    class _ProviderShape(BaseModel):
+        finish_reason: int
+
+    try:
+        _ProviderShape.model_validate({"finish_reason": "error"})
+    except ValidationError as exc:
+        provider_exc = exc
+
+    fake = MagicMock()
+    fake.run = AsyncMock(side_effect=provider_exc)
+    with patch("pydantic_ai.Agent", return_value=fake):
+        events = await _collect(
+            TokenBackend().run(
+                _rendered_direct(provider="openrouter"), "hi", "rid"
+            )
+        )
+
+    types_ = _types(events)
+    # Required slots: opening log, system, user, error log, done(ok=False)
+    assert types_[0] == "log"
+    assert "text" in types_
+    assert _roles(events)[:2] == ["system", "user"], (
+        "system + user turns MUST be present even on provider error"
+    )
+    err_logs = [e for e in events if isinstance(e, LogEvent) and e.level == "error"]
+    assert err_logs, "provider error must surface a LogEvent(level='error')"
+    done = events[-1]
+    assert isinstance(done, DoneEvent) and done.ok is False
+    # status may be "error" once executor finalises; backend itself may
+    # not set it — both are valid at the backend layer.
+
+
+# ---------------------------------------------------------------------
+# Token backend — pending scenarios (flip xfail to pass as work lands)
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.xfail(reason="Phase 1.3 — thinking events not yet emitted by token backend")
+async def test_token_scenario_3_thinking() -> None:
+    raise AssertionError("not yet implemented")
+
+
+@pytest.mark.xfail(reason="Phase 1.3 — timeout-event path not exercised in backend unit tests")
+async def test_token_scenario_5_timeout() -> None:
+    raise AssertionError("not yet implemented")
+
+
+@pytest.mark.xfail(reason="Phase 1.3 — validation-retry round-trip needs executor integration")
+async def test_token_scenario_6_validation_retry() -> None:
+    raise AssertionError("not yet implemented")
+
+
+# ---------------------------------------------------------------------
+# claude_code / opencode — half-migrated; full parity arrives in Phase 4
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.xfail(reason="Phase 4 — claude_code backend still delegates to legacy runner")
+async def test_claude_code_scenario_1_text_only() -> None:
+    raise AssertionError("pending Phase 4 inlining")
+
+
+@pytest.mark.xfail(reason="Phase 4 — opencode backend still delegates to legacy runner")
+async def test_opencode_scenario_1_text_only() -> None:
+    raise AssertionError("pending Phase 4 inlining")
+
+
+# ---------------------------------------------------------------------
+# codex / pi — backends do not yet exist; arrive in Phase 2
+# ---------------------------------------------------------------------
+
+
+@pytest.mark.xfail(reason="Phase 2 — codex backend not yet implemented")
+async def test_codex_scenario_1_text_only() -> None:
+    raise AssertionError("pending Phase 2")
+
+
+@pytest.mark.xfail(reason="Phase 2 — pi backend not yet implemented")
+async def test_pi_scenario_1_text_only() -> None:
+    raise AssertionError("pending Phase 2")

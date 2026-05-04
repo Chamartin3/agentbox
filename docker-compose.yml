@@ -64,6 +64,8 @@ services:
       - AGENTBOX_PORT=8765
       - HOME=/home/appuser
       - CLAUDE_CONFIG_DIR=/agentbox/creds/claude
+      # LLM provider keys — forwarded from parent compose .env when set.
+      - OPENROUTER_API_KEY=${OPEN_ROUTER_API_KEY:-}
     networks:
       - default
     logging:
@@ -103,10 +105,41 @@ services:
         max-size: "200k"
         max-file: "10"
 
+  # Plan 16 — opt-in Ollama for the verification harness.
+  # Start with:  docker compose --profile verify up -d ollama ollama-seed
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["verify"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  ollama-seed:
+    image: ollama/ollama:latest
+    profiles: ["verify"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    networks:
+      - default
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "ollama pull llama3.2:1b && ollama pull qwen2.5-coder:0.5b"
+
 volumes:
   agentbox-data:
   agentbox-claude:
   agentbox-web-node-modules:
+  ollama-data:
   # Optional — declare these in an override file for persistence across recreations:
   # agentbox-workspaces:
   # agentbox-opencode:

@@ -62,6 +62,7 @@ class OpenCodeBackend(BackendAdapter):
         workdir: Path,
         mcp_tools: list[dict] | None = None,
         creds: dict | None = None,
+        runner_config: Any | None = None,
     ) -> RenderedConfig:
         spec = agent.runner
         argv: list[str] = [
@@ -73,23 +74,36 @@ class OpenCodeBackend(BackendAdapter):
         ]
 
         argv += spec.extra_args
+        # Append runner_config.extra_args if present
+        if runner_config is not None and getattr(runner_config, "extra_args", None):
+            argv += runner_config.extra_args
+
+        # Use runner_config.model if present, otherwise fall back to spec/default
+        if runner_config is not None and getattr(runner_config, "model", None):
+            model = runner_config.model
+        else:
+            model = self._resolve_model(spec)
 
         # `_resolve_model` returns spec.model or the default. We only
         # inject `--model` when the caller didn't already pass one via
         # extra_args (preserves the existing escape hatch).
-        model = self._resolve_model(spec)
         if "--model" not in spec.extra_args and not spec.model and model:
             argv += ["--model", model]
 
         env = dict(os.environ)
         env["PWD"] = str(workdir)
 
+        # Use runner_config.timeout_seconds if present, otherwise use spec
+        timeout_seconds = spec.timeout_seconds
+        if runner_config is not None and getattr(runner_config, "timeout_seconds", None):
+            timeout_seconds = runner_config.timeout_seconds
+
         return RenderedConfig(
             argv=argv,
             env=env,
             cwd=Path("."),
             files=self._collect_system_files(agent, workdir),
-            agent_meta={"timeout_seconds": spec.timeout_seconds},
+            agent_meta={"timeout_seconds": timeout_seconds},
             model=model,
         )
 
@@ -134,7 +148,7 @@ class OpenCodeBackend(BackendAdapter):
         import asyncio
         import json
 
-        from agentbox.core.runners._rate_limit import detect_in_opencode_event
+        from agentbox.core.streaming.rate_limit import detect_in_opencode_event
 
         try:
             proc = await asyncio.create_subprocess_exec(

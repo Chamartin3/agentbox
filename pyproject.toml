@@ -26,16 +26,12 @@ agentbox-mcp = "agentbox.mcp_server.server:main"
 [project.entry-points."agentbox.runners"]
 claude_code = "agentbox.core.runners.claude_code:ClaudeCodeRunner"
 opencode = "agentbox.core.runners.opencode:OpenCodeRunner"
-pydantic_ai = "agentbox.core.runners.pydantic_ai:PydanticAiRunner"
+token = "agentbox.core.runners.token:TokenRunner"
 
 [project.entry-points."agentbox.backends"]
 claude_code = "agentbox.core.backends.claude_code:ClaudeCodeBackend"
 opencode = "agentbox.core.backends.opencode:OpenCodeBackend"
-pydantic_ai = "agentbox.core.backends.pydantic_ai:PydanticAiBackend"
-pydantic_ai_structured = "agentbox.core.backends.pydantic_ai_structured:PydanticAiStructuredBackend"
-# `token` was a redundant simpler variant of `pydantic_ai` — merged
-# back into the `pydantic_ai` backend (which now also supports the
-# direct ``pydantic_ai.Agent`` flow with ``deps_factory``).
+token = "agentbox.core.backends.token:TokenBackend"
 
 
 [project.entry-points."agentbox.conversations"]
@@ -73,6 +69,7 @@ markers = [
   "unit: fast, isolated tests for a single module",
   "integration: cross-module / executor / API / store tests",
   "slow: tests that take noticeable wall-time",
+  "live_ollama: requires a running Ollama instance (set OLLAMA_HOST)",
 ]
 filterwarnings = [
   "error",

@@ -64,7 +64,7 @@ from agentbox.core.runner_profiles import (
     EffectiveRunnerConfig,
     RunnerProfileResolver,
 )
-from agentbox.core.runners._rate_limit import detect_in_text_line
+from agentbox.core.streaming.rate_limit import detect_in_text_line
 from agentbox.core.runners.base import RunRequest
 from agentbox.core.versioning.drift import check_drift, startup_sweep
 from agentbox.core.workspaces import (
@@ -138,6 +138,11 @@ _FAILED_ERROR_MARKERS: tuple[str, ...] = (
     "ECONNREFUSED",
     "ECONNRESET",
     "output validation failed",
+    # pydantic-ai surfaces structured-output validation exhaustion as
+    # ``UnexpectedModelBehavior: Exceeded maximum output retries (N)`` —
+    # the model couldn't produce schema-compliant output. Treat as a
+    # validation-shaped failure rather than a runner crash.
+    "exceeded maximum output retries",
 )
 
 
@@ -809,8 +814,10 @@ class RunExecutor:
         self.store.finish_run(run_id, ok=False, error=error_msg)
         broadcaster = RunBroadcaster()
         self._broadcasters[run_id] = broadcaster
-        broadcaster.publish(LogEvent(text=f"Error: {error_msg}"))
-        broadcaster.publish(DoneEvent(ok=False, error=error_msg))
+        broadcaster.publish(
+            LogEvent(run_id=run_id, level="error", message=f"Error: {error_msg}")
+        )
+        broadcaster.publish(DoneEvent(run_id=run_id, ok=False, error=error_msg))
         broadcaster.close()
         return run_id
 
@@ -1314,9 +1321,12 @@ class RunExecutor:
     ) -> None:
         tf.write(ev.model_dump_json() + "\n")
         if isinstance(ev, TextEvent):
-            # Delta events are UI-only — the runner emits a final
-            # non-delta TextEvent with the consolidated output.
-            if not getattr(ev, "delta", False):
+            # Delta events are UI-only. Prompt turns should be persisted and
+            # broadcast, but only assistant text is the run output.
+            if (
+                not getattr(ev, "delta", False)
+                and getattr(ev, "role", "assistant") == "assistant"
+            ):
                 output_text.append(ev.text)
         elif isinstance(ev, UsageEvent):
             self.store.record_usage(run_id, ev.model_dump())
@@ -1330,19 +1340,28 @@ class RunExecutor:
         *validated_via* is ``"jsonschema"``, ``"pydantic"``, or
         ``"both"``.
         """
-        if not agent.runner.output_schema_path:
-            return True, "", "off"
+        # Composition pipeline attaches the parsed schema dict to the agent
+        # as ``_composed_schema``. Prefer it over re-reading the file: it
+        # works uniformly for disk-backed bundles and DB-only agents (which
+        # have no on-disk schema file). Falls back to the legacy on-disk
+        # path-based load when composition didn't run.
+        composed_schema = agent.__dict__.get("_composed_schema")
+        if isinstance(composed_schema, dict):
+            schema = composed_schema
+        else:
+            if not agent.runner.output_schema_path:
+                return True, "", "off"
 
-        schema_path = workdir / agent.runner.output_schema_path
-        if not schema_path.exists():
-            schema_path = self.settings.project_root / agent.runner.output_schema_path
-        if not schema_path.exists():
-            return False, f"schema file not found: {agent.runner.output_schema_path}", "none"
+            schema_path = workdir / agent.runner.output_schema_path
+            if not schema_path.exists():
+                schema_path = self.settings.project_root / agent.runner.output_schema_path
+            if not schema_path.exists():
+                return False, f"schema file not found: {agent.runner.output_schema_path}", "none"
 
-        try:
-            schema = json.loads(schema_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as exc:
-            return False, f"cannot load schema: {exc}", "none"
+            try:
+                schema = json.loads(schema_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                return False, f"cannot load schema: {exc}", "none"
 
         engine = getattr(agent.runner, "output_validation_engine", "both")
 
