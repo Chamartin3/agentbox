@@ -218,15 +218,75 @@ async def test_opencode_scenario_1_text_only() -> None:
 
 
 # ---------------------------------------------------------------------
-# codex / pi — backends do not yet exist; arrive in Phase 2
+# codex / pi — Phase 2 backends; text-only scenario verified
 # ---------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="Phase 2 — codex backend not yet implemented")
+async def _fake_jsonl_stream(events: list[Any]) -> Any:
+    """Build an async generator matching stream_jsonl_subprocess's shape."""
+
+    async def _gen(**_kwargs: Any) -> Any:
+        for ev, sid in events:
+            yield ev, sid
+
+    return _gen
+
+
 async def test_codex_scenario_1_text_only() -> None:
-    raise AssertionError("pending Phase 2")
+    from agentbox.api.events import UsageEvent
+    from agentbox.core.backends import codex as codex_mod
+
+    rendered = RenderedConfig(
+        argv=["codex", "exec", "--json"],
+        env={},
+        cwd=Path("."),
+        files={},
+        agent_meta={"timeout_seconds": 60},
+        model="o4-mini",
+    )
+    fake_events = [
+        (TextEvent(run_id="rid", text="hello", delta=True), None),
+        (UsageEvent(run_id="rid", input_tokens=3, output_tokens=4, model="o4-mini"), None),
+        (DoneEvent(run_id="rid", ok=True), None),
+    ]
+    gen = await _fake_jsonl_stream(fake_events)
+    with (
+        patch.object(codex_mod.shutil, "which", return_value="/usr/bin/codex"),
+        patch.object(codex_mod, "stream_jsonl_subprocess", gen),
+    ):
+        events = await _collect(codex_mod.CodexBackend().run(rendered, "hi", "rid"))
+
+    types_ = _types(events)
+    assert types_[0] == "log"
+    assert "text" in types_ and "usage" in types_
+    assert isinstance(events[-1], DoneEvent) and events[-1].ok is True
 
 
-@pytest.mark.xfail(reason="Phase 2 — pi backend not yet implemented")
 async def test_pi_scenario_1_text_only() -> None:
-    raise AssertionError("pending Phase 2")
+    from agentbox.api.events import UsageEvent
+    from agentbox.core.backends import pi as pi_mod
+
+    rendered = RenderedConfig(
+        argv=["pi", "-p", "--mode", "json"],
+        env={},
+        cwd=Path("."),
+        files={},
+        agent_meta={"timeout_seconds": 60},
+        model="pi-1",
+    )
+    fake_events = [
+        (TextEvent(run_id="rid", text="hello", delta=True), None),
+        (UsageEvent(run_id="rid", input_tokens=3, output_tokens=4, model="pi-1"), None),
+        (DoneEvent(run_id="rid", ok=True), None),
+    ]
+    gen = await _fake_jsonl_stream(fake_events)
+    with (
+        patch.object(pi_mod.shutil, "which", return_value="/usr/bin/pi"),
+        patch.object(pi_mod, "stream_jsonl_subprocess", gen),
+    ):
+        events = await _collect(pi_mod.PiBackend().run(rendered, "hi", "rid"))
+
+    types_ = _types(events)
+    assert types_[0] == "log"
+    assert "text" in types_ and "usage" in types_
+    assert isinstance(events[-1], DoneEvent) and events[-1].ok is True

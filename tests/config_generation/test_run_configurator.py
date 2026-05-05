@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from agentbox.core.config_generation.backends import get_generator, list_generators
 from agentbox.core.config_generation.run_configurator import (
     ComposedMetadata,
@@ -323,10 +322,12 @@ class TestSkillFilter:
 
 class TestGeneratorRegistry:
     def test_all_backends_registered(self) -> None:
-        assert set(list_generators()) == {"opencode", "claude_code"}
+        assert set(list_generators()) == {"opencode", "claude_code", "codex", "pi"}
 
     def test_get_generator_returns_instance(self) -> None:
-        from agentbox.core.config_generation.backends.opencode import OpenCodeConfigGenerator
+        from agentbox.core.config_generation.backends.opencode import (
+            OpenCodeConfigGenerator,
+        )
 
         gen = get_generator("opencode")
         assert isinstance(gen, OpenCodeConfigGenerator)

@@ -32,6 +32,8 @@ token = "agentbox.core.runners.token:TokenRunner"
 claude_code = "agentbox.core.backends.claude_code:ClaudeCodeBackend"
 opencode = "agentbox.core.backends.opencode:OpenCodeBackend"
 token = "agentbox.core.backends.token:TokenBackend"
+codex = "agentbox.core.backends.codex:CodexBackend"
+pi = "agentbox.core.backends.pi:PiBackend"
 
 
 [project.entry-points."agentbox.conversations"]
@@ -39,6 +41,8 @@ claude-cli-jsonl = "agentbox.core.conversations.sources.claude_cli:ClaudeCliJson
 opencode-session = "agentbox.core.conversations.sources.opencode:OpencodeSessionSource"
 pydantic-ai-history = "agentbox.core.conversations.sources.pydantic_ai:PydanticAiHistorySource"
 agentbox-transcript = "agentbox.core.conversations.sources.transcript:TranscriptSource"
+codex-session = "agentbox.core.conversations.sources.codex:CodexSessionSource"
+pi-session = "agentbox.core.conversations.sources.pi:PiSessionSource"
 
 # Register guardrails by adding entries here or in a plugin package:
 # [project.entry-points."agentbox.guardrails"]
