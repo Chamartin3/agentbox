@@ -120,9 +120,10 @@ def list_resources(
     """
     store = get_store()
     resources = store.list_resources(kind=kind, q=q, limit=limit, offset=offset)
+    total = store.count_active_resources(kind=kind, q=q)
     return PaginatedResourcesResponse(
         items=[SharedResourceResponse.from_record(r) for r in resources],
-        total=None,  # List may be paginated; returning None to indicate incomplete count
+        total=total,
     )
 
 

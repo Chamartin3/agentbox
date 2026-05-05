@@ -273,6 +273,27 @@ class SharedResourcesMixin:
             rows = conn.execute(query)
             return [self._row_to_record(r._mapping) for r in rows]
 
+    def count_active_resources(
+        self, *, kind: str | None = None, q: str | None = None
+    ) -> int:
+        """Mirror of `list_resources` filters, returning a row count."""
+        from sqlalchemy import func, or_, select
+
+        with self.engine.connect() as conn:
+            query = select(func.count()).select_from(shared_resources).where(
+                shared_resources.c.is_active == 1
+            )
+            if kind:
+                query = query.where(shared_resources.c.kind == kind)
+            if q:
+                query = query.where(
+                    or_(
+                        shared_resources.c.name.ilike(f"%{q}%"),
+                        shared_resources.c.description.ilike(f"%{q}%"),
+                    )
+                )
+            return int(conn.execute(query).scalar() or 0)
+
     def list_resource_versions(
         self, id: str, *, limit: int = 50, offset: int = 0
     ) -> list[SharedResourceRecord]:
