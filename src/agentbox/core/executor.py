@@ -21,7 +21,6 @@ import re
 import shutil
 import tempfile
 import uuid
-from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -65,7 +64,6 @@ from agentbox.core.runner_profiles import (
     RunnerProfileResolver,
 )
 from agentbox.core.streaming.rate_limit import detect_in_text_line
-from agentbox.core.runners.base import RunRequest
 from agentbox.core.versioning.drift import check_drift, startup_sweep
 from agentbox.core.workspaces import (
     load_capabilities,
@@ -260,74 +258,6 @@ class RunBroadcaster:
         for q in self._subscribers:
             q.put_nowait(None)
         self._subscribers.clear()
-
-
-class _LegacyRunnerAdapter:
-    """Wraps a legacy ``Runner`` subclass so it satisfies the
-    ``BackendAdapter`` protocol (has ``render()`` + ``run()``).
-
-    ``render()`` produces a minimal ``RenderedConfig`` with agent metadata
-    encoded in ``agent_meta`` so ``run()`` can reconstruct the
-    ``RunRequest`` the legacy runner expects.
-    """
-
-    name = "_legacy"
-
-    def __init__(self, runner: Any, agent: AgentDef, project_root: Path):
-        self._runner = runner
-        self._agent = agent
-        self._project_root = project_root
-
-    @property
-    def conversation_format(self) -> str | None:
-        return getattr(self._runner, "conversation_format", None)
-
-    def conversation_uri(
-        self,
-        run_id: str,
-        transcript_path: str | None = None,
-    ) -> str | None:
-        meth = getattr(self._runner, "conversation_uri", None)
-        if meth is None:
-            return None
-        return meth(run_id=run_id, transcript_path=transcript_path)
-
-    def render(
-        self,
-        agent: Any,
-        workdir: Path,
-        mcp_tools: list[Any] | None = None,
-        creds: dict[str, str] | None = None,
-        runner_config: Any | None = None,
-    ) -> RenderedConfig:
-        files = {}
-        claude_md = workdir / "CLAUDE.md"
-        if claude_md.exists():
-            files["CLAUDE.md"] = claude_md.read_bytes()
-        return RenderedConfig(
-            files=files,
-            cwd=Path("."),
-            agent_meta={
-                "agent_id": agent.id,
-                "project_root": str(self._project_root),
-            },
-        )
-
-    async def run(
-        self,
-        rendered: RenderedConfig,
-        input: str,
-        run_id: str,
-    ) -> AsyncIterator[RunEvent]:
-        req = RunRequest(
-            run_id=run_id,
-            agent=self._agent,
-            input=input,
-            workdir=rendered.cwd,
-            project_root=self._project_root,
-        )
-        async for ev in self._runner.run(req):
-            yield ev
 
 
 class RunExecutor:
@@ -845,9 +775,6 @@ class RunExecutor:
                 inst = cls()
             except KeyError:
                 return None
-            # Legacy Runner subclasses don't have render() — wrap them.
-            if not hasattr(inst, "render"):
-                inst = _LegacyRunnerAdapter(inst, agent, self.settings.project_root)
             return inst  # type: ignore[return-value]
 
         candidates: list[str] = []

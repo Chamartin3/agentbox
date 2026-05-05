@@ -1,8 +1,8 @@
-"""Backend adapter for the OpenCode CLI runner.
+"""Backend adapter for the OpenCode CLI.
 
-Wraps ``agentbox.core.runners.opencode`` — ``render()`` builds
-argv/env from the ``AgentDef``, ``run()`` delegates to the existing
-subprocess loop.
+Self-contained after Plan 16 Phase 4 — ``render()`` builds argv/env
+from the ``AgentDef`` and ``run()`` streams events from the OpenCode
+subprocess directly.
 """
 
 from __future__ import annotations
@@ -25,9 +25,9 @@ from agentbox.api.events import (
 )
 from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
-from agentbox.core.runners.opencode import _DEFAULT_OPENCODE_MODEL
 
 _NAME = "opencode"
+_DEFAULT_OPENCODE_MODEL = "opencode/deepseek-v4-flash-free"
 
 # Emit a heartbeat LogEvent whenever the child produces no stdout for this
 # many seconds. Without this, a silent child (stuck on DNS, in opencode's

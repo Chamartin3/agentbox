@@ -23,7 +23,6 @@ from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.streaming.jsonl import stream_jsonl_subprocess
 
-
 _NAME = "pi"
 _DEFAULT_PI_MODEL: str | None = None
 

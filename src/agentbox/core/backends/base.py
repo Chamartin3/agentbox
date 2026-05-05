@@ -26,6 +26,27 @@ from typing import Any, ClassVar, TypedDict
 from agentbox.api.events import RunEvent
 
 
+@dataclass
+class RunRequest:
+    """Per-run inputs handed to a backend's ``run()`` (legacy shape, kept
+    for direct in-process callers).
+
+    Most code paths use :class:`RenderedConfig` instead — the executor
+    renders once and then calls ``run(rendered, input, run_id)``. This
+    dataclass survives for tests and the few helpers that still want a
+    single object holding everything about a run.
+    """
+
+    run_id: str
+    agent: Any  # AgentDef — avoids a circular import; runtime type is AgentDef.
+    input: str
+    workdir: Path
+    project_root: Path
+    session_id: str | None = None
+    runner_profile: str | None = None
+    runner_config: dict[str, Any] | None = None
+
+
 class McpToolSpec(TypedDict, total=False):
     """Minimal MCP tool descriptor consumed by ``render()``."""
 
@@ -141,6 +162,7 @@ class BackendAdapter(ABC):
         workdir: Path,
         mcp_tools: list[McpToolSpec] | None = None,
         creds: dict[str, str] | None = None,
+        runner_config: Any | None = None,
     ) -> RenderedConfig:
         """Analyse ``agent`` and ``workdir``, return a frozen run config.
 
@@ -148,7 +170,8 @@ class BackendAdapter(ABC):
         produce the same ``RenderedConfig`` (same digest). Must NOT
         write to disk; the executor handles materialisation. Must
         populate :attr:`RenderedConfig.model` with the effective model
-        (use :meth:`_resolve_model`).
+        (use :meth:`_resolve_model`). If ``runner_config`` is provided,
+        honour its fields for model, timeout, extra_args, and provider routing.
         """
 
     @abstractmethod
@@ -173,8 +196,15 @@ class BackendAdapter(ABC):
         """Return ``spec.model`` if set, otherwise this backend's default.
 
         Backends override :attr:`default_model` rather than this method.
+        Operators can also override the default at runtime via the
+        ``runtime_defaults.default_model_<name>`` setting.
         """
-        return getattr(spec, "model", None) or self.default_model
+        spec_model = getattr(spec, "model", None)
+        if spec_model:
+            return spec_model
+        from agentbox.core.constants import runtime_default_model
+
+        return runtime_default_model(self.name) or self.default_model
 
     def _collect_system_files(
         self, agent: Any, workdir: Path

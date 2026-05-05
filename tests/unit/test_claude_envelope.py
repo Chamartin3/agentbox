@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.runners.claude_code import (
+from agentbox.core.backends.claude_code import (
     _build_usage_event,
     _parse_envelope,
 )

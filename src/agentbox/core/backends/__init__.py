@@ -7,9 +7,8 @@ from agentbox.core.plugins import backends
 
 
 def get_backend(name: str) -> BackendAdapter:
-    """Look up ``name`` in the ``agentbox.backends`` entry-point group
-    (falling back to ``agentbox.runners`` for backward compat), instantiate,
-    and return the adapter."""
+    """Look up ``name`` in the ``agentbox.backends`` entry-point group,
+    instantiate, and return the adapter."""
     from agentbox.core.plugins import get_backend as _resolve
 
     return _resolve(name)()

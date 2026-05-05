@@ -53,6 +53,7 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     manifest = tmp_path / "manifest.toml"
     manifest.write_text("# test manifest\n")
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
@@ -122,39 +123,6 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
         deps.get_mcp_registry,
     ):
         fn.cache_clear()
-
-
-# --------------------------------------------------------------------------- #
-# Fake runner — for executor lifecycle tests that don't need a subprocess
-# --------------------------------------------------------------------------- #
-
-
-@pytest.fixture
-def fake_runner():  # type: ignore[no-untyped-def]
-    """Factory that builds a Runner yielding a scripted event sequence.
-
-    Usage::
-
-        runner = fake_runner([
-            UsageEvent(run_id=..., input_tokens=10),
-            DoneEvent(run_id=..., ok=True),
-        ])
-
-    The returned object satisfies the ``Runner`` ABC: a single
-    ``async def run(req) -> AsyncIterator[RunEvent]`` method.
-    """
-    from agentbox.api.events import RunEvent
-    from agentbox.core.runners.base import Runner
-
-    class _Scripted(Runner):
-        def __init__(self, events: list[RunEvent]) -> None:
-            self._events = events
-
-        async def run(self, req: Any) -> AsyncIterator[RunEvent]:  # type: ignore[override]
-            for ev in self._events:
-                yield ev
-
-    return _Scripted
 
 
 # --------------------------------------------------------------------------- #

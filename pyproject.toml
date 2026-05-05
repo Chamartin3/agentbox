@@ -17,16 +17,12 @@ dependencies = [
   "fastmcp>=0.2",
   "jsonschema>=4.0",
   "alembic>=1.18.4",
+  "datamodel-code-generator>=0.26",
 ]
 
 [project.scripts]
 agentbox = "agentbox.cli:app"
 agentbox-mcp = "agentbox.mcp_server.server:main"
-
-[project.entry-points."agentbox.runners"]
-claude_code = "agentbox.core.runners.claude_code:ClaudeCodeRunner"
-opencode = "agentbox.core.runners.opencode:OpenCodeRunner"
-token = "agentbox.core.runners.token:TokenRunner"
 
 [project.entry-points."agentbox.backends"]
 claude_code = "agentbox.core.backends.claude_code:ClaudeCodeBackend"

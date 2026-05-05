@@ -157,12 +157,11 @@ def doctor() -> None:
     try:
         from agentbox.core import plugins
 
-        runner_count = len(plugins.runners())
         guard_count = len(plugins.guardrails())
         backend_count = len(plugins.backends())
         _ok(
             "Plugins",
-            f"{runner_count} runner(s), {guard_count} guardrail(s), {backend_count} backend(s)",
+            f"{backend_count} backend(s), {guard_count} guardrail(s)",
         )
     except Exception as exc:
         _fail("Plugins", str(exc))
