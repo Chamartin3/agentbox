@@ -124,6 +124,9 @@ export interface AgentDef {
   source_format: string | null;
   updated_at?: string | null;
   resolved_workspace?: string;
+  version?: number | null;
+  total_versions?: number | null;
+  active_version?: number | null;
 }
 
 export interface PromptFragment {
@@ -295,6 +298,78 @@ export interface PromptVersionList {
 
 export interface PromptVersionDetail extends PromptVersionSummary {
   content: string;
+}
+
+// ---- runner profiles -----------------------------------------------------
+
+export interface RunnerProfile {
+  id: string;
+  name: string;
+  description: string | null;
+  backend: string;
+  provider: string | null;
+  model: string | null;
+  timeout_seconds: number | null;
+  base_url: string | null;
+  api_key_env: string | null;
+  params: Record<string, unknown>;
+  headers: Record<string, string>;
+  extra_args: string[];
+  is_enabled: boolean;
+  is_system_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RunnerProfileCreate {
+  id?: string;
+  name: string;
+  description?: string | null;
+  backend: string;
+  provider?: string | null;
+  model?: string | null;
+  timeout_seconds?: number | null;
+  base_url?: string | null;
+  api_key_env?: string | null;
+  params?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  extra_args?: string[];
+  is_enabled?: boolean;
+  is_system_default?: boolean;
+}
+
+export type RunnerProfilePatch = Partial<RunnerProfileCreate>;
+
+export interface RunnerProfileStats {
+  profile_id: string;
+  runs: number;
+  succeeded: number;
+  failed: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number | null;
+  avg_duration_ms: number | null;
+  last_run_at: string | null;
+}
+
+export interface RunnerProvider {
+  id: string;
+  label: string;
+  backend: string;
+  compatible_backends: string[];
+  requires_api_key: boolean;
+  supports_base_url: boolean;
+  supports_model_listing: boolean;
+  default_base_url: string | null;
+  default_api_key_env: string | null;
+}
+
+export interface RunnerBackend {
+  id: string;
+  label: string;
+  default_model: string | null;
+  compatible_providers: string[];
+  accepts_no_provider: boolean;
 }
 
 // ---- endpoints ---------------------------------------------------------
@@ -569,6 +644,73 @@ export const api = {
   // mcp manifest
   getMcpManifest: () => req<Record<string, unknown>>('/api/mcp/manifest'),
   getMcpToolGroups: () => req<Record<string, unknown>>('/api/mcp/tool-groups'),
+
+  // ---- runner profiles -----------------------------------------------------
+
+  // Provider* helpers are the canonical UI names from IMPROVEMENTS.md Phase 4.
+  // They alias the legacy runner-profile endpoints; backend exposes both
+  // via providers_alias router (307 redirect).
+  listProviders: () => req<RunnerProfile[]>('/api/runner-profiles'),
+  listRunnerProfiles: () => req<RunnerProfile[]>('/api/runner-profiles'),
+  getRunnerProfile: (id: string) => req<RunnerProfile>(`/api/runner-profiles/${id}`),
+  createRunnerProfile: (body: RunnerProfileCreate) =>
+    req<RunnerProfile>('/api/runner-profiles', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateRunnerProfile: (id: string, body: RunnerProfilePatch) =>
+    req<RunnerProfile>(`/api/runner-profiles/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteRunnerProfile: (id: string) =>
+    req<void>(`/api/runner-profiles/${id}`, { method: 'DELETE' }),
+  getRunnerProfileStats: (id: string) =>
+    req<RunnerProfileStats>(`/api/runner-profiles/${id}/stats`),
+
+  getAgentRunnerProfile: (agentId: string) =>
+    req<RunnerProfile | null>(`/api/agents/${agentId}/runner-profile`),
+  setAgentRunnerProfile: (agentId: string, profileId: string) =>
+    req<{ agent_id: string; runner_profile_id: string }>(
+      `/api/agents/${agentId}/runner-profile`,
+      { method: 'PATCH', body: JSON.stringify({ runner_profile_id: profileId }) },
+    ),
+  clearAgentRunnerProfile: (agentId: string) =>
+    req<void>(`/api/agents/${agentId}/runner-profile`, { method: 'DELETE' }),
+
+  listRunnerBackends: () => req<RunnerBackend[]>('/api/runner-backends'),
+  listRunnerProviders: (backend?: string) => {
+    const qs = backend ? `?backend=${encodeURIComponent(backend)}` : '';
+    return req<RunnerProvider[]>(`/api/runner-providers${qs}`);
+  },
+  listProviderModels: (
+    providerId: string,
+    opts?: {
+      profile_id?: string;
+      base_url?: string;
+      api_key_env?: string;
+      backend?: string;
+      refresh?: boolean;
+    },
+  ) => {
+    const params = new URLSearchParams();
+    if (opts?.profile_id) params.set('profile_id', opts.profile_id);
+    if (opts?.base_url) params.set('base_url', opts.base_url);
+    if (opts?.api_key_env) params.set('api_key_env', opts.api_key_env);
+    if (opts?.backend) params.set('backend', opts.backend);
+    if (opts?.refresh) params.set('refresh', 'true');
+    const qs = params.toString();
+    return req<
+      Array<{
+        id: string;
+        name?: string | null;
+        context_length?: number | null;
+        input_modalities?: string[];
+        output_modalities?: string[];
+        raw?: Record<string, unknown>;
+      }>
+    >(`/api/runner-providers/${providerId}/models${qs ? `?${qs}` : ''}`);
+  },
 
   // legacy agent-centric workspace endpoints
   getWorkspace: (agentId: string) => req<Record<string, unknown>>(`/api/workspaces/${agentId}`),

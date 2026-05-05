@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
 from pathlib import Path
 
@@ -21,15 +22,32 @@ from agentbox.api.routes import (
     activity,
     agents,
     agents_create,
+    api_tokens,
+    env_doc,
     health,
+    host_env,
     manifest,
     mcp,
     prompts,
+    providers_alias,
+    repo_resources,
+    resource_bindings,
     resources,
+    runner_backends,
+    runner_profiles,
+    runner_providers,
     runs,
     usage,
     versions,
+    workspace_mcp,
     workspaces,
+)
+from agentbox.api.routes import (
+    settings as settings_routes,
+)
+from agentbox.core.resources.boot_import import (
+    import_repo_resources,
+    sweep_workspace_skill_bindings,
 )
 from agentbox.core.versioning.drift import startup_sweep
 
@@ -62,55 +80,101 @@ def _sweep_legacy_generated(workspaces_root: Path) -> None:
 
 
 def _on_startup() -> None:
-    """Initialize MCP connections and run drift sweep (best-effort, non-blocking)."""
+    """Initialize MCP connections and run drift sweep (best-effort, non-blocking).
+
+    Manifest-free startup: works when either a manifest exists OR the DB has
+    agents. Operators can bootstrap with just the DB and create agents via API.
+    """
     import agentbox.api.deps as _deps
 
-    # Phase 0: warn if the manifest mount is absent (production should always bind-mount it).
-    try:
-        _deps.get_settings().check_manifest()
-    except RuntimeError as exc:
-        _log.critical("%s", exc)
-        return
+    settings = _deps.get_settings()
+    store = _deps.get_store()
 
-    # Phase 1: load manifest
+    # Phase 0: check runtime sources (manifest-free startup support)
+    # Always returns True; no longer raises on missing manifest.
+    settings.check_runtime_sources(store)
+
+    # Phase 1: load manifest (if it exists)
+    loaded_manifest = None
     try:
         loader = _deps.get_loader()
         loaded_manifest = loader.load()
-    except Exception:
-        return
+        if settings.manifest_path.exists():
+            _log.debug("manifest loaded successfully")
+        else:
+            _log.info("manifest not found; running in manifest-free mode")
+    except Exception as exc:
+        _log.warning("manifest load failed: %s; continuing anyway", exc)
 
     # Phase 2: MCP (best-effort, non-blocking)
-    try:
-        if loaded_manifest.mcp_servers:
+    if loaded_manifest and loaded_manifest.mcp_servers:
+        try:
             registry = _deps.get_mcp_registry()
             specs = [s.model_dump() for s in loaded_manifest.mcp_servers]
             task = asyncio.ensure_future(registry.sync_servers(specs))
             task.add_done_callback(
                 lambda t: t.exception() if not t.cancelled() else None
             )
-    except Exception:
-        pass
+        except Exception:
+            pass
 
-    # Phase 3: agent version drift sweep (best-effort, independent)
-    try:
-        store = _deps.get_store()
-        _project_root = _deps.get_settings().project_root
-        _shared_roots = {
-            k: (_project_root / v).resolve()
-            for k, v in (loaded_manifest.shared_assets or {}).items()
-        }
-        startup_sweep(
-            loaded_manifest.agents,
-            store,
-            project_root=_project_root,
-            shared_roots=_shared_roots,
-        )
-    except Exception:
-        pass
+    # Phase 3: agent version drift sweep (only if manifest-loaded agents exist)
+    if loaded_manifest and loaded_manifest.agents:
+        try:
+            _project_root = settings.project_root
+            _shared_roots = {
+                k: (_project_root / v).resolve()
+                for k, v in (loaded_manifest.shared_assets or {}).items()
+            }
+            startup_sweep(
+                loaded_manifest.agents,
+                store,
+                project_root=_project_root,
+                shared_roots=_shared_roots,
+            )
+        except Exception:
+            pass
+
+    # Phase 3b: seed default runner profiles (idempotent).
+    # Set AGENTBOX_SKIP_DEFAULT_PROFILES=1 to opt out (used by the test suite).
+    if not os.environ.get("AGENTBOX_SKIP_DEFAULT_PROFILES"):
+        try:
+            from agentbox.core.data.runner_profiles_seed import (
+                seed_default_runner_profiles,
+            )
+
+            created = seed_default_runner_profiles(store)
+            if created:
+                _log.info("seeded %d default runner profile(s)", created)
+        except Exception:
+            _log.exception("default runner profile seed failed")
+
+    # Phase 3c: populate the central resource repository from the on-disk
+    # manifest layout (Plan 01 §Migration + Plan 03 §Migration). Imports
+    # skills/schemas/prompts/shared-folders into repo_resources and wires
+    # manifest-declared workspace skills as workspace_file_resource_bindings.
+    # Set AGENTBOX_SKIP_RESOURCE_IMPORT=1 to opt out.
+    if not os.environ.get("AGENTBOX_SKIP_RESOURCE_IMPORT"):
+        try:
+            summary = import_repo_resources(store, settings.project_root)
+            if summary["created"] or summary["updated"]:
+                _log.info(
+                    "boot-import repo_resources: created=%d updated=%d skipped=%d failed=%d",
+                    summary["created"], summary["updated"],
+                    summary["skipped"], summary["failed"],
+                )
+            ws_summary = sweep_workspace_skill_bindings(store, loaded_manifest)
+            if ws_summary["bindings_added"]:
+                _log.info(
+                    "boot-import workspace bindings: wired %d workspace(s), %d binding(s)",
+                    ws_summary["workspaces_wired"], ws_summary["bindings_added"],
+                )
+        except Exception:
+            _log.exception("repo-resource boot import failed")
 
     # Phase 4: reap orphaned 'running' rows from a previous process.
     try:
-        reaped = _deps.get_store().reap_orphan_runs()
+        reaped = store.reap_orphan_runs()
         if reaped:
             _log.warning("reaped %d orphaned 'running' run(s) on startup", reaped)
     except Exception:
@@ -120,20 +184,20 @@ def _on_startup() -> None:
     # never ran. SessionStore._init reaps orphans synchronously at
     # construction time, before the event loop exists — so schedule_webhook
     # couldn't have fired then. We do it here, once the loop is up.
-    try:
-        from agentbox.api.webhooks import schedule_webhook
+    if loaded_manifest and loaded_manifest.agents:
+        try:
+            from agentbox.api.webhooks import schedule_webhook
 
-        store = _deps.get_store()
-        agents_by_id = {a.id: a for a in loaded_manifest.agents}
-        pending = store.list_orphaned_unnotified_runs()
-        if pending:
-            _log.warning(
-                "scheduling webhooks for %d orphan-reaped run(s)", len(pending)
-            )
-        for run in pending:
-            schedule_webhook(agents_by_id.get(run.agent_id), run, store)
-    except Exception:
-        _log.exception("orphan webhook dispatch failed")
+            agents_by_id = {a.id: a for a in loaded_manifest.agents}
+            pending = store.list_orphaned_unnotified_runs()
+            if pending:
+                _log.warning(
+                    "scheduling webhooks for %d orphan-reaped run(s)", len(pending)
+                )
+            for run in pending:
+                schedule_webhook(agents_by_id.get(run.agent_id), run, store)
+        except Exception:
+            _log.exception("orphan webhook dispatch failed")
 
 
 def create_app() -> FastAPI:
@@ -148,10 +212,21 @@ def create_app() -> FastAPI:
     app.include_router(manifest.router)
     app.include_router(prompts.router)
     app.include_router(resources.router)
+    app.include_router(repo_resources.router)
+    app.include_router(resource_bindings.router)
+    app.include_router(env_doc.router)
+    app.include_router(workspace_mcp.router)
+    app.include_router(host_env.router)
+    app.include_router(runner_backends.router)
+    app.include_router(runner_profiles.router)
+    app.include_router(runner_providers.router)
+    app.include_router(providers_alias.router)
     app.include_router(activity.router)
     app.include_router(mcp.router)
     app.include_router(health.router)
     app.include_router(versions.router)
+    app.include_router(settings_routes.router)
+    app.include_router(api_tokens.router)
 
     # SPA assets.
     assets_dir = SPA_DIR / "assets"
