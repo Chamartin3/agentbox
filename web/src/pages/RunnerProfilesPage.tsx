@@ -8,6 +8,7 @@ import {
   type RunnerProfilePatch,
   type RunnerProvider,
 } from '../api/client';
+import { BackendId } from '../api/enums';
 import Toast from '../components/Toast';
 import './RunnerProfilesPage.css';
 
@@ -24,7 +25,7 @@ function encodeModel(
   backend: string | null | undefined,
 ): string {
   if (!model) return '';
-  if (backend !== 'token') return model;
+  if (backend !== BackendId.Token) return model;
   if (!provider) return model;
   if (model.startsWith(`${provider}:`)) return model;
   if (model.includes(':')) return model;
@@ -45,7 +46,7 @@ type FormMode = 'create' | 'edit' | null;
 
 type FormState = Partial<RunnerProfile> & { id: string };
 
-const blankForm: FormState = { id: '', name: '', backend: 'token' };
+const blankForm: FormState = { id: '', name: '', backend: BackendId.Token };
 
 export default function RunnerProfilesPage() {
   const [profiles, setProfiles] = useState<RunnerProfile[]>([]);
@@ -58,11 +59,16 @@ export default function RunnerProfilesPage() {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
+  const [apiTokens, setApiTokens] = useState<Array<{ id: string; name: string; environment: string }>>([]);
 
   useEffect(() => {
     loadProfiles();
     loadProviders();
     loadBackends();
+    fetch('/api/api-tokens')
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setApiTokens(Array.isArray(d) ? d : (d?.items ?? [])))
+      .catch(() => setApiTokens([]));
   }, []);
 
   useEffect(() => {
@@ -166,6 +172,7 @@ export default function RunnerProfilesPage() {
         timeout_seconds: formData.timeout_seconds || null,
         base_url: formData.base_url || null,
         api_key_env: formData.api_key_env || null,
+        api_token_id: formData.api_token_id || null,
         params: formData.params || {},
         headers: formData.headers || {},
         extra_args: formData.extra_args || [],
@@ -198,6 +205,7 @@ export default function RunnerProfilesPage() {
         timeout_seconds: formData.timeout_seconds ?? undefined,
         base_url: formData.base_url ?? undefined,
         api_key_env: formData.api_key_env ?? undefined,
+        api_token_id: formData.api_token_id ?? undefined,
         params: formData.params || undefined,
         headers: formData.headers || undefined,
         extra_args: formData.extra_args || undefined,
@@ -419,6 +427,20 @@ export default function RunnerProfilesPage() {
               />
             </div>
             <div>
+              <label>Assigned API Token</label>
+              <select
+                value={formData.api_token_id || ''}
+                onChange={(e) => handleFormChange('api_token_id', e.target.value || null)}
+              >
+                <option value="">— none —</option>
+                {apiTokens.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.environment} / {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label>
                 <input
                   type="checkbox"
@@ -467,12 +489,13 @@ export default function RunnerProfilesPage() {
           <tr>
             <th>Name</th>
             <th>Backend</th>
+            <th>Token</th>
           </tr>
         </thead>
         <tbody>
           {profiles.length === 0 ? (
             <tr>
-              <td colSpan={2} className="dim" style={{ textAlign: 'center', padding: 24 }}>
+              <td colSpan={3} className="dim" style={{ textAlign: 'center', padding: 24 }}>
                 no runner profiles
               </td>
             </tr>
@@ -499,6 +522,30 @@ export default function RunnerProfilesPage() {
                   </button>
                 </td>
                 <td><span className="tag">{p.backend}</span></td>
+                <td>
+                  <select
+                    value={p.api_token_id || ''}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={async (e) => {
+                      const value = e.target.value || null;
+                      try {
+                        await api.updateRunnerProfile(p.id, { api_token_id: value });
+                        setToast({ kind: 'ok', msg: value ? 'token assigned' : 'token cleared' });
+                        loadProfiles();
+                      } catch (err) {
+                        setToast({ kind: 'error', msg: errMsg(err, 'failed to update token') });
+                      }
+                    }}
+                    style={{ fontSize: 12, padding: '2px 6px' }}
+                  >
+                    <option value="">— none —</option>
+                    {apiTokens.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.environment} / {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
               </tr>
             ))
           )}

@@ -1,0 +1,63 @@
+.form-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.form-panel h2 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.form-panel label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--fg);
+}
+
+.form-panel input,
+.form-panel select,
+.form-panel textarea {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.form-panel input:focus,
+.form-panel select:focus,
+.form-panel textarea:focus {
+  outline: none;
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--link-alpha);
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.pill.default {
+  background: var(--bg-success-alpha);
+  color: var(--success);
+}
+
+.pill.disabled {
+  background: var(--bg-muted-alpha);
+  color: var(--fg-muted);
+}
+
+.pill.eph {
+  background: var(--bg-info-alpha);
+  color: var(--info);
+}
