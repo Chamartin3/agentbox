@@ -167,6 +167,38 @@ class ResourcesMixin:
             )
         return self.get_repo_resource(rid) or {}
 
+    def update_repo_resource(
+        self,
+        resource_id: str,
+        *,
+        type: str | None = None,
+        display_name: str | None = None,
+        description: str | None = None,
+        tags: Iterable[str] | None = None,
+    ) -> dict | None:
+        """Update mutable resource fields. Pass only the fields you want to change."""
+        values: dict = {}
+        if type is not None:
+            if type not in RESOURCE_TYPES:
+                raise ValueError(f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}")
+            values["type"] = type
+        if display_name is not None:
+            values["display_name"] = display_name
+        if description is not None:
+            values["description"] = description
+        if tags is not None:
+            values["tags"] = _tags_to_db(tags)
+        if not values:
+            return self.get_repo_resource(resource_id)
+        values["updated_at"] = now_iso()
+        with self.engine.begin() as conn:
+            conn.execute(
+                resources_table.update()
+                .where(resources_table.c.id == resource_id)
+                .values(**values)
+            )
+        return self.get_repo_resource(resource_id)
+
     def get_repo_resource(self, resource_id: str) -> dict | None:
         with self.engine.connect() as conn:
             row = conn.execute(
