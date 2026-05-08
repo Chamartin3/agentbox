@@ -11,6 +11,7 @@ import mimetypes
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.resources.importers.base import (
     ImporterContext,
     ImporterResult,
@@ -68,6 +69,6 @@ class ScriptImporter(ResourceImporter):
                 "output_schema_resource_id": self.output_schema_resource_id,
                 "line_count": text.count("\n") + 1,
             },
-            suggested_type="script",
+            suggested_type=ResourceType.SCRIPT,
             suggested_display_name=self.filename,
         )

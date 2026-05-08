@@ -4,6 +4,8 @@ import { api } from '../api/client';
 import EnvDocEditor from '../components/EnvDocEditor';
 import WorkspaceResourcesEditor from '../components/WorkspaceResourcesEditor';
 import SubagentsEditor from '../components/SubagentsEditor';
+import WorkspaceMcpEditor from '../components/WorkspaceMcpEditor';
+import WorkspaceHostEnvEditor from '../components/WorkspaceHostEnvEditor';
 
 interface WorkspaceFile {
   path: string;
@@ -315,6 +317,18 @@ export default function WorkspaceDetailPage() {
       <section className="section">
         <h3 style={{ marginTop: 0 }}>Subagents</h3>
         <SubagentsEditor workspaceId={id!} />
+      </section>
+
+      {/* Plan 05 — workspace-level MCP server + tool overrides */}
+      <section className="section">
+        <h3 style={{ marginTop: 0 }}>MCP Servers &amp; Tools</h3>
+        <WorkspaceMcpEditor workspaceId={id!} />
+      </section>
+
+      {/* Plan 06 — host-env capability grants */}
+      <section className="section">
+        <h3 style={{ marginTop: 0 }}>Host-Env Capabilities</h3>
+        <WorkspaceHostEnvEditor workspaceId={id!} />
       </section>
 
       {/* Skills viewer — narrow list on left, wide content on right */}

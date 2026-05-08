@@ -87,6 +87,19 @@ class BundleFile(StrEnum):
     INPUT_SCHEMA = "input_schema.json"
 
 
+class ResourceType(StrEnum):
+    """Allowed values for ``repo_resources.type``.
+
+    Mirrors the SQL CHECK constraint in ``core/data/schema.py``.
+    """
+
+    DOCUMENT = "document"
+    FOLDER = "folder"
+    SKILL = "skill"
+    SCHEMA = "schema"
+    SCRIPT = "script"
+
+
 class EventType(StrEnum):
     """Discriminator values for RunEvent subclasses.
 

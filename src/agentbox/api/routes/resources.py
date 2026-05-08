@@ -4,13 +4,28 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
 from agentbox.core.data.records import SharedResourceRecord
 
-router = APIRouter(prefix="/api/resources", tags=["resources"])
+
+def _mark_deprecated(response: Response) -> None:
+    """Inject RFC 8594 Deprecation headers pointing to /api/repo-resources.
+
+    The legacy /api/resources surface is preserved for one release so
+    consumers can migrate; every response advertises the successor.
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = '</api/repo-resources>; rel="successor-version"'
+
+
+router = APIRouter(
+    prefix="/api/resources",
+    tags=["resources"],
+    dependencies=[Depends(_mark_deprecated)],
+)
 
 # Valid resource kinds
 VALID_KINDS = Literal[

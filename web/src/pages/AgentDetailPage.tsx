@@ -7,6 +7,7 @@ import CommentThread from '../components/CommentThread';
 import ManifestEditor from '../components/ManifestEditor';
 import MarkdownEditor from '../components/MarkdownEditor';
 import AgentRunsList from '../components/AgentRunsList';
+import AgentResourcesEditor from '../components/AgentResourcesEditor';
 import Toast from '../components/Toast';
 import './AgentDetailPage.css';
 
@@ -307,60 +308,9 @@ export default function AgentDetailPage() {
               )}
             </section>
 
-            {agent.composition ? (
-              <section className="section">
-                <h2>Recipe <span className="dim" style={{ fontWeight: 400, fontSize: 12 }}>· declared in agent.toml</span></h2>
-                <dl className="composition-dl">
-                  <dt>System prompt</dt>
-                  <dd><code>{agent.composition.system}</code></dd>
-                  <dt>Transport</dt>
-                  <dd><code>{agent.composition.transport}</code></dd>
-                  {agent.composition.user_template && (
-                    <>
-                      <dt>User template</dt>
-                      <dd><code>{agent.composition.user_template}</code></dd>
-                    </>
-                  )}
-                  {agent.composition.input_schema && (
-                    <>
-                      <dt>Input schema</dt>
-                      <dd><code>{agent.composition.input_schema}</code></dd>
-                    </>
-                  )}
-                  {agent.composition.output_schema && (
-                    <>
-                      <dt>Output schema</dt>
-                      <dd><code>{agent.composition.output_schema}</code></dd>
-                    </>
-                  )}
-                  <dt>Validation</dt>
-                  <dd><code>{agent.composition.output_validation}</code></dd>
-                  {agent.composition.references.length > 0 && (
-                    <>
-                      <dt>References</dt>
-                      <dd>
-                        <ul className="reference-list">
-                          {agent.composition.references.map((ref, i) => {
-                            const path = typeof ref === 'string' ? ref : ref.path;
-                            const heading = typeof ref === 'string' ? null : ref.heading;
-                            return (
-                              <li key={i}>
-                                <code>{path}</code>
-                                {heading && <span className="dim"> → {heading}</span>}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </dd>
-                    </>
-                  )}
-                </dl>
-              </section>
-            ) : (
-              <section className="section">
-                <p className="dim">This agent does not declare a <code>[composition]</code> block.</p>
-              </section>
-            )}
+            <section className="section">
+              <AgentResourcesEditor agentId={id} promptTemplate={prompt} />
+            </section>
 
             <section className="section">
               <h2>

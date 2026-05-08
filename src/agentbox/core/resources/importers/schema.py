@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.resources.importers.base import (
     ImporterContext,
     ImporterResult,
@@ -58,7 +59,7 @@ class SchemaImporter(ResourceImporter):
                 "validation_errors": errors,
                 "title": doc.get("title"),
             },
-            suggested_type="schema",
+            suggested_type=ResourceType.SCHEMA,
             suggested_display_name=doc.get("title") or self.filename,
             suggested_description=doc.get("description"),
         )

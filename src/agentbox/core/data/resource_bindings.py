@@ -30,6 +30,7 @@ from agentbox.core.data.schema import (
 )
 
 VALID_PROMPT_MODES = ("inline", "skill_primer", "name_only", "manifest")
+VALID_PROMPT_SLOTS = ("input_schema", "output_schema")
 VALID_MATERIALIZE_MODES = ("copy", "symlink", "mount")
 VALID_ON_CONFLICT = ("error", "overwrite", "skip")
 
@@ -65,23 +66,46 @@ class ResourceBindingsMixin:
         actor: str | None = None,
     ) -> list[dict]:
         reason = _validate_reason(reason)
-        rows = []
+        rows: list[dict] = []
         now = now_iso()
+        slots_seen: set[str] = set()
         for idx, b in enumerate(bindings):
+            if not b.get("resource_id"):
+                raise ValueError("resource_id is required for prompt bindings")
+            slot = b.get("slot")
             mode = b.get("mode")
-            if mode not in VALID_PROMPT_MODES:
-                raise ValueError(
-                    f"Invalid prompt-binding mode {mode!r}; must be one of {VALID_PROMPT_MODES}"
-                )
-            if not b.get("resource_id") or not b.get("marker"):
-                raise ValueError("resource_id and marker are required for prompt bindings")
+            marker = b.get("marker")
+            if slot is not None:
+                if slot not in VALID_PROMPT_SLOTS:
+                    raise ValueError(
+                        f"Invalid prompt-binding slot {slot!r}; must be one of {VALID_PROMPT_SLOTS}"
+                    )
+                if slot in slots_seen:
+                    raise ValueError(
+                        f"Duplicate prompt-binding slot {slot!r} for agent {agent_id!r}"
+                    )
+                slots_seen.add(slot)
+                # Schemas don't need a marker or mode; ignore them if posted.
+                marker = marker or None
+                mode = mode or None
+            else:
+                if not marker:
+                    raise ValueError(
+                        "marker is required for prompt bindings without a slot"
+                    )
+                if mode not in VALID_PROMPT_MODES:
+                    raise ValueError(
+                        f"Invalid prompt-binding mode {mode!r}; must be one of {VALID_PROMPT_MODES}"
+                    )
             rows.append(
                 {
                     "id": uuid.uuid4().hex,
                     "agent_id": agent_id,
                     "resource_id": b["resource_id"],
-                    "marker": b["marker"],
+                    "marker": marker,
                     "mode": mode,
+                    "slot": slot,
+                    "attach_as_reference": 1 if b.get("attach_as_reference") else 0,
                     "pinned_version_id": b.get("pinned_version_id"),
                     "display_order": int(b.get("display_order", idx)),
                     "required": 1 if b.get("required", True) else 0,

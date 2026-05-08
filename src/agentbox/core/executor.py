@@ -51,12 +51,14 @@ from agentbox.core.plugins import get_backend, get_guardrail
 from agentbox.core.prompt_capture import build_fragments, fragments_to_json
 from agentbox.core.render import materialize_rendered_config
 from agentbox.core.resources.prompt_resolver import resolve_prompt
+from agentbox.core.resources.subagent_render import materialize_subagents
 from agentbox.core.resources.workspace_materialize import materialize_workspace
 from agentbox.core.run_prep import (
     prompt_resolution_to_snapshot,
     render_env_doc,
     resolve_agent_prompt_bindings,
     resolve_workspace_resources,
+    resolve_workspace_subagents,
     workspace_outcomes_to_snapshot,
 )
 from agentbox.core.runner_profiles import (
@@ -367,6 +369,31 @@ class RunExecutor:
             except Exception:
                 logger.exception(
                     "executor: env doc rendering failed for workspace %r",
+                    _workspace_id,
+                )
+
+            # Workspace subagents (RESOURCES_PLAN E3): write
+            # .{claude,opencode,codex}/agents/<alias>.md per registered
+            # subagent so the active backend can delegate to them.
+            try:
+                resolved_subagents = resolve_workspace_subagents(
+                    self.store, _workspace_id
+                )
+                if resolved_subagents:
+                    sub_outcomes = materialize_subagents(workdir, resolved_subagents)
+                    for o in sub_outcomes:
+                        _resource_snapshot_entries.append(
+                            {
+                                "role": "workspace_subagent",
+                                "workspace_id": o.workspace_id,
+                                "agent_id": o.agent_id,
+                                "alias": o.alias,
+                                "files_written": o.files_written,
+                            }
+                        )
+            except Exception:
+                logger.exception(
+                    "executor: workspace subagent materialization failed for workspace %r",
                     _workspace_id,
                 )
 

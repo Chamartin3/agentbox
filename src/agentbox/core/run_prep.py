@@ -83,6 +83,57 @@ def resolve_workspace_resources(store: SessionStore, workspace_id: str) -> list[
 
 
 # ---------------------------------------------------------------------------
+# Workspace subagent resolution (RESOURCES_PLAN E3)
+# ---------------------------------------------------------------------------
+
+
+def resolve_workspace_subagents(store: SessionStore, workspace_id: str) -> list[dict]:
+    """Hydrate workspace subagent rows into renderer-ready dicts.
+
+    Each entry includes: workspace_id, agent_id, alias, description,
+    prompt_content — the shape :func:`materialize_subagents` consumes.
+    Subagents whose referenced agent has no active version (or no prompt
+    content) are skipped with a warning.
+    """
+    if not workspace_id or workspace_id == "<ephemeral>":
+        return []
+
+    rows = store.list_workspace_subagents(workspace_id)
+    if not rows:
+        return []
+
+    resolved: list[dict] = []
+    for r in rows:
+        agent_id = r["agent_id"]
+        active = store.get_active_version(agent_id)
+        prompt = (active or {}).get("prompt_content") or (active or {}).get(
+            "prompt_snapshot"
+        )
+        if not prompt:
+            logger.warning(
+                "run_prep: subagent %s for workspace %s — agent %s has no active "
+                "prompt content; skipping",
+                r.get("alias"),
+                workspace_id,
+                agent_id,
+            )
+            continue
+        agent_def = store.get_agent_def(agent_id)
+        resolved.append(
+            {
+                "workspace_id": workspace_id,
+                "agent_id": agent_id,
+                "alias": r["alias"],
+                "description": getattr(agent_def, "description", None)
+                if agent_def
+                else None,
+                "prompt_content": prompt,
+            }
+        )
+    return resolved
+
+
+# ---------------------------------------------------------------------------
 # Agent prompt binding resolution
 # ---------------------------------------------------------------------------
 
@@ -123,12 +174,14 @@ def resolve_agent_prompt_bindings(store: SessionStore, agent_id: str) -> list[di
         resolved.append(
             {
                 "binding_id": b["id"],
-                "marker": b["marker"],
+                "marker": b.get("marker"),
+                "slot": b.get("slot"),
+                "attach_as_reference": bool(b.get("attach_as_reference")),
                 "resource_id": b["resource_id"],
                 "version_id": version_id,
                 "content_hash": version["content_hash"],
                 "type": resource["type"],
-                "mode": b["mode"],
+                "mode": b.get("mode"),
                 "display_name": resource["display_name"],
                 "required": bool(b.get("required", 1)),
                 "blobs": blobs,

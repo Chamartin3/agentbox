@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.resources.importers.base import (
     ImportedBlob,
     ImporterContext,
@@ -86,7 +87,7 @@ class HostPathImporter(ResourceImporter):
                 blobs=blobs,
                 import_source=self.import_source,
                 source_metadata={"host_path": str(root), "kind": "file"},
-                suggested_type="document",
+                suggested_type=ResourceType.DOCUMENT,
                 suggested_display_name=root.name,
             )
 
@@ -113,6 +114,6 @@ class HostPathImporter(ResourceImporter):
                 "file_count": len(blobs),
             },
             metadata={"file_count": len(blobs)},
-            suggested_type="folder",
+            suggested_type=ResourceType.FOLDER,
             suggested_display_name=root.name,
         )

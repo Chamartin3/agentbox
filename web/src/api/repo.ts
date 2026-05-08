@@ -213,3 +213,90 @@ export const subagentsApi = {
       { method: 'PUT', body: JSON.stringify({ subagents, actor }) },
     ),
 };
+
+// --- Workspace MCP overrides (Plan 05) ---
+
+export type McpPolicy = 'allow_all_unless_disabled' | 'deny_all_unless_enabled';
+
+export interface McpServerView {
+  name: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  disabled_tools: string[];
+  source: 'default' | 'override';
+}
+
+export interface EffectiveMcp {
+  servers: McpServerView[];
+  policy: McpPolicy;
+}
+
+export const workspaceMcpApi = {
+  get: (workspaceId: string) =>
+    req<EffectiveMcp>(`/api/workspaces/${encodeURIComponent(workspaceId)}/mcp`),
+  setPolicy: (workspaceId: string, policy: McpPolicy) =>
+    req<{ policy: McpPolicy }>(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/policy`,
+      { method: 'PUT', body: JSON.stringify({ default_policy: policy }) },
+    ),
+  setServer: (
+    workspaceId: string,
+    serverName: string,
+    enabled: boolean,
+    reason: string,
+    config_overrides?: Record<string, unknown> | null,
+  ) =>
+    req(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/servers/${encodeURIComponent(serverName)}`,
+      { method: 'PUT', body: JSON.stringify({ enabled, reason, config_overrides }) },
+    ),
+  setTool: (
+    workspaceId: string,
+    serverName: string,
+    toolName: string,
+    enabled: boolean,
+  ) =>
+    req(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/servers/${encodeURIComponent(serverName)}/tools/${encodeURIComponent(toolName)}`,
+      { method: 'PUT', body: JSON.stringify({ enabled }) },
+    ),
+  refresh: (workspaceId: string) =>
+    req<{ invalidated: number }>(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/refresh`,
+      { method: 'POST' },
+    ),
+};
+
+// --- Host-env grants (Plan 06) ---
+
+export interface HostEnvCapability {
+  name: string;
+  description: string;
+  grant_schema: Record<string, unknown>;
+  default_granted: boolean;
+}
+
+export interface HostEnvGrants {
+  grants: Record<string, Record<string, unknown>>;
+  profile_id: string | null;
+}
+
+export const hostEnvApi = {
+  capabilities: () =>
+    req<{ capabilities: HostEnvCapability[] }>(`/api/host-env/capabilities`),
+  getWorkspace: (workspaceId: string) =>
+    req<HostEnvGrants>(`/api/workspaces/${encodeURIComponent(workspaceId)}/host-env`),
+  setWorkspace: (
+    workspaceId: string,
+    overrides: Record<string, Record<string, unknown>>,
+    reason: string,
+    profile_id?: string | null,
+  ) =>
+    req<HostEnvGrants>(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/host-env`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ overrides, profile_id, reason }),
+      },
+    ),
+};

@@ -10,6 +10,7 @@ from __future__ import annotations
 import mimetypes
 from dataclasses import dataclass
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.resources.importers.base import (
     ImporterContext,
     ImporterResult,
@@ -39,6 +40,6 @@ class UploadImporter(ResourceImporter):
             blobs=[("", self.content, mime, text)],
             import_source=self.import_source,
             source_metadata={"filename": self.filename, "mime": mime},
-            suggested_type="document",
+            suggested_type=ResourceType.DOCUMENT,
             suggested_display_name=self.filename,
         )

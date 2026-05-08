@@ -31,6 +31,30 @@ router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])
 ResourceType = Literal["document", "folder", "skill", "schema", "script"]
 
 
+def _resolve_resource_id(store: SessionStore, id_or_slug: str) -> str | None:
+    """Look up a resource by UUID id, slug, or dotted-slug (legacy).
+
+    Returns the canonical resource UUID, or None if not found.
+    """
+    if not id_or_slug:
+        return None
+    r = store.get_repo_resource(id_or_slug)
+    if r:
+        return r["id"]
+    r = store.get_repo_resource_by_slug(id_or_slug)
+    if r:
+        return r["id"]
+    if "." in id_or_slug and "/" not in id_or_slug:
+        # Legacy ids used dots; new slugs use slashes (agent.X.foo → agent/X/foo).
+        # Replace only segments that look like a path separator (preserve dots in
+        # final segment like 'output_schema.json').
+        candidate = id_or_slug.replace(".", "/")
+        r = store.get_repo_resource_by_slug(candidate)
+        if r:
+            return r["id"]
+    return None
+
+
 # --- request models ---
 
 
@@ -115,10 +139,11 @@ def get_resource(
     resource_id: str,
     store: Annotated[SessionStore, Depends(get_store)],
 ):
-    r = store.get_repo_resource(resource_id)
-    if not r:
+    rid = _resolve_resource_id(store, resource_id)
+    if rid is None:
         raise HTTPException(status_code=404, detail="resource not found")
-    active = store.get_active_repo_version(resource_id) if r.get("active_version_id") else None
+    r = store.get_repo_resource(rid)
+    active = store.get_active_repo_version(rid) if r and r.get("active_version_id") else None
     return {"resource": r, "active_version": active}
 
 
@@ -127,9 +152,10 @@ def list_versions(
     resource_id: str,
     store: Annotated[SessionStore, Depends(get_store)],
 ):
-    if not store.get_repo_resource(resource_id):
+    rid = _resolve_resource_id(store, resource_id)
+    if rid is None:
         raise HTTPException(status_code=404, detail="resource not found")
-    return {"items": store.list_repo_versions(resource_id)}
+    return {"items": store.list_repo_versions(rid)}
 
 
 @router.post("/{resource_id}/versions/upload", status_code=201)
@@ -249,8 +275,10 @@ def get_blob(
     path: str = "",
     version_id: str | None = None,
 ):
-    if not store.get_repo_resource(resource_id):
+    rid = _resolve_resource_id(store, resource_id)
+    if rid is None:
         raise HTTPException(status_code=404, detail="resource not found")
+    resource_id = rid
     if version_id is None:
         active = store.get_active_repo_version(resource_id)
         if not active:
@@ -272,6 +300,10 @@ def render_resource(
     version_id: str | None = None,
 ):
     """Return the prompt-embed rendering of a resource version."""
+    rid = _resolve_resource_id(store, resource_id)
+    if rid is None:
+        raise HTTPException(status_code=404, detail="resource not found")
+    resource_id = rid
     resource = store.get_repo_resource(resource_id)
     if not resource:
         raise HTTPException(status_code=404, detail="resource not found")
@@ -295,8 +327,10 @@ def get_tree(
     version_id: str | None = None,
 ):
     """Return a flat list of blob entries (path, size, mime) for a version."""
-    if not store.get_repo_resource(resource_id):
+    rid = _resolve_resource_id(store, resource_id)
+    if rid is None:
         raise HTTPException(status_code=404, detail="resource not found")
+    resource_id = rid
     if version_id is None:
         active = store.get_active_repo_version(resource_id)
         if not active:

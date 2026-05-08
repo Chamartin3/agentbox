@@ -65,6 +65,11 @@ def resolve_prompt(
     snapshot: list[ResolvedBinding] = []
     warnings: list[str] = []
     for b in resolved_bindings:
+        # Schema-slot and other marker-less bindings are not splice
+        # candidates — callers must handle them separately. Skip them
+        # here so resolve_prompt only deals with marker/mode bindings.
+        if not b.get("marker") or not b.get("mode"):
+            continue
         try:
             rendered = _render_for_mode(
                 b["type"], b["mode"], b.get("blobs") or [], b.get("display_name", "")

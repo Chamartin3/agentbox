@@ -68,6 +68,7 @@ class _CoreStore:
     def _init(self) -> None:
         self._run_alembic_migrations()
         self._migrate()
+        self.engine.dispose()
         self._reap_orphaned_runs()
 
     def _run_alembic_migrations(self) -> None:
@@ -192,6 +193,33 @@ class _CoreStore:
                 )
             except Exception:
                 pass
+
+            # Extend resources.type CHECK constraint to include schema/script
+            try:
+                row = conn.exec_driver_sql(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='resources'"
+                ).fetchone()
+                if row and row[0] and "'schema'" not in row[0]:
+                    new_sql = row[0].replace(
+                        "type IN ('document', 'folder', 'skill')",
+                        "type IN ('document', 'folder', 'skill', 'schema', 'script')",
+                    )
+                    if new_sql != row[0]:
+                        conn.exec_driver_sql("PRAGMA writable_schema=ON")
+                        conn.exec_driver_sql(
+                            "UPDATE sqlite_master SET sql=? "
+                            "WHERE type='table' AND name='resources'",
+                            (new_sql,),
+                        )
+                        cur_ver = conn.exec_driver_sql(
+                            "PRAGMA schema_version"
+                        ).fetchone()[0]
+                        conn.exec_driver_sql(
+                            f"PRAGMA schema_version={cur_ver + 1}"
+                        )
+                        conn.exec_driver_sql("PRAGMA writable_schema=OFF")
+            except Exception:
+                logger.exception("migrate: failed to extend resources_type_check")
 
             # Create index on runs.runner_profile_id
             try:

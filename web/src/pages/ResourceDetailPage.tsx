@@ -1,7 +1,25 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import CodeMirror from '@uiw/react-codemirror';
+import { markdown } from '@codemirror/lang-markdown';
+import { javascript } from '@codemirror/lang-javascript';
+import { githubDark } from '@uiw/codemirror-theme-github';
 import { repoApi, RepoResource, RepoVersion, RepoType } from '../api/repo';
 import { RepoType as RepoTypeEnum } from '../api/enums';
+
+function roleFromTags(tags: string | null | undefined): string | undefined {
+  if (!tags) return undefined;
+  const KNOWN = ['system_fragment', 'system_prompt', 'output_schema', 'input_schema'];
+  let parts: string[] = [];
+  try {
+    const j = JSON.parse(tags);
+    if (Array.isArray(j)) parts = j.map(String);
+  } catch {
+    parts = tags.split(',').map((t) => t.trim());
+  }
+  for (const p of parts) if (KNOWN.includes(p)) return p === 'system_prompt' ? 'system_fragment' : p;
+  return undefined;
+}
 
 function fmtDate(s?: string): string {
   if (!s) return '';
@@ -128,9 +146,69 @@ function SchemaViewer({ content }: { content: string }) {
   );
 }
 
-function DocumentViewer({ content }: { content: string }) {
-  // TODO: install react-markdown to render markdown with formatting.
-  return <pre style={PRE_STYLE}>{content}</pre>;
+function looksLikeJsonSchema(content: string): boolean {
+  const trimmed = content.trimStart();
+  if (!trimmed.startsWith('{')) return false;
+  try {
+    const o = JSON.parse(content);
+    return !!o && typeof o === 'object' && (
+      '$schema' in o || 'properties' in o || (o.type === 'object' && 'required' in o)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function DocumentViewer({ content, role }: { content: string; role?: string }) {
+  const isSystemFragment = role === 'system_fragment';
+  const isSchemaShape = !isSystemFragment && looksLikeJsonSchema(content);
+
+  if (isSchemaShape) {
+    return (
+      <div className="stack" style={{ gap: 6 }}>
+        <div
+          className="dim"
+          style={{
+            fontSize: 12,
+            padding: '6px 10px',
+            background: 'rgba(80, 160, 200, 0.12)',
+            borderLeft: '3px solid #4ea1c4',
+            borderRadius: 2,
+          }}
+        >
+          Detected JSON schema — rendering as schema table.
+        </div>
+        <SchemaViewer content={content} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      {isSystemFragment && (
+        <div
+          className="dim"
+          style={{
+            fontSize: 12,
+            padding: '6px 10px',
+            background: 'rgba(120, 80, 200, 0.12)',
+            borderLeft: '3px solid #845ec2',
+            borderRadius: 2,
+          }}
+        >
+          System prompt fragment — composed into the agent's system prompt at run time.
+        </div>
+      )}
+      <CodeMirror
+        value={content}
+        extensions={[markdown()]}
+        theme={githubDark}
+        editable={false}
+        basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
+        style={{ maxHeight: 480, overflow: 'auto', fontSize: 12 }}
+      />
+    </div>
+  );
 }
 
 function fmtBytes(n: number | null): string {
@@ -228,7 +306,14 @@ function SkillViewer({ content }: { content: string }) {
         </table>
       )}
       <h3 style={{ fontSize: 13, margin: '8px 0 0 0' }}>SKILL.md body</h3>
-      <pre style={PRE_STYLE}>{body.trim()}</pre>
+      <CodeMirror
+        value={body.trim()}
+        extensions={[markdown()]}
+        theme={githubDark}
+        editable={false}
+        basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
+        style={{ maxHeight: 480, overflow: 'auto', fontSize: 12 }}
+      />
     </div>
   );
 }
@@ -236,21 +321,26 @@ function SkillViewer({ content }: { content: string }) {
 function ScriptViewer({ content, filename }: { content: string; filename?: string }) {
   const ext = (filename || '').toLowerCase().split('.').pop() || '';
   let language = 'text';
+  const extensions = [];
   if (ext === 'py') language = 'python';
-  else if (ext === 'js' || ext === 'mjs' || ext === 'cjs' || ext === 'ts') language = 'js';
-  else if (ext === 'sh' || ext === 'bash') language = 'shell';
+  else if (ext === 'js' || ext === 'mjs' || ext === 'cjs') {
+    language = 'javascript';
+    extensions.push(javascript());
+  } else if (ext === 'ts' || ext === 'tsx') {
+    language = 'typescript';
+    extensions.push(javascript({ typescript: true }));
+  } else if (ext === 'sh' || ext === 'bash') language = 'shell';
   return (
     <div className="stack" style={{ gap: 4 }}>
       <span className="dim" style={{ fontSize: 12 }}>language: {language}</span>
-      <pre
-        style={{
-          ...PRE_STYLE,
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-          whiteSpace: 'pre',
-        }}
-      >
-        {content}
-      </pre>
+      <CodeMirror
+        value={content}
+        extensions={extensions}
+        theme={githubDark}
+        editable={false}
+        basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: false }}
+        style={{ maxHeight: 520, overflow: 'auto', fontSize: 12 }}
+      />
     </div>
   );
 }
@@ -647,6 +737,10 @@ export default function ResourceDetailPage() {
             kind={resource.type}
             content={rendered}
             filename={(activeVersion?.source_metadata?.filename as string | undefined) ?? undefined}
+            role={
+              ((activeVersion?.metadata as Record<string, unknown> | undefined)?.role as string | undefined)
+              ?? roleFromTags(resource.tags)
+            }
           />
         </section>
       )}

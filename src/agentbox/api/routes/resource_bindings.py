@@ -19,14 +19,17 @@ from agentbox.core.resources.rendering import render_for_type
 router = APIRouter(tags=["resource-bindings"])
 
 PromptMode = Literal["inline", "skill_primer", "name_only", "manifest"]
+PromptSlot = Literal["input_schema", "output_schema"]
 MaterializeMode = Literal["copy", "symlink", "mount"]
 OnConflict = Literal["error", "overwrite", "skip"]
 
 
 class PromptBindingIn(BaseModel):
     resource_id: str
-    marker: str
-    mode: PromptMode
+    marker: str | None = None
+    mode: PromptMode | None = None
+    slot: PromptSlot | None = None
+    attach_as_reference: bool = False
     pinned_version_id: str | None = None
     required: bool = True
     display_order: int = 0
@@ -84,16 +87,64 @@ def _resolve_binding_for_prompt(store: SessionStore, b: dict) -> dict:
     blobs = list(store.iter_repo_blobs(version_id))
     return {
         "binding_id": b["id"],
-        "marker": b["marker"],
+        "marker": b.get("marker"),
+        "slot": b.get("slot"),
+        "attach_as_reference": bool(b.get("attach_as_reference")),
         "resource_id": b["resource_id"],
         "version_id": version_id,
         "content_hash": version["content_hash"],
         "type": resource["type"],
-        "mode": b["mode"],
+        "mode": b.get("mode"),
         "display_name": resource["display_name"],
         "required": bool(b.get("required", 1)),
         "blobs": blobs,
     }
+
+
+def _render_references_block(resolved: list[dict]) -> tuple[str, list[dict]]:
+    """Render the References section for prompt bindings flagged
+    ``attach_as_reference``. Returns ``(text, refs_meta)`` where ``text``
+    is appended to the composed prompt and ``refs_meta`` is the
+    structured ref list returned by the preview endpoint.
+    """
+    parts: list[str] = []
+    refs_meta: list[dict] = []
+    for b in resolved:
+        if not b.get("attach_as_reference"):
+            continue
+        if b["type"] not in ("document", "folder"):
+            continue
+        rendered = render_for_type(b["type"], b.get("blobs") or [])
+        heading = b.get("display_name") or b.get("marker") or b["resource_id"]
+        body = rendered.get("text") or ""
+        if body:
+            parts.append(f"## {heading}\n\n{body}")
+        refs_meta.append(
+            {
+                "binding_id": b["binding_id"],
+                "resource_id": b["resource_id"],
+                "version_id": b["version_id"],
+                "display_name": b.get("display_name"),
+            }
+        )
+    if not parts:
+        return "", refs_meta
+    return "## References\n\n" + "\n\n".join(parts), refs_meta
+
+
+def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
+    for b in resolved:
+        if b.get("slot") == slot:
+            rendered = render_for_type(b["type"], b.get("blobs") or [])
+            return {
+                "binding_id": b["binding_id"],
+                "resource_id": b["resource_id"],
+                "version_id": b["version_id"],
+                "display_name": b.get("display_name"),
+                "content_hash": b["content_hash"],
+                "text": rendered.get("text") or "",
+            }
+    return None
 
 
 # --- prompt bindings (Plan 02) ---
@@ -112,8 +163,10 @@ def list_prompt_resources(
         enriched.append(
             {
                 **b,
+                "attach_as_reference": bool(b.get("attach_as_reference")),
                 "resource_slug": resource["slug"] if resource else None,
                 "resource_type": resource["type"] if resource else None,
+                "resource_display_name": resource["display_name"] if resource else None,
                 "active_version_id": active["id"] if active else None,
             }
         )
@@ -156,11 +209,27 @@ def preview_prompt(
     else:
         raw = store.list_prompt_bindings(agent_id)
     resolved = [_resolve_binding_for_prompt(store, b) for b in raw]
-    result = resolve_prompt(body.template, resolved)
+    # Only marker-style (non-slot) bindings participate in splicing.
+    splice_bindings = [b for b in resolved if b.get("marker") and b.get("mode")]
+    result = resolve_prompt(body.template, splice_bindings)
+
+    refs_text, refs_meta = _render_references_block(resolved)
+    composed = result.rendered_prompt
+    if refs_text:
+        composed = composed.rstrip() + "\n\n" + refs_text
+
+    input_schema = _schema_for_slot(resolved, "input_schema")
+    output_schema = _schema_for_slot(resolved, "output_schema")
+    raw_text_output = output_schema is None
+
     return {
-        "rendered_prompt": result.rendered_prompt,
+        "rendered_prompt": composed,
         "unresolved_markers": result.unresolved_markers,
         "warnings": result.warnings,
+        "references": refs_meta,
+        "input_schema": input_schema,
+        "output_schema": output_schema,
+        "raw_text_output": raw_text_output,
         "snapshot": [
             {
                 "binding_id": rb.binding_id,

@@ -7,21 +7,26 @@ startup via `_metadata.create_all(engine)`; no migration tool is used.
 from __future__ import annotations
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     Column,
     Float,
     ForeignKey,
     Index,
     Integer,
-    JSON,
     LargeBinary,
     MetaData,
     String,
     Table,
     UniqueConstraint,
+    text,
 )
 
+from agentbox.core.constants import ResourceType
+
 metadata = MetaData()
+
+_RESOURCE_TYPES_SQL = ", ".join(f"'{t.value}'" for t in ResourceType)
 
 sessions = Table(
     "sessions",
@@ -321,7 +326,8 @@ resources = Table(
     Column("updated_at", String, nullable=False),
     Column("created_by", String, nullable=True),
     CheckConstraint(
-        "type IN ('document', 'folder', 'skill')", name="resources_type_check"
+        f"type IN ({_RESOURCE_TYPES_SQL})",
+        name="resources_type_check",
     ),
     UniqueConstraint("slug", name="uq_resources_slug"),
     Index("ix_resources_type", "type"),
@@ -397,8 +403,15 @@ agent_prompt_resource_bindings = Table(
     Column("id", String, primary_key=True),
     Column("agent_id", String, nullable=False),
     Column("resource_id", String, ForeignKey("resources.id"), nullable=False),
-    Column("marker", String, nullable=False),
-    Column("mode", String, nullable=False),
+    Column("marker", String, nullable=True),
+    Column("mode", String, nullable=True),
+    Column("slot", String, nullable=True),
+    Column(
+        "attach_as_reference",
+        Integer,
+        nullable=False,
+        server_default="0",
+    ),
     Column("pinned_version_id", String, ForeignKey("resource_versions.id"), nullable=True),
     Column("display_order", Integer, nullable=False, server_default="0"),
     Column("required", Integer, nullable=False, server_default="1"),
@@ -406,15 +419,33 @@ agent_prompt_resource_bindings = Table(
     Column("created_at", String, nullable=False),
     Column("created_by", String, nullable=True),
     CheckConstraint(
-        "mode IN ('inline', 'skill_primer', 'name_only', 'manifest')",
+        "mode IS NULL OR mode IN ('inline', 'skill_primer', 'name_only', 'manifest')",
         name="agent_prompt_bindings_mode_check",
     ),
+    CheckConstraint(
+        "slot IS NULL OR slot IN ('input_schema', 'output_schema')",
+        name="agent_prompt_bindings_slot_check",
+    ),
+    CheckConstraint(
+        "(slot IS NOT NULL) OR (marker IS NOT NULL AND mode IS NOT NULL)",
+        name="agent_prompt_bindings_slot_or_marker",
+    ),
     CheckConstraint("required IN (0, 1)", name="agent_prompt_bindings_required_bool"),
+    CheckConstraint(
+        "attach_as_reference IN (0, 1)",
+        name="agent_prompt_bindings_reference_bool",
+    ),
     UniqueConstraint(
         "agent_id", "marker", "resource_id",
         name="uq_agent_prompt_bindings_triple",
     ),
     Index("ix_agent_prompt_bindings_agent", "agent_id"),
+    Index(
+        "uq_agent_prompt_bindings_slot",
+        "agent_id", "slot",
+        unique=True,
+        sqlite_where=text("slot IS NOT NULL"),
+    ),
 )
 
 # --- Plan 03: workspace file-materialize bindings ---

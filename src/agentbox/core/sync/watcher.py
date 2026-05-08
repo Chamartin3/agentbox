@@ -54,6 +54,11 @@ async def watch_agents(
         logger.warning("watchfiles not installed — sync watcher disabled")
         return
 
+    from agentbox.core.resources.boot_import import (
+        import_one_skill,
+        resolve_skill_roots,
+    )
+
     watch_paths: list[Path] = []
     for candidate in (
         project_root / "agents.d",
@@ -63,6 +68,10 @@ async def watch_agents(
         if candidate.exists():
             watch_paths.append(candidate)
 
+    skill_roots = resolve_skill_roots(project_root)
+    for sr in skill_roots:
+        watch_paths.append(sr)
+
     if not watch_paths:
         logger.info("watcher: no agent paths to watch, exiting")
         return
@@ -70,19 +79,52 @@ async def watch_agents(
     logger.info("watcher: watching %s", [str(p) for p in watch_paths])
 
     pending: set[Path] = set()
+    pending_skills: set[Path] = set()  # skill dirs (parent of SKILL.md)
     debounce_task: asyncio.Task | None = None  # type: ignore[type-arg]
+
+    def _match_skill_root(path: Path) -> Path | None:
+        for sr in skill_roots:
+            try:
+                rel = path.relative_to(sr)
+            except ValueError:
+                continue
+            # path must be <root>/<skill_name>/SKILL.md
+            if len(rel.parts) >= 2 and rel.name == "SKILL.md":
+                return sr
+        return None
 
     async def _flush() -> None:
         await _debounce(_DEBOUNCE_S)
         paths_to_process = list(pending)
+        skill_dirs_to_import = list(pending_skills)
         pending.clear()
+        pending_skills.clear()
         if paths_to_process:
             await _process_changes(store, loader, project_root)
+        for skill_dir in skill_dirs_to_import:
+            sr = next(
+                (r for r in skill_roots if skill_dir.is_relative_to(r)),
+                None,
+            )
+            if sr is None:
+                continue
+            try:
+                action, slug = import_one_skill(store, skill_dir, project_root)
+                logger.info("watcher: skill %s %s", action, slug)
+            except Exception:
+                logger.exception(
+                    "watcher: failed to import skill at %s", skill_dir
+                )
 
     async for changes in awatch(*watch_paths):
         for change_type, path_str in changes:
             if change_type in (Change.added, Change.modified):
-                pending.add(Path(path_str))
+                p = Path(path_str)
+                sr = _match_skill_root(p)
+                if sr is not None:
+                    pending_skills.add(p.parent)
+                else:
+                    pending.add(p)
 
         if debounce_task is not None and not debounce_task.done():
             debounce_task.cancel()

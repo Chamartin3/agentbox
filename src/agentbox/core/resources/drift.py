@@ -14,6 +14,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agentbox.core.constants import ResourceType
+
 if TYPE_CHECKING:
     from agentbox.core.data.store import SessionStore
 
@@ -81,7 +83,7 @@ def import_manifest_documents(
         else:
             row = store.create_repo_resource(
                 slug=slug,
-                type="document",
+                type=ResourceType.DOCUMENT,
                 display_name=slug,
                 description=f"Imported from {path.name}",
             )
@@ -133,7 +135,7 @@ def import_manifest_skills(
         else:
             row = store.create_repo_resource(
                 slug=slug,
-                type="skill",
+                type=ResourceType.SKILL,
                 display_name=path.stem,
                 description=f"Imported from {path.name}",
             )

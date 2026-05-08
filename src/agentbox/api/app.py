@@ -49,6 +49,9 @@ from agentbox.core.resources.boot_import import (
     import_repo_resources,
     sweep_workspace_skill_bindings,
 )
+from agentbox.core.resources.legacy_migration import (
+    migrate_shared_resources_to_repo,
+)
 from agentbox.core.versioning.drift import startup_sweep
 
 SPA_DIR = Path(__file__).parent.parent / "ui" / "static" / "dist"
@@ -163,6 +166,22 @@ def _on_startup() -> None:
                     summary["created"], summary["updated"],
                     summary["skipped"], summary["failed"],
                 )
+            # Plan 01 legacy sweep: move shared_resources rows into the
+            # unified repo. Runs after import_repo_resources so that
+            # manifest-imported rows take precedence and overlapping legacy
+            # rows are skipped by slug match. Idempotent.
+            try:
+                legacy_report = migrate_shared_resources_to_repo(store)
+                _summary = legacy_report.summary()
+                if _summary["migrated"] or _summary["failed"]:
+                    _log.info(
+                        "legacy shared_resources sweep: %s", _summary,
+                    )
+                else:
+                    _log.debug("legacy shared_resources sweep: %s", _summary)
+            except Exception:
+                _log.exception("legacy shared_resources sweep failed")
+
             ws_summary = sweep_workspace_skill_bindings(store, loaded_manifest)
             if ws_summary["bindings_added"]:
                 _log.info(

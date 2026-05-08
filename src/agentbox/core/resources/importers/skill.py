@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.resources.importers.base import ImporterContext, ImporterResult
 from agentbox.core.resources.importers.host_path import HostPathImporter
 
@@ -60,7 +61,7 @@ class SkillImporter(HostPathImporter):
                 "entry_path": ENTRY_FILE,
                 "file_count": len(result.blobs),
             },
-            suggested_type="skill",
+            suggested_type=ResourceType.SKILL,
             suggested_slug=f"skill:{skill_name}",
             suggested_display_name=skill_name,
             suggested_description=skill_desc,
