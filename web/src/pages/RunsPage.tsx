@@ -5,6 +5,7 @@ import {
   RunsPage as RunsPageData,
   api,
 } from '../api/client';
+import { RunsFilterKey, RunStatus } from '../api/enums';
 
 const PAGE_SIZE = 25;
 
@@ -12,7 +13,7 @@ const PAGE_SIZE = 25;
 // query params we own:
 //   ?agent=<id>&status=ok|error|running&executor=<model>&q=<text>&page=<1-based>
 // Empty values are dropped from the URL.
-type FilterKey = 'agent' | 'status' | 'executor' | 'q' | 'page';
+type FilterKey = RunsFilterKey;
 
 function readParam(p: URLSearchParams, k: FilterKey): string {
   return p.get(k) ?? '';
@@ -28,27 +29,27 @@ function setParam(
   else next.delete(k);
   // Changing a filter resets pagination, except when the filter *is*
   // the page itself.
-  if (k !== 'page') next.delete('page');
+  if (k !== RunsFilterKey.Page) next.delete(RunsFilterKey.Page);
   return next;
 }
 
 const STATUSES = [
   { value: '', label: 'All' },
-  { value: 'ok', label: 'OK' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'error', label: 'Error' },
-  { value: 'incomplete', label: 'Incomplete' },
-  { value: 'timeout', label: 'Timeout' },
-  { value: 'running', label: 'Running' },
+  { value: RunStatus.Ok, label: 'OK' },
+  { value: RunStatus.Failed, label: 'Failed' },
+  { value: RunStatus.Error, label: 'Error' },
+  { value: RunStatus.Incomplete, label: 'Incomplete' },
+  { value: RunStatus.Timeout, label: 'Timeout' },
+  { value: RunStatus.Running, label: 'Running' },
 ];
 
 export default function RunsPage() {
   const [params, setParams] = useSearchParams();
-  const agent = readParam(params, 'agent');
-  const status = readParam(params, 'status');
-  const executor = readParam(params, 'executor');
-  const qParam = readParam(params, 'q');
-  const page = Math.max(1, Number(readParam(params, 'page') || '1'));
+  const agent = readParam(params, RunsFilterKey.Agent);
+  const status = readParam(params, RunsFilterKey.Status);
+  const executor = readParam(params, RunsFilterKey.Executor);
+  const qParam = readParam(params, RunsFilterKey.Q);
+  const page = Math.max(1, Number(readParam(params, RunsFilterKey.Page) || '1'));
 
   // Local search input — debounced into the URL so we don't refetch on
   // every keystroke. Initialised from the URL on mount and whenever the
@@ -58,7 +59,7 @@ export default function RunsPage() {
   useEffect(() => {
     const t = window.setTimeout(() => {
       if (qInput !== qParam) {
-        setParams(setParam(params, 'q', qInput), { replace: true });
+        setParams(setParam(params, RunsFilterKey.Q, qInput), { replace: true });
       }
     }, 250);
     return () => window.clearTimeout(t);
@@ -124,7 +125,7 @@ export default function RunsPage() {
     setParams(setParam(params, k, v), { replace: false });
 
   const goToPage = (n: number) =>
-    setParams(setParam(params, 'page', String(Math.max(1, n))), { replace: false });
+    setParams(setParam(params, RunsFilterKey.Page, String(Math.max(1, n))), { replace: false });
 
   const clearAll = () => {
     const next = new URLSearchParams();
@@ -155,13 +156,13 @@ export default function RunsPage() {
           placeholder="Search input/output/error/id…"
           style={{ minWidth: 260 }}
         />
-        <select value={agent} onChange={(e) => setFilter('agent', e.target.value)}>
+        <select value={agent} onChange={(e) => setFilter(RunsFilterKey.Agent, e.target.value)}>
           <option value="">All agents</option>
           {facets?.agents.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
         </select>
-        <select value={executor} onChange={(e) => setFilter('executor', e.target.value)}>
+        <select value={executor} onChange={(e) => setFilter(RunsFilterKey.Executor, e.target.value)}>
           <option value="">All executors</option>
           {facets?.executors.map((e) => (
             <option key={e} value={e}>{e}</option>
@@ -172,7 +173,7 @@ export default function RunsPage() {
             <button
               key={s.value || 'all'}
               className={status === s.value ? 'active' : ''}
-              onClick={() => setFilter('status', s.value)}
+              onClick={() => setFilter(RunsFilterKey.Status, s.value)}
             >
               {s.label}
             </button>

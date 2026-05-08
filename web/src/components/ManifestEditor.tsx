@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError } from '../api/client';
+import { repoApi, RepoResource } from '../api/repo';
 import BundleFileEditor from './BundleFileEditor';
 
 type BundleFile = {
@@ -22,7 +23,6 @@ interface Props {
 
 export default function ManifestEditor({ agent, bundleFiles = [], currentVersion, isDraft, onSaved, onError, onLifecycleChange }: Props) {
   const navigate = useNavigate();
-  const [runnerKind, setRunnerKind] = useState(agent.runner.kind);
 
   // Lifecycle state
   const [publishReason, setPublishReason] = useState('');
@@ -40,8 +40,6 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
   const [exporting, setExporting] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
-  const [modelOptions, setModelOptions] = useState<string[]>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
   const [workspaceOptions, setWorkspaceOptions] = useState<string[]>([]);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
 
@@ -52,8 +50,8 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
   const [tags, setTags] = useState(agent.tags.join(', '));
   const [webhookUrl, setWebhookUrl] = useState(agent.webhook_url || '');
 
-  // Runner config
-  const [model, setModel] = useState(agent.runner.model || '');
+  // Runner config (kind+model live on the bound runner profile; only
+  // agent-level execution overrides are edited here).
   const [timeout, setTimeoutSec] = useState(String(agent.runner.timeout_seconds));
   const [maxValidationRetries, setMaxValidationRetries] = useState(
     String(agent.runner.max_validation_retries),
@@ -71,6 +69,16 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
     agent.composition?.output_validation || 'strict',
   );
 
+  // Repo-resource schemas (discoverability picker — links out)
+  const [repoSchemas, setRepoSchemas] = useState<RepoResource[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    repoApi.list({ type: 'schema', limit: 200 })
+      .then((r) => { if (!cancelled) setRepoSchemas(r.items); })
+      .catch(() => { if (!cancelled) setRepoSchemas([]); });
+    return () => { cancelled = true; };
+  }, []);
+
   // Available bundle resources, grouped by kind
   const schemaFiles = bundleFiles.filter(
     (f) => f.kind === 'output_schema' || f.kind === 'input_schema' || f.kind === 'schema',
@@ -83,13 +91,11 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
 
   // Sync local state when the agent prop changes (e.g. after a successful save)
   useEffect(() => {
-    setRunnerKind(agent.runner.kind);
     setDescription(agent.description);
     setSessionMode(agent.session_mode);
     setWorkspace(agent.workspace || '');
     setTags(agent.tags.join(', '));
     setWebhookUrl(agent.webhook_url || '');
-    setModel(agent.runner.model || '');
     setTimeoutSec(String(agent.runner.timeout_seconds));
     setMaxValidationRetries(String(agent.runner.max_validation_retries));
     setMaxErrorRetries(String(agent.runner.max_error_retries));
@@ -99,29 +105,6 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
     setUserTemplate(agent.composition?.user_template || '');
     setOutputValidation(agent.composition?.output_validation || 'strict');
   }, [agent]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingModels(true);
-    api
-      .listRunnerModels(runnerKind)
-      .then((res) => {
-        if (cancelled) return;
-        setModelOptions(res.models);
-        if (runnerKind !== agent.runner.kind && !res.models.includes(model)) {
-          setModel('');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setModelOptions([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingModels(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [runnerKind]);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,13 +135,11 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
   };
 
   const dirty =
-    runnerKind !== agent.runner.kind ||
     description !== agent.description ||
     sessionMode !== agent.session_mode ||
     workspace !== (agent.workspace || '') ||
     tags !== agent.tags.join(', ') ||
     webhookUrl !== (agent.webhook_url || '') ||
-    model !== (agent.runner.model || '') ||
     timeout !== String(agent.runner.timeout_seconds) ||
     maxValidationRetries !== String(agent.runner.max_validation_retries) ||
     maxErrorRetries !== String(agent.runner.max_error_retries) ||
@@ -259,10 +240,6 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
       patch.webhook_url = webhookUrl.trim() || null;
     }
 
-    if (runnerKind !== agent.runner.kind) runnerPatch.kind = runnerKind;
-    if (model !== (agent.runner.model || '')) {
-      runnerPatch.model = model.trim() || null;
-    }
     if (timeout !== String(agent.runner.timeout_seconds)) {
       const n = parseInt(timeout, 10);
       if (Number.isFinite(n) && n > 0) runnerPatch.timeout_seconds = n;
@@ -309,33 +286,55 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
     onChange: (v: string) => void,
     options: BundleFile[],
     hint: string,
-  ) => (
-    <div className="field">
-      <label>{label}</label>
-      {options.length > 0 ? (
-        <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: '100%' }}>
-          <option value="">(none)</option>
-          {value && !options.find((o) => o.relative_path === value) && (
-            <option value={value}>{value} (current — not in bundle)</option>
-          )}
-          {options.map((f) => (
-            <option key={f.relative_path} value={f.relative_path}>
-              {f.relative_path}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={hint}
-        />
-      )}
-      <p className="dim" style={{ fontSize: 11, marginTop: 4 }}>
-        Bundle-relative path. Add files via the agent bundle directory, then they appear here.
-      </p>
-    </div>
-  );
+  ) => {
+    const isSchemaField = label === 'input_schema' || label === 'output_schema';
+    return (
+      <div className="field">
+        <label>{label}</label>
+        {options.length > 0 ? (
+          <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: '100%' }}>
+            <option value="">(none)</option>
+            {value && !options.find((o) => o.relative_path === value) && (
+              <option value={value}>{value} (current — not in bundle)</option>
+            )}
+            {options.map((f) => (
+              <option key={f.relative_path} value={f.relative_path}>
+                {f.relative_path}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={hint}
+          />
+        )}
+        <p className="dim" style={{ fontSize: 11, marginTop: 4 }}>
+          Bundle-relative path. Add files via the agent bundle directory, then they appear here.
+        </p>
+        {isSchemaField && repoSchemas.length > 0 && (
+          <div className="row" style={{ gap: 6, alignItems: 'center', marginTop: 4 }}>
+            <span className="dim" style={{ fontSize: 11 }}>browse repo schemas:</span>
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                const id = e.target.value;
+                if (id) window.open(`/workspaces/resources/${encodeURIComponent(id)}`, '_blank');
+                e.currentTarget.value = '';
+              }}
+              style={{ fontSize: 11 }}
+            >
+              <option value="">— pick to open in new tab —</option>
+              {repoSchemas.map((r) => (
+                <option key={r.id} value={r.id}>{r.slug} · {r.display_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <section className="section">
@@ -435,49 +434,13 @@ export default function ManifestEditor({ agent, bundleFiles = [], currentVersion
         </div>
       </fieldset>
 
-      {/* ---- Runner --------------------------------------------------- */}
+      {/* ---- Execution -------------------------------------------------- */}
       <fieldset className="config-fieldset">
-        <legend>runner</legend>
-
-        <div className="field">
-          <label>kind</label>
-          <select
-            value={runnerKind}
-            onChange={(e) => setRunnerKind(e.target.value)}
-            style={{ width: '100%' }}
-          >
-            <option value="claude_code">claude_code</option>
-            <option value="opencode">opencode</option>
-            <option value="pydantic_ai">pydantic_ai</option>
-          </select>
-        </div>
-
-        <div className="field">
-          <label>model</label>
-          {modelOptions.length > 0 ? (
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              style={{ width: '100%' }}
-            >
-              <option value="">(default)</option>
-              {!modelOptions.includes(model) && model && (
-                <option value={model}>{model} (current)</option>
-              )}
-              {modelOptions.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder={loadingModels ? 'loading models…' : '(default)'}
-            />
-          )}
-        </div>
+        <legend>execution</legend>
+        <p className="dim" style={{ fontSize: 11, marginTop: 0 }}>
+          Backend and model are controlled by the bound <strong>runner profile</strong> (see above).
+          The fields below are agent-level execution overrides.
+        </p>
 
         <div className="field">
           <label>timeout_seconds</label>

@@ -312,6 +312,7 @@ export interface RunnerProfile {
   timeout_seconds: number | null;
   base_url: string | null;
   api_key_env: string | null;
+  api_token_id: string | null;
   params: Record<string, unknown>;
   headers: Record<string, string>;
   extra_args: string[];
@@ -331,6 +332,7 @@ export interface RunnerProfileCreate {
   timeout_seconds?: number | null;
   base_url?: string | null;
   api_key_env?: string | null;
+  api_token_id?: string | null;
   params?: Record<string, unknown>;
   headers?: Record<string, string>;
   extra_args?: string[];
@@ -371,6 +373,7 @@ export interface RunnerBackend {
   compatible_providers: string[];
   accepts_no_provider: boolean;
 }
+
 
 // ---- endpoints ---------------------------------------------------------
 
@@ -529,6 +532,20 @@ export const api = {
 
   // workspace endpoints (by name)
   listWorkspaces: () => req<Array<Record<string, unknown>>>('/api/workspaces'),
+  listWorkspacesPaginated: (params: {
+    q?: string; sort?: string | null; order?: 'asc' | 'desc' | null;
+    limit?: number; offset?: number;
+  }) => {
+    const p = new URLSearchParams({ paginated: 'true' });
+    if (params.q) p.set('q', params.q);
+    if (params.sort) p.set('sort', params.sort);
+    if (params.order) p.set('order', params.order);
+    if (params.limit != null) p.set('limit', String(params.limit));
+    if (params.offset != null) p.set('offset', String(params.offset));
+    return req<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/api/workspaces?${p.toString()}`,
+    );
+  },
   getWorkspaceByName: (name: string) => req<Record<string, unknown>>(`/api/workspaces/by-name/${name}`),
   generateWorkspaceConfigsByName: (name: string) =>
     req<Record<string, unknown>>(`/api/workspaces/by-name/${name}/generate-configs`, { method: 'POST' }),

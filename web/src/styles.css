@@ -57,14 +57,17 @@ tr:hover td { background: var(--bg-elevated); }
   font-size: 11px;
   font-weight: 600;
 }
-.pill.ok { background: #1f6f3a; color: #fff; }
-.pill.error { background: #8b1a1a; color: #fff; }
-.pill.running { background: #1f6feb; color: #fff; }
-.pill.eph { background: #4a3a14; color: #f6c453; }
-/* failed = expected agent-level failure (validation, rate-limit,
-   webhook delivery). Softer red than .error so genuine executor
-   crashes still stand out. */
-.pill.failed { background: #7a3a1a; color: #fff; }
+/* Status pill colors come from the single source of truth in
+   src/theme/statusColors.ts (CSS vars are injected at boot via
+   installStatusCssVars). Edit colors there, not here. */
+.pill.ok        { background: var(--status-ok-bg);         color: #fff; }
+.pill.running   { background: var(--status-running-bg);    color: #fff; }
+.pill.error     { background: var(--status-error-bg);      color: #fff; }
+.pill.failed    { background: var(--status-failed-bg);     color: #fff; }
+.pill.timeout   { background: var(--status-timeout-bg);    color: #fff; }
+.pill.incomplete{ background: var(--status-incomplete-bg); color: #fff; }
+/* legacy alias retained while older callers migrate. */
+.pill.eph { background: var(--status-incomplete-bg); color: #fff; }
 
 pre, code {
   font-family: ui-monospace, Menlo, Consolas, monospace;

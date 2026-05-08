@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
+import EnvDocEditor from '../components/EnvDocEditor';
+import WorkspaceResourcesEditor from '../components/WorkspaceResourcesEditor';
+import SubagentsEditor from '../components/SubagentsEditor';
 
 interface WorkspaceFile {
   path: string;
@@ -295,6 +298,24 @@ export default function WorkspaceDetailPage() {
           <div className="kpi-sub">/ {totalToolCount + builtinTools.length} possible</div>
         </div>
       </div>
+
+      {/* D1 — workspace env-doc editor (top of the page, "front and center") */}
+      <section className="section">
+        <h3 style={{ marginTop: 0 }}>Environment Documentation</h3>
+        <EnvDocEditor workspaceId={id!} />
+      </section>
+
+      {/* D2 — central resource bindings (skills/folders/scripts/schemas/docs) */}
+      <section className="section">
+        <h3 style={{ marginTop: 0 }}>Resources</h3>
+        <WorkspaceResourcesEditor workspaceId={id!} />
+      </section>
+
+      {/* D3 / E4 — subagent assignments with reorder */}
+      <section className="section">
+        <h3 style={{ marginTop: 0 }}>Subagents</h3>
+        <SubagentsEditor workspaceId={id!} />
+      </section>
 
       {/* Skills viewer — narrow list on left, wide content on right */}
       <section className="section">

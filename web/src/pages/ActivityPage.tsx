@@ -4,11 +4,13 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { CHART_STATUSES, STATUS_COLORS } from '../theme/statusColors';
 import {
   ActivityRange,
   ActivitySummary,
@@ -107,7 +109,17 @@ export default function ActivityPage() {
   const series = useMemo(() => {
     const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
     const byDate = new Map(rawSeries.map((p) => [p.date, p]));
-    const out: Array<{ date: string; runs: number; failures: number }> = [];
+    const empty = {
+      runs: 0,
+      failures: 0,
+      running: 0,
+      ok: 0,
+      error: 0,
+      failed: 0,
+      timeout: 0,
+      incomplete: 0,
+    };
+    const out: Array<typeof empty & { date: string }> = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     for (let i = days - 1; i >= 0; i -= 1) {
@@ -115,7 +127,7 @@ export default function ActivityPage() {
       d.setDate(today.getDate() - i);
       const key = d.toISOString().slice(0, 10);
       const hit = byDate.get(key);
-      out.push(hit ?? { date: key, runs: 0, failures: 0 });
+      out.push(hit ?? { date: key, ...empty });
     }
     return out;
   }, [rawSeries, range]);
@@ -193,14 +205,12 @@ export default function ActivityPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={series} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="runsFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#1f6feb" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="#1f6feb" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="failFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f85149" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="#f85149" stopOpacity={0} />
-                    </linearGradient>
+                    {CHART_STATUSES.map((k) => (
+                      <linearGradient key={k} id={`fill-${k}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={STATUS_COLORS[k]} stopOpacity={0.7} />
+                        <stop offset="100%" stopColor={STATUS_COLORS[k]} stopOpacity={0.15} />
+                      </linearGradient>
+                    ))}
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
                   <XAxis dataKey="date" tickFormatter={fmtDateTick} stroke="#8b949e" fontSize={11} />
@@ -209,8 +219,18 @@ export default function ActivityPage() {
                     labelFormatter={(v) => new Date(v as string).toLocaleDateString()}
                     contentStyle={{ background: '#161b22', border: '1px solid #30363d', fontSize: 12 }}
                   />
-                  <Area type="monotone" dataKey="runs" stroke="#58a6ff" fill="url(#runsFill)" name="Runs" />
-                  <Area type="monotone" dataKey="failures" stroke="#f85149" fill="url(#failFill)" name="Failures" />
+                  <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
+                  {CHART_STATUSES.map((k) => (
+                    <Area
+                      key={k}
+                      type="monotone"
+                      stackId="status"
+                      dataKey={k}
+                      stroke={STATUS_COLORS[k]}
+                      fill={`url(#fill-${k})`}
+                      name={k}
+                    />
+                  ))}
                 </AreaChart>
               </ResponsiveContainer>
             </div>

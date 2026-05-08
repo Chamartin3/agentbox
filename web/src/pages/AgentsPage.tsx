@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, AgentDef } from '../api/client';
+import { AgentSortKey, SortDir } from '../api/enums';
 
 function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void }) {
   const [prompt, setPrompt] = useState<string | null>(null);
@@ -51,8 +52,7 @@ function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void
   );
 }
 
-type SortKey = 'id' | 'runner' | 'model' | 'updated_at';
-type SortDir = 'asc' | 'desc';
+type SortKey = Exclude<AgentSortKey, 'last_run'>;
 
 const PAGE_SIZE = 20;
 
@@ -68,8 +68,8 @@ export default function AgentsPage() {
   const [selected, setSelected] = useState<AgentDef | null>(null);
   const [query, setQuery] = useState('');
   const [runnerFilter, setRunnerFilter] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('updated_at');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [sortKey, setSortKey] = useState<SortKey>(AgentSortKey.UpdatedAt);
+  const [sortDir, setSortDir] = useState<SortDir>(SortDir.Desc);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -91,11 +91,11 @@ export default function AgentsPage() {
   });
 
   const sorted = [...filtered].sort((a, b) => {
-    const dir = sortDir === 'asc' ? 1 : -1;
+    const dir = sortDir === SortDir.Asc ? 1 : -1;
     const pick = (x: AgentDef): string | null =>
-      sortKey === 'id' ? x.id
-      : sortKey === 'runner' ? x.runner.kind
-      : sortKey === 'model' ? (x.runner.model || null)
+      sortKey === AgentSortKey.Id ? x.id
+      : sortKey === AgentSortKey.Runner ? x.runner.kind
+      : sortKey === AgentSortKey.Model ? (x.runner.model || null)
       : (x.updated_at || null);
     const av = pick(a);
     const bv = pick(b);
@@ -110,12 +110,12 @@ export default function AgentsPage() {
   const pageRows = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function toggleSort(k: SortKey) {
-    if (sortKey === k) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(k); setSortDir(k === 'updated_at' ? 'desc' : 'asc'); }
+    if (sortKey === k) setSortDir(sortDir === SortDir.Asc ? SortDir.Desc : SortDir.Asc);
+    else { setSortKey(k); setSortDir(k === AgentSortKey.UpdatedAt ? SortDir.Desc : SortDir.Asc); }
     setPage(1);
   }
 
-  const ind = (k: SortKey) => sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  const ind = (k: SortKey) => sortKey === k ? (sortDir === SortDir.Asc ? ' ▲' : ' ▼') : '';
 
   return (
     <div className="stack">
@@ -141,13 +141,13 @@ export default function AgentsPage() {
       <table>
         <thead>
           <tr>
-            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('id')}>ID{ind('id')}</th>
-            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('runner')}>Runner{ind('runner')}</th>
-            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('model')}>Model{ind('model')}</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Id)}>ID{ind(AgentSortKey.Id)}</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Runner)}>Runner{ind(AgentSortKey.Runner)}</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Model)}>Model{ind(AgentSortKey.Model)}</th>
             <th>Session</th>
             <th>Workspace</th>
             <th>Description</th>
-            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('updated_at')}>Last changed{ind('updated_at')}</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.UpdatedAt)}>Last changed{ind(AgentSortKey.UpdatedAt)}</th>
             <th></th>
           </tr>
         </thead>

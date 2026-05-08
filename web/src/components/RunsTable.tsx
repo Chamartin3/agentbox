@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { RunStatus, canonicalStatus } from '../theme/statusColors';
 
 // Normalized row shape used by the shared runs table. Both the runs API
 // (RunRecord) and the activity API (AgentRun) map onto this — fields not
@@ -46,27 +47,11 @@ const DEFAULT_COLUMNS: RunsColumn[] = [
 ];
 
 function statusClass(s: string): string {
-  if (s === 'succeeded' || s === 'ok') return 'ok';
-  if (s === 'running') return 'running';
-  if (s === 'timeout') return 'eph';
-  // ``incomplete`` is the interrupted / container-died case — visually
-  // softer than a hard error so it doesn't read as the agent's fault.
-  // ``stopped`` is a legacy alias that may appear in old rows until
-  // they're migrated on startup.
-  if (s === 'incomplete' || s === 'stopped') return 'eph';
-  // ``failed`` is an expected, agent-level failure (validation, rate
-  // limit, webhook delivery). Distinct CSS class so it can be tinted
-  // differently from a hard ``error`` if desired; falls back to the
-  // ``error`` pill style today.
-  if (s === 'failed') return 'failed';
-  return 'error';
+  return canonicalStatus(s);
 }
 
 function statusLabel(s: string): string {
-  if (s === 'succeeded') return 'ok';
-  // Show the raw status string for everything else so ``failed``,
-  // ``incomplete`` and ``error`` are visually distinguishable in the table.
-  return s;
+  return canonicalStatus(s) === RunStatus.OK && s !== RunStatus.OK ? RunStatus.OK : s;
 }
 
 export function StatusPill({ status }: { status: string }) {

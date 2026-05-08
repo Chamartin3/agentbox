@@ -56,7 +56,17 @@ export interface ActivityByExecutor {
 
 export interface ActivitySummary {
   totals: ActivityTotals;
-  series: Array<{ date: string; runs: number; failures: number }>;
+  series: Array<{
+    date: string;
+    runs: number;
+    failures: number;
+    running: number;
+    ok: number;
+    error: number;
+    failed: number;
+    timeout: number;
+    incomplete: number;
+  }>;
   by_action: ActivityByAction[];
   by_executor: ActivityByExecutor[];
 }
