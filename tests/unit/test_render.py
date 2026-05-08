@@ -207,14 +207,14 @@ def test_backend_includes_claude_md_in_files(tmp_path: Path) -> None:
 def test_backend_cwd_is_relative(tmp_path: Path) -> None:
     from agentbox.core.backends.claude_code import ClaudeCodeBackend
     from agentbox.core.backends.opencode import OpenCodeBackend
-    from agentbox.core.backends.pydantic_ai import PydanticAiBackend
+    from agentbox.core.backends.token import TokenBackend
     from agentbox.core.data.manifest import AgentDef, RunnerSpec
 
     agent = AgentDef(id="t", runner=RunnerSpec(kind="claude_code"))
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    for backend_cls in (ClaudeCodeBackend, OpenCodeBackend, PydanticAiBackend):
+    for backend_cls in (ClaudeCodeBackend, OpenCodeBackend, TokenBackend):
         adapter = backend_cls()
         rendered = adapter.render(agent, workdir)
         assert rendered.cwd == Path("."), f"{backend_cls.__name__} cwd is not relative"

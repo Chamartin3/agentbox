@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from agentbox.core.data.agent_versions import AgentVersionsMixin
     from agentbox.core.data.manifest import AgentDef
     from agentbox.core.data.prompts import PromptVersionsMixin
+    from agentbox.core.data.runner_profiles import RunnerProfilesMixin
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,63 @@ def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
         logger.exception("versioning: heal failed for %r", agent_id)
 
 
+def _ingest_runner_profile(
+    agent: AgentDef,
+    agent_id: str,
+    store: RunnerProfilesMixin,
+) -> None:
+    """Create or reuse a runner profile for an agent with a [runner] block.
+
+    Profile ID scheme: ``f"legacy:{agent_id}"`` for stable, idempotent imports.
+    Only creates a profile if the agent has a non-empty runner spec.
+    """
+    if not agent.runner or not agent.runner.kind:
+        return
+
+    try:
+        from agentbox.core.data.runner_profiles import (
+            RunnerProfileCreate,
+        )
+
+        profile_id = f"legacy:{agent_id}"
+
+        # Check if profile already exists
+        existing = store.get_runner_profile(profile_id)
+        if existing is not None:
+            # Update binding if needed
+            store.set_agent_runner_profile(agent_id, profile_id)
+            logger.debug(
+                "versioning: reused runner profile %r for agent %r",
+                profile_id,
+                agent_id,
+            )
+            return
+
+        # Create new profile from RunnerSpec
+        runner_spec = agent.runner
+        profile_create = RunnerProfileCreate(
+            id=profile_id,
+            name=f"Legacy: {agent_id}",
+            description="Imported from legacy agent runner config",
+            backend=str(runner_spec.kind),
+            model=runner_spec.model,
+            timeout_seconds=runner_spec.timeout_seconds,
+            extra_args=runner_spec.extra_args or [],
+        )
+
+        store.create_runner_profile(profile_create)
+        store.set_agent_runner_profile(agent_id, profile_id)
+        logger.info(
+            "versioning: created runner profile %r for agent %r",
+            profile_id,
+            agent_id,
+        )
+    except Exception:
+        logger.exception(
+            "versioning: failed to ingest runner profile for agent %r", agent_id
+        )
+
+
 def startup_sweep(
     agents: list[AgentDef],
     store: AgentVersionsMixin,
@@ -189,6 +247,9 @@ def startup_sweep(
     every agent (independent of agent-definition drift status) so that
     out-of-band edits to ``prompt.md`` get versioned even when the agent's
     TOML definition is unchanged.
+
+    For agents with a [runner] block, creates or reuses a runner profile
+    and binds it to the agent (Phase 13f import).
     """
     shared_roots = shared_roots or {}
     for agent in agents:
@@ -216,6 +277,9 @@ def startup_sweep(
                     files=files or None,
                 )
                 logger.info("versioning: created v1 for new agent %r", agent.id)
+                # Import runner profile if agent has [runner] block
+                if hasattr(store, "create_runner_profile"):
+                    _ingest_runner_profile(agent, agent.id, store)  # type: ignore
             elif status == AgentDriftStatus.DRIFTED:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
                 files = _capture_files_safe(agent, project_root, shared_roots)

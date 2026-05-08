@@ -55,8 +55,8 @@ class RunnerBlock(BaseModel):
     """Inline runner config inside a markdown frontmatter block."""
 
     kind: Literal[
-        "claude_code", "opencode", "pydantic_ai", "http", "subprocess", "adapter"
-    ] = "pydantic_ai"
+        "claude_code", "opencode", "token", "http", "subprocess", "adapter"
+    ] = "token"
     timeout_seconds: int = Field(default=120, ge=1)
     mcp_config_path: str | None = None
     agents_config_path: str | None = None

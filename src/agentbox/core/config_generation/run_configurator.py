@@ -174,7 +174,9 @@ class RunConfigurator:
         self._write_prompts(prompts_dir, composed)
 
         # 3. Skills (copy filtered skills into backend-native dirs)
-        from agentbox.core.config_generation.skills.filter import filter_skills_for_backend
+        from agentbox.core.config_generation.skills.filter import (
+            filter_skills_for_backend,
+        )
         from agentbox.core.skills import discover_skills
 
         backend_dir = run_dir / "backends" / backend

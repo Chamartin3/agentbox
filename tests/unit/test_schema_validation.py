@@ -16,7 +16,7 @@ import pytest
 
 def test_jsonschema_importable() -> None:
     """jsonschema must be importable — it is a hard dep, not optional."""
-    import jsonschema  # noqa: F401
+    import jsonschema
 
     assert hasattr(jsonschema, "validate")
     assert hasattr(jsonschema, "ValidationError")

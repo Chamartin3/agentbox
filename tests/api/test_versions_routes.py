@@ -5,10 +5,17 @@ Each test creates its own app + DB to avoid DI cache pollution.
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
 from agentbox.api.app import create_app
 from fastapi.testclient import TestClient
+
+
+class _ManagedTestClient(TestClient):
+    def __del__(self) -> None:
+        with contextlib.suppress(Exception):
+            self.__exit__(None, None, None)
 
 
 def _setup(tmp_path: Path):
@@ -37,7 +44,7 @@ def _app(tmp_path):
         deps.get_mcp_registry,
     ):
         fn.cache_clear()
-    client = TestClient(create_app())
+    client = _ManagedTestClient(create_app())
     client.__enter__()
     store = deps.get_store()
     return client, store

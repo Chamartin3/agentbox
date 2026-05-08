@@ -51,6 +51,7 @@ def _events_to_conversation_view(
 
         if ev_type == "text":
             text = ev.get("text", "")
+            role = ev.get("role") or "assistant"
             parts = [
                 ContentPart(
                     type="text",
@@ -62,7 +63,7 @@ def _events_to_conversation_view(
             turns.append(
                 Turn(
                     index=turn_idx,
-                    role="assistant",
+                    role=role,
                     ts=ts,
                     content=parts,
                 )
@@ -90,7 +91,7 @@ def _events_to_conversation_view(
             turn_idx += 1
 
         elif ev_type == "tool_call":
-            tool_name = ev.get("tool_name") or ev.get("name", "")
+            tool_name = ev.get("tool_name") or ev.get("tool") or ev.get("name", "")
             inp = ev.get("input") or ev.get("arguments", {})
             import json as _json
             body_str = _json.dumps(inp) if inp else ""
@@ -113,7 +114,12 @@ def _events_to_conversation_view(
             turn_idx += 1
 
         elif ev_type == "tool_result":
-            output = ev.get("output", "") or ev.get("text", "") or ""
+            output = (
+                ev.get("output", "")
+                or ev.get("text", "")
+                or ev.get("result_excerpt", "")
+                or ""
+            )
             parts = [
                 ContentPart(
                     type="tool_result",

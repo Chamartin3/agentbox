@@ -70,8 +70,9 @@ class PatchError(Exception):
 
 
 class ManifestWriter:
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, store: Any | None = None):
         self.project_root = project_root
+        self.store = store
 
     @property
     def path(self) -> Path:
@@ -120,7 +121,7 @@ class ManifestWriter:
 
     def _save_standalone_toml(self, agent: AgentDef) -> Path:
         path = agent.source_path or self.project_root / "agents.d" / f"{agent.id}.toml"
-        write_standalone_toml(path, agent)
+        write_standalone_toml(path, agent, store=self.store)
         return path
 
     def _save_legacy_dir(self, agent: AgentDef) -> Path:
@@ -132,7 +133,7 @@ class ManifestWriter:
             )
         else:
             agent_dir = self.project_root / "agents" / agent.id
-        write_legacy_dir(agent_dir, agent)
+        write_legacy_dir(agent_dir, agent, store=self.store)
         return agent_dir / "agent.toml"
 
     def _save_inline(self, agent: AgentDef) -> Path:
@@ -153,9 +154,9 @@ class ManifestWriter:
         existing = _find_agent_table(agents, agent.id)
         if existing is not None:
             idx = agents.index(existing)
-            agents[idx] = _agent_to_table(agent)
+            agents[idx] = _agent_to_table(agent, store=self.store)
         else:
-            agents.append(_agent_to_table(agent))
+            agents.append(_agent_to_table(agent, store=self.store))
 
         new_text = tomlkit.dumps(doc)
         _atomic_write(path, new_text)
@@ -277,8 +278,12 @@ def _apply_patch(table: Table, patch: dict[str, Any]) -> None:
                 runner_tbl[k] = v
 
 
-def _agent_to_table(agent: AgentDef) -> Table:
-    """Convert an ``AgentDef`` to a tomlkit ``Table`` for inline storage."""
+def _agent_to_table(agent: AgentDef, store: Any | None = None) -> Table:
+    """Convert an ``AgentDef`` to a tomlkit ``Table`` for inline storage.
+
+    If store is provided, synthesize [runner] from the bound runner profile
+    if available; otherwise fall back to the legacy RunnerSpec.
+    """
     t = tomlkit.table()
     t["id"] = agent.id
     if agent.description:
@@ -312,7 +317,7 @@ def _agent_to_table(agent: AgentDef) -> Table:
     elif agent.prompt_path:
         t["prompt_path"] = agent.prompt_path
 
-    t["runner"] = _build_runner_table(agent.runner)
+    t["runner"] = _build_runner_table(agent.runner, store=store, agent_id=agent.id)
     return t
 
 

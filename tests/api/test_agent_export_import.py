@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-import json
+import contextlib
 from pathlib import Path
 
 from agentbox.api.app import create_app
 from fastapi.testclient import TestClient
+
+
+class _ManagedTestClient(TestClient):
+    def __del__(self) -> None:
+        with contextlib.suppress(Exception):
+            self.__exit__(None, None, None)
 
 
 def _app(tmp_path: Path):
@@ -25,7 +31,7 @@ def _app(tmp_path: Path):
         deps.get_mcp_registry,
     ):
         fn.cache_clear()
-    client = TestClient(create_app())
+    client = _ManagedTestClient(create_app())
     client.__enter__()
     store = deps.get_store()
     return client, store
@@ -51,7 +57,7 @@ class TestExportAgent:
         config = {
             "id": agent_id,
             "description": "Test agent for export",
-            "runner": {"kind": "pydantic_ai"},
+            "runner": {"kind": "token"},
         }
         store.create_agent(
             agent_id=agent_id,
@@ -87,7 +93,7 @@ class TestExportAgent:
         config = {
             "id": agent_id,
             "description": "Test",
-            "runner": {"kind": "pydantic_ai"},
+            "runner": {"kind": "token"},
         }
         store.create_agent(
             agent_id=agent_id,
@@ -126,7 +132,7 @@ class TestImportAgent:
 id: imported_agent
 description: Imported test agent
 runner:
-  kind: pydantic_ai
+  kind: token
 ---
 
 # System Prompt
@@ -167,7 +173,7 @@ This is a test agent."""
         config = {
             "id": agent_id,
             "description": "Existing",
-            "runner": {"kind": "pydantic_ai"},
+            "runner": {"kind": "token"},
         }
         store.create_agent(
             agent_id=agent_id,
@@ -185,7 +191,7 @@ This is a test agent."""
 id: existing_agent
 description: Updated description
 runner:
-  kind: pydantic_ai
+  kind: token
 ---
 
 Updated prompt"""
@@ -215,7 +221,7 @@ Updated prompt"""
         config = {
             "id": agent_id,
             "description": "v1",
-            "runner": {"kind": "pydantic_ai"},
+            "runner": {"kind": "token"},
         }
         store.create_agent(
             agent_id=agent_id,
@@ -234,7 +240,7 @@ Updated prompt"""
 id: versioned_agent
 description: v2 updated
 runner:
-  kind: pydantic_ai
+  kind: token
 ---
 
 Updated v2 prompt"""
@@ -287,7 +293,7 @@ Updated v2 prompt"""
         config = {
             "id": agent_id,
             "description": "Existing",
-            "runner": {"kind": "pydantic_ai"},
+            "runner": {"kind": "token"},
         }
         store.create_agent(
             agent_id=agent_id,
@@ -332,7 +338,7 @@ New prompt"""
         config = {
             "id": agent_id,
             "description": "v1",
-            "runner": {"kind": "pydantic_ai"},
+            "runner": {"kind": "token"},
         }
         store.create_agent(
             agent_id=agent_id,

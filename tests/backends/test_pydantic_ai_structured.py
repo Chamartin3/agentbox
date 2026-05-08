@@ -1,4 +1,4 @@
-"""Tests for the pydantic_ai_structured backend adapter."""
+"""Tests for the token backend adapter — schema conversion and render (formerly pydantic_ai_structured)."""
 
 from __future__ import annotations
 
@@ -10,9 +10,7 @@ import pytest
 
 class TestJsonSchemaToPydanticModel:
     def _make_model(self):
-        from agentbox.core.backends.pydantic_ai_structured import (
-            _json_schema_to_pydantic_model,
-        )
+        from agentbox.core.backends.token import _json_schema_to_pydantic_model
 
         return _json_schema_to_pydantic_model
 
@@ -112,11 +110,9 @@ class TestJsonSchemaToPydanticModel:
         assert instance.items[0].id == 1
 
 
-class TestPydanticAiStructuredBackendRender:
+class TestTokenBackendRender:
     def test_render_builds_agent_meta(self, tmp_path: Path) -> None:
-        from agentbox.core.backends.pydantic_ai_structured import (
-            PydanticAiStructuredBackend,
-        )
+        from agentbox.core.backends.token import TokenBackend
         from agentbox.core.data.manifest import AgentDef, RunnerSpec
 
         schema = {"type": "object", "properties": {"name": {"type": "string"}}}
@@ -126,14 +122,14 @@ class TestPydanticAiStructuredBackendRender:
             id="test",
             description="t",
             runner=RunnerSpec(
-                kind="pydantic_ai",
+                kind="token",
                 model="openai:gpt-4o",
                 output_schema_path="output_schema.json",
                 timeout_seconds=60,
             ),
         )
 
-        backend = PydanticAiStructuredBackend()
+        backend = TokenBackend()
         rendered = backend.render(agent, tmp_path)
 
         assert rendered.agent_meta["model"] == "openai:gpt-4o"
@@ -141,21 +137,19 @@ class TestPydanticAiStructuredBackendRender:
         assert rendered.agent_meta["timeout_seconds"] == 60
 
     def test_render_handles_missing_schema(self, tmp_path: Path) -> None:
-        from agentbox.core.backends.pydantic_ai_structured import (
-            PydanticAiStructuredBackend,
-        )
+        from agentbox.core.backends.token import TokenBackend
         from agentbox.core.data.manifest import AgentDef, RunnerSpec
 
         agent = AgentDef(
             id="test",
             description="t",
             runner=RunnerSpec(
-                kind="pydantic_ai",
+                kind="token",
                 output_schema_path="nonexistent.json",
             ),
         )
 
-        backend = PydanticAiStructuredBackend()
+        backend = TokenBackend()
         rendered = backend.render(agent, tmp_path)
 
         assert rendered.agent_meta["output_schema"] is None

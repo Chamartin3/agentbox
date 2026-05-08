@@ -6,11 +6,9 @@ Tests the SharedRef model, shared ref detection, and content resolution.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
 from agentbox.core.composition import (
     _fetch_shared_content,
     _is_shared_ref,

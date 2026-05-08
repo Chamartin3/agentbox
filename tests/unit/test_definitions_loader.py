@@ -22,12 +22,12 @@ def test_missing_manifest_returns_empty(tmp_path: Path) -> None:
 
 
 def test_markdown_only_agent_auto_discovered(tmp_path: Path) -> None:
-    """An agent dir with only prompts/system.md becomes a default pydantic_ai agent."""
+    """An agent dir with only prompts/system.md becomes a default token agent."""
     _write(tmp_path / "agents" / "writer" / "prompts" / "system.md", "be helpful")
     m = DefinitionLoader(tmp_path).load()
     assert [a.id for a in m.agents] == ["writer"]
     agent = m.agents[0]
-    assert agent.runner.kind == RunnerKind.PYDANTIC_AI
+    assert agent.runner.kind == RunnerKind.TOKEN
     assert agent.workspace == "default"
     assert agent.prompt_path is not None and agent.prompt_path.endswith("system.md")
 
@@ -64,7 +64,7 @@ id = "dup"
 description = "from dir"
 
 [runner]
-kind = "pydantic_ai"
+kind = "token"
 """,
     )
     _write(

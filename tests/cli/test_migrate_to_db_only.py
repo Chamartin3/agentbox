@@ -2,10 +2,8 @@
 
 from pathlib import Path
 
-import pytest
-from typer.testing import CliRunner
-
 from agentbox.cli import app
+from typer.testing import CliRunner
 
 runner = CliRunner()
 
@@ -38,7 +36,7 @@ def test_migrate_to_db_only_flips_meta(monkeypatch, tmp_path: Path) -> None:
 description = "Test agent"
 
 [runner]
-kind = "pydantic_ai"
+kind = "token"
 """
     )
 
@@ -120,7 +118,7 @@ def test_migrate_to_db_only_is_idempotent(monkeypatch, tmp_path: Path) -> None:
 description = "Test agent"
 
 [runner]
-kind = "pydantic_ai"
+kind = "token"
 """
     )
 

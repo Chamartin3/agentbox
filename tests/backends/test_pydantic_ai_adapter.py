@@ -1,14 +1,14 @@
-"""Tests for the PydanticAI backend adapter."""
+"""Tests for the unified token backend adapter (formerly pydantic_ai)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.backends.pydantic_ai import PydanticAiBackend
+from agentbox.core.backends.token import TokenBackend
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 
-DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.PYDANTIC_AI)
+DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.TOKEN)
 
 
 def _make_agent(**overrides: object) -> AgentDef:
@@ -22,7 +22,7 @@ def _make_agent(**overrides: object) -> AgentDef:
 
 def test_render_returns_minimal_config() -> None:
     agent = _make_agent()
-    adapter = PydanticAiBackend()
+    adapter = TokenBackend()
     rendered = adapter.render(agent, Path("/tmp/workdir"))
 
     assert rendered.argv == []
@@ -33,11 +33,11 @@ def test_render_returns_minimal_config() -> None:
 def test_render_stores_agent_meta() -> None:
     agent = _make_agent(
         runner=RunnerSpec(
-            kind=RunnerKind.PYDANTIC_AI,
+            kind=RunnerKind.TOKEN,
             agent_module="my_module:MyAgent",
         )
     )
-    adapter = PydanticAiBackend()
+    adapter = TokenBackend()
     rendered = adapter.render(agent, Path("/tmp/workdir"))
 
     assert rendered.agent_meta.get("agent_module") == "my_module:MyAgent"
@@ -50,7 +50,7 @@ def test_render_stores_prompt_text(tmp_path: Path) -> None:
     agent = _make_agent(
         prompt_path=str(prompt_file),
     )
-    adapter = PydanticAiBackend()
+    adapter = TokenBackend()
     rendered = adapter.render(agent, tmp_path)
 
     assert "helpful assistant" in rendered.agent_meta.get("prompt", "")
@@ -58,7 +58,7 @@ def test_render_stores_prompt_text(tmp_path: Path) -> None:
 
 def test_digest_stable_across_identical_inputs() -> None:
     agent = _make_agent()
-    adapter = PydanticAiBackend()
+    adapter = TokenBackend()
     r1 = adapter.render(agent, Path("/tmp/workdir"))
     r2 = adapter.render(agent, Path("/tmp/workdir"))
 
@@ -66,17 +66,17 @@ def test_digest_stable_across_identical_inputs() -> None:
 
 
 def test_digest_changes_when_agent_module_changes() -> None:
-    adapter = PydanticAiBackend()
+    adapter = TokenBackend()
 
     agent_a = _make_agent(
         runner=RunnerSpec(
-            kind=RunnerKind.PYDANTIC_AI,
+            kind=RunnerKind.TOKEN,
             agent_module="mod_a:AgentA",
         )
     )
     agent_b = _make_agent(
         runner=RunnerSpec(
-            kind=RunnerKind.PYDANTIC_AI,
+            kind=RunnerKind.TOKEN,
             agent_module="mod_b:AgentB",
         )
     )

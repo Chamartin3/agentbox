@@ -22,7 +22,7 @@ def test_round_trip_basic(tmp_path: Path) -> None:
         workspace="default",
         tools=["@read", "@write"],
         tags=["tag1"],
-        runner=RunnerSpec(kind=RunnerKind.PYDANTIC_AI, timeout_seconds=120),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN, timeout_seconds=120),
         prompt="Hello world",
         source_format=AgentSource.MARKDOWN,
         source_path=tmp_path / "test.md",
@@ -58,7 +58,7 @@ def test_round_trip_headless(tmp_path: Path) -> None:
     agent = AgentDef(
         id="headless",
         headless=True,
-        runner=RunnerSpec(kind=RunnerKind.PYDANTIC_AI),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN),
         prompt="Do JSON",
         source_format=AgentSource.MARKDOWN,
     )
@@ -70,7 +70,7 @@ def test_round_trip_webhook(tmp_path: Path) -> None:
     agent = AgentDef(
         id="webhook",
         webhook_url="https://example.com/hook",
-        runner=RunnerSpec(kind=RunnerKind.PYDANTIC_AI),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN),
         prompt="Body",
         source_format=AgentSource.MARKDOWN,
     )
@@ -110,7 +110,7 @@ def test_body_trailing_newline_normalized(tmp_path: Path) -> None:
     """Trailing whitespace is trimmed on write."""
     agent = AgentDef(
         id="trimmed",
-        runner=RunnerSpec(kind=RunnerKind.PYDANTIC_AI),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN),
         prompt="Some content\n\n",
         source_format=AgentSource.MARKDOWN,
     )
@@ -125,7 +125,7 @@ def test_body_trailing_newline_normalized(tmp_path: Path) -> None:
 def test_empty_body_handled(tmp_path: Path) -> None:
     agent = AgentDef(
         id="no-body",
-        runner=RunnerSpec(kind=RunnerKind.PYDANTIC_AI),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN),
         source_format=AgentSource.MARKDOWN,
     )
     path = tmp_path / "no-body.md"

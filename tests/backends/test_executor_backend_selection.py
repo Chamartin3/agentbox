@@ -37,7 +37,7 @@ def test_explicit_backend_is_honored(tmp_path: Path) -> None:
 
     agent = AgentDef(
         id="test",
-        runner=RunnerSpec(kind=RunnerKind.PYDANTIC_AI),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN),
     )
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -57,7 +57,7 @@ def test_missing_backend_raises(tmp_path: Path) -> None:
 
     agent = AgentDef(
         id="test",
-        runner=RunnerSpec(kind=RunnerKind.PYDANTIC_AI),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN),
     )
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -95,7 +95,7 @@ def test_unsupported_backends_skipped_in_preference(tmp_path: Path) -> None:
     agent = AgentDef(
         id="test",
         runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE),
-        unsupported_backends=["claude_code", "opencode", "pydantic_ai"],
+        unsupported_backends=["claude_code", "opencode", "token"],
     )
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -104,7 +104,7 @@ def test_unsupported_backends_skipped_in_preference(tmp_path: Path) -> None:
     toml_path = settings.project_root / "agentbox.toml"
     toml_path.write_text(
         'project = "test"\n'
-        'backend_preference = ["claude_code", "opencode", "pydantic_ai"]\n'
+        'backend_preference = ["claude_code", "opencode", "token"]\n'
     )
 
     # The executor caches the loader result; create a new one.

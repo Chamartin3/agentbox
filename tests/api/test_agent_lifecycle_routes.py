@@ -5,10 +5,17 @@ Each test creates its own app + DB to avoid DI cache pollution.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+import contextlib
+from unittest.mock import patch
 
 from agentbox.api.app import create_app
 from fastapi.testclient import TestClient
+
+
+class _ManagedTestClient(TestClient):
+    def __del__(self) -> None:
+        with contextlib.suppress(Exception):
+            self.__exit__(None, None, None)
 
 
 def _setup_agent_with_active_version(store) -> dict:
@@ -43,7 +50,7 @@ def _app(tmp_path):
         deps.get_mcp_registry,
     ):
         fn.cache_clear()
-    client = TestClient(create_app())
+    client = _ManagedTestClient(create_app())
     client.__enter__()
     store = deps.get_store()
     return client, store
@@ -204,6 +211,7 @@ class TestPublishWebhook:
         self, isolated_data_dir
     ) -> None:
         import json
+
         from sqlalchemy import update
 
         client, store = _app(isolated_data_dir)
@@ -257,6 +265,7 @@ class TestPublishWebhook:
         self, isolated_data_dir
     ) -> None:
         import json
+
         from sqlalchemy import update
 
         client, store = _app(isolated_data_dir)
@@ -303,6 +312,7 @@ class TestPublishWebhook:
         self, isolated_data_dir
     ) -> None:
         import json
+
         from sqlalchemy import update
 
         client, store = _app(isolated_data_dir)

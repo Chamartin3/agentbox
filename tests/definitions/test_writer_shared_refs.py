@@ -15,8 +15,12 @@ from pathlib import Path
 
 import pytest
 import tomlkit
-
-from agentbox.core.data.manifest import AgentDef, AgentSource, CompositionConfig, SharedRef
+from agentbox.core.data.manifest import (
+    AgentDef,
+    AgentSource,
+    CompositionConfig,
+    SharedRef,
+)
 from agentbox.core.definitions import DefinitionLoader, ManifestWriter
 
 

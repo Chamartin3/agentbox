@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -43,7 +44,15 @@ class CreateRunBody(BaseModel):
     backend: str | None = None
     """Per-run backend override. Overrides the agent's backend selection
     for this invocation only. E.g. ``"claude_code"``, ``"opencode"``,
-    ``"pydantic_ai"``."""
+    ``"token"``."""
+
+    runner_profile: str | None = None
+    """Per-run runner profile ID. Selects a named profile to resolve the
+    effective runner configuration. Takes precedence over agent defaults."""
+
+    runner_config: dict[str, Any] | None = None
+    """Per-run runner configuration dict. Inline config overrides; merged
+    with or superseeds profile-based settings."""
 
     runner_embedded: bool = False
     """When ``True``, the caller will run the agent itself (e.g. pydantic-ai
@@ -79,6 +88,8 @@ async def create_run(body: CreateRunBody) -> dict:
             webhook_url=body.webhook_url,
             runner_override=body.runner,
             backend=body.backend,
+            runner_profile=body.runner_profile,
+            runner_config=body.runner_config,
         )
         return {"run_id": run_id, "agent": agent.id}
 
@@ -96,6 +107,8 @@ async def create_run(body: CreateRunBody) -> dict:
         webhook_url=body.webhook_url,
         runner_override=body.runner,
         backend=body.backend,
+        runner_profile=body.runner_profile,
+        runner_config=body.runner_config,
         runner_embedded=body.runner_embedded,
     )
     return {"run_id": run_id, "agent": agent.id}
@@ -242,6 +255,35 @@ async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
         schedule_webhook(agent, refreshed, store)
 
     return {"ok": True, "run_id": run_id}
+
+
+class PostOutcomeBody(BaseModel):
+    status: str
+    error_kind: str | None = None
+    errors: list[dict] | None = None
+
+
+@router.post("/{run_id}/post_outcome")
+def post_outcome(run_id: str, body: PostOutcomeBody) -> dict:
+    """Record downstream post-processing outcome for a completed run."""
+    store = get_store()
+    existing = store.get_run(run_id)
+    if existing is None:
+        raise HTTPException(404, f"unknown run {run_id!r}")
+
+    ok = body.status == "ok"
+    store.set_run_post_outcome(
+        run_id,
+        ok=ok,
+        error_kind=body.error_kind,
+        errors=body.errors,
+    )
+    refreshed = store.get_run(run_id) or existing
+    return {
+        "ok": True,
+        "run_id": run_id,
+        "post_status": refreshed.post_status,
+    }
 
 
 @router.post("/{run_id}/rerun")

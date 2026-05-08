@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import pytest
-
 from agentbox.core.data.store import SessionStore
 from agentbox.core.definitions.loader import DefinitionLoader
 from agentbox.core.sync.watcher import _process_changes
@@ -32,7 +31,7 @@ def manifest_with_agent(tmp_path: Path) -> tuple[Path, str]:
 description = "Test agent"
 
 [runner]
-kind = "pydantic_ai"
+kind = "token"
 """
     )
 

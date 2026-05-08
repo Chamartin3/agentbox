@@ -184,6 +184,10 @@ class AnalyticsMixin:
         )
 
         day = func.date(runs.c.created_at).label("day")
+        status_cols = [
+            func.sum(case((runs.c.status == s, 1), else_=0)).label(s)
+            for s in ("running", "ok", "error", "failed", "timeout", "incomplete")
+        ]
         series_stmt = (
             select(
                 day,
@@ -199,6 +203,7 @@ class AnalyticsMixin:
                         else_=0,
                     )
                 ).label("failures"),
+                *status_cols,
             )
             .select_from(runs)
             .where(*base_filters)
@@ -295,6 +300,12 @@ class AnalyticsMixin:
                     "date": r._mapping["day"],
                     "runs": int(r._mapping["runs"] or 0),
                     "failures": int(r._mapping["failures"] or 0),
+                    "running": int(r._mapping["running"] or 0),
+                    "ok": int(r._mapping["ok"] or 0),
+                    "error": int(r._mapping["error"] or 0),
+                    "failed": int(r._mapping["failed"] or 0),
+                    "timeout": int(r._mapping["timeout"] or 0),
+                    "incomplete": int(r._mapping["incomplete"] or 0),
                 }
                 for r in conn.execute(series_stmt)
             ]

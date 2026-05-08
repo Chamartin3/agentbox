@@ -32,7 +32,7 @@ _SKIP = frozenset({".", "..", "README.md"})
 def _build_runner_spec(rm: Any) -> RunnerSpec:
     """Build a ``RunnerSpec`` from a ``RunnerManifest`` (or ``None``)."""
     if rm is None:
-        return RunnerSpec(kind=RunnerKind.PYDANTIC_AI, timeout_seconds=120)
+        return RunnerSpec(kind=RunnerKind.TOKEN, timeout_seconds=120)
     return RunnerSpec(
         kind=rm.kind,
         model=rm.model,

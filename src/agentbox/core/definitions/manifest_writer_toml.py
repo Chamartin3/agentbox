@@ -91,8 +91,50 @@ def _build_composition_table(agent: AgentDef) -> Table | None:
     return ct
 
 
-def _build_runner_table(r: RunnerSpec) -> Table:
-    """Convert a ``RunnerSpec`` to a tomlkit ``Table`` of non-default fields."""
+def _build_runner_table_from_profile(profile: Any) -> Table:
+    """Synthesize a [runner] table from a RunnerProfile for export.
+
+    Args:
+        profile: A RunnerProfile instance with backend, model, timeout_seconds,
+                 extra_args, and params attributes.
+    """
+    rt: Table = tomlkit.table()
+    rt["kind"] = profile.backend
+    if profile.model:
+        rt["model"] = profile.model
+    if profile.timeout_seconds is not None and profile.timeout_seconds != 120:
+        rt["timeout_seconds"] = profile.timeout_seconds
+    if profile.extra_args:
+        arr = tomlkit.array()
+        arr.extend(profile.extra_args)
+        rt["extra_args"] = arr
+    # Merge params into the runner table
+    for key, val in (profile.params or {}).items():
+        if key not in rt:
+            rt[key] = val
+    return rt
+
+
+def _build_runner_table(r: RunnerSpec, store: Any | None = None, agent_id: str | None = None) -> Table:
+    """Convert a ``RunnerSpec`` to a tomlkit ``Table`` of non-default fields.
+
+    If store and agent_id are provided, prefer the bound runner profile over
+    the legacy RunnerSpec.
+    """
+    # Check if agent has a bound runner profile
+    if store is not None and agent_id is not None:
+        try:
+            from agentbox.core.data.runner_profiles import RunnerProfilesMixin
+
+            if isinstance(store, RunnerProfilesMixin):
+                profile = store.get_agent_runner_profile(agent_id)
+                if profile is not None:
+                    return _build_runner_table_from_profile(profile)
+        except Exception:
+            # If profile lookup fails, fall back to legacy RunnerSpec
+            pass
+
+    # Fall back to legacy RunnerSpec
     rt: Table = tomlkit.table()
     if r.model:
         rt["model"] = r.model
@@ -117,8 +159,14 @@ def _build_runner_table(r: RunnerSpec) -> Table:
     return rt
 
 
-def write_standalone_toml(path: Path, agent: AgentDef) -> None:
-    """Write a standalone ``.toml`` file for an agent."""
+def write_standalone_toml(
+    path: Path, agent: AgentDef, store: Any | None = None
+) -> None:
+    """Write a standalone ``.toml`` file for an agent.
+
+    If store is provided, synthesize [runner] from the bound runner profile
+    if available; otherwise fall back to the legacy RunnerSpec.
+    """
     doc = tomlkit.document()
     doc["id"] = agent.id
     if agent.description:
@@ -155,17 +203,21 @@ def write_standalone_toml(path: Path, agent: AgentDef) -> None:
     elif agent.prompt_path:
         doc["prompt_path"] = agent.prompt_path
 
-    rt = _build_runner_table(agent.runner)
+    rt = _build_runner_table(agent.runner, store=store, agent_id=agent.id)
     doc["runner"] = rt
 
     path.parent.mkdir(parents=True, exist_ok=True)
     _atomic_write(path, tomlkit.dumps(doc))
 
 
-def write_legacy_dir(agent_dir: Path, agent: AgentDef) -> None:
+def write_legacy_dir(
+    agent_dir: Path, agent: AgentDef, store: Any | None = None
+) -> None:
     """Write the legacy agent.toml + prompts/system.md format.
 
     When composition is set, it takes precedence over prompt_path/prompt.
+    If store is provided, synthesize [runner] from the bound runner profile
+    if available; otherwise fall back to the legacy RunnerSpec.
     """
     agent_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = agent_dir / "agent.toml"
@@ -195,7 +247,7 @@ def write_legacy_dir(agent_dir: Path, agent: AgentDef) -> None:
     else:
         doc["prompt_path"] = "prompts/system.md"
 
-    rt = _build_runner_table(agent.runner)
+    rt = _build_runner_table(agent.runner, store=store, agent_id=agent.id)
     if rt:
         doc["runner"] = rt
 

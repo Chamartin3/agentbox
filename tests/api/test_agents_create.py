@@ -10,7 +10,7 @@ def test_create_agent_happy_path(client: Any) -> None:
     req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai", "model": "claude-3-sonnet"},
+        "runner": {"kind": "token", "model": "claude-3-sonnet"},
         "prompt": "You are a helpful assistant.",
         "author": "test_user",
         "changelog": "Initial creation",
@@ -29,7 +29,7 @@ def test_create_agent_duplicate_id_returns_409(client: Any) -> None:
     req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai"},
+        "runner": {"kind": "token"},
         "author": "test_user",
         "changelog": "Initial creation",
     }
@@ -50,7 +50,7 @@ def test_create_agent_missing_changelog_returns_422(client: Any) -> None:
     req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai"},
+        "runner": {"kind": "token"},
         "author": "test_user",
         # changelog missing (required)
     }
@@ -64,7 +64,7 @@ def test_upload_file_to_draft_succeeds(client: Any) -> None:
     create_req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai"},
+        "runner": {"kind": "token"},
         "author": "test_user",
         "changelog": "Initial",
     }
@@ -93,7 +93,7 @@ def test_upload_file_to_published_returns_409(client: Any) -> None:
     create_req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai"},
+        "runner": {"kind": "token"},
         "author": "test_user",
         "changelog": "Initial",
     }
@@ -123,7 +123,7 @@ def test_upload_duplicate_sha_returns_409(client: Any) -> None:
     create_req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai"},
+        "runner": {"kind": "token"},
         "author": "test_user",
         "changelog": "Initial",
     }
@@ -159,7 +159,7 @@ def test_delete_file_from_draft_succeeds_returns_204(client: Any) -> None:
     create_req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai"},
+        "runner": {"kind": "token"},
         "author": "test_user",
         "changelog": "Initial",
     }
@@ -196,7 +196,7 @@ def test_delete_file_from_published_returns_409(client: Any) -> None:
     create_req = {
         "id": "test_agent",
         "description": "A test agent",
-        "runner": {"kind": "pydantic_ai"},
+        "runner": {"kind": "token"},
         "author": "test_user",
         "changelog": "Initial",
     }

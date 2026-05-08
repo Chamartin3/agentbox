@@ -107,3 +107,16 @@ def migrate_to_db_only(agent_id: str) -> None:
     )
     console.print("  sync_mode: watch → off")
     console.print(f"  export_to_disk: {bool(result.get('export_to_disk'))}")
+
+
+@migrate_app.command("prompt-versions")
+def migrate_prompt_versions() -> None:
+    """Backfill ``runs.prompt_version_id`` from historical prompt_versions.
+
+    See ``agentbox.core.data.backfill_prompt_versions``.
+    """
+    from agentbox.core.data.backfill_prompt_versions import backfill
+
+    store = get_store()
+    n = backfill(store)
+    console.print(f"[green]✓[/green] backfilled {n} run(s) with prompt_version_id")

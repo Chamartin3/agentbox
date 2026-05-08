@@ -49,7 +49,7 @@ async def watch_agents(
     Cancelled on application shutdown.
     """
     try:
-        from watchfiles import awatch, Change  # type: ignore[import-untyped]
+        from watchfiles import Change, awatch  # type: ignore[import-untyped]
     except ImportError:
         logger.warning("watchfiles not installed — sync watcher disabled")
         return

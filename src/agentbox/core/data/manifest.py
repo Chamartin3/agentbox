@@ -74,7 +74,7 @@ class McpServerSpec(BaseModel):
 
 
 class RunnerSpec(BaseModel):
-    kind: RunnerKind = RunnerKind.PYDANTIC_AI
+    kind: RunnerKind = RunnerKind.TOKEN
     """Which backend to dispatch to (deprecated — use ``backend`` on the
     run request or ``backend_preference`` on the project manifest instead).
 
@@ -111,7 +111,7 @@ class RunnerSpec(BaseModel):
 
     # config_path removed — opencode config is now generated per-workspace.
 
-    # --- pydantic_ai runner ---
+    # --- token runner ---
 
     agent_module: str | None = None
     """Python import path to the pydantic-ai Agent class.
@@ -123,7 +123,7 @@ class RunnerSpec(BaseModel):
     a minimal agent is auto-generated from the markdown.
     """
 
-    # --- pydantic_ai direct-Agent dependencies ---
+    # --- token direct-Agent dependencies ---
 
     deps_factory: str | None = None
     """Dotted import path ``module.path:callable`` that constructs the
@@ -271,7 +271,7 @@ class AgentDef(BaseModel):
     prompt_path: str | None = None
     """Project-relative path to system prompt markdown.
 
-    For ``pydantic_ai`` runners without an explicit ``agent_module``,
+    For ``token`` runners without an explicit ``agent_module``,
     this markdown is used to auto-generate a minimal agent.
 
     .. deprecated::
@@ -381,13 +381,13 @@ class RunnerManifest(BaseModel):
     do not appear here.
     """
 
-    kind: RunnerKind = RunnerKind.PYDANTIC_AI
-    """Defaults to ``pydantic_ai`` so markdown-only agents need no
+    kind: RunnerKind = RunnerKind.TOKEN
+    """Defaults to ``token`` so markdown-only agents need no
     explicit runner configuration."""
 
     model: str | None = None
     agent_module: str | None = None
-    """Python import path for pydantic_ai agents
+    """Python import path for token/pydantic-ai agents
     (e.g. ``agents.company_researcher.agent:CompanyResearcherAgent``)."""
 
     mcp_config_path: str | None = None
@@ -428,7 +428,7 @@ class AgentManifest(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
     runner: RunnerManifest | None = None
-    """Runner configuration. When unset, a default ``pydantic_ai``
+    """Runner configuration. When unset, a default ``token``
     runner is used (auto-generated agent from the markdown prompt)."""
 
 

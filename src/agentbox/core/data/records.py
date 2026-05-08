@@ -52,6 +52,9 @@ class RunRecord:
     post_errors: str | None = None
     conversation_format: str | None = None
     conversation_uri: str | None = None
+    runner_profile_id: str | None = None
+    resource_snapshot: str | None = None
+    mcp_snapshot: str | None = None
 
 
 def now_iso() -> str:
@@ -84,4 +87,7 @@ def row_to_run(row: Row) -> RunRecord:
         post_errors=m.get("post_errors"),
         conversation_format=m.get("conversation_format"),
         conversation_uri=m.get("conversation_uri"),
+        runner_profile_id=m.get("runner_profile_id"),
+        resource_snapshot=m.get("resource_snapshot"),
+        mcp_snapshot=m.get("mcp_snapshot"),
     )

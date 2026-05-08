@@ -28,7 +28,7 @@ from agentbox.core.guardrails.base import Guardrail, GuardrailContext, Guardrail
 class _OkAdapter:
     name = "fake"
 
-    def render(self, agent, workdir, mcp_tools=None, creds=None):  # type: ignore[no-untyped-def]
+    def render(self, agent, workdir, mcp_tools=None, creds=None, runner_config=None):  # type: ignore[no-untyped-def]
         return RenderedConfig(argv=["true"], cwd=workdir)
 
     async def run(self, rendered, input, run_id):  # type: ignore[no-untyped-def]
@@ -39,7 +39,7 @@ class _OkAdapter:
 class _BoomAdapter:
     name = "fake"
 
-    def render(self, agent, workdir, mcp_tools=None, creds=None):  # type: ignore[no-untyped-def]
+    def render(self, agent, workdir, mcp_tools=None, creds=None, runner_config=None):  # type: ignore[no-untyped-def]
         return RenderedConfig(argv=["true"], cwd=workdir)
 
     async def run(self, rendered, input, run_id) -> AsyncIterator[RunEvent]:  # type: ignore[no-untyped-def]

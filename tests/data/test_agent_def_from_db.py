@@ -6,7 +6,6 @@ import json
 from typing import Any
 
 import pytest
-
 from agentbox.core.data.manifest import AgentDef
 
 

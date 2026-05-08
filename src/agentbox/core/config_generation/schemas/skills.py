@@ -63,7 +63,7 @@ class SkillFrontmatter(BaseModel):
         default_factory=SkillFormatter,
         description="Controls how skill content is formatted when injected into prompts.",
     )
-    runners: list[Literal["claude_code", "opencode", "pydantic_ai"]] | None = Field(
+    runners: list[Literal["claude_code", "opencode", "token"]] | None = Field(
         default=None,
         description="Runners this skill applies to. None means all runners.",
     )

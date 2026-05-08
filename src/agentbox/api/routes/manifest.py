@@ -66,12 +66,33 @@ def get_manifest() -> dict:
 
 @router.get("/runner-models")
 def list_runner_models(kind: str) -> dict:
-    """Return available model identifiers for a runner kind."""
+    """Return available model identifiers for a runner kind.
+
+    DEPRECATED: Use /api/runner-providers/{provider_id}/models instead.
+
+    This endpoint is deprecated in favor of the new provider-based model
+    discovery API. See /api/runner-providers for available providers.
+    """
     if kind == "claude_code":
-        return {"kind": kind, "models": _CLAUDE_MODELS}
+        return {
+            "kind": kind,
+            "models": _CLAUDE_MODELS,
+            "deprecated": True,
+            "replacement": "/api/runner-providers/{provider}/models",
+        }
     if kind == "opencode":
-        return {"kind": kind, "models": _fetch_opencode_models()}
-    return {"kind": kind, "models": []}
+        return {
+            "kind": kind,
+            "models": _fetch_opencode_models(),
+            "deprecated": True,
+            "replacement": "/api/runner-providers/{provider}/models",
+        }
+    return {
+        "kind": kind,
+        "models": [],
+        "deprecated": True,
+        "replacement": "/api/runner-providers/{provider}/models",
+    }
 
 
 class RunnerPatch(BaseModel):

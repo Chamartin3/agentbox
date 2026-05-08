@@ -533,7 +533,13 @@ class RunExecutor:
         except ValueError as exc:
             return self._fail_pre_run(agent, input_, workdir, session_id, str(exc))
 
-        if effective.source in ("agent_legacy", "backend_default"):
+        # Require a bound runner profile only when the caller did not
+        # explicitly pick a backend (e.g. via the API ``backend=`` override
+        # or programmatic ``execute(..., backend=...)`` from tests).
+        if (
+            effective.source in ("agent_legacy", "backend_default")
+            and backend is None
+        ):
             error_msg = (
                 f"agent {agent.id!r} has no runner profile bound. "
                 "Assign a runner profile in the UI (Agents → Runner Profile)."

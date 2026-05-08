@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from agentbox.core.composition.pydantic_validate import validate_with_pydantic
 
 

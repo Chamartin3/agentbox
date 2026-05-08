@@ -26,7 +26,7 @@ class _EchoAdapter:
 
     name = "echo_composition"
 
-    def render(self, agent, workdir, mcp_tools=None, creds=None):  # type: ignore[no-untyped-def]
+    def render(self, agent, workdir, mcp_tools=None, creds=None, runner_config=None):  # type: ignore[no-untyped-def]
         return RenderedConfig(argv=["true"], cwd=Path("."))
 
     async def run(

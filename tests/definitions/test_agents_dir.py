@@ -43,7 +43,7 @@ description = "Writes drafts"
 workspace = "default"
 
 [runner]
-kind = "pydantic_ai"
+kind = "token"
 timeout_seconds = 120
 """,
     )

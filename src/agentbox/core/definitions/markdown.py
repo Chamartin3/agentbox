@@ -72,7 +72,7 @@ def load_markdown_agent(path: Path) -> AgentDef:
         runner_data = {}
 
     kind_str = runner_data.pop("kind", None)
-    runner_kind = RunnerKind(kind_str) if kind_str else RunnerKind.PYDANTIC_AI
+    runner_kind = RunnerKind(kind_str) if kind_str else RunnerKind.TOKEN
 
     runner = RunnerSpec(
         kind=runner_kind,
@@ -176,7 +176,7 @@ def write_markdown_agent(
 
     runner_meta: dict = {}
     r = agent.runner
-    if r.kind != RunnerKind.PYDANTIC_AI:
+    if r.kind != RunnerKind.TOKEN:
         runner_meta["kind"] = str(r.kind)
     if r.model:
         runner_meta["model"] = r.model

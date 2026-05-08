@@ -11,8 +11,9 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core import workspaces as ws
 from agentbox.core.composition import compose_from_source
-from agentbox.core.composition.sources import DbBundleSource
+from agentbox.core.composition.sources import DbBundleSource, FilesystemBundleSource
 from agentbox.core.data.manifest import AgentDef
+from agentbox.core.data.runner_profiles import RunnerProfile
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +21,11 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
 def _hydrate_from_snapshot(row: dict) -> AgentDef | None:
-    """Reconstruct an AgentDef from a version row's content_snapshot."""
-    snap = row.get("content_snapshot")
-    if not snap:
-        return None
+    """Reconstruct an AgentDef from a version row snapshot."""
     try:
-        data = json.loads(snap)
-    except json.JSONDecodeError:
-        logger.warning(
-            "agents list: snapshot for %r v%s is not valid JSON",
-            row.get("agent_id"),
-            row.get("version"),
-        )
+        return AgentDef.from_db_row(row)
+    except ValueError:
         return None
-    try:
-        return AgentDef.model_validate(data)
     except Exception:
         logger.exception(
             "agents list: snapshot for %r v%s failed validation",
@@ -56,24 +47,49 @@ def list_agents() -> list[dict]:
     loader = get_loader()
     settings = get_settings()
 
-    latest_rows = store.list_agents_with_latest()
-    enriched: list[dict] = []
-    for row in latest_rows:
-        agent = _hydrate_from_snapshot(row)
-        if agent is None:
-            continue
+    def _enrich(
+        agent: AgentDef, *, updated_at: str | None = None, version: int | None = None
+    ) -> dict:
         try:
             workspace_str = str(ws.resolve_path(agent, settings, loader)[0])
         except Exception:
             workspace_str = ""
+        data = {
+            **agent.model_dump(),
+            "resolved_workspace": workspace_str,
+        }
+        if updated_at is not None:
+            data["updated_at"] = updated_at
+        if version is not None:
+            data["version"] = version
+        return data
+
+    latest_rows = store.list_agents_with_latest()
+    enriched: list[dict] = []
+    seen: set[str] = set()
+    for row in latest_rows:
+        agent = _hydrate_from_snapshot(row)
+        if agent is None:
+            continue
         enriched.append(
-            {
-                **agent.model_dump(),
-                "resolved_workspace": workspace_str,
-                "updated_at": row.get("created_at"),
-                "version": row.get("version"),
-            }
+            _enrich(
+                agent,
+                updated_at=row.get("created_at"),
+                version=row.get("version"),
+            )
         )
+        seen.add(agent.id)
+
+    try:
+        manifest = loader.load()
+    except Exception:
+        manifest = None
+    if manifest is not None:
+        for agent in manifest.agents:
+            if agent.id not in seen:
+                enriched.append(_enrich(agent))
+                seen.add(agent.id)
+
     return enriched
 
 
@@ -102,9 +118,13 @@ def get_agent(agent_id: str) -> dict:
     composed_user: str | None = None
     bundle_files: list[dict] = []
     latest_row = store.latest_version(agent_id)
-    if latest_row is not None and agent.composition is not None:
+    if agent.composition is not None:
         try:
-            files = store.list_version_files(latest_row["id"])
+            files = (
+                store.list_version_files(latest_row["id"])
+                if latest_row is not None
+                else []
+            )
             if files:
                 bundle_files = [
                     {
@@ -120,9 +140,35 @@ def get_agent(agent_id: str) -> dict:
                     composition=agent.composition.model_dump(mode="json"),
                     files=list(files),
                 )
-                result = compose_from_source(source, variables={}, render=False)
-                composed_system = result.system
-                composed_user = result.user
+            else:
+                src_path = getattr(agent, "source_path", None)
+                bundle_path = (
+                    (settings.project_root / src_path).parent
+                    if src_path
+                    else None
+                )
+                if bundle_path is None or not bundle_path.exists():
+                    raise FileNotFoundError(
+                        f"no on-disk bundle for agent {agent_id!r}"
+                    )
+                shared_roots: dict = {}
+                if settings.manifest_path.exists():
+                    try:
+                        mf = loader.load()
+                        shared_roots = {
+                            k: (settings.project_root / v).resolve()
+                            for k, v in (mf.shared_assets or {}).items()
+                        }
+                    except Exception:
+                        shared_roots = {}
+                source = FilesystemBundleSource(
+                    bundle_path=bundle_path,
+                    composition=agent.composition.model_dump(mode="json"),
+                    shared_roots=shared_roots,
+                )
+            result = compose_from_source(source, variables={}, render=False)
+            composed_system = result.system
+            composed_user = result.user
         except Exception:
             logger.exception(
                 "agents detail: composition preview failed for %r", agent_id
@@ -277,6 +323,55 @@ def branch_draft(agent_id: str, body: DraftRequest) -> dict:
 class RollbackRequest(BaseModel):
     reason: str = Field(..., min_length=3)
     author: str = Field(..., min_length=1)
+
+
+# ---------------------------------------------------------------------------
+# Runner profile binding
+# ---------------------------------------------------------------------------
+
+
+class SetAgentRunnerProfileBody(BaseModel):
+    """Request body for setting an agent's runner profile."""
+
+    runner_profile_id: str
+
+
+@router.get("/{agent_id}/runner-profile")
+def get_agent_runner_profile(
+    agent_id: str,
+) -> RunnerProfile:
+    """Get the runner profile bound to an agent."""
+    store = get_store()
+    profile = store.get_agent_runner_profile(agent_id)
+    if profile is None:
+        raise HTTPException(
+            404, f"no runner profile bound to agent {agent_id!r}"
+        )
+    return profile
+
+
+@router.patch("/{agent_id}/runner-profile")
+def set_agent_runner_profile(
+    agent_id: str,
+    body: SetAgentRunnerProfileBody,
+) -> RunnerProfile:
+    """Bind a runner profile to an agent."""
+    store = get_store()
+    profile = store.get_runner_profile(body.runner_profile_id)
+    if profile is None:
+        raise HTTPException(
+            404, f"runner profile not found: {body.runner_profile_id!r}"
+        )
+    return store.set_agent_runner_profile(agent_id, body.runner_profile_id)
+
+
+@router.delete("/{agent_id}/runner-profile")
+def clear_agent_runner_profile(
+    agent_id: str,
+) -> None:
+    """Remove the runner profile binding from an agent."""
+    store = get_store()
+    store.clear_agent_runner_profile(agent_id)
 
 
 @router.post("/{agent_id}/versions/{version}/rollback", status_code=201)

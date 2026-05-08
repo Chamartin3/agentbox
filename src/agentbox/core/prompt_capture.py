@@ -36,7 +36,7 @@ class PromptFragment:
     """'user', 'agent_def', 'project', 'agentbox', 'claude_cli'."""
 
     injected_by: str
-    """Which layer pushes this text into the model: 'agentbox', 'claude_cli', 'pydantic_ai'."""
+    """Which layer pushes this text into the model: 'agentbox', 'claude_cli', 'token'."""
 
     content: str
     """The actual text. May be a note for things we cannot inspect."""
@@ -124,12 +124,12 @@ def build_fragments(
 
     if agent.runner.kind == RunnerKind.CLAUDE_CODE:
         frags.extend(_claude_code_fragments(agent, project_root, argv))
-    elif agent.runner.kind == RunnerKind.PYDANTIC_AI:
+    elif agent.runner.kind == RunnerKind.TOKEN:
         frags.append(
             PromptFragment(
-                name="pydantic_ai_note",
+                name="token_note",
                 source="agentbox",
-                injected_by=RunnerKind.PYDANTIC_AI,
+                injected_by=RunnerKind.TOKEN,
                 content=(
                     "The pydantic-ai Agent assembles its own message list at "
                     "call time (system prompt registered in the Agent ctor, "

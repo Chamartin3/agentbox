@@ -6,10 +6,11 @@ import json
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_loader, get_mcp_registry, get_settings
+from agentbox.api._pagination import paginate_list
+from agentbox.api.deps import get_loader, get_mcp_registry, get_settings, get_store
 from agentbox.core import workspaces as ws
 from agentbox.core.config_generation import ConfigGenerator
 from agentbox.core.config_generation.constants import (
@@ -34,24 +35,86 @@ def _get_settings():
 
 
 @router.get("")
-def list_workspaces() -> list[dict]:
-    """Return all named workspaces with assigned agents and summary stats."""
+def list_workspaces(
+    paginated: bool = False,
+    q: str | None = None,
+    sort: str | None = None,
+    order: str = "asc",
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> list[dict] | dict:
+    """Return all named workspaces with assigned agents and summary stats.
+
+    When ``paginated=true`` returns the standard envelope
+    ``{items, total, offset, limit, has_more}`` and supports ``q``, ``sort``,
+    ``order``. Without the flag returns a plain list for backward compat.
+    """
     loader = _get_loader()
     settings = _get_settings()
-    manifest = loader.load()
+    store = get_store()
+    try:
+        manifest = loader.load()
+    except Exception:
+        manifest = None
 
-    # Build a map of workspace name -> list of agent IDs
+    # Workspaces from the manifest (descriptions + declared paths).
+    toml_meta: dict[str, dict] = {}
+    if manifest:
+        for w in manifest.workspaces:
+            toml_meta[w.name] = {
+                "description": w.description,
+                "path": settings.project_root / w.path,
+            }
+
+    # Workspaces with any DB-persisted state (subagents, mcp/host-env
+    # overrides, file bindings, env-docs, policies).
+    db_ids: set[str] = set()
+    try:
+        db_ids = set(store.list_known_workspace_ids())
+    except AttributeError:
+        # Fallback: scan each DB table directly if helper not present.
+        from sqlalchemy import text
+        sql = text(
+            "SELECT workspace_id FROM workspace_subagents UNION "
+            "SELECT workspace_id FROM workspace_mcp_overrides UNION "
+            "SELECT workspace_id FROM workspace_mcp_tool_overrides UNION "
+            "SELECT workspace_id FROM workspace_mcp_policies UNION "
+            "SELECT workspace_id FROM workspace_host_env_grants UNION "
+            "SELECT workspace_id FROM workspace_env_docs UNION "
+            "SELECT workspace_id FROM workspace_file_resource_bindings"
+        )
+        try:
+            with store.engine.connect() as conn:
+                db_ids = {r[0] for r in conn.execute(sql) if r[0]}
+        except Exception:
+            db_ids = set()
+
+    # Workspaces present on disk under <project_root>/workspaces/.
+    disk_ids: set[str] = set()
+    ws_root = settings.workspaces_root
+    if ws_root.exists():
+        disk_ids = {p.name for p in ws_root.iterdir() if p.is_dir() and not p.name.startswith(".")}
+
+    # Agent assignments.
     workspace_agents: dict[str, list[str]] = {}
-    for a in manifest.agents:
-        ws_name = a.workspace or "default"
-        workspace_agents.setdefault(ws_name, []).append(a.id)
+    if manifest:
+        for a in manifest.agents:
+            ws_name = a.workspace or "default"
+            workspace_agents.setdefault(ws_name, []).append(a.id)
 
+    # Resource binding counts.
+    try:
+        resource_counts = store.count_workspace_file_bindings_by_workspace()
+    except Exception:
+        resource_counts = {}
+
+    all_names = set(toml_meta) | db_ids | disk_ids | set(workspace_agents)
     result = []
-    for w in manifest.workspaces:
-        ws_path = settings.project_root / w.path
-        agents = workspace_agents.get(w.name, [])
+    for name in sorted(all_names):
+        meta = toml_meta.get(name, {})
+        ws_path = meta.get("path") or (ws_root / name)
+        agents = workspace_agents.get(name, [])
 
-        # Count user-visible files (exclude .claude/, .opencode/, etc.) and skills
         file_count = 0
         skill_count = 0
         if ws_path.exists():
@@ -60,20 +123,40 @@ def list_workspaces() -> list[dict]:
                     file_count += 1
             skill_count = len(discover_skills(ws_path))
 
+        sources = []
+        if name in toml_meta:
+            sources.append("manifest")
+        if name in db_ids:
+            sources.append("db")
+        if name in disk_ids:
+            sources.append("disk")
+
         result.append(
             {
-                "name": w.name,
+                "name": name,
                 "path": str(ws_path),
-                "description": w.description,
+                "description": meta.get("description"),
                 "kind": "named",
                 "agents": agents,
                 "agent_count": len(agents),
                 "file_count": file_count,
                 "skill_count": skill_count,
+                "resource_count": resource_counts.get(name, 0),
                 "exists": ws_path.exists(),
+                "sources": sources,
             }
         )
 
+    if paginated:
+        return paginate_list(
+            result,
+            q=q,
+            q_fields=("name", "description", "path"),
+            sort=sort,
+            order=order,
+            limit=limit,
+            offset=offset,
+        )
     return result
 
 

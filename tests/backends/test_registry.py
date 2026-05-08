@@ -11,7 +11,7 @@ def test_registry_loads_all_entry_points() -> None:
     names = backends()
     assert "claude_code" in names
     assert "opencode" in names
-    assert "pydantic_ai" in names
+    assert "token" in names
 
 
 def test_get_backend_returns_instance() -> None:
@@ -29,11 +29,11 @@ def test_list_backends_includes_all() -> None:
     names = list_backends()
     assert "claude_code" in names
     assert "opencode" in names
-    assert "pydantic_ai" in names
+    assert "token" in names
 
 
 def test_backend_adapter_has_name_attr() -> None:
-    for name in ("claude_code", "opencode", "pydantic_ai"):
+    for name in ("claude_code", "opencode", "token"):
         adapter = get_backend(name)
         assert adapter.name == name
 
@@ -44,7 +44,7 @@ def test_fake_adapter_can_be_registered(monkeypatch) -> None:
     class FakeBackend:
         name = "fake"
 
-        def render(self, agent, workdir, mcp_tools=None, creds=None) -> RenderedConfig:
+        def render(self, agent, workdir, mcp_tools=None, creds=None, runner_config=None) -> RenderedConfig:
             return RenderedConfig(cwd=workdir)
 
         async def run(self, rendered, input, run_id):
