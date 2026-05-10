@@ -67,10 +67,7 @@ from agentbox.core.runner_profiles import (
 )
 from agentbox.core.streaming.rate_limit import detect_in_text_line
 from agentbox.core.versioning.drift import check_drift, startup_sweep
-from agentbox.core.workspaces import (
-    load_capabilities,
-    resolve_path,
-)
+from agentbox.core.workspaces import resolve_path
 
 if TYPE_CHECKING:
     from agentbox.core.backends.base import BackendAdapter
@@ -203,31 +200,48 @@ def _format_validation_error(exc: _jsonschema.ValidationError) -> str:
 
 
 def _load_workspace_permissions(
-    workdir: Path, agent: AgentDef, loader: DefinitionLoader, settings: Settings
+    workdir: Path,
+    agent: AgentDef,
+    loader: DefinitionLoader,
+    settings: Settings,
+    store: SessionStore | None = None,
 ) -> dict:
-    """Load workspace permissions from WorkspaceDef or capabilities.json (deprecated).
+    """Resolve effective workspace permissions: WorkspaceDef <- DB overlay.
 
-    Resolution order:
-    1. Try to resolve the agent's workspace and get permissions from WorkspaceDef.
-    2. Fall back to loading from capabilities.json (deprecated).
+    1. Manifest defaults from ``WorkspaceDef``.
+    2. DB overlay row from ``workspace_runtime_permissions`` (single source
+       of truth for built-in tools, file scopes, max_tokens, flags).
+    3. ``capabilities.json`` is no longer consulted — it is a derived
+       artifact written by the workspaces route + config generator.
     """
     try:
-        # Try to get WorkspaceDef first
-        if agent.workspace:
-            if agent.workspace == "<ephemeral>":
-                return {}
-            ws_def = loader.get_workspace(agent.workspace)
-            if ws_def is not None:
-                return {
-                    "allowed_tools": ws_def.allowed_tools,
-                    "allowed_builtin_tools": ws_def.allowed_builtin_tools,
-                    "files": [f.model_dump() for f in ws_def.files],
-                    "max_tokens": ws_def.max_tokens,
-                    "allow_file_write": ws_def.allow_file_write,
-                    "allow_network": ws_def.allow_network,
-                }
-        # Fall back to loading from JSON (deprecated)
-        return load_capabilities(workdir)
+        if not agent.workspace or agent.workspace == "<ephemeral>":
+            return {}
+        ws_def = loader.get_workspace(agent.workspace)
+        if ws_def is None:
+            return {}
+        perms: dict = {
+            "allowed_tools": list(ws_def.allowed_tools),
+            "allowed_builtin_tools": list(ws_def.allowed_builtin_tools),
+            "files": [f.model_dump() for f in ws_def.files],
+            "max_tokens": ws_def.max_tokens,
+            "allow_file_write": ws_def.allow_file_write,
+            "allow_network": ws_def.allow_network,
+        }
+        if store is not None:
+            overlay = store.get_workspace_runtime_permissions(agent.workspace)
+            if overlay:
+                if overlay.get("allowed_builtin_tools") is not None:
+                    perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
+                if overlay.get("files") is not None:
+                    perms["files"] = overlay["files"]
+                if overlay.get("max_tokens") is not None:
+                    perms["max_tokens"] = overlay["max_tokens"]
+                if overlay.get("allow_file_write") is not None:
+                    perms["allow_file_write"] = bool(overlay["allow_file_write"])
+                if overlay.get("allow_network") is not None:
+                    perms["allow_network"] = bool(overlay["allow_network"])
+        return perms
     except Exception:
         return {}
 
@@ -913,7 +927,7 @@ class RunExecutor:
         materialize_rendered_config(rendered, run_dir)
 
         permissions = _load_workspace_permissions(
-            workdir, agent, self.loader, self.settings
+            workdir, agent, self.loader, self.settings, self.store
         )
         generator = self._make_generator()
         generator.generate_configs_into(

@@ -254,23 +254,132 @@ def get_workspace_by_name(name: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _load_permissions(ws_path: Path) -> dict:
-    """Load capabilities.json from workspace permissions directory."""
-    perm_file = ws_path / "permissions" / "capabilities.json"
-    if perm_file.is_file():
-        return json.loads(perm_file.read_text(encoding="utf-8"))
-    return {
+def _load_permissions(ws_path: Path, name: str | None = None) -> dict:
+    """Return effective workspace permissions: manifest defaults <- DB overlay
+    <- derived MCP ``allowed_tools``.
+
+    capabilities.json is no longer the source of truth — it is a derived
+    artifact written by ``generate_for_workspace`` on save. The legacy file
+    on disk is ignored.
+    """
+    loader = _get_loader()
+
+    # Defaults from WorkspaceDef (manifest).
+    perms: dict = {
         "allowed_tools": [],
         "allowed_builtin_tools": [],
         "files": [],
-        "max_tokens": 64000,
-        "allow_file_write": False,
-        "allow_network": False,
+        "max_tokens": None,
+        "allow_file_write": True,
+        "allow_network": True,
     }
+    if name:
+        ws_def = loader.get_workspace(name)
+        if ws_def is not None:
+            perms["allowed_builtin_tools"] = list(ws_def.allowed_builtin_tools)
+            perms["files"] = [f.model_dump() for f in ws_def.files]
+            perms["max_tokens"] = ws_def.max_tokens
+            perms["allow_file_write"] = ws_def.allow_file_write
+            perms["allow_network"] = ws_def.allow_network
+
+    if not name:
+        return perms
+
+    # Overlay DB row (only set fields override).
+    store = get_store()
+    overlay = store.get_workspace_runtime_permissions(name)
+    if overlay:
+        if overlay.get("allowed_builtin_tools") is not None:
+            perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
+        if overlay.get("files") is not None:
+            perms["files"] = overlay["files"]
+        if overlay.get("max_tokens") is not None:
+            perms["max_tokens"] = overlay["max_tokens"]
+        if overlay.get("allow_file_write") is not None:
+            perms["allow_file_write"] = bool(overlay["allow_file_write"])
+        if overlay.get("allow_network") is not None:
+            perms["allow_network"] = bool(overlay["allow_network"])
+
+    # Derive allowed_tools from MCP overrides + tool manifest.
+    perms["allowed_tools"] = _derive_allowed_tools(name)
+    return perms
 
 
-def _save_permissions(ws_path: Path, permissions: dict) -> None:
-    """Save capabilities.json to workspace permissions directory."""
+def _derive_allowed_tools(workspace_id: str) -> list[str]:
+    """Flatten the workspace's effective MCP state into prefixed tool names.
+
+    Walks the tool manifest, applies workspace MCP server enable + per-tool
+    overrides + policy, and returns the Claude-prefixed names the runner
+    expects. Returns ``[]`` when no MCP manifest is loaded.
+    """
+    settings = _get_settings()
+    loader = _get_loader()
+    tool_manifest = _load_tool_manifest(settings.project_root)
+    if not tool_manifest:
+        return []
+    try:
+        manifest = loader.load()
+    except Exception:
+        return []
+    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+    claude_prefix = f"mcp__{mcp_server_name}__"
+
+    store = get_store()
+    discovered = {mcp_server_name: [t for tools in tool_manifest.values() for t in tools]}
+    resolved = store.resolve_workspace_mcp(
+        workspace_id,
+        [{"name": mcp_server_name, "config": {}}],
+        discovered_tools=discovered,
+    )
+    out: list[str] = []
+    for srv in resolved.get("servers", []):
+        if not srv.get("enabled"):
+            continue
+        disabled = set(srv.get("disabled_tools") or [])
+        for tool in discovered.get(srv["name"], []):
+            if tool in disabled:
+                continue
+            out.append(f"{claude_prefix}{tool}")
+    return out
+
+
+def _apply_allowed_tools(workspace_id: str, allowed_tools: list[str]) -> None:
+    """Translate a full ``allowed_tools`` list into per-MCP-tool DB overrides.
+
+    Full-replace semantics: tools present become enabled overrides, tools
+    absent become disabled overrides. Only acts on tools known to the
+    current tool manifest — unknown prefixed names are ignored.
+    """
+    settings = _get_settings()
+    loader = _get_loader()
+    tool_manifest = _load_tool_manifest(settings.project_root)
+    if not tool_manifest:
+        return
+    try:
+        manifest = loader.load()
+    except Exception:
+        return
+    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+    claude_prefix = f"mcp__{mcp_server_name}__"
+    allowed = set(allowed_tools)
+    store = get_store()
+    for tools in tool_manifest.values():
+        for tool in tools:
+            prefixed = f"{claude_prefix}{tool}"
+            enabled = prefixed in allowed
+            store.set_workspace_mcp_tool_override(
+                workspace_id, mcp_server_name, tool, enabled=enabled
+            )
+
+
+def _write_capabilities_artifact(ws_path: Path, permissions: dict) -> None:
+    """Write the derived capabilities.json artifact to disk.
+
+    Kept so existing runtime consumers and CLI fallbacks (executor's
+    ``_load_workspace_permissions``, ``load_capabilities``) still see the
+    effective permissions. Not the source of truth — overwritten on every
+    save and on every config-generation run.
+    """
     perm_dir = ws_path / "permissions"
     perm_dir.mkdir(parents=True, exist_ok=True)
     perm_file = perm_dir / "capabilities.json"
@@ -282,7 +391,7 @@ def _save_permissions(ws_path: Path, permissions: dict) -> None:
 @router.get("/by-name/{name}/permissions")
 def get_permissions_by_name(name: str) -> dict:
     ws_path, _ = _resolve_workspace(name)
-    permissions = _load_permissions(ws_path)
+    permissions = _load_permissions(ws_path, name)
     return {
         "workspace": name,
         "path": str(ws_path / "permissions" / "capabilities.json"),
@@ -296,28 +405,52 @@ class PermissionsBody(BaseModel):
 
 @router.put("/by-name/{name}/permissions")
 def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
-    loader = _get_loader()
-    ws_path, project_root = _resolve_workspace(name)
-    _save_permissions(ws_path, body.permissions)
+    """Write workspace permissions to DB and regenerate disk artifacts.
 
-    # Regenerate both Claude and OpenCode configs from the same permission spec.
-    # The workspace permissions are the single source of truth.
-    allowed_tools = set(body.permissions.get("allowed_tools", []))
-    allowed_builtin_tools = body.permissions.get("allowed_builtin_tools") or []
-    files = body.permissions.get("files") or []
+    Source of truth split:
+      - ``allowed_tools`` (MCP-prefixed) → fanned out to
+        ``workspace_mcp_tool_overrides`` (full-replace semantics).
+      - everything else → ``workspace_runtime_permissions`` overlay.
+
+    capabilities.json is rewritten as a derived artifact for the executor
+    fallback path; it is not read by ``GET /permissions``.
+    """
+    loader = _get_loader()
+    store = get_store()
+    ws_path, project_root = _resolve_workspace(name)
+
+    p = body.permissions
+    # Persist overlay fields (None means "clear override, inherit manifest").
+    store.set_workspace_runtime_permissions(
+        name,
+        allowed_builtin_tools=p.get("allowed_builtin_tools"),
+        files=p.get("files"),
+        max_tokens=p.get("max_tokens"),
+        allow_file_write=p.get("allow_file_write"),
+        allow_network=p.get("allow_network"),
+    )
+    # Fan allowed_tools out to per-MCP-tool overrides.
+    if "allowed_tools" in p and p["allowed_tools"] is not None:
+        _apply_allowed_tools(name, list(p["allowed_tools"]))
+
+    # Re-derive the effective view and write the artifact + runner configs.
+    effective = _load_permissions(ws_path, name)
+    _write_capabilities_artifact(ws_path, effective)
+
+    allowed_tools = set(effective.get("allowed_tools") or [])
     generator = _make_generator(project_root, loader)
     generated_paths = generator.generate_for_workspace(
         ws_path,
         allowed_tools=allowed_tools if allowed_tools else None,
-        allowed_builtin_tools=allowed_builtin_tools,
-        files=files,
+        allowed_builtin_tools=effective.get("allowed_builtin_tools") or [],
+        files=effective.get("files") or [],
         project_root=project_root,
     )
 
     return {
         "workspace": name,
         "path": str(ws_path / "permissions" / "capabilities.json"),
-        "permissions": body.permissions,
+        "permissions": effective,
         "regenerated": {
             "claude_agents": str(generated_paths["claude_agents"]),
             "claude_settings": str(generated_paths["claude_settings"]),
@@ -407,7 +540,7 @@ def get_workspace_mcp_tools(name: str) -> dict:
 
     # Current workspace permissions (to show which are already enabled)
     ws_path, _ = _resolve_workspace(name)
-    permissions = _load_permissions(ws_path)
+    permissions = _load_permissions(ws_path, name)
     allowed = set(permissions.get("allowed_tools", []))
 
     # Mark which groups are currently active
@@ -438,7 +571,7 @@ def generate_configs_by_name(name: str) -> dict:
     ws_path, project_root = _resolve_workspace(name)
 
     # Read workspace permissions and respect them when generating.
-    permissions = _load_permissions(ws_path)
+    permissions = _load_permissions(ws_path, name)
     allowed_tools = set(permissions.get("allowed_tools", []))
     allowed_builtin_tools = permissions.get("allowed_builtin_tools") or []
     files = permissions.get("files") or []
@@ -644,7 +777,7 @@ def generate_configs(agent_id: str) -> dict:
     if agent is None:
         raise HTTPException(404)
     workspace_path, _ = ws.resolve_path(agent, settings, loader)
-    permissions = _load_permissions(workspace_path)
+    permissions = _load_permissions(workspace_path, agent.workspace)
     generator = _make_generator(settings.project_root, loader)
     paths = generator.generate_for_workspace(
         workspace_path,

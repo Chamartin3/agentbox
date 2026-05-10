@@ -35,7 +35,7 @@ from agentbox.core.data.records import RunRecord, now_iso, row_to_run
 from agentbox.core.data.resource_bindings import ResourceBindingsMixin
 from agentbox.core.data.resources import ResourcesMixin
 from agentbox.core.data.runner_profiles import RunnerProfilesMixin
-from agentbox.core.data.settings import SettingsMixin
+from agentbox.core.data.runtime_permissions import RuntimePermissionsMixin
 from agentbox.core.data.schema import (
     guardrail_results,
     metadata,
@@ -46,6 +46,7 @@ from agentbox.core.data.schema import (
     usage,
     webhook_deliveries,
 )
+from agentbox.core.data.settings import SettingsMixin
 from agentbox.core.data.shared_resources import SharedResourcesMixin
 
 
@@ -707,6 +708,7 @@ class SessionStore(
     ResourceBindingsMixin,
     EnvDocsMixin,
     McpOverridesMixin,
+    RuntimePermissionsMixin,
     McpDiscoveryMixin,
     HostEnvMixin,
     RunnerProfilesMixin,

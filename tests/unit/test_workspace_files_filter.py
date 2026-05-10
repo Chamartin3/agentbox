@@ -35,6 +35,15 @@ def test_skill_packs_are_hidden() -> None:
     assert not _is_user_file("skills/draft_review/SKILL.md")
 
 
+def test_env_doc_render_artifacts_at_root_are_hidden() -> None:
+    # CLAUDE.md / AGENTS.md at the workspace root are rewritten on every run
+    # by the env-doc renderer. The Files list should not surface them.
+    assert not _is_user_file("CLAUDE.md")
+    assert not _is_user_file("AGENTS.md")
+    # ...but a nested CLAUDE.md authored by the user under notes/ is fine.
+    assert _is_user_file("notes/CLAUDE.md")
+
+
 def test_filter_against_real_workspace_layout(tmp_path: Path) -> None:
     """Sanity check the filter against a realistic directory layout."""
     (tmp_path / "README.md").write_text("hi")

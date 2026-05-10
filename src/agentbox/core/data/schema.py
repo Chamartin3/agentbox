@@ -599,6 +599,19 @@ host_env_call_log = Table(
     Index("ix_host_env_call_log_workspace", "workspace_id"),
 )
 
+workspace_runtime_permissions = Table(
+    "workspace_runtime_permissions",
+    metadata,
+    Column("workspace_id", String, primary_key=True),
+    Column("allowed_builtin_tools", JSON, nullable=True),
+    Column("files", JSON, nullable=True),
+    Column("max_tokens", Integer, nullable=True),
+    Column("allow_file_write", Integer, nullable=True),
+    Column("allow_network", Integer, nullable=True),
+    Column("updated_at", String, nullable=False),
+    Column("updated_by", String, nullable=True),
+)
+
 workspace_env_docs = Table(
     "workspace_env_docs",
     metadata,
