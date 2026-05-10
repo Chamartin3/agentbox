@@ -203,13 +203,22 @@ _FILE_HIDE_PREFIXES = (
     "skills/",
 )
 
+# Root-level files that are render artifacts (re-materialized every run by the
+# executor / env-doc renderer / config generator). They have dedicated UI
+# surfaces, so excluding them from the Files list avoids confusing users into
+# editing files that will be silently overwritten.
+_RENDERED_ARTIFACT_FILES = frozenset({
+    "CLAUDE.md",
+    "AGENTS.md",
+})
+
 
 def _is_user_file(rel_path: str) -> bool:
-    """User files are anything outside generated/permissions/skill dirs.
-
-    Generated configs, capabilities.json, and skill packs each have their
-    own UI section, so excluding them from the Files list avoids noise.
+    """User files are anything outside generated/permissions/skill dirs and
+    not a render artifact at the workspace root.
     """
+    if rel_path in _RENDERED_ARTIFACT_FILES:
+        return False
     return not any(
         rel_path == p.rstrip("/") or rel_path.startswith(p) for p in _FILE_HIDE_PREFIXES
     )
