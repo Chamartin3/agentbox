@@ -6,12 +6,14 @@ a mandatory reason. Includes a preview/dry-run endpoint per side.
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
+from agentbox.core.composition import _append_input_schema, _append_schema
 from agentbox.core.data.store import SessionStore
 from agentbox.core.resources.prompt_resolver import resolve_prompt
 from agentbox.core.resources.rendering import render_for_type
@@ -37,7 +39,7 @@ class PromptBindingIn(BaseModel):
 
 class ReplacePromptBindings(BaseModel):
     bindings: list[PromptBindingIn]
-    reason: str = Field(..., min_length=3)
+    reason: str = Field(default="ui edit", min_length=1)
     actor: str | None = None
 
 
@@ -63,7 +65,7 @@ class WorkspaceBindingIn(BaseModel):
 
 class ReplaceWorkspaceBindings(BaseModel):
     bindings: list[WorkspaceBindingIn]
-    reason: str = Field(..., min_length=3)
+    reason: str = Field(default="ui edit", min_length=1)
     actor: str | None = None
 
 
@@ -91,6 +93,7 @@ def _resolve_binding_for_prompt(store: SessionStore, b: dict) -> dict:
         "slot": b.get("slot"),
         "attach_as_reference": bool(b.get("attach_as_reference")),
         "resource_id": b["resource_id"],
+        "resource_slug": resource["slug"],
         "version_id": version_id,
         "content_hash": version["content_hash"],
         "type": resource["type"],
@@ -101,24 +104,32 @@ def _resolve_binding_for_prompt(store: SessionStore, b: dict) -> dict:
     }
 
 
-def _render_references_block(resolved: list[dict]) -> tuple[str, list[dict]]:
+def _render_references_block(
+    resolved: list[dict],
+) -> tuple[str, list[dict], list[dict]]:
     """Render the References section for prompt bindings flagged
-    ``attach_as_reference``. Returns ``(text, refs_meta)`` where ``text``
-    is appended to the composed prompt and ``refs_meta`` is the
-    structured ref list returned by the preview endpoint.
+    ``attach_as_reference``. Returns ``(text, refs_meta, per_ref_chars)``.
+
+    ``per_ref_chars`` is a list of ``{label, chars}`` entries (one per
+    rendered reference) suitable for inclusion in the char-breakdown
+    visualization.
     """
     parts: list[str] = []
     refs_meta: list[dict] = []
+    per_ref_chars: list[dict] = []
     for b in resolved:
         if not b.get("attach_as_reference"):
             continue
         if b["type"] not in ("document", "folder"):
             continue
         rendered = render_for_type(b["type"], b.get("blobs") or [])
-        heading = b.get("display_name") or b.get("marker") or b["resource_id"]
+        heading = b.get("display_name") or b.get("resource_slug") or b["resource_id"]
         body = rendered.get("text") or ""
         if body:
-            parts.append(f"## {heading}\n\n{body}")
+            entry = f"## {heading}\n\n{body}"
+            parts.append(entry)
+            # +2 for the "\n\n" separator joining entries
+            per_ref_chars.append({"label": heading, "chars": len(entry) + 2})
         refs_meta.append(
             {
                 "binding_id": b["binding_id"],
@@ -128,8 +139,11 @@ def _render_references_block(resolved: list[dict]) -> tuple[str, list[dict]]:
             }
         )
     if not parts:
-        return "", refs_meta
-    return "## References\n\n" + "\n\n".join(parts), refs_meta
+        return "", refs_meta, per_ref_chars
+    # Account for the "## References\n\n" header chars on the first entry.
+    if per_ref_chars:
+        per_ref_chars[0]["chars"] += len("## References\n\n")
+    return "## References\n\n" + "\n\n".join(parts), refs_meta, per_ref_chars
 
 
 def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
@@ -213,14 +227,54 @@ def preview_prompt(
     splice_bindings = [b for b in resolved if b.get("marker") and b.get("mode")]
     result = resolve_prompt(body.template, splice_bindings)
 
-    refs_text, refs_meta = _render_references_block(resolved)
-    composed = result.rendered_prompt
-    if refs_text:
-        composed = composed.rstrip() + "\n\n" + refs_text
+    refs_text, refs_meta, per_ref_chars = _render_references_block(resolved)
+    base_prompt = result.rendered_prompt
+    composed = base_prompt
 
     input_schema = _schema_for_slot(resolved, "input_schema")
     output_schema = _schema_for_slot(resolved, "output_schema")
     raw_text_output = output_schema is None
+
+    # Inline schemas via the same runtime helpers
+    # (core/composition/prompts/{input,output}_schema.md). Falls back to
+    # raw text if the schema is not valid JSON.
+    def _schema_block(slot: str, schema_view: dict | None) -> str:
+        if not schema_view or not schema_view.get("text"):
+            return ""
+        text = schema_view["text"]
+        try:
+            parsed = json.loads(text)
+        except (TypeError, ValueError):
+            parsed = None
+        if isinstance(parsed, dict):
+            if slot == "input_schema":
+                return _append_input_schema("", parsed)
+            return _append_schema("", parsed)
+        header = (
+            "# Input Format" if slot == "input_schema" else "# Required Output"
+        )
+        return f"{header}\n\n## JSON Schema\n\n{text}"
+
+    input_schema_block = _schema_block("input_schema", input_schema)
+    if input_schema_block:
+        composed = composed.rstrip() + "\n\n" + input_schema_block
+
+    output_schema_block = _schema_block("output_schema", output_schema)
+    if output_schema_block:
+        composed = composed.rstrip() + "\n\n" + output_schema_block
+
+    if refs_text:
+        composed = composed.rstrip() + "\n\n" + refs_text
+
+    parts = [
+        {"label": "prompt template", "chars": len(base_prompt)},
+    ]
+    if input_schema_block:
+        parts.append({"label": "input_schema block", "chars": len(input_schema_block) + 2})
+    if output_schema_block:
+        parts.append({"label": "output_schema block", "chars": len(output_schema_block) + 2})
+    if refs_text:
+        parts.extend(per_ref_chars)
 
     return {
         "rendered_prompt": composed,
@@ -230,6 +284,8 @@ def preview_prompt(
         "input_schema": input_schema,
         "output_schema": output_schema,
         "raw_text_output": raw_text_output,
+        "char_breakdown": parts,
+        "total_chars": len(composed),
         "snapshot": [
             {
                 "binding_id": rb.binding_id,

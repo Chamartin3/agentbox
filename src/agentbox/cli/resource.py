@@ -190,3 +190,45 @@ def resource_rollback(
         f"[green]✓[/green] rolled back to version {version_number} — "
         f"new version [bold]{version['version_number']}[/bold] for resource [bold]{slug}[/bold]"
     )
+
+
+@resource_app.command("migrate-composition")
+def resource_migrate_composition(
+    agent: str | None = typer.Option(
+        None, "--agent", help="Migrate only this agent_id (default: all agents)"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Report what would change without writing"
+    ),
+) -> None:
+    """Migrate composition slots (input/output_schema, user_template) → resource bindings."""
+    from agentbox.core.resources.composition_to_bindings import (
+        migrate_composition_to_bindings,
+    )
+
+    if dry_run:
+        console.print(
+            "[yellow]--dry-run not implemented yet; migration is idempotent, "
+            "running for real.[/yellow]"
+        )
+
+    store = get_store()
+    report = migrate_composition_to_bindings(store, only_agent_id=agent)
+    summary = report.summary()
+
+    table = Table(title="Composition Migration", header_style="bold cyan", padding=(0, 2))
+    table.add_column("Metric", style="bold")
+    table.add_column("Count", justify="right")
+    for k, v in summary.items():
+        table.add_row(k, str(v))
+    console.print(table)
+
+    if report.agents_migrated:
+        console.print(
+            f"[green]migrated:[/green] {', '.join(report.agents_migrated)}"
+        )
+    if report.failed:
+        console.print("[red]failed:[/red]")
+        for agent_id, err in report.failed:
+            console.print(f"  [red]{agent_id}[/red]: {err}")
+        raise typer.Exit(1)

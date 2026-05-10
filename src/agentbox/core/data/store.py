@@ -48,6 +48,7 @@ from agentbox.core.data.schema import (
 )
 from agentbox.core.data.settings import SettingsMixin
 from agentbox.core.data.shared_resources import SharedResourcesMixin
+from agentbox.core.data.workspaces import WorkspacesMixin
 
 
 class _CoreStore:
@@ -706,6 +707,7 @@ class SessionStore(
     SharedResourcesMixin,
     ResourcesMixin,
     ResourceBindingsMixin,
+    WorkspacesMixin,
     EnvDocsMixin,
     McpOverridesMixin,
     RuntimePermissionsMixin,

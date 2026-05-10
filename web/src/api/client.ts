@@ -546,6 +546,16 @@ export const api = {
       `/api/workspaces?${p.toString()}`,
     );
   },
+  createWorkspaceRegistry: (body: { name: string; description?: string; path?: string }) =>
+    req<Record<string, unknown>>('/api/workspaces', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteWorkspaceRegistry: (name: string, purgeDisk = false) =>
+    req<Record<string, unknown>>(
+      `/api/workspaces/by-name/${encodeURIComponent(name)}${purgeDisk ? '?purge_disk=true' : ''}`,
+      { method: 'DELETE' },
+    ),
   getWorkspaceByName: (name: string) => req<Record<string, unknown>>(`/api/workspaces/by-name/${name}`),
   generateWorkspaceConfigsByName: (name: string) =>
     req<Record<string, unknown>>(`/api/workspaces/by-name/${name}/generate-configs`, { method: 'POST' }),

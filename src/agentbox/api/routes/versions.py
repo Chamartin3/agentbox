@@ -27,26 +27,32 @@ def list_agent_versions(agent_id: str) -> dict:
         raise HTTPException(404, f"unknown agent {agent_id!r}")
     store = get_store()
     versions = store.list_versions(agent_id)
-    enriched = []
-    for v in versions:
-        rating = store.get_rating(v["id"])
-        comments = store.list_comments(v["id"])
-        enriched.append(
-            {
-                "id": v["id"],
-                "version": v["version"],
-                "author": v["author"],
-                "changelog": v["changelog"],
-                "is_legacy": v["is_legacy"],
-                "created_at": v["created_at"],
-                "has_comments": len(comments) > 0,
-                "rating": rating["rating"] if rating else None,
-            }
-        )
+    active = store.get_active_version(agent_id)
     latest = store.latest_version(agent_id)
+    # Fall back to latest when no active pointer exists (legacy agents
+    # imported before active_agent_versions was populated).
+    if active is None and latest is not None:
+        active = latest
+    active_id = active["id"] if active else None
+    active_version_num = active["version"] if active else None
+    enriched = [
+        {
+            "id": v["id"],
+            "version": v["version"],
+            "author": v["author"],
+            "changelog": v["changelog"],
+            "is_legacy": v.get("is_legacy", False),
+            "is_draft": bool(v.get("is_draft", False)),
+            "is_active": v["id"] == active_id,
+            "created_at": v["created_at"],
+        }
+        for v in versions
+    ]
     return {
         "agent_id": agent_id,
         "latest_version": latest["version"] if latest else None,
+        "active_version": active_version_num,
+        "active_version_id": active_id,
         "versions": enriched,
     }
 
@@ -172,6 +178,38 @@ def create_agent_version(agent_id: str, body: NewVersionBody) -> dict:
         author=body.author,
         changelog=body.changelog,
     )
+
+
+class PromptRevisionBody(BaseModel):
+    prompt_content: str
+    changelog: str = ""
+    author: str = "ui"
+    activate: bool = True
+
+
+@router.post("/prompt-revision", status_code=201)
+def save_prompt_revision(agent_id: str, body: PromptRevisionBody) -> dict:
+    """Create a new agent_version with edited prompt_content.
+
+    Every call creates a new row — the "draft slot" reuse pattern of the
+    legacy prompt_versions table does not apply. If ``activate`` is true
+    (default), the new version is also set as active.
+    """
+    store = get_store()
+    loader = get_loader()
+    if store.get_agent_def(agent_id) is None and loader.get(agent_id) is None:
+        raise HTTPException(404, f"unknown agent {agent_id!r}")
+    try:
+        result = store.save_prompt_revision(
+            agent_id,
+            prompt_content=body.prompt_content,
+            author=body.author,
+            changelog=body.changelog,
+            activate=body.activate,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return result
 
 
 # Rollback is handled by the canonical endpoint in agents.py

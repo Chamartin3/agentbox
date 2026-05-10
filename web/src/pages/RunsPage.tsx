@@ -206,17 +206,17 @@ export default function RunsPage() {
             <tr key={r.id}>
               <td><Link to={`/runs/${r.id}`}>{r.id.slice(0, 12)}</Link></td>
               <td>
-                <Link to={`/runs?agent=${encodeURIComponent(r.agent_id)}`} title="filter by this agent">
+                <Link to={`/agents/${encodeURIComponent(r.agent_id)}`} title="open agent">
                   {r.agent_id}
                 </Link>
               </td>
               <td>
-                {r.agent_version_id ? (
+                {r.agent_version != null ? (
                   <Link
                     to={`/agents/${encodeURIComponent(r.agent_id)}/versions?highlight=${r.agent_version_id}`}
                     className="version-chip"
                   >
-                    v{r.agent_version_id}
+                    v{r.agent_version}
                   </Link>
                 ) : (
                   <span className="dim">—</span>

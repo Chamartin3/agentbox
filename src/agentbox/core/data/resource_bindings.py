@@ -69,6 +69,7 @@ class ResourceBindingsMixin:
         rows: list[dict] = []
         now = now_iso()
         slots_seen: set[str] = set()
+        bindings = list(bindings)
         for idx, b in enumerate(bindings):
             if not b.get("resource_id"):
                 raise ValueError("resource_id is required for prompt bindings")
@@ -89,14 +90,22 @@ class ResourceBindingsMixin:
                 marker = marker or None
                 mode = mode or None
             else:
-                if not marker:
-                    raise ValueError(
-                        "marker is required for prompt bindings without a slot"
-                    )
-                if mode not in VALID_PROMPT_MODES:
-                    raise ValueError(
-                        f"Invalid prompt-binding mode {mode!r}; must be one of {VALID_PROMPT_MODES}"
-                    )
+                # marker/mode are optional: when caller doesn't provide them,
+                # this is a reference-only binding (appended to ## References
+                # under the resource's display_name, not spliced into the
+                # template). A synthetic non-splicing marker is stored to
+                # satisfy the legacy NOT-NULL check constraint.
+                if marker:
+                    if mode not in VALID_PROMPT_MODES:
+                        raise ValueError(
+                            f"Invalid prompt-binding mode {mode!r}; must be one of {VALID_PROMPT_MODES}"
+                        )
+                else:
+                    marker = f"ref_{uuid.uuid4().hex[:8]}"
+                    mode = "inline"
+                    # Reference-only bindings should never warn about
+                    # an unreferenced marker — they are not spliced.
+                    b = {**b, "required": False}
             rows.append(
                 {
                     "id": uuid.uuid4().hex,

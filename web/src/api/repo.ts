@@ -73,6 +73,12 @@ export const repoApi = {
   create: (body: { slug: string; type: RepoType; display_name: string; description?: string }) =>
     req<RepoResource>('/api/repo-resources', { method: 'POST', body: JSON.stringify(body) }),
 
+  update: (id: string, body: { display_name?: string; description?: string; tags?: string[] }) =>
+    req<RepoResource>(`/api/repo-resources/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
   uploadVersion: (id: string, file: File, changelog: string, draft = false, actor?: string) => {
     const fd = new FormData();
     fd.set('file', file);

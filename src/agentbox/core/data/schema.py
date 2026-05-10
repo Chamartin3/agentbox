@@ -624,6 +624,27 @@ workspace_env_docs = Table(
     ),
 )
 
+# Canonical workspace registry. Source of truth for "what workspaces exist".
+# Satellite tables (workspace_*) reference by name but are not enforced as FKs
+# for backwards-compat with pre-registry rows; the WorkspacesMixin handles
+# cascade delete explicitly.
+workspaces = Table(
+    "workspaces",
+    metadata,
+    Column("name", String, primary_key=True),
+    Column("description", String, nullable=True),
+    Column("path", String, nullable=True),
+    # 'manifest' = declared in agentbox.toml, 'db' = created via API only
+    Column("source", String, nullable=False, server_default="db"),
+    Column("created_at", String, nullable=False),
+    Column("created_by", String, nullable=True),
+    Column("updated_at", String, nullable=False),
+    CheckConstraint(
+        "source IN ('manifest', 'db')",
+        name="workspaces_source_check",
+    ),
+)
+
 agent_config_events = Table(
     "agent_config_events",
     metadata,

@@ -132,9 +132,21 @@ def list_runs(
     ``paginated=true`` (or any filter beyond ``agent``+``limit``) to get
     the envelope ``{items, total, offset, limit, has_more}``.
     """
+    store = get_store()
+
+    def _enrich(rec) -> dict:
+        d = rec.__dict__.copy()
+        vid = d.get("agent_version_id")
+        if vid is not None:
+            v = store.get_version_by_id(vid)
+            d["agent_version"] = v["version"] if v else None
+        else:
+            d["agent_version"] = None
+        return d
+
     if not paginated and not any([status, executor, q, since, until, offset]):
-        return [r.__dict__ for r in get_store().list_runs(limit=limit, agent_id=agent)]
-    items, total = get_store().list_runs_paged(
+        return [_enrich(r) for r in store.list_runs(limit=limit, agent_id=agent)]
+    items, total = store.list_runs_paged(
         agent_id=agent,
         status=status,
         executor=executor,
@@ -145,7 +157,7 @@ def list_runs(
         offset=offset,
     )
     return {
-        "items": [r.__dict__ for r in items],
+        "items": [_enrich(r) for r in items],
         "total": total,
         "offset": offset,
         "limit": limit,

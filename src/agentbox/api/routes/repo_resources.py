@@ -66,6 +66,12 @@ class CreateResourceBody(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class UpdateResourceBody(BaseModel):
+    display_name: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+
+
 class HostPathImportBody(BaseModel):
     path: str
     recursive: bool = True
@@ -145,6 +151,26 @@ def get_resource(
     r = store.get_repo_resource(rid)
     active = store.get_active_repo_version(rid) if r and r.get("active_version_id") else None
     return {"resource": r, "active_version": active}
+
+
+@router.patch("/{resource_id}")
+def update_resource(
+    resource_id: str,
+    body: UpdateResourceBody,
+    store: Annotated[SessionStore, Depends(get_store)],
+):
+    rid = _resolve_resource_id(store, resource_id)
+    if rid is None:
+        raise HTTPException(status_code=404, detail="resource not found")
+    updated = store.update_repo_resource(
+        rid,
+        display_name=body.display_name,
+        description=body.description,
+        tags=body.tags,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="resource not found")
+    return updated
 
 
 @router.get("/{resource_id}/versions")

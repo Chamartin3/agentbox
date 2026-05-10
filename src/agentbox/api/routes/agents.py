@@ -71,11 +71,15 @@ def list_agents() -> list[dict]:
         agent = _hydrate_from_snapshot(row)
         if agent is None:
             continue
+        active = store.get_active_version(agent.id)
+        active_version = (
+            active["version"] if active else row.get("version")
+        )
         enriched.append(
             _enrich(
                 agent,
                 updated_at=row.get("created_at"),
-                version=row.get("version"),
+                version=active_version,
             )
         )
         seen.add(agent.id)
@@ -117,7 +121,7 @@ def get_agent(agent_id: str) -> dict:
     composed_system: str | None = None
     composed_user: str | None = None
     bundle_files: list[dict] = []
-    latest_row = store.latest_version(agent_id)
+    latest_row = store.get_active_version(agent_id) or store.latest_version(agent_id)
     if agent.composition is not None:
         try:
             files = (
@@ -244,7 +248,7 @@ def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
 
 
 class PublishRequest(BaseModel):
-    reason: str = Field(..., min_length=3)
+    reason: str = Field(default="activate from UI", min_length=1)
 
 
 @router.post("/{agent_id}/versions/{version}/publish")

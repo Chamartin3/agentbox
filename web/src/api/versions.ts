@@ -11,14 +11,16 @@ export interface VersionSummary {
   author: string;
   changelog: string;
   is_legacy: boolean;
+  is_draft: boolean;
+  is_active: boolean;
   created_at: string;
-  has_comments: boolean;
-  rating: number | null;
 }
 
 export interface VersionListResponse {
   agent_id: string;
   latest_version: number | null;
+  active_version: number | null;
+  active_version_id: string | null;
   versions: VersionSummary[];
 }
 
@@ -37,16 +39,8 @@ export interface VersionDetail {
 export interface DiffResponse {
   from_version: number;
   to_version: number;
-  agent_id: string;
-  prompt_diff: {
-    type: 'added' | 'removed' | 'modified' | 'unchanged';
-    lines: string[];
-  }[];
-  metadata_diff: {
-    key: string;
-    from: unknown;
-    to: unknown;
-  }[];
+  prompt_diff: string;
+  content_diff: Record<string, unknown>;
 }
 
 export interface Comment {
@@ -89,10 +83,19 @@ export class VersionsClient {
     toVersion: number
   ): Promise<DiffResponse> {
     const resp = await fetch(
-      `/api/agents/${agentId}/versions/diff?from=${fromVersion}&to=${toVersion}`
+      `/api/agents/${agentId}/versions/${fromVersion}/diff/${toVersion}`
     );
     if (!resp.ok) throw new Error(`Failed to diff versions: ${resp.status}`);
     return resp.json();
+  }
+
+  async activate(agentId: string, version: number): Promise<void> {
+    const resp = await fetch(`/api/agents/${agentId}/versions/${version}/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'activate from UI' }),
+    });
+    if (!resp.ok) throw new Error(`Failed to activate: ${resp.status}`);
   }
 
   async getComments(versionId: string): Promise<CommentThreadResponse> {
@@ -133,6 +136,21 @@ export class VersionsClient {
       method: 'DELETE',
     });
     if (!resp.ok) throw new Error(`Failed to clear rating: ${resp.status}`);
+  }
+
+  async savePromptRevision(
+    agentId: string,
+    promptContent: string,
+    changelog: string = '',
+    activate: boolean = true,
+  ): Promise<VersionSummary> {
+    const resp = await fetch(`/api/agents/${agentId}/versions/prompt-revision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt_content: promptContent, changelog, activate, author: 'ui' }),
+    });
+    if (!resp.ok) throw new Error(`Failed to save prompt revision: ${resp.status}`);
+    return resp.json();
   }
 
   async saveNewVersion(

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import DataTable, { ColumnDef } from '../components/DataTable';
@@ -7,15 +8,48 @@ interface WorkspaceItem {
   path: string;
   description?: string;
   kind: string;
+  source?: 'manifest' | 'db';
   agents: string[];
   agent_count: number;
   file_count: number;
   skill_count: number;
   resource_count: number;
   exists: boolean;
+  on_disk?: boolean;
 }
 
 export default function WorkspacesPage() {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  const handleDelete = async (name: string) => {
+    const purge = window.confirm(
+      `Delete workspace "${name}"?\n\nOK = remove registry + DB state only.\n` +
+      `Cancel = abort.\n\n(Files on disk are kept unless you tick "purge disk" below.)`,
+    );
+    if (!purge) return;
+    const purgeDisk = window.confirm(`Also delete on-disk workspace directory for "${name}"?`);
+    try {
+      await api.deleteWorkspaceRegistry(name, purgeDisk);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      alert(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    try {
+      await api.createWorkspaceRegistry({ name: newName.trim() });
+      setNewName('');
+      setCreating(false);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      alert(`Create failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   const columns: ColumnDef<WorkspaceItem>[] = [
     {
       key: 'name',
@@ -62,15 +96,79 @@ export default function WorkspacesPage() {
         ),
     },
     {
+      key: 'source',
+      header: 'Source',
+      sortable: true,
+      accessor: (w) => w.source ?? 'db',
+      render: (w) => (
+        <span
+          className="pill"
+          style={
+            w.source === 'manifest'
+              ? { background: '#dbeafe', color: '#1e3a8a' }
+              : { background: '#f3f4f6', color: '#374151' }
+          }
+        >
+          {w.source ?? 'db'}
+        </span>
+      ),
+    },
+    {
       key: 'open',
       header: '',
-      render: (w) => <Link to={`/workspaces/${w.name}`}>open →</Link>,
+      render: (w) => (
+        <span style={{ whiteSpace: 'nowrap' }}>
+          <Link to={`/workspaces/${w.name}`}>open →</Link>
+          <button
+            type="button"
+            onClick={() => handleDelete(w.name)}
+            style={{
+              marginLeft: 12,
+              padding: '2px 8px',
+              fontSize: 12,
+              background: 'transparent',
+              border: '1px solid #fca5a5',
+              color: '#b91c1c',
+              borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
+            delete
+          </button>
+        </span>
+      ),
     },
   ];
 
   return (
     <div className="stack">
-      <h1>Workspaces</h1>
+      <div className="row between">
+        <h1>Workspaces</h1>
+        {creating ? (
+          <span style={{ display: 'inline-flex', gap: 6 }}>
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="workspace name"
+              style={{ padding: '6px 10px', fontSize: 13 }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreate();
+                if (e.key === 'Escape') {
+                  setCreating(false);
+                  setNewName('');
+                }
+              }}
+            />
+            <button type="button" onClick={handleCreate}>create</button>
+            <button type="button" onClick={() => { setCreating(false); setNewName(''); }}>
+              cancel
+            </button>
+          </span>
+        ) : (
+          <button type="button" onClick={() => setCreating(true)}>+ new workspace</button>
+        )}
+      </div>
       <DataTable<WorkspaceItem>
         mode="server"
         columns={columns}
@@ -78,6 +176,7 @@ export default function WorkspacesPage() {
         pageSize={20}
         searchPlaceholder="search workspaces…"
         emptyMessage="No workspaces found."
+        refreshKey={refreshKey}
         fetcher={({ q, sort, order, limit, offset }) =>
           api
             .listWorkspacesPaginated({ q, sort, order, limit, offset })

@@ -1,28 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-
-type Visibility = 'both' | 'claude_only' | 'agents_only' | 'hidden';
-
-interface Section {
-  id: string;
-  title: string;
-  body_markdown: string;
-  visibility: Visibility;
-}
-
-interface Command {
-  label: string;
-  command: string;
-  description: string;
-}
+import { useEffect, useState } from 'react';
+import MarkdownEditor from './MarkdownEditor';
 
 interface EnvDocContent {
   project_name: string;
   overview: string;
   working_directory_layout: string | null;
   conventions: string[];
-  commands: Command[];
+  commands: { label: string; command: string; description: string }[];
   verification: string[] | null;
-  sections: Section[];
+  sections: { id: string; title: string; body_markdown: string; visibility: string }[];
   references: {
     include_skills: boolean;
     include_folders: boolean;
@@ -63,18 +49,22 @@ export default function EnvDocEditor({ workspaceId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'edit' | 'claude' | 'agents'>('edit');
-  const [previews, setPreviews] = useState<{ claude_md: string; agents_md: string } | null>(null);
+  const [changelog, setChangelog] = useState('');
+  const [activeVersion, setActiveVersion] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const data = await api<{ active: { content_json: EnvDocContent } | null }>(
-        `/api/workspaces/${encodeURIComponent(workspaceId)}/env-doc`,
+      const data = await api<{
+        active: { content_json: EnvDocContent; version?: number } | null;
+      }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/env-doc`);
+      setContent(
+        data.active
+          ? { ...EMPTY, ...data.active.content_json }
+          : { ...EMPTY, project_name: workspaceId },
       );
-      setContent(data.active ? { ...EMPTY, ...data.active.content_json } : null);
+      setActiveVersion(data.active?.version ?? null);
       setDirty(false);
-      setPreviews(null);
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -83,30 +73,26 @@ export default function EnvDocEditor({ workspaceId }: Props) {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId]);
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId]);
 
-  const createBlank = () => {
-    setContent({ ...EMPTY, project_name: workspaceId });
+  const updateOverview = (overview: string) => {
+    setContent((prev) => (prev ? { ...prev, overview } : prev));
     setDirty(true);
-    setTab('edit');
   };
 
-  const update = (patch: Partial<EnvDocContent>) => {
-    setContent((prev) => (prev ? { ...prev, ...patch } : prev));
-    setDirty(true);
-    setPreviews(null);
-  };
-
-  const save = async () => {
+  const save = async (publish: boolean) => {
     if (!content) return;
-    const reason = window.prompt('Reason for env-doc change:', 'updated env doc');
-    if (!reason || reason.trim().length < 3) return;
+    const reason = (changelog.trim() || (publish ? 'publish env doc' : 'save env doc draft'));
     setBusy(true);
     try {
       await api(`/api/workspaces/${encodeURIComponent(workspaceId)}/env-doc`, {
         method: 'PUT',
-        body: JSON.stringify({ content, reason: reason.trim(), publish: true }),
+        body: JSON.stringify({ content, reason, publish }),
       });
+      setChangelog('');
       await load();
     } catch (e) {
       alert(String(e));
@@ -115,235 +101,73 @@ export default function EnvDocEditor({ workspaceId }: Props) {
     }
   };
 
-  const preview = async () => {
-    if (!content) return;
-    setBusy(true);
-    try {
-      const data = await api<{ claude_md: string; agents_md: string }>(
-        `/api/workspaces/${encodeURIComponent(workspaceId)}/env-doc/preview`,
-        { method: 'POST', body: JSON.stringify({ content }) },
-      );
-      setPreviews(data);
-      setTab('claude');
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const addSection = () => {
-    if (!content) return;
-    const id = `section-${content.sections.length + 1}`;
-    update({
-      sections: [
-        ...content.sections,
-        { id, title: 'New section', body_markdown: '', visibility: 'both' },
-      ],
-    });
-  };
-
-  const updateSection = (i: number, patch: Partial<Section>) => {
-    if (!content) return;
-    const next = content.sections.slice();
-    next[i] = { ...next[i], ...patch };
-    update({ sections: next });
-  };
-
-  const removeSection = (i: number) => {
-    if (!content) return;
-    update({ sections: content.sections.filter((_, idx) => idx !== i) });
-  };
-
-  const moveSection = (i: number, dir: -1 | 1) => {
-    if (!content) return;
-    const j = i + dir;
-    if (j < 0 || j >= content.sections.length) return;
-    const next = content.sections.slice();
-    [next[i], next[j]] = [next[j], next[i]];
-    update({ sections: next });
-  };
-
-  const conventionsText = useMemo(
-    () => (content?.conventions ?? []).join('\n'),
-    [content?.conventions],
-  );
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (dirty && !busy) void save(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, busy, content, changelog]);
 
   if (loading) return <p className="dim">loading env-doc…</p>;
   if (error) return <p style={{ color: 'crimson', fontSize: 12 }}>{error}</p>;
-
-  if (!content) {
-    return (
-      <div className="stack" style={{ gap: 12 }}>
-        <p className="dim">No env-doc found for this workspace.</p>
-        <div>
-          <button onClick={createBlank} className="primary">
-            create env doc
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!content) return null;
 
   return (
-    <div className="stack" style={{ gap: 12 }}>
-      <div className="row between">
+    <section className="section">
+      <div className="row between" style={{ marginBottom: 8 }}>
+        <h2 style={{ border: 'none', margin: 0 }}>Environment documentation</h2>
         <div className="row" style={{ gap: 6 }}>
-          <button onClick={() => setTab('edit')} className={tab === 'edit' ? 'primary' : ''}>
-            edit
-          </button>
+          {activeVersion != null && (
+            <span className="dim" style={{ fontSize: 11 }}>
+              active v{activeVersion}
+              {dirty && <span className="dirty"> · unsaved</span>}
+            </span>
+          )}
           <button
-            onClick={() => (previews ? setTab('claude') : preview())}
-            className={tab === 'claude' ? 'primary' : ''}
-            disabled={busy}
+            onClick={() => void save(false)}
+            disabled={!dirty || busy}
+            className="primary"
+            style={{ fontSize: 11, padding: '4px 10px' }}
           >
-            CLAUDE.md
-          </button>
-          <button
-            onClick={() => (previews ? setTab('agents') : preview())}
-            className={tab === 'agents' ? 'primary' : ''}
-            disabled={busy}
-          >
-            AGENTS.md
-          </button>
-        </div>
-        <div className="row" style={{ gap: 6 }}>
-          <button onClick={preview} disabled={busy}>preview</button>
-          <button onClick={save} disabled={busy || !dirty} className="primary">
-            {busy ? 'saving…' : dirty ? 'save & publish' : 'saved'}
+            Save Draft
           </button>
         </div>
       </div>
 
-      {tab === 'edit' && (
-        <div className="stack" style={{ gap: 12 }}>
-          <div className="row" style={{ gap: 8 }}>
-            <label style={{ flex: 1 }}>
-              <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>Project name</div>
-              <input
-                type="text"
-                value={content.project_name}
-                onChange={(e) => update({ project_name: e.target.value })}
-                style={{ width: '100%', padding: '6px 8px', fontSize: 12 }}
-              />
-            </label>
-          </div>
+      <div
+        style={{
+          resize: 'vertical',
+          overflow: 'auto',
+          height: 260,
+          minHeight: 120,
+          border: '1px solid var(--border)',
+          borderRadius: 4,
+        }}
+      >
+        <MarkdownEditor value={content.overview} onChange={updateOverview} height="100%" />
+      </div>
 
-          <label>
-            <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>Overview</div>
-            <textarea
-              rows={3}
-              value={content.overview}
-              onChange={(e) => update({ overview: e.target.value })}
-              style={{ width: '100%', padding: '6px 8px', fontSize: 12, fontFamily: 'inherit' }}
-            />
-          </label>
+      <div className="row" style={{ gap: 8, marginTop: 10 }}>
+        <input
+          type="text"
+          value={changelog}
+          onChange={(e) => setChangelog(e.target.value)}
+          placeholder="Changelog (optional)"
+          style={{ flex: 1, maxWidth: 300 }}
+        />
+        <button onClick={() => void save(true)} disabled={busy}>
+          Publish
+        </button>
+      </div>
 
-          <label>
-            <div className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
-              Conventions <span>(one per line)</span>
-            </div>
-            <textarea
-              rows={4}
-              value={conventionsText}
-              onChange={(e) =>
-                update({
-                  conventions: e.target.value.split('\n').map((s) => s.trimEnd()).filter(Boolean),
-                })
-              }
-              style={{ width: '100%', padding: '6px 8px', fontSize: 12, fontFamily: 'monospace' }}
-            />
-          </label>
-
-          <div>
-            <div className="row between" style={{ marginBottom: 6 }}>
-              <strong style={{ fontSize: 12 }}>Sections ({content.sections.length})</strong>
-              <button onClick={addSection}>+ add section</button>
-            </div>
-            {content.sections.length === 0 ? (
-              <p className="dim" style={{ fontSize: 11 }}>No sections yet.</p>
-            ) : (
-              <div className="stack" style={{ gap: 8 }}>
-                {content.sections.map((s, i) => (
-                  <div key={s.id} className="section" style={{ padding: 8 }}>
-                    <div className="row between" style={{ marginBottom: 6 }}>
-                      <input
-                        type="text"
-                        value={s.title}
-                        onChange={(e) => updateSection(i, { title: e.target.value })}
-                        placeholder="title"
-                        style={{ flex: 1, padding: '4px 6px', fontSize: 12, fontWeight: 600 }}
-                      />
-                      <select
-                        value={s.visibility}
-                        onChange={(e) => updateSection(i, { visibility: e.target.value as Visibility })}
-                        style={{ fontSize: 11, marginLeft: 6 }}
-                      >
-                        <option value="both">both</option>
-                        <option value="claude_only">claude only</option>
-                        <option value="agents_only">agents only</option>
-                        <option value="hidden">hidden</option>
-                      </select>
-                      <button onClick={() => moveSection(i, -1)} disabled={i === 0} title="up">↑</button>
-                      <button onClick={() => moveSection(i, 1)} disabled={i === content.sections.length - 1} title="down">↓</button>
-                      <button onClick={() => removeSection(i)} style={{ color: 'crimson', fontSize: 11 }}>remove</button>
-                    </div>
-                    <textarea
-                      rows={4}
-                      value={s.body_markdown}
-                      onChange={(e) => updateSection(i, { body_markdown: e.target.value })}
-                      placeholder="markdown body"
-                      style={{ width: '100%', padding: '6px 8px', fontSize: 12, fontFamily: 'monospace' }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="row" style={{ gap: 16 }}>
-            <label className="row" style={{ gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={content.references.include_skills}
-                onChange={(e) =>
-                  update({
-                    references: { ...content.references, include_skills: e.target.checked },
-                  })
-                }
-              />
-              <span style={{ fontSize: 12 }}>include skills in references</span>
-            </label>
-            <label className="row" style={{ gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={content.references.include_folders}
-                onChange={(e) =>
-                  update({
-                    references: { ...content.references, include_folders: e.target.checked },
-                  })
-                }
-              />
-              <span style={{ fontSize: 12 }}>include folders in references</span>
-            </label>
-          </div>
-        </div>
-      )}
-
-      {tab !== 'edit' && (
-        <div className="code-block">
-          <div className="code-block-bar">
-            <span className="dim" style={{ fontSize: 11 }}>
-              {tab === 'claude' ? 'CLAUDE.md preview' : 'AGENTS.md preview'}
-            </span>
-          </div>
-          <pre style={{ maxHeight: 500, overflow: 'auto', fontSize: 12, padding: '12px 14px', margin: 0 }}>
-            {previews
-              ? (tab === 'claude' ? previews.claude_md : previews.agents_md)
-              : 'click preview to render…'}
-          </pre>
-        </div>
-      )}
-    </div>
+      <p className="dim" style={{ marginTop: 12, fontSize: 11 }}>
+        Rendered into CLAUDE.md / AGENTS.md inside the workdir on every run.
+      </p>
+    </section>
   );
 }

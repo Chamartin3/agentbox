@@ -57,45 +57,17 @@ def list_workspaces(
     except Exception:
         manifest = None
 
-    # Workspaces from the manifest (descriptions + declared paths).
-    toml_meta: dict[str, dict] = {}
-    if manifest:
-        for w in manifest.workspaces:
-            toml_meta[w.name] = {
-                "description": w.description,
-                "path": settings.project_root / w.path,
-            }
+    # The `workspaces` table is the canonical registry — single source of
+    # truth for "what workspaces exist". Disk/manifest are decorations
+    # used to enrich the row, not to invent rows.
+    registry = store.list_workspaces()
 
-    # Workspaces with any DB-persisted state (subagents, mcp/host-env
-    # overrides, file bindings, env-docs, policies).
-    db_ids: set[str] = set()
-    try:
-        db_ids = set(store.list_known_workspace_ids())
-    except AttributeError:
-        # Fallback: scan each DB table directly if helper not present.
-        from sqlalchemy import text
-        sql = text(
-            "SELECT workspace_id FROM workspace_subagents UNION "
-            "SELECT workspace_id FROM workspace_mcp_overrides UNION "
-            "SELECT workspace_id FROM workspace_mcp_tool_overrides UNION "
-            "SELECT workspace_id FROM workspace_mcp_policies UNION "
-            "SELECT workspace_id FROM workspace_host_env_grants UNION "
-            "SELECT workspace_id FROM workspace_env_docs UNION "
-            "SELECT workspace_id FROM workspace_file_resource_bindings"
-        )
-        try:
-            with store.engine.connect() as conn:
-                db_ids = {r[0] for r in conn.execute(sql) if r[0]}
-        except Exception:
-            db_ids = set()
-
-    # Workspaces present on disk under <project_root>/workspaces/.
-    disk_ids: set[str] = set()
     ws_root = settings.workspaces_root
+    disk_ids: set[str] = set()
     if ws_root.exists():
         disk_ids = {p.name for p in ws_root.iterdir() if p.is_dir() and not p.name.startswith(".")}
 
-    # Agent assignments.
+    # Agent assignments from the manifest (decoration only).
     workspace_agents: dict[str, list[str]] = {}
     if manifest:
         for a in manifest.agents:
@@ -108,11 +80,11 @@ def list_workspaces(
     except Exception:
         resource_counts = {}
 
-    all_names = set(toml_meta) | db_ids | disk_ids | set(workspace_agents)
     result = []
-    for name in sorted(all_names):
-        meta = toml_meta.get(name, {})
-        ws_path = meta.get("path") or (ws_root / name)
+    for ws_row in registry:
+        name = ws_row["name"]
+        rel_path = ws_row.get("path")
+        ws_path = settings.project_root / rel_path if rel_path else ws_root / name
         agents = workspace_agents.get(name, [])
 
         file_count = 0
@@ -123,27 +95,22 @@ def list_workspaces(
                     file_count += 1
             skill_count = len(discover_skills(ws_path))
 
-        sources = []
-        if name in toml_meta:
-            sources.append("manifest")
-        if name in db_ids:
-            sources.append("db")
-        if name in disk_ids:
-            sources.append("disk")
-
         result.append(
             {
                 "name": name,
                 "path": str(ws_path),
-                "description": meta.get("description"),
+                "description": ws_row.get("description"),
                 "kind": "named",
+                "source": ws_row.get("source", "db"),
                 "agents": agents,
                 "agent_count": len(agents),
                 "file_count": file_count,
                 "skill_count": skill_count,
                 "resource_count": resource_counts.get(name, 0),
                 "exists": ws_path.exists(),
-                "sources": sources,
+                "on_disk": name in disk_ids,
+                "created_at": ws_row.get("created_at"),
+                "updated_at": ws_row.get("updated_at"),
             }
         )
 
@@ -158,6 +125,62 @@ def list_workspaces(
             offset=offset,
         )
     return result
+
+
+# ---------------------------------------------------------------------------
+# Create / delete (registry-level)
+# ---------------------------------------------------------------------------
+
+
+class CreateWorkspaceBody(BaseModel):
+    name: str
+    description: str | None = None
+    path: str | None = None
+
+
+@router.post("", status_code=201)
+def create_workspace_registry(body: CreateWorkspaceBody) -> dict:
+    """Create a new workspace in the canonical registry.
+
+    The workspace exists in the registry immediately; the on-disk
+    directory is materialized lazily by the executor on first use.
+    """
+    store = get_store()
+    try:
+        row = store.create_workspace(
+            body.name,
+            description=body.description,
+            path=body.path,
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return row
+
+
+@router.delete("/by-name/{name}", status_code=200)
+def delete_workspace_registry(name: str, purge_disk: bool = False) -> dict:
+    """Remove a workspace from the registry and cascade-delete every
+    satellite row (env-docs, MCP overrides, file bindings, etc.).
+
+    Optionally purges the on-disk workspace directory as well
+    (``?purge_disk=true``). The directory is left alone by default —
+    deleting registry state shouldn't clobber user files.
+    """
+    store = get_store()
+    settings = _get_settings()
+    existing = store.get_workspace(name)
+    if existing is None:
+        raise HTTPException(404, f"unknown workspace {name!r}")
+    counts = store.delete_workspace_cascade(name)
+    disk_removed = False
+    if purge_disk:
+        ws_path = settings.project_root / existing["path"] if existing.get("path") else (
+            settings.workspaces_root / name
+        )
+        if ws_path.exists() and ws_path.is_dir():
+            shutil.rmtree(ws_path)
+            disk_removed = True
+    return {"deleted": name, "counts": counts, "disk_removed": disk_removed}
 
 
 # ---------------------------------------------------------------------------

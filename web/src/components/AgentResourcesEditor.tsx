@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { marked } from 'marked';
 import { ApiError } from '../api/client';
 import { repoApi, type RepoResource, type RepoType, type RepoVersion } from '../api/repo';
+import ResourcePicker from './ResourcePicker';
 import Toast from './Toast';
 
 type PromptMode = 'inline' | 'skill_primer' | 'name_only' | 'manifest';
@@ -37,6 +39,11 @@ interface PreviewSchema {
   text: string;
 }
 
+interface CharPart {
+  label: string;
+  chars: number;
+}
+
 interface PreviewResult {
   rendered_prompt: string;
   unresolved_markers: string[];
@@ -45,6 +52,8 @@ interface PreviewResult {
   input_schema: PreviewSchema | null;
   output_schema: PreviewSchema | null;
   raw_text_output: boolean;
+  char_breakdown?: CharPart[];
+  total_chars?: number;
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -70,95 +79,6 @@ function errMsg(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
 
-interface ResourcePickerProps {
-  filterType?: RepoType | null;
-  onPick: (r: RepoResource) => void;
-  onClose: () => void;
-}
-
-function ResourcePicker({ filterType, onPick, onClose }: ResourcePickerProps) {
-  const [items, setItems] = useState<RepoResource[]>([]);
-  const [q, setQ] = useState('');
-  const [type, setType] = useState<RepoType | ''>(filterType ?? '');
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setErr(null);
-    repoApi
-      .list({ q: q || undefined, type: (type as RepoType) || undefined, limit: 50 })
-      .then((p) => { if (!cancelled) setItems(p.items); })
-      .catch((e) => { if (!cancelled) { setItems([]); setErr(errMsg(e, 'failed to load resources')); } })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [q, type]);
-
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: 'var(--bg, #1a1a1a)', padding: 16, borderRadius: 6,
-          width: 'min(720px, 90vw)', maxHeight: '80vh', overflow: 'auto',
-          border: '1px solid var(--border, #333)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: 0 }}>
-            {filterType ? `Pick ${filterType}` : 'Add resource'}
-          </h3>
-          <button onClick={onClose}>close</button>
-        </div>
-        <div className="row" style={{ gap: 8, marginBottom: 8 }}>
-          <input
-            placeholder="search slug or name…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={{ flex: 1, padding: '6px 10px' }}
-            autoFocus
-          />
-          {!filterType && (
-            <select value={type} onChange={(e) => setType(e.target.value as RepoType | '')} style={{ padding: '6px 10px' }}>
-              <option value="">all types</option>
-              <option value="document">document</option>
-              <option value="folder">folder</option>
-              <option value="skill">skill</option>
-              <option value="schema">schema</option>
-            </select>
-          )}
-        </div>
-        {err && <p style={{ color: 'crimson', fontSize: 12 }}>{err}</p>}
-        {loading ? (
-          <p className="dim">loading…</p>
-        ) : items.length === 0 ? (
-          <p className="dim">no resources match</p>
-        ) : (
-          <table style={{ fontSize: 12, width: '100%' }}>
-            <thead><tr><th>Slug</th><th>Type</th><th>Name</th><th></th></tr></thead>
-            <tbody>
-              {items.map((r) => (
-                <tr key={r.id}>
-                  <td><code>{r.slug}</code></td>
-                  <td><span className="tag">{r.type}</span></td>
-                  <td>{r.display_name}</td>
-                  <td><button onClick={() => onPick(r)}>add</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function defaultModeFor(type: RepoType | null | undefined): PromptMode {
   if (type === 'skill') return 'skill_primer';
@@ -176,18 +96,29 @@ interface Props {
   agentId: string;
   promptTemplate: string;
   onPreview?: (result: PreviewResult | null) => void;
+  outputValidation?: string;
+  onChangeOutputValidation?: (next: string) => void;
 }
 
-export default function AgentResourcesEditor({ agentId, promptTemplate, onPreview }: Props) {
+export default function AgentResourcesEditor({
+  agentId,
+  promptTemplate,
+  onPreview,
+  outputValidation,
+  onChangeOutputValidation,
+}: Props) {
   const [bindings, setBindings] = useState<Binding[]>([]);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [picker, setPicker] = useState<{ kind: 'binding' | 'input_schema' | 'output_schema' } | null>(null);
   const [versionsCache, setVersionsCache] = useState<Record<string, RepoVersion[]>>({});
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [splicingId, setSplicingId] = useState<string | null>(null);
+  const [nameDrafts, setNameDrafts] = useState<Record<string, string>>({});
+  const [savingName, setSavingName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -250,12 +181,12 @@ export default function AgentResourcesEditor({ agentId, promptTemplate, onPrevie
       template: promptTemplate,
       bindings: bindings.map((b) => ({
         resource_id: b.resource_id,
-        marker: b.slot ? null : (b.marker ?? defaultMarkerFor(b.resource_type)),
-        mode: b.slot ? null : (b.mode ?? defaultModeFor(b.resource_type)),
+        marker: b.slot ? null : (b.marker || null),
+        mode: b.slot ? null : (b.marker ? (b.mode ?? defaultModeFor(b.resource_type)) : (b.resource_type === 'skill' ? (b.mode ?? null) : null)),
         slot: b.slot ?? null,
         attach_as_reference: b.attach_as_reference,
         pinned_version_id: b.pinned_version_id ?? null,
-        required: b.required,
+        required: b.slot || !b.marker ? false : b.required,
         display_order: b.display_order,
       })),
     };
@@ -313,28 +244,65 @@ export default function AgentResourcesEditor({ agentId, promptTemplate, onPrevie
     setDirty(true);
   };
 
-  const onPickBinding = (r: RepoResource) => {
-    const newB: Binding = {
-      resource_id: r.id,
-      resource_slug: r.slug,
-      resource_type: r.type,
-      resource_display_name: r.display_name,
-      marker: defaultMarkerFor(r.type),
-      mode: defaultModeFor(r.type),
-      slot: null,
-      attach_as_reference: r.type === 'document' || r.type === 'folder',
-      pinned_version_id: null,
-      required: true,
-      display_order: bindings.length,
-      active_version_id: r.active_version_id ?? null,
-    };
-    setBindings((bs) => [...bs, newB]);
+  const onPickBinding = (rs: RepoResource[]) => {
+    setBindings((bs) => {
+      const newRows: Binding[] = rs.map((r, i) => ({
+        resource_id: r.id,
+        resource_slug: r.slug,
+        resource_type: r.type,
+        resource_display_name: r.display_name,
+        marker: null,
+        mode: r.type === 'skill' ? defaultModeFor(r.type) : null,
+        slot: null,
+        attach_as_reference: r.type === 'document' || r.type === 'folder',
+        pinned_version_id: null,
+        required: true,
+        display_order: bs.length + i,
+        active_version_id: r.active_version_id ?? null,
+      }));
+      return [...bs, ...newRows];
+    });
     setPicker(null);
     setDirty(true);
   };
 
-  const onPickSchema = (slot: SchemaSlot) => (r: RepoResource) => {
-    // Drop any existing row for this slot first.
+  const saveDisplayName = async (b: Binding) => {
+    const key = b.id ?? b.resource_id;
+    const draft = (nameDrafts[key] ?? b.resource_display_name ?? '').trim();
+    if (!draft || draft === (b.resource_display_name ?? '')) {
+      setNameDrafts((d) => {
+        const next = { ...d };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+    setSavingName(key);
+    try {
+      const updated = await repoApi.update(b.resource_id, { display_name: draft });
+      setBindings((bs) =>
+        bs.map((row) =>
+          row.resource_id === b.resource_id
+            ? { ...row, resource_display_name: updated.display_name }
+            : row,
+        ),
+      );
+      setNameDrafts((d) => {
+        const next = { ...d };
+        delete next[key];
+        return next;
+      });
+      setToast({ kind: 'ok', msg: 'name updated' });
+    } catch (e) {
+      setToast({ kind: 'error', msg: errMsg(e, 'failed to rename resource') });
+    } finally {
+      setSavingName(null);
+    }
+  };
+
+  const onPickSchema = (slot: SchemaSlot) => (rs: RepoResource[]) => {
+    const r = rs[0];
+    if (!r) return;
     setBindings((bs) => {
       const filtered = bs.filter((b) => b.slot !== slot);
       const newB: Binding = {
@@ -357,33 +325,31 @@ export default function AgentResourcesEditor({ agentId, promptTemplate, onPrevie
     setDirty(true);
   };
 
-  const reasonInvalid = reason.trim().length < 3;
+  const attachedIds = useMemo(
+    () => new Set(bindings.filter((b) => !b.slot).map((b) => b.resource_id)),
+    [bindings],
+  );
 
   const save = async () => {
-    if (reasonInvalid) {
-      setToast({ kind: 'error', msg: 'reason is required (min 3 chars)' });
-      return;
-    }
     setBusy(true);
     try {
       const body = {
         bindings: bindings.map((b, i) => ({
           resource_id: b.resource_id,
-          marker: b.slot ? null : (b.marker ?? defaultMarkerFor(b.resource_type)),
-          mode: b.slot ? null : (b.mode ?? defaultModeFor(b.resource_type)),
+          marker: b.slot ? null : (b.marker || null),
+          mode: b.slot ? null : (b.marker ? (b.mode ?? defaultModeFor(b.resource_type)) : (b.resource_type === 'skill' ? (b.mode ?? null) : null)),
           slot: b.slot ?? null,
           attach_as_reference: b.attach_as_reference,
           pinned_version_id: b.pinned_version_id ?? null,
-          required: b.required,
+          required: b.slot || !b.marker ? false : b.required,
           display_order: i,
         })),
-        reason: reason.trim(),
+        reason: 'ui edit',
       };
       await req(`/api/agents/${encodeURIComponent(agentId)}/prompt-resources`, {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      setReason('');
       setToast({ kind: 'ok', msg: 'bindings saved' });
       await refresh();
     } catch (e) {
@@ -401,9 +367,8 @@ export default function AgentResourcesEditor({ agentId, promptTemplate, onPrevie
         <div>
           <h3 style={{ marginTop: 0, marginBottom: 2 }}>Resource bindings</h3>
           <p className="dim" style={{ fontSize: 12, margin: 0 }}>
-            Resources spliced into the system prompt and optionally
-            attached as references. Toggle "Reference" to also append
-            a resource into the composed prompt's References section.
+            Schemas (input/output) and reference documents attached to the
+            composed prompt. Use the row menu for advanced options.
           </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
@@ -417,87 +382,194 @@ export default function AgentResourcesEditor({ agentId, promptTemplate, onPrevie
         <table style={{ fontSize: 12, width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ width: 56 }}>order</th>
-              <th>resource</th>
-              <th>marker</th>
-              <th>mode</th>
-              <th>reference</th>
-              <th>version</th>
-              <th></th>
+              <th style={{ width: 56 }}>↕</th>
+              <th>name</th>
+              <th style={{ width: 90 }}>type</th>
+              <th style={{ width: 80 }}>active</th>
+              <th style={{ width: 140 }}>version</th>
+              <th style={{ width: 40 }}></th>
             </tr>
           </thead>
           <tbody>
             {markerBindings.map((b) => {
               const idx = bindings.indexOf(b);
               const versions = versionsCache[b.resource_id] || [];
+              const rowKey = b.id ?? `new-${idx}`;
+              const nameKey = b.id ?? b.resource_id;
               const refDisabled = b.resource_type === 'skill' || b.resource_type === 'schema' || b.resource_type === 'script';
+              // ref_* markers were assigned by the legacy/migration importer
+              // for reference-only bindings — they should not surface splice UI.
+              const isLegacyRef = !!b.marker && /^ref_/.test(b.marker);
+              const isSplice = !!b.marker && !isLegacyRef;
+              const isActive = b.attach_as_reference || isSplice;
+              const draft = nameDrafts[nameKey];
+              const nameValue = draft !== undefined ? draft : (b.resource_display_name ?? '');
+              const menuShown = menuOpen === rowKey;
+              const splicing = splicingId === rowKey;
               return (
-                <tr key={b.id ?? `new-${idx}`}>
-                  <td>
-                    <div className="row" style={{ gap: 2 }}>
-                      <button onClick={() => moveBinding(idx, -1)} style={{ padding: '0 6px' }}>↑</button>
-                      <button onClick={() => moveBinding(idx, 1)} style={{ padding: '0 6px' }}>↓</button>
-                    </div>
-                  </td>
-                  <td>
-                    <Link to={`/workspaces/resources/${encodeURIComponent(b.resource_id)}`}>
-                      <code>{b.resource_slug || b.resource_id.slice(0, 12)}</code>
-                    </Link>
-                    {b.resource_type && (
-                      <span className="tag" style={{ marginLeft: 4 }}>{b.resource_type}</span>
-                    )}
-                  </td>
-                  <td>
-                    <input
-                      value={b.marker ?? ''}
-                      onChange={(e) => updateAt(idx, { marker: e.target.value })}
-                      style={{ width: 120, padding: '2px 6px', fontFamily: 'monospace', fontSize: 12 }}
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={b.mode ?? defaultModeFor(b.resource_type)}
-                      onChange={(e) => updateAt(idx, { mode: e.target.value as PromptMode })}
-                    >
-                      {b.resource_type === 'document' && <option value="inline">inline</option>}
-                      {b.resource_type === 'folder' && <option value="manifest">manifest</option>}
-                      {b.resource_type === 'skill' && (
-                        <>
-                          <option value="skill_primer">skill_primer</option>
-                          <option value="name_only">name_only</option>
-                        </>
+                <Fragment key={rowKey}>
+                  <tr>
+                    <td>
+                      <div className="row" style={{ gap: 2 }}>
+                        <button onClick={() => moveBinding(idx, -1)} style={{ padding: '0 6px' }}>↑</button>
+                        <button onClick={() => moveBinding(idx, 1)} style={{ padding: '0 6px' }}>↓</button>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="row" style={{ gap: 4, alignItems: 'center' }}>
+                        <input
+                          value={nameValue}
+                          placeholder={b.resource_slug || ''}
+                          onChange={(e) =>
+                            setNameDrafts((d) => ({ ...d, [nameKey]: e.target.value }))
+                          }
+                          onBlur={() => {
+                            if (draft !== undefined) saveDisplayName(b);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            if (e.key === 'Escape') {
+                              setNameDrafts((d) => {
+                                const next = { ...d };
+                                delete next[nameKey];
+                                return next;
+                              });
+                            }
+                          }}
+                          disabled={savingName === nameKey}
+                          style={{ flex: 1, padding: '2px 6px', fontSize: 12 }}
+                        />
+                        {isSplice && (
+                          <span
+                            className="tag"
+                            title={`spliced via {{resource:${b.marker}}}`}
+                            style={{ fontSize: 10 }}
+                          >
+                            splice
+                          </span>
+                        )}
+                      </div>
+                      <div className="dim" style={{ fontSize: 10, marginTop: 2 }}>
+                        <Link to={`/workspaces/resources/${encodeURIComponent(b.resource_id)}`}>
+                          <code>{b.resource_slug || b.resource_id.slice(0, 12)}</code>
+                        </Link>
+                      </div>
+                    </td>
+                    <td>
+                      {b.resource_type && (
+                        <span className="tag">{b.resource_type}</span>
                       )}
-                      {!b.resource_type && <option value="inline">inline</option>}
-                    </select>
-                  </td>
-                  <td>
-                    <label className="row" style={{ gap: 4 }} title={refDisabled ? `not applicable for ${b.resource_type}` : ''}>
-                      <input
-                        type="checkbox"
-                        disabled={refDisabled}
-                        checked={b.attach_as_reference}
-                        onChange={(e) => updateAt(idx, { attach_as_reference: e.target.checked })}
-                      />
-                      <span className="dim" style={{ fontSize: 11 }}>attach</span>
-                    </label>
-                  </td>
-                  <td>
-                    <select
-                      value={b.pinned_version_id ?? ''}
-                      onChange={(e) => updateAt(idx, { pinned_version_id: e.target.value || null })}
-                    >
-                      <option value="">active</option>
-                      {versions.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          v{v.version_number}{v.is_draft ? ' (draft)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <button onClick={() => removeAt(idx)} style={{ color: 'crimson' }}>remove</button>
-                  </td>
-                </tr>
+                    </td>
+                    <td>
+                      <label className="row" style={{ gap: 4 }} title={refDisabled && !isSplice ? `not applicable for ${b.resource_type}` : ''}>
+                        <input
+                          type="checkbox"
+                          disabled={refDisabled && !isSplice}
+                          checked={isActive}
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            if (isSplice) {
+                              // splice rows: turning off clears the marker
+                              updateAt(idx, next
+                                ? { attach_as_reference: !refDisabled }
+                                : { marker: null, mode: b.resource_type === 'skill' ? b.mode : null, attach_as_reference: false });
+                            } else {
+                              updateAt(idx, { attach_as_reference: next });
+                            }
+                          }}
+                        />
+                      </label>
+                    </td>
+                    <td>
+                      <select
+                        value={b.pinned_version_id ?? ''}
+                        onChange={(e) => updateAt(idx, { pinned_version_id: e.target.value || null })}
+                      >
+                        <option value="">active</option>
+                        {versions.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            v{v.version_number}{v.is_draft ? ' (draft)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setMenuOpen(menuShown ? null : rowKey)}
+                        style={{ padding: '2px 8px' }}
+                        title="more options"
+                      >⋮</button>
+                      {menuShown && (
+                        <div
+                          style={{
+                            position: 'absolute', right: 0, top: '100%', zIndex: 10,
+                            background: 'var(--bg, #1a1a1a)', border: '1px solid var(--border, #333)',
+                            borderRadius: 4, padding: 4, minWidth: 180, fontSize: 12,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                          }}
+                        >
+                          <button
+                            onClick={() => {
+                              setSplicingId(splicing ? null : rowKey);
+                              setMenuOpen(null);
+                              if (!isSplice && !splicing) {
+                                updateAt(idx, {
+                                  marker: defaultMarkerFor(b.resource_type),
+                                  mode: defaultModeFor(b.resource_type),
+                                });
+                              }
+                            }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}
+                          >
+                            {isSplice ? 'Edit splice marker…' : 'Splice into template…'}
+                          </button>
+                          {b.resource_type === 'skill' && (
+                            <div style={{ padding: '4px 8px' }}>
+                              <div className="dim" style={{ fontSize: 10, marginBottom: 2 }}>skill render mode</div>
+                              <select
+                                value={b.mode ?? 'skill_primer'}
+                                onChange={(e) => updateAt(idx, { mode: e.target.value as PromptMode })}
+                                style={{ width: '100%' }}
+                              >
+                                <option value="skill_primer">skill_primer</option>
+                                <option value="name_only">name_only</option>
+                              </select>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => { setMenuOpen(null); removeAt(idx); }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 8px', background: 'none', border: 'none', color: 'crimson', cursor: 'pointer' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {(splicing || isSplice) && (
+                    <tr>
+                      <td></td>
+                      <td colSpan={5} style={{ paddingTop: 0 }}>
+                        <div className="row" style={{ gap: 6, alignItems: 'center', fontSize: 11 }}>
+                          <span className="dim">splice marker:</span>
+                          <code style={{ fontSize: 11 }}>{'{{resource:'}</code>
+                          <input
+                            value={b.marker ?? ''}
+                            placeholder={defaultMarkerFor(b.resource_type)}
+                            onChange={(e) => updateAt(idx, { marker: e.target.value || null })}
+                            style={{ width: 140, padding: '2px 6px', fontFamily: 'monospace', fontSize: 11 }}
+                          />
+                          <code style={{ fontSize: 11 }}>{'}}'}</code>
+                          {b.marker && !promptTemplate.includes(`{{resource:${b.marker}}}`) && (
+                            <span style={{ color: 'orange', fontSize: 11 }}>
+                              ⚠ marker not found in prompt template
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
@@ -505,43 +577,51 @@ export default function AgentResourcesEditor({ agentId, promptTemplate, onPrevie
       )}
 
       <div style={{ marginTop: 16 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 4 }}>Schema slots <span className="dim" style={{ fontSize: 11, fontWeight: 400 }}>· optional</span></h3>
-        <p className="dim" style={{ fontSize: 12, marginTop: 0 }}>
-          Both schemas are optional. When no output schema is set, the agent's output is treated as raw text.
-        </p>
+        <div className="dim" style={{ fontSize: 11, marginBottom: 6 }}>
+          Schema slots · optional · when no output schema is set the agent's
+          output is treated as raw text
+        </div>
         <table style={{ fontSize: 12, width: '100%' }}>
-          <thead>
-            <tr>
-              <th style={{ width: 140 }}>slot</th>
-              <th>resource</th>
-              <th></th>
-            </tr>
-          </thead>
           <tbody>
             {(['input_schema', 'output_schema'] as SchemaSlot[]).map((slot) => {
               const b = slot === 'input_schema' ? inputSchema : outputSchema;
+              const isOutput = slot === 'output_schema';
               return (
                 <tr key={slot}>
-                  <td><strong>{slot === 'input_schema' ? 'Input schema' : 'Output schema'}</strong></td>
-                  <td>
+                  <td style={{ width: 140, padding: '3px 6px' }}>
+                    <strong>{slot === 'input_schema' ? 'Input schema' : 'Output schema'}</strong>
+                  </td>
+                  <td style={{ padding: '3px 6px' }}>
                     {b ? (
-                      <>
-                        <Link to={`/workspaces/resources/${encodeURIComponent(b.resource_id)}`}>
-                          <code>{b.resource_slug || b.resource_id.slice(0, 12)}</code>
-                        </Link>
-                        {b.resource_type && (
-                          <span className="tag" style={{ marginLeft: 4 }}>{b.resource_type}</span>
-                        )}
-                      </>
+                      <Link to={`/workspaces/resources/${encodeURIComponent(b.resource_id)}`}>
+                        {b.resource_display_name || b.resource_slug || b.resource_id.slice(0, 12)}
+                      </Link>
                     ) : (
                       <span className="dim">— none —</span>
                     )}
                   </td>
-                  <td>
+                  <td style={{ padding: '3px 6px' }}>
+                    {isOutput && onChangeOutputValidation && (
+                      <div className="row" style={{ gap: 4, alignItems: 'center', fontSize: 11 }}>
+                        <span className="dim">validation:</span>
+                        <select
+                          value={outputValidation || 'strict'}
+                          onChange={(e) => onChangeOutputValidation(e.target.value)}
+                          style={{ fontSize: 11, padding: '1px 4px' }}
+                          title="How the executor responds when output does not match the schema"
+                        >
+                          <option value="strict">strict</option>
+                          <option value="warn">warn</option>
+                          <option value="off">off</option>
+                        </select>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ width: 1, padding: '3px 6px', whiteSpace: 'nowrap' }}>
                     {b ? (
-                      <button onClick={() => removeSlot(slot)} style={{ color: 'crimson' }}>remove</button>
+                      <button onClick={() => removeSlot(slot)} style={{ color: 'crimson', fontSize: 11 }}>remove</button>
                     ) : (
-                      <button onClick={() => setPicker({ kind: slot })}>+ set</button>
+                      <button onClick={() => setPicker({ kind: slot })} style={{ fontSize: 11 }}>+ set / upload</button>
                     )}
                   </td>
                 </tr>
@@ -552,62 +632,126 @@ export default function AgentResourcesEditor({ agentId, promptTemplate, onPrevie
       </div>
 
       {dirty && (
-        <div style={{ marginTop: 12 }}>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-            Reason for change <span className="dim">(required, min 3 chars)</span>
-          </label>
-          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-            <input
-              placeholder="why are you changing these bindings?"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                borderColor: reasonInvalid ? 'var(--error, #b91c1c)' : undefined,
-              }}
-            />
-            <button onClick={save} disabled={busy || reasonInvalid} className="primary">
-              {busy ? 'saving…' : 'Save'}
-            </button>
-            <button onClick={refresh} disabled={busy}>discard</button>
-          </div>
+        <div className="row" style={{ marginTop: 12, gap: 8, alignItems: 'center' }}>
+          <button onClick={save} disabled={busy} className="primary">
+            {busy ? 'saving…' : 'Save'}
+          </button>
+          <button onClick={refresh} disabled={busy}>discard</button>
         </div>
       )}
 
       {preview && (
         <div style={{ marginTop: 16 }}>
-          <h3 style={{ marginTop: 0, marginBottom: 4 }}>
-            Live composed prompt
-            {preview.raw_text_output && (
-              <span className="tag" style={{ marginLeft: 8 }}>raw-text output</span>
-            )}
-          </h3>
+          <div className="row between" style={{ marginBottom: 8, alignItems: 'baseline' }}>
+            <h3 style={{ marginTop: 0, marginBottom: 0 }}>
+              Live composed prompt
+              {preview.raw_text_output && (
+                <span className="tag" style={{ marginLeft: 8 }}>raw-text output</span>
+              )}
+            </h3>
+            <div style={{ textAlign: 'right', lineHeight: 1.1 }}>
+              <div style={{ fontSize: 32, fontWeight: 700 }}>
+                {(preview.total_chars ?? preview.rendered_prompt.length).toLocaleString()}
+                <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.7, marginLeft: 6 }}>
+                  chars
+                </span>
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                ≈ {Math.round((preview.total_chars ?? preview.rendered_prompt.length) / 4).toLocaleString()} tokens
+              </div>
+            </div>
+          </div>
+          {preview.char_breakdown && preview.char_breakdown.length > 0 && (() => {
+            const total = preview.total_chars ?? preview.rendered_prompt.length;
+            const n = preview.char_breakdown.length;
+            const colors = preview.char_breakdown.map((_, i) =>
+              `hsl(${Math.round((i * 360) / Math.max(n, 1))}, 65%, 55%)`
+            );
+            return (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  display: 'flex', height: 18, borderRadius: 4, overflow: 'hidden',
+                  border: '1px solid var(--border, #333)', marginBottom: 6,
+                }}>
+                  {preview.char_breakdown.map((p, i) => {
+                    const pct = total > 0 ? (p.chars / total) * 100 : 0;
+                    return (
+                      <div
+                        key={p.label}
+                        title={`${p.label}: ${p.chars.toLocaleString()} chars (${pct.toFixed(1)}%)`}
+                        style={{
+                          background: colors[i % colors.length],
+                          width: `${pct}%`,
+                          minWidth: pct > 0 ? 2 : 0,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="row" style={{ gap: 12, flexWrap: 'wrap', fontSize: 12 }}>
+                  {preview.char_breakdown.map((p, i) => {
+                    const pct = total > 0 ? (p.chars / total) * 100 : 0;
+                    return (
+                      <div key={p.label} className="row" style={{ gap: 5, alignItems: 'center' }}>
+                        <span style={{
+                          width: 10, height: 10, borderRadius: 2,
+                          background: colors[i % colors.length], display: 'inline-block',
+                        }} />
+                        <span style={{ fontWeight: 500 }}>{p.label}</span>
+                        <span style={{ opacity: 0.8 }}>
+                          {p.chars.toLocaleString()}
+                          <span style={{ opacity: 0.5 }}> ({pct.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
           {preview.warnings.length > 0 && (
             <ul className="dim" style={{ fontSize: 11, marginTop: 4 }}>
               {preview.warnings.map((w, i) => <li key={i}>{w}</li>)}
             </ul>
           )}
-          <pre
+          <div
+            className="md-preview"
             style={{
-              background: 'var(--bg-soft, #111)', padding: 10, borderRadius: 4,
-              fontSize: 11, maxHeight: 400, overflow: 'auto',
-              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              background: 'var(--bg-soft, #111)', padding: 14, borderRadius: 4,
+              fontSize: 13, maxHeight: 600, overflow: 'auto',
+              lineHeight: 1.5,
             }}
-          >
-            {preview.rendered_prompt}
-          </pre>
+            dangerouslySetInnerHTML={{
+              __html: marked.parse(preview.rendered_prompt || '', { async: false }) as string,
+            }}
+          />
         </div>
       )}
 
       {picker?.kind === 'binding' && (
-        <ResourcePicker onPick={onPickBinding} onClose={() => setPicker(null)} />
+        <ResourcePicker
+          excludeIds={attachedIds}
+          onPick={onPickBinding}
+          onClose={() => setPicker(null)}
+        />
       )}
       {picker?.kind === 'input_schema' && (
-        <ResourcePicker filterType="schema" onPick={onPickSchema('input_schema')} onClose={() => setPicker(null)} />
+        <ResourcePicker
+          filterType="schema"
+          allowUpload
+          title="Pick or upload input schema"
+          onPick={onPickSchema('input_schema')}
+          onClose={() => setPicker(null)}
+        />
       )}
       {picker?.kind === 'output_schema' && (
-        <ResourcePicker filterType="schema" onPick={onPickSchema('output_schema')} onClose={() => setPicker(null)} />
+        <ResourcePicker
+          filterType="schema"
+          allowUpload
+          title="Pick or upload output schema"
+          onPick={onPickSchema('output_schema')}
+          onClose={() => setPicker(null)}
+        />
       )}
 
       {toast && <Toast kind={toast.kind} msg={toast.msg} />}

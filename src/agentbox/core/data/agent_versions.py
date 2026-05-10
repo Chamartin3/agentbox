@@ -264,6 +264,103 @@ class AgentVersionsMixin:
 
         return self.get_version_by_id(new_vid) or {}
 
+    def save_prompt_revision(
+        self,
+        agent_id: str,
+        *,
+        prompt_content: str,
+        author: str,
+        changelog: str = "",
+        activate: bool = False,
+    ) -> dict:
+        """Create a new agent_version cloning active config but with new prompt_content.
+
+        Every call yields a new row in ``agent_versions`` — the "draft slot
+        is overwritten" behaviour from the legacy ``prompt_versions`` table
+        does not apply here.
+
+        Args:
+            agent_id: Agent identifier.
+            prompt_content: New prompt body.
+            author: Author label.
+            changelog: Short message (stored on row).
+            activate: If True, also flip ``is_draft=False`` and set as active.
+
+        Returns:
+            New AgentVersionRecord (dict).
+
+        Raises:
+            ValueError: if no active version exists to clone from.
+        """
+        active = self.get_active_version(agent_id) or self.latest_version(agent_id)
+        if active is None:
+            raise ValueError(f"No version to clone for agent {agent_id}")
+
+        next_v = self._next_version(agent_id)
+        active_vid = active["id"]
+        is_draft = 0 if activate else 1
+
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version=next_v,
+                    source_path=active.get("source_path") or "",
+                    source_format=active.get("source_format") or "",
+                    content_snapshot=active.get("content_snapshot") or "",
+                    prompt_snapshot=prompt_content,
+                    content_hash="",
+                    author=author,
+                    changelog=changelog or f"prompt edit from v{active['version']}",
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    config_json=active.get("config_json"),
+                    prompt_content=prompt_content,
+                    source=active.get("source", "ui"),
+                    is_draft=is_draft,
+                )
+            )
+            new_vid = int(result.inserted_primary_key[0])
+
+            files = conn.execute(
+                agent_version_files.select().where(
+                    agent_version_files.c.version_id == active_vid
+                )
+            ).fetchall()
+            if files:
+                conn.execute(
+                    agent_version_files.insert(),
+                    [
+                        {
+                            "version_id": new_vid,
+                            "relative_path": f._mapping["relative_path"],
+                            "kind": f._mapping["kind"],
+                            "content": f._mapping["content"],
+                            "sha256": f._mapping["sha256"],
+                            "source_uri": f._mapping.get("source_uri"),
+                            "position": f._mapping.get("position", 0),
+                            "created_at": now_iso(),
+                        }
+                        for f in files
+                    ],
+                )
+
+            if activate:
+                conn.execute(
+                    active_agent_versions.delete().where(
+                        active_agent_versions.c.agent_id == agent_id
+                    )
+                )
+                conn.execute(
+                    active_agent_versions.insert().values(
+                        agent_id=agent_id,
+                        version_id=new_vid,
+                        activated_at=now_iso(),
+                    )
+                )
+
+        return self.get_version_by_id(new_vid) or {}
+
     def rollback_to(
         self, agent_id: str, target_version: int, reason: str, *, author: str
     ) -> dict:

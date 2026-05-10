@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../api/client';
-import { repoApi, type RepoResource, type RepoType, type RepoVersion } from '../api/repo';
+import { repoApi, type RepoResource, type RepoVersion } from '../api/repo';
 import { ConflictPolicy, MaterializeMode, RepoType as RepoTypeEnum } from '../api/enums';
+import ResourcePicker from './ResourcePicker';
 import Toast from './Toast';
 
 type OnConflict = ConflictPolicy;
@@ -65,89 +66,6 @@ function errMsg(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
 
-interface ResourcePickerProps {
-  onPick: (r: RepoResource) => void;
-  onClose: () => void;
-}
-
-function ResourcePicker({ onPick, onClose }: ResourcePickerProps) {
-  const [items, setItems] = useState<RepoResource[]>([]);
-  const [q, setQ] = useState('');
-  const [type, setType] = useState<RepoType | ''>('');
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setErr(null);
-    repoApi
-      .list({ q: q || undefined, type: (type as RepoType) || undefined, limit: 50 })
-      .then((p) => { if (!cancelled) setItems(p.items); })
-      .catch((e) => { if (!cancelled) { setItems([]); setErr(errMsg(e, 'failed to load resources')); } })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [q, type]);
-
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: 'var(--bg, #1a1a1a)', padding: 16, borderRadius: 6,
-          width: 'min(720px, 90vw)', maxHeight: '80vh', overflow: 'auto',
-          border: '1px solid var(--border, #333)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: 0 }}>Add resource</h3>
-          <button onClick={onClose}>close</button>
-        </div>
-        <div className="row" style={{ gap: 8, marginBottom: 8 }}>
-          <input
-            placeholder="search slug or name…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={{ flex: 1, padding: '6px 10px' }}
-            autoFocus
-          />
-          <select value={type} onChange={(e) => setType(e.target.value as RepoType | '')} style={{ padding: '6px 10px' }}>
-            <option value="">all types</option>
-            <option value="document">document</option>
-            <option value="folder">folder</option>
-            <option value="skill">skill</option>
-          </select>
-        </div>
-        {err && <p style={{ color: 'crimson', fontSize: 12 }}>{err}</p>}
-        {loading ? (
-          <p className="dim">loading…</p>
-        ) : items.length === 0 ? (
-          <p className="dim">no resources match</p>
-        ) : (
-          <table style={{ fontSize: 12, width: '100%' }}>
-            <thead><tr><th>Slug</th><th>Type</th><th>Name</th><th></th></tr></thead>
-            <tbody>
-              {items.map((r) => (
-                <tr key={r.id}>
-                  <td><code>{r.slug}</code></td>
-                  <td><span className="tag">{r.type}</span></td>
-                  <td>{r.display_name}</td>
-                  <td><button onClick={() => onPick(r)}>add</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function defaultTargetPath(r: RepoResource): string {
   if (r.type === RepoTypeEnum.Skill) {
@@ -161,7 +79,6 @@ export default function WorkspaceResourcesEditor({ workspaceId }: { workspaceId:
   const [bindings, setBindings] = useState<Binding[]>([]);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const [dryRun, setDryRun] = useState<DryRunResult | null>(null);
@@ -239,30 +156,28 @@ export default function WorkspaceResourcesEditor({ workspaceId }: { workspaceId:
     setDirty(true);
   };
 
-  const onPick = (r: RepoResource) => {
-    const newB: Binding = {
-      resource_id: r.id,
-      resource_slug: r.slug,
-      resource_type: r.type,
-      target_path: defaultTargetPath(r),
-      materialize_mode: r.type === RepoTypeEnum.Skill ? MaterializeMode.Symlink : MaterializeMode.Copy,
-      on_conflict: ConflictPolicy.Error,
-      pinned_version_id: null,
-      display_order: bindings.length,
-      active_version_id: r.active_version_id ?? null,
-    };
-    setBindings((bs) => [...bs, newB]);
+  const onPick = (rs: RepoResource[]) => {
+    setBindings((bs) => {
+      const newRows: Binding[] = rs.map((r, i) => ({
+        resource_id: r.id,
+        resource_slug: r.slug,
+        resource_type: r.type,
+        target_path: defaultTargetPath(r),
+        materialize_mode: r.type === RepoTypeEnum.Skill ? MaterializeMode.Symlink : MaterializeMode.Copy,
+        on_conflict: ConflictPolicy.Error,
+        pinned_version_id: null,
+        display_order: bs.length + i,
+        active_version_id: r.active_version_id ?? null,
+      }));
+      return [...bs, ...newRows];
+    });
     setPicking(false);
     setDirty(true);
   };
 
-  const reasonInvalid = reason.trim().length < 3;
+  const attachedIds = new Set(bindings.map((b) => b.resource_id));
 
   const save = async () => {
-    if (reasonInvalid) {
-      setToast({ kind: 'error', msg: 'reason is required (min 3 chars)' });
-      return;
-    }
     setBusy(true);
     try {
       const body = {
@@ -274,13 +189,12 @@ export default function WorkspaceResourcesEditor({ workspaceId }: { workspaceId:
           pinned_version_id: b.pinned_version_id || null,
           display_order: i,
         })),
-        reason: reason.trim(),
+        reason: 'ui edit',
       };
       await req(`/api/workspaces/${encodeURIComponent(workspaceId)}/resources`, {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      setReason('');
       setToast({ kind: 'ok', msg: 'bindings saved' });
       await refresh();
     } catch (e) {
@@ -432,33 +346,13 @@ export default function WorkspaceResourcesEditor({ workspaceId }: { workspaceId:
       )}
 
       {dirty && (
-        <div style={{ marginTop: 12 }}>
-          <label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-            Reason for change <span className="dim">(required, min 3 chars)</span>
-          </label>
-          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-            <input
-              placeholder="why are you changing these bindings?"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                borderColor: reasonInvalid ? 'var(--error, #b91c1c)' : undefined,
-              }}
-            />
-            <button onClick={save} disabled={busy || reasonInvalid}>
-              {busy ? 'saving…' : 'save bindings'}
-            </button>
-            <button onClick={refresh} disabled={busy} style={{ background: 'var(--bg-secondary)' }}>
-              discard
-            </button>
-          </div>
-          {reasonInvalid && (
-            <div className="dim" style={{ fontSize: 11, marginTop: 4, color: 'var(--error, #b91c1c)' }}>
-              reason must be at least 3 characters
-            </div>
-          )}
+        <div className="row" style={{ marginTop: 12, gap: 8, alignItems: 'center' }}>
+          <button onClick={save} disabled={busy} className="primary">
+            {busy ? 'saving…' : 'save bindings'}
+          </button>
+          <button onClick={refresh} disabled={busy} style={{ background: 'var(--bg-secondary)' }}>
+            discard
+          </button>
         </div>
       )}
 
@@ -537,7 +431,13 @@ export default function WorkspaceResourcesEditor({ workspaceId }: { workspaceId:
         </div>
       )}
 
-      {picking && <ResourcePicker onPick={onPick} onClose={() => setPicking(false)} />}
+      {picking && (
+        <ResourcePicker
+          excludeIds={attachedIds}
+          onPick={onPick}
+          onClose={() => setPicking(false)}
+        />
+      )}
 
       {toast && <Toast kind={toast.kind} msg={toast.msg} />}
     </section>

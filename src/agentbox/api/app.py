@@ -46,8 +46,12 @@ from agentbox.api.routes import (
     settings as settings_routes,
 )
 from agentbox.core.resources.boot_import import (
+    import_composition_references,
     import_repo_resources,
     sweep_workspace_skill_bindings,
+)
+from agentbox.core.resources.composition_to_bindings import (
+    migrate_composition_to_bindings,
 )
 from agentbox.core.resources.legacy_migration import (
     migrate_shared_resources_to_repo,
@@ -188,8 +192,54 @@ def _on_startup() -> None:
                     "boot-import workspace bindings: wired %d workspace(s), %d binding(s)",
                     ws_summary["workspaces_wired"], ws_summary["bindings_added"],
                 )
+
+            ref_summary = import_composition_references(
+                store, settings.project_root, loaded_manifest,
+            )
+            if ref_summary["bindings_added"]:
+                _log.info(
+                    "boot-import composition refs: wired %d agent(s), %d resource(s), %d binding(s)",
+                    ref_summary["agents_wired"],
+                    ref_summary["resources_created"],
+                    ref_summary["bindings_added"],
+                )
+
+            # Phase 3d: migrate composition slots (input_schema, output_schema,
+            # user_template) into resource_bindings. Gated for first rollout.
+            if os.environ.get("AGENTBOX_MIGRATE_COMPOSITION"):
+                try:
+                    comp_report = migrate_composition_to_bindings(store)
+                    _comp_summary = comp_report.summary()
+                    if _comp_summary["bindings_created"] or _comp_summary["failed"]:
+                        _log.info(
+                            "composition→bindings migration: %s", _comp_summary,
+                        )
+                    else:
+                        _log.debug(
+                            "composition→bindings migration: %s", _comp_summary,
+                        )
+                except Exception:
+                    _log.exception("composition→bindings migration failed")
         except Exception:
             _log.exception("repo-resource boot import failed")
+
+    # Phase 3e: sync canonical workspaces registry. Backfill from satellite
+    # tables first (safety net for any workspace_id row written without
+    # creating a registry entry), then upsert manifest workspaces with
+    # source='manifest'. After this the `workspaces` table is the single
+    # source of truth for workspace existence — the list endpoint reads
+    # from it and never re-unions manifest+disk+satellites.
+    try:
+        store.backfill_workspaces_from_satellites()
+        if loaded_manifest and loaded_manifest.workspaces:
+            store.sync_workspaces_from_manifest(
+                [
+                    {"name": w.name, "description": w.description, "path": w.path}
+                    for w in loaded_manifest.workspaces
+                ]
+            )
+    except Exception:
+        _log.exception("workspaces registry sync failed")
 
     # Phase 4: reap orphaned 'running' rows from a previous process.
     try:

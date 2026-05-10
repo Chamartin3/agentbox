@@ -46,7 +46,13 @@ type FormMode = 'create' | 'edit' | null;
 
 type FormState = Partial<RunnerProfile> & { id: string };
 
-const blankForm: FormState = { id: '', name: '', backend: BackendId.Token };
+const blankForm: FormState = {
+  id: '',
+  name: '',
+  backend: BackendId.Token,
+  is_enabled: true,
+  is_system_default: false,
+};
 
 export default function RunnerProfilesPage() {
   const [profiles, setProfiles] = useState<RunnerProfile[]>([]);
@@ -58,6 +64,7 @@ export default function RunnerProfilesPage() {
   const [providerModels, setProviderModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
+  const [credentialsUnlocked, setCredentialsUnlocked] = useState(false);
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
   const [apiTokens, setApiTokens] = useState<Array<{ id: string; name: string; environment: string }>>([]);
 
@@ -76,6 +83,16 @@ export default function RunnerProfilesPage() {
     const t = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // ESC closes the modal
+  useEffect(() => {
+    if (!formMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeForm();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [formMode]);
 
   const loadProfiles = async () => {
     try {
@@ -156,6 +173,25 @@ export default function RunnerProfilesPage() {
     formData.api_key_env,
   ]);
 
+  const openCreate = () => {
+    setFormData(blankForm);
+    setCredentialsUnlocked(false);
+    setFormMode('create');
+  };
+
+  const openEdit = (p: RunnerProfile) => {
+    setFormData({ ...p, model: stripProviderPrefix(p.model, p.provider) });
+    setCredentialsUnlocked(false);
+    setFormMode('edit');
+  };
+
+  const closeForm = () => {
+    setFormMode(null);
+    setFormData(blankForm);
+    setCredentialsUnlocked(false);
+    setModelsError(null);
+  };
+
   const handleCreate = async () => {
     if (!formData.name || !formData.backend) {
       setToast({ kind: 'error', msg: 'name and backend are required' });
@@ -181,8 +217,7 @@ export default function RunnerProfilesPage() {
       };
       await api.createRunnerProfile(payload);
       setToast({ kind: 'ok', msg: 'profile created' });
-      setFormMode(null);
-      setFormData(blankForm);
+      closeForm();
       loadProfiles();
     } catch (e) {
       setToast({ kind: 'error', msg: errMsg(e, 'failed to create profile') });
@@ -203,8 +238,9 @@ export default function RunnerProfilesPage() {
               ? encodeModel(formData.model, formData.provider, formData.backend)
               : null,
         timeout_seconds: formData.timeout_seconds ?? undefined,
-        base_url: formData.base_url ?? undefined,
-        api_key_env: formData.api_key_env ?? undefined,
+        // Only send credential edits if the user explicitly unlocked them.
+        base_url: credentialsUnlocked ? (formData.base_url ?? undefined) : undefined,
+        api_key_env: credentialsUnlocked ? (formData.api_key_env ?? undefined) : undefined,
         api_token_id: formData.api_token_id ?? undefined,
         params: formData.params || undefined,
         headers: formData.headers || undefined,
@@ -214,7 +250,7 @@ export default function RunnerProfilesPage() {
       };
       await api.updateRunnerProfile(id, patch);
       setToast({ kind: 'ok', msg: 'profile updated' });
-      setFormMode(null);
+      closeForm();
       loadProfiles();
     } catch (e) {
       setToast({ kind: 'error', msg: errMsg(e, 'failed to update profile') });
@@ -226,6 +262,7 @@ export default function RunnerProfilesPage() {
     try {
       await api.deleteRunnerProfile(id);
       setToast({ kind: 'ok', msg: 'profile deleted' });
+      closeForm();
       loadProfiles();
     } catch (e) {
       setToast({ kind: 'error', msg: errMsg(e, 'failed to delete profile') });
@@ -236,6 +273,10 @@ export default function RunnerProfilesPage() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  // On create, credentials should be editable by default (no existing value
+  // to protect). On edit they are locked until the user unlocks them.
+  const credentialsEditable = formMode === 'create' || credentialsUnlocked;
+
   if (loading) {
     return <div className="stack"><h1>Runner Profiles</h1><p className="dim">loading…</p></div>;
   }
@@ -244,245 +285,8 @@ export default function RunnerProfilesPage() {
     <div className="stack">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>Runner Profiles</h1>
-        <button onClick={() => { setFormMode('create'); setFormData(blankForm); }}>
-          + Create Profile
-        </button>
+        <button onClick={openCreate}>+ Create Profile</button>
       </div>
-
-      {formMode && (
-        <div className="form-panel">
-          <h2>{formMode === 'create' ? 'Create Runner Profile' : 'Edit Runner Profile'}</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <label>Name</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleFormChange('name', e.target.value)}
-                placeholder="My Profile"
-              />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label>Description</label>
-              <input
-                type="text"
-                value={formData.description || ''}
-                onChange={(e) => handleFormChange('description', e.target.value)}
-                placeholder="Optional description"
-              />
-            </div>
-            <div>
-              <label>Backend</label>
-              <select
-                value={formData.backend}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  handleFormChange('backend', v);
-                  // Clear provider/model if they don't fit the new backend.
-                  const nextBackend = backends.find((b) => b.id === v);
-                  if (
-                    nextBackend &&
-                    formData.provider &&
-                    !nextBackend.compatible_providers.includes(formData.provider)
-                  ) {
-                    handleFormChange('provider', null);
-                    handleFormChange('model', null);
-                    handleFormChange('base_url', '');
-                    handleFormChange('api_key_env', '');
-                  }
-                }}
-              >
-                {backends.length === 0 ? (
-                  <option value="token">token</option>
-                ) : (
-                  backends.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.label}
-                    </option>
-                  ))
-                )}
-              </select>
-              {currentBackend && currentBackend.compatible_providers.length === 0 && (
-                <div className="dim" style={{ fontSize: 11, marginTop: 4 }}>
-                  No external providers — runs use the backend's own credentials.
-                </div>
-              )}
-            </div>
-            <div>
-              <label>Provider</label>
-              <select
-                value={formData.provider || ''}
-                onChange={(e) => {
-                  const v = e.target.value || null;
-                  handleFormChange('provider', v);
-                  const prov = providers.find((p) => p.id === v);
-                  // Always reset routing fields to the new provider's defaults — never
-                  // leave stale values from the previous provider.
-                  handleFormChange('base_url', prov?.default_base_url ?? '');
-                  handleFormChange('api_key_env', prov?.default_api_key_env ?? '');
-                  handleFormChange('model', '');
-                }}
-                disabled={
-                  currentBackend != null && currentBackend.compatible_providers.length === 0
-                }
-              >
-                <option value="">None</option>
-                {compatibleProviders.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
-              {providerIncompatible && (
-                <div
-                  className="dim"
-                  style={{ fontSize: 11, marginTop: 4, color: 'var(--error, #b91c1c)' }}
-                >
-                  ⚠ "{formData.provider}" is not compatible with backend "{formData.backend}".
-                  Pick another provider or change backend.
-                </div>
-              )}
-            </div>
-            <div>
-              <label>
-                Model
-                {currentProvider?.supports_model_listing && (
-                  <span className="dim" style={{ fontSize: 11, marginLeft: 6 }}>
-                    {modelsLoading
-                      ? '(loading…)'
-                      : `(${providerModels.length} available)`}
-                  </span>
-                )}
-              </label>
-              {currentProvider && currentProvider.supports_model_listing ? (
-                <select
-                  value={formData.model || ''}
-                  onChange={(e) => handleFormChange('model', e.target.value || null)}
-                  disabled={modelsLoading || providerModels.length === 0}
-                >
-                  <option value="">
-                    {modelsLoading
-                      ? 'loading models…'
-                      : providerModels.length === 0
-                        ? 'no models available'
-                        : 'select a model'}
-                  </option>
-                  {providerModels.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                  {formData.model && !providerModels.includes(formData.model) && (
-                    <option key={formData.model} value={formData.model}>
-                      {formData.model} (legacy)
-                    </option>
-                  )}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={formData.model || ''}
-                  onChange={(e) => handleFormChange('model', e.target.value || null)}
-                  placeholder={
-                    currentBackend?.default_model
-                      ? `default: ${currentBackend.default_model}`
-                      : 'model id (raw)'
-                  }
-                  autoComplete="off"
-                />
-              )}
-              {modelsError && (
-                <div
-                  className="dim"
-                  style={{ fontSize: 11, marginTop: 4, color: 'var(--error, #b91c1c)' }}
-                >
-                  ⚠ {modelsError} — set the API-key env var on the server and try again.
-                </div>
-              )}
-            </div>
-            <div>
-              <label>Timeout (seconds)</label>
-              <input
-                type="number"
-                value={formData.timeout_seconds || ''}
-                onChange={(e) => handleFormChange('timeout_seconds', e.target.value ? parseInt(e.target.value) : null)}
-                placeholder="300"
-              />
-            </div>
-            <div>
-              <label>Base URL</label>
-              <input
-                type="text"
-                value={formData.base_url || ''}
-                onChange={(e) => handleFormChange('base_url', e.target.value || null)}
-                placeholder={currentProvider?.default_base_url || 'https://api.example.com'}
-                disabled={currentProvider != null && !currentProvider.supports_base_url}
-              />
-            </div>
-            <div>
-              <label>API Key Env Var</label>
-              <input
-                type="text"
-                value={formData.api_key_env || ''}
-                onChange={(e) => handleFormChange('api_key_env', e.target.value || null)}
-                placeholder={currentProvider?.default_api_key_env || 'OPENAI_API_KEY'}
-              />
-            </div>
-            <div>
-              <label>Assigned API Token</label>
-              <select
-                value={formData.api_token_id || ''}
-                onChange={(e) => handleFormChange('api_token_id', e.target.value || null)}
-              >
-                <option value="">— none —</option>
-                {apiTokens.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.environment} / {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={formData.is_enabled ?? true}
-                  onChange={(e) => handleFormChange('is_enabled', e.target.checked)}
-                />
-                {' '}Enabled
-              </label>
-            </div>
-            <div>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={formData.is_system_default ?? false}
-                  onChange={(e) => handleFormChange('is_system_default', e.target.checked)}
-                />
-                {' '}System Default
-              </label>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
-            <div>
-              {formMode === 'edit' && (
-                <button
-                  onClick={() => handleDelete(formData.id)}
-                  style={{ background: 'none', border: '1px solid var(--error)', color: 'var(--error)' }}
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setFormMode(null)} style={{ background: 'var(--bg-secondary)' }}>
-                Cancel
-              </button>
-              <button onClick={() => formMode === 'create' ? handleCreate() : handleUpdate(formData.id)}>
-                {formMode === 'create' ? 'Create' : 'Update'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <table>
         <thead>
@@ -504,11 +308,7 @@ export default function RunnerProfilesPage() {
               <tr key={p.id}>
                 <td>
                   <button
-                    onClick={() => {
-                      setFormMode('edit');
-                      setFormData({ ...p, model: stripProviderPrefix(p.model, p.provider) });
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
+                    onClick={() => openEdit(p)}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -551,6 +351,295 @@ export default function RunnerProfilesPage() {
           )}
         </tbody>
       </table>
+
+      {formMode && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeForm();
+          }}
+        >
+          <div className="modal" role="dialog" aria-modal="true">
+            <div className="modal-header">
+              <h2>{formMode === 'create' ? 'Create Runner Profile' : `Edit · ${formData.name || formData.id}`}</h2>
+              <button className="modal-close" onClick={closeForm} aria-label="Close">×</button>
+            </div>
+
+            <div className="modal-body">
+              {/* ── Identity ───────────────────────────────────────── */}
+              <section className="form-section">
+                <div className="form-section-header"><span>Identity</span></div>
+                <div className="form-grid">
+                  <div className="form-field">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => handleFormChange('name', e.target.value)}
+                      placeholder="My Profile"
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>ID {formMode === 'edit' && <span className="dim" style={{ fontWeight: 400 }}>(read-only)</span>}</label>
+                    <input
+                      type="text"
+                      value={formData.id || ''}
+                      onChange={(e) => handleFormChange('id', e.target.value)}
+                      disabled={formMode === 'edit'}
+                      placeholder="auto"
+                    />
+                  </div>
+                  <div className="form-field full">
+                    <label>Description</label>
+                    <input
+                      type="text"
+                      value={formData.description || ''}
+                      onChange={(e) => handleFormChange('description', e.target.value)}
+                      placeholder="Optional description"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* ── Routing ────────────────────────────────────────── */}
+              <section className="form-section">
+                <div className="form-section-header"><span>Routing</span></div>
+                <div className="form-grid">
+                  <div className="form-field">
+                    <label>Backend</label>
+                    <select
+                      value={formData.backend}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        handleFormChange('backend', v);
+                        const nextBackend = backends.find((b) => b.id === v);
+                        if (
+                          nextBackend &&
+                          formData.provider &&
+                          !nextBackend.compatible_providers.includes(formData.provider)
+                        ) {
+                          handleFormChange('provider', null);
+                          handleFormChange('model', null);
+                          handleFormChange('base_url', '');
+                          handleFormChange('api_key_env', '');
+                        }
+                      }}
+                    >
+                      {backends.length === 0 ? (
+                        <option value="token">token</option>
+                      ) : (
+                        backends.map((b) => (
+                          <option key={b.id} value={b.id}>{b.label}</option>
+                        ))
+                      )}
+                    </select>
+                    {currentBackend && currentBackend.compatible_providers.length === 0 && (
+                      <div className="form-hint">
+                        No external providers — runs use the backend's own credentials.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-field">
+                    <label>Provider</label>
+                    <select
+                      value={formData.provider || ''}
+                      onChange={(e) => {
+                        const v = e.target.value || null;
+                        handleFormChange('provider', v);
+                        const prov = providers.find((p) => p.id === v);
+                        handleFormChange('base_url', prov?.default_base_url ?? '');
+                        handleFormChange('api_key_env', prov?.default_api_key_env ?? '');
+                        handleFormChange('model', '');
+                      }}
+                      disabled={
+                        currentBackend != null && currentBackend.compatible_providers.length === 0
+                      }
+                    >
+                      <option value="">None</option>
+                      {compatibleProviders.map((p) => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </select>
+                    {providerIncompatible && (
+                      <div className="form-hint error">
+                        ⚠ "{formData.provider}" is not compatible with backend "{formData.backend}".
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-field">
+                    <label>
+                      Model
+                      {currentProvider?.supports_model_listing && (
+                        <span className="dim" style={{ fontSize: 11, marginLeft: 6, fontWeight: 400 }}>
+                          {modelsLoading ? '(loading…)' : `(${providerModels.length} available)`}
+                        </span>
+                      )}
+                    </label>
+                    {currentProvider && currentProvider.supports_model_listing ? (
+                      <select
+                        value={formData.model || ''}
+                        onChange={(e) => handleFormChange('model', e.target.value || null)}
+                        disabled={modelsLoading || providerModels.length === 0}
+                      >
+                        <option value="">
+                          {modelsLoading
+                            ? 'loading models…'
+                            : providerModels.length === 0
+                              ? 'no models available'
+                              : 'select a model'}
+                        </option>
+                        {providerModels.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                        {formData.model && !providerModels.includes(formData.model) && (
+                          <option key={formData.model} value={formData.model}>
+                            {formData.model} (legacy)
+                          </option>
+                        )}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={formData.model || ''}
+                        onChange={(e) => handleFormChange('model', e.target.value || null)}
+                        placeholder={
+                          currentBackend?.default_model
+                            ? `default: ${currentBackend.default_model}`
+                            : 'model id (raw)'
+                        }
+                        autoComplete="off"
+                      />
+                    )}
+                    {modelsError && (
+                      <div className="form-hint error">
+                        ⚠ {modelsError} — set the API-key env var and try again.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-field">
+                    <label>Timeout (seconds)</label>
+                    <input
+                      type="number"
+                      value={formData.timeout_seconds || ''}
+                      onChange={(e) =>
+                        handleFormChange('timeout_seconds', e.target.value ? parseInt(e.target.value) : null)
+                      }
+                      placeholder="300"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* ── Credentials ────────────────────────────────────── */}
+              <section className="form-section">
+                <div className="form-section-header">
+                  <span>Credentials</span>
+                  {formMode === 'edit' && (
+                    <button
+                      type="button"
+                      className={`unlock-btn ${credentialsUnlocked ? 'active' : ''}`}
+                      onClick={() => setCredentialsUnlocked((v) => !v)}
+                    >
+                      {credentialsUnlocked ? '🔓 Locked on save' : '🔒 Click to edit'}
+                    </button>
+                  )}
+                </div>
+                <div className="form-grid">
+                  <div className="form-field">
+                    <label>Base URL</label>
+                    <input
+                      type="text"
+                      value={formData.base_url || ''}
+                      onChange={(e) => handleFormChange('base_url', e.target.value || null)}
+                      placeholder={currentProvider?.default_base_url || 'https://api.example.com'}
+                      disabled={
+                        !credentialsEditable ||
+                        (currentProvider != null && !currentProvider.supports_base_url)
+                      }
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>API Key Env Var</label>
+                    <input
+                      type="text"
+                      value={formData.api_key_env || ''}
+                      onChange={(e) => handleFormChange('api_key_env', e.target.value || null)}
+                      placeholder={currentProvider?.default_api_key_env || 'OPENAI_API_KEY'}
+                      disabled={!credentialsEditable}
+                    />
+                  </div>
+                  <div className="form-field full">
+                    <label>Assigned API Token</label>
+                    <select
+                      value={formData.api_token_id || ''}
+                      onChange={(e) => handleFormChange('api_token_id', e.target.value || null)}
+                    >
+                      <option value="">— none —</option>
+                      {apiTokens.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.environment} / {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {formMode === 'edit' && !credentialsUnlocked && (
+                  <div className="form-hint" style={{ marginTop: 8 }}>
+                    Base URL and API Key Env are locked. Click "Click to edit" above to change them.
+                  </div>
+                )}
+              </section>
+
+              {/* ── Flags ──────────────────────────────────────────── */}
+              <section className="form-section">
+                <div className="form-section-header"><span>Status</span></div>
+                <div className="checkbox-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_enabled ?? true}
+                      onChange={(e) => handleFormChange('is_enabled', e.target.checked)}
+                    />
+                    Enabled
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_system_default ?? false}
+                      onChange={(e) => handleFormChange('is_system_default', e.target.checked)}
+                    />
+                    System Default
+                  </label>
+                </div>
+              </section>
+            </div>
+
+            <div className="modal-footer">
+              <div>
+                {formMode === 'edit' && (
+                  <button
+                    onClick={() => handleDelete(formData.id)}
+                    style={{ background: 'none', border: '1px solid var(--error)', color: 'var(--error)' }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+              <div className="footer-actions">
+                <button onClick={closeForm} style={{ background: 'var(--bg-secondary)' }}>
+                  Cancel
+                </button>
+                <button onClick={() => (formMode === 'create' ? handleCreate() : handleUpdate(formData.id))}>
+                  {formMode === 'create' ? 'Create' : 'Update'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && <Toast kind={toast.kind} msg={toast.msg} />}
     </div>
