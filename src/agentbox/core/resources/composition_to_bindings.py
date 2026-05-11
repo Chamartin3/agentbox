@@ -4,8 +4,9 @@ For each agent's active version, reads
 ``config_json.composition`` and the snapshotted ``agent_version_files``
 rows, and turns each composition slot into a resource + binding:
 
-* ``composition.input_schema``  → ``schema`` resource + binding(slot="input_schema")
-* ``composition.output_schema`` → ``schema`` resource + binding(slot="output_schema")
+* ``composition.system``        → ``document`` resource + binding(slot="system", attach=1)
+* ``composition.input_schema``  → ``schema`` resource + binding(slot="input_schema", attach=1)
+* ``composition.output_schema`` → ``schema`` resource + binding(slot="output_schema", attach=1)
 * ``composition.user_template`` → ``document`` resource + binding(marker="user_template", mode="inline")
 
 Content-hash dedup: identical files across agents collapse to a single
@@ -136,6 +137,25 @@ def _get_or_create_resource(
     return res["id"]
 
 
+def _backfill_slot_active_flag(store: SessionStore) -> None:
+    """Flip every existing slot binding to ``attach_as_reference=1``.
+
+    Slots created before bundle deprecation defaulted the flag to 0; the
+    new BindingsBundleSource gates rendering on it. Backfill makes the
+    cutover safe.
+    """
+    from sqlalchemy import text
+
+    with store.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE agent_prompt_resource_bindings "
+                "SET attach_as_reference = 1 "
+                "WHERE slot IS NOT NULL AND attach_as_reference = 0"
+            )
+        )
+
+
 def _binding_to_input(b: dict) -> dict:
     """Convert a list_prompt_bindings row to a replace_prompt_bindings input dict."""
     return {
@@ -175,12 +195,30 @@ def _migrate_one_agent(
     next_order = max((b.get("display_order", 0) for b in existing_bindings), default=-1) + 1
     added = 0
 
-    def _maybe_add_slot(slot: str, kind: str) -> None:
+    def _maybe_add_slot(slot: str, kind: str, type_: str) -> None:
         nonlocal next_order, added
-        rel = composition.get(slot)
-        if not rel or slot in existing_slots:
+        # System slot has no relative_path in composition — it's always
+        # the agent's prompt file. Pick whatever the kind='system' row
+        # offers in agent_version_files.
+        if slot == "system":
+            rel = composition.get("system") or composition.get("system_prompt")
+        else:
+            rel = composition.get(slot)
+        if slot in existing_slots:
             return
-        f = files_by_kind_path.get((kind, rel))
+        if not rel and slot != "system":
+            return
+        # For system, allow any kind='system' row regardless of rel.
+        f = (
+            files_by_kind_path.get((kind, rel))
+            if rel is not None
+            else None
+        )
+        if f is None and slot == "system":
+            for (k, _p), row in files_by_kind_path.items():
+                if k == "system":
+                    f = row
+                    break
         if f is None:
             logger.warning(
                 "composition migration: agent %s declares %s=%r but no agent_version_files row "
@@ -191,8 +229,8 @@ def _migrate_one_agent(
         resource_id = _get_or_create_resource(
             store,
             content_text=f["content"] or "",
-            type_="schema",
-            relative_path=rel,
+            type_=type_,
+            relative_path=rel or f["relative_path"],
             agent_id=agent_id,
             report=report,
         )
@@ -202,7 +240,9 @@ def _migrate_one_agent(
                 "marker": None,
                 "mode": None,
                 "slot": slot,
-                "attach_as_reference": False,
+                # All slot bindings are active by default. The runtime
+                # gates rendering on attach_as_reference.
+                "attach_as_reference": True,
                 "pinned_version_id": None,
                 "required": False,
                 "display_order": next_order,
@@ -211,8 +251,9 @@ def _migrate_one_agent(
         next_order += 1
         added += 1
 
-    _maybe_add_slot("input_schema", "input_schema")
-    _maybe_add_slot("output_schema", "output_schema")
+    _maybe_add_slot("system", "system", "document")
+    _maybe_add_slot("input_schema", "input_schema", "schema")
+    _maybe_add_slot("output_schema", "output_schema", "schema")
 
     user_template_rel = composition.get("user_template")
     if user_template_rel:
@@ -286,6 +327,11 @@ def migrate_composition_to_bindings(
         A CompositionMigrationReport describing what happened.
     """
     report = CompositionMigrationReport()
+    # Backfill: every pre-existing slot binding (input_schema /
+    # output_schema, created when the runtime didn't gate on
+    # attach_as_reference) needs the flag flipped to active so the
+    # new BindingsBundleSource keeps rendering them.
+    _backfill_slot_active_flag(store)
     agent_rows = store.list_agents_with_latest()
 
     for row in agent_rows:
@@ -305,12 +351,9 @@ def migrate_composition_to_bindings(
                 report.failed.append((agent_id, f"invalid config_json: {exc}"))
                 continue
             composition = config.get("composition") or {}
-            has_any_slot = any(
-                composition.get(k) for k in ("input_schema", "output_schema", "user_template")
-            )
-            if not has_any_slot:
-                report.agents_skipped_no_composition.append(agent_id)
-                continue
+            # Every agent has at least a system prompt, so we always
+            # attempt the migration — _migrate_one_agent is itself
+            # idempotent and short-circuits when there is nothing to add.
 
             added = _migrate_one_agent(
                 store,

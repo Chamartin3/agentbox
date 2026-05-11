@@ -423,7 +423,9 @@ agent_prompt_resource_bindings = Table(
         name="agent_prompt_bindings_mode_check",
     ),
     CheckConstraint(
-        "slot IS NULL OR slot IN ('input_schema', 'output_schema')",
+        "slot IS NULL OR slot IN ("
+        "'system', 'user_template', 'input_schema', 'output_schema'"
+        ")",
         name="agent_prompt_bindings_slot_check",
     ),
     CheckConstraint(
