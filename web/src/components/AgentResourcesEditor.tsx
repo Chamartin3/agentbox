@@ -313,7 +313,7 @@ export default function AgentResourcesEditor({
         marker: null,
         mode: null,
         slot,
-        attach_as_reference: false,
+        attach_as_reference: true,
         pinned_version_id: null,
         required: false,
         display_order: filtered.length,
@@ -586,6 +586,7 @@ export default function AgentResourcesEditor({
             {(['input_schema', 'output_schema'] as SchemaSlot[]).map((slot) => {
               const b = slot === 'input_schema' ? inputSchema : outputSchema;
               const isOutput = slot === 'output_schema';
+              const slotIdx = b ? bindings.indexOf(b) : -1;
               return (
                 <tr key={slot}>
                   <td style={{ width: 140, padding: '3px 6px' }}>
@@ -598,6 +599,24 @@ export default function AgentResourcesEditor({
                       </Link>
                     ) : (
                       <span className="dim">— none —</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '3px 6px', width: 70 }}>
+                    {b && (
+                      <label
+                        className="row"
+                        style={{ gap: 4, fontSize: 11, alignItems: 'center' }}
+                        title="When unchecked, the schema is kept on the agent but not rendered into the composed prompt"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={b.attach_as_reference}
+                          onChange={(e) =>
+                            updateAt(slotIdx, { attach_as_reference: e.target.checked })
+                          }
+                        />
+                        <span className="dim">active</span>
+                      </label>
                     )}
                   </td>
                   <td style={{ padding: '3px 6px' }}>

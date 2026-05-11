@@ -321,3 +321,225 @@ class DbBundleSource:
                 input_info.schema, sort_keys=True
             )
         return out
+
+
+# --------------------------------------------------------------------------- #
+# Bindings (agent_prompt_resource_bindings)
+# --------------------------------------------------------------------------- #
+
+
+# Pseudo paths used in the synthesized ``composition`` dict so the rest
+# of the composer (which still treats the composition as a TOML-shaped
+# document with file paths) does not need to special-case bindings.
+_SYS_PSEUDO = "bindings://system"
+_USER_PSEUDO = "bindings://user_template"
+_INPUT_SCHEMA_PSEUDO = "bindings://input_schema"
+_OUTPUT_SCHEMA_PSEUDO = "bindings://output_schema"
+
+
+@dataclass
+class BindingsBundleSource:
+    """Read a bundle from ``agent_prompt_resource_bindings``.
+
+    All composition inputs come from bindings:
+
+    * ``slot='system'``         → system prompt
+    * ``slot='user_template'``  → user template (or marker='user_template')
+    * ``slot='input_schema'``   → input schema (gated on attach_as_reference)
+    * ``slot='output_schema'``  → output schema (gated on attach_as_reference)
+    * marker bindings with ``attach_as_reference=True`` → references
+
+    The legacy bundle (``DbBundleSource`` / ``FilesystemBundleSource``)
+    is no longer consulted. When a slot has no binding, the corresponding
+    composition entry is absent (strict — no fallback).
+    """
+
+    agent_id: str
+    store: Any  # SessionStore — avoid circular import
+    composition: dict[str, Any] = field(init=False)
+
+    def __post_init__(self) -> None:
+        # Resolve once; downstream methods reuse the same view so we
+        # don't re-query for every read_*.
+        self._resolved: list[dict] = []
+        bindings = self.store.list_prompt_bindings(self.agent_id)
+        for b in bindings:
+            resource = self.store.get_repo_resource(b["resource_id"])
+            if resource is None:
+                continue
+            version_id = b.get("pinned_version_id")
+            if not version_id:
+                active = self.store.get_active_repo_version(b["resource_id"])
+                if not active:
+                    continue
+                version_id = active["id"]
+            version = self.store.get_repo_version(version_id)
+            blobs = list(self.store.iter_repo_blobs(version_id))
+            self._resolved.append(
+                {
+                    "binding_id": b["id"],
+                    "marker": b.get("marker"),
+                    "slot": b.get("slot"),
+                    "attach_as_reference": bool(b.get("attach_as_reference")),
+                    "resource_id": b["resource_id"],
+                    "resource_slug": resource["slug"],
+                    "version_id": version_id,
+                    "content_hash": version["content_hash"],
+                    "type": resource["type"],
+                    "mode": b.get("mode"),
+                    "display_name": resource["display_name"],
+                    "display_order": b.get("display_order", 0),
+                    "required": bool(b.get("required", 1)),
+                    "blobs": blobs,
+                }
+            )
+
+        # Strict: every agent must have a system slot binding. Raising
+        # here lets the executor's fallback path (filesystem bundle)
+        # kick in for un-migrated agents.
+        if self._find_slot("system") is None:
+            raise FileNotFoundError(
+                f"agent {self.agent_id!r} has no slot='system' binding"
+            )
+        # Synthesize a composition dict so the existing composer
+        # branches (which check ``composition['user_template']`` etc.)
+        # continue to work without a special case.
+        comp: dict[str, Any] = {}
+        if self._find_slot("system"):
+            comp["system"] = _SYS_PSEUDO
+        if self._find_user_template() is not None:
+            comp["user_template"] = _USER_PSEUDO
+        if self._find_active_slot("input_schema") is not None:
+            comp["input_schema"] = _INPUT_SCHEMA_PSEUDO
+        if self._find_active_slot("output_schema") is not None:
+            comp["output_schema"] = _OUTPUT_SCHEMA_PSEUDO
+        comp["references"] = [
+            {
+                "path": f"bindings://reference/{b['resource_id']}",
+                "heading": b.get("display_name") or b.get("resource_slug"),
+            }
+            for b in self._reference_bindings()
+        ]
+        self.composition = comp
+
+    # --- internal lookup helpers ---
+
+    def _find_slot(self, slot: str) -> dict | None:
+        for b in self._resolved:
+            if b.get("slot") == slot:
+                return b
+        return None
+
+    def _find_active_slot(self, slot: str) -> dict | None:
+        b = self._find_slot(slot)
+        return b if (b and b.get("attach_as_reference")) else None
+
+    def _find_user_template(self) -> dict | None:
+        # Slot wins over marker if both exist.
+        slot_b = self._find_slot("user_template")
+        if slot_b is not None:
+            return slot_b
+        for b in self._resolved:
+            if b.get("marker") == "user_template" and b.get("type") == "document":
+                return b
+        return None
+
+    def _reference_bindings(self) -> list[dict]:
+        refs = [
+            b
+            for b in self._resolved
+            if b.get("attach_as_reference")
+            and not b.get("slot")
+            and b.get("marker") != "user_template"
+            and b.get("type") in ("document", "folder", "skill")
+        ]
+        refs.sort(key=lambda b: b.get("display_order", 0))
+        return refs
+
+    # --- BundleSource protocol ---
+
+    def references(self) -> list[ReferenceSpec]:
+        return [
+            ReferenceSpec(
+                path=f"bindings://reference/{b['resource_id']}",
+                heading=b.get("display_name") or b.get("resource_slug"),
+            )
+            for b in self._reference_bindings()
+        ]
+
+    def _render_blob_text(self, b: dict) -> str:
+        # Local import avoids a circular at module import time.
+        from agentbox.core.resources.rendering import render_for_type
+
+        rendered = render_for_type(b["type"], b.get("blobs") or [])
+        return rendered.get("text") or ""
+
+    def read_system(self) -> str:
+        b = self._find_slot("system")
+        if b is None:
+            raise FileNotFoundError(
+                f"agent {self.agent_id!r} has no slot='system' binding"
+            )
+        return self._render_blob_text(b)
+
+    def read_user_template(self) -> str | None:
+        b = self._find_user_template()
+        if b is None:
+            return None
+        return self._render_blob_text(b)
+
+    def read_reference(self, ref: ReferenceSpec) -> str:
+        # The composition uses bindings:// paths so the binding id maps
+        # back to a resource_id directly.
+        prefix = "bindings://reference/"
+        if not ref.path.startswith(prefix):
+            raise FileNotFoundError(
+                f"BindingsBundleSource cannot resolve non-binding reference {ref.path!r}"
+            )
+        resource_id = ref.path[len(prefix) :]
+        for b in self._reference_bindings():
+            if b["resource_id"] == resource_id:
+                return self._render_blob_text(b)
+        raise FileNotFoundError(f"Reference not found in bindings: {ref.path!r}")
+
+    def _read_schema_slot(self, slot: str) -> OutputSchemaInfo | None:
+        b = self._find_active_slot(slot)
+        if b is None:
+            return None
+        text = self._render_blob_text(b)
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"agent {self.agent_id!r} {slot} binding content is not valid JSON: {exc}"
+            ) from exc
+        return OutputSchemaInfo(
+            schema=parsed,
+            relative_path=(
+                _INPUT_SCHEMA_PSEUDO if slot == "input_schema" else _OUTPUT_SCHEMA_PSEUDO
+            ),
+        )
+
+    def read_output_schema(self) -> OutputSchemaInfo | None:
+        return self._read_schema_slot("output_schema")
+
+    def read_input_schema(self) -> OutputSchemaInfo | None:
+        return self._read_schema_slot("input_schema")
+
+    def bundle_files(self) -> dict[str, str]:
+        files: dict[str, str] = {}
+        sys_b = self._find_slot("system")
+        if sys_b is not None:
+            files[_SYS_PSEUDO] = self._render_blob_text(sys_b)
+        ut_b = self._find_user_template()
+        if ut_b is not None:
+            files[_USER_PSEUDO] = self._render_blob_text(ut_b)
+        for b in self._reference_bindings():
+            files[f"bindings://reference/{b['resource_id']}"] = self._render_blob_text(b)
+        inp = self._read_schema_slot("input_schema")
+        if inp is not None:
+            files[_INPUT_SCHEMA_PSEUDO] = json.dumps(inp.schema, sort_keys=True)
+        out_ = self._read_schema_slot("output_schema")
+        if out_ is not None:
+            files[_OUTPUT_SCHEMA_PSEUDO] = json.dumps(out_.schema, sort_keys=True)
+        return files

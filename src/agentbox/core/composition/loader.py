@@ -10,13 +10,18 @@ import logging
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from agentbox.core.composition import (
     ComposeResult,
     compose,
     compose_from_source,
 )
-from agentbox.core.composition.sources import BundleSource, DbBundleSource
+from agentbox.core.composition.sources import (
+    BindingsBundleSource,
+    BundleSource,
+    DbBundleSource,
+)
 from agentbox.core.data.manifest import CompositionConfig
 
 logger = logging.getLogger(__name__)
@@ -154,6 +159,29 @@ def load_bundle(
         path=root,
         composition=composition,
         legacy_prompt_path=legacy_prompt_path if composition is None else None,
+    )
+
+
+def load_bundle_from_bindings(
+    agent_id: str,
+    store: Any,
+    fallback_path: Path | None = None,
+) -> Bundle:
+    """Build a Bundle backed by agent_prompt_resource_bindings.
+
+    This is the post-deprecation default — composition state comes from
+    bindings, not from agent_version_files or disk.
+    """
+    source = BindingsBundleSource(agent_id=agent_id, store=store)
+    # Synthesize a CompositionConfig from the source's composition dict so
+    # downstream callers that introspect ``bundle.composition`` keep
+    # working. Unknown fields are dropped by model_validate.
+    composition = CompositionConfig.model_validate(source.composition)
+    return Bundle(
+        agent_id=agent_id,
+        path=fallback_path,
+        composition=composition,
+        source=source,
     )
 
 

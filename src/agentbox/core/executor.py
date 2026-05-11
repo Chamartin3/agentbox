@@ -417,7 +417,7 @@ class RunExecutor:
         if agent.composition is not None and variables is not None:
             from agentbox.core.composition.loader import (
                 load_bundle,
-                load_bundle_from_db,
+                load_bundle_from_bindings,
             )
 
             manifest = self.loader.load()
@@ -429,27 +429,29 @@ class RunExecutor:
             # Find the agent bundle path
             bundle_path = self._resolve_bundle_path(agent)
 
-            # DB-first composition: when the active version has captured
-            # files, render from the snapshot. ``AGENTBOX_BUNDLE_SOURCE=disk``
-            # forces the legacy filesystem path (useful for debugging a
-            # mismatch between DB content and disk).
+            # Bindings-first composition: agent_prompt_resource_bindings
+            # is now the single source of truth for system prompt,
+            # user template, schemas and references. The legacy bundle
+            # path is only used when AGENTBOX_BUNDLE_SOURCE=disk (debug).
             bundle = None
             source_pref = os.getenv("AGENTBOX_BUNDLE_SOURCE", "auto").lower()
             if source_pref != "disk":
                 try:
-                    active = self.store.get_active_version(agent.id)
-                    if active is not None:
-                        files = self.store.list_version_files(active["id"])
-                        if files:
-                            bundle = load_bundle_from_db(
-                                agent_id=agent.id,
-                                composition=agent.composition,
-                                files=files,
-                                fallback_path=bundle_path,
-                            )
+                    bundle = load_bundle_from_bindings(
+                        agent_id=agent.id,
+                        store=self.store,
+                        fallback_path=bundle_path,
+                    )
+                except FileNotFoundError as exc:
+                    logger.info(
+                        "executor: agent %r not yet migrated to bindings (%s); using disk bundle",
+                        agent.id,
+                        exc,
+                    )
+                    bundle = None
                 except Exception:
                     logger.exception(
-                        "executor: DB bundle load failed for %r — falling back to disk",
+                        "executor: bindings bundle load failed for %r — falling back to disk",
                         agent.id,
                     )
                     bundle = None

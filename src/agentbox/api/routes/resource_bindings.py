@@ -148,7 +148,7 @@ def _render_references_block(
 
 def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
     for b in resolved:
-        if b.get("slot") == slot:
+        if b.get("slot") == slot and b.get("attach_as_reference"):
             rendered = render_for_type(b["type"], b.get("blobs") or [])
             return {
                 "binding_id": b["binding_id"],

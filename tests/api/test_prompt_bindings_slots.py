@@ -132,7 +132,13 @@ def test_raw_text_output_when_no_output_schema(client: Any) -> None:
         "/api/agents/agent-rt/prompt-resources/preview",
         json={
             "template": "hello",
-            "bindings": [{"resource_id": schema, "slot": "input_schema"}],
+            "bindings": [
+                {
+                    "resource_id": schema,
+                    "slot": "input_schema",
+                    "attach_as_reference": True,
+                }
+            ],
         },
     )
     assert r.status_code == 200, r.text

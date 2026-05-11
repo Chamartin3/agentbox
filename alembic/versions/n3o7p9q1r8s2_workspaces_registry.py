@@ -19,7 +19,7 @@ every workspace name that the union currently produces so existing
 deployments don't lose any rows.
 """
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from alembic import op
@@ -62,7 +62,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
     existing = set(inspector.get_table_names())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     seen: set[str] = set()
     for table in _SATELLITE_TABLES:
         if table not in existing:

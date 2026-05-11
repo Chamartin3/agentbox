@@ -101,7 +101,6 @@ def list_workspaces(
                 "path": str(ws_path),
                 "description": ws_row.get("description"),
                 "kind": "named",
-                "source": ws_row.get("source", "db"),
                 "agents": agents,
                 "agent_count": len(agents),
                 "file_count": file_count,
@@ -189,13 +188,28 @@ def delete_workspace_registry(name: str, purge_disk: bool = False) -> dict:
 
 
 def _resolve_workspace(name: str) -> tuple[Path, Path]:
-    """Return (workspace_path, project_root) for a named workspace."""
-    loader = _get_loader()
+    """Return (workspace_path, project_root) for a named workspace.
+
+    Registry-first: the canonical `workspaces` table is the source of
+    truth for existence. The manifest is consulted only to enrich the
+    path when the registry row has no explicit ``path`` and a manifest
+    entry happens to declare one.
+    """
     settings = _get_settings()
-    w = loader.get_workspace(name)
-    if w is None:
+    store = get_store()
+    row = store.get_workspace(name)
+    if row is None:
         raise HTTPException(404, f"unknown workspace {name!r}")
-    return settings.project_root / w.path, settings.project_root
+    rel_path = row.get("path")
+    if not rel_path:
+        loader = _get_loader()
+        w = loader.get_workspace(name)
+        if w is not None and w.path:
+            rel_path = w.path
+    ws_path = (
+        settings.project_root / rel_path if rel_path else settings.workspaces_root / name
+    )
+    return ws_path, settings.project_root
 
 
 def _make_generator(project_root: Path, loader) -> ConfigGenerator:

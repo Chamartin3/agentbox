@@ -223,20 +223,35 @@ def _on_startup() -> None:
         except Exception:
             _log.exception("repo-resource boot import failed")
 
-    # Phase 3e: sync canonical workspaces registry. Backfill from satellite
-    # tables first (safety net for any workspace_id row written without
-    # creating a registry entry), then upsert manifest workspaces with
-    # source='manifest'. After this the `workspaces` table is the single
-    # source of truth for workspace existence — the list endpoint reads
-    # from it and never re-unions manifest+disk+satellites.
+    # Phase 3e: sync canonical workspaces registry. The migration already
+    # backfilled from satellite tables once. That was too greedy — any
+    # workspace_id ever written by experimental code (empty dirs, one-off
+    # MCP overrides) became a permanent phantom row. Going forward:
+    #
+    #   1. No more auto-backfill from satellites. Registry rows are
+    #      created explicitly: by manifest sync, by POST /api/workspaces,
+    #      or by the executor when a real run needs a new workspace.
+    #   2. Upsert manifest workspaces with source='manifest'.
+    #   3. Prune phantoms — auto-backfilled rows that aren't in the
+    #      manifest, have no agent referencing them, and have no rows in
+    #      any satellite table. On-disk dirs are left alone.
     try:
-        store.backfill_workspaces_from_satellites()
         if loaded_manifest and loaded_manifest.workspaces:
             store.sync_workspaces_from_manifest(
                 [
                     {"name": w.name, "description": w.description, "path": w.path}
                     for w in loaded_manifest.workspaces
                 ]
+            )
+        keep_names: set[str] = {"default"}
+        if loaded_manifest:
+            keep_names |= {w.name for w in loaded_manifest.workspaces}
+            keep_names |= {a.workspace or "default" for a in loaded_manifest.agents}
+        pruned = store.prune_phantom_workspaces(keep=keep_names)
+        if pruned:
+            _log.info(
+                "pruned %d phantom workspace registry rows: %s",
+                len(pruned), sorted(pruned),
             )
     except Exception:
         _log.exception("workspaces registry sync failed")

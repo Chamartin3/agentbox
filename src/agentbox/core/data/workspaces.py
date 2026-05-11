@@ -19,7 +19,6 @@ from sqlalchemy.engine import Engine
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import workspaces
 
-
 # Satellite tables whose rows belong to a workspace. Listed here so
 # delete_workspace_cascade and the boot backfill stay in sync.
 _SATELLITE_TABLES: tuple[str, ...] = (
@@ -197,6 +196,51 @@ class WorkspacesMixin:
                 )
                 inserted += 1
         return inserted
+
+    def prune_phantom_workspaces(self, keep: set[str]) -> list[str]:
+        """Delete registry rows that are demonstrably phantoms.
+
+        A phantom is a registry row that:
+          - is not in ``keep`` (manifest + agent-referenced + ``default``),
+          - has ``source != 'manifest'`` (manifest rows are always kept),
+          - has zero rows in every satellite table.
+
+        On-disk directories are left untouched — they may be scratch
+        directories from past experiments and the user can clean them up
+        manually. Returns the list of names that were deleted.
+        """
+        deleted: list[str] = []
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                text("SELECT name, source FROM workspaces")
+            ).fetchall()
+            for name, source in rows:
+                if name in keep:
+                    continue
+                if source == "manifest":
+                    continue
+                has_satellite = False
+                for table in _SATELLITE_TABLES:
+                    try:
+                        r = conn.execute(
+                            text(
+                                f"SELECT 1 FROM {table} WHERE workspace_id = :n LIMIT 1"
+                            ),
+                            {"n": name},
+                        ).first()
+                    except Exception:
+                        continue
+                    if r is not None:
+                        has_satellite = True
+                        break
+                if has_satellite:
+                    continue
+                conn.execute(
+                    text("DELETE FROM workspaces WHERE name = :n"),
+                    {"n": name},
+                )
+                deleted.append(name)
+        return deleted
 
     def sync_workspaces_from_manifest(self, manifest_workspaces: list[dict]) -> None:
         """Reconcile manifest-declared workspaces into the registry.

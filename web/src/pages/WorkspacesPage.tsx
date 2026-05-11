@@ -8,7 +8,6 @@ interface WorkspaceItem {
   path: string;
   description?: string;
   kind: string;
-  source?: 'manifest' | 'db';
   agents: string[];
   agent_count: number;
   file_count: number;
@@ -94,24 +93,6 @@ export default function WorkspacesPage() {
         ) : (
           <span className="pill" style={{ background: '#fee2e2', color: '#991b1b' }}>missing</span>
         ),
-    },
-    {
-      key: 'source',
-      header: 'Source',
-      sortable: true,
-      accessor: (w) => w.source ?? 'db',
-      render: (w) => (
-        <span
-          className="pill"
-          style={
-            w.source === 'manifest'
-              ? { background: '#dbeafe', color: '#1e3a8a' }
-              : { background: '#f3f4f6', color: '#374151' }
-          }
-        >
-          {w.source ?? 'db'}
-        </span>
-      ),
     },
     {
       key: 'open',

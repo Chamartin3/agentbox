@@ -30,7 +30,7 @@ from agentbox.core.data.schema import (
 )
 
 VALID_PROMPT_MODES = ("inline", "skill_primer", "name_only", "manifest")
-VALID_PROMPT_SLOTS = ("input_schema", "output_schema")
+VALID_PROMPT_SLOTS = ("system", "user_template", "input_schema", "output_schema")
 VALID_MATERIALIZE_MODES = ("copy", "symlink", "mount")
 VALID_ON_CONFLICT = ("error", "overwrite", "skip")
 

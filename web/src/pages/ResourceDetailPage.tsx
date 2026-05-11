@@ -27,6 +27,34 @@ function fmtDate(s?: string): string {
   return isNaN(d.getTime()) ? s : d.toLocaleString();
 }
 
+// Per-resource-type file picker hints. Keep these aligned with the
+// upload dispatch in `onUpload` (schema → JSON, script → py/sh, folder/skill → archive).
+function acceptFor(type: RepoType): string {
+  switch (type) {
+    case 'schema': return '.json,application/json';
+    case 'script': return '.py,.sh,text/x-python,application/x-sh';
+    case 'folder':
+    case 'skill': return '.zip,.tar,.tgz,.gz,application/zip,application/gzip,application/x-tar';
+    case 'document': return '.md,.txt,text/markdown,text/plain';
+    default: return '';
+  }
+}
+
+function acceptHintFor(type: RepoType): string {
+  switch (type) {
+    case 'schema': return '.json';
+    case 'script': return '.py or .sh';
+    case 'folder':
+    case 'skill': return '.zip / .tar.gz';
+    case 'document': return '.md / .txt';
+    default: return 'any';
+  }
+}
+
+function uploadHint(type: RepoType): string {
+  return `Accepted: ${acceptHintFor(type)}`;
+}
+
 const PRE_STYLE: React.CSSProperties = {
   background: 'var(--code-bg, #0d1117)',
   color: 'var(--code-fg, #c9d1d9)',
@@ -48,27 +76,83 @@ interface SchemaProp {
   children?: SchemaProp[];
 }
 
-function extractProps(schema: Record<string, unknown> | null | undefined): SchemaProp[] {
+// Pydantic-generated JSON schemas use $defs + $ref; we resolve refs against
+// the root schema's $defs/definitions so nested objects/arrays expand
+// instead of bottoming out as opaque leaves.
+type Defs = Record<string, Record<string, unknown>>;
+
+function getDefs(root: Record<string, unknown> | null | undefined): Defs {
+  if (!root) return {};
+  const a = (root.$defs as Defs) || (root.definitions as Defs) || {};
+  return a || {};
+}
+
+function resolveRef(def: Record<string, unknown>, defs: Defs): Record<string, unknown> {
+  // Resolve a single $ref hop (e.g. "#/$defs/Foo"). Allof/oneOf get
+  // simplified to the first viable branch — enough for display.
+  let cur = def;
+  for (let i = 0; i < 4; i++) {
+    const ref = cur.$ref as string | undefined;
+    if (ref) {
+      const key = ref.split('/').pop() || '';
+      const target = defs[key];
+      if (!target) return cur;
+      cur = { ...target, ...stripRef(cur) };
+      continue;
+    }
+    const allOf = cur.allOf as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(allOf) && allOf.length) {
+      cur = { ...cur, ...allOf[0] };
+      continue;
+    }
+    break;
+  }
+  return cur;
+}
+
+function stripRef(o: Record<string, unknown>): Record<string, unknown> {
+  const { $ref: _ref, ...rest } = o;
+  void _ref;
+  return rest;
+}
+
+function extractProps(
+  schema: Record<string, unknown> | null | undefined,
+  defs: Defs = {},
+): SchemaProp[] {
   if (!schema || typeof schema !== 'object') return [];
-  const props = (schema.properties as Record<string, unknown>) || {};
-  const required = new Set<string>(Array.isArray(schema.required) ? (schema.required as string[]) : []);
+  const resolvedRoot = resolveRef(schema, defs);
+  const props = (resolvedRoot.properties as Record<string, unknown>) || {};
+  const required = new Set<string>(
+    Array.isArray(resolvedRoot.required) ? (resolvedRoot.required as string[]) : [],
+  );
   const result: SchemaProp[] = [];
   for (const [name, raw] of Object.entries(props)) {
-    const def = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const rawDef = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const def = resolveRef(rawDef, defs);
     let type = (def.type as string) || (def.$ref ? '$ref' : 'any');
     if (Array.isArray(def.type)) type = (def.type as string[]).join('|');
     if (def.enum) type = `${type} (enum)`;
-    const description = (def.description as string) || '';
+    const description = (def.description as string) || (rawDef.description as string) || '';
     const node: SchemaProp = { name, type, required: required.has(name), description };
     if (type === 'object' && def.properties) {
-      node.children = extractProps(def);
+      node.children = extractProps(def, defs);
+    } else if (type === 'object' && def.additionalProperties && typeof def.additionalProperties === 'object') {
+      // Dict-shaped object: surface the value type so the user can see
+      // what the map contains.
+      const ap = resolveRef(def.additionalProperties as Record<string, unknown>, defs);
+      const valueType = (ap.type as string) || (ap.$ref ? '$ref' : 'any');
+      node.type = `object<string, ${valueType}>`;
+      if (ap.properties) node.children = extractProps(ap, defs);
     } else if (type === 'array' && def.items && typeof def.items === 'object') {
-      const items = def.items as Record<string, unknown>;
+      const items = resolveRef(def.items as Record<string, unknown>, defs);
       if (items.properties) {
         node.type = 'array<object>';
-        node.children = extractProps(items);
+        node.children = extractProps(items, defs);
       } else if (items.type) {
         node.type = `array<${items.type as string}>`;
+      } else if (items.enum) {
+        node.type = 'array (enum)';
       }
     }
     result.push(node);
@@ -76,33 +160,104 @@ function extractProps(schema: Record<string, unknown> | null | undefined): Schem
   return result;
 }
 
-function SchemaRow({ prop, depth }: { prop: SchemaProp; depth: number }) {
+// Foreground tints for JSON-schema types — dark-theme palette tuned to
+// the app's --bg-elevated chip background. The base keyword maps to the
+// color; composite labels like 'array<string>' fall back to neutral fg.
+const SCHEMA_TYPE_FG: Record<string, string> = {
+  object:  '#d2a8ff', // purple
+  array:   '#ffa657', // amber
+  string:  '#7ee787', // green
+  number:  '#79c0ff', // blue
+  integer: '#79c0ff',
+  boolean: '#ff7b72', // red
+  null:    'var(--fg-muted)',
+};
+
+function typeFg(t: string): string {
+  const base = t.replace(/<.*$/, '').split('|')[0];
+  return SCHEMA_TYPE_FG[base] || 'var(--fg-muted)';
+}
+
+function TypeBadge({ type }: { type: string }) {
+  return (
+    <span
+      className="tag"
+      style={{
+        color: typeFg(type),
+        fontFamily: 'monospace',
+        fontSize: 11,
+      }}
+    >
+      {type}
+    </span>
+  );
+}
+
+function SchemaNode({ prop, depth }: { prop: SchemaProp; depth: number }) {
   const [open, setOpen] = useState(depth < 1);
   const hasChildren = (prop.children?.length ?? 0) > 0;
   return (
-    <>
-      <tr>
-        <td style={{ paddingLeft: 8 + depth * 18 }}>
-          {hasChildren ? (
-            <button
-              onClick={() => setOpen((v) => !v)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginRight: 4 }}
-            >
-              {open ? '▾' : '▸'}
-            </button>
-          ) : (
-            <span style={{ display: 'inline-block', width: 14 }} />
-          )}
-          <code>{prop.name}</code>
-        </td>
-        <td className="dim" style={{ fontSize: 12 }}>{prop.type}</td>
-        <td>{prop.required ? '✓' : '—'}</td>
-        <td style={{ fontSize: 12 }}>{prop.description}</td>
-      </tr>
-      {open && hasChildren && prop.children!.map((c) => (
-        <SchemaRow key={`${prop.name}.${c.name}`} prop={c} depth={depth + 1} />
-      ))}
-    </>
+    <div
+      style={{
+        borderLeft: depth > 0 ? '1px solid var(--border)' : 'none',
+        marginLeft: depth > 0 ? 12 : 0,
+        paddingLeft: depth > 0 ? 10 : 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          alignItems: 'baseline',
+          padding: '4px 0',
+          cursor: hasChildren ? 'pointer' : 'default',
+        }}
+        onClick={() => hasChildren && setOpen((v) => !v)}
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            width: 12,
+            color: 'var(--fg-muted)',
+            fontSize: 10,
+            transform: hasChildren && open ? 'rotate(90deg)' : 'none',
+            transition: 'transform 80ms ease',
+          }}
+        >
+          {hasChildren ? '▶' : ''}
+        </span>
+        <code style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg)' }}>
+          {prop.name}
+        </code>
+        <TypeBadge type={prop.type} />
+        {prop.required && (
+          <span
+            className="tag"
+            style={{
+              color: '#ff7b72',
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+            }}
+          >
+            required
+          </span>
+        )}
+        {prop.description && (
+          <span className="dim" style={{ fontSize: 12, marginLeft: 4 }}>
+            — {prop.description}
+          </span>
+        )}
+      </div>
+      {hasChildren && open && (
+        <div>
+          {prop.children!.map((c) => (
+            <SchemaNode key={`${prop.name}.${c.name}`} prop={c} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -115,32 +270,34 @@ function SchemaViewer({ content }: { content: string }) {
   } catch (e) {
     parseError = String(e);
   }
-  const props = extractProps(parsed);
+  const props = extractProps(parsed, getDefs(parsed));
+  const rootType = parsed?.type as string | undefined;
+  const rootTitle = parsed?.title as string | undefined;
   return (
     <div className="stack" style={{ gap: 8 }}>
-      <div className="row" style={{ gap: 8 }}>
+      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        {rootTitle && <strong style={{ fontSize: 14 }}>{rootTitle}</strong>}
+        {rootType && <TypeBadge type={rootType} />}
+        <span style={{ flex: 1 }} />
         <button onClick={() => setShowRaw((v) => !v)}>
-          {showRaw ? 'show table' : 'show raw JSON'}
+          {showRaw ? 'show tree' : 'show raw JSON'}
         </button>
       </div>
       {showRaw || parseError || props.length === 0 ? (
         <pre style={PRE_STYLE}>{parseError ? `Parse error: ${parseError}\n\n${content}` : content}</pre>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Property</th>
-              <th>Type</th>
-              <th>Required</th>
-              <th>Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {props.map((p) => (
-              <SchemaRow key={p.name} prop={p} depth={0} />
-            ))}
-          </tbody>
-        </table>
+        <div
+          style={{
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            padding: '6px 12px',
+            background: 'var(--bg-elevated)',
+          }}
+        >
+          {props.map((p) => (
+            <SchemaNode key={p.name} prop={p} depth={0} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -378,6 +535,7 @@ export default function ResourceDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Upload form
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [changelog, setChangelog] = useState('');
   const [busy, setBusy] = useState(false);
@@ -458,6 +616,7 @@ export default function ResourceDetailPage() {
       await repoApi.publish(id, v.id, changelog.trim());
       setFile(null);
       setChangelog('');
+      setUploadOpen(false);
       await refresh();
     } catch (err) {
       alert(String(err));
@@ -584,76 +743,116 @@ export default function ResourceDetailPage() {
       </div>
 
       <section className="stack">
-        <h2 style={{ fontSize: 14, margin: 0 }}>Upload new version</h2>
-        <form onSubmit={onUpload} className="stack" style={{ border: '1px solid var(--border, #333)', padding: 12, borderRadius: 4 }}>
-          <input
-            type="file"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-          <input
-            type="text"
-            placeholder="changelog (required, min 3 chars)"
-            value={changelog}
-            onChange={(e) => setChangelog(e.target.value)}
-            style={{ padding: '6px 10px' }}
-            required
-            minLength={3}
-          />
-          {resource.type === RepoTypeEnum.Script && (
-            <div className="stack" style={{ gap: 6, border: '1px dashed var(--border, #333)', padding: 8, borderRadius: 4 }}>
-              <span className="dim" style={{ fontSize: 11 }}>script options</span>
-              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                <label style={{ fontSize: 12 }}>
-                  language:
-                  <select
-                    value={scriptLanguage}
-                    onChange={(e) => setScriptLanguage(e.target.value as '' | 'python' | 'shell')}
-                    style={{ marginLeft: 4 }}
-                  >
-                    <option value="">(auto)</option>
-                    <option value="python">python</option>
-                    <option value="shell">shell</option>
-                  </select>
-                </label>
-                <label style={{ fontSize: 12 }}>
-                  input schema:
-                  <select
-                    value={scriptInputSchemaId}
-                    onChange={(e) => setScriptInputSchemaId(e.target.value)}
-                    style={{ marginLeft: 4 }}
-                  >
-                    <option value="">(none)</option>
-                    {schemaOptions.map((s) => (
-                      <option key={s.id} value={s.id}>{s.slug}</option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ fontSize: 12 }}>
-                  output schema:
-                  <select
-                    value={scriptOutputSchemaId}
-                    onChange={(e) => setScriptOutputSchemaId(e.target.value)}
-                    style={{ marginLeft: 4 }}
-                  >
-                    <option value="">(none)</option>
-                    {schemaOptions.map((s) => (
-                      <option key={s.id} value={s.id}>{s.slug}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
-          )}
-          <div className="row" style={{ gap: 8 }}>
-            <button type="submit" disabled={busy || !file}>
-              {busy ? 'uploading…' : 'upload & publish'}
-            </button>
-            <span className="dim" style={{ fontSize: 12 }}>
-              For folder/skill resources, upload a .zip or .tar.gz.
-            </span>
-          </div>
-        </form>
+        <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+          <button type="button" onClick={() => setUploadOpen(true)}>
+            Upload new version
+          </button>
+          <span className="dim" style={{ fontSize: 12 }}>
+            {uploadHint(resource.type)}
+          </span>
+        </div>
       </section>
+
+      {uploadOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+          }}
+          onClick={() => { if (!busy) setUploadOpen(false); }}
+          onKeyDown={(e) => { if (e.key === 'Escape' && !busy) setUploadOpen(false); }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--bg, #1a1a1a)', borderRadius: 6,
+              width: 'min(560px, 92vw)', maxHeight: '85vh', overflow: 'auto',
+              padding: 16, border: '1px solid var(--border, #333)',
+            }}
+          >
+            <div className="row between" style={{ alignItems: 'center', marginBottom: 12 }}>
+              <h2 style={{ fontSize: 16, margin: 0 }}>Upload new version</h2>
+              <button type="button" onClick={() => setUploadOpen(false)} disabled={busy}>×</button>
+            </div>
+            <form onSubmit={onUpload} className="stack">
+              <label className="stack" style={{ gap: 4 }}>
+                <span className="dim" style={{ fontSize: 12 }}>
+                  file ({acceptHintFor(resource.type)})
+                </span>
+                <input
+                  type="file"
+                  accept={acceptFor(resource.type)}
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              <input
+                type="text"
+                placeholder="changelog (required, min 3 chars)"
+                value={changelog}
+                onChange={(e) => setChangelog(e.target.value)}
+                style={{ padding: '6px 10px' }}
+                required
+                minLength={3}
+              />
+              {resource.type === RepoTypeEnum.Script && (
+                <div className="stack" style={{ gap: 6, border: '1px dashed var(--border, #333)', padding: 8, borderRadius: 4 }}>
+                  <span className="dim" style={{ fontSize: 11 }}>script options</span>
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 12 }}>
+                      language:
+                      <select
+                        value={scriptLanguage}
+                        onChange={(e) => setScriptLanguage(e.target.value as '' | 'python' | 'shell')}
+                        style={{ marginLeft: 4 }}
+                      >
+                        <option value="">(auto)</option>
+                        <option value="python">python</option>
+                        <option value="shell">shell</option>
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12 }}>
+                      input schema:
+                      <select
+                        value={scriptInputSchemaId}
+                        onChange={(e) => setScriptInputSchemaId(e.target.value)}
+                        style={{ marginLeft: 4 }}
+                      >
+                        <option value="">(none)</option>
+                        {schemaOptions.map((s) => (
+                          <option key={s.id} value={s.id}>{s.slug}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 12 }}>
+                      output schema:
+                      <select
+                        value={scriptOutputSchemaId}
+                        onChange={(e) => setScriptOutputSchemaId(e.target.value)}
+                        style={{ marginLeft: 4 }}
+                      >
+                        <option value="">(none)</option>
+                        {schemaOptions.map((s) => (
+                          <option key={s.id} value={s.id}>{s.slug}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              )}
+              <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setUploadOpen(false)} disabled={busy}>
+                  cancel
+                </button>
+                <button type="submit" disabled={busy || !file}>
+                  {busy ? 'uploading…' : 'upload & publish'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {resource.type === RepoTypeEnum.Schema && activeVersion && (
         <section className="stack">

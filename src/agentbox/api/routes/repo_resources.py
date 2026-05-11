@@ -17,6 +17,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
+from agentbox.core.constants import ResourceType
 from agentbox.core.data.store import SessionStore
 from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter
@@ -27,8 +28,6 @@ from agentbox.core.resources.importers.zip_upload import ZipUploadImporter
 from agentbox.core.resources.rendering import render_for_type
 
 router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])
-
-ResourceType = Literal["document", "folder", "skill", "schema", "script"]
 
 
 def _resolve_resource_id(store: SessionStore, id_or_slug: str) -> str | None:

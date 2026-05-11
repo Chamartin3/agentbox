@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.composition.sources import (
+    BindingsBundleSource,
     BundleSource,
     DbBundleSource,
     FilesystemBundleSource,
@@ -660,6 +661,7 @@ def compose_with_store(
 
 
 __all__ = [
+    "BindingsBundleSource",
     "BundleSource",
     "ComposeResult",
     "CompositionPreview",
