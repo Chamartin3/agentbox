@@ -152,8 +152,11 @@ def _apply_delivery_outcome(
 
     Shared by the background done-callback and the synchronous
     ``resend_webhook`` path so both follow the same rules. Promotes
-    ``failed`` rows back to ``ok`` on a successful resend (the only
-    reason such a row exists is a prior delivery failure). ``incomplete``
+    ``failed`` rows back to ``ok`` on a successful resend *only* when
+    ``failed`` was caused by a prior delivery failure (``error`` empty).
+    Real agent-level failures — validation, rate-limit, auth — also
+    classify as ``failed`` and set ``error``; those must not be flipped
+    to ``ok`` just because the courtesy webhook landed. ``incomplete``
     rows are orphan-reaped: the agent never finished, so a webhook
     delivery cannot make them ``ok``.
     """
@@ -165,7 +168,7 @@ def _apply_delivery_outcome(
     if current is None:
         return
     if delivered:
-        if current.status == RunStatus.FAILED:
+        if current.status == RunStatus.FAILED and not current.error:
             try:
                 store.set_run_status(run_id, RunStatus.OK)
             except Exception:
