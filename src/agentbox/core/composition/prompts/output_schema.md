@@ -4,4 +4,6 @@ Respond with a SINGLE JSON object that strictly conforms to the schema below. Ou
 
 ## JSON Schema
 
+```json
 {schema}
+```

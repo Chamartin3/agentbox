@@ -1,18 +1,15 @@
 import { useEffect, useState, KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError } from '../api/client';
-import BundleFileEditor from './BundleFileEditor';
 import { RunnerProfileSection } from './RunnerProfileSection';
 
 interface Props {
   agent: AgentDef;
-  currentVersion?: number | null;
-  isDraft?: boolean;
   onSaved: (updated: AgentDef) => void;
   onError: (msg: string) => void;
 }
 
-export default function ManifestEditor({ agent, currentVersion, isDraft, onSaved, onError }: Props) {
+export default function ManifestEditor({ agent, onSaved, onError }: Props) {
   const navigate = useNavigate();
 
   const [workspaceOptions, setWorkspaceOptions] = useState<string[]>([]);
@@ -373,17 +370,6 @@ export default function ManifestEditor({ agent, currentVersion, isDraft, onSaved
         </div>
       </fieldset>
 
-      {/* ---- Bundle file editor for draft versions -------------------- */}
-      {currentVersion != null && isDraft && (
-        <fieldset className="config-fieldset">
-          <legend>bundle files (draft v{currentVersion})</legend>
-          <BundleFileEditor
-            agentId={agent.id}
-            version={currentVersion}
-            isDraft={isDraft}
-          />
-        </fieldset>
-      )}
     </section>
   );
 }

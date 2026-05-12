@@ -21,7 +21,7 @@ from agentbox.core.resources.rendering import render_for_type
 router = APIRouter(tags=["resource-bindings"])
 
 PromptMode = Literal["inline", "skill_primer", "name_only", "manifest"]
-PromptSlot = Literal["input_schema", "output_schema"]
+PromptSlot = Literal["system", "user_template", "input_schema", "output_schema"]
 MaterializeMode = Literal["copy", "symlink", "mount"]
 OnConflict = Literal["error", "overwrite", "skip"]
 
@@ -119,6 +119,10 @@ def _render_references_block(
     per_ref_chars: list[dict] = []
     for b in resolved:
         if not b.get("attach_as_reference"):
+            continue
+        # Slot bindings (system/user_template/input_schema/output_schema)
+        # have dedicated rendering — skip them here to avoid duplication.
+        if b.get("slot"):
             continue
         if b["type"] not in ("document", "folder"):
             continue
@@ -223,9 +227,17 @@ def preview_prompt(
     else:
         raw = store.list_prompt_bindings(agent_id)
     resolved = [_resolve_binding_for_prompt(store, b) for b in raw]
+    # When a system slot binding is active, its rendered text replaces
+    # the posted template (which is the legacy on-disk prompt). This
+    # makes the preview match what BindingsBundleSource feeds the runner.
+    system_view = _schema_for_slot(resolved, "system")
+    template_text = (
+        system_view["text"] if system_view and system_view.get("text")
+        else body.template
+    )
     # Only marker-style (non-slot) bindings participate in splicing.
     splice_bindings = [b for b in resolved if b.get("marker") and b.get("mode")]
-    result = resolve_prompt(body.template, splice_bindings)
+    result = resolve_prompt(template_text, splice_bindings)
 
     refs_text, refs_meta, per_ref_chars = _render_references_block(resolved)
     base_prompt = result.rendered_prompt
@@ -253,28 +265,28 @@ def preview_prompt(
         header = (
             "# Input Format" if slot == "input_schema" else "# Required Output"
         )
-        return f"{header}\n\n## JSON Schema\n\n{text}"
+        return f"{header}\n\n## JSON Schema\n\n```json\n{text}\n```"
 
     input_schema_block = _schema_block("input_schema", input_schema)
     if input_schema_block:
         composed = composed.rstrip() + "\n\n" + input_schema_block
 
+    if refs_text:
+        composed = composed.rstrip() + "\n\n" + refs_text
+
     output_schema_block = _schema_block("output_schema", output_schema)
     if output_schema_block:
         composed = composed.rstrip() + "\n\n" + output_schema_block
-
-    if refs_text:
-        composed = composed.rstrip() + "\n\n" + refs_text
 
     parts = [
         {"label": "prompt template", "chars": len(base_prompt)},
     ]
     if input_schema_block:
         parts.append({"label": "input_schema block", "chars": len(input_schema_block) + 2})
-    if output_schema_block:
-        parts.append({"label": "output_schema block", "chars": len(output_schema_block) + 2})
     if refs_text:
         parts.extend(per_ref_chars)
+    if output_schema_block:
+        parts.append({"label": "output_schema block", "chars": len(output_schema_block) + 2})
 
     return {
         "rendered_prompt": composed,

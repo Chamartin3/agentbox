@@ -73,19 +73,27 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool
     def get_agent(agent_id: str) -> dict:
-        """Full agent definition + current committed prompt metadata."""
+        """Full agent definition + active version metadata.
+
+        Reads from ``agent_versions`` / ``active_agent_versions`` (the
+        DB-as-source-of-truth tables the UI uses). Falls back to
+        ``latest_version`` when no active pointer is set."""
         ctx = get_context()
         agent = ctx.loader.get(agent_id)
         if agent is None:
             return {"error": "not_found", "agent_id": agent_id}
-        latest = ctx.store.get_latest_committed_prompt(agent_id)
+        active = ctx.store.get_active_version(agent_id) or ctx.store.latest_version(
+            agent_id
+        )
         prompt_meta = None
-        if latest:
+        if active:
             prompt_meta = {
-                "version": latest["version"],
-                "changelog": latest["changelog"],
-                "author": latest["author"],
-                "created_at": latest["created_at"],
+                "version": active["version"],
+                "version_id": active["id"],
+                "is_draft": bool(active.get("is_draft", False)),
+                "changelog": active.get("changelog"),
+                "author": active.get("author"),
+                "created_at": active.get("created_at"),
             }
         return {"agent": _agent_dict(agent), "prompt": prompt_meta}
 

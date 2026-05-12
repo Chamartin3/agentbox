@@ -183,8 +183,6 @@ export default function AgentDetailPage() {
           <div className="tab-pane stack">
             <ManifestEditor
               agent={agent}
-              currentVersion={currentVersion}
-              isDraft={versions.some((v) => v.version === currentVersion && v.is_draft)}
               onSaved={(updated) => {
                 setAgent(updated);
                 loadAgent();

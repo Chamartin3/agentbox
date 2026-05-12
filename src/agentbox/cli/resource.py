@@ -212,8 +212,15 @@ def resource_migrate_composition(
             "running for real.[/yellow]"
         )
 
+    from agentbox.api.deps import get_settings
+
     store = get_store()
-    report = migrate_composition_to_bindings(store, only_agent_id=agent)
+    settings = get_settings()
+    report = migrate_composition_to_bindings(
+        store,
+        only_agent_id=agent,
+        project_root=settings.project_root,
+    )
     summary = report.summary()
 
     table = Table(title="Composition Migration", header_style="bold cyan", padding=(0, 2))

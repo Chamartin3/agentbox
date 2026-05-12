@@ -1,7 +1,30 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { marked } from 'marked';
+import { Marked } from 'marked';
+import { markedHighlight } from 'marked-highlight';
+import hljs from 'highlight.js/lib/core';
+import json from 'highlight.js/lib/languages/json';
+import 'highlight.js/styles/github-dark.css';
 import { ApiError } from '../api/client';
+
+hljs.registerLanguage('json', json);
+
+const marked = new Marked(
+  markedHighlight({
+    emptyLangClass: 'hljs',
+    langPrefix: 'hljs language-',
+    highlight(code, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          return hljs.highlight(code, { language: lang }).value;
+        } catch {
+          /* fall through */
+        }
+      }
+      return code;
+    },
+  }),
+);
 import { repoApi, type RepoResource, type RepoType, type RepoVersion } from '../api/repo';
 import ResourcePicker from './ResourcePicker';
 import Toast from './Toast';
@@ -200,6 +223,7 @@ export default function AgentResourcesEditor({
         onPreview?.(r);
       } catch (e) {
         console.error('preview failed', e);
+        setToast({ kind: 'error', msg: errMsg(e, 'preview failed') });
       }
     }, 250);
     return () => clearTimeout(handle);

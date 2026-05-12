@@ -208,7 +208,9 @@ def _on_startup() -> None:
             # user_template) into resource_bindings. Gated for first rollout.
             if os.environ.get("AGENTBOX_MIGRATE_COMPOSITION"):
                 try:
-                    comp_report = migrate_composition_to_bindings(store)
+                    comp_report = migrate_composition_to_bindings(
+                        store, project_root=settings.project_root,
+                    )
                     _comp_summary = comp_report.summary()
                     if _comp_summary["bindings_created"] or _comp_summary["failed"]:
                         _log.info(

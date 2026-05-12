@@ -1,7 +1,9 @@
 """MCP tools for versioned system-prompt management.
 
-Editing always bumps the version and requires a non-empty ``reason``
-(stored as the version's changelog). There are no silent updates."""
+Reads/writes go through the ``agent_versions`` table (DB-as-source-of-truth);
+the legacy ``prompt_versions`` table is no longer consulted here. Editing
+always creates a new version and requires a non-empty ``reason`` (stored as
+the version's changelog). There are no silent updates."""
 
 from __future__ import annotations
 
@@ -11,49 +13,67 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from agentbox.core import prompts as prompt_ops
 from agentbox.core.composition import preview as preview_composition
 from agentbox.mcp_server.deps import get_context
 from agentbox.mcp_server.schemas import clamp_limit
 
 
-def _doc_to_dict(doc) -> dict:
+def _version_prompt_content(version: dict) -> str:
+    """Return the prompt body stored on an ``agent_versions`` row."""
+    return (
+        version.get("prompt_content")
+        or version.get("prompt_snapshot")
+        or ""
+    )
+
+
+def _version_meta(version: dict) -> dict:
+    """Slim metadata dict for an ``agent_versions`` row."""
     return {
-        "path": doc.path,
-        "content": doc.content,
-        "size": doc.size,
-        "mtime": doc.mtime,
+        "version": version.get("version"),
+        "version_id": version.get("id"),
+        "is_draft": bool(version.get("is_draft", False)),
+        "author": version.get("author"),
+        "changelog": version.get("changelog"),
+        "created_at": version.get("created_at"),
     }
+
+
+def _resolve_active(store, agent_id: str) -> dict | None:
+    """Active version with ``latest_version`` fallback (mirrors the API)."""
+    return store.get_active_version(agent_id) or store.latest_version(agent_id)
 
 
 def register(mcp: FastMCP) -> None:
     @mcp.tool
     def get_prompt(agent_id: str, version: int | None = None) -> dict:
-        """Return the full published system prompt for an agent (single blob).
+        """Return the published system prompt body for an agent.
 
-        This is the versioned ``prompt.md`` content — the system-prompt
-        string as committed. It does NOT include composition pieces
-        (references, schemas, user template). For those, use
-        ``get_agent_prompt_fragments``. For the per-run captured fragments
-        (what was actually injected into a specific run), use
-        ``get_run_prompt_fragments``."""
+        Reads from ``agent_versions.prompt_content`` (DB source of truth).
+        When ``version`` is omitted, returns the *active* version (with a
+        fallback to the latest row if no active pointer exists). It does
+        NOT include composition pieces (references, schemas, user
+        template); for those use ``get_agent_prompt_fragments``. For the
+        per-run captured fragments, use ``get_run_prompt_fragments``."""
         ctx = get_context()
-        if version is not None:
-            row = ctx.store.get_prompt_version(agent_id, version)
-            if row is None:
-                return {"error": "not_found", "agent_id": agent_id,
-                        "version": version}
-            return row
         agent = ctx.loader.get(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
-        doc = prompt_ops.read_versioned(agent, ctx.settings.project_root, ctx.store)
-        latest = ctx.store.get_latest_committed_prompt(agent_id)
+        if version is not None:
+            row = ctx.store.get_version(agent_id, version)
+            if row is None:
+                return {"error": "not_found", "agent_id": agent_id,
+                        "version": version}
+            return {
+                "content": _version_prompt_content(row),
+                **_version_meta(row),
+            }
+        active = _resolve_active(ctx.store, agent_id)
+        if active is None:
+            return {"error": "no_versions", "agent_id": agent_id}
         return {
-            **_doc_to_dict(doc),
-            "version": latest["version"] if latest else None,
-            "changelog": latest["changelog"] if latest else None,
-            "author": latest["author"] if latest else None,
+            "content": _version_prompt_content(active),
+            **_version_meta(active),
         }
 
     @mcp.tool
@@ -63,21 +83,34 @@ def register(mcp: FastMCP) -> None:
         limit: int = 20,
         offset: int = 0,
     ) -> dict:
-        """Paginated history of prompt versions for an agent."""
+        """Paginated history of agent versions for an agent.
+
+        Reads from ``agent_versions``. Each row includes ``is_active`` so
+        callers can identify which version is currently pinned."""
         limit = clamp_limit(limit)
-        rows = get_context().store.list_prompt_versions(agent_id)
+        store = get_context().store
+        rows = store.list_versions(agent_id)
         if not include_drafts:
             rows = [r for r in rows if not r.get("is_draft")]
+        active = store.get_active_version(agent_id)
+        active_id = active["id"] if active else None
         total = len(rows)
         page = rows[offset : offset + limit]
-        for r in page:
-            r.pop("content", None)
+        items = [
+            {
+                **_version_meta(r),
+                "is_active": r["id"] == active_id,
+                "source": r.get("source"),
+            }
+            for r in page
+        ]
         return {
-            "items": page,
+            "items": items,
             "total": total,
             "limit": limit,
             "offset": offset,
             "has_more": offset + len(page) < total,
+            "active_version": active["version"] if active else None,
         }
 
     @mcp.tool
@@ -87,33 +120,31 @@ def register(mcp: FastMCP) -> None:
         reason: str,
         author: str = "mcp",
     ) -> dict:
-        """Edit a system prompt — bumps version and writes to disk.
+        """Edit a system prompt — creates a new active version.
 
+        Writes a new ``agent_versions`` row cloned from the active version
+        with ``prompt_content`` replaced, then pins it as active.
         ``reason`` is required (min length 3) and stored as the version's
-        changelog. The new version is committed atomically (draft +
-        publish in one call). Returns the new committed version."""
+        changelog."""
         if not reason or len(reason.strip()) < 3:
             return {"error": "reason_required",
                     "detail": "reason must be at least 3 characters"}
         ctx = get_context()
-        agent = ctx.loader.get(agent_id)
-        if agent is None:
+        if ctx.loader.get(agent_id) is None and ctx.store.get_agent_def(agent_id) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
-        ctx.store.save_prompt_draft(agent_id, content, author)
-        doc = prompt_ops.publish(
-            agent_id,
-            ctx.store,
-            ctx.settings.project_root,
-            agent=agent,
-            changelog=reason.strip(),
-            author=author,
-        )
-        latest = ctx.store.get_latest_committed_prompt(agent_id)
+        try:
+            new_row = ctx.store.save_prompt_revision(
+                agent_id,
+                prompt_content=content,
+                author=author,
+                changelog=reason.strip(),
+                activate=True,
+            )
+        except ValueError as exc:
+            return {"error": "no_active_version", "detail": str(exc)}
         return {
-            **_doc_to_dict(doc),
-            "version": latest["version"] if latest else None,
-            "changelog": latest["changelog"] if latest else None,
-            "author": latest["author"] if latest else None,
+            "content": _version_prompt_content(new_row),
+            **_version_meta(new_row),
         }
 
     @mcp.tool
@@ -123,43 +154,42 @@ def register(mcp: FastMCP) -> None:
         reason: str,
         author: str = "mcp",
     ) -> dict:
-        """Rollback to a prior version — creates a NEW version with that content."""
+        """Rollback to a prior version — creates a NEW active version.
+
+        Calls ``store.rollback_to`` (the same path the UI/API uses), which
+        clones ``target_version``'s config + prompt into a new row and
+        pins it active."""
         if not reason or len(reason.strip()) < 3:
             return {"error": "reason_required",
                     "detail": "reason must be at least 3 characters"}
         ctx = get_context()
-        agent = ctx.loader.get(agent_id)
-        if agent is None:
+        if ctx.loader.get(agent_id) is None and ctx.store.get_agent_def(agent_id) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
-        doc = prompt_ops.rollback(
-            agent_id,
-            ctx.store,
-            ctx.settings.project_root,
-            target_version,
-            agent=agent,
-            author=f"{author} (reason: {reason.strip()})",
-        )
-        latest = ctx.store.get_latest_committed_prompt(agent_id)
+        try:
+            new_row = ctx.store.rollback_to(
+                agent_id, target_version, reason.strip(), author=author
+            )
+        except ValueError as exc:
+            return {"error": "rollback_failed", "detail": str(exc)}
         return {
-            **_doc_to_dict(doc),
-            "version": latest["version"] if latest else None,
-            "changelog": latest["changelog"] if latest else None,
+            "content": _version_prompt_content(new_row),
+            **_version_meta(new_row),
         }
 
     @mcp.tool
     def get_prompt_diff(
         agent_id: str, from_version: int, to_version: int
     ) -> dict:
-        """Unified diff between two prompt versions."""
+        """Unified diff of ``prompt_content`` between two agent versions."""
         store = get_context().store
-        a = store.get_prompt_version(agent_id, from_version)
-        b = store.get_prompt_version(agent_id, to_version)
+        a = store.get_version(agent_id, from_version)
+        b = store.get_version(agent_id, to_version)
         if a is None or b is None:
             return {"error": "version_not_found",
                     "from": from_version, "to": to_version}
         diff = difflib.unified_diff(
-            a["content"].splitlines(keepends=True),
-            b["content"].splitlines(keepends=True),
+            _version_prompt_content(a).splitlines(keepends=True),
+            _version_prompt_content(b).splitlines(keepends=True),
             fromfile=f"v{from_version}",
             tofile=f"v{to_version}",
         )

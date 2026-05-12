@@ -74,6 +74,47 @@ interface SchemaProp {
   required: boolean;
   description: string;
   children?: SchemaProp[];
+  constraints?: string[];
+  enumValues?: unknown[];
+  defaultValue?: unknown;
+  examples?: unknown[];
+  format?: string;
+  nullable?: boolean;
+  deprecated?: boolean;
+}
+
+// Pull every JSON-schema validation keyword we know how to render into
+// human-friendly chips. Keywords not handled fall through silently; we
+// don't try to be exhaustive, just useful.
+function extractConstraints(def: Record<string, unknown>): string[] {
+  const c: string[] = [];
+  const push = (label: string, value: unknown) => {
+    if (value !== undefined && value !== null) c.push(`${label} ${value}`);
+  };
+  // Numeric
+  push('min', def.minimum);
+  push('max', def.maximum);
+  push('>', def.exclusiveMinimum);
+  push('<', def.exclusiveMaximum);
+  push('multipleOf', def.multipleOf);
+  // String
+  push('minLen', def.minLength);
+  push('maxLen', def.maxLength);
+  if (typeof def.pattern === 'string') c.push(`pattern /${def.pattern}/`);
+  // Array
+  push('minItems', def.minItems);
+  push('maxItems', def.maxItems);
+  if (def.uniqueItems === true) c.push('unique');
+  // Object
+  push('minProps', def.minProperties);
+  push('maxProps', def.maxProperties);
+  if (def.additionalProperties === false) c.push('no extra props');
+  // Const
+  if ('const' in def) c.push(`const ${JSON.stringify(def.const)}`);
+  // readOnly / writeOnly
+  if (def.readOnly === true) c.push('readOnly');
+  if (def.writeOnly === true) c.push('writeOnly');
+  return c;
 }
 
 // Pydantic-generated JSON schemas use $defs + $ref; we resolve refs against
@@ -135,6 +176,19 @@ function extractProps(
     if (def.enum) type = `${type} (enum)`;
     const description = (def.description as string) || (rawDef.description as string) || '';
     const node: SchemaProp = { name, type, required: required.has(name), description };
+    node.constraints = extractConstraints(def);
+    if (Array.isArray(def.enum)) node.enumValues = def.enum as unknown[];
+    if ('default' in def) node.defaultValue = def.default;
+    if (Array.isArray(def.examples)) node.examples = def.examples as unknown[];
+    if (typeof def.format === 'string') node.format = def.format;
+    if (def.nullable === true) node.nullable = true;
+    if (def.deprecated === true) node.deprecated = true;
+    // Detect Optional[T] expressed as anyOf:[T, null] in pydantic schemas.
+    const anyOf = def.anyOf as Array<Record<string, unknown>> | undefined;
+    if (!node.nullable && Array.isArray(anyOf)) {
+      const hasNull = anyOf.some((b) => b && (b as Record<string, unknown>).type === 'null');
+      if (hasNull) node.nullable = true;
+    }
     if (type === 'object' && def.properties) {
       node.children = extractProps(def, defs);
     } else if (type === 'object' && def.additionalProperties && typeof def.additionalProperties === 'object') {
@@ -230,6 +284,16 @@ function SchemaNode({ prop, depth }: { prop: SchemaProp; depth: number }) {
           {prop.name}
         </code>
         <TypeBadge type={prop.type} />
+        {prop.format && (
+          <span className="tag" style={{ color: '#79c0ff', fontSize: 10 }}>
+            {prop.format}
+          </span>
+        )}
+        {prop.nullable && (
+          <span className="tag" style={{ color: 'var(--fg-muted)', fontSize: 10 }}>
+            nullable
+          </span>
+        )}
         {prop.required && (
           <span
             className="tag"
@@ -244,12 +308,77 @@ function SchemaNode({ prop, depth }: { prop: SchemaProp; depth: number }) {
             required
           </span>
         )}
+        {prop.deprecated && (
+          <span
+            className="tag"
+            style={{
+              color: '#ffa657',
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+            }}
+          >
+            deprecated
+          </span>
+        )}
         {prop.description && (
           <span className="dim" style={{ fontSize: 12, marginLeft: 4 }}>
             — {prop.description}
           </span>
         )}
       </div>
+      {(prop.constraints?.length ||
+        prop.enumValues ||
+        prop.defaultValue !== undefined ||
+        prop.examples) && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 4,
+            paddingLeft: 20,
+            paddingBottom: 4,
+          }}
+        >
+          {prop.constraints?.map((c) => (
+            <span
+              key={c}
+              className="tag"
+              style={{ color: 'var(--fg-muted)', fontSize: 10, fontFamily: 'monospace' }}
+            >
+              {c}
+            </span>
+          ))}
+          {prop.enumValues && (
+            <span
+              className="tag"
+              style={{ color: '#d2a8ff', fontSize: 10, fontFamily: 'monospace' }}
+              title={JSON.stringify(prop.enumValues)}
+            >
+              enum: {formatEnum(prop.enumValues)}
+            </span>
+          )}
+          {prop.defaultValue !== undefined && (
+            <span
+              className="tag"
+              style={{ color: '#7ee787', fontSize: 10, fontFamily: 'monospace' }}
+            >
+              default {JSON.stringify(prop.defaultValue)}
+            </span>
+          )}
+          {prop.examples && prop.examples.length > 0 && (
+            <span
+              className="tag"
+              style={{ color: 'var(--fg-muted)', fontSize: 10, fontFamily: 'monospace' }}
+              title={JSON.stringify(prop.examples)}
+            >
+              e.g. {JSON.stringify(prop.examples[0])}
+              {prop.examples.length > 1 ? ` (+${prop.examples.length - 1})` : ''}
+            </span>
+          )}
+        </div>
+      )}
       {hasChildren && open && (
         <div>
           {prop.children!.map((c) => (
@@ -259,6 +388,12 @@ function SchemaNode({ prop, depth }: { prop: SchemaProp; depth: number }) {
       )}
     </div>
   );
+}
+
+function formatEnum(values: unknown[]): string {
+  const max = 4;
+  const head = values.slice(0, max).map((v) => JSON.stringify(v)).join(' | ');
+  return values.length > max ? `${head} | …(+${values.length - max})` : head;
 }
 
 function SchemaViewer({ content }: { content: string }) {

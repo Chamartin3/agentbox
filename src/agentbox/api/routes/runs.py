@@ -79,9 +79,39 @@ async def create_run(body: CreateRunBody) -> dict:
                 agent.id,
             )
         executor = get_executor()
+        try:
+            run_id = await executor.execute(
+                agent,
+                body.input,
+                session_id=body.session_id,
+                workspace_override=body.workspace,
+                timeout_seconds=body.timeout_seconds,
+                webhook_url=body.webhook_url,
+                runner_override=body.runner,
+                backend=body.backend,
+                runner_profile=body.runner_profile,
+                runner_config=body.runner_config,
+            )
+        except KeyError as exc:
+            if exc.args and exc.args[0] == "NO_BACKEND_AVAILABLE":
+                raise HTTPException(
+                    422,
+                    f"no backend registered for agent {agent.id!r} "
+                    f"(runner.kind={agent.runner.kind!r}). "
+                    "Promote a version with a supported runner via the agentbox UI.",
+                ) from exc
+            raise
+        return {"run_id": run_id, "agent": agent.id}
+
+    if body.variables is None:
+        raise HTTPException(422, "either 'input' or 'variables' must be provided")
+
+    executor = get_executor()
+    try:
         run_id = await executor.execute(
             agent,
-            body.input,
+            "",  # input is derived from composition
+            variables=body.variables,
             session_id=body.session_id,
             workspace_override=body.workspace,
             timeout_seconds=body.timeout_seconds,
@@ -90,27 +120,22 @@ async def create_run(body: CreateRunBody) -> dict:
             backend=body.backend,
             runner_profile=body.runner_profile,
             runner_config=body.runner_config,
+            runner_embedded=body.runner_embedded,
         )
-        return {"run_id": run_id, "agent": agent.id}
-
-    if body.variables is None:
-        raise HTTPException(422, "either 'input' or 'variables' must be provided")
-
-    executor = get_executor()
-    run_id = await executor.execute(
-        agent,
-        "",  # input is derived from composition
-        variables=body.variables,
-        session_id=body.session_id,
-        workspace_override=body.workspace,
-        timeout_seconds=body.timeout_seconds,
-        webhook_url=body.webhook_url,
-        runner_override=body.runner,
-        backend=body.backend,
-        runner_profile=body.runner_profile,
-        runner_config=body.runner_config,
-        runner_embedded=body.runner_embedded,
-    )
+    except KeyError as exc:
+        # `_select_backend` raises KeyError("NO_BACKEND_AVAILABLE") when the
+        # agent's runner.kind has no registered adapter (e.g. legacy
+        # `pydantic_ai` after that backend was removed). Surface this as a
+        # structured 422 so callers can render a useful message instead of
+        # a bare HTML 500.
+        if exc.args and exc.args[0] == "NO_BACKEND_AVAILABLE":
+            raise HTTPException(
+                422,
+                f"no backend registered for agent {agent.id!r} "
+                f"(runner.kind={agent.runner.kind!r}). "
+                "Promote a version with a supported runner via the agentbox UI.",
+            ) from exc
+        raise
     return {"run_id": run_id, "agent": agent.id}
 
 

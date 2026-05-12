@@ -4,4 +4,6 @@ You will receive a user message whose payload conforms to the JSON schema below.
 
 ## JSON Schema
 
+```json
 {schema}
+```

@@ -397,6 +397,19 @@ def compose(
     system_raw = _read_text(system_path)
     system_rendered = _format_template(system_raw, variables)
 
+    # -- input schema --------------------------------------------------
+    # Auto-detect input_schema.json at the bundle root and surface it in
+    # the system prompt so the agent knows the shape of the user payload.
+    # Placed before references so the agent learns the payload shape up-front.
+    input_schema_file = bundle_path / BundleFile.INPUT_SCHEMA
+    if input_schema_file.exists():
+        try:
+            input_schema = json.loads(_read_text(input_schema_file))
+        except json.JSONDecodeError:
+            input_schema = None
+        if input_schema is not None:
+            system_rendered = _append_input_schema(system_rendered, input_schema)
+
     # -- references ----------------------------------------------------
     refs = composition.get("references", [])
     ref_parts: list[str] = []
@@ -424,18 +437,6 @@ def compose(
 
     if ref_parts:
         system_rendered = system_rendered + "\n\n" + "\n\n".join(ref_parts)
-
-    # -- input schema --------------------------------------------------
-    # Auto-detect input_schema.json at the bundle root and surface it in
-    # the system prompt so the agent knows the shape of the user payload.
-    input_schema_file = bundle_path / BundleFile.INPUT_SCHEMA
-    if input_schema_file.exists():
-        try:
-            input_schema = json.loads(_read_text(input_schema_file))
-        except json.JSONDecodeError:
-            input_schema = None
-        if input_schema is not None:
-            system_rendered = _append_input_schema(system_rendered, input_schema)
 
     # -- user prompt ---------------------------------------------------
     user_template = composition.get("user_template")
@@ -538,6 +539,12 @@ def compose_from_source(
     system_raw = source.read_system()
     system_rendered = _format_template(system_raw, variables) if render else system_raw
 
+    input_schema_info = source.read_input_schema()
+    if input_schema_info is not None:
+        system_rendered = _append_input_schema(
+            system_rendered, input_schema_info.schema
+        )
+
     refs = source.references()
     ref_parts: list[str] = []
     for ref in refs:
@@ -546,12 +553,6 @@ def compose_from_source(
         ref_parts.append(f"## {heading}\n\n{content}")
     if ref_parts:
         system_rendered = system_rendered + "\n\n" + "\n\n".join(ref_parts)
-
-    input_schema_info = source.read_input_schema()
-    if input_schema_info is not None:
-        system_rendered = _append_input_schema(
-            system_rendered, input_schema_info.schema
-        )
 
     user_template = source.read_user_template()
     if user_template is not None:
