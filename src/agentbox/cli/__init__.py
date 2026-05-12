@@ -16,7 +16,6 @@ from agentbox.cli.resource import resource_app
 from agentbox.cli.root import app, register_backward_compat
 from agentbox.cli.runner_profiles import runner_profile_app, runner_provider_app
 from agentbox.cli.runs import runs_app
-from agentbox.cli.versioning import versioning_app
 from agentbox.cli.workspace_resources import workspace_resources_app
 from agentbox.cli.ws import ws_app
 
@@ -27,7 +26,6 @@ app.add_typer(cfg_app, name="cfg")
 app.add_typer(mf_app, name="mf")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(migrate_app, name="migrate")
-app.add_typer(versioning_app, name="versioning")
 app.add_typer(runner_profile_app, name="runner-profile")
 app.add_typer(runner_provider_app, name="runner-provider")
 app.add_typer(resource_app, name="resource")

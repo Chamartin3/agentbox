@@ -20,7 +20,6 @@ from agentbox.core.composition import (
 from agentbox.core.composition.sources import (
     BindingsBundleSource,
     BundleSource,
-    DbBundleSource,
 )
 from agentbox.core.data.manifest import CompositionConfig
 
@@ -185,40 +184,3 @@ def load_bundle_from_bindings(
     )
 
 
-def load_bundle_from_db(
-    agent_id: str,
-    composition: CompositionConfig | None,
-    files: list[dict],
-    fallback_path: Path | None = None,
-) -> Bundle:
-    """Build a Bundle backed by a versioned DB snapshot.
-
-    Args:
-        agent_id: stable identifier.
-        composition: parsed ``CompositionConfig`` from the version's
-            ``config_json``. ``None`` for legacy versions — a minimal
-            composition is synthesised from the system file row.
-        files: rows from ``SessionStore.list_version_files(version_id)``.
-        fallback_path: optional disk path kept around as a workdir hint.
-            The composer never reads from this path.
-    """
-    if not files:
-        raise ValueError(
-            f"DB bundle for {agent_id!r} has no files — cannot compose"
-        )
-    if composition is None:
-        system_row = next((f for f in files if f.get("kind") == "system"), None)
-        if system_row is None:
-            raise ValueError(
-                f"DB bundle for {agent_id!r} has no kind='system' row"
-            )
-        composition = CompositionConfig(system=system_row["relative_path"])
-
-    composition_dict = composition.model_dump(mode="json")
-    source = DbBundleSource(composition=composition_dict, files=list(files))
-    return Bundle(
-        agent_id=agent_id,
-        path=fallback_path,
-        composition=composition,
-        source=source,
-    )

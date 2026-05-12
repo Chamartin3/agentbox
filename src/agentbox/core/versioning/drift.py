@@ -123,31 +123,6 @@ def _sync_prompt(
         logger.exception("versioning: prompt sync failed for agent %r", agent.id)
 
 
-def _capture_files_safe(
-    agent: AgentDef,
-    project_root: Path | None,
-    shared_roots: dict[str, Path],
-) -> list[dict]:
-    """Capture bundle files; log and return [] when a file is missing.
-
-    A broken bundle should not block the version row from being written —
-    the operator needs to see the import landed even when references are
-    half-migrated.
-    """
-    from agentbox.core.versioning.bundle_capture import capture_bundle_files
-
-    try:
-        return capture_bundle_files(agent, project_root or Path(), shared_roots)
-    except FileNotFoundError as exc:
-        logger.warning(
-            "versioning: bundle capture skipped for %r — %s", agent.id, exc
-        )
-        return []
-    except Exception:
-        logger.exception("versioning: bundle capture failed for %r", agent.id)
-        return []
-
-
 def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
     """If versions exist but no active pointer, promote the latest committed one.
 
@@ -258,7 +233,6 @@ def startup_sweep(
             _heal_active_pointer(agent.id, store)
             if status == AgentDriftStatus.NEW:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
-                files = _capture_files_safe(agent, project_root, shared_roots)
                 store.create_version(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
@@ -274,7 +248,7 @@ def startup_sweep(
                     content_hash=file_hash,
                     author="filesystem",
                     changelog="initial import",
-                    files=files or None,
+                    files=None,
                 )
                 logger.info("versioning: created v1 for new agent %r", agent.id)
                 # Import runner profile if agent has [runner] block
@@ -282,7 +256,6 @@ def startup_sweep(
                     _ingest_runner_profile(agent, agent.id, store)  # type: ignore
             elif status == AgentDriftStatus.DRIFTED:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
-                files = _capture_files_safe(agent, project_root, shared_roots)
                 store.create_version(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
@@ -294,7 +267,7 @@ def startup_sweep(
                     content_hash=file_hash,
                     author="filesystem",
                     changelog="out-of-band edit",
-                    files=files or None,
+                    files=None,
                 )
                 logger.info(
                     "versioning: created new version for drifted agent %r",

@@ -137,36 +137,15 @@ def _bundle_files_drifted(
     project_root: Path,
     shared_roots: dict[str, Path],
 ) -> bool:
-    """Return True when any bundle file's sha differs from the latest version.
+    """Always False — disk bundle drift is no longer tracked.
 
-    Without this, editing only ``prompts/system.md`` (or a reference) would
-    leave ``agent.toml`` unchanged, drift detection would report SAME, and
-    no new version would be created — even though the rendered prompt the
-    runner uses just changed.
+    Bindings are the source of truth: prompt and reference content live in
+    ``agent_prompt_resource_bindings`` (plus the repo resources they point
+    to), not in ``agent_version_files``. Edits flow through the UI / MCP /
+    API, not by hand-editing files on disk. The watcher still reacts to
+    ``agent.toml`` changes (via ``check_drift``) so config edits create a
+    draft, but per-file drift detection is intentionally a no-op.
     """
-    from agentbox.core.versioning.bundle_capture import capture_bundle_files
-
-    try:
-        current = capture_bundle_files(agent, project_root, shared_roots)
-    except Exception:
-        return False
-    if not current:
-        return False
-    latest = store.latest_version(agent.id)
-    if latest is None:
-        return True
-    stored = store.list_version_files(latest["id"])
-    if not stored:
-        # Old version row predating agent_version_files — treat any
-        # capturable bundle as a change worth recording.
-        return True
-    stored_by_path = {(r["kind"], r["relative_path"]): r["sha256"] for r in stored}
-    for row in current:
-        key = (row["kind"], row["relative_path"])
-        if stored_by_path.get(key) != row["sha256"]:
-            return True
-    if len(stored) != len(current):
-        return True
     return False
 
 
@@ -180,7 +159,6 @@ async def _process_changes(
         AgentDriftStatus,
         _build_config_json,
         _build_snapshot,
-        _capture_files_safe,
         _compute_file_hash,
         _load_prompt_safe,
         check_drift,
@@ -219,7 +197,6 @@ async def _process_changes(
             prompt_text = _load_prompt_safe(agent)
 
             if sync_mode == "watch":
-                files = _capture_files_safe(agent, project_root, shared_roots)
                 v = store.create_version(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
@@ -239,7 +216,7 @@ async def _process_changes(
                     prompt_content=prompt_text,
                     source="manifest",
                     is_draft=True,
-                    files=files or None,
+                    files=None,
                 )
                 # For NEW agents, auto-activate the first version.
                 if status == AgentDriftStatus.NEW:

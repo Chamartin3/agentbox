@@ -187,7 +187,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     import logging
 
     from agentbox.core.data.manifest import AgentDef
-    from agentbox.core.versioning.drift import _build_snapshot, _capture_files_safe
+    from agentbox.core.versioning.drift import _build_snapshot
 
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
     if not patch:
@@ -214,18 +214,12 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     updated.source_format = current.source_format
 
     # --- step 2: write DB ------------------------------------------------
-    manifest = loader.load()
-    shared_roots = {
-        k: (settings.project_root / v).resolve()
-        for k, v in (manifest.shared_assets or {}).items()
-    }
     prompt_text = ""
     if updated.prompt_path:
         try:
             prompt_text = updated.load_prompt(settings.project_root)
         except FileNotFoundError:
             prompt_text = ""
-    files = _capture_files_safe(updated, settings.project_root, shared_roots)
     snapshot = _build_snapshot(updated)
     try:
         store.create_version(
@@ -239,7 +233,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
             content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
             author="api:patch",
             changelog=f"manifest patch: {', '.join(sorted(patch))}",
-            files=files or None,
+            files=None,
         )
     except Exception as exc:
         logging.getLogger(__name__).exception(
