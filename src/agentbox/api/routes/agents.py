@@ -12,7 +12,6 @@ from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core import workspaces as ws
 from agentbox.core.composition import compose_from_source
 from agentbox.core.composition.loader import load_bundle_from_bindings
-from agentbox.core.composition.sources import FilesystemBundleSource
 from agentbox.core.data.manifest import AgentDef
 from agentbox.core.data.runner_profiles import RunnerProfile
 
@@ -132,40 +131,10 @@ def get_agent(agent_id: str) -> dict:
         composed_system = result.system
         composed_user = result.user
     except FileNotFoundError:
-        # Bindings have no system slot yet (agent not migrated). Fall back
-        # to the on-disk bundle so the Composition tab still shows
-        # something useful.
-        if agent.composition is not None:
-            try:
-                src_path = getattr(agent, "source_path", None)
-                bundle_path = (
-                    (settings.project_root / src_path).parent
-                    if src_path
-                    else None
-                )
-                if bundle_path is not None and bundle_path.exists():
-                    shared_roots: dict = {}
-                    if settings.manifest_path.exists():
-                        try:
-                            mf = loader.load()
-                            shared_roots = {
-                                k: (settings.project_root / v).resolve()
-                                for k, v in (mf.shared_assets or {}).items()
-                            }
-                        except Exception:
-                            shared_roots = {}
-                    fs_source = FilesystemBundleSource(
-                        bundle_path=bundle_path,
-                        composition=agent.composition.model_dump(mode="json"),
-                        shared_roots=shared_roots,
-                    )
-                    result = compose_from_source(fs_source, variables={}, render=False)
-                    composed_system = result.system
-                    composed_user = result.user
-            except Exception:
-                logger.exception(
-                    "agents detail: disk-fallback compose failed for %r", agent_id
-                )
+        logger.info(
+            "agents detail: no system slot binding for %r; preview empty",
+            agent_id,
+        )
     except Exception:
         logger.exception(
             "agents detail: composition preview failed for %r", agent_id

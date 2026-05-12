@@ -289,6 +289,26 @@ def _on_startup() -> None:
 def create_app() -> FastAPI:
     app = FastAPI(title="agentbox", version="1.0.0", on_startup=[_on_startup])
 
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        # FastAPI's default 500 returns `Internal Server Error` text — clients
+        # then have to crack open server logs to see what went wrong. Render a
+        # JSON envelope with the exception type + message so consumers (and
+        # the UI) can surface the real cause directly.
+        _log.exception(
+            "unhandled exception on %s %s", request.method, request.url.path
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": f"{type(exc).__name__}: {exc}",
+                "error": str(exc) or type(exc).__name__,
+                "path": request.url.path,
+            },
+        )
+
     # API routers first.
     app.include_router(runs.router)
     app.include_router(agents.router)
