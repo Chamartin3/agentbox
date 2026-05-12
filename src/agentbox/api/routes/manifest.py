@@ -16,6 +16,45 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core.data.manifest import AgentDef, AgentSource
 from agentbox.core.definitions import ManifestWriter
+from agentbox.core.plugins import backend_load_failure, backends
+
+
+def _validate_runner_against_registry(agent: AgentDef) -> None:
+    """Reject agents whose ``runner.kind`` has no usable backend.
+
+    The ``RunnerKind`` enum is wider than the live plugin registry (e.g.
+    ``subprocess`` / ``adapter`` exist in the enum but ship no backend
+    module). Without this check, ``runner.kind`` validation passes at
+    write time and the dispatch later 503s. Rejecting here makes the
+    failure visible at the boundary where it can be corrected.
+    """
+    kind = agent.runner.kind
+    name = kind.value if hasattr(kind, "value") else str(kind)
+    loaded = backends()
+    if name in loaded:
+        return
+    failure = backend_load_failure(name)
+    if failure is not None:
+        raise HTTPException(
+            400,
+            {
+                "code": "backend_unloadable",
+                "detail": (
+                    f"runner.kind={name!r} is declared but failed to load "
+                    f"at startup ({failure})."
+                ),
+            },
+        )
+    raise HTTPException(
+        400,
+        {
+            "code": "backend_unknown",
+            "detail": (
+                f"runner.kind={name!r} has no backend installed. "
+                f"Registered: {sorted(loaded.keys())}."
+            ),
+        },
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +248,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
         raise HTTPException(
             400, {"code": "validation_failed", "detail": str(exc)}
         ) from exc
+    _validate_runner_against_registry(updated)
     # Preserve source metadata pydantic doesn't infer.
     updated.source_path = current.source_path
     updated.source_format = current.source_format
@@ -433,6 +473,8 @@ def import_agent(body: ImportRequest):
         raise HTTPException(
             400, {"code": "parse_error", "detail": "Could not parse agent"}
         )
+
+    _validate_runner_against_registry(agent_def)
 
     agent_id = agent_def.id
     existing = store.latest_version(agent_id)

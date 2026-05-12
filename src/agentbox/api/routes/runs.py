@@ -12,6 +12,36 @@ from pydantic import BaseModel
 from agentbox.api.deps import get_executor, get_loader, get_store
 from agentbox.api.webhooks import schedule_webhook
 from agentbox.core.data import read_transcript
+from agentbox.core.executor import NoBackendAvailable
+from agentbox.core.plugins import backend_load_failure, backends
+
+
+def _no_backend_detail(exc: NoBackendAvailable) -> str:
+    """Compose an honest 'why is no backend available' message.
+
+    For each backend the executor *tried* to use, report whether it was
+    never registered or whether it's registered but failed to import at
+    startup (with the real exception text). Never says "promote a version"
+    — the agent config is fine; the *server* can't fulfil the request.
+    """
+    loaded = set(backends().keys())
+    parts: list[str] = []
+    for name in exc.attempted:
+        failure = backend_load_failure(name)
+        if failure is not None:
+            parts.append(f"{name!r} failed to load at startup: {failure}")
+        elif name not in loaded:
+            parts.append(f"{name!r} is not a registered backend")
+        else:
+            # Registered, loaded, but _try_backend returned None — likely
+            # raised during instantiation. We can't recover the reason
+            # without a second attempt; surface the bare fact.
+            parts.append(f"{name!r} failed to instantiate")
+    why = "; ".join(parts) if parts else "no backend candidates were derived"
+    return (
+        f"agent {exc.agent_id!r}: cannot dispatch — {why}. "
+        f"Registered backends: {sorted(loaded)}."
+    )
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -92,15 +122,8 @@ async def create_run(body: CreateRunBody) -> dict:
                 runner_profile=body.runner_profile,
                 runner_config=body.runner_config,
             )
-        except KeyError as exc:
-            if exc.args and exc.args[0] == "NO_BACKEND_AVAILABLE":
-                raise HTTPException(
-                    422,
-                    f"no backend registered for agent {agent.id!r} "
-                    f"(runner.kind={agent.runner.kind!r}). "
-                    "Promote a version with a supported runner via the agentbox UI.",
-                ) from exc
-            raise
+        except NoBackendAvailable as exc:
+            raise HTTPException(503, _no_backend_detail(exc)) from exc
         return {"run_id": run_id, "agent": agent.id}
 
     if body.variables is None:
@@ -122,20 +145,8 @@ async def create_run(body: CreateRunBody) -> dict:
             runner_config=body.runner_config,
             runner_embedded=body.runner_embedded,
         )
-    except KeyError as exc:
-        # `_select_backend` raises KeyError("NO_BACKEND_AVAILABLE") when the
-        # agent's runner.kind has no registered adapter (e.g. legacy
-        # `pydantic_ai` after that backend was removed). Surface this as a
-        # structured 422 so callers can render a useful message instead of
-        # a bare HTML 500.
-        if exc.args and exc.args[0] == "NO_BACKEND_AVAILABLE":
-            raise HTTPException(
-                422,
-                f"no backend registered for agent {agent.id!r} "
-                f"(runner.kind={agent.runner.kind!r}). "
-                "Promote a version with a supported runner via the agentbox UI.",
-            ) from exc
-        raise
+    except NoBackendAvailable as exc:
+        raise HTTPException(503, _no_backend_detail(exc)) from exc
     return {"run_id": run_id, "agent": agent.id}
 
 

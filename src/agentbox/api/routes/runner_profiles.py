@@ -15,7 +15,7 @@ from agentbox.core.data.runner_profiles import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.plugins import get_backend
+from agentbox.core.plugins import backend_load_failure, backends, get_backend
 from agentbox.core.providers import get_provider, list_providers
 
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
@@ -23,11 +23,29 @@ router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
 
 
 def _validate_backend(backend: str) -> None:
-    """Validate backend is registered. Raises HTTPException 400 if invalid."""
+    """Validate ``backend`` resolves in the live plugin registry.
+
+    Distinguishes two failure modes so the caller knows whether the value
+    is wrong (typo / removed plugin) or the *server* is misconfigured
+    (entry point declared but module failed to import — usually a missing
+    Python dep). Without this split, both cases collapse to "unknown
+    backend" and the operator can't tell them apart.
+    """
     try:
         get_backend(backend)
     except KeyError as exc:
-        raise HTTPException(400, f"unknown backend: {backend!r}") from exc
+        failure = backend_load_failure(backend)
+        if failure is not None:
+            raise HTTPException(
+                400,
+                f"backend {backend!r} is declared but failed to load at startup "
+                f"({failure}). Fix the agentbox install before binding it.",
+            ) from exc
+        raise HTTPException(
+            400,
+            f"unknown backend: {backend!r}. "
+            f"Registered: {sorted(backends().keys())}.",
+        ) from exc
 
 
 def _validate_provider(provider: str | None) -> None:

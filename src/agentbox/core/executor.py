@@ -246,6 +246,23 @@ def _load_workspace_permissions(
         return {}
 
 
+class NoBackendAvailable(RuntimeError):
+    """Raised when ``_select_backend`` cannot pick any registered adapter.
+
+    Carries the attempted names so the HTTP layer can tell the client
+    *which* backend was requested and let the loader's failure-reason
+    map explain why it's unavailable.
+    """
+
+    def __init__(self, *, agent_id: str, attempted: list[str]) -> None:
+        self.agent_id = agent_id
+        self.attempted = list(attempted)
+        super().__init__(
+            f"no backend available for agent {agent_id!r} "
+            f"(attempted: {self.attempted})"
+        )
+
+
 class RunBroadcaster:
     """In-memory pub/sub for one run's event stream."""
 
@@ -841,7 +858,11 @@ class RunExecutor:
         else:
             kind = agent.runner.kind
             if kind is not None:
-                candidates = [str(kind)]
+                # `kind` is a RunnerKind enum; str() returns the repr
+                # ("RunnerKind.OPENCODE"), so use .value to get the
+                # backend-registry key ("opencode"). Fall back to str()
+                # for the rare case it was already a plain string.
+                candidates = [kind.value if hasattr(kind, "value") else str(kind)]
 
         for name in candidates:
             adapter = _try_backend(name)
@@ -851,7 +872,9 @@ class RunExecutor:
                 )
                 return adapter, rendered
 
-        raise KeyError("NO_BACKEND_AVAILABLE")
+        # Carry the list of attempted names so the HTTP layer can tell the
+        # caller *which* backend was asked for and why it's unavailable.
+        raise NoBackendAvailable(agent_id=agent.id, attempted=candidates)
 
     @staticmethod
     def _apply_overrides(
