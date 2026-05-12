@@ -35,7 +35,7 @@ import sys
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 from pydantic import BaseModel, ValidationError, create_model
 from pydantic_ai.models.openai import OpenAIModel
@@ -65,7 +65,7 @@ def _json_schema_to_pydantic_model(
     schema: dict[str, Any],
     *,
     model_name: str = "OutputModel",
-) -> type[BaseModel]:
+) -> Any:
     """Convert a JSON Schema dict to a pydantic ``BaseModel``.
 
     Handles the common shapes produced by ``model_json_schema()``:
@@ -119,7 +119,26 @@ def _json_schema_to_pydantic_model(
         schema_obj: dict[str, Any],
         *,
         name: str = "NestedModel",
-    ) -> type[BaseModel]:
+    ) -> Any:
+        union_branches = schema_obj.get("oneOf") or schema_obj.get("anyOf")
+        if union_branches:
+            branch_types: list[Any] = []
+            for i, branch in enumerate(union_branches):
+                if "$ref" in branch:
+                    resolved = _resolve_ref(branch["$ref"])
+                    branch_name = branch["$ref"].split("/")[-1]
+                    branch_types.append(
+                        _build_model_from_schema(resolved, name=branch_name)
+                    )
+                else:
+                    branch_name = branch.get("title") or f"{name}Branch{i}"
+                    branch_types.append(
+                        _build_model_from_schema(branch, name=branch_name)
+                    )
+            if len(branch_types) == 1:
+                return branch_types[0]
+            return Union[tuple(branch_types)]  # type: ignore[return-value]
+
         properties = schema_obj.get("properties", {})
         required = set(schema_obj.get("required", []))
         fields: dict[str, tuple[type, Any]] = {}
@@ -181,8 +200,17 @@ def _stringify_excerpt(value: Any, *, limit: int = 2000) -> str:
 def _iter_message_history_events(run_id: str, messages: Any) -> list[RunEvent]:
     events: list[RunEvent] = []
     for msg in messages or []:
+        msg_kind = getattr(msg, "kind", "") or msg.__class__.__name__.lower()
+        is_response = "response" in msg_kind or "model" in msg_kind
         for part in getattr(msg, "parts", []) or []:
             kind = _part_kind(part)
+            if is_response and ("text" in kind and "tool" not in kind):
+                text = getattr(part, "content", None) or getattr(part, "text", None)
+                if text:
+                    events.append(
+                        TextEvent(run_id=run_id, role="assistant", text=str(text))
+                    )
+                continue
             if "thinking" in kind or "reasoning" in kind:
                 text = (
                     getattr(part, "text", None)
@@ -522,7 +550,7 @@ class TokenBackend(BackendAdapter):
             return
 
         # Build result_type from schema when present.
-        result_type: type[BaseModel] | None = None
+        result_type: Any = None
         if output_schema:
             try:
                 result_type = _json_schema_to_pydantic_model(
