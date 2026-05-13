@@ -147,12 +147,13 @@ agent_meta = Table(
     "agent_meta",
     metadata,
     Column("agent_id", String, primary_key=True),
-    Column("sync_mode", String, nullable=False, server_default="watch"),
-    Column("export_to_disk", Integer, nullable=False, server_default="1"),
+    Column("sync_mode", String, nullable=False, server_default="off"),
+    Column("export_to_disk", Integer, nullable=False, server_default="0"),
     Column("source_path", String, nullable=True),
     Column("source_format", String, nullable=True),
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
+    Column("deleted_at", String, nullable=True),
 )
 
 agent_version_comments = Table(

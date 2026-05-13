@@ -1,5 +1,5 @@
 import WorkspacesPage from './WorkspacesPage';
-import ResourcesPage from './ResourcesPage';
+import RepoResourcesPage from './RepoResourcesPage';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -21,7 +21,7 @@ export default function WorkspacesSection() {
     <div className="stack">
       <WorkspacesPage />
       <Section title="Resources">
-        <ResourcesPage />
+        <RepoResourcesPage />
       </Section>
     </div>
   );

@@ -627,8 +627,8 @@ class AgentVersionsMixin:
     def init_agent_meta(
         self,
         agent_id: str,
-        sync_mode: str = "watch",
-        export_to_disk: bool = True,
+        sync_mode: str = "off",
+        export_to_disk: bool = False,
         source_path: str | None = None,
         source_format: str | None = None,
     ) -> dict:
@@ -741,6 +741,8 @@ class AgentVersionsMixin:
         latest = self.latest_version(agent_id)
         if latest is None:
             return None
+        if self.is_agent_deleted(agent_id):
+            return None
         try:
             return AgentDef.from_db_row(latest)
         except ValueError:
@@ -755,13 +757,16 @@ class AgentVersionsMixin:
             )
             return None
 
-    def list_agents_with_latest(self) -> list[dict]:
+    def list_agents_with_latest(self, include_deleted: bool = False) -> list[dict]:
         """Return one row per agent_id — the latest version's snapshot.
 
         DB-as-source-of-truth read path for the agent list. Avoids hitting
         the filesystem loader so the API surfaces exactly what was imported
         into ``agent_versions`` (including DB-only agents with no on-disk
         bundle).
+
+        Soft-deleted agents (``agent_meta.deleted_at IS NOT NULL``) are
+        excluded by default.
         """
         with self.engine.connect() as conn:
             inner = (
@@ -772,7 +777,7 @@ class AgentVersionsMixin:
                 .group_by(agent_versions.c.agent_id)
                 .subquery()
             )
-            rows = conn.execute(
+            q = (
                 agent_versions.select()
                 .join(
                     inner,
@@ -781,7 +786,82 @@ class AgentVersionsMixin:
                 )
                 .order_by(agent_versions.c.created_at.desc())
             )
-            return [self._row_dict(r) for r in rows]
+            rows = list(conn.execute(q))
+            if include_deleted:
+                return [self._row_dict(r) for r in rows]
+            deleted_ids = {
+                r._mapping["agent_id"]
+                for r in conn.execute(
+                    agent_meta.select().where(
+                        agent_meta.c.deleted_at.isnot(None)
+                    )
+                )
+            }
+            return [
+                self._row_dict(r)
+                for r in rows
+                if self._row_dict(r).get("agent_id") not in deleted_ids
+            ]
+
+    def is_agent_deleted(self, agent_id: str) -> bool:
+        meta = self.get_agent_meta(agent_id)
+        return bool(meta and meta.get("deleted_at"))
+
+    def soft_delete_agent(self, agent_id: str) -> dict | None:
+        """Mark an agent as deleted by stamping ``agent_meta.deleted_at``.
+
+        Idempotent: returns the current meta row whether or not the agent
+        was already deleted. Returns ``None`` if the agent has no version
+        history at all.
+        """
+        latest = self.latest_version(agent_id)
+        if latest is None:
+            return None
+        now = now_iso()
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                agent_meta.select().where(agent_meta.c.agent_id == agent_id)
+            ).first()
+            if existing:
+                conn.execute(
+                    agent_meta.update()
+                    .where(agent_meta.c.agent_id == agent_id)
+                    .values(deleted_at=now, updated_at=now)
+                )
+            else:
+                conn.execute(
+                    agent_meta.insert().values(
+                        agent_id=agent_id,
+                        sync_mode="off",
+                        export_to_disk=0,
+                        source_path=None,
+                        source_format=None,
+                        created_at=now,
+                        updated_at=now,
+                        deleted_at=now,
+                    )
+                )
+            # Clear active pointer so the agent isn't runnable.
+            conn.execute(
+                active_agent_versions.delete().where(
+                    active_agent_versions.c.agent_id == agent_id
+                )
+            )
+        return self.get_agent_meta(agent_id)
+
+    def restore_agent(self, agent_id: str) -> dict | None:
+        """Clear ``deleted_at``. Active version pointer must be re-set
+        separately if the caller wants the agent runnable again."""
+        meta = self.get_agent_meta(agent_id)
+        if meta is None:
+            return None
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_meta.update()
+                .where(agent_meta.c.agent_id == agent_id)
+                .values(deleted_at=None, updated_at=now_iso())
+            )
+        return self.get_agent_meta(agent_id)
 
     def list_versions(self, agent_id: str) -> list[dict]:
         with self.engine.connect() as conn:

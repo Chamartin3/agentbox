@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import typer
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -148,3 +151,341 @@ def agent_prompt(
         return
 
     console.print(Syntax(content, "markdown", theme="ansi_dark"))
+
+
+# ---------------------------------------------------------------------------
+# Plan 18 — DB-only write commands. These talk to the store directly so they
+# work in offline contexts (no HTTP server required).
+# ---------------------------------------------------------------------------
+
+
+def _set_dotted(obj: dict, dotted: str, value: object) -> None:
+    parts = dotted.split(".")
+    cur = obj
+    for p in parts[:-1]:
+        nxt = cur.get(p)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            cur[p] = nxt
+        cur = nxt
+    cur[parts[-1]] = value
+
+
+def _coerce(value: str) -> object:
+    """Try JSON first (so ``[1,2]`` / ``true`` parse), else return the str."""
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
+@agent_app.command("create")
+def agent_create(
+    config: Path = typer.Option(
+        ...,
+        "--config",
+        "-c",
+        exists=True,
+        readable=True,
+        help="Path to inline JSON config (full AgentDef shape).",
+    ),
+    author: str = typer.Option(..., "--author"),
+    changelog: str = typer.Option(
+        "initial draft", "--changelog", help="Changelog (min 3 chars)."
+    ),
+) -> None:
+    """Create a new DB-only agent from an inline JSON config file.
+
+    The config file must be a JSON object matching ``AgentDef``. No on-disk
+    backing file is created; the agent lives entirely in the DB.
+    """
+    from agentbox.core.agent_config import build_config_json_payload
+    from agentbox.core.data.manifest import AgentDef
+
+    data = json.loads(config.read_text(encoding="utf-8"))
+    try:
+        agent_def = AgentDef.model_validate(data)
+    except Exception as exc:
+        console.print(f"[red]invalid AgentDef:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    store = get_store()
+    if store.latest_version(agent_def.id) is not None:
+        console.print(f"[red]agent {agent_def.id!r} already exists[/red]")
+        raise typer.Exit(1)
+
+    rec = store.create_agent(
+        agent_id=agent_def.id,
+        config_json={
+            **agent_def.model_dump(mode="json", exclude_none=True),
+            **build_config_json_payload(agent_def),
+        },
+        prompt_content=agent_def.prompt,
+        author=author,
+        changelog=changelog,
+        source="cli",
+        sync_mode="off",
+        export_to_disk=False,
+    )
+    console.print(
+        f"[green]created[/green] {agent_def.id!r} v{rec['version']} "
+        f"(draft, version_id={rec['id']})"
+    )
+
+
+@agent_app.command("edit")
+def agent_edit(
+    agent_id: str,
+    set_: list[str] = typer.Option(
+        [],
+        "--set",
+        "-s",
+        help="dotted=value pairs, e.g. runner.kind=token. Repeatable.",
+    ),
+    author: str = typer.Option("cli", "--author"),
+    changelog: str = typer.Option("cli edit", "--changelog"),
+) -> None:
+    """Edit an agent in the DB. Each ``--set k=v`` overrides a field.
+
+    Values are parsed as JSON when possible (so ``--set tags='["x","y"]'``
+    works), else stored verbatim as a string.
+    """
+    import hashlib
+
+    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.versioning.drift import _build_snapshot
+
+    if not set_:
+        console.print("[red]nothing to set; pass --set k=v[/red]")
+        raise typer.Exit(2)
+
+    store = get_store()
+    settings = get_settings()
+    current = store.get_agent_def(agent_id) or get_loader().get(agent_id)
+    if current is None:
+        console.print(f"[red]agent {agent_id!r} not found[/red]")
+        raise typer.Exit(1)
+
+    merged = current.model_dump(mode="python")
+    for pair in set_:
+        if "=" not in pair:
+            console.print(f"[red]bad --set pair: {pair!r}[/red]")
+            raise typer.Exit(2)
+        k, v = pair.split("=", 1)
+        _set_dotted(merged, k.strip(), _coerce(v.strip()))
+
+    try:
+        updated = AgentDef.model_validate(merged)
+    except Exception as exc:
+        console.print(f"[red]validation failed:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    updated.source_path = current.source_path
+    updated.source_format = current.source_format
+    snapshot = _build_snapshot(updated)
+    prompt_text = ""
+    if updated.prompt_path:
+        try:
+            prompt_text = updated.load_prompt(settings.project_root)
+        except FileNotFoundError:
+            prompt_text = ""
+
+    rec = store.create_version(
+        agent_id=updated.id,
+        source_path=str(updated.source_path) if updated.source_path else "",
+        source_format=(
+            updated.source_format.value if updated.source_format else "unknown"
+        ),
+        content_snapshot=snapshot,
+        prompt_snapshot=prompt_text,
+        content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
+        author=author,
+        changelog=changelog,
+        files=None,
+    )
+    console.print(
+        f"[green]new version[/green] {updated.id!r} v{rec['version']} "
+        f"(draft={rec.get('is_draft', False)}) — publish with `agent publish`"
+    )
+
+
+@agent_app.command("export")
+def agent_export(
+    agent_id: str,
+    out: Path | None = typer.Option(
+        None, "--out", help="Output file path (default: agents.d/<id>.md)."
+    ),
+    fmt: str = typer.Option(
+        "markdown",
+        "--format",
+        "-f",
+        help="Format: markdown | standalone_toml | legacy_dir.",
+    ),
+) -> None:
+    """Dump the active agent version to disk as TOML/markdown."""
+    from agentbox.core.data.manifest import AgentDef, AgentSource
+    from agentbox.core.definitions import ManifestWriter
+
+    store = get_store()
+    settings = get_settings()
+    active = store.get_active_version(agent_id)
+    if active is None:
+        console.print(f"[red]agent {agent_id!r} has no active version[/red]")
+        raise typer.Exit(1)
+
+    if active.get("config_json"):
+        raw = active["config_json"]
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        agent_def = AgentDef.model_validate(data)
+    else:
+        agent_def = AgentDef.from_db_row(active)
+
+    if out is not None:
+        target = out
+    else:
+        agents_d = settings.project_root / "agents.d"
+        if fmt == "legacy_dir":
+            target = settings.project_root / "agents" / agent_id / "agent.toml"
+        elif fmt == "standalone_toml":
+            target = agents_d / f"{agent_id}.toml"
+        else:
+            target = agents_d / f"{agent_id}.md"
+
+    agent_def.source_path = target
+    agent_def.source_format = AgentSource(fmt)
+    written = ManifestWriter(settings.project_root).save_agent(agent_def)
+    console.print(f"[green]wrote[/green] {written}")
+
+
+@agent_app.command("import")
+def agent_import(
+    path: Path = typer.Argument(..., exists=True, readable=True),
+    fmt: str = typer.Option(
+        "auto",
+        "--format",
+        "-f",
+        help="auto | markdown | standalone_toml | legacy_dir.",
+    ),
+    strategy: str = typer.Option(
+        "new_agent",
+        "--strategy",
+        help="new_agent | new_version | skip | overwrite.",
+    ),
+    author: str = typer.Option(..., "--author"),
+    changelog: str = typer.Option(
+        "import from file", "--changelog", help="Changelog (min 3 chars)."
+    ),
+) -> None:
+    """Migration helper: import an agent from a TOML/markdown file into the DB.
+
+    Plan 18 retires filesystem-driven config. Use this only for one-shot
+    migrations of an existing on-disk bundle.
+    """
+    import hashlib
+
+    from agentbox.core.data.manifest import AgentDef
+
+    inferred = fmt
+    if inferred == "auto":
+        if path.suffix == ".md":
+            inferred = "markdown"
+        elif path.suffix == ".toml":
+            inferred = "standalone_toml"
+        elif path.is_dir():
+            inferred = "legacy_dir"
+        else:
+            inferred = "standalone_toml"
+
+    if inferred == "markdown":
+        from agentbox.core.definitions.markdown import load_markdown_agent
+
+        agent_def = load_markdown_agent(path)
+        if not isinstance(agent_def, AgentDef):
+            agent_def = AgentDef.model_validate(agent_def)
+    elif inferred == "legacy_dir":
+        from agentbox.core.definitions.agents_dir import _load_legacy_dir_agent
+
+        agent_def = _load_legacy_dir_agent(path, path.name)
+        if not isinstance(agent_def, AgentDef):
+            agent_def = AgentDef.model_validate(agent_def)
+    else:
+        import tomllib
+
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        agent_def = AgentDef.model_validate(data)
+
+    store = get_store()
+    settings = get_settings()
+    from agentbox.core.agent_config import build_config_json_payload
+
+    config_dict = agent_def.model_dump(mode="python", exclude_none=False)
+    if isinstance(config_dict.get("source_path"), Path):
+        config_dict["source_path"] = str(config_dict["source_path"])
+    config_dict.update(build_config_json_payload(agent_def))
+    config_json = json.dumps(config_dict, sort_keys=True, default=str)
+    content_hash = hashlib.sha256(config_json.encode("utf-8")).hexdigest()
+    try:
+        prompt_content = agent_def.load_prompt(settings.project_root)
+    except FileNotFoundError:
+        prompt_content = agent_def.prompt or ""
+
+    existing = store.latest_version(agent_def.id)
+    if existing is not None and strategy == "new_agent":
+        console.print(f"[red]agent {agent_def.id!r} already exists[/red]")
+        raise typer.Exit(1)
+    if existing is not None and strategy == "skip":
+        console.print(f"[yellow]skipped[/yellow] {agent_def.id!r}")
+        return
+    if existing is not None:
+        rec = store.create_version(
+            agent_id=agent_def.id,
+            source_path=str(path),
+            source_format=inferred,
+            content_snapshot="",
+            prompt_snapshot=prompt_content or "",
+            content_hash=content_hash,
+            author=author,
+            changelog=changelog,
+            config_json=config_json,
+            prompt_content=prompt_content,
+            source="import",
+            is_draft=(strategy == "new_version"),
+        )
+        if strategy == "overwrite":
+            store.publish_version(agent_def.id, rec["version"], "imported")
+    else:
+        rec = store.create_agent(
+            agent_id=agent_def.id,
+            config_json=config_dict,
+            prompt_content=prompt_content,
+            author=author,
+            changelog=changelog,
+            source="import",
+            source_path=str(path),
+            source_format=inferred,
+            export_to_disk=False,
+        )
+    console.print(
+        f"[green]imported[/green] {agent_def.id!r} v{rec['version']} "
+        f"from {path}"
+    )
+
+
+@agent_app.command("delete")
+def agent_delete(
+    agent_id: str,
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
+) -> None:
+    """Soft-delete an agent. Version history is retained."""
+    if not yes:
+        confirm = typer.confirm(
+            f"Soft-delete agent {agent_id!r}? (history retained)"
+        )
+        if not confirm:
+            raise typer.Exit(0)
+    store = get_store()
+    result = store.soft_delete_agent(agent_id)
+    if result is None:
+        console.print(f"[red]agent {agent_id!r} not found[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]deleted[/green] {agent_id!r}")

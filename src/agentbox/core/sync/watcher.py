@@ -178,7 +178,9 @@ async def _process_changes(
     for agent in manifest.agents:
         try:
             meta = store.get_agent_meta(agent.id)
-            sync_mode = (meta or {}).get("sync_mode", "watch")
+            # Plan 18: default is "off". The watcher only acts on agents
+            # whose meta row was explicitly opted in to "watch"/"manual".
+            sync_mode = (meta or {}).get("sync_mode", "off")
             if sync_mode == "off":
                 continue
 
@@ -224,7 +226,7 @@ async def _process_changes(
                     store.init_agent_meta(
                         agent_id=agent.id,
                         sync_mode="watch",
-                        export_to_disk=True,
+                        export_to_disk=False,
                         source_path=str(agent.source_path) if agent.source_path else None,
                         source_format=(
                             agent.source_format.value if agent.source_format else None

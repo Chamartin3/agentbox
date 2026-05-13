@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -125,7 +124,6 @@ def get_agent(agent_id: str) -> dict:
         bundle = load_bundle_from_bindings(
             agent_id=agent_id,
             store=store,
-            fallback_path=None,
         )
         result = compose_from_source(bundle.source, variables={}, render=False)
         composed_system = result.system
@@ -337,6 +335,20 @@ def clear_agent_runner_profile(
     """Remove the runner profile binding from an agent."""
     store = get_store()
     store.clear_agent_runner_profile(agent_id)
+
+
+@router.delete("/{agent_id}", status_code=204)
+def delete_agent(agent_id: str) -> None:
+    """Soft-delete an agent.
+
+    Marks ``agent_meta.deleted_at`` and clears the active version pointer.
+    Version history is retained; the agent is hidden from list endpoints
+    and ``get_agent_def`` returns ``None`` so dispatch fails fast.
+    """
+    store = get_store()
+    result = store.soft_delete_agent(agent_id)
+    if result is None:
+        raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
 
 
 @router.post("/{agent_id}/versions/{version}/rollback", status_code=201)

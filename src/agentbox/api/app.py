@@ -22,6 +22,7 @@ from agentbox.api.routes import (
     activity,
     agents,
     agents_create,
+    agents_write,
     api_tokens,
     env_doc,
     health,
@@ -125,8 +126,17 @@ def _on_startup() -> None:
         except Exception:
             pass
 
-    # Phase 3: agent version drift sweep (only if manifest-loaded agents exist)
-    if loaded_manifest and loaded_manifest.agents:
+    # Phase 3: agent version drift sweep.
+    #
+    # Plan 18: filesystem → DB import is opt-in. Without
+    # ``AGENTBOX_IMPORT_ON_START=1`` the manifest is read-only at boot and
+    # files can never silently overwrite DB state. Operators migrating an
+    # existing install can flip the flag once, then turn it back off.
+    if (
+        loaded_manifest
+        and loaded_manifest.agents
+        and os.environ.get("AGENTBOX_IMPORT_ON_START") == "1"
+    ):
         try:
             _project_root = settings.project_root
             _shared_roots = {
@@ -313,6 +323,7 @@ def create_app() -> FastAPI:
     app.include_router(runs.router)
     app.include_router(agents.router)
     app.include_router(agents_create.router)
+    app.include_router(agents_write.router)
     app.include_router(usage.router)
     app.include_router(workspaces.router)
     app.include_router(manifest.router)

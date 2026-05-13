@@ -135,3 +135,8 @@ def _scrub_agentbox_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in list(os.environ):
         if key.startswith("AGENTBOX_") and key != "AGENTBOX_DEBUG":
             monkeypatch.delenv(key, raising=False)
+    # Plan 18 gated startup_sweep behind an opt-in flag. Most existing
+    # tests still rely on filesystem→DB auto-import to seed agents, so
+    # enable it by default for the test suite. Tests that exercise the
+    # gated-off behavior can monkeypatch.delenv this back out.
+    monkeypatch.setenv("AGENTBOX_IMPORT_ON_START", "1")
