@@ -3,11 +3,6 @@ import Toast from '../components/Toast';
 
 const SECTIONS = [
   {
-    key: 'runtime_defaults',
-    label: 'Runtime defaults',
-    hint: 'Default model per backend + runner timeout. Backends consult these on every run, so changes take effect on the next run.',
-  },
-  {
     key: 'workspace_defaults',
     label: 'Workspace defaults',
     hint: 'Default permissions / scaffolding applied to new workspaces.',
@@ -29,7 +24,7 @@ interface SectionPayload {
   overrides?: Record<string, unknown>;
 }
 
-type ToastState = { kind: 'ok' | 'error'; msg: string } | null;
+export type ToastState = { kind: 'ok' | 'error'; msg: string } | null;
 
 async function fetchSection(section: string): Promise<SectionPayload> {
   const r = await fetch(`/api/settings/${section}`);
@@ -82,7 +77,7 @@ function inputRow(label: string, child: React.ReactNode) {
   );
 }
 
-function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => void }) {
+export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => void }) {
   const section = 'runtime_defaults';
   const [timeout, setTimeoutS] = useState<number | ''>('');
   const [opencode, setOpencode] = useState('');
@@ -533,9 +528,7 @@ export default function SettingsBaseTab() {
     <div className="stack" style={{ gap: 16 }}>
       {SECTIONS.map((s) => (
         <SectionShell key={s.key} section={s.key} label={s.label} hint={s.hint}>
-          {s.key === 'runtime_defaults' ? (
-            <RuntimeDefaultsForm onToast={setToast} />
-          ) : s.key === 'webhook' ? (
+          {s.key === 'webhook' ? (
             <WebhookForm onToast={setToast} />
           ) : s.key === 'telemetry' ? (
             <TelemetryForm onToast={setToast} />

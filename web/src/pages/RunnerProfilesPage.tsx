@@ -54,7 +54,7 @@ const blankForm: FormState = {
   is_system_default: false,
 };
 
-export default function RunnerProfilesPage() {
+export default function RunnerProfilesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [profiles, setProfiles] = useState<RunnerProfile[]>([]);
   const [providers, setProviders] = useState<RunnerProvider[]>([]);
   const [backends, setBackends] = useState<RunnerBackend[]>([]);
@@ -278,13 +278,13 @@ export default function RunnerProfilesPage() {
   const credentialsEditable = formMode === 'create' || credentialsUnlocked;
 
   if (loading) {
-    return <div className="stack"><h1>Runner Profiles</h1><p className="dim">loading…</p></div>;
+    return <div className="stack">{!embedded && <h1>Runner Profiles</h1>}<p className="dim">loading…</p></div>;
   }
 
   return (
     <div className="stack">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Runner Profiles</h1>
+        {embedded ? <span /> : <h1>Runner Profiles</h1>}
         <button onClick={openCreate}>+ Create Profile</button>
       </div>
 
@@ -294,12 +294,13 @@ export default function RunnerProfilesPage() {
             <th>Name</th>
             <th>Backend</th>
             <th>Token</th>
+            <th style={{ width: 1 }}></th>
           </tr>
         </thead>
         <tbody>
           {profiles.length === 0 ? (
             <tr>
-              <td colSpan={3} className="dim" style={{ textAlign: 'center', padding: 24 }}>
+              <td colSpan={4} className="dim" style={{ textAlign: 'center', padding: 24 }}>
                 no runner profiles
               </td>
             </tr>
@@ -345,6 +346,19 @@ export default function RunnerProfilesPage() {
                       </option>
                     ))}
                   </select>
+                </td>
+                <td>
+                  <div className="row" style={{ gap: 6 }}>
+                    <button onClick={() => openEdit(p)} style={{ fontSize: 12, padding: '2px 8px' }}>
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      style={{ fontSize: 12, padding: '2px 8px', border: '1px solid var(--error)', color: 'var(--error)', background: 'none' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))

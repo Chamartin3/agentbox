@@ -55,6 +55,9 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
         const role = String(ev.role || 'assistant');
         const text = String(ev.text || '');
         if (!text.trim()) continue;
+        // System and user turns are already shown in the Prompt section
+        // of the run detail page — don't duplicate them here.
+        if (role === 'system' || role === 'user') continue;
         const isDelta = Boolean(ev.delta);
         const last = msgs[msgs.length - 1];
         // Non-delta following deltas → consolidated final text, replace
