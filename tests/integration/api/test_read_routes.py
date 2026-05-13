@@ -38,7 +38,7 @@ def test_activity_summary_default_range(client) -> None:  # type: ignore[no-unty
 
 
 def test_manifest_get_on_empty_project(client) -> None:  # type: ignore[no-untyped-def]
-    r = client.get("/api/manifest")
+    r = client.get("/api/agents/export-all")
     assert r.status_code == 200
     assert isinstance(r.json(), dict)
 

@@ -321,9 +321,11 @@ def create_app() -> FastAPI:
 
     # API routers first.
     app.include_router(runs.router)
-    app.include_router(agents.router)
-    app.include_router(agents_create.router)
+    # agents_write owns /api/agents/export-all and /import-file — must
+    # come before agents.router which catches /api/agents/{agent_id}.
     app.include_router(agents_write.router)
+    app.include_router(agents_create.router)
+    app.include_router(agents.router)
     app.include_router(usage.router)
     app.include_router(workspaces.router)
     app.include_router(manifest.router)

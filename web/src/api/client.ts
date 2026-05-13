@@ -492,13 +492,13 @@ export const api = {
       versions: Array<Record<string, unknown>>;
     }>(`/api/agents/${id}`),
 
-  getManifest: () => req<ManifestDoc>('/api/manifest'),
+  getManifest: () => req<ManifestDoc>('/api/agents/export-all'),
   listRunnerModels: (kind: string) =>
     req<{ kind: string; models: string[] }>(
       `/api/manifest/runner-models?kind=${encodeURIComponent(kind)}`,
     ),
   patchAgent: (id: string, body: Partial<AgentDef> & { runner?: Partial<RunnerSpec> }) =>
-    req<{ agent: AgentDef }>(`/api/manifest/agents/${id}`, {
+    req<{ agent: AgentDef }>(`/api/agents/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
@@ -620,13 +620,13 @@ export const api = {
     ),
 
   exportAgent: (agentId: string, body: ExportRequest) =>
-    req<{ ok: boolean; path?: string }>(`/api/manifest/agents/${agentId}/export`, {
+    req<{ ok: boolean; path?: string }>(`/api/agents/${agentId}/export`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
 
   importAgent: (body: ImportRequest) =>
-    req<AgentCreateResult>('/api/manifest/agents/import', {
+    req<AgentCreateResult>('/api/agents/import-file', {
       method: 'POST',
       body: JSON.stringify(body),
     }),

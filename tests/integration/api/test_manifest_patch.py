@@ -33,7 +33,7 @@ tools = ["tool1"]
 def test_patch_agent_creates_db_version(
     client: Any, isolated_data_dir: Path, manifest_with_agent: Path
 ) -> None:
-    """PATCH /api/manifest/agents/{id} should create a new agent_versions row."""
+    """PATCH /api/agents/{id} should create a new agent_versions row."""
     import agentbox.api.deps as deps
 
     # Point the loader at our manifest and clear caches.
@@ -56,7 +56,7 @@ def test_patch_agent_creates_db_version(
 
         # Patch description and tags.
         resp = c.patch(
-            "/api/manifest/agents/test.patch_agent",
+            "/api/agents/test.patch_agent",
             json={
                 "description": "after",
                 "tags": ["new"],
@@ -113,7 +113,7 @@ def test_patch_runner_preserves_kind_and_error_retries(
 
     with TestClient(create_app()) as c:
         resp = c.patch(
-            "/api/manifest/agents/test.patch_agent",
+            "/api/agents/test.patch_agent",
             json={
                 "runner": {
                     "kind": "opencode",
@@ -149,7 +149,7 @@ def test_patch_composition_input_and_output_schema(
 
     with TestClient(create_app()) as c:
         resp = c.patch(
-            "/api/manifest/agents/test.patch_agent",
+            "/api/agents/test.patch_agent",
             json={
                 "composition": {
                     "system": "prompts/system.md",

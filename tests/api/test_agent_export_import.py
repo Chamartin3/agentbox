@@ -1,4 +1,4 @@
-"""Tests for /api/manifest/agents/{id}/export and /api/manifest/agents/import endpoints."""
+"""Tests for /api/agents/{id}/export and /api/agents/import-file endpoints."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ class TestExportAgent:
         """Exporting a non-existent agent returns 404."""
         client, _ = _app(isolated_data_dir)
         resp = client.post(
-            "/api/manifest/agents/nonexistent/export",
+            "/api/agents/nonexistent/export",
             json={"source_format": "markdown"},
         )
         assert resp.status_code == 404
@@ -72,7 +72,7 @@ class TestExportAgent:
 
         # Export as markdown
         resp = client.post(
-            f"/api/manifest/agents/{agent_id}/export",
+            f"/api/agents/{agent_id}/export",
             json={"source_format": "markdown"},
         )
         assert resp.status_code == 200
@@ -106,7 +106,7 @@ class TestExportAgent:
 
         # Export
         resp = client.post(
-            f"/api/manifest/agents/{agent_id}/export",
+            f"/api/agents/{agent_id}/export",
             json={"source_format": "standalone_toml"},
         )
         assert resp.status_code == 200
@@ -142,7 +142,7 @@ This is a test agent."""
 
         # Import
         resp = client.post(
-            "/api/manifest/agents/import",
+            "/api/agents/import-file",
             json={
                 "path": str(agent_file),
                 "strategy": "new_agent",
@@ -199,7 +199,7 @@ Updated prompt"""
 
         # Try to import as new_agent (should fail)
         resp = client.post(
-            "/api/manifest/agents/import",
+            "/api/agents/import-file",
             json={
                 "path": str(agent_file),
                 "strategy": "new_agent",
@@ -248,7 +248,7 @@ Updated v2 prompt"""
 
         # Import as new_version
         resp = client.post(
-            "/api/manifest/agents/import",
+            "/api/agents/import-file",
             json={
                 "path": str(agent_file),
                 "strategy": "new_version",
@@ -273,7 +273,7 @@ Updated v2 prompt"""
         client, _ = _app(isolated_data_dir)
 
         resp = client.post(
-            "/api/manifest/agents/import",
+            "/api/agents/import-file",
             json={
                 "path": "/nonexistent/file.md",
                 "strategy": "new_agent",
@@ -317,7 +317,7 @@ New prompt"""
 
         # Import with skip
         resp = client.post(
-            "/api/manifest/agents/import",
+            "/api/agents/import-file",
             json={
                 "path": str(agent_file),
                 "strategy": "skip",
@@ -363,7 +363,7 @@ Overwritten prompt"""
 
         # Import with overwrite
         resp = client.post(
-            "/api/manifest/agents/import",
+            "/api/agents/import-file",
             json={
                 "path": str(agent_file),
                 "strategy": "overwrite",
