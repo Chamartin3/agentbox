@@ -31,3 +31,9 @@ docs/
 
 # Playwright MCP scratch
 .playwright-mcp/
+
+# Claude Code local config
+.claude/
+
+# Local screenshots / scratch images
+*.png
