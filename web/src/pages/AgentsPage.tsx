@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, AgentDef } from '../api/client';
+import { api, AgentDef, RunnerProfile } from '../api/client';
 import { AgentSortKey, SortDir } from '../api/enums';
 
 function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void }) {
@@ -65,6 +65,8 @@ function formatUpdated(s?: string | null): string {
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentDef[]>([]);
+  const [profiles, setProfiles] = useState<RunnerProfile[]>([]);
+  const [savingProfile, setSavingProfile] = useState<string | null>(null);
   const [selected, setSelected] = useState<AgentDef | null>(null);
   const [query, setQuery] = useState('');
   const [runnerFilter, setRunnerFilter] = useState('');
@@ -74,7 +76,28 @@ export default function AgentsPage() {
 
   useEffect(() => {
     api.listAgents().then(setAgents).catch(console.error);
+    api.listRunnerProfiles().then(setProfiles).catch(console.error);
   }, []);
+
+  const onChangeProfile = async (agentId: string, profileId: string) => {
+    setSavingProfile(agentId);
+    try {
+      if (profileId) {
+        await api.setAgentRunnerProfile(agentId, profileId);
+      } else {
+        await api.clearAgentRunnerProfile(agentId);
+      }
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId ? { ...a, runner_profile_id: profileId || null } : a,
+        ),
+      );
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingProfile(null);
+    }
+  };
 
   const runnerKinds = Array.from(new Set(agents.map((a) => a.runner.kind))).sort();
 
@@ -143,12 +166,13 @@ export default function AgentsPage() {
           <tr>
             <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Id)}>ID{ind(AgentSortKey.Id)}</th>
             <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Runner)}>Runner{ind(AgentSortKey.Runner)}</th>
-            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Model)}>Model{ind(AgentSortKey.Model)}</th>
+            <th>Profile</th>
             <th>Session</th>
             <th>Workspace</th>
             <th>Description</th>
+            <th>v</th>
             <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.UpdatedAt)}>Last changed{ind(AgentSortKey.UpdatedAt)}</th>
-            <th></th>
+            <th>Runs</th>
           </tr>
         </thead>
         <tbody>
@@ -162,7 +186,22 @@ export default function AgentsPage() {
                 <Link to={`/agents/${a.id}`}><strong>{a.id}</strong></Link>
               </td>
               <td><span className="tag">{a.runner.kind}</span></td>
-              <td className="dim">{a.runner.model || '—'}</td>
+              <td onClick={(e) => e.stopPropagation()}>
+                <select
+                  value={a.runner_profile_id || ''}
+                  disabled={savingProfile === a.id}
+                  onChange={(e) => void onChangeProfile(a.id, e.target.value)}
+                  style={{ fontSize: 12, maxWidth: 220 }}
+                  title={a.runner_profile_id || 'system default'}
+                >
+                  <option value="">— system default —</option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.model ? ` · ${p.model}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </td>
               <td className="dim">{a.session_mode}</td>
               <td className="dim">
                 {a.workspace === '<ephemeral>'
@@ -170,18 +209,23 @@ export default function AgentsPage() {
                   : (a.workspace || <span className="dim">auto</span>)}
               </td>
               <td>{a.description}</td>
+              <td onClick={(e) => e.stopPropagation()} className="dim" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                {a.version != null ? (
+                  <Link to={`/agents/${a.id}/versions`} title="prompt versions">v{a.version}</Link>
+                ) : '—'}
+              </td>
               <td className="dim" style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
                 {formatUpdated(a.updated_at)}
               </td>
-              <td onClick={(e) => e.stopPropagation()}>
+              <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right' }}>
                 <Link to={`/runs?agent=${encodeURIComponent(a.id)}`} title="view runs">
-                  runs →
+                  {a.run_count ?? 0}
                 </Link>
               </td>
             </tr>
           ))}
           {pageRows.length === 0 && (
-            <tr><td colSpan={8} className="dim" style={{ textAlign: 'center', padding: 24 }}>no agents match</td></tr>
+            <tr><td colSpan={9} className="dim" style={{ textAlign: 'center', padding: 24 }}>no agents match</td></tr>
           )}
         </tbody>
       </table>

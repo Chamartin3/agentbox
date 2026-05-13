@@ -62,6 +62,9 @@ export interface RunRecord {
   variables: Record<string, string> | null;
   validation_status: string | null;
   validation_errors: string | null;
+  backend?: string | null;
+  configured_model?: string | null;
+  reported_model?: string | null;
 }
 
 export interface UsageRecord {
@@ -127,6 +130,8 @@ export interface AgentDef {
   version?: number | null;
   total_versions?: number | null;
   active_version?: number | null;
+  run_count?: number | null;
+  runner_profile_id?: string | null;
 }
 
 export interface PromptFragment {
@@ -709,6 +714,13 @@ export const api = {
   listRunnerProviders: (backend?: string) => {
     const qs = backend ? `?backend=${encodeURIComponent(backend)}` : '';
     return req<RunnerProvider[]>(`/api/runner-providers${qs}`);
+  },
+  refreshRunnerProviders: (backend?: string) => {
+    const qs = backend ? `?backend=${encodeURIComponent(backend)}` : '';
+    return req<{ opencode: string[]; model_cache_cleared: boolean }>(
+      `/api/runner-providers/refresh${qs}`,
+      { method: 'POST' },
+    );
   },
   listProviderModels: (
     providerId: string,

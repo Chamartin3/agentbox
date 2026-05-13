@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core import workspaces as ws
@@ -13,6 +14,8 @@ from agentbox.core.composition import compose_from_source
 from agentbox.core.composition.loader import load_bundle_from_bindings
 from agentbox.core.data.manifest import AgentDef
 from agentbox.core.data.runner_profiles import RunnerProfile
+from agentbox.core.data.schema import agent_runner_profiles
+from agentbox.core.data.schema import runs as runs_table
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,27 @@ def list_agents() -> list[dict]:
     loader = get_loader()
     settings = get_settings()
 
+    # Per-agent run counts and bound runner profiles, in two cheap queries.
+    run_counts: dict[str, int] = {}
+    profile_bindings: dict[str, str] = {}
+    try:
+        with store.engine.connect() as conn:
+            for agent_id, n in conn.execute(
+                select(runs_table.c.agent_id, func.count().label("n"))
+                .group_by(runs_table.c.agent_id)
+            ):
+                if agent_id:
+                    run_counts[agent_id] = int(n)
+            for agent_id, profile_id in conn.execute(
+                select(
+                    agent_runner_profiles.c.agent_id,
+                    agent_runner_profiles.c.runner_profile_id,
+                )
+            ):
+                profile_bindings[agent_id] = profile_id
+    except Exception:
+        logger.exception("agents list: failed to load run counts / profile bindings")
+
     def _enrich(
         agent: AgentDef, *, updated_at: str | None = None, version: int | None = None
     ) -> dict:
@@ -56,6 +80,8 @@ def list_agents() -> list[dict]:
         data = {
             **agent.model_dump(),
             "resolved_workspace": workspace_str,
+            "run_count": run_counts.get(agent.id, 0),
+            "runner_profile_id": profile_bindings.get(agent.id),
         }
         if updated_at is not None:
             data["updated_at"] = updated_at
