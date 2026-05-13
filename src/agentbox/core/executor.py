@@ -17,31 +17,25 @@ import contextlib
 import json
 import logging
 import os
-import re
 import shutil
 import tempfile
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import jsonschema as _jsonschema
-
 from agentbox.api.events import (
     DoneEvent,
     GuardrailEvent,
     LogEvent,
-    RetryEvent,
     RunEvent,
-    TextEvent,
-    TimeoutEvent,
     UsageEvent,
-    ValidationEvent,
 )
 from agentbox.api.webhooks import schedule_webhook
 from agentbox.config import Settings
+from agentbox.core.agent_config import ExecutionConfig
 from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.config_generation import ConfigGenerator
-from agentbox.core.constants import RunStatus
+from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS, RunStatus
 from agentbox.core.data import SessionStore
 from agentbox.core.data.schema import runs as _runs_table
 from agentbox.core.definitions import AgentDef, DefinitionLoader
@@ -65,43 +59,51 @@ from agentbox.core.runner_profiles import (
     EffectiveRunnerConfig,
     RunnerProfileResolver,
 )
-from agentbox.core.streaming.rate_limit import detect_in_text_line
+from agentbox.core.streaming.session import RunStreamSession
+from agentbox.core.validation import extract_json
 from agentbox.core.versioning.drift import check_drift, startup_sweep
 from agentbox.core.workspaces import resolve_path
 
 if TYPE_CHECKING:
-    from agentbox.core.backends.base import BackendAdapter
+    from agentbox.core.backends.base import BackendAdapter, BackendRunResult
     from agentbox.core.mcp.registry import McpRegistry
 
 logger = logging.getLogger(__name__)
 
 
-_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
+async def _adapter_run_into_session(
+    adapter: Any,
+    rendered: RenderedConfig,
+    input_: str,
+    session: RunStreamSession,
+) -> BackendRunResult:
+    """Invoke ``adapter.run_into_session`` or bridge a legacy iterator backend.
 
-
-def _extract_json(text: str) -> str:
-    """Pull a JSON payload out of model output that may include prose / fences.
-
-    Models often wrap the JSON in ```json fences and surrounding prose
-    despite being told not to. Validation should still engage on the JSON
-    they produced, so we extract the first fenced block when present;
-    otherwise we fall back to the first '{...}' / '[...]' slice; otherwise
-    return the raw text unchanged for json.loads to fail on naturally.
+    Adapters that inherit from :class:`BackendAdapter` get the default
+    iterator-bridge implementation for free. Duck-typed adapters used
+    in tests (or older external backends that predate the bridge)
+    expose only ``run()`` returning an ``AsyncIterator[RunEvent]``;
+    this helper pumps them into the session manually so the executor's
+    single entry point keeps working.
     """
-    if not text:
-        return text
-    m = _FENCED_JSON_RE.search(text)
-    if m:
-        return m.group(1).strip()
-    s = text.strip()
-    if s.startswith(("{", "[")):
-        return s
-    for opener, closer in (("{", "}"), ("[", "]")):
-        i = s.find(opener)
-        j = s.rfind(closer)
-        if 0 <= i < j:
-            return s[i : j + 1]
-    return s
+    from agentbox.core.backends.base import BackendRunResult
+
+    if hasattr(adapter, "run_into_session"):
+        return await adapter.run_into_session(rendered, input_, session)
+
+    # Duck-typed fallback — mirror the default bridge in BackendAdapter.
+    result = BackendRunResult(ok=False)
+    async for ev in adapter.run(rendered, input_, session.run_id):
+        if isinstance(ev, DoneEvent):
+            result = BackendRunResult(
+                ok=ev.ok,
+                exit_code=ev.exit_code,
+                error=ev.error,
+                status=ev.status,
+            )
+            continue
+        session.emit(ev)
+    return result
 
 
 # Substring markers that identify expected, agent-level failures (vs.
@@ -157,46 +159,6 @@ def _classify_terminal_error(err: str | None) -> str | None:
         if marker.lower() in lower:
             return RunStatus.FAILED.value
     return None
-
-
-def _format_validation_error(exc: _jsonschema.ValidationError) -> str:
-    """Render a jsonschema ValidationError so the agent sees *where* it failed.
-
-    The default ``str(exc)`` dumps the schema and instance but does not say
-    *which JSON pointer path* in the instance the failing validator was
-    anchored at — so when ``oneOf`` is at the root, agents often think it's
-    anchored on a nested object and fix the wrong place.
-    """
-    instance_pointer = "/" + "/".join(str(p) for p in exc.absolute_path) if exc.absolute_path else "/"
-    schema_pointer = "/" + "/".join(str(p) for p in exc.absolute_schema_path) if exc.absolute_schema_path else "/"
-    lines = [
-        f"validation failed at instance path: {instance_pointer}",
-        f"schema rule violated at: {schema_pointer} ({exc.validator})",
-        f"message: {exc.message}",
-    ]
-    if exc.validator == "oneOf" and exc.context:
-        lines.append("")
-        lines.append("oneOf sub-errors (each branch's first failure):")
-        for branch_idx, sub in enumerate(exc.context):
-            title = ""
-            try:
-                title = sub.schema.get("title", "") if isinstance(sub.schema, dict) else ""
-            except AttributeError:
-                title = ""
-            label = f"branch[{branch_idx}]"
-            if title:
-                label += f" ({title})"
-            sub_path = "/" + "/".join(str(p) for p in sub.absolute_path) if sub.absolute_path else "/"
-            lines.append(f"  - {label} at {sub_path}: {sub.message}")
-    try:
-        instance_preview = json.dumps(exc.instance, default=str)
-    except (TypeError, ValueError):
-        instance_preview = repr(exc.instance)
-    if len(instance_preview) > 800:
-        instance_preview = instance_preview[:800] + "...(truncated)"
-    lines.append("")
-    lines.append(f"failing instance ({instance_pointer}): {instance_preview}")
-    return "\n".join(lines)
 
 
 def _load_workspace_permissions(
@@ -372,9 +334,10 @@ class RunExecutor:
             agent, session_id, workspace_override
         )
 
-        agent = self._apply_overrides(
-            agent, timeout_seconds, webhook_url, runner_override
-        )
+        if backend is None and runner_override is not None:
+            backend = runner_override
+        if webhook_url is not None:
+            agent = agent.model_copy(update={"webhook_url": webhook_url})
 
         # --- resource prep (Plan 08 Phase 1) ---------------------------------
         _resource_snapshot_entries: list[dict] = []
@@ -430,10 +393,8 @@ class RunExecutor:
 
         # --- composition path ------------------------------------------------
         composed_result = None
-        bundle_path: Path | None = None
         if agent.composition is not None and variables is not None:
             from agentbox.core.composition.loader import (
-                load_bundle,
                 load_bundle_from_bindings,
             )
 
@@ -443,42 +404,15 @@ class RunExecutor:
                 for k, v in (manifest.shared_assets or {}).items()
             }
 
-            # Find the agent bundle path
-            bundle_path = self._resolve_bundle_path(agent)
-
-            # Bindings-first composition: agent_prompt_resource_bindings
-            # is now the single source of truth for system prompt,
-            # user template, schemas and references. The legacy bundle
-            # path is only used when AGENTBOX_BUNDLE_SOURCE=disk (debug).
-            bundle = None
-            source_pref = os.getenv("AGENTBOX_BUNDLE_SOURCE", "auto").lower()
-            if source_pref != "disk":
-                try:
-                    bundle = load_bundle_from_bindings(
-                        agent_id=agent.id,
-                        store=self.store,
-                        fallback_path=bundle_path,
-                    )
-                except FileNotFoundError as exc:
-                    logger.info(
-                        "executor: agent %r not yet migrated to bindings (%s); using disk bundle",
-                        agent.id,
-                        exc,
-                    )
-                    bundle = None
-                except Exception:
-                    logger.exception(
-                        "executor: bindings bundle load failed for %r — falling back to disk",
-                        agent.id,
-                    )
-                    bundle = None
-            if bundle is None:
-                bundle = load_bundle(
-                    agent_id=agent.id,
-                    root=bundle_path,
-                    manifest_composition=agent.composition,
-                    legacy_prompt_path=agent.prompt_path,
-                )
+            # DB-as-source-of-truth (Plan 18): bundle inputs come from
+            # ``agent_prompt_resource_bindings`` first, with a fallback
+            # to ``agent_versions.prompt_content`` for agents that have
+            # not been migrated to bindings. The on-disk bundle is no
+            # longer read at runtime — only at import time.
+            bundle = load_bundle_from_bindings(
+                agent_id=agent.id,
+                store=self.store,
+            )
             composed_result = bundle.compose(variables, shared_roots)
 
             # Append validation-engine hint to system prompt when a schema
@@ -486,9 +420,7 @@ class RunExecutor:
             # checked.
             system_text = composed_result.system
             if composed_result.schema is not None:
-                engine = getattr(
-                    agent.runner, "output_validation_engine", "both"
-                )
+                engine = ExecutionConfig.from_agent(agent).output_validation_engine
                 from agentbox.core.composition import (
                     _append_validation_engine_hint,
                 )
@@ -511,36 +443,18 @@ class RunExecutor:
         # declaring it in [composition].output_schema still engage validation.
         comp = agent.composition
         if comp is not None:
-            if bundle_path is None:
-                bundle_path = self._resolve_bundle_path(agent)
             if composed_result is None:
                 agent = agent.model_copy(deep=True)
-            schema_rel: str | None = None
-            if comp.output_schema:
-                schema_rel = comp.output_schema
-            else:
-                from agentbox.core.constants import BundleFile
-
-                for fallback in (
-                    BundleFile.OUTPUT_SCHEMA,
-                    BundleFile.OUTPUT_SCHEMA_ALT,
-                ):
-                    if (bundle_path / fallback).exists():
-                        schema_rel = fallback
-                        break
-            if schema_rel and comp.output_validation != "off":
-                schema_path = bundle_path / schema_rel
-                runner_updates: dict = {
-                    "output_schema_path": str(schema_path),
-                }
-                if comp.output_validation == "warn":
-                    runner_updates["max_validation_retries"] = 0
-                agent = agent.model_copy(
-                    update={"runner": agent.runner.model_copy(update=runner_updates)}
-                )
+            # Schema location: when composition resolved a schema (via
+            # bindings or agent_versions), it's already attached to
+            # ``agent._composed_schema``. The legacy
+            # ``runner.output_schema_path`` only matters when no
+            # composed schema is present — in that case there's nothing
+            # to validate against and ``_validate_output`` returns "off".
             agent.__dict__["_composed_validation_mode"] = comp.output_validation
 
         # --- prompt resource binding substitution (Plan 08 Phase 1) ----------
+        prompt_bindings: list[dict] = []
         try:
             prompt_bindings = resolve_agent_prompt_bindings(self.store, agent.id)
             if prompt_bindings:
@@ -580,6 +494,30 @@ class RunExecutor:
                 agent.id,
             )
 
+        # Wire output_schema binding → _composed_schema for runtime validation.
+        # Covers legacy_dir agents that declare output schemas via resource
+        # bindings (sync_agent_schemas) but have no [composition] block.
+        if prompt_bindings and not isinstance(agent.__dict__.get("_composed_schema"), dict):
+            for _b in prompt_bindings:
+                if _b.get("slot") != "output_schema":
+                    continue
+                for _blob in _b.get("blobs") or []:
+                    _raw = (_blob.get("content_text") or "").strip()
+                    if not _raw:
+                        continue
+                    try:
+                        _schema = json.loads(_raw)
+                    except (json.JSONDecodeError, TypeError):
+                        logger.warning(
+                            "executor: failed to parse output_schema binding for agent %r",
+                            agent.id,
+                        )
+                        continue
+                    if isinstance(_schema, dict):
+                        agent.__dict__["_composed_schema"] = _schema
+                    break
+                break
+
         # Resolve effective runner config and select backend adapter
         try:
             effective = self._profile_resolver.resolve(
@@ -596,22 +534,12 @@ class RunExecutor:
         # Require a bound runner profile only when the caller did not
         # explicitly pick a backend (e.g. via the API ``backend=`` override
         # or programmatic ``execute(..., backend=...)`` from tests).
-        if (
-            effective.source in ("agent_legacy", "backend_default")
-            and backend is None
-        ):
+        if effective.backend is None and backend is None:
             error_msg = (
                 f"agent {agent.id!r} has no runner profile bound. "
                 "Assign a runner profile in the UI (Agents → Runner Profile)."
             )
             return self._fail_pre_run(agent, input_, workdir, session_id, error_msg)
-
-        # Apply effective timeout if not already overridden
-        effective_timeout = timeout_seconds or effective.timeout_seconds
-        if effective_timeout and not timeout_seconds:
-            agent = self._apply_overrides(
-                agent, effective_timeout, webhook_url, runner_override
-            )
 
         adapter, rendered = self._select_backend(
             agent, workdir, backend, runner_config=effective
@@ -653,11 +581,32 @@ class RunExecutor:
             runner_profile_id=effective.profile_id,
         )
 
+        # Snapshot the resolved runner config — historical fact, never
+        # updated. UI reads this so renaming/rebinding/deleting the
+        # bound profile doesn't rewrite what the run page displays.
+        try:
+            self.store.save_run_runner_snapshot(
+                run_id,
+                self._build_runner_snapshot(
+                    effective=effective,
+                    rendered_model=rendered.model,
+                    backend_override=backend,
+                    runner_override=runner_override,
+                    runner_profile_id_param=runner_profile,
+                    runner_config_param=runner_config,
+                    timeout_override=timeout_seconds,
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "failed to persist runner_snapshot for run %s", run_id
+            )
+
         # Record the effective model immediately at run creation — before
         # the runner task starts — so every run has a model name in the
         # usage table regardless of backend, status, or whether the
         # runner ever emits a UsageEvent. ``rendered.model`` is populated
-        # by the adapter's ``render()`` (spec.model or backend default).
+        # from EffectiveRunnerConfig or the backend default.
         if rendered.model:
             try:
                 self.store.record_usage(run_id, {"model": rendered.model})
@@ -763,6 +712,7 @@ class RunExecutor:
                 run_dir,
                 transcript_path,
                 broadcaster,
+                effective=effective,
             )
         )
         self._tasks.add(task)
@@ -778,15 +728,6 @@ class RunExecutor:
 
         task.add_done_callback(_on_task_done)
         return run_id
-
-    def _resolve_bundle_path(self, agent: AgentDef) -> Path:
-        """Resolve the filesystem path for an agent's bundle."""
-        if agent.source_path and agent.source_path.is_dir():
-            return agent.source_path
-        if agent.source_path and agent.source_path.is_file():
-            return agent.source_path.parent
-        # Fallback: agents_dir / agent.id
-        return self.settings.project_root / "agents" / agent.id
 
     def _fail_pre_run(
         self,
@@ -828,12 +769,12 @@ class RunExecutor:
 
         Algorithm:
         1. Explicit ``backend`` from the request (highest priority).
-        2. ``backend_preference`` list from the project manifest; skip any
-           in ``agent.unsupported_backends``.
-        3. Fall back to ``agent.runner.kind`` (deprecated).
-        4. ``NO_BACKEND_AVAILABLE`` error.
+        2. Resolved ``EffectiveRunnerConfig.backend``.
+        3. ``NO_BACKEND_AVAILABLE`` error.
+
+        Static ``agent.runner`` is intentionally ignored; dispatch has a
+        single runtime source of truth: ``EffectiveRunnerConfig``.
         """
-        manifest = self.loader.load()
 
         def _try_backend(name: str) -> BackendAdapter | None:
             try:
@@ -849,20 +790,6 @@ class RunExecutor:
             candidates = [backend_override]
         elif runner_config is not None and runner_config.backend:
             candidates = [runner_config.backend]
-        elif manifest.backend_preference:
-            candidates = [
-                n
-                for n in manifest.backend_preference
-                if n not in agent.unsupported_backends
-            ]
-        else:
-            kind = agent.runner.kind
-            if kind is not None:
-                # `kind` is a RunnerKind enum; str() returns the repr
-                # ("RunnerKind.OPENCODE"), so use .value to get the
-                # backend-registry key ("opencode"). Fall back to str()
-                # for the rare case it was already a plain string.
-                candidates = [kind.value if hasattr(kind, "value") else str(kind)]
 
         for name in candidates:
             adapter = _try_backend(name)
@@ -876,27 +803,63 @@ class RunExecutor:
         # caller *which* backend was asked for and why it's unavailable.
         raise NoBackendAvailable(agent_id=agent.id, attempted=candidates)
 
-    @staticmethod
-    def _apply_overrides(
-        agent: AgentDef,
-        timeout_seconds: int | None,
-        webhook_url: str | None,
-        runner_override: str | None = None,
-    ) -> AgentDef:
-        runner_updates: dict = {}
-        if timeout_seconds is not None:
-            runner_updates["timeout_seconds"] = timeout_seconds
-        if runner_override is not None:
-            runner_updates["kind"] = runner_override
+    def _build_runner_snapshot(
+        self,
+        *,
+        effective: EffectiveRunnerConfig,
+        rendered_model: str | None,
+        backend_override: str | None,
+        runner_override: str | None,
+        runner_profile_id_param: str | None,
+        runner_config_param: dict[str, Any] | None,
+        timeout_override: int | None,
+    ) -> dict[str, Any]:
+        """Compose the append-only runner_snapshot dict for a run.
 
-        kwargs: dict = {}
-        if runner_updates:
-            kwargs["runner"] = agent.runner.model_copy(update=runner_updates)
-        if webhook_url is not None:
-            kwargs["webhook_url"] = webhook_url
-        if kwargs:
-            return agent.model_copy(update=kwargs)
-        return agent
+        Captures everything the run-detail UI needs to render what
+        actually executed: backend, model, timeout, provider, extra_args,
+        the resolution source, and any per-run overrides that were
+        applied. Profile name is looked up best-effort.
+        """
+        from agentbox.core.data.records import now_iso
+
+        profile_name: str | None = None
+        if effective.profile_id:
+            try:
+                profile = self.store.get_runner_profile(effective.profile_id)
+                if profile is not None:
+                    profile_name = getattr(profile, "name", None) or (
+                        profile.get("name") if hasattr(profile, "get") else None
+                    )
+            except Exception:
+                logger.debug(
+                    "could not resolve profile name for %s", effective.profile_id
+                )
+
+        overrides_applied: dict[str, Any] = {}
+        if backend_override:
+            overrides_applied["backend"] = backend_override
+        if runner_override:
+            overrides_applied["runner_kind"] = runner_override
+        if runner_profile_id_param:
+            overrides_applied["runner_profile_id"] = runner_profile_id_param
+        if runner_config_param:
+            overrides_applied["runner_config"] = runner_config_param
+        if timeout_override:
+            overrides_applied["timeout_seconds"] = timeout_override
+
+        return {
+            "profile_id": effective.profile_id,
+            "profile_name": profile_name,
+            "backend": effective.backend,
+            "model": rendered_model or effective.model,
+            "timeout_seconds": effective.timeout_seconds,
+            "provider": effective.provider,
+            "extra_args": list(effective.extra_args or []),
+            "source": effective.source,
+            "overrides_applied": overrides_applied,
+            "captured_at": now_iso(),
+        }
 
     def _prepare_workdir(
         self,
@@ -1041,77 +1004,122 @@ class RunExecutor:
         run_dir: Path,
         transcript_path: Path,
         broadcaster: RunBroadcaster,
+        effective: EffectiveRunnerConfig | None = None,
     ) -> None:
+        from agentbox.core.agent_config import ExecutionConfig, PythonAgentConfig
+
         current_input = input_
 
-        output_text: list[str] = []
         final_ok = False
         final_error: str | None = None
         final_status: str | None = None
-        done_event_published = False
         output: str | None = None
         validation_status: str | None = None
         validation_errors: list[str] | None = None
         schema_validated_via: str | None = None
 
-        error_retries_left = agent.runner.max_error_retries or 0
-        validation_retries_left = agent.runner.max_validation_retries or 0
+        exec_cfg = ExecutionConfig.from_agent(agent)
+        python_cfg = PythonAgentConfig.from_agent(agent)
+
+        error_retries_left = exec_cfg.max_error_retries or 0
+        validation_retries_left = exec_cfg.max_validation_retries or 0
         # Cap total attempts to avoid infinite loops.
         max_attempts = 1 + error_retries_left + validation_retries_left
 
-        timeout = agent.runner.timeout_seconds
+        timeout = (
+            effective.timeout_seconds if effective is not None else None
+        ) or DEFAULT_RUNNER_TIMEOUT_SECONDS
+
+        # ``timeout`` is the per-RUN wall-clock budget, shared across every
+        # error/validation retry attempt below — not a per-attempt allowance.
+        # The old behaviour granted each attempt its own ``timeout`` window,
+        # which let a 400s timeout produce 27-minute runs when the LLM kept
+        # failing schema validation (3 retries at ~6 min each + the original).
+        # Users read "timeout" as "this run will finish within N seconds";
+        # a shared deadline honours that. A slow attempt 1 can now starve
+        # attempt 2 — that's the correct trade-off: the configured timeout
+        # is the *budget*, not the *per-iteration cap*.
+        deadline = asyncio.get_event_loop().time() + timeout
+
+        # Single fan-out point for transcript + WS broadcast + output_text
+        # accumulation. Replaces three lines of plumbing scattered across the
+        # run loop and enforces "DoneEvent is the LAST event emitted" — UIs
+        # treat ``done`` as terminal, so post-run ``ValidationEvent``s
+        # previously raced the close and were lost from WS subscribers.
+        session = RunStreamSession(
+            run_id=run_id,
+            broadcaster=broadcaster,
+            transcript_path=transcript_path,
+        )
+        session.add_observer(
+            lambda ev: self.store.record_usage(run_id, ev.model_dump())
+            if isinstance(ev, UsageEvent)
+            else None
+        )
+
         try:
-            transcript_path.parent.mkdir(parents=True, exist_ok=True)
             # Model is pre-recorded at run creation (see ``execute``); no
             # need to re-record here. UsageEvents from the runner refine
             # token/cost; model is preserved by COALESCE in record_usage.
-            for attempt in range(max_attempts):
-                output_text.clear()
-                run_error: str | None = None
+            with session:
+                for attempt in range(max_attempts):
+                    session.output_text.clear()
+                    run_error: str | None = None
 
-                with transcript_path.open("a", encoding="utf-8", buffering=1) as tf:
+                    # Honour the shared wall-clock deadline computed above.
+                    # If a prior attempt already exhausted the budget, raise
+                    # synthetic TimeoutError immediately rather than waiting
+                    # for ``asyncio.timeout_at`` to fire on a no-op await.
+                    if asyncio.get_event_loop().time() >= deadline:
+                        run_error = (
+                            f"timeout after {timeout}s "
+                            f"(budget exhausted across {attempt} attempt"
+                            f"{'s' if attempt != 1 else ''})"
+                        )
+                        final_error = run_error
+                        final_ok = False
+                        final_status = RunStatus.TIMEOUT.value
+                        session.emit_timeout(
+                            timeout_seconds=timeout, error=run_error
+                        )
+                        session.emit_log(level="error", message=run_error)
+                        break
+
                     try:
-                        async with asyncio.timeout(timeout):
-                            async for ev in adapter.run(rendered, current_input, run_id):
-                                self._handle_event(run_id, ev, output_text, tf)
-                                broadcaster.publish(ev)
-                                if isinstance(ev, DoneEvent):
-                                    final_ok = ev.ok
-                                    final_error = ev.error
-                                    final_status = ev.status
-                                    done_event_published = True
-                                    # Finalize as soon as the runner signals done;
-                                    # don't wait for the generator to drain. Any
-                                    # tail-end task can otherwise delay or skip
-                                    # the finally block (status persist + webhook).
-                                    break
-                                # Centralised fatal-pattern detection: any
-                                # LogEvent whose message matches a known
-                                # rate-limit / auth / quota signature aborts
-                                # the run immediately instead of waiting for
-                                # the per-run timeout. Applies to every
-                                # backend that surfaces diagnostics as
-                                # LogEvents — no per-runner duplication.
-                                if isinstance(ev, LogEvent):
-                                    fatal = detect_in_text_line(ev.message or "")
-                                    if fatal is not None:
-                                        final_ok = False
-                                        final_error = fatal
-                                        final_status = RunStatus.FAILED.value
-                                        break
+                        async with asyncio.timeout_at(deadline):
+                            # Backend pushes events through the session
+                            # (which enforces DoneEvent-last ordering) and
+                            # returns the terminal status. The default
+                            # ``run_into_session`` pump intercepts the
+                            # backend's DoneEvent so it doesn't reach WS
+                            # clients before validation runs.
+                            #
+                            # Note: the previous loop also early-broke on
+                            # fatal LogEvents (rate-limit / auth / quota
+                            # markers) to cut off subprocess output sooner.
+                            # We've dropped that here — the backend still
+                            # surfaces the error via its own DoneEvent, and
+                            # ``_classify_terminal_error`` below reclassifies
+                            # the run as ``failed`` based on the error
+                            # string. Responsiveness regression on stuck
+                            # rate-limited subprocesses is the trade-off;
+                            # the per-run timeout still bounds total wall
+                            # time. See ``detect_in_text_line``.
+                            backend_result = await _adapter_run_into_session(
+                                adapter, rendered, current_input, session
+                            )
+                            final_ok = backend_result.ok
+                            final_error = backend_result.error
+                            final_status = backend_result.status
                     except TimeoutError:
                         run_error = f"timeout after {timeout}s"
                         final_error = run_error
                         final_ok = False
                         final_status = RunStatus.TIMEOUT.value
                         if timeout is not None:
-                            to_ev = TimeoutEvent(
-                                run_id=run_id,
-                                timeout_seconds=timeout,
-                                error=run_error,
+                            session.emit_timeout(
+                                timeout_seconds=timeout, error=run_error
                             )
-                            tf.write(to_ev.model_dump_json() + "\n")
-                            broadcaster.publish(to_ev)
                     except Exception as exc:
                         import traceback as _tb
                         tb_text = _tb.format_exc()
@@ -1122,113 +1130,97 @@ class RunExecutor:
                             "runner crashed for run %s", run_id
                         )
 
-                    # --- Post-run logic (inside with block so tf is available) ---
                     if run_error:
-                        ev = LogEvent(
-                            run_id=run_id,
-                            level="error",
-                            message=run_error,
-                        )
-                        tf.write(ev.model_dump_json() + "\n")
-                        broadcaster.publish(ev)
+                        session.emit_log(level="error", message=run_error)
 
-                    output = "\n".join(output_text).strip() or None
+                    output = "\n".join(session.output_text).strip() or None
 
-                    # --- workdir/output.json fallback ---------------------------
-                    # When the agent wrote its structured output to a file
-                    # instead of returning it inline (e.g. opencode running
-                    # with write tools), prefer the file content if the text
+                    # When the agent wrote structured output to a file
+                    # instead of returning it inline (e.g. opencode with
+                    # write tools), prefer the file content if the text
                     # output doesn't parse as JSON. Only kicks in when an
                     # output schema is configured.
-                    if agent.runner.output_schema_path:
+                    has_schema = python_cfg.output_schema_path or isinstance(
+                        agent.__dict__.get("_composed_schema"), dict
+                    )
+                    if has_schema:
                         output = self._maybe_load_output_file(output, workdir)
 
-                    # --- Error recovery (any failure including timeout) ----------
+                    # --- Error recovery (any failure including timeout) ---
                     if not final_ok:
                         if error_retries_left > 0:
                             error_retries_left -= 1
-                            reason = "timeout" if final_status == RunStatus.TIMEOUT.value else "run_error"
+                            reason = (
+                                "timeout"
+                                if final_status == RunStatus.TIMEOUT.value
+                                else "run_error"
+                            )
                             current_input = self._build_error_retry_prompt(
                                 input_, output, final_error
                             )
-                            ev = RetryEvent(
-                                run_id=run_id,
+                            session.emit_retry(
                                 attempt=attempt + 1,
                                 reason=reason,
                                 error=final_error,
                             )
-                            tf.write(ev.model_dump_json() + "\n")
-                            broadcaster.publish(ev)
-                            ev = LogEvent(
-                                run_id=run_id,
+                            session.emit_log(
                                 level="warn",
                                 message=(
-                                    f"Run failed (attempt {attempt + 1}): {final_error} — "
-                                    f"retrying ({error_retries_left} left)"
+                                    f"Run failed (attempt {attempt + 1}): "
+                                    f"{final_error} — retrying "
+                                    f"({error_retries_left} left)"
                                 ),
                             )
-                            tf.write(ev.model_dump_json() + "\n")
-                            broadcaster.publish(ev)
                             continue
                         # No retries left — final error is already set.
                         break
 
-                    # --- Validation retry (output schema check) -----------------
-                    if agent.runner.output_schema_path:
-                        if not output:
-                            is_valid = False
-                            v_error = "output is empty but an output schema is required"
-                            schema_validated_via = "none"
-                        else:
-                            is_valid, v_error, schema_validated_via = (
-                                self._validate_output(output, agent, workdir)
-                            )
-                        mode = getattr(agent, "_composed_validation_mode", "strict")
-                        engine = schema_validated_via or "none"
-                        v_ev = ValidationEvent(
-                            run_id=run_id,
-                            ok=is_valid,
-                            attempt=attempt + 1,
-                            mode=mode if mode in ("strict", "warn", "off") else "strict",
-                            engine=engine if engine in ("jsonschema", "pydantic", "both", "none") else "none",
-                            error=None if is_valid else v_error,
+                    # --- Validation retry (output schema check) -----------
+                    if has_schema:
+                        result = adapter.validate_output(
+                            agent,
+                            workdir,
+                            output,
+                            project_root=self.settings.project_root,
                         )
-                        tf.write(v_ev.model_dump_json() + "\n")
-                        broadcaster.publish(v_ev)
-                        if is_valid:
+                        schema_validated_via = result.engine
+                        mode = getattr(agent, "_composed_validation_mode", "strict")
+                        session.emit_validation(
+                            ok=result.ok,
+                            attempt=attempt + 1,
+                            mode=mode,
+                            engine=result.engine,
+                            error=None if result.ok else result.error,
+                        )
+                        if result.ok:
                             validation_status = "ok"
                             validation_errors = None
                             break
                         validation_status = "fail"
-                        validation_errors = [v_error]
+                        validation_errors = [result.error]
                         if validation_retries_left > 0:
                             validation_retries_left -= 1
                             current_input = self._build_retry_prompt(
-                                input_, output, v_error
+                                input_, output, result.error
                             )
-                            ev = RetryEvent(
-                                run_id=run_id,
+                            session.emit_retry(
                                 attempt=attempt + 1,
                                 reason="validation_failed",
-                                error=v_error,
+                                error=result.error,
                             )
-                            tf.write(ev.model_dump_json() + "\n")
-                            broadcaster.publish(ev)
-                            ev = LogEvent(
-                                run_id=run_id,
+                            session.emit_log(
                                 level="warn",
                                 message=(
                                     f"Validation failed (attempt {attempt + 1}): "
-                                    f"{v_error} — retrying ({validation_retries_left} left)"
+                                    f"{result.error} — retrying "
+                                    f"({validation_retries_left} left)"
                                 ),
                             )
-                            tf.write(ev.model_dump_json() + "\n")
-                            broadcaster.publish(ev)
                             continue
                         # Final attempt failed validation
                         if mode == "strict":
                             final_ok = False
-                            final_error = f"output validation failed: {v_error}"
+                            final_error = f"output validation failed: {result.error}"
                             # Validation failure is an expected, agent-level
                             # outcome — classify as ``failed`` so the
                             # error-status bucket stays reserved for
@@ -1240,22 +1232,36 @@ class RunExecutor:
 
                     # Success path — no validation configured or passed.
                     break
-            try:
-                await self._run_guardrails(
-                    run_id, agent, input_, output or "", transcript_path, broadcaster
-                )
-            except Exception as exc:
-                suffix = f"guardrail error: {exc}"
-                final_error = f"{final_error} | {suffix}" if final_error else suffix
-            if schema_validated_via is None:
-                mode = getattr(agent, "_composed_validation_mode", "strict")
-                if mode == "off":
-                    schema_validated_via = "off"
-            # Reclassify expected, agent-level failures (rate-limit /
-            # connection / auth / validation) from ``error`` → ``failed``.
-            # Leaves ``timeout`` and any already-set status alone.
-            if not final_ok and final_status is None:
-                final_status = _classify_terminal_error(final_error)
+
+                try:
+                    await self._run_guardrails(
+                        run_id, agent, input_, output or "", session
+                    )
+                except Exception as exc:
+                    suffix = f"guardrail error: {exc}"
+                    final_error = (
+                        f"{final_error} | {suffix}" if final_error else suffix
+                    )
+                if schema_validated_via is None:
+                    mode = getattr(agent, "_composed_validation_mode", "strict")
+                    if mode == "off":
+                        schema_validated_via = "off"
+                # Reclassify expected, agent-level failures (rate-limit /
+                # connection / auth / validation) from ``error`` → ``failed``.
+                # Leaves ``timeout`` and any already-set status alone.
+                if not final_ok and final_status is None:
+                    final_status = _classify_terminal_error(final_error)
+
+                # ALWAYS emit the terminal DoneEvent through the session so
+                # it lands last in both the transcript and WS stream. The
+                # backend's own DoneEvent was captured (not re-emitted)
+                # above, so this is the only ``done`` clients see.
+                if not session.done_emitted:
+                    session.emit_done(
+                        ok=bool(final_ok),
+                        error=final_error,
+                        status=final_status,
+                    )
         finally:
             # Re-persist conversation_uri for runners that discover
             # their session ID during execution (e.g. OpenCode).
@@ -1280,24 +1286,6 @@ class RunExecutor:
                 validation_errors=validation_errors,
                 schema_validated_via=schema_validated_via,
             )
-            # Ensure WS clients always see a terminal DoneEvent. The
-            # runner publishes its own DoneEvent on the happy path
-            # (handled in the loop above), but when the executor breaks
-            # out early on timeout / fatal-pattern detection / validation
-            # failure / unexpected crash, no DoneEvent has been
-            # broadcast — clients would hang waiting for one. Synthesize
-            # one here so every terminal path emits exactly one DoneEvent.
-            if not done_event_published:
-                with contextlib.suppress(Exception):
-                    final_done = DoneEvent(
-                        run_id=run_id,
-                        ok=bool(final_ok),
-                        error=final_error,
-                        status=final_status,
-                    )
-                    with transcript_path.open("a", encoding="utf-8", buffering=1) as _tf:
-                        _tf.write(final_done.model_dump_json() + "\n")
-                    broadcaster.publish(final_done)
             try:
                 refreshed = self.store.get_run(run_id)
                 if refreshed is not None:
@@ -1311,97 +1299,6 @@ class RunExecutor:
             with contextlib.suppress(Exception):
                 self._cleanup_workdir(agent, workdir)
 
-    def _handle_event(
-        self,
-        run_id: str,
-        ev: RunEvent,
-        output_text: list[str],
-        tf,
-    ) -> None:
-        tf.write(ev.model_dump_json() + "\n")
-        if isinstance(ev, TextEvent):
-            # Delta events are UI-only. Prompt turns should be persisted and
-            # broadcast, but only assistant text is the run output.
-            if (
-                not getattr(ev, "delta", False)
-                and getattr(ev, "role", "assistant") == "assistant"
-            ):
-                output_text.append(ev.text)
-        elif isinstance(ev, UsageEvent):
-            self.store.record_usage(run_id, ev.model_dump())
-
-    def _validate_output(
-        self, output: str, agent: AgentDef, workdir: Path
-    ) -> tuple[bool, str, str]:
-        """Validate *output* against the agent's output schema.
-
-        Returns ``(is_valid, error_message, validated_via)`` where
-        *validated_via* is ``"jsonschema"``, ``"pydantic"``, or
-        ``"both"``.
-        """
-        # Composition pipeline attaches the parsed schema dict to the agent
-        # as ``_composed_schema``. Prefer it over re-reading the file: it
-        # works uniformly for disk-backed bundles and DB-only agents (which
-        # have no on-disk schema file). Falls back to the legacy on-disk
-        # path-based load when composition didn't run.
-        composed_schema = agent.__dict__.get("_composed_schema")
-        if isinstance(composed_schema, dict):
-            schema = composed_schema
-        else:
-            if not agent.runner.output_schema_path:
-                return True, "", "off"
-
-            schema_path = workdir / agent.runner.output_schema_path
-            if not schema_path.exists():
-                schema_path = self.settings.project_root / agent.runner.output_schema_path
-            if not schema_path.exists():
-                return False, f"schema file not found: {agent.runner.output_schema_path}", "none"
-
-            try:
-                schema = json.loads(schema_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError) as exc:
-                return False, f"cannot load schema: {exc}", "none"
-
-        engine = getattr(agent.runner, "output_validation_engine", "both")
-
-        if engine == "jsonschema":
-            return self._validate_jsonschema(output, schema)
-
-        if engine == "pydantic":
-            return self._validate_pydantic(output, schema)
-
-        # "both" — jsonschema first, then pydantic
-        js_ok, js_err, _ = self._validate_jsonschema(output, schema)
-        if not js_ok:
-            return False, js_err, "jsonschema"
-        py_ok, py_err, _ = self._validate_pydantic(output, schema)
-        if not py_ok:
-            return False, py_err, "pydantic"
-        return True, "", "both"
-
-    @staticmethod
-    def _validate_jsonschema(
-        output: str, schema: dict[str, Any]
-    ) -> tuple[bool, str, str]:
-        try:
-            instance = json.loads(_extract_json(output))
-        except json.JSONDecodeError as exc:
-            return False, f"output is not valid JSON: {exc}", "jsonschema"
-        try:
-            _jsonschema.validate(instance=instance, schema=schema)
-            return True, "", "jsonschema"
-        except _jsonschema.ValidationError as exc:
-            return False, _format_validation_error(exc), "jsonschema"
-
-    @staticmethod
-    def _validate_pydantic(
-        output: str, schema: dict[str, Any]
-    ) -> tuple[bool, str, str]:
-        from agentbox.core.composition.pydantic_validate import validate_with_pydantic
-
-        ok, err = validate_with_pydantic(output, schema)
-        return ok, err, "pydantic"
-
     @staticmethod
     def _maybe_load_output_file(current: str | None, workdir: Path) -> str | None:
         """Return ``workdir/output.json`` content when ``current`` isn't JSON.
@@ -1414,7 +1311,7 @@ class RunExecutor:
         """
         if current:
             try:
-                json.loads(_extract_json(current))
+                json.loads(extract_json(current))
                 return current
             except (json.JSONDecodeError, ValueError):
                 pass
@@ -1467,17 +1364,17 @@ class RunExecutor:
         agent: AgentDef,
         input_: str,
         output: str,
-        transcript_path: Path,
-        broadcaster: RunBroadcaster,
+        session: RunStreamSession,
     ) -> None:
         for idx, ref in enumerate(agent.guardrails):
             try:
                 cls = get_guardrail(ref.name)
             except KeyError as exc:
-                ev = GuardrailEvent(
-                    run_id=run_id, name=ref.name, ok=False, message=str(exc)
+                session.emit(
+                    GuardrailEvent(
+                        run_id=run_id, name=ref.name, ok=False, message=str(exc)
+                    )
                 )
-                broadcaster.publish(ev)
                 continue
             instance = cls()
             ctx = GuardrailContext(
@@ -1485,7 +1382,7 @@ class RunExecutor:
                 agent_id=agent.id,
                 input=input_,
                 output=output,
-                transcript_path=str(transcript_path),
+                transcript_path=str(session.transcript_path),
                 attempt=idx,
                 options=ref.options,
             )
@@ -1493,19 +1390,15 @@ class RunExecutor:
             self.store.record_guardrail(
                 run_id, ref.name, result.ok, result.message, attempt=idx
             )
-            ev = GuardrailEvent(
-                run_id=run_id,
-                name=ref.name,
-                ok=result.ok,
-                message=result.message,
-                attempt=idx,
+            session.emit(
+                GuardrailEvent(
+                    run_id=run_id,
+                    name=ref.name,
+                    ok=result.ok,
+                    message=result.message,
+                    attempt=idx,
+                )
             )
-            broadcaster.publish(ev)
-            try:
-                with transcript_path.open("a", encoding="utf-8", buffering=1) as tf:
-                    tf.write(ev.model_dump_json() + "\n")
-            except OSError:
-                pass
 
     def _stamp_run_agent_version(self, run_id: str, agent: AgentDef) -> None:
         try:
