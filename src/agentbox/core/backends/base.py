@@ -23,7 +23,31 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
-from agentbox.api.events import RunEvent
+from agentbox.api.events import DoneEvent, RunEvent
+from agentbox.core.streaming.session import RunStreamSession
+from agentbox.core.validation import ValidationResult, validate_output
+
+
+@dataclass(frozen=True)
+class BackendRunResult:
+    """Terminal status reported by a backend after a run completes.
+
+    Backends report their *runner-level* outcome here — did the
+    subprocess exit cleanly, was there a runtime error, what was the
+    exit code. Validation outcome is the executor's concern: it runs
+    schema checks AFTER ``run_into_session`` returns and adjusts the
+    final state accordingly before emitting the terminal ``DoneEvent``.
+
+    Why a return value instead of a streamed ``DoneEvent``: the executor
+    must enforce "DoneEvent is the last event emitted" so WS clients
+    see validation results before they treat the run as terminal.
+    Returning the status keeps the backend out of the ordering decision.
+    """
+
+    ok: bool
+    exit_code: int | None = None
+    error: str | None = None
+    status: str | None = None  # "ok" | "error" | "timeout" | None
 
 
 @dataclass
@@ -83,7 +107,7 @@ class RenderedConfig:
     model: str | None = None
     """Effective model name that will actually be used to run the agent.
 
-    Set by the adapter during ``render()`` — combines ``spec.model`` with
+    Set by the adapter during ``render()`` from EffectiveRunnerConfig or
     the backend's own default. Persisted by the executor so even runs
     that never emit a ``UsageEvent`` (timeouts, early crashes) keep a
     model name in the runs table.
@@ -137,8 +161,9 @@ class BackendAdapter(ABC):
     the executor falls back to the agentbox JSONL transcript."""
 
     default_model: ClassVar[str | None] = None
-    """Model used when ``agent.runner.model`` is empty. ``None`` means
-    the backend has no default — the upstream CLI / SDK picks one."""
+    """Model used when the effective runner config omits a model.
+    ``None`` means the backend has no default — the upstream CLI / SDK
+    picks one."""
 
     # ----- public API ------------------------------------------------------
 
@@ -169,9 +194,10 @@ class BackendAdapter(ABC):
         Must be stateless: calling it twice on the same inputs must
         produce the same ``RenderedConfig`` (same digest). Must NOT
         write to disk; the executor handles materialisation. Must
-        populate :attr:`RenderedConfig.model` with the effective model
-        (use :meth:`_resolve_model`). If ``runner_config`` is provided,
-        honour its fields for model, timeout, extra_args, and provider routing.
+        populate :attr:`RenderedConfig.model` with the effective model.
+        ``runner_config`` is the authoritative runtime dispatch config;
+        adapters must not read ``agent.runner`` for backend/model/timeout/
+        extra_args fallback.
         """
 
     @abstractmethod
@@ -186,25 +212,86 @@ class BackendAdapter(ABC):
         ``rendered.files`` have already been materialised on disk by
         the executor. The implementation must yield a terminal
         ``DoneEvent``.
+
+        This is the lower-level iterator-based entry point. New code
+        should use :meth:`run_into_session` instead — it pushes events
+        through the executor's central capture object and returns the
+        terminal status as a value. Subclasses can keep implementing
+        ``run`` (the bridge below adapts it) or override
+        ``run_into_session`` directly for cleaner control flow.
         """
         if False:
             yield  # pragma: no cover — signals async generator
 
-    # ----- protected helpers (shared across backends) ----------------------
+    async def run_into_session(
+        self,
+        rendered: RenderedConfig,
+        input: str,
+        session: RunStreamSession,
+    ) -> BackendRunResult:
+        """Execute the agent, pushing events through ``session``.
 
-    def _resolve_model(self, spec: Any) -> str | None:
-        """Return ``spec.model`` if set, otherwise this backend's default.
+        Canonical entry point — the executor calls this. Returns the
+        terminal status as a :class:`BackendRunResult`; the executor
+        runs validation against the accumulated output and then emits
+        the final ``DoneEvent`` itself, guaranteeing it lands LAST.
 
-        Backends override :attr:`default_model` rather than this method.
-        Operators can also override the default at runtime via the
-        ``runtime_defaults.default_model_<name>`` setting.
+        Default implementation bridges the legacy
+        ``run() -> AsyncIterator`` contract by pumping each event into
+        the session, intercepting ``DoneEvent`` to extract terminal
+        status (without emitting it — the executor will). Backends that
+        want to skip the iterator overhead, integrate native validation,
+        or simplify their control flow can override this directly.
+
+        The default exists so the 5 existing iterator-based backends
+        keep working unchanged through the new central path. Backends
+        migrated to direct ``session.emit*`` calls override this method.
         """
-        spec_model = getattr(spec, "model", None)
-        if spec_model:
-            return spec_model
-        from agentbox.core.constants import runtime_default_model
+        result = BackendRunResult(ok=False)
+        async for ev in self.run(rendered, input, session.run_id):
+            if isinstance(ev, DoneEvent):
+                # Capture terminal status; do NOT publish — the executor
+                # will emit the final DoneEvent after validation runs.
+                result = BackendRunResult(
+                    ok=ev.ok,
+                    exit_code=ev.exit_code,
+                    error=ev.error,
+                    status=ev.status,
+                )
+                continue
+            session.emit(ev)
+        return result
 
-        return runtime_default_model(self.name) or self.default_model
+    def validate_output(
+        self,
+        agent: Any,
+        workdir: Path,
+        output: str | None,
+        *,
+        project_root: Path | None = None,
+    ) -> ValidationResult:
+        """Validate ``output`` against the agent's declared schema.
+
+        Default implementation resolves the schema from
+        ``agent._composed_schema`` (preferred — set by the composition
+        pipeline or by the output_schema prompt-binding) or from
+        ``runner.output_schema_path`` (legacy disk path), and runs the
+        engine declared by ``runner.output_validation_engine``.
+
+        Backends that already produce typed objects (token / pydantic-ai
+        with structured returns) should override and either short-circuit
+        with ``ValidationResult(ok=True, engine="pydantic")`` or wrap
+        their native validation error.
+
+        Lives on the adapter (not the executor) so validation can run
+        in the same place as the rest of the backend's run lifecycle —
+        keeps the executor backend-agnostic and lets the
+        ``BackendAdapter`` ABC own the full "render → run → validate"
+        contract.
+        """
+        return validate_output(agent, workdir, output, project_root=project_root)
+
+    # ----- protected helpers (shared across backends) ----------------------
 
     def _collect_system_files(
         self, agent: Any, workdir: Path

@@ -12,8 +12,16 @@ from agentbox.core.streaming.rate_limit import (
     detect_in_opencode_event,
     detect_in_text_line,
 )
+from agentbox.core.streaming.session import (
+    CaptureSession,
+    DoneAlreadyEmittedError,
+    RunStreamSession,
+)
 
 __all__ = [
+    "CaptureSession",
+    "DoneAlreadyEmittedError",
+    "RunStreamSession",
     "detect_in_opencode_event",
     "detect_in_text_line",
     "stream_jsonl_subprocess",

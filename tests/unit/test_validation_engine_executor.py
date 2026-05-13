@@ -1,4 +1,10 @@
-"""Tests for validation engine selection in the executor."""
+"""Tests for validation engine selection.
+
+The engine selection logic lives in ``core/validation.validate_output``
+(extracted from the executor in the streaming-session refactor). These
+tests pin down the engine-dispatch rules; deep coverage of each engine
+lives in ``test_validation.py``.
+"""
 
 from __future__ import annotations
 
@@ -6,31 +12,17 @@ import json
 from pathlib import Path
 
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.validation import validate_output
 
 
-def _make_executor(tmp_path: Path):
-    from agentbox.config import Settings
-    from agentbox.core.data import SessionStore
-    from agentbox.core.definitions import DefinitionLoader
-    from agentbox.core.executor import RunExecutor
+def _validate(output: str, agent: AgentDef, workdir: Path) -> tuple[bool, str, str]:
+    """Compatibility shim around the new ValidationResult API.
 
-    (tmp_path / "agentbox.toml").write_text("project='t'\n")
-    settings = Settings(
-        manifest_path=tmp_path / "agentbox.toml",
-        data_dir=tmp_path,
-        db_path=tmp_path / "db.sqlite",
-        port=0,
-        host="127.0.0.1",
-        agents_dir=None,
-        agents_bundle_dir=None,
-        prompts_dir=None,
-        skills_dir=None,
-        outputs_dir=None,
-        completion_webhook_url=None,
-    )
-    store = SessionStore(tmp_path / "db.sqlite")
-    loader = DefinitionLoader(tmp_path)
-    return RunExecutor(store=store, settings=settings, loader=loader)
+    Keeps the original ``(ok, err, via)`` tuple shape used throughout
+    this file so the assertions don't need rewriting.
+    """
+    r = validate_output(agent, workdir, output)
+    return r.ok, r.error, r.engine
 
 
 _SCHEMA = {
@@ -55,8 +47,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="jsonschema",
             ),
         )
-        executor = _make_executor(tmp_path)
-        ok, err, via = executor._validate_output(_VALID, agent, tmp_path)
+        ok, err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "jsonschema"
 
@@ -71,8 +62,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="jsonschema",
             ),
         )
-        executor = _make_executor(tmp_path)
-        ok, err, via = executor._validate_output(_INVALID, agent, tmp_path)
+        ok, err, via = _validate(_INVALID, agent, tmp_path)
         assert not ok
         assert via == "jsonschema"
 
@@ -87,8 +77,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="pydantic",
             ),
         )
-        executor = _make_executor(tmp_path)
-        ok, err, via = executor._validate_output(_VALID, agent, tmp_path)
+        ok, err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "pydantic"
 
@@ -103,8 +92,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="pydantic",
             ),
         )
-        executor = _make_executor(tmp_path)
-        ok, err, via = executor._validate_output(_INVALID, agent, tmp_path)
+        ok, err, via = _validate(_INVALID, agent, tmp_path)
         assert not ok
         assert via == "pydantic"
 
@@ -119,8 +107,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="both",
             ),
         )
-        executor = _make_executor(tmp_path)
-        ok, err, via = executor._validate_output(_VALID, agent, tmp_path)
+        ok, err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "both"
 
@@ -136,8 +123,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="both",
             ),
         )
-        executor = _make_executor(tmp_path)
-        ok, err, via = executor._validate_output(_INVALID, agent, tmp_path)
+        ok, err, via = _validate(_INVALID, agent, tmp_path)
         assert not ok
         assert via == "jsonschema"
 
@@ -152,7 +138,6 @@ class TestValidationEngineSelection:
                 output_schema_path="schema.json",
             ),
         )
-        executor = _make_executor(tmp_path)
-        ok, err, via = executor._validate_output(_VALID, agent, tmp_path)
+        ok, err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "both"

@@ -32,29 +32,30 @@ def test_no_basic_shape_check_fallback() -> None:
     )
 
 
-def _make_executor(tmp_path: Path):  # type: ignore[no-untyped-def]
-    from agentbox.config import Settings
-    from agentbox.core.data import SessionStore
-    from agentbox.core.definitions import DefinitionLoader
-    from agentbox.core.executor import RunExecutor
+class _ValidatorShim:
+    """Compatibility wrapper so tests can keep calling
+    ``executor._validate_output(output, agent, workdir) -> (ok, err, via)``.
 
-    (tmp_path / "agentbox.toml").write_text("project='t'\n")
-    settings = Settings(
-        manifest_path=tmp_path / "agentbox.toml",
-        data_dir=tmp_path,
-        db_path=tmp_path / "db.sqlite",
-        port=0,
-        host="127.0.0.1",
-        agents_dir=None,
-        agents_bundle_dir=None,
-        prompts_dir=None,
-        skills_dir=None,
-        outputs_dir=None,
-        completion_webhook_url=None,
-    )
-    store = SessionStore(tmp_path / "db.sqlite")
-    loader = DefinitionLoader(tmp_path)
-    return RunExecutor(store=store, settings=settings, loader=loader)
+    The real method moved to ``core.validation.validate_output`` (returns
+    a ``ValidationResult``). Rather than rewrite every assertion, this
+    shim adapts the new shape to the old tuple.
+    """
+
+    def _validate_output(  # noqa: D401 - matches old signature exactly
+        self, output: str, agent, workdir: Path
+    ) -> tuple[bool, str, str]:
+        from agentbox.core.validation import validate_output
+
+        r = validate_output(agent, workdir, output)
+        return r.ok, r.error, r.engine
+
+
+def _make_executor(tmp_path: Path):  # type: ignore[no-untyped-def]
+    # Validation no longer needs an executor — return the shim to keep
+    # the existing call sites working. The Settings/store/loader setup
+    # was only ever used by ``_validate_output``, which now reads
+    # everything it needs from the agent itself.
+    return _ValidatorShim()
 
 
 def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:

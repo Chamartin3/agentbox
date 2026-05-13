@@ -30,9 +30,21 @@ _SKIP = frozenset({".", "..", "README.md"})
 
 
 def _build_runner_spec(rm: Any) -> RunnerSpec:
-    """Build a ``RunnerSpec`` from a ``RunnerManifest`` (or ``None``)."""
+    """Build a ``RunnerSpec`` from a ``RunnerManifest`` (or ``None``).
+
+    Deprecated path. The on-disk ``[runner]`` table is import-only;
+    runtime config resolves from ``runner_profiles`` +
+    ``agent_versions.config_json``. This shim exists so legacy TOML
+    bundles still register correctly — the values feed the Phase 2
+    backfill into ``config_json[execution|runtime|python]``.
+    """
     if rm is None:
         return RunnerSpec(kind=RunnerKind.TOKEN, timeout_seconds=120)
+    logger.debug(
+        "agents_dir: ignoring TOML [runner] kind=%r at runtime; runner "
+        "profile binding is authoritative",
+        getattr(rm, "kind", None),
+    )
     return RunnerSpec(
         kind=rm.kind,
         model=rm.model,
@@ -142,46 +154,45 @@ def _load_standalone_toml(path: Path) -> AgentDef | None:
 
 
 def _load_legacy_dir_agent(agent_dir: Path) -> AgentDef | None:
-    """Load a legacy ``agent.toml`` + ``prompts/system.md`` agent."""
+    """Load a legacy ``agent.toml`` agent definition.
+
+    A directory is treated as an agent ONLY when it carries an explicit
+    ``agent.toml`` manifest. The previous fallback that auto-discovered
+    any directory containing ``prompts/system.md`` produced ghost
+    entries in the agents list — one per Python module directory under
+    ``apps/cvman/ai/agents/<name>/`` (e.g. ``stage_draft_fixer``) — even
+    though those directories exist to host Python imports, not to
+    register agents. With ``agent_versions`` (DB) now being the source
+    of truth, agents are created via the API or sync flow; bare
+    directories must NOT spawn duplicate manifest rows that collide
+    with the DB-backed dot-notation entries (``stage.draft_fixer``).
+    """
     manifest_path = agent_dir / "agent.toml"
+    if not manifest_path.exists():
+        return None
 
-    if manifest_path.exists():
-        with manifest_path.open("rb") as f:
-            data = tomllib.load(f)
-        manifest = AgentManifest.model_validate(data)
+    with manifest_path.open("rb") as f:
+        data = tomllib.load(f)
+    manifest = AgentManifest.model_validate(data)
 
-        if manifest.prompt_path is not None:
-            resolved_prompt: str | None = str(
-                (agent_dir / manifest.prompt_path).resolve()
-            )
-        else:
-            default = agent_dir / "prompts" / "system.md"
-            resolved_prompt = str(default) if default.exists() else None
-
-        return AgentDef(
-            id=manifest.id,
-            description=manifest.description,
-            prompt_path=resolved_prompt,
-            composition=manifest.composition,
-            workspace=manifest.workspace or "default",
-            session_mode=manifest.session_mode,
-            webhook_url=manifest.webhook_url,
-            tags=manifest.tags,
-            runner=_build_runner_spec(manifest.runner),
-            source_path=manifest_path,
-            source_format=AgentSource.LEGACY_DIR,
+    if manifest.prompt_path is not None:
+        resolved_prompt: str | None = str(
+            (agent_dir / manifest.prompt_path).resolve()
         )
+    else:
+        default = agent_dir / "prompts" / "system.md"
+        resolved_prompt = str(default) if default.exists() else None
 
-    prompt_path = agent_dir / "prompts" / "system.md"
-    if prompt_path.exists():
-        return AgentDef(
-            id=agent_dir.name,
-            description=f"Auto-discovered agent from {agent_dir.name}",
-            prompt_path=str(prompt_path),
-            workspace="default",
-            runner=_build_runner_spec(None),
-            source_path=agent_dir,
-            source_format=AgentSource.LEGACY_DIR,
-        )
-
-    return None
+    return AgentDef(
+        id=manifest.id,
+        description=manifest.description,
+        prompt_path=resolved_prompt,
+        composition=manifest.composition,
+        workspace=manifest.workspace or "default",
+        session_mode=manifest.session_mode,
+        webhook_url=manifest.webhook_url,
+        tags=manifest.tags,
+        runner=_build_runner_spec(manifest.runner),
+        source_path=manifest_path,
+        source_format=AgentSource.LEGACY_DIR,
+    )
