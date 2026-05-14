@@ -9,6 +9,8 @@ and a curated fallback list.
 Returned ``ProviderModel.id`` is the **short** model name (e.g.
 ``gpt-4o``), not the provider-prefixed form. The token-backend layer
 prepends ``{provider}:`` when constructing pydantic-ai model strings.
+CLI providers may return native CLI model ids instead (for example
+``opencode/gpt-5``) because those backends pass model ids through verbatim.
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
-class Provider(str, Enum):
+class Provider(str, Enum):  # noqa: UP042
     """Canonical identifiers for built-in providers."""
 
     OPENAI = "openai"
@@ -34,6 +36,7 @@ class Provider(str, Enum):
     OPENROUTER = "openrouter"
     XAI = "xai"
     OLLAMA = "ollama"
+    CODEX = "codex"
 
 
 class ProviderModel(BaseModel):

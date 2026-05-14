@@ -1,27 +1,36 @@
 """Provider registry with model listing cache."""
 
+import logging
 import time
 from typing import Any
 
 from agentbox.core.providers.base import ProviderAdapter, ProviderDescriptor
 
-# Module-level cache: (provider_id, base_url, api_key_env) -> (models, timestamp)
-_MODEL_CACHE: dict[tuple[str, str | None, str | None], tuple[Any, float]] = {}
+logger = logging.getLogger(__name__)
+
+# Module-level cache: (provider_id, base_url, api_key_env, backend) -> (models, timestamp)
+_MODEL_CACHE: dict[tuple[str, str | None, str | None, str | None], tuple[Any, float]] = {}
 _CACHE_TTL_SECONDS = 60
 
 
 def _cache_key(
-    provider_id: str, base_url: str | None, api_key_env: str | None
-) -> tuple[str, str | None, str | None]:
+    provider_id: str,
+    base_url: str | None,
+    api_key_env: str | None,
+    backend: str | None,
+) -> tuple[str, str | None, str | None, str | None]:
     """Build a cache key from provider config."""
-    return (provider_id, base_url, api_key_env)
+    return (provider_id, base_url, api_key_env, backend)
 
 
 def _get_cached_models(
-    provider_id: str, base_url: str | None, api_key_env: str | None
+    provider_id: str,
+    base_url: str | None,
+    api_key_env: str | None,
+    backend: str | None,
 ) -> Any | None:
     """Retrieve cached models if still fresh."""
-    key = _cache_key(provider_id, base_url, api_key_env)
+    key = _cache_key(provider_id, base_url, api_key_env, backend)
     if key in _MODEL_CACHE:
         models, timestamp = _MODEL_CACHE[key]
         if time.time() - timestamp < _CACHE_TTL_SECONDS:
@@ -32,10 +41,14 @@ def _get_cached_models(
 
 
 def _set_cached_models(
-    provider_id: str, base_url: str | None, api_key_env: str | None, models: Any
+    provider_id: str,
+    base_url: str | None,
+    api_key_env: str | None,
+    backend: str | None,
+    models: Any,
 ) -> None:
     """Cache models with current timestamp."""
-    key = _cache_key(provider_id, base_url, api_key_env)
+    key = _cache_key(provider_id, base_url, api_key_env, backend)
     _MODEL_CACHE[key] = (models, time.time())
 
 
@@ -47,6 +60,7 @@ def _initialize_providers() -> None:
     """Populate the provider registry by importing provider modules."""
     from agentbox.core.providers import (
         anthropic,
+        cli,
         google,
         ollama,
         openai,
@@ -60,9 +74,65 @@ def _initialize_providers() -> None:
     _PROVIDERS["openrouter"] = openrouter.OpenRouterAdapter()
     _PROVIDERS["xai"] = xai.XAIAdapter()
     _PROVIDERS["ollama"] = ollama.OllamaAdapter()
+    _PROVIDERS["codex"] = cli.CodexCLIAdapter()
+
+
+def refresh_opencode_providers() -> list[str]:
+    """Re-discover OpenCode CLI provider prefixes and update the registry.
+
+    Returns the sorted list of provider ids now registered for the
+    opencode backend. The set grows as credentials become available
+    inside the container (env vars or ``opencode providers login``).
+    """
+    from agentbox.core.providers import cli
+
+    discovered = cli.discover_opencode_providers()
+
+    # Drop any existing opencode-backed adapters that came from a previous
+    # discovery pass; HTTP/static providers (openai, ollama, ...) are left
+    # alone even though some of them are listed by ``opencode models``.
+    for pid in list(_PROVIDERS):
+        adapter = _PROVIDERS[pid]
+        if isinstance(adapter, cli.OpenCodeCLIAdapter):
+            del _PROVIDERS[pid]
+
+    for prefix in discovered:
+        existing = _PROVIDERS.get(prefix)
+        if existing is not None:
+            compat = list(existing.descriptor.compatible_backends or [])
+            if "opencode" in compat:
+                # A first-class adapter already covers this prefix for the
+                # opencode backend (e.g. Ollama) — don't shadow it.
+                continue
+            # An HTTP/token-only adapter owns the bare id (e.g. ``openai``).
+            # Register the opencode-side view under a namespaced id so both
+            # remain available.
+            descriptor_id = f"opencode-{prefix}"
+        else:
+            descriptor_id = prefix
+        _PROVIDERS[descriptor_id] = cli.OpenCodeCLIAdapter(
+            cli_prefix=prefix,
+            descriptor_id=descriptor_id,
+        )
+
+    # Invalidate any cached model listings — provider set just changed.
+    _MODEL_CACHE.clear()
+
+    if discovered:
+        logger.info("opencode provider discovery: %s", ", ".join(discovered))
+    else:
+        logger.debug(
+            "opencode provider discovery returned no providers "
+            "(binary missing or call failed)"
+        )
+    return discovered
 
 
 _initialize_providers()
+try:
+    refresh_opencode_providers()
+except Exception:  # discovery is best-effort at import time
+    logger.exception("initial opencode provider discovery failed")
 
 
 def list_providers() -> list[ProviderDescriptor]:
@@ -98,12 +168,13 @@ async def list_models(
 
     base_url = config.base_url if config else None
     api_key_env = config.api_key_env if config else None
+    backend = config.backend if config else None
 
     if not refresh:
-        cached = _get_cached_models(provider_id, base_url, api_key_env)
+        cached = _get_cached_models(provider_id, base_url, api_key_env, backend)
         if cached is not None:
             return cached
 
     models = await adapter.list_models(config)
-    _set_cached_models(provider_id, base_url, api_key_env, models)
+    _set_cached_models(provider_id, base_url, api_key_env, backend, models)
     return models

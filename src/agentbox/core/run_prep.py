@@ -64,6 +64,16 @@ def resolve_workspace_resources(store: SessionStore, workspace_id: str) -> list[
             version_id = active["id"]
         version = store.get_repo_version(version_id)
         blobs = list(store.iter_repo_blobs(version_id))
+        source_metadata: dict = {}
+        raw_meta = version.get("source_metadata") if version else None
+        if raw_meta:
+            if isinstance(raw_meta, str):
+                try:
+                    source_metadata = json.loads(raw_meta)
+                except Exception:
+                    source_metadata = {}
+            elif isinstance(raw_meta, dict):
+                source_metadata = raw_meta
         resolved.append(
             {
                 "binding_id": b["id"],
@@ -71,12 +81,14 @@ def resolve_workspace_resources(store: SessionStore, workspace_id: str) -> list[
                 "version_id": version_id,
                 "content_hash": version["content_hash"],
                 "type": resource["type"],
+                "slug": resource["slug"],
                 "display_name": resource["display_name"],
                 "target_path": b.get("target_path"),
                 "materialize_mode": b.get("materialize_mode", "copy"),
                 "on_conflict": b.get("on_conflict", "error"),
                 "blobs": blobs,
                 "skill_meta": None,
+                "source_metadata": source_metadata,
             }
         )
     return resolved

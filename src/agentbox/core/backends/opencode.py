@@ -64,7 +64,9 @@ class OpenCodeBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
     ) -> RenderedConfig:
-        spec = agent.runner
+        extra_args = list(getattr(runner_config, "extra_args", None) or [])
+        model = getattr(runner_config, "model", None) or self.default_model
+
         argv: list[str] = [
             "opencode",
             "run",
@@ -72,31 +74,17 @@ class OpenCodeBackend(BackendAdapter):
             "--format",
             "json",
         ]
-
-        argv += spec.extra_args
-        # Append runner_config.extra_args if present
-        if runner_config is not None and getattr(runner_config, "extra_args", None):
-            argv += runner_config.extra_args
-
-        # Use runner_config.model if present, otherwise fall back to spec/default
-        if runner_config is not None and getattr(runner_config, "model", None):
-            model = runner_config.model
-        else:
-            model = self._resolve_model(spec)
-
-        # `_resolve_model` returns spec.model or the default. We only
-        # inject `--model` when the caller didn't already pass one via
-        # extra_args (preserves the existing escape hatch).
-        if "--model" not in spec.extra_args and not spec.model and model:
+        if "--model" not in extra_args and model:
             argv += ["--model", model]
+        argv += extra_args
 
         env = dict(os.environ)
         env["PWD"] = str(workdir)
 
-        # Use runner_config.timeout_seconds if present, otherwise use spec
-        timeout_seconds = spec.timeout_seconds
-        if runner_config is not None and getattr(runner_config, "timeout_seconds", None):
-            timeout_seconds = runner_config.timeout_seconds
+        timeout_seconds = (
+            getattr(runner_config, "timeout_seconds", None)
+            or DEFAULT_RUNNER_TIMEOUT_SECONDS
+        )
 
         return RenderedConfig(
             argv=argv,
@@ -148,7 +136,10 @@ class OpenCodeBackend(BackendAdapter):
         import asyncio
         import json
 
-        from agentbox.core.streaming.rate_limit import detect_in_opencode_event
+        from agentbox.core.streaming.rate_limit import (
+            detect_in_opencode_event,
+            detect_in_text_line,
+        )
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -264,8 +255,9 @@ class OpenCodeBackend(BackendAdapter):
 
         stderr_task = asyncio.create_task(_drain_stderr())
 
-        def _drain_stderr_queue() -> list[LogEvent]:
+        def _drain_stderr_queue() -> tuple[list[LogEvent], str | None]:
             out: list[LogEvent] = []
+            fatal: str | None = None
             while not stderr_queue.empty():
                 try:
                     msg = stderr_queue.get_nowait()
@@ -274,7 +266,9 @@ class OpenCodeBackend(BackendAdapter):
                 out.append(
                     LogEvent(run_id=run_id, level="warn", message=msg)
                 )
-            return out
+                if fatal is None:
+                    fatal = detect_in_text_line(msg)
+            return out, fatal
 
         stdout_chunks: list[str] = []
         streamed_text_parts: list[str] = []
@@ -304,8 +298,12 @@ class OpenCodeBackend(BackendAdapter):
                         return_when=asyncio.FIRST_COMPLETED,
                     )
                     if not done:
-                        for log_ev in _drain_stderr_queue():
+                        drained, fatal = _drain_stderr_queue()
+                        for log_ev in drained:
                             yield log_ev
+                        if fatal is not None:
+                            rate_limit_error = fatal
+                            break
                         yield LogEvent(
                             run_id=run_id,
                             level="info",
@@ -320,8 +318,14 @@ class OpenCodeBackend(BackendAdapter):
                         msg = queue_task.result()
                         queue_task = None
                         yield LogEvent(run_id=run_id, level="warn", message=msg)
-                        for log_ev in _drain_stderr_queue():
+                        fatal_msg = detect_in_text_line(msg)
+                        drained, fatal = _drain_stderr_queue()
+                        for log_ev in drained:
                             yield log_ev
+                        fatal_msg = fatal_msg or fatal
+                        if fatal_msg is not None:
+                            rate_limit_error = fatal_msg
+                            break
                         if read_task not in done:
                             continue
                     if read_task not in done:
@@ -329,8 +333,12 @@ class OpenCodeBackend(BackendAdapter):
                     line_bytes = read_task.result()
                     read_task = None
                     silent_since = _time.time()
-                    for log_ev in _drain_stderr_queue():
+                    drained, fatal = _drain_stderr_queue()
+                    for log_ev in drained:
                         yield log_ev
+                    if fatal is not None:
+                        rate_limit_error = fatal
+                        break
                     if not line_bytes:
                         break
                     line = line_bytes.decode(errors="replace")

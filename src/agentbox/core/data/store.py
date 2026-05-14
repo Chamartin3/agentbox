@@ -131,7 +131,9 @@ class _CoreStore:
             ("runs", "runner_profile_id", "TEXT"),
             ("runs", "resource_snapshot", "TEXT"),
             ("runs", "mcp_snapshot", "TEXT"),
+            ("runs", "runner_snapshot", "TEXT"),
             ("prompt_versions", "content_hash", "TEXT"),
+            ("agent_meta", "deleted_at", "TEXT"),
         ]
         with self.engine.begin() as conn:
             for table, col, col_type in _add_column_if_missing:
@@ -697,6 +699,30 @@ class _CoreStore:
         if values:
             with self.engine.begin() as conn:
                 conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
+
+    def save_run_runner_snapshot(
+        self,
+        run_id: str,
+        runner_snapshot: dict,
+    ) -> None:
+        """Persist the runner config resolved at dispatch time.
+
+        Append-only — write once, never updated. This is the historical
+        record of what backend/model/timeout actually ran the agent.
+        Mutating the bound profile or rebinding the agent must not affect
+        a previously persisted snapshot.
+        """
+        import json as _json
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                runs.update()
+                .where(
+                    runs.c.id == run_id,
+                    runs.c.runner_snapshot.is_(None),
+                )
+                .values(runner_snapshot=_json.dumps(runner_snapshot))
+            )
 
 
 class SessionStore(

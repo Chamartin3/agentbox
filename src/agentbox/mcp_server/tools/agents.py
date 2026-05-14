@@ -7,6 +7,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+from agentbox.core.services.agents import list_all_agents, resolve_agent
 from agentbox.mcp_server.deps import get_context
 from agentbox.mcp_server.schemas import clamp_limit
 
@@ -39,10 +40,12 @@ def register(mcp: FastMCP) -> None:
         limit: int = 20,
         offset: int = 0,
     ) -> dict:
-        """Paginated list of agents from the project manifest."""
+        """Paginated list of agents (DB first, manifest fallback).
+
+        Same source as the REST ``GET /api/agents`` endpoint."""
         limit = clamp_limit(limit)
-        manifest = get_context().loader.load()
-        agents = [_agent_dict(a) for a in manifest.agents]
+        ctx = get_context()
+        agents = [_agent_dict(a) for a in list_all_agents(store=ctx.store, loader=ctx.loader)]
         if tag:
             agents = [a for a in agents if tag in (a.get("tags") or [])]
         if runner:
@@ -58,9 +61,9 @@ def register(mcp: FastMCP) -> None:
         """Substring search across agent id, description, and tags."""
         limit = clamp_limit(limit)
         q = query.lower().strip()
-        manifest = get_context().loader.load()
+        ctx = get_context()
         results = []
-        for a in manifest.agents:
+        for a in list_all_agents(store=ctx.store, loader=ctx.loader):
             d = _agent_dict(a)
             hay = " ".join([
                 str(d.get("id") or ""),
@@ -79,7 +82,7 @@ def register(mcp: FastMCP) -> None:
         DB-as-source-of-truth tables the UI uses). Falls back to
         ``latest_version`` when no active pointer is set."""
         ctx = get_context()
-        agent = ctx.loader.get(agent_id)
+        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
         if agent is None:
             return {"error": "not_found", "agent_id": agent_id}
         active = ctx.store.get_active_version(agent_id) or ctx.store.latest_version(
@@ -99,10 +102,10 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool
     def list_agent_tags() -> dict:
-        """Distinct tags across the manifest."""
-        manifest = get_context().loader.load()
+        """Distinct tags across all known agents (DB + manifest)."""
+        ctx = get_context()
         tags: set[str] = set()
-        for a in manifest.agents:
+        for a in list_all_agents(store=ctx.store, loader=ctx.loader):
             tags.update(_agent_dict(a).get("tags") or [])
         return {"items": sorted(tags), "total": len(tags)}
 
@@ -168,7 +171,7 @@ def register(mcp: FastMCP) -> None:
                 "detail": "reason must be at least 3 characters",
             }
         ctx = get_context()
-        agent = ctx.loader.get(agent_id)
+        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         v = ctx.store.get_version(agent_id, version)

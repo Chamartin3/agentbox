@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core.data.manifest import AgentDef, AgentSource
 from agentbox.core.definitions import ManifestWriter
+from agentbox.core.services.agents import resolve_agent
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +144,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     loader = get_loader()
     settings = get_settings()
 
-    current = store.get_agent_def(agent_id) or loader.get(agent_id)
+    current = resolve_agent(agent_id, store=store, loader=loader)
     if current is None:
         raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
 

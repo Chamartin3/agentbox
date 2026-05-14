@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
+from agentbox.core.agent_config import build_config_json_payload
 from agentbox.core.data.manifest import (
     AgentDef,
     CompositionConfig,
@@ -93,7 +94,10 @@ def create_agent(req: AgentCreateRequest) -> AgentCreateResponse:
     try:
         version_record = store.create_agent(
             agent_id=req.id,
-            config_json=agent_def.model_dump(mode="json", exclude_none=True),
+            config_json={
+                **agent_def.model_dump(mode="json", exclude_none=True),
+                **build_config_json_payload(agent_def),
+            },
             prompt_content=req.prompt,
             author=req.author,
             changelog=req.changelog,

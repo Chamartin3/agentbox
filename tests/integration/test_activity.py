@@ -44,9 +44,9 @@ def test_activity_summary_basic(tmp_path: Path) -> None:
     assert actions["fill_job_post"]["total"] == 2
     assert actions["fill_job_post"]["failures"] == 1
     assert actions["extract_keywords"]["total"] == 1
-    executors = {row["executor"]: row for row in s["by_executor"]}
-    assert executors["haiku"]["total"] == 2
-    assert executors["sonnet"]["total"] == 1
+    models = {row["reported_model"]: row for row in s["by_reported_model"]}
+    assert models["haiku"]["total"] == 2
+    assert models["sonnet"]["total"] == 1
 
 
 def test_activity_summary_agent_filter(tmp_path: Path) -> None:
@@ -65,5 +65,5 @@ def test_list_runs_rich(tmp_path: Path) -> None:
     rows = store.list_runs_rich(since)
     assert len(rows) == 1
     assert rows[0]["id"] == rid
-    assert rows[0]["executor"] == "haiku"
+    assert rows[0]["reported_model"] == "haiku"
     assert rows[0]["input_tokens"] == 10

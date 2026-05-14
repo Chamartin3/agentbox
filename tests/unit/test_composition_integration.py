@@ -5,48 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-from agentbox.core.composition.loader import load_bundle
-
-
-class TestLoadBundle:
-    def test_load_bundle_with_composition(self, tmp_path: Path) -> None:
-        bundle = tmp_path / "agent"
-        bundle.mkdir()
-        (bundle / "agent.toml").write_text(
-            '[composition]\nsystem_prompt = "prompts/system.md"\n',
-            encoding="utf-8",
-        )
-        prompts = bundle / "prompts"
-        prompts.mkdir()
-        (prompts / "system.md").write_text("You are {role}.", encoding="utf-8")
-
-        b = load_bundle("test", bundle)
-        assert b.agent_id == "test"
-        assert b.composition.system == "prompts/system.md"
-
-    def test_load_bundle_legacy_fallback(self, tmp_path: Path) -> None:
-        bundle = tmp_path / "agent"
-        bundle.mkdir()
-        (bundle / "agent.toml").write_text('id = "test"\n', encoding="utf-8")
-        prompts = bundle / "prompts"
-        prompts.mkdir()
-        (prompts / "system.md").write_text("Legacy sys.", encoding="utf-8")
-
-        with pytest.warns(DeprecationWarning):
-            b = load_bundle("test", bundle, legacy_prompt_path="prompts/system.md")
-        assert b.composition.system == "prompts/system.md"
-
-    def test_load_bundle_missing_system(self, tmp_path: Path) -> None:
-        bundle = tmp_path / "agent"
-        bundle.mkdir()
-        (bundle / "agent.toml").write_text(
-            '[composition]\nsystem_prompt = "prompts/missing.md"\n',
-            encoding="utf-8",
-        )
-        with pytest.raises(FileNotFoundError):
-            load_bundle("test", bundle)
-
 
 class TestCompositionStore:
     def test_save_run_composition(self, tmp_path: Path) -> None:

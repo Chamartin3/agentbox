@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+
 from fastmcp import FastMCP
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.env_doc.renderers import AgentsMdRenderer, ClaudeMdRenderer
+from agentbox.core.resources.importers.base import ImporterContext
+from agentbox.core.resources.importers.upload import UploadImporter
 from agentbox.core.resources.prompt_resolver import resolve_prompt
 from agentbox.core.run_prep import (
     resolve_agent_prompt_bindings,
     resolve_workspace_resources,
 )
+from agentbox.core.services.agents import resolve_agent
 from agentbox.mcp_server.deps import get_context
 from agentbox.mcp_server.schemas import clamp_limit
 
@@ -21,6 +28,81 @@ def _require_reason(reason: str) -> dict | None:
 
 
 def register(mcp: FastMCP) -> None:
+    @mcp.tool
+    def create_repo_resource(
+        slug: str,
+        type: str,
+        display_name: str,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        content: str | None = None,
+        content_base64: str | None = None,
+        filename: str | None = None,
+        mime_type: str | None = None,
+        changelog: str | None = None,
+        draft: bool = False,
+    ) -> dict:
+        """Create a new shared resource, optionally with an initial version.
+
+        Calls the same ``SessionStore`` methods used by ``POST /api/repo-resources``
+        and ``POST /api/repo-resources/{id}/versions/upload``.
+
+        ``type`` is one of: document, folder, skill, schema, script.
+        Provide ``content`` (text) or ``content_base64`` (binary) to also
+        upload an initial version; ``changelog`` (≥ 3 chars) is required
+        in that case. For folder/skill archives use the web UI / REST.
+        """
+        try:
+            rtype = ResourceType(type)
+        except ValueError:
+            return {"error": "invalid_type", "detail": f"type must be one of {[t.value for t in ResourceType]}"}
+
+        ctx = get_context()
+        try:
+            resource = ctx.store.create_repo_resource(
+                slug=slug,
+                type=rtype.value,
+                display_name=display_name,
+                description=description,
+                tags=tags or [],
+            )
+        except ValueError as exc:
+            return {"error": "invalid_request", "detail": str(exc)}
+
+        result: dict = {"resource": resource}
+        if content is None and content_base64 is None:
+            return result
+
+        err = _require_reason(changelog or "")
+        if err:
+            return {**err, "resource": resource, "hint": "provide `changelog` (≥ 3 chars) when uploading content"}
+
+        if content_base64 is not None:
+            try:
+                raw = base64.b64decode(content_base64, validate=True)
+            except (binascii.Error, ValueError) as exc:
+                return {"error": "invalid_base64", "detail": str(exc), "resource": resource}
+        else:
+            raw = (content or "").encode("utf-8")
+
+        fname = filename or f"{slug.replace('/', '_')}.md"
+        importer = UploadImporter(filename=fname, content=raw, mime_type=mime_type)
+        try:
+            imported = importer.run(ImporterContext(actor=None, changelog=changelog))
+            version = ctx.store.import_repo_version(
+                resource["id"],
+                imported.blobs,
+                import_source=imported.import_source,
+                changelog=changelog or "",
+                source_metadata=imported.source_metadata,
+                metadata=imported.metadata,
+                draft=draft,
+            )
+        except ValueError as exc:
+            return {"error": "import_failed", "detail": str(exc), "resource": resource}
+        result["version"] = version
+        return result
+
     @mcp.tool
     def set_prompt_resources(
         agent_id: str,
@@ -52,7 +134,7 @@ def register(mcp: FastMCP) -> None:
         if template_override:
             template = template_override
         else:
-            agent = ctx.loader.get(agent_id)
+            agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
             if agent is None:
                 return {"error": "agent_not_found", "agent_id": agent_id}
             template = agent.prompt or ""
@@ -101,18 +183,31 @@ def register(mcp: FastMCP) -> None:
     def set_env_doc(
         workspace_id: str,
         content: str,
-        reason: str,
+        reason: str = "edit",
         audience: str = "both",
     ) -> dict:
-        """Save a new env-doc draft for a workspace.
+        """Save the workspace env-doc — immediately live (no drafts).
 
         ``audience`` is 'both', 'claude_only', or 'agents_only'.
-        ``reason`` must be ≥ 3 chars."""
-        err = _require_reason(reason)
-        if err:
-            return err
+        ``reason`` is recorded for audit; it's optional and defaults to
+        ``"edit"``. After saving, the workspace is re-synced so CLAUDE.md
+        / AGENTS.md reflect the new content right away.
+        """
+        from agentbox.api.deps import get_settings
+        from agentbox.core.workspace_sync import sync_workspace_by_name
+
         ctx = get_context()
-        row = ctx.store.save_env_doc(workspace_id, content, changelog=reason, audience=audience)
+        row = ctx.store.save_env_doc(
+            workspace_id, content, changelog=reason or "edit", audience=audience
+        )
+        try:
+            sync_workspace_by_name(ctx.store, get_settings(), workspace_id)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "set_env_doc: sync failed for %s", workspace_id
+            )
         return row
 
     @mcp.tool

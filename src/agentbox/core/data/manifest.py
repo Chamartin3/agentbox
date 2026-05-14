@@ -365,7 +365,18 @@ class AgentDef(BaseModel):
             data = _json.loads(raw)
         else:
             data = raw
-        return cls.model_validate(data)
+        inst = cls.model_validate(data)
+        # Stash the structured config_json so the agent_config
+        # accessors (ExecutionConfig/RuntimeConfig/PythonAgentConfig)
+        # can read execution/runtime/python sub-dicts directly without
+        # roundtripping through the legacy agent.runner pydantic model.
+        # Falls back to the same data dict when config_json was absent —
+        # the accessors only consume sub-keys they recognize.
+        try:
+            inst.__dict__["_config_json"] = data
+        except Exception:
+            pass
+        return inst
 
 
 # ---------------------------------------------------------------------------

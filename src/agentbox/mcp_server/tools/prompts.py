@@ -14,6 +14,7 @@ from pathlib import Path
 from fastmcp import FastMCP
 
 from agentbox.core.composition import preview as preview_composition
+from agentbox.core.services.agents import resolve_agent
 from agentbox.mcp_server.deps import get_context
 from agentbox.mcp_server.schemas import clamp_limit
 
@@ -56,7 +57,7 @@ def register(mcp: FastMCP) -> None:
         template); for those use ``get_agent_prompt_fragments``. For the
         per-run captured fragments, use ``get_run_prompt_fragments``."""
         ctx = get_context()
-        agent = ctx.loader.get(agent_id)
+        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if version is not None:
@@ -130,7 +131,7 @@ def register(mcp: FastMCP) -> None:
             return {"error": "reason_required",
                     "detail": "reason must be at least 3 characters"}
         ctx = get_context()
-        if ctx.loader.get(agent_id) is None and ctx.store.get_agent_def(agent_id) is None:
+        if resolve_agent(agent_id, store=ctx.store, loader=ctx.loader) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
             new_row = ctx.store.save_prompt_revision(
@@ -163,7 +164,7 @@ def register(mcp: FastMCP) -> None:
             return {"error": "reason_required",
                     "detail": "reason must be at least 3 characters"}
         ctx = get_context()
-        if ctx.loader.get(agent_id) is None and ctx.store.get_agent_def(agent_id) is None:
+        if resolve_agent(agent_id, store=ctx.store, loader=ctx.loader) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
             new_row = ctx.store.rollback_to(
@@ -209,7 +210,7 @@ def register(mcp: FastMCP) -> None:
         injection. For the run-time fragments (user input, MCP config,
         argv, claude_cli envelope), use ``get_run_prompt_fragments``."""
         ctx = get_context()
-        agent = ctx.loader.get(agent_id)
+        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if agent.source_path is None:

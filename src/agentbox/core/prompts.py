@@ -92,9 +92,20 @@ def read_versioned(
     """Return the active prompt for this agent.
 
     Priority:
-    1. Latest committed version from the DB.
-    2. Fall back to reading the file from disk (backward compat).
+    1. ``agent_versions.prompt_content`` from the active/latest row
+       (DB-as-source-of-truth).
+    2. Legacy ``prompt_versions`` committed entry.
+    3. Fall back to reading the file from disk (backward compat).
     """
+    row = store.get_active_version(agent.id) or store.latest_version(agent.id)
+    if row and row.get("prompt_content"):
+        content = row["prompt_content"]
+        return PromptDoc(
+            path=agent.prompt_path or "",
+            content=content,
+            size=len(content.encode("utf-8")),
+            mtime=row.get("created_at", ""),
+        )
     committed = store.get_latest_committed_prompt(agent.id)
     if committed:
         return PromptDoc(

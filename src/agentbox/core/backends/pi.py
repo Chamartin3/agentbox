@@ -27,14 +27,16 @@ _NAME = "pi"
 _DEFAULT_PI_MODEL: str | None = None
 
 
-def build_pi_argv(spec: Any, default_model: str | None) -> list[str]:
+def build_pi_argv(
+    model: str | None, extra_args: list[str] | None, default_model: str | None
+) -> list[str]:
     """Construct the pi argv. Public so tests can introspect it."""
+    args = list(extra_args or [])
+    effective_model = model or default_model
     argv: list[str] = ["pi", "-p", "--mode", "json"]
-    if spec.model:
-        argv += ["--model", spec.model]
-    elif default_model and "--model" not in spec.extra_args:
-        argv += ["--model", default_model]
-    argv += list(spec.extra_args)
+    if effective_model and "--model" not in args:
+        argv += ["--model", effective_model]
+    argv += args
     return argv
 
 
@@ -119,25 +121,17 @@ class PiBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
     ) -> RenderedConfig:
-        spec = agent.runner
+        model = getattr(runner_config, "model", None) or self.default_model
+        extra_args = list(getattr(runner_config, "extra_args", None) or [])
 
-        if runner_config is not None and getattr(runner_config, "model", None):
-            model = runner_config.model
-        else:
-            model = self._resolve_model(spec)
-
-        argv = build_pi_argv(spec, self.default_model)
-
-        if runner_config is not None and getattr(runner_config, "extra_args", None):
-            argv += list(runner_config.extra_args)
+        argv = build_pi_argv(model, extra_args, self.default_model)
 
         env = dict(os.environ)
 
-        timeout_seconds = spec.timeout_seconds
-        if runner_config is not None and getattr(
-            runner_config, "timeout_seconds", None
-        ):
-            timeout_seconds = runner_config.timeout_seconds
+        timeout_seconds = (
+            getattr(runner_config, "timeout_seconds", None)
+            or DEFAULT_RUNNER_TIMEOUT_SECONDS
+        )
 
         return RenderedConfig(
             argv=argv,

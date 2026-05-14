@@ -168,6 +168,12 @@ class ResourceBindingsMixin:
         reason = _validate_reason(reason)
         rows = []
         now = now_iso()
+        # Collect folder-type target paths separately from single-file paths.
+        # Single-file bindings with the same ``target_path`` no longer
+        # collide because each resolves to a different filename inside it
+        # (see ``_resolve_target_path`` in workspace_materialize.py).
+        # Folder-type bindings DO collide on the same path.
+        seen_folder_targets: dict[str, str] = {}
         for idx, b in enumerate(bindings):
             mode = b.get("materialize_mode", "copy")
             if mode not in VALID_MATERIALIZE_MODES:
@@ -186,6 +192,22 @@ class ResourceBindingsMixin:
                 raise ValueError(
                     f"target_path {target_path!r} must not contain '..' segments"
                 )
+            # Folder collisions: two folder-type bindings cannot share a
+            # target_path. Look up the resource type to know which kind
+            # of binding this is.
+            if target_path:
+                resource = self.get_repo_resource(b["resource_id"])  # type: ignore[attr-defined]
+                rtype = (resource or {}).get("type")
+                if rtype == "folder":
+                    normalized = target_path.strip("/")
+                    prior = seen_folder_targets.get(normalized)
+                    if prior is not None:
+                        raise ValueError(
+                            f"target_path {target_path!r} used by multiple folder "
+                            f"bindings ({prior!r} and {b['resource_id']!r}); each "
+                            f"folder target_path must be unique within a workspace"
+                        )
+                    seen_folder_targets[normalized] = b["resource_id"]
             rows.append(
                 {
                     "id": uuid.uuid4().hex,

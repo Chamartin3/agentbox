@@ -14,6 +14,7 @@ The models endpoint accepts optional configuration via query params:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
@@ -21,7 +22,7 @@ from fastapi import APIRouter, HTTPException, Query
 from agentbox.api.deps import get_store
 from agentbox.core.providers import get_provider, list_providers
 from agentbox.core.providers.base import ProviderDescriptor, ProviderModel
-from agentbox.core.providers.registry import list_models
+from agentbox.core.providers.registry import list_models, refresh_opencode_providers
 from agentbox.core.runner_profiles import EffectiveRunnerConfig
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,25 @@ async def list_runner_providers(
     if backend is None:
         return providers
     return [p for p in providers if backend in (p.compatible_backends or [])]
+
+
+@router.post("/refresh")
+async def refresh_providers(backend: str | None = Query(None)) -> dict[str, Any]:
+    """Re-run dynamic provider discovery and invalidate all model caches.
+
+    Calls ``opencode models`` again — its output grows with available
+    credentials — and clears the shared model-listing cache so the next
+    ``/models`` call hits the live source for every provider.
+    """
+    from agentbox.core.providers.registry import _MODEL_CACHE
+
+    discovered = refresh_opencode_providers()
+    _MODEL_CACHE.clear()
+    return {
+        "opencode": discovered,
+        "opencode_count": len(discovered),
+        "model_cache_cleared": True,
+    }
 
 
 @router.get("/{provider_id}/models")
@@ -122,6 +142,7 @@ async def list_provider_models(
     else:
         # Use query params + descriptor defaults
         config = EffectiveRunnerConfig(
+            backend=backend,
             base_url=base_url or provider.descriptor.default_base_url,
             api_key_env=api_key_env or provider.descriptor.default_api_key_env,
             provider=provider_id,

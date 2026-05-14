@@ -140,18 +140,51 @@ class BindingsBundleSource:
                 }
             )
 
-        # Strict: every agent must have a system slot binding. Raising
-        # here lets the executor's fallback path (filesystem bundle)
-        # kick in for un-migrated agents.
+        # DB-as-source-of-truth: when no slot='system' binding exists,
+        # fall back to ``agent_versions.prompt_content`` (the active
+        # version row). Bindings exist for shared/cross-agent prompts;
+        # simple agents whose prompt lives in their own version row
+        # should not need a binding to run. Disk fallback removed in
+        # Plan 18 — bundles are never read from the filesystem at
+        # runtime.
+        self._av_prompt: str | None = None
+        self._av_config: dict[str, Any] = {}
         if self._find_slot("system") is None:
-            raise FileNotFoundError(
-                f"agent {self.agent_id!r} has no slot='system' binding"
-            )
+            av = None
+            try:
+                av = self.store.get_active_version(self.agent_id)
+            except Exception:
+                av = None
+            if av is None:
+                # Last resort — try the latest version row even if no
+                # active pointer is set. Mirrors store.get_agent_def.
+                try:
+                    av = self.store.latest_version(self.agent_id)
+                except Exception:
+                    av = None
+            prompt = (av or {}).get("prompt_content") if isinstance(av, dict) else None
+            if not prompt:
+                raise ValueError(
+                    f"agent {self.agent_id!r} has no prompt source: no "
+                    "slot='system' binding and no agent_versions.prompt_content. "
+                    "Populate one via the UI prompt editor or "
+                    "agentbox-mcp.edit_prompt."
+                )
+            self._av_prompt = prompt
+            cfg = (av or {}).get("config_json") if isinstance(av, dict) else None
+            if isinstance(cfg, str):
+                try:
+                    cfg = json.loads(cfg)
+                except (ValueError, TypeError):
+                    cfg = None
+            if isinstance(cfg, dict):
+                self._av_config = cfg
+
         # Synthesize a composition dict so the existing composer
         # branches (which check ``composition['user_template']`` etc.)
         # continue to work without a special case.
         comp: dict[str, Any] = {}
-        if self._find_slot("system"):
+        if self._find_slot("system") or self._av_prompt is not None:
             comp["system"] = _SYS_PSEUDO
         if self._find_user_template() is not None:
             comp["user_template"] = _USER_PSEUDO
@@ -223,8 +256,11 @@ class BindingsBundleSource:
     def read_system(self) -> str:
         b = self._find_slot("system")
         if b is None:
+            if self._av_prompt is not None:
+                return self._av_prompt
             raise FileNotFoundError(
-                f"agent {self.agent_id!r} has no slot='system' binding"
+                f"agent {self.agent_id!r} has no slot='system' binding "
+                "and no agent_versions.prompt_content fallback"
             )
         return self._render_blob_text(b)
 
@@ -277,6 +313,8 @@ class BindingsBundleSource:
         sys_b = self._find_slot("system")
         if sys_b is not None:
             files[_SYS_PSEUDO] = self._render_blob_text(sys_b)
+        elif self._av_prompt is not None:
+            files[_SYS_PSEUDO] = self._av_prompt
         ut_b = self._find_user_template()
         if ut_b is not None:
             files[_USER_PSEUDO] = self._render_blob_text(ut_b)

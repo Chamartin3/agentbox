@@ -25,6 +25,7 @@ from agentbox.api.events import (
     TimeoutEvent,
     UsageEvent,
 )
+from agentbox.core.agent_config import RuntimeConfig
 from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.streaming.rate_limit import detect_in_text_line
@@ -57,11 +58,9 @@ class ClaudeCodeBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
     ) -> RenderedConfig:
-        spec = agent.runner
-        if runner_config is not None and getattr(runner_config, "model", None):
-            model = runner_config.model
-        else:
-            model = self._resolve_model(spec)
+        runtime_cfg = RuntimeConfig.from_agent(agent)
+        extra_args = list(getattr(runner_config, "extra_args", None) or [])
+        model = getattr(runner_config, "model", None) or self.default_model
         argv: list[str] = ["claude", "-p"]
 
         if model:
@@ -77,23 +76,22 @@ class ClaudeCodeBackend(BackendAdapter):
 
         capabilities = load_capabilities(workdir)
         effective_tools = _intersect_allowed_tools(
-            spec.allowed_tools, capabilities.get("allowed_tools")
+            list(runtime_cfg.allowed_tools), capabilities.get("allowed_tools")
         )
         if effective_tools:
             argv += ["--allowedTools", *effective_tools]
 
         argv += ["--output-format", "json", "--permission-mode", "bypassPermissions"]
-        argv += spec.extra_args
-        if runner_config is not None and getattr(runner_config, "extra_args", None):
-            argv += runner_config.extra_args
+        argv += extra_args
 
         env = dict(os.environ)
         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             env.pop(k, None)
 
-        timeout_seconds = spec.timeout_seconds
-        if runner_config is not None and getattr(runner_config, "timeout_seconds", None):
-            timeout_seconds = runner_config.timeout_seconds
+        timeout_seconds = (
+            getattr(runner_config, "timeout_seconds", None)
+            or DEFAULT_RUNNER_TIMEOUT_SECONDS
+        )
 
         return RenderedConfig(
             argv=argv,

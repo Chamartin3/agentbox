@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json as _json
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Query
 
-from agentbox.api.deps import get_loader, get_store
+from agentbox.api.deps import get_store
 
 router = APIRouter(prefix="/api/activity", tags=["activity"])
 
@@ -45,14 +46,54 @@ def recent_runs(
         limit=limit,
     )
     # Compute duration on the fly so the client doesn't recompute.
-    loader = get_loader()
-    runner_kind_cache: dict[str, str | None] = {}
+    store = get_store()
+    profile_backend_cache: dict[str, str | None] = {}
 
-    def _runner_kind(agent_id: str) -> str | None:
-        if agent_id not in runner_kind_cache:
-            ad = loader.get(agent_id)
-            runner_kind_cache[agent_id] = ad.runner.kind if ad else None
-        return runner_kind_cache[agent_id]
+    def _backend_from_profile(profile_id: str | None) -> str | None:
+        if not profile_id:
+            return None
+        if profile_id in profile_backend_cache:
+            return profile_backend_cache[profile_id]
+        try:
+            profile = store.get_runner_profile(profile_id)
+        except Exception:
+            profile = None
+        backend = None
+        if profile is not None:
+            backend = (
+                getattr(profile, "backend", None)
+                or (profile.get("backend") if hasattr(profile, "get") else None)
+            )
+        profile_backend_cache[profile_id] = backend
+        return backend
+
+    def _model_from_profile(profile_id: str | None) -> str | None:
+        if not profile_id:
+            return None
+        try:
+            profile = store.get_runner_profile(profile_id)
+        except Exception:
+            profile = None
+        if profile is not None:
+            return (
+                getattr(profile, "model", None)
+                or (profile.get("model") if hasattr(profile, "get") else None)
+            )
+        return None
+
+    def _snapshot_fields(r: dict) -> tuple[str | None, str | None]:
+        """Return (backend, configured_model) from snapshot or profile fallback."""
+        snap_raw = r.get("runner_snapshot")
+        if snap_raw:
+            try:
+                snap = _json.loads(snap_raw) if isinstance(snap_raw, str) else snap_raw
+                if isinstance(snap, dict):
+                    return snap.get("backend"), snap.get("model")
+            except (ValueError, TypeError):
+                pass
+        # Pre-snapshot rows: fall back to the bound profile.
+        profile_id = r.get("runner_profile_id")
+        return _backend_from_profile(profile_id), _model_from_profile(profile_id)
 
     out = []
     for r in rows:
@@ -67,12 +108,15 @@ def recent_runs(
                 )
                 * 1000
             )
+        backend, configured_model = _snapshot_fields(r)
+        reported = r.get("reported_model")
         out.append(
             {
                 "id": r["id"],
                 "action_name": r["agent_id"],
-                "executor": _runner_kind(r["agent_id"]) or r["executor"],
-                "model": r["executor"] if r["executor"] != "unknown" else None,
+                "backend": backend or reported or "unknown",
+                "configured_model": configured_model,
+                "reported_model": reported if reported != "unknown" else None,
                 "state": _state_label(r["status"]),
                 "started_at": started,
                 "completed_at": finished,

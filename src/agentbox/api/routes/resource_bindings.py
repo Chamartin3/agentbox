@@ -6,17 +6,19 @@ a mandatory reason. Includes a preview/dry-run endpoint per side.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_store
+from agentbox.api.deps import get_settings, get_store
 from agentbox.core.composition import _append_input_schema, _append_schema
 from agentbox.core.data.store import SessionStore
 from agentbox.core.resources.prompt_resolver import resolve_prompt
 from agentbox.core.resources.rendering import render_for_type
+from agentbox.core.workspace_sync import sync_workspace_by_name
 
 router = APIRouter(tags=["resource-bindings"])
 
@@ -343,16 +345,19 @@ def replace_workspace_resources(
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     try:
-        return {
-            "items": store.replace_workspace_file_bindings(
-                workspace_id,
-                [b.model_dump() for b in body.bindings],
-                reason=body.reason,
-                actor=body.actor,
-            )
-        }
+        items = store.replace_workspace_file_bindings(
+            workspace_id,
+            [b.model_dump() for b in body.bindings],
+            reason=body.reason,
+            actor=body.actor,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Phase 1: re-materialize the workspace on disk after the DB write.
+    with contextlib.suppress(Exception):
+        sync_workspace_by_name(store, get_settings(), workspace_id)
+    return {"items": items}
 
 
 @router.post("/api/workspaces/{workspace_id}/resources/dry-run")
@@ -477,12 +482,15 @@ def replace_workspace_subagents(
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     try:
-        return {
-            "items": store.replace_workspace_subagents(
-                workspace_id,
-                [s.model_dump() for s in body.subagents],
-                actor=body.actor,
-            )
-        }
+        items = store.replace_workspace_subagents(
+            workspace_id,
+            [s.model_dump() for s in body.subagents],
+            actor=body.actor,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Phase 1: re-materialize subagent files after the DB write.
+    with contextlib.suppress(Exception):
+        sync_workspace_by_name(store, get_settings(), workspace_id)
+    return {"items": items}

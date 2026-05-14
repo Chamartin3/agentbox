@@ -36,7 +36,22 @@ def register(mcp: FastMCP) -> None:
         if agent is None:
             return {"error": f"agent {run.agent_id!r} not found"}
 
-        timeout = agent.runner.timeout_seconds if agent.runner else None
+        # Prefer the historical runner_snapshot — that's what actually
+        # constrained the run. Fall back to agent.runner only for runs
+        # that predate the snapshot column.
+        timeout: int | None = None
+        snap_raw = getattr(run, "runner_snapshot", None)
+        if snap_raw:
+            try:
+                import json as _json
+
+                snap = _json.loads(snap_raw) if isinstance(snap_raw, str) else snap_raw
+                if isinstance(snap, dict):
+                    timeout = snap.get("timeout_seconds")
+            except (ValueError, TypeError):
+                pass
+        if timeout is None:
+            timeout = agent.runner.timeout_seconds if agent.runner else None
         if timeout is None or timeout <= 0:
             return {
                 "run_id": run_id,

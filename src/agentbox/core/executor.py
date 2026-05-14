@@ -273,6 +273,9 @@ class RunExecutor:
         # a long-running run mid-flight, skipping the finally block that
         # persists final status and fires the webhook.
         self._tasks: set[asyncio.Task[None]] = set()
+        # run_id → task lookup for operator cancellation. Kept in sync
+        # with ``_tasks`` (entries removed on task completion).
+        self._run_tasks: dict[str, asyncio.Task[None]] = {}
         # Runner profile resolver — cheap to instantiate, used on every run.
         self._profile_resolver = RunnerProfileResolver()
 
@@ -716,9 +719,11 @@ class RunExecutor:
             )
         )
         self._tasks.add(task)
+        self._run_tasks[run_id] = task
 
         def _on_task_done(t: asyncio.Task[None]) -> None:
             self._tasks.discard(t)
+            self._run_tasks.pop(run_id, None)
             if not t.cancelled():
                 exc = t.exception()
                 if exc is not None:
@@ -728,6 +733,53 @@ class RunExecutor:
 
         task.add_done_callback(_on_task_done)
         return run_id
+
+    async def cancel_run(self, run_id: str) -> bool:
+        """Cancel an in-progress run.
+
+        Marks the run as ``incomplete`` in the store first (so the
+        executor's ``finally`` finish_run becomes a no-op — it only
+        updates rows still in ``running``), emits a terminal ``DoneEvent``
+        to any WS subscribers, then cancels the asyncio task driving the
+        subprocess. The subprocess transport will be torn down as the
+        cancellation unwinds, which sends SIGKILL to the backend process
+        via asyncio's subprocess transport shutdown.
+
+        Returns ``True`` if a running task was found and cancellation was
+        initiated, ``False`` otherwise.
+        """
+        task = self._run_tasks.get(run_id)
+        if task is None or task.done():
+            return False
+
+        error_msg = "cancelled by operator"
+        try:
+            self.store.finish_run(
+                run_id,
+                ok=False,
+                error=error_msg,
+                status=RunStatus.INCOMPLETE.value,
+            )
+        except Exception:
+            logger.exception("cancel_run: failed to persist incomplete status for %s", run_id)
+
+        broadcaster = self._broadcasters.get(run_id)
+        if broadcaster is not None:
+            with contextlib.suppress(Exception):
+                broadcaster.publish(
+                    LogEvent(run_id=run_id, level="warn", message=error_msg)
+                )
+                broadcaster.publish(
+                    DoneEvent(
+                        run_id=run_id,
+                        ok=False,
+                        error=error_msg,
+                        status=RunStatus.INCOMPLETE.value,
+                    )
+                )
+
+        task.cancel()
+        return True
 
     def _fail_pre_run(
         self,

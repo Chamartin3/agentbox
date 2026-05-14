@@ -47,11 +47,11 @@ class AnalyticsMixin:
         """Paginated + filterable run listing.
 
         Filters compose with AND. ``executor`` matches ``usage.model``
-        (which the activity API exposes as "executor"). ``q`` is a
-        case-insensitive LIKE match against input/output/error so a user
-        can grep for a job-application id, an error fragment, or an
-        agent_task_id embedded in input. Returns ``(rows, total)`` where
-        ``total`` is the un-paginated count for the same filter.
+        (reported model from telemetry). ``q`` is a case-insensitive
+        LIKE match against input/output/error so a user can grep for a
+        job-application id, an error fragment, or an agent_task_id
+        embedded in input. Returns ``(rows, total)`` where ``total`` is
+        the un-paginated count for the same filter.
         """
         stmt = select(runs).select_from(runs)
         count_stmt = select(func.count(func.distinct(runs.c.id))).select_from(runs)
@@ -97,11 +97,11 @@ class AnalyticsMixin:
         return rows, total
 
     def distinct_executors(self) -> list[str]:
-        """Distinct executor (model) values across all runs, for filter UI."""
+        """Distinct reported model values across all runs, for filter UI."""
         stmt = (
-            select(func.coalesce(usage.c.model, "unknown").label("executor"))
+            select(func.coalesce(usage.c.model, "unknown").label("reported_model"))
             .distinct()
-            .order_by("executor")
+            .order_by("reported_model")
         )
         with self.engine.connect() as conn:
             return [r[0] for r in conn.execute(stmt)]
@@ -242,10 +242,12 @@ class AnalyticsMixin:
             .order_by(func.count().desc())
         )
 
-        executor_col = func.coalesce(usage.c.model, "unknown").label("executor")
-        by_executor_stmt = (
+        reported_model_col = func.coalesce(usage.c.model, "unknown").label(
+            "reported_model"
+        )
+        by_reported_model_stmt = (
             select(
-                executor_col,
+                reported_model_col,
                 func.count().label("total"),
                 func.sum(
                     case(
@@ -267,7 +269,7 @@ class AnalyticsMixin:
             )
             .select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
             .where(*base_filters)
-            .group_by("executor")
+            .group_by("reported_model")
             .order_by(func.count().desc())
         )
 
@@ -324,12 +326,12 @@ class AnalyticsMixin:
                     }
                 )
 
-            by_executor = []
-            for r in conn.execute(by_executor_stmt):
+            by_reported_model = []
+            for r in conn.execute(by_reported_model_stmt):
                 m = r._mapping
-                by_executor.append(
+                by_reported_model.append(
                     {
-                        "executor": m["executor"],
+                        "reported_model": m["reported_model"],
                         "total": int(m["total"] or 0),
                         "failures": int(m["failures"] or 0),
                         "total_input_tokens": int(m["total_input_tokens"] or 0),
@@ -341,7 +343,7 @@ class AnalyticsMixin:
             "totals": totals,
             "series": series,
             "by_action": by_action,
-            "by_executor": by_executor,
+            "by_reported_model": by_reported_model,
         }
 
     def list_runs_rich(
@@ -362,12 +364,14 @@ class AnalyticsMixin:
                 runs.c.finished_at,
                 runs.c.error,
                 runs.c.session_id,
-                func.coalesce(usage.c.model, "unknown").label("executor"),
+                func.coalesce(usage.c.model, "unknown").label("reported_model"),
                 usage.c.input_tokens,
                 usage.c.output_tokens,
                 usage.c.cache_read_tokens,
                 usage.c.cache_write_tokens.label("cache_creation_tokens"),
                 usage.c.cost_usd,
+                runs.c.runner_profile_id,
+                runs.c.runner_snapshot,
             )
             .select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
             .where(runs.c.created_at >= since_iso)

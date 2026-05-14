@@ -39,7 +39,9 @@ export default function RunDetailDrawer({ run, onClose }: Props) {
 
         <dl className="dl">
           <dt>Action</dt><dd><code>{run.action_name}</code></dd>
-          <dt>Executor</dt><dd><code>{run.executor}</code></dd>
+          <dt>Backend</dt><dd><code>{run.backend}</code></dd>
+          <dt>Model</dt><dd><code>{run.configured_model ?? '—'}</code></dd>
+          <dt>Reported</dt><dd><code>{run.reported_model ?? '—'}</code></dd>
           <dt>State</dt><dd>{run.state}</dd>
           <dt>Started</dt><dd>{fmtDt(run.started_at)}</dd>
           <dt>Completed</dt><dd>{fmtDt(run.completed_at)}</dd>

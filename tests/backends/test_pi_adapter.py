@@ -12,6 +12,7 @@ from agentbox.core.backends.pi import (
 )
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.runner_profiles import EffectiveRunnerConfig
 
 DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.PI, extra_args=[])
 
@@ -27,25 +28,25 @@ def test_render_produces_expected_argv() -> None:
     assert rendered.argv[:4] == ["pi", "-p", "--mode", "json"]
 
 
-def test_render_passes_model_when_set() -> None:
-    agent = _agent(
-        runner=RunnerSpec(kind=RunnerKind.PI, model="pi-1", extra_args=[])
+def test_render_passes_effective_model_when_set() -> None:
+    agent = _agent()
+    rendered = PiBackend().render(
+        agent,
+        Path("/tmp/wd"),
+        runner_config=EffectiveRunnerConfig(backend="pi", model="pi-1"),
     )
-    rendered = PiBackend().render(agent, Path("/tmp/wd"))
     idx = rendered.argv.index("--model")
     assert rendered.argv[idx + 1] == "pi-1"
 
 
 def test_build_pi_argv_uses_default_when_no_spec_model() -> None:
-    spec = RunnerSpec(kind=RunnerKind.PI, extra_args=[])
-    argv = build_pi_argv(spec, default_model="pi-default")
+    argv = build_pi_argv(None, [], default_model="pi-default")
     idx = argv.index("--model")
     assert argv[idx + 1] == "pi-default"
 
 
 def test_build_pi_argv_skips_default_when_extra_args_has_model() -> None:
-    spec = RunnerSpec(kind=RunnerKind.PI, extra_args=["--model", "custom"])
-    argv = build_pi_argv(spec, default_model="pi-default")
+    argv = build_pi_argv(None, ["--model", "custom"], default_model="pi-default")
     assert argv.count("--model") == 1
     assert "custom" in argv and "pi-default" not in argv
 

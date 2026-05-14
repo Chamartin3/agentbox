@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 export interface StreamEvent {
   type: string;
@@ -108,13 +108,13 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
                 <code>{tool}</code>
                 {ev.ok ? <span className="pill ok">ok</span> : <span className="pill error">fail</span>}
               </div>
-              {matched?.arguments && (
+              {matched?.arguments !== undefined && matched?.arguments !== null && (
                 <details>
                   <summary className="dim" style={{ fontSize: 11, cursor: 'pointer' }}>arguments</summary>
-                  <pre style={{ fontSize: 11, margin: '4px 0 0' }}>{JSON.stringify(matched.arguments, null, 2)}</pre>
+                  <pre style={{ fontSize: 11, margin: '4px 0 0' }}>{JSON.stringify(matched.arguments, null, 2) ?? ''}</pre>
                 </details>
               )}
-              {ev.result_excerpt && (
+              {ev.result_excerpt !== undefined && ev.result_excerpt !== null && (
                 <details>
                   <summary className="dim" style={{ fontSize: 11, cursor: 'pointer' }}>result</summary>
                   <pre style={{ fontSize: 11, margin: '4px 0 0' }}>{String(ev.result_excerpt)}</pre>
@@ -162,8 +162,8 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
           content: errText ? (
             <details className="conversation-retry">
               <summary className="conversation-retry-summary">
-                <span className="pill running" style={{ fontSize: 10 }}>retry #{ev.attempt}</span>
-                <span className="dim">{ev.reason}</span>
+                <span className="pill running" style={{ fontSize: 10 }}>retry #{String(ev.attempt ?? '')}</span>
+                <span className="dim">{String(ev.reason ?? '')}</span>
                 <span className="dim" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {errText.slice(0, 60)}{errText.length > 60 ? '...' : ''}
                 </span>
@@ -172,9 +172,43 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
             </details>
           ) : (
             <div className="conversation-retry">
-              <span className="pill running" style={{ fontSize: 10 }}>retry #{ev.attempt}</span>
-              <span className="dim">{ev.reason}</span>
+              <span className="pill running" style={{ fontSize: 10 }}>retry #{String(ev.attempt ?? '')}</span>
+              <span className="dim">{String(ev.reason ?? '')}</span>
             </div>
+          ),
+        });
+        break;
+      }
+      case 'validation': {
+        const ok = Boolean(ev.ok);
+        const errText = ev.error ? String(ev.error) : '';
+        const engine = String(ev.engine ?? '');
+        const mode = String(ev.mode ?? '');
+        const attempt = String(ev.attempt ?? '');
+        msgs.push({
+          id: `${msgs.length}-validation`,
+          role: 'meta',
+          ts,
+          content: ok ? (
+            <div className="conversation-retry">
+              <span className="pill ok" style={{ fontSize: 10 }}>validation ok</span>
+              <span className="dim">attempt #{attempt}</span>
+              <span className="dim">engine={engine}</span>
+              <span className="dim">mode={mode}</span>
+            </div>
+          ) : (
+            <details className="conversation-retry" open>
+              <summary className="conversation-retry-summary">
+                <span className="pill error" style={{ fontSize: 10 }}>validation fail</span>
+                <span className="dim">attempt #{attempt}</span>
+                <span className="dim">engine={engine}</span>
+                <span className="dim">mode={mode}</span>
+                <span className="dim" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {errText.slice(0, 80)}{errText.length > 80 ? '...' : ''}
+                </span>
+              </summary>
+              <pre className="conversation-retry-body">{errText}</pre>
+            </details>
           ),
         });
         break;
@@ -187,8 +221,8 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
           content: (
             <div className="conversation-usage">
               <span className="dim">tokens</span>
-              <span>in {ev.input_tokens ?? 0}</span>
-              <span>out {ev.output_tokens ?? 0}</span>
+              <span>in {Number(ev.input_tokens ?? 0)}</span>
+              <span>out {Number(ev.output_tokens ?? 0)}</span>
               {ev.cost_usd !== null && ev.cost_usd !== undefined && <span>${Number(ev.cost_usd).toFixed(4)}</span>}
             </div>
           ),
@@ -218,7 +252,7 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
           content: (
             <div className="conversation-done">
               <span className={`pill ${ev.ok ? 'ok' : 'error'}`}>{ev.ok ? 'done' : String(ev.status || 'error')}</span>
-              {ev.error && <span className="dim">{String(ev.error).slice(0, 200)}</span>}
+              {ev.error !== undefined && ev.error !== null && <span className="dim">{String(ev.error).slice(0, 200)}</span>}
             </div>
           ),
         });
@@ -235,7 +269,7 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
                 <span className="pill error" style={{ fontSize: 10 }}>timeout</span>
                 <span className="dim">after {String(ev.timeout_seconds ?? '?')}s</span>
               </summary>
-              {ev.error && <pre className="conversation-timeout-body">{String(ev.error)}</pre>}
+              {ev.error !== undefined && ev.error !== null && <pre className="conversation-timeout-body">{String(ev.error)}</pre>}
             </details>
           ),
         });
@@ -257,10 +291,10 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
             <code>{String(tc.tool || '')}</code>
             <span className="dim">…</span>
           </div>
-          {tc.arguments && (
+          {tc.arguments !== undefined && tc.arguments !== null && (
             <details>
               <summary className="dim" style={{ fontSize: 11, cursor: 'pointer' }}>arguments</summary>
-              <pre style={{ fontSize: 11, margin: '4px 0 0' }}>{JSON.stringify(tc.arguments, null, 2)}</pre>
+              <pre style={{ fontSize: 11, margin: '4px 0 0' }}>{JSON.stringify(tc.arguments, null, 2) ?? ''}</pre>
             </details>
           )}
         </div>
@@ -273,17 +307,6 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
 
 export default function ConversationView({ events }: { events: StreamEvent[] }) {
   const messages = useMemo(() => buildConversation(events), [events]);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const toggle = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   if (messages.length === 0) {
     return <div className="conversation-empty">no messages yet</div>;
   }
@@ -291,7 +314,6 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
   return (
     <div className="conversation">
       {messages.map((m) => {
-        const isOpen = expanded.has(m.id);
         switch (m.role) {
           case 'assistant':
             return (
@@ -301,7 +323,7 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
                   {m.ts && <span className="conversation-ts">{fmtDt(m.ts)}</span>}
                 </div>
                 <div className="conversation-turn-body">
-                  <pre className="conversation-text">{m.content}</pre>
+                  <pre className="conversation-text">{String(m.content)}</pre>
                 </div>
               </div>
             );
@@ -313,7 +335,7 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
                   {m.ts && <span className="conversation-ts">{fmtDt(m.ts)}</span>}
                 </div>
                 <div className="conversation-turn-body">
-                  <pre className="conversation-text">{m.content}</pre>
+                  <pre className="conversation-text">{String(m.content)}</pre>
                 </div>
               </div>
             );
@@ -325,7 +347,7 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
                   {m.ts && <span className="conversation-ts">{fmtDt(m.ts)}</span>}
                 </div>
                 <div className="conversation-turn-body">
-                  <pre className="conversation-text">{m.content}</pre>
+                  <pre className="conversation-text">{String(m.content)}</pre>
                 </div>
               </div>
             );

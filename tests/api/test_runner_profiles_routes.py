@@ -177,6 +177,28 @@ class TestCreateRunnerProfile:
             assert resp.status_code == 400
             assert "positive" in resp.json()["detail"].lower()
 
+    def test_create_profile_without_id_auto_slugifies(self, client: Any) -> None:
+        """POST without id derives it from slugify(name)."""
+        req = {"name": "My Cool Profile", "backend": "token"}
+        resp = client.post("/api/runner-profiles", json=req)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["id"] == "my-cool-profile"
+        assert data["name"] == "My Cool Profile"
+
+    def test_create_profile_without_id_avoids_collision(self, client: Any) -> None:
+        """When slug already exists, append a numeric suffix."""
+        client.post("/api/runner-profiles", json={
+            "id": "collision-test",
+            "name": "Collision Test",
+            "backend": "token",
+        })
+        req = {"name": "Collision Test", "backend": "token"}
+        resp = client.post("/api/runner-profiles", json=req)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["id"] == "collision-test-2"
+
 
 class TestGetRunnerProfile:
     """GET /api/runner-profiles/{profile_id} tests."""

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { subagentsApi } from '../api/repo';
 import EnvDocEditor from '../components/EnvDocEditor';
 import WorkspaceResourcesEditor from '../components/WorkspaceResourcesEditor';
 import SubagentsEditor from '../components/SubagentsEditor';
@@ -38,6 +39,8 @@ export default function WorkspaceDetailPage() {
   const [permissions, setPermissions] = useState<Record<string, any>>({});
   const [permissionsSaving, setPermissionsSaving] = useState(false);
   const [builtinTools, setBuiltinTools] = useState<string[]>([]);
+  const [subagentCount, setSubagentCount] = useState(0);
+  const [bindingCount, setBindingCount] = useState(0);
 
   // File viewer state
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -49,11 +52,14 @@ export default function WorkspaceDetailPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [ws, perms, mcp, sk] = await Promise.all([
+      const [ws, perms, mcp, sk, subagents, bindings] = await Promise.all([
         api.getWorkspaceByName(id),
         api.getWorkspacePermissionsByName(id),
         api.getWorkspaceMcpToolsByName(id),
         api.listWorkspaceSkillsByName(id),
+        subagentsApi.list(id),
+        fetch(`/api/workspaces/${encodeURIComponent(id)}/resources`)
+          .then((r) => (r.ok ? r.json() : { items: [] })),
       ]);
       setData(ws);
       setPermissions((perms as any).permissions || {});
@@ -61,6 +67,8 @@ export default function WorkspaceDetailPage() {
       // (it's the same registry); MCP groups are no longer rendered here.
       setBuiltinTools((mcp as any).builtin_tools || []);
       setSkills((sk as any).skills || []);
+      setSubagentCount(subagents.items?.length || 0);
+      setBindingCount((bindings as any).items?.length || 0);
     } catch (e) {
       console.error(e);
     } finally {
@@ -190,16 +198,21 @@ export default function WorkspaceDetailPage() {
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 8 }}>
         <div className="kpi">
-          <div className="kpi-label">Agents</div>
-          <div className="kpi-value">{data.agents?.length || 0}</div>
+          <div className="kpi-label">Subagents</div>
+          <div className="kpi-value">{subagentCount}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Resources</div>
+          <div className="kpi-value">{bindingCount}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-label">Skill packs</div>
+          <div className="kpi-value">{skills.length}</div>
+          <div className="kpi-sub">on-disk SKILL.md</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Files</div>
           <div className="kpi-value">{files.length}</div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-label">Skills</div>
-          <div className="kpi-value">{skills.length}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Built-in tools</div>
@@ -208,26 +221,12 @@ export default function WorkspaceDetailPage() {
         </div>
       </div>
 
-      {/* 1. Environment — env-doc (renders CLAUDE.md/AGENTS.md on each run) */}
-      <section className="section">
-        <h3 style={{ marginTop: 0 }}>Environment</h3>
-        <EnvDocEditor workspaceId={id!} />
-      </section>
-
-      {/* 2. Resources — skills/folders/scripts/schemas/docs bound to this
-          workspace. Skill packs discovered on disk surface here as
-          available-to-bind; the dedicated Skills viewer section was
-          removed to stop double-presenting the same concept. */}
-      <section className="section">
-        <h3 style={{ marginTop: 0 }}>Resources</h3>
-        <WorkspaceResourcesEditor workspaceId={id!} />
-      </section>
-
-      {/* 3. Agents — subagent assignments with reorder */}
-      <section className="section">
-        <h3 style={{ marginTop: 0 }}>Agents</h3>
-        <SubagentsEditor workspaceId={id!} />
-      </section>
+      {/* Each editor renders its own card chrome (heading + panel). The
+          page used to wrap them in an outer <section className="section">
+          which produced visible card-in-card nesting. */}
+      <EnvDocEditor workspaceId={id!} />
+      <WorkspaceResourcesEditor workspaceId={id!} />
+      <SubagentsEditor workspaceId={id!} />
 
       {/* 4. Capabilities — single section bundling everything that controls
           what the agent CAN do at runtime. The previous "MCP Tool Groups"

@@ -6,27 +6,27 @@ import './AgentVersionDiff.css';
 interface AgentVersionDiffProps {
   agentId?: string;
   latestVersion?: number;
+  selectedVersion?: number;
   versions?: VersionSummary[];
 }
 
 export default function AgentVersionDiff({
   agentId: propAgentId,
   latestVersion: propLatestVersion,
+  selectedVersion,
   versions: propVersions,
 }: AgentVersionDiffProps) {
   const { id } = useParams<{ id: string }>();
   const agentId = propAgentId || id || '';
   const [loadedVersions, setLoadedVersions] = useState<VersionSummary[]>(propVersions || []);
   const [loadedLatest, setLoadedLatest] = useState<number>(propLatestVersion || 0);
-  const [versionsLoaded, setVersionsLoaded] = useState(!!propVersions);
 
   useEffect(() => {
     if (!propVersions && agentId) {
       versionsApi.listVersions(agentId).then((data) => {
         setLoadedVersions(data.versions);
         setLoadedLatest(data.latest_version || 0);
-        setVersionsLoaded(true);
-      }).catch(() => setVersionsLoaded(true));
+      }).catch(() => undefined);
     }
   }, [agentId, propVersions]);
 
@@ -40,11 +40,12 @@ export default function AgentVersionDiff({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (latestVersion > 1) {
-      setFromVersion(latestVersion - 1);
-      setToVersion(latestVersion);
+    const target = selectedVersion || latestVersion;
+    if (target > 1) {
+      setFromVersion(target - 1);
+      setToVersion(target);
     }
-  }, [latestVersion]);
+  }, [latestVersion, selectedVersion]);
 
   useEffect(() => {
     if (fromVersion >= 0 && toVersion > fromVersion) {
@@ -125,14 +126,16 @@ export default function AgentVersionDiff({
                 <p className="no-changes">No changes in prompt content.</p>
               ) : (
                 <div className="diff-lines">
-                  {diff.prompt_diff.map((line, idx) => (
-                    <div key={idx} className={`diff-line ${getLineClass(line.type)}`}>
-                      <span className="diff-marker">
-                        {line.type === 'added' && '+'}
-                        {line.type === 'removed' && '−'}
-                        {line.type === 'modified' && '~'}
-                      </span>
-                      <code>{line.lines.join('\n')}</code>
+                  {diff.prompt_diff.split('\n').map((line, idx) => (
+                    <div key={idx} className={`diff-line ${getLineClass(
+                      line.startsWith('+') && !line.startsWith('+++')
+                        ? 'added'
+                        : line.startsWith('-') && !line.startsWith('---')
+                          ? 'removed'
+                          : 'unchanged'
+                    )}`}>
+                      <span className="diff-marker">{line.slice(0, 1)}</span>
+                      <code>{line}</code>
                     </div>
                   ))}
                 </div>
@@ -140,7 +143,7 @@ export default function AgentVersionDiff({
             </div>
           </div>
 
-          {diff.metadata_diff.length > 0 && (
+          {(diff.metadata_diff || []).length > 0 && (
             <div className="diff-section">
               <h3>Metadata Changes</h3>
               <table className="metadata-diff">
@@ -152,7 +155,7 @@ export default function AgentVersionDiff({
                   </tr>
                 </thead>
                 <tbody>
-                  {diff.metadata_diff.map((change, idx) => (
+                  {(diff.metadata_diff || []).map((change, idx) => (
                     <tr key={idx} className="metadata-changed">
                       <td className="field-name">{change.key}</td>
                       <td className="from-value">
@@ -168,7 +171,7 @@ export default function AgentVersionDiff({
             </div>
           )}
 
-          {diff.prompt_diff.length === 0 && diff.metadata_diff.length === 0 && (
+          {diff.prompt_diff.length === 0 && (diff.metadata_diff || []).length === 0 && (
             <p className="no-changes">No differences between these versions.</p>
           )}
         </div>

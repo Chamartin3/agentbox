@@ -21,8 +21,6 @@ SourceType = Literal[
     "run_profile",
     "agent_profile",
     "system_default",
-    "agent_legacy",
-    "backend_default",
 ]
 
 
@@ -63,7 +61,7 @@ class EffectiveRunnerConfig(BaseModel):
     profile_id: str | None = None
     """Source profile ID, if resolved from a profile."""
 
-    source: SourceType = "backend_default"
+    source: SourceType = "run_override"
     """How this config was resolved."""
 
 
@@ -71,12 +69,13 @@ class RunnerProfileResolver:
     """Resolves effective runner config from multiple sources.
 
     Precedence (first match wins):
-    1. Per-run runner_config dict
+    1. Per-run runner_config dict / explicit backend or timeout override
     2. Per-run runner_profile_id
     3. Agent-bound runner profile
     4. System default runner profile
-    5. Agent's legacy runner spec
-    6. Backend defaults
+
+    AgentDef.runner is intentionally not consulted here. The resolved
+    EffectiveRunnerConfig is the only runtime dispatch source of truth.
     """
 
     def resolve(
@@ -107,18 +106,21 @@ class RunnerProfileResolver:
                 missing, or backend is invalid.
         """
 
-        # Rule 1: Per-run runner_config dict (non-empty)
-        if runner_config:
+        # Rule 1: Per-run runner_config dict, or explicit backend/timeout
+        # override. This is a transient run-specific config, independent
+        # from the static agent definition.
+        if runner_config or backend_override:
+            data = runner_config or {}
             config = EffectiveRunnerConfig(
-                backend=runner_config.get("backend") or backend_override,
-                provider=runner_config.get("provider"),
-                model=runner_config.get("model"),
-                timeout_seconds=runner_config.get("timeout_seconds") or timeout_seconds,
-                base_url=runner_config.get("base_url"),
-                api_key_env=runner_config.get("api_key_env"),
-                params=runner_config.get("params", {}),
-                headers=runner_config.get("headers", {}),
-                extra_args=runner_config.get("extra_args", []),
+                backend=data.get("backend") or backend_override,
+                provider=data.get("provider"),
+                model=data.get("model"),
+                timeout_seconds=data.get("timeout_seconds") or timeout_seconds,
+                base_url=data.get("base_url"),
+                api_key_env=data.get("api_key_env"),
+                params=data.get("params", {}),
+                headers=data.get("headers", {}),
+                extra_args=data.get("extra_args", []),
                 source="run_override",
             )
             # Validate backend if present
@@ -180,30 +182,9 @@ class RunnerProfileResolver:
             )
             return config
 
-        # Rule 5: Agent's legacy runner spec
-        if hasattr(agent, "runner") and agent.runner:
-            runner = agent.runner
-            config = EffectiveRunnerConfig(
-                backend=getattr(runner, "kind", None),
-                model=getattr(runner, "model", None),
-                timeout_seconds=getattr(runner, "timeout_seconds", None),
-                extra_args=getattr(runner, "extra_args", []),
-                source="agent_legacy",
-            )
-            # Apply per-run overrides
-            if backend_override:
-                config.backend = backend_override
-            if timeout_seconds:
-                config.timeout_seconds = timeout_seconds
-            return config
-
-        # Rule 6: Backend defaults
-        config = EffectiveRunnerConfig(source="backend_default")
-        if backend_override:
-            config.backend = backend_override
-        if timeout_seconds:
-            config.timeout_seconds = timeout_seconds
-        return config
+        return EffectiveRunnerConfig(
+            timeout_seconds=timeout_seconds, source="run_override"
+        )
 
     def _build_from_profile(
         self,

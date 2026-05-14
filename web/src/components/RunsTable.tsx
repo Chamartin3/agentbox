@@ -12,8 +12,9 @@ export interface RunRow {
   started_at: string | null;
   finished_at: string | null;
   duration_ms?: number | null;
-  executor?: string | null;
-  model?: string | null;
+  backend?: string | null;
+  configured_model?: string | null;
+  reported_model?: string | null;
   agent_version?: number | null;
   agent_version_id?: number | null;
   input_tokens?: number | null;
@@ -165,9 +166,23 @@ export default function RunsTable({
           <span className="dim">—</span>
         );
       case 'runner':
-        return r.executor ? <code className="dim">{r.executor}</code> : <span className="dim">—</span>;
-      case 'model':
-        return r.model ? <code className="dim">{r.model}</code> : <span className="dim">—</span>;
+        return r.backend ? <code className="dim">{r.backend}</code> : <span className="dim">—</span>;
+      case 'model': {
+        const primary = r.configured_model;
+        const reported = r.reported_model;
+        if (!primary) return <span className="dim">—</span>;
+        if (reported && reported !== primary) {
+          return (
+            <code className="dim" title={`Reported as: ${reported}`}>
+              {primary}
+              <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>
+                as: {reported}
+              </span>
+            </code>
+          );
+        }
+        return <code className="dim">{primary}</code>;
+      }
       case 'status':
         return <StatusPill status={r.status} />;
       case 'started':

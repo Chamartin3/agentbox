@@ -565,8 +565,22 @@ export default function RunDetailPage() {
 
   const workspace = agent?.workspace ?? null;
   const isEphemeral = workspace === '<ephemeral>';
-  const runnerKind = agent?.runner?.kind ?? null;
-  const modelName = usage?.model ?? agent?.runner?.model ?? null;
+  // runner_snapshot is the historical truth of what executed this run.
+  // Prefer it over agent.runner (current config) and over the bound
+  // profile (mutable, can be edited/rebound after the run).
+  const runnerSnapshot = (run as any)?.runner_snapshot ?? null;
+  const snapshotMissing =
+    runnerSnapshot && (runnerSnapshot.snapshot === 'missing' || runnerSnapshot.snapshot === 'invalid');
+  const runnerKind = run.backend
+    || (runnerSnapshot && !snapshotMissing && runnerSnapshot.backend)
+    || agent?.runner?.kind
+    || null;
+  const modelName = run.configured_model
+    || (runnerSnapshot && !snapshotMissing && runnerSnapshot.model)
+    || usage?.model
+    || agent?.runner?.model
+    || null;
+  const runnerProfileName = (runnerSnapshot && !snapshotMissing && runnerSnapshot.profile_name) || null;
   const cacheTokens = (usage?.cache_read_tokens ?? 0) + (usage?.cache_write_tokens ?? 0);
 
   return (
@@ -594,6 +608,7 @@ export default function RunDetailPage() {
         </div>
         <StatusPill status={run.status} />
         {runnerKind && <span className="stat">runner<strong>{runnerKind}</strong></span>}
+        {runnerProfileName && <span className="stat">profile<strong>{runnerProfileName}</strong></span>}
         {modelName && <span className="stat">model<strong>{modelName}</strong></span>}
         <span className="spacer" />
         <button
@@ -1000,10 +1015,10 @@ export default function RunDetailPage() {
           </h2>
           {run.composition_snapshot ? (
             <dl className="dl">
-              {run.composition_snapshot.bundle_sha && (
+              {run.composition_snapshot.bundle_sha !== undefined && run.composition_snapshot.bundle_sha !== null && (
                 <><dt>Bundle SHA</dt><dd><code>{String(run.composition_snapshot.bundle_sha)}</code></dd></>
               )}
-              {run.composition_snapshot.schema_sha && (
+              {run.composition_snapshot.schema_sha !== undefined && run.composition_snapshot.schema_sha !== null && (
                 <><dt>Schema SHA</dt><dd><code>{String(run.composition_snapshot.schema_sha)}</code></dd></>
               )}
               {Array.isArray(run.composition_snapshot.references) && (
@@ -1012,7 +1027,7 @@ export default function RunDetailPage() {
                   <dd>
                     <ul style={{ margin: 0, paddingLeft: 16 }}>
                       {run.composition_snapshot.references.map((ref: unknown, i: number) => (
-                        <li key={i}><code>{typeof ref === 'string' ? ref : JSON.stringify(ref)}</code></li>
+                        <li key={i}><code>{typeof ref === 'string' ? ref : (JSON.stringify(ref) ?? '')}</code></li>
                       ))}
                     </ul>
                   </dd>

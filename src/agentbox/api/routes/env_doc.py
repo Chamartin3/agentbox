@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from agentbox.api.deps import get_store
+from agentbox.api.deps import get_settings, get_store
 from agentbox.core.data.store import SessionStore
 from agentbox.core.env_doc.renderers import (
     AgentsMdRenderer,
@@ -16,25 +17,23 @@ from agentbox.core.env_doc.renderers import (
 )
 from agentbox.core.env_doc.renderers.base import ReferenceEntry
 from agentbox.core.env_doc.schema import EnvDocContent
+from agentbox.core.workspace_sync import sync_workspace_by_name
 
 router = APIRouter(tags=["env-doc"])
 
 
 class SaveEnvDocBody(BaseModel):
+    """Body for saving an env-doc. Drafts and changelog requirements were
+    removed — every save is live and immediately syncs to disk.
+    ``reason``/``actor`` are kept optional for audit but not required."""
+
     content: EnvDocContent
-    reason: str = Field(..., min_length=3)
-    publish: bool = True
+    reason: str = "edit"
     actor: str | None = None
 
 
 class PreviewEnvDocBody(BaseModel):
     content: EnvDocContent | None = None
-
-
-class RollbackBody(BaseModel):
-    target_version_id: str
-    reason: str = Field(..., min_length=3)
-    actor: str | None = None
 
 
 def _runtime_context(store: SessionStore, workspace_id: str) -> RuntimeContext:
@@ -67,29 +66,36 @@ def get_env_doc(workspace_id: str, store: Annotated[SessionStore, Depends(get_st
     return {"active": active}
 
 
-@router.get("/api/workspaces/{workspace_id}/env-doc/versions")
-def list_env_doc_versions(
-    workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
-):
-    return {"items": store.list_env_doc_versions(workspace_id)}
-
-
 @router.put("/api/workspaces/{workspace_id}/env-doc")
 def save_env_doc(
     workspace_id: str,
     body: SaveEnvDocBody,
     store: Annotated[SessionStore, Depends(get_store)],
 ):
+    """Save and publish the workspace env-doc.
+
+    Drafts were removed — every save is live, immediately becomes the
+    active version, and triggers a workspace re-sync to refresh
+    CLAUDE.md / AGENTS.md on disk.
+    """
     try:
-        return store.save_env_doc(
+        result = store.save_env_doc(
             workspace_id,
             body.content.model_dump(),
             changelog=body.reason,
-            publish=body.publish,
+            publish=True,
             actor=body.actor,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        sync_workspace_by_name(store, get_settings(), workspace_id)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "env_doc save: sync_workspace_by_name failed for %s", workspace_id
+        )
+    return result
 
 
 @router.post("/api/workspaces/{workspace_id}/env-doc/preview")
@@ -109,18 +115,3 @@ def preview_env_doc(
     return _render_both(content, ctx)
 
 
-@router.post("/api/workspaces/{workspace_id}/env-doc/rollback")
-def rollback_env_doc(
-    workspace_id: str,
-    body: RollbackBody,
-    store: Annotated[SessionStore, Depends(get_store)],
-):
-    try:
-        return store.rollback_env_doc(
-            workspace_id,
-            body.target_version_id,
-            changelog=body.reason,
-            actor=body.actor,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc

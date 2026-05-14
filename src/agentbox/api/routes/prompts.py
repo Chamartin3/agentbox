@@ -18,11 +18,12 @@ router = APIRouter(prefix="/api", tags=["prompts"])
 
 @router.get("/agents/{agent_id}/prompt")
 def get_prompt(agent_id: str) -> dict:
-    agent = get_loader().get(agent_id)
+    store = get_store()
+    agent = store.get_agent_def(agent_id) or get_loader().get(agent_id)
     if agent is None:
         raise HTTPException(404, f"unknown agent {agent_id!r}")
     try:
-        doc = prompts.read_versioned(agent, get_settings().project_root, get_store())
+        doc = prompts.read_versioned(agent, get_settings().project_root, store)
     except prompts.PromptError as exc:
         raise HTTPException(400, {"code": exc.code, "detail": exc.detail}) from exc
     return doc.__dict__

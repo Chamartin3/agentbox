@@ -51,19 +51,42 @@ class TestRunnerProfilesCRUD:
         assert fetched.headers == profile.headers
         assert fetched.extra_args == profile.extra_args
 
-    def test_create_with_auto_id(self, session_store) -> None:
-        """Creating without explicit id auto-generates a UUID."""
+    def test_create_with_auto_id_slugifies_name(self, session_store) -> None:
+        """Creating without explicit id auto-generates a slug from the name."""
         data = RunnerProfileCreate(
             name="Auto ID Profile",
             backend="claude_code",
         )
 
         profile = session_store.create_runner_profile(data)
-        assert profile.id is not None
-        assert len(profile.id) > 0
+        assert profile.id == "auto-id-profile"
         # Verify it's persisted
         fetched = session_store.get_runner_profile(profile.id)
         assert fetched is not None
+
+    def test_create_with_auto_id_avoids_collision(self, session_store) -> None:
+        """Auto-generated id appends a numeric suffix when the slug already exists."""
+        session_store.create_runner_profile(
+            RunnerProfileCreate(id="my-profile", name="My Profile", backend="token")
+        )
+
+        profile = session_store.create_runner_profile(
+            RunnerProfileCreate(name="My Profile", backend="token")
+        )
+        assert profile.id == "my-profile-2"
+
+        profile3 = session_store.create_runner_profile(
+            RunnerProfileCreate(name="My Profile", backend="token")
+        )
+        assert profile3.id == "my-profile-3"
+
+    def test_create_with_auto_id_empty_name_fallback(self, session_store) -> None:
+        """A name that slugifies to nothing falls back to 'profile'."""
+        profile = session_store.create_runner_profile(
+            RunnerProfileCreate(name="!!!", backend="token")
+        )
+        assert profile.id.startswith("profile")
+        assert profile.id != ""
 
     def test_list_profiles_filters(self, session_store) -> None:
         """List profiles with filters by backend, provider, and enabled status."""

@@ -21,11 +21,10 @@ router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
 
 @router.get("")
 def list_agent_versions(agent_id: str) -> dict:
-    loader = get_loader()
-    agent = loader.get(agent_id)
+    store = get_store()
+    agent = store.get_agent_def(agent_id) or get_loader().get(agent_id)
     if agent is None:
         raise HTTPException(404, f"unknown agent {agent_id!r}")
-    store = get_store()
     versions = store.list_versions(agent_id)
     active = store.get_active_version(agent_id)
     latest = store.latest_version(agent_id)
@@ -59,10 +58,9 @@ def list_agent_versions(agent_id: str) -> dict:
 
 @router.get("/{version}")
 def get_agent_version(agent_id: str, version: int) -> dict:
-    loader = get_loader()
-    if loader.get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     store = get_store()
+    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
+        raise HTTPException(404, f"unknown agent {agent_id!r}")
     v = store.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
@@ -87,10 +85,9 @@ def get_agent_version(agent_id: str, version: int) -> dict:
 
 @router.get("/{a}/diff/{b}")
 def diff_agent_versions(agent_id: str, a: int, b: int) -> dict:
-    loader = get_loader()
-    if loader.get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     store = get_store()
+    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
+        raise HTTPException(404, f"unknown agent {agent_id!r}")
     try:
         return store.diff_versions(agent_id, a, b)
     except ValueError as exc:
@@ -109,10 +106,9 @@ class CommentBody(BaseModel):
 
 @router.post("/{version}/comments")
 def add_comment(agent_id: str, version: int, body: CommentBody) -> dict:
-    loader = get_loader()
-    if loader.get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     store = get_store()
+    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
+        raise HTTPException(404, f"unknown agent {agent_id!r}")
     v = store.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
@@ -131,10 +127,9 @@ class RatingBody(BaseModel):
 
 @router.put("/{version}/rating")
 def set_rating(agent_id: str, version: int, body: RatingBody) -> dict:
-    loader = get_loader()
-    if loader.get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     store = get_store()
+    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
+        raise HTTPException(404, f"unknown agent {agent_id!r}")
     v = store.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")

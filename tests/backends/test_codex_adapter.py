@@ -12,6 +12,7 @@ from agentbox.core.backends.codex import (
 )
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.runner_profiles import EffectiveRunnerConfig
 
 DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.CODEX, extra_args=[])
 
@@ -27,20 +28,24 @@ def test_render_produces_expected_argv() -> None:
     assert rendered.argv[:3] == ["codex", "exec", "--json"]
 
 
-def test_render_passes_model_when_set() -> None:
-    agent = _agent(
-        runner=RunnerSpec(kind=RunnerKind.CODEX, model="o4-mini", extra_args=[])
+def test_render_passes_effective_model_when_set() -> None:
+    agent = _agent()
+    rendered = CodexBackend().render(
+        agent,
+        Path("/tmp/wd"),
+        runner_config=EffectiveRunnerConfig(backend="codex", model="o4-mini"),
     )
-    rendered = CodexBackend().render(agent, Path("/tmp/wd"))
     idx = rendered.argv.index("--model")
     assert rendered.argv[idx + 1] == "o4-mini"
 
 
-def test_render_appends_extra_args() -> None:
-    agent = _agent(
-        runner=RunnerSpec(kind=RunnerKind.CODEX, extra_args=["--cwd", "/x"])
+def test_render_appends_effective_extra_args() -> None:
+    agent = _agent()
+    rendered = CodexBackend().render(
+        agent,
+        Path("/tmp/wd"),
+        runner_config=EffectiveRunnerConfig(backend="codex", extra_args=["--cwd", "/x"]),
     )
-    rendered = CodexBackend().render(agent, Path("/tmp/wd"))
     assert "--cwd" in rendered.argv and "/x" in rendered.argv
 
 
@@ -53,15 +58,13 @@ def test_digest_stable_across_identical_inputs() -> None:
 
 
 def test_build_codex_argv_uses_default_when_no_spec_model() -> None:
-    spec = RunnerSpec(kind=RunnerKind.CODEX, extra_args=[])
-    argv = build_codex_argv(spec, default_model="o4-mini-default")
+    argv = build_codex_argv(None, [], default_model="o4-mini-default")
     idx = argv.index("--model")
     assert argv[idx + 1] == "o4-mini-default"
 
 
 def test_build_codex_argv_skips_default_when_extra_args_has_model() -> None:
-    spec = RunnerSpec(kind=RunnerKind.CODEX, extra_args=["--model", "custom"])
-    argv = build_codex_argv(spec, default_model="o4-mini-default")
+    argv = build_codex_argv(None, ["--model", "custom"], default_model="o4-mini-default")
     # Only one --model expected (the one inside extra_args)
     assert argv.count("--model") == 1
     assert "custom" in argv and "o4-mini-default" not in argv

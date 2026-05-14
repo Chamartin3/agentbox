@@ -408,3 +408,21 @@ def runner_provider_models(
         )
 
     console.print(table)
+
+
+@runner_provider_app.command("refresh")
+def runner_provider_refresh() -> None:
+    """Re-discover dynamic providers (currently: opencode CLI)."""
+    from agentbox.core.providers.registry import refresh_opencode_providers
+
+    discovered = refresh_opencode_providers()
+    if not discovered:
+        console.print(
+            "[yellow]No opencode providers discovered "
+            "(binary missing or call failed).[/yellow]"
+        )
+        return
+    console.print(
+        f"[green]Discovered {len(discovered)} opencode provider(s):[/green] "
+        + ", ".join(discovered)
+    )

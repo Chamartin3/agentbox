@@ -7,6 +7,7 @@ from agentbox.cli.agent import agent_app
 from agentbox.cli.cfg import cfg_app
 from agentbox.cli.env_doc import env_doc_app
 from agentbox.cli.host_env import host_env_app
+from agentbox.cli.launch import launch_cmd
 from agentbox.cli.mcp import mcp_app
 from agentbox.cli.mcp_workspace import mcp_workspace_app
 from agentbox.cli.mf import mf_app
@@ -34,6 +35,7 @@ app.add_typer(workspace_resources_app, name="workspace-resources")
 app.add_typer(env_doc_app, name="env-doc")
 app.add_typer(mcp_workspace_app, name="mcp-workspace")
 app.add_typer(host_env_app, name="host-env")
+app.command(name="launch")(launch_cmd)
 
 register_backward_compat()
 

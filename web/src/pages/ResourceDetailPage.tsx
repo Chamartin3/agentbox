@@ -7,20 +7,6 @@ import { githubDark } from '@uiw/codemirror-theme-github';
 import { repoApi, RepoResource, RepoVersion, RepoType } from '../api/repo';
 import { RepoType as RepoTypeEnum } from '../api/enums';
 
-function roleFromTags(tags: string | null | undefined): string | undefined {
-  if (!tags) return undefined;
-  const KNOWN = ['system_fragment', 'system_prompt', 'output_schema', 'input_schema'];
-  let parts: string[] = [];
-  try {
-    const j = JSON.parse(tags);
-    if (Array.isArray(j)) parts = j.map(String);
-  } catch {
-    parts = tags.split(',').map((t) => t.trim());
-  }
-  for (const p of parts) if (KNOWN.includes(p)) return p === 'system_prompt' ? 'system_fragment' : p;
-  return undefined;
-}
-
 function fmtDate(s?: string): string {
   if (!s) return '';
   const d = new Date(s);
@@ -451,9 +437,30 @@ function looksLikeJsonSchema(content: string): boolean {
   }
 }
 
-function DocumentViewer({ content, role }: { content: string; role?: string }) {
+interface DocumentViewerProps {
+  content: string;
+  role?: string;
+  resourceId?: string;
+  filename?: string;
+  onSaved?: () => void | Promise<void>;
+}
+
+function DocumentViewer({ content, role, resourceId, filename, onSaved }: DocumentViewerProps) {
   const isSystemFragment = role === 'system_fragment';
   const isSchemaShape = !isSystemFragment && looksLikeJsonSchema(content);
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(content);
+  const [changelog, setChangelog] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(content);
+    setEditing(false);
+    setChangelog('');
+    setSaveErr(null);
+  }, [content, resourceId]);
 
   if (isSchemaShape) {
     return (
@@ -475,6 +482,28 @@ function DocumentViewer({ content, role }: { content: string; role?: string }) {
     );
   }
 
+  const dirty = draft !== content;
+  const canSave = !!resourceId && dirty && changelog.trim().length >= 3 && !saving;
+
+  const onSave = async () => {
+    if (!resourceId) return;
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const fname = filename || 'document.md';
+      const file = new File([draft], fname, { type: 'text/markdown' });
+      const v = await repoApi.uploadVersion(resourceId, file, changelog.trim(), false);
+      await repoApi.publish(resourceId, v.id, changelog.trim());
+      setEditing(false);
+      setChangelog('');
+      if (onSaved) await onSaved();
+    } catch (e) {
+      setSaveErr(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="stack" style={{ gap: 6 }}>
       {isSystemFragment && (
@@ -491,12 +520,47 @@ function DocumentViewer({ content, role }: { content: string; role?: string }) {
           System prompt fragment — composed into the agent's system prompt at run time.
         </div>
       )}
+      {resourceId && (
+        <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+          {!editing ? (
+            <button onClick={() => setEditing(true)} style={{ fontSize: 12 }}>Edit</button>
+          ) : (
+            <>
+              <button
+                onClick={() => { setEditing(false); setDraft(content); setChangelog(''); setSaveErr(null); }}
+                disabled={saving}
+                style={{ fontSize: 12 }}
+              >
+                Cancel
+              </button>
+              <input
+                placeholder="changelog (min 3 chars)"
+                value={changelog}
+                onChange={(e) => setChangelog(e.target.value)}
+                disabled={saving}
+                style={{ fontSize: 12, padding: '4px 8px', flex: 1, maxWidth: 320 }}
+              />
+              <button
+                onClick={onSave}
+                disabled={!canSave}
+                className="primary"
+                style={{ fontSize: 12 }}
+              >
+                {saving ? 'saving…' : 'Save as new version'}
+              </button>
+              {dirty && <span className="dim" style={{ fontSize: 11 }}>unsaved changes</span>}
+            </>
+          )}
+        </div>
+      )}
+      {saveErr && <p style={{ color: 'crimson', fontSize: 12, margin: 0 }}>{saveErr}</p>}
       <CodeMirror
-        value={content}
+        value={editing ? draft : content}
+        onChange={editing ? (v) => setDraft(v) : undefined}
         extensions={[markdown()]}
         theme={githubDark}
-        editable={false}
-        basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
+        editable={editing}
+        basicSetup={{ lineNumbers: editing, foldGutter: false, highlightActiveLine: editing }}
         style={{ maxHeight: 480, overflow: 'auto', fontSize: 12 }}
       />
     </div>
@@ -641,14 +705,23 @@ interface KindViewerProps {
   kind: RepoType;
   content: string;
   filename?: string;
+  resourceId?: string;
+  onSaved?: () => void | Promise<void>;
 }
 
-function KindViewer({ kind, content, filename }: KindViewerProps) {
+function KindViewer({ kind, content, filename, resourceId, onSaved }: KindViewerProps) {
   switch (kind) {
     case RepoTypeEnum.Schema:
       return <SchemaViewer content={content} />;
     case RepoTypeEnum.Document:
-      return <DocumentViewer content={content} />;
+      return (
+        <DocumentViewer
+          content={content}
+          resourceId={resourceId}
+          filename={filename}
+          onSaved={onSaved}
+        />
+      );
     case RepoTypeEnum.Folder:
       return <FolderViewer content={content} />;
     case RepoTypeEnum.Skill:
@@ -1071,10 +1144,8 @@ export default function ResourceDetailPage() {
             kind={resource.type}
             content={rendered}
             filename={(activeVersion?.source_metadata?.filename as string | undefined) ?? undefined}
-            role={
-              ((activeVersion?.metadata as Record<string, unknown> | undefined)?.role as string | undefined)
-              ?? roleFromTags(resource.tags)
-            }
+            resourceId={id}
+            onSaved={refresh}
           />
         </section>
       )}

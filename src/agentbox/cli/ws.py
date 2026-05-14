@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from pathlib import Path
 
 import typer
 from rich.text import Text
@@ -12,9 +13,17 @@ from agentbox.core import workspaces as ws
 
 ws_app = typer.Typer(
     name="ws",
-    help="Manage per-agent workspaces.",
-    no_args_is_help=True,
+    help="Manage per-agent workspaces. Default: open a shell in the default workspace.",
+    no_args_is_help=False,
+    invoke_without_command=True,
 )
+
+
+@ws_app.callback()
+def ws_default(ctx: typer.Context) -> None:
+    """Default: open a shell in the default workspace."""
+    if ctx.invoked_subcommand is None:
+        ws_shell(name=None)
 
 
 @ws_app.command("ls")
@@ -65,10 +74,12 @@ def ws_ls() -> None:
 
 
 @ws_app.command("path")
-def ws_path(agent: str) -> None:
-    """Print the absolute path of an agent's workspace."""
-    a = resolve_agent(agent)
-    path, _eph = ws.resolve_path(a, get_settings(), get_loader())
+def ws_path(
+    name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
+) -> None:
+    """Print the absolute path of a workspace or an agent's workspace."""
+    target = name or "default"
+    path, _ = _resolve_workspace(target)
     typer.echo(str(path))
 
 
@@ -106,3 +117,93 @@ def ws_edit(
     path = ws.ensure(a, get_settings(), get_loader(), scaffold=True)
     editor = os.environ.get("EDITOR", "vi")
     subprocess.call([editor, str(path / file)])
+
+
+# ---------------------------------------------------------------------------
+# shell / explore
+# ---------------------------------------------------------------------------
+
+
+def _resolve_workspace(
+    name: str,
+) -> tuple[Path, str]:
+    """Resolve a workspace path from a named workspace or agent ID.
+
+    Tries named workspace first, then falls back to agent lookup.
+    Returns (path, label) where label is the display name.
+    """
+    settings = get_settings()
+    loader = get_loader()
+
+    ws_def = loader.get_workspace(name)
+    if ws_def is not None:
+        path = settings.project_root / ws_def.path
+        path.mkdir(parents=True, exist_ok=True)
+        return path, name
+
+    a = resolve_agent(name)
+    path = ws.ensure(a, settings, loader, scaffold=True)
+    return path, name
+
+
+def _delegate_shell(name: str | None, generate: bool) -> int:
+    """Resolve ``name`` to a workspace or agent ID and delegate to ``launch``.
+
+    Preserves the legacy ``ws shell <name>`` semantics: try a named
+    workspace first; if that doesn't match, treat ``name`` as an agent ID
+    and let the launch resolver use the agent's declared workspace.
+    """
+    from agentbox.cli.launch import _launch_session
+
+    loader = get_loader()
+    workspace_arg: str | None = None
+    agent_arg: str | None = None
+    if name and name != "default":
+        if loader.get_workspace(name) is not None:
+            workspace_arg = name
+        else:
+            agent_arg = name
+
+    return _launch_session(
+        runner="shell",
+        agent=agent_arg,
+        workspace=workspace_arg,
+        model=None,
+        ephemeral=False,
+        keep_configs=generate,
+    )
+
+
+@ws_app.command("shell")
+def ws_shell(
+    name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
+    generate: bool = typer.Option(
+        True,
+        "--generate/--no-generate",
+        help="Generate runner configs into workspace/.agentbox/generated",
+    ),
+) -> None:
+    """Open an interactive shell in a fully-built workspace.
+
+    Thin wrapper around ``agentbox launch shell`` that accepts either a
+    named workspace or an agent ID as the positional argument. Defaults
+    to the ``default`` workspace.
+    """
+    raise SystemExit(_delegate_shell(name, generate))
+
+
+@ws_app.command("explore")
+def ws_explore(
+    name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
+    generate: bool = typer.Option(
+        True,
+        "--generate/--no-generate",
+        help="Generate runner configs into workspace/.agentbox/generated",
+    ),
+) -> None:
+    """Open a shell in a workspace with a yazi tip.
+
+    Same as ``ws shell`` — kept for backward compatibility.
+    """
+    console.print("[dim]Tip: run [bold]yazi[/bold] to browse the file tree[/dim]")
+    raise SystemExit(_delegate_shell(name, generate))

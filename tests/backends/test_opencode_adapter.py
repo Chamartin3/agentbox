@@ -7,6 +7,7 @@ from pathlib import Path
 from agentbox.core.backends.opencode import OpenCodeBackend
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.runner_profiles import EffectiveRunnerConfig
 
 DEFAULT_RUNNER = RunnerSpec(
     kind=RunnerKind.OPENCODE,
@@ -43,10 +44,16 @@ def test_render_sets_pwd_env() -> None:
     assert rendered.env.get("PWD") == "/tmp/test_workdir"
 
 
-def test_render_includes_extra_args() -> None:
+def test_render_includes_effective_extra_args() -> None:
     agent = _make_agent()
     adapter = OpenCodeBackend()
-    rendered = adapter.render(agent, Path("/tmp/workdir"))
+    rendered = adapter.render(
+        agent,
+        Path("/tmp/workdir"),
+        runner_config=EffectiveRunnerConfig(
+            backend="opencode", extra_args=["--agent", "test-agent"]
+        ),
+    )
 
     assert "--agent" in rendered.argv
     assert "test-agent" in rendered.argv
@@ -61,17 +68,21 @@ def test_render_applies_default_model_when_missing() -> None:
 
 
 def test_render_does_not_override_explicit_model_in_extra_args() -> None:
-    agent = _make_agent(
-        runner=RunnerSpec(
-            kind=RunnerKind.OPENCODE,
-            extra_args=["--model", "my-custom-model"],
-        )
-    )
+    agent = _make_agent()
     adapter = OpenCodeBackend()
-    rendered = adapter.render(agent, Path("/tmp/workdir"))
+    rendered = adapter.render(
+        agent,
+        Path("/tmp/workdir"),
+        runner_config=EffectiveRunnerConfig(
+            backend="opencode",
+            model="opencode/big-pickle",
+            extra_args=["--model", "my-custom-model"],
+        ),
+    )
 
     model_idx = rendered.argv.index("--model")
     assert rendered.argv[model_idx + 1] == "my-custom-model"
+    assert "opencode/big-pickle" not in rendered.argv
 
 
 def test_digest_stable_across_identical_inputs() -> None:
@@ -83,17 +94,37 @@ def test_digest_stable_across_identical_inputs() -> None:
     assert r1.digest == r2.digest
 
 
-def test_digest_changes_when_extra_args_change() -> None:
+def test_digest_changes_when_effective_extra_args_change() -> None:
     adapter = OpenCodeBackend()
+    agent = _make_agent()
 
-    agent_a = _make_agent(
-        runner=RunnerSpec(kind=RunnerKind.OPENCODE, extra_args=["--agent", "a"])
+    r_a = adapter.render(
+        agent,
+        Path("/tmp/workdir"),
+        runner_config=EffectiveRunnerConfig(backend="opencode", extra_args=["--agent", "a"]),
     )
-    agent_b = _make_agent(
-        runner=RunnerSpec(kind=RunnerKind.OPENCODE, extra_args=["--agent", "b"])
+    r_b = adapter.render(
+        agent,
+        Path("/tmp/workdir"),
+        runner_config=EffectiveRunnerConfig(backend="opencode", extra_args=["--agent", "b"]),
     )
-
-    r_a = adapter.render(agent_a, Path("/tmp/workdir"))
-    r_b = adapter.render(agent_b, Path("/tmp/workdir"))
 
     assert r_a.digest != r_b.digest
+
+
+def test_effective_model_is_passed_even_when_agent_has_legacy_model() -> None:
+    agent = _make_agent(
+        runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, model="haiku")
+    )
+    adapter = OpenCodeBackend()
+    rendered = adapter.render(
+        agent,
+        Path("/tmp/workdir"),
+        runner_config=EffectiveRunnerConfig(
+            backend="opencode", model="opencode/big-pickle"
+        ),
+    )
+
+    model_idx = rendered.argv.index("--model")
+    assert rendered.argv[model_idx + 1] == "opencode/big-pickle"
+    assert "haiku" not in rendered.argv

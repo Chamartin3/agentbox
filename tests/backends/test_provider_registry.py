@@ -27,8 +27,8 @@ from agentbox.core.runner_profiles import EffectiveRunnerConfig
 class TestProviderRegistry:
     """Test suite for the provider registry."""
 
-    def test_list_providers_includes_all_four(self) -> None:
-        """list_providers() returns descriptors for openai, openrouter, xai, ollama."""
+    def test_list_providers_includes_builtin_providers(self) -> None:
+        """list_providers() returns descriptors for built-in providers."""
         providers = list_providers()
         provider_ids = {p.id for p in providers}
 
@@ -36,6 +36,9 @@ class TestProviderRegistry:
         assert "openrouter" in provider_ids
         assert "xai" in provider_ids
         assert "ollama" in provider_ids
+        assert "codex" in provider_ids
+        # opencode CLI providers are dynamically discovered; only assert
+        # they get registered if discovery succeeded at import time.
 
     def test_get_provider_returns_adapter_or_none(self) -> None:
         """get_provider() returns adapter for registered provider, None otherwise."""
@@ -56,17 +59,18 @@ class TestProviderRegistry:
             assert isinstance(descriptor, ProviderDescriptor)
             assert descriptor.id
             assert descriptor.label
-            assert descriptor.backend  # all should be "token"
-            assert descriptor.backend == "token"
+            assert descriptor.backend
             assert isinstance(descriptor.requires_api_key, bool)
             assert isinstance(descriptor.supports_base_url, bool)
             assert isinstance(descriptor.supports_model_listing, bool)
 
-    def test_descriptor_backend_all_token(self) -> None:
-        """All HTTP provider descriptors use token backend."""
-        providers = list_providers()
-        for descriptor in providers:
-            assert descriptor.backend == "token"
+    def test_descriptor_backend_matches_provider_family(self) -> None:
+        """Provider descriptors declare their owning backend family."""
+        by_id = {p.id: p for p in list_providers()}
+        assert by_id["openai"].backend == "token"
+        assert by_id["ollama"].compatible_backends == ["token", "opencode"]
+        assert by_id["codex"].backend == "codex"
+        assert by_id["codex"].compatible_backends == ["codex"]
 
     def test_openai_descriptor_fields(self) -> None:
         """OpenAI descriptor has correct values."""
@@ -226,6 +230,7 @@ class TestProviderRegistry:
         assert adapter is not None
 
         config = EffectiveRunnerConfig(
+            backend="token",
             base_url="http://localhost:11434",
         )
 
@@ -251,19 +256,147 @@ class TestProviderRegistry:
             assert models[0].id == "llama3"
             assert models[1].id == "mistral"
 
+    @pytest.mark.asyncio
+    async def test_ollama_list_models_opencode_uses_qualified_ids(self) -> None:
+        """Ollama model ids are provider-qualified for the OpenCode CLI."""
+        adapter = get_provider("ollama")
+        assert adapter is not None
+
+        config = EffectiveRunnerConfig(
+            backend="opencode",
+            base_url="http://localhost:11434",
+        )
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "models": [
+                {"name": "llama3", "model": "llama3:latest"},
+                {"name": "mistral", "model": "mistral:latest"},
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            models = await adapter.list_models(config)
+
+            assert [model.id for model in models] == ["ollama/llama3", "ollama/mistral"]
+
+    def test_refresh_opencode_providers_registers_discovered_prefixes(self) -> None:
+        """refresh_opencode_providers() adds one adapter per discovered prefix.
+
+        Verifies the namespace-collision rule: bare ``openai`` is owned by
+        the HTTP adapter, so the opencode side is registered as
+        ``opencode-openai``; ``ollama`` declares opencode compat so it is
+        left untouched.
+        """
+        from agentbox.core.providers import cli, registry
+
+        with patch.object(
+            cli,
+            "discover_opencode_providers",
+            return_value=["openai", "ollama", "opencode", "opencode-go"],
+        ):
+            discovered = registry.refresh_opencode_providers()
+
+        assert discovered == ["openai", "ollama", "opencode", "opencode-go"]
+        # HTTP openai keeps the bare id; opencode side gets a namespaced id.
+        assert isinstance(registry.get_provider("openai"), object)
+        assert registry.get_provider("openai").descriptor.backend == "token"  # type: ignore[union-attr]
+        opencode_openai = registry.get_provider("opencode-openai")
+        assert opencode_openai is not None
+        assert opencode_openai.descriptor.compatible_backends == ["opencode"]
+        # Ollama opencode-compat adapter is preserved untouched.
+        ollama = registry.get_provider("ollama")
+        assert ollama is not None
+        assert "opencode" in (ollama.descriptor.compatible_backends or [])
+        # Bare opencode prefix registers as itself.
+        bare = registry.get_provider("opencode")
+        assert bare is not None
+        assert isinstance(bare, cli.OpenCodeCLIAdapter)
+        assert bare.cli_prefix == "opencode"
+
+        # Restore real state for subsequent tests.
+        registry.refresh_opencode_providers()
+
+    def test_ollama_url_rewrite_swaps_localhost_inside_container(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Forcing in-container mode rewrites localhost → host.docker.internal."""
+        from agentbox.core.providers.ollama import rewrite_ollama_url
+
+        monkeypatch.setenv("AGENTBOX_IN_CONTAINER", "1")
+        monkeypatch.delenv("AGENTBOX_OLLAMA_URL_REWRITE", raising=False)
+
+        assert (
+            rewrite_ollama_url("http://localhost:11434")
+            == "http://host.docker.internal:11434"
+        )
+        assert (
+            rewrite_ollama_url("http://127.0.0.1:11434/v1")
+            == "http://host.docker.internal:11434/v1"
+        )
+        # Non-matching host is left untouched.
+        assert rewrite_ollama_url("http://ollama:11434") == "http://ollama:11434"
+
+    def test_ollama_url_rewrite_disabled_when_env_empty(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Empty AGENTBOX_OLLAMA_URL_REWRITE disables the default rewrite."""
+        from agentbox.core.providers.ollama import rewrite_ollama_url
+
+        monkeypatch.setenv("AGENTBOX_IN_CONTAINER", "1")
+        monkeypatch.setenv("AGENTBOX_OLLAMA_URL_REWRITE", "")
+
+        assert rewrite_ollama_url("http://localhost:11434") == "http://localhost:11434"
+
+    def test_ollama_url_rewrite_custom_map(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Explicit override map wins over the container default."""
+        from agentbox.core.providers.ollama import rewrite_ollama_url
+
+        monkeypatch.setenv(
+            "AGENTBOX_OLLAMA_URL_REWRITE", "localhost=ollama-svc,my-host=other"
+        )
+        assert (
+            rewrite_ollama_url("http://localhost:11434")
+            == "http://ollama-svc:11434"
+        )
+        assert (
+            rewrite_ollama_url("http://my-host/api")
+            == "http://other/api"
+        )
+
+    def test_opencode_provider_parser_filters_provider(self) -> None:
+        """OpenCode CLI provider adapters keep only their provider-qualified ids."""
+        from agentbox.core.providers.cli import _parse_opencode_lines
+
+        models = _parse_opencode_lines(
+            "opencode/gpt-5\nopencode-go/qwen3.5\nopenai/gpt-5\n",
+            "opencode",
+        )
+
+        assert [model.id for model in models] == ["opencode/gpt-5"]
+
     def test_cache_key_generation(self) -> None:
-        """Cache key correctly encodes provider, base_url, and api_key_env."""
+        """Cache key correctly encodes provider, base_url, api_key_env, and backend."""
         from agentbox.core.providers.registry import _cache_key
 
-        key1 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY")
-        key2 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY")
-        key3 = _cache_key("openai", "https://custom.com/v1", "OPENAI_API_KEY")
+        key1 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token")
+        key2 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token")
+        key3 = _cache_key("openai", "https://custom.com/v1", "OPENAI_API_KEY", "token")
+        key4 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "opencode")
 
         # Same inputs produce same key
         assert key1 == key2
 
-        # Different base_url produces different key
+        # Different base_url/backend produces different key
         assert key1 != key3
+        assert key1 != key4
 
     def test_cache_ttl_expiration(self) -> None:
         """_get_cached_models returns None after TTL expires."""
@@ -276,19 +409,19 @@ class TestProviderRegistry:
         _MODEL_CACHE.clear()
 
         models = [ProviderModel(id="test-model")]
-        _set_cached_models("test_provider", None, None, models)
+        _set_cached_models("test_provider", None, None, "token", models)
 
         # Should be retrievable immediately
-        cached = _get_cached_models("test_provider", None, None)
+        cached = _get_cached_models("test_provider", None, None, "token")
         assert cached == models
 
         # Manually age the cache entry past TTL
-        key = ("test_provider", None, None)
+        key = ("test_provider", None, None, "token")
         old_time = time.time() - (_CACHE_TTL_SECONDS + 1)
         _MODEL_CACHE[key] = (models, old_time)
 
         # Should now be expired
-        expired = _get_cached_models("test_provider", None, None)
+        expired = _get_cached_models("test_provider", None, None, "token")
         assert expired is None
 
         # Cleanup

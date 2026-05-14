@@ -51,6 +51,7 @@ from agentbox.api.events import (
     ToolResultEvent,
     UsageEvent,
 )
+from agentbox.core.agent_config import PythonAgentConfig
 from agentbox.core.backends.base import BackendAdapter, RenderedConfig
 
 _NAME = "token"
@@ -137,7 +138,7 @@ def _json_schema_to_pydantic_model(
                     )
             if len(branch_types) == 1:
                 return branch_types[0]
-            return Union[tuple(branch_types)]  # type: ignore[return-value]
+            return Union[tuple(branch_types)]  # type: ignore[return-value]  # noqa: UP007
 
         properties = schema_obj.get("properties", {})
         required = set(schema_obj.get("required", []))
@@ -316,12 +317,8 @@ class TokenBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
     ) -> RenderedConfig:
-        spec = agent.runner
-        # Use runner_config.model if present, otherwise fall back to spec/default.
-        if runner_config is not None and getattr(runner_config, "model", None):
-            model = runner_config.model
-        else:
-            model = self._resolve_model(spec)
+        python_cfg = PythonAgentConfig.from_agent(agent)
+        model = getattr(runner_config, "model", None) or self.default_model
 
         # Load output schema for result_type construction (direct-agent mode).
         # Prefer the in-memory schema attached by the composition pipeline
@@ -331,13 +328,13 @@ class TokenBackend(BackendAdapter):
         composed_schema = getattr(agent, "_composed_schema", None)
         if isinstance(composed_schema, dict):
             output_schema = composed_schema
-        elif getattr(spec, "output_schema_path", None):
-            schema_path = workdir / spec.output_schema_path
+        elif python_cfg.output_schema_path:
+            schema_path = workdir / python_cfg.output_schema_path
             if not schema_path.exists():
                 # Try project_root from agent def if available.
                 project_root = getattr(agent, "_project_root", None)
                 if project_root is not None:
-                    schema_path = Path(project_root) / spec.output_schema_path
+                    schema_path = Path(project_root) / python_cfg.output_schema_path
             if schema_path.exists():
                 import contextlib
 
@@ -347,12 +344,12 @@ class TokenBackend(BackendAdapter):
                     )
 
         agent_meta: dict[str, Any] = {
-            "agent_module": spec.agent_module,
+            "agent_module": python_cfg.agent_module,
             "prompt": self._resolve_prompt(agent, workdir),
             "agent_id": agent.id,
             "model": model,
             "output_schema": output_schema,
-            "timeout_seconds": getattr(spec, "timeout_seconds", None),
+            "timeout_seconds": getattr(runner_config, "timeout_seconds", None),
         }
 
         # Store provider routing info from runner_config if present.

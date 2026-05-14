@@ -68,6 +68,7 @@ runs = Table(
     Column("runner_profile_id", String, ForeignKey("runner_profiles.id")),
     Column("resource_snapshot", String),
     Column("mcp_snapshot", String),
+    Column("runner_snapshot", String),
     Column("prompt_version_id", Integer, ForeignKey("prompt_versions.id"), nullable=True),
     Index("runs_by_agent", "agent_id", "created_at"),
     Index("runs_by_status", "status", "created_at"),

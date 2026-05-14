@@ -434,6 +434,7 @@ export default function WorkspaceResourcesEditor({ workspaceId }: { workspaceId:
       {picking && (
         <ResourcePicker
           excludeIds={attachedIds}
+          allowUpload
           onPick={onPick}
           onClose={() => setPicking(false)}
         />

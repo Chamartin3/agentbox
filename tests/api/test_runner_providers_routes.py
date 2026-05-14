@@ -23,6 +23,20 @@ def test_list_runner_providers(client: Any) -> None:
         assert "supports_model_listing" in provider
 
 
+def test_list_runner_providers_filters_by_backend(client: Any) -> None:
+    """Provider list can be filtered to the selected backend."""
+    codex_resp = client.get("/api/runner-providers", params={"backend": "codex"})
+    assert codex_resp.status_code == 200
+    assert {p["id"] for p in codex_resp.json()} == {"codex"}
+
+    opencode_resp = client.get("/api/runner-providers", params={"backend": "opencode"})
+    assert opencode_resp.status_code == 200
+    # opencode CLI sub-providers are discovered dynamically; only ollama
+    # is guaranteed (it declares opencode compat statically).
+    provider_ids = {p["id"] for p in opencode_resp.json()}
+    assert "ollama" in provider_ids
+
+
 def test_list_provider_models_missing_provider(client: Any) -> None:
     """Test listing models for a nonexistent provider."""
     resp = client.get("/api/runner-providers/nonexistent-provider/models")

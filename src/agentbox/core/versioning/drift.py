@@ -67,9 +67,14 @@ def _build_config_json(agent: AgentDef) -> str:
     runner field — defaults included — to prevent silent revert to the
     pydantic default (e.g. ``timeout_seconds=120``).
     """
+    from agentbox.core.agent_config import build_config_json_payload
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         data = agent.model_dump(mode="json", exclude_none=False)
+    # Merge in structured execution/runtime/python sub-dicts so new versions
+    # never need the legacy `runner`-fallback path in `agent_config.py`.
+    data.update(build_config_json_payload(agent))
     return json.dumps(data, sort_keys=True, default=str)
 
 
@@ -279,3 +284,21 @@ def startup_sweep(
         # Always sync prompt content — prompt edits are independent of
         # agent-definition drift and must be versioned in their own table.
         _sync_prompt(agent, store, project_root)
+
+    # Phase 5: degraded-mode boot — warn (don't fail) for agents with no
+    # runner profile binding. They remain non-runnable until bound; the
+    # executor enforces this at dispatch time via `_fail_pre_run`.
+    if hasattr(store, "get_agent_runner_profile"):
+        for agent in agents:
+            try:
+                binding = store.get_agent_runner_profile(agent.id)  # type: ignore[attr-defined]
+                if binding is None:
+                    logger.warning(
+                        "versioning: agent %r has no runner profile bound — "
+                        "runs will fail until one is assigned via "
+                        "/api/agents/%s/runner-profile",
+                        agent.id,
+                        agent.id,
+                    )
+            except Exception:
+                pass

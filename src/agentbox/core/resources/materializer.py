@@ -7,6 +7,7 @@ can be reused by tests and CLI.
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -31,14 +32,31 @@ def materialize_blobs(
     is_single_doc = len(blobs) == 1 and blobs[0]["relative_path"] == ""
     if is_single_doc:
         # Document — target_root is the file path itself.
-        if target_root.exists() and not overwrite:
-            return []
+        if target_root.exists() or target_root.is_symlink():
+            if not overwrite:
+                return []
+            # The target may have been a directory from a prior folder-
+            # type materialization; clear it before writing the file.
+            if target_root.is_symlink() or not target_root.is_dir():
+                target_root.unlink()
+            else:
+                shutil.rmtree(target_root)
         target_root.parent.mkdir(parents=True, exist_ok=True)
         target_root.write_bytes(blobs[0]["content"])
         written.append(target_root)
         return written
 
     # Folder / skill — target_root is a directory.
+    # Clear file-where-folder-expected obstacles when overwriting (e.g.
+    # a prior sync materialized a single-doc into this exact path).
+    if target_root.exists() and not target_root.is_dir():
+        if not overwrite:
+            return []
+        target_root.unlink()
+    elif target_root.is_symlink():
+        if not overwrite:
+            return []
+        target_root.unlink()
     target_root.mkdir(parents=True, exist_ok=True)
     for blob in blobs:
         rel = blob["relative_path"]

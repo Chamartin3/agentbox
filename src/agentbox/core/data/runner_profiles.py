@@ -7,6 +7,7 @@ Composed into ``SessionStore``. Reads ``self.engine`` and operates on
 from __future__ import annotations
 
 import json as _json
+import re
 import uuid
 from typing import Any
 
@@ -93,6 +94,26 @@ class RunnerProfileStats(BaseModel):
     last_run_at: str | None = None
 
 
+def _slugify_id(name: str) -> str:
+    """Derive a URL-safe profile id from a display name."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    if not slug:
+        slug = "profile"
+    return slug
+
+
+def _derive_profile_id(name: str, existing_ids: set[str]) -> str:
+    """Create a unique slug-style id from *name*, appending a numeric suffix on collision."""
+    base = _slugify_id(name)
+    if base not in existing_ids:
+        return base
+    for i in range(2, 1000):
+        candidate = f"{base}-{i}"
+        if candidate not in existing_ids:
+            return candidate
+    return f"{base}-{uuid.uuid4().hex[:8]}"
+
+
 def _row_to_profile(row: Row) -> RunnerProfile:
     """Convert a database row to a RunnerProfile model."""
     m = row._mapping
@@ -125,12 +146,20 @@ class RunnerProfilesMixin:
     def create_runner_profile(self, data: RunnerProfileCreate) -> RunnerProfile:
         """Create a new runner profile.
 
+        If ``data.id`` is omitted, derives one from ``slugify(name)``;
+        on collision appends a short numeric suffix.
+
         If is_system_default=True, atomically clears is_system_default on
         all other profiles in the same transaction.
         """
         from sqlalchemy import insert
 
-        profile_id = data.id or uuid.uuid4().hex
+        if data.id:
+            profile_id = data.id
+        else:
+            existing = self.list_runner_profiles()
+            existing_ids = {p.id for p in existing}
+            profile_id = _derive_profile_id(data.name, existing_ids)
         now = now_iso()
 
         with self.engine.begin() as conn:

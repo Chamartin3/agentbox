@@ -3,8 +3,6 @@
  * Consumed by: AgentVersions, AgentVersionDiff, CommentThread, RatingStars components.
  */
 
-import { api } from './client';
-
 export interface VersionSummary {
   id: string;
   version: number;
@@ -26,13 +24,17 @@ export interface VersionListResponse {
 
 export interface VersionDetail {
   id: string;
-  agent_id: string;
+  agent_id?: string;
   version: number;
   author: string;
   created_at: string;
   changelog: string;
-  prompt_content: string;
-  agent_metadata: Record<string, unknown>;
+  prompt_content?: string;
+  agent_metadata?: Record<string, unknown>;
+  content_snapshot?: string;
+  prompt_snapshot?: string;
+  comments?: Comment[];
+  rating?: Rating | null;
   is_legacy: boolean;
 }
 
@@ -41,6 +43,7 @@ export interface DiffResponse {
   to_version: number;
   prompt_diff: string;
   content_diff: Record<string, unknown>;
+  metadata_diff?: Array<{ key: string; from: unknown; to: unknown }>;
 }
 
 export interface Comment {

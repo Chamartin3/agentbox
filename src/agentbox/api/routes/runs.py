@@ -14,6 +14,7 @@ from agentbox.api.webhooks import schedule_webhook
 from agentbox.core.data import read_transcript
 from agentbox.core.executor import NoBackendAvailable
 from agentbox.core.plugins import backend_load_failure, backends
+from agentbox.core.services.agents import resolve_agent
 
 
 def _no_backend_detail(exc: NoBackendAvailable) -> str:
@@ -96,7 +97,7 @@ async def create_run(body: CreateRunBody) -> dict:
     logger = logging.getLogger(__name__)
     loader = get_loader()
     store = get_store()
-    agent = store.get_agent_def(body.agent) or loader.get(body.agent)
+    agent = resolve_agent(body.agent, store=store, loader=loader)
     if agent is None:
         raise HTTPException(404, f"unknown agent {body.agent!r}")
 
@@ -244,7 +245,7 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
 
     refreshed = store.get_run(run_id) or existing
     loader = get_loader()
-    agent = store.get_agent_def(refreshed.agent_id) or loader.get(refreshed.agent_id)
+    agent = resolve_agent(refreshed.agent_id, store=store, loader=loader)
     schedule_webhook(agent, refreshed, store)
     return {"ok": True, "run_id": run_id, "status": refreshed.status}
 
@@ -298,7 +299,7 @@ async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
 
     refreshed = store.get_run(run_id) or existing
     loader = get_loader()
-    agent = loader.get(refreshed.agent_id)
+    agent = resolve_agent(refreshed.agent_id, store=store, loader=loader)
     if agent:
         schedule_webhook(agent, refreshed, store)
 
@@ -347,7 +348,7 @@ async def rerun(run_id: str) -> dict:
     if rec is None:
         raise HTTPException(404, f"unknown run {run_id!r}")
     loader = get_loader()
-    agent = store.get_agent_def(rec.agent_id) or loader.get(rec.agent_id)
+    agent = resolve_agent(rec.agent_id, store=store, loader=loader)
     if agent is None:
         raise HTTPException(404, f"agent {rec.agent_id!r} no longer exists")
 
@@ -409,6 +410,8 @@ def run_facets() -> dict:
 
 @router.get("/{run_id}")
 def get_run(run_id: str) -> dict:
+    import json as _json
+
     rec = get_store().get_run(run_id)
     if rec is None:
         raise HTTPException(404)
@@ -419,6 +422,29 @@ def get_run(run_id: str) -> dict:
         ver = get_store().get_version_by_id(rec.agent_version_id)
         if ver is not None:
             run_dict["agent_version"] = ver.get("version")
+    # Parse runner_snapshot once for the client; clients should consume
+    # this exclusively for "what runner executed this run". The
+    # runner_profile_id is retained only as a navigation link to the
+    # (possibly mutated or deleted) current profile.
+    snap_raw = run_dict.get("runner_snapshot")
+    snap: dict | None = None
+    if isinstance(snap_raw, str) and snap_raw:
+        try:
+            snap = _json.loads(snap_raw)
+            run_dict["runner_snapshot"] = snap
+        except ValueError:
+            run_dict["runner_snapshot"] = {"snapshot": "invalid", "raw": snap_raw}
+    elif not snap_raw and rec.runner_profile_id:
+        run_dict["runner_snapshot"] = {"snapshot": "missing"}
+
+    # Derive stable top-level fields so the UI doesn't have to drill
+    # into the snapshot blob.
+    run_dict["backend"] = snap.get("backend") if isinstance(snap, dict) else None
+    run_dict["configured_model"] = (
+        snap.get("model") if isinstance(snap, dict) else None
+    )
+    run_dict["reported_model"] = usage.get("model") if usage else None
+
     return {"run": run_dict, "usage": usage, "guardrails": guardrails}
 
 

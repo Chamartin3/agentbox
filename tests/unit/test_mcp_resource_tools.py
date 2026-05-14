@@ -91,6 +91,9 @@ class TestPreviewPrompt:
         ctx = _make_ctx(tmp_path)
         agent = MagicMock()
         agent.prompt = "Hello {{resource:foo}}"
+        # Lookup now goes through ``resolve_agent`` (DB first, manifest
+        # fallback). Stub both sides so the resolver returns this agent.
+        ctx.store.get_agent_def.return_value = agent
         ctx.loader.get.return_value = agent
         with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx), \
              patch("agentbox.mcp_server.tools.resources.resolve_agent_prompt_bindings", return_value=[]):
@@ -102,6 +105,8 @@ class TestPreviewPrompt:
 
     def test_agent_not_found(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
+        # Both DB and manifest must miss for resolve_agent to return None.
+        ctx.store.get_agent_def.return_value = None
         ctx.loader.get.return_value = None
         with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx), \
              patch("agentbox.mcp_server.tools.resources.resolve_agent_prompt_bindings", return_value=[{"marker": "x"}]):

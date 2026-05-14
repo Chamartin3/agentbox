@@ -234,11 +234,10 @@ class TestResolverPureLogic:
         assert config.backend == "token"
         assert config.profile_id == default_profile.id
 
-    def test_legacy_agent_runner_fallback(self, tmp_path: Path) -> None:
-        """Legacy agent.runner spec is used as fallback when no profiles exist."""
+    def test_no_profile_does_not_fall_back_to_agent_runner(self, tmp_path: Path) -> None:
+        """Legacy agent.runner is not a dispatch fallback."""
         store = SessionStore(tmp_path / "db.sqlite")
 
-        # Agent with legacy runner spec, no profiles exist
         agent = AgentDef(
             id="test-agent",
             runner=RunnerSpec(
@@ -258,10 +257,10 @@ class TestResolverPureLogic:
             timeout_seconds=None,
         )
 
-        assert config.source == "agent_legacy"
-        assert config.backend == "claude_code"
-        assert config.model == "claude-3-opus"
-        assert config.timeout_seconds == 180
+        assert config.source == "run_override"
+        assert config.backend is None
+        assert config.model is None
+        assert config.timeout_seconds is None
 
     def test_disabled_explicit_profile_raises(self, tmp_path: Path) -> None:
         """Requesting a disabled profile explicitly raises ValueError."""

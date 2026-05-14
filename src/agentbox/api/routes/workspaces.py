@@ -484,6 +484,17 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
         project_root=project_root,
     )
 
+    # Phase 1: also re-sync env-doc / subagents / resource bindings so
+    # the workspace's on-disk state matches what the saved permissions
+    # imply. Best-effort; failures are logged inside.
+    try:
+        from agentbox.api.deps import get_settings as _get_settings
+        from agentbox.core.workspace_sync import sync_workspace_by_name
+
+        sync_workspace_by_name(store, _get_settings(), name)
+    except Exception:
+        pass
+
     return {
         "workspace": name,
         "path": str(ws_path / "permissions" / "capabilities.json"),

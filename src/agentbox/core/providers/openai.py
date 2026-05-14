@@ -18,7 +18,7 @@ class OpenAIAdapter(HTTPProviderAdapter):
         id=Provider.OPENAI.value,
         label="OpenAI",
         backend="token",
-        compatible_backends=["token", "codex"],
+        compatible_backends=["token"],
         requires_api_key=True,
         supports_base_url=True,
         supports_model_listing=True,

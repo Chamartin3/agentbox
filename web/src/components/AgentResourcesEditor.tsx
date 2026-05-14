@@ -774,6 +774,7 @@ export default function AgentResourcesEditor({
       {picker?.kind === 'binding' && (
         <ResourcePicker
           excludeIds={attachedIds}
+          allowUpload
           onPick={onPickBinding}
           onClose={() => setPicker(null)}
         />

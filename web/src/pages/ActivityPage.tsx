@@ -104,7 +104,7 @@ export default function ActivityPage() {
   const totals = summary?.totals;
   const rawSeries = summary?.series ?? [];
   const byAction = summary?.by_action ?? [];
-  const byExecutor = summary?.by_executor ?? [];
+  const byReportedModel = summary?.by_reported_model ?? [];
 
   const series = useMemo(() => {
     const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
@@ -136,9 +136,9 @@ export default function ActivityPage() {
     () => Array.from(new Set(byAction.map((b) => b.action_name))).sort(),
     [byAction],
   );
-  const executorOptions = useMemo(
-    () => Array.from(new Set(byExecutor.map((b) => b.executor))).sort(),
-    [byExecutor],
+  const reportedModelOptions = useMemo(
+    () => Array.from(new Set(byReportedModel.map((b) => b.reported_model))).sort(),
+    [byReportedModel],
   );
 
   return (
@@ -160,8 +160,8 @@ export default function ActivityPage() {
           {actionOptions.map((a) => <option key={a} value={a}>{a}</option>)}
         </select>
         <select value={executorFilter} onChange={(e) => setExecutorFilter(e.target.value)}>
-          <option value="">All executors</option>
-          {executorOptions.map((x) => <option key={x} value={x}>{x}</option>)}
+          <option value="">All models</option>
+          {reportedModelOptions.map((x) => <option key={x} value={x}>{x}</option>)}
         </select>
         <select
           value={stateFilter}
@@ -275,27 +275,27 @@ export default function ActivityPage() {
             </section>
 
             <section className="section">
-              <h2 style={{ borderBottom: 'none' }}>By executor</h2>
+              <h2 style={{ borderBottom: 'none' }}>By reported model</h2>
               <table>
                 <thead>
                   <tr>
-                    <th>Executor</th>
+                    <th>Model</th>
                     <th style={{ textAlign: 'right' }}>Runs</th>
                     <th style={{ textAlign: 'right' }}>Fail</th>
                     <th style={{ textAlign: 'right' }}>Tokens</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {byExecutor.length === 0 ? (
+                  {byReportedModel.length === 0 ? (
                     <tr><td colSpan={4} className="dim">no runs in range</td></tr>
-                  ) : byExecutor.map((row) => (
+                  ) : byReportedModel.map((row) => (
                     <tr
-                      key={row.executor}
-                      onClick={() => navigate(`/runs?executor=${encodeURIComponent(row.executor)}`)}
+                      key={row.reported_model}
+                      onClick={() => navigate(`/runs?executor=${encodeURIComponent(row.reported_model)}`)}
                       style={{ cursor: 'pointer' }}
-                      title={`Open runs for executor ${row.executor}`}
+                      title={`Open runs for model ${row.reported_model}`}
                     >
-                      <td><code>{row.executor}</code></td>
+                      <td><code>{row.reported_model}</code></td>
                       <td style={{ textAlign: 'right' }}>{row.total}</td>
                       <td style={{ textAlign: 'right', color: row.failures ? 'var(--red)' : 'inherit' }}>
                         {row.failures}
@@ -320,8 +320,9 @@ export default function ActivityPage() {
                 started_at: r.started_at,
                 finished_at: r.completed_at,
                 duration_ms: r.duration_ms,
-                executor: r.executor,
-                model: r.model,
+                backend: r.backend,
+                configured_model: r.configured_model,
+                reported_model: r.reported_model,
                 input_tokens: r.input_tokens,
                 output_tokens: r.output_tokens,
                 cache_read_tokens: r.cache_read_tokens,

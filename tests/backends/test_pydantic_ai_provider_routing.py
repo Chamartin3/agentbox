@@ -67,24 +67,23 @@ class TestTokenProviderRouting:
         # Assert no secret value is stored
         assert "api_key" not in rendered.agent_meta or rendered.agent_meta.get("api_key") is None
 
-    def test_render_model_falls_back_to_spec_when_no_runner_config(self) -> None:
-        """render() with runner_config=None uses model from agent.runner.model."""
+    def test_render_without_runner_config_ignores_legacy_runner_model(self) -> None:
+        """render() does not read agent.runner.model as runtime config."""
         agent = _make_agent(
             runner=RunnerSpec(
                 kind=RunnerKind.TOKEN,
-                model="fallback:model",
+                model="legacy:model",
             )
         )
         adapter = TokenBackend()
         rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=None)
 
-        # Model should come from agent.runner.model
-        assert rendered.model == "fallback:model"
-        # No provider info in agent_meta
+        assert rendered.model is None
+        assert rendered.agent_meta.get("model") is None
         assert "provider" not in rendered.agent_meta
 
-    def test_render_runner_config_model_wins_over_spec(self) -> None:
-        """runner_config.model overrides agent.runner.model."""
+    def test_render_runner_config_model_is_authoritative(self) -> None:
+        """runner_config.model is the runtime source of truth."""
         agent = _make_agent(
             runner=RunnerSpec(
                 kind=RunnerKind.TOKEN,
@@ -100,7 +99,6 @@ class TestTokenProviderRouting:
 
         rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=runner_config)
 
-        # runner_config model should win
         assert rendered.model == "override:model"
 
     def test_render_with_only_api_key_env_stored_not_resolved(self) -> None:

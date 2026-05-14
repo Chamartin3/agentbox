@@ -4,8 +4,9 @@ export type AgentRunState = 'running' | 'succeeded' | 'failed' | 'timeout';
 export interface AgentRun {
   id: string;
   action_name: string;
-  executor: string;
-  model: string | null;
+  backend: string;
+  configured_model: string | null;
+  reported_model: string | null;
   state: AgentRunState;
   started_at: string | null;
   completed_at: string | null;
@@ -46,8 +47,8 @@ export interface ActivityByAction {
   total_output_tokens: number;
 }
 
-export interface ActivityByExecutor {
-  executor: string;
+export interface ActivityByReportedModel {
+  reported_model: string;
   total: number;
   failures: number;
   total_input_tokens: number;
@@ -68,7 +69,7 @@ export interface ActivitySummary {
     incomplete: number;
   }>;
   by_action: ActivityByAction[];
-  by_executor: ActivityByExecutor[];
+  by_reported_model: ActivityByReportedModel[];
 }
 
 async function get<T>(path: string): Promise<T> {

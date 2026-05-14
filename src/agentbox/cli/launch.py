@@ -1,4 +1,16 @@
-"""agentbox launch — interactive runner for Claude Code and OpenCode agents."""
+"""agentbox launch — interactive runner for any supported backend.
+
+Launches the bare CLI (no `-p` / `exec --json` / non-interactive flags) inside
+a resolved workspace so the user gets a real TTY session. Supports:
+
+- ``claude``    — Claude Code CLI (default)
+- ``opencode``  — OpenCode CLI
+- ``codex``     — OpenAI Codex CLI
+- ``pi``        — pi.dev CLI
+
+The ``token`` (in-process pydantic-ai) backend has no CLI to attach to and
+is rejected with a helpful message.
+"""
 
 from __future__ import annotations
 
@@ -18,57 +30,186 @@ from agentbox.core.data.manifest import AgentDef
 from agentbox.core.definitions import DefinitionLoader
 from agentbox.core.mcp import McpRegistry
 
+SUPPORTED_RUNNERS = ("claude", "opencode", "codex", "pi", "shell")
+DEFAULT_WORKSPACE_NAME = "default"
+
+# Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
+# ``$SHELL`` (falling back to /bin/bash) and never needs a runner binary.
+_RUNNER_BINARIES = {
+    "claude": "claude",
+    "opencode": "opencode",
+    "codex": "codex",
+    "pi": "pi",
+}
+
+# Runners that need a generated config bundle (claude_agents.json, MCP
+# config, etc.). ``shell`` only generates when ``--keep-configs`` is set,
+# so the user can poke at the bundle from inside the shell.
+_RUNNERS_NEEDING_CONFIG = {"claude", "opencode"}
+
+
+def _require_binary(runner: str) -> None:
+    """Fail fast if the runner's CLI is not on PATH."""
+    binary = _RUNNER_BINARIES.get(runner)
+    if binary is None:
+        return
+    if shutil.which(binary) is None:
+        console.print(
+            f"[red]The {binary!r} CLI is not installed in this container.[/red]\n"
+            f"Add it to [bold]libs/agentbox/Dockerfile[/bold] (or install it "
+            f"into the running container) and try again."
+        )
+        raise typer.Exit(127)
+
 
 def launch_cmd(
-    agent: str = typer.Argument(..., help="Agent ID to launch"),
-    workspace: str | None = typer.Option(
-        None, "--workspace", "-w", help="Named workspace or path override"
+    runner: str = typer.Argument(
+        "claude",
+        help=f"Runner to launch interactively. One of: {', '.join(SUPPORTED_RUNNERS)}.",
     ),
-    runner: str = typer.Option(
-        "claude", "--runner", "-r", help="Runner: claude or opencode"
+    agent: str | None = typer.Option(
+        None, "--agent", "-a", help="Optional agent ID to scope the session to."
+    ),
+    workspace: str | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help="Named workspace (defaults to the 'default' workspace).",
     ),
     model: str | None = typer.Option(None, "--model", "-m", help="Model alias"),
     ephemeral: bool = typer.Option(
         False, "--ephemeral", "-e", help="Force an ephemeral (tmp) workspace"
     ),
+    keep_configs: bool = typer.Option(
+        False,
+        "--keep-configs/--no-keep-configs",
+        help=(
+            "Materialize generated runner configs into "
+            "<workspace>/.agentbox/generated/ instead of a tmp dir. "
+            "Useful for inspecting configs from inside a 'shell' session."
+        ),
+    ),
 ) -> None:
-    """Launch an agent interactively inside the container.
+    """Launch an interactive backend session inside a workspace.
 
     Resolves the workspace, applies credentials, generates runner configs
-    from the live manifest, and exec's into the requested runner.
+    (for backends that need them), and exec's into the bare CLI.
     """
+    sys.exit(
+        _launch_session(
+            runner=runner,
+            agent=agent,
+            workspace=workspace,
+            model=model,
+            ephemeral=ephemeral,
+            keep_configs=keep_configs,
+        )
+    )
+
+
+def _launch_session(
+    *,
+    runner: str,
+    agent: str | None,
+    workspace: str | None,
+    model: str | None,
+    ephemeral: bool,
+    keep_configs: bool,
+) -> int:
+    """Core launch logic — callable from other CLI commands (e.g. ``ws shell``)."""
+    if runner == "token":
+        console.print(
+            "[red]The 'token' backend runs in-process via pydantic-ai and has "
+            "no interactive CLI.[/red]\nUse [bold]agentbox run[/bold] or the HTTP API."
+        )
+        raise typer.Exit(2)
+    if runner not in SUPPORTED_RUNNERS:
+        console.print(
+            f"[red]Unknown runner:[/red] {runner!r}. "
+            f"Expected one of: {', '.join(SUPPORTED_RUNNERS)}."
+        )
+        raise typer.Exit(2)
+
+    _require_binary(runner)
+
     settings = load_settings()
     loader = DefinitionLoader(settings.project_root)
     manifest = loader.load()
 
-    agent_def = next((a for a in manifest.agents if a.id == agent), None)
-    if agent_def is None:
-        console.print(f"[red]Unknown agent:[/red] {agent!r}")
-        raise typer.Exit(1)
+    agent_def: AgentDef | None = None
+    if agent:
+        agent_def = next((a for a in manifest.agents if a.id == agent), None)
+        if agent_def is None:
+            console.print(f"[red]Unknown agent:[/red] {agent!r}")
+            raise typer.Exit(1)
 
-    workspace_path, is_ephemeral, creds = _resolve_workspace(
+    workspace_path, is_ephemeral, creds, workspace_name = _resolve_workspace(
         agent_def, workspace, ephemeral, settings, loader
     )
 
     _apply_creds(creds, settings)
 
-    gen_dir = Path(tempfile.mkdtemp(prefix="agentbox-launch-"))
+    # Phase 1: sync env-doc, subagents, and resource bindings into the
+    # workspace before the runner starts. Skipped for ephemeral/unnamed
+    # workspaces (sync_workspace also no-ops on those).
+    if workspace_name and not is_ephemeral:
+        from agentbox.api.deps import get_store
+        from agentbox.core.workspace_sync import sync_workspace
+
+        try:
+            sync_result = sync_workspace(
+                store=get_store(),
+                settings=settings,
+                workspace_id=workspace_name,
+                workdir=workspace_path,
+            )
+            if sync_result.errors:
+                for err in sync_result.errors:
+                    console.print(f"[yellow]sync warning:[/yellow] {err}")
+        except Exception as e:
+            console.print(f"[yellow]workspace sync failed:[/yellow] {e}")
+
+    needs_config = runner in _RUNNERS_NEEDING_CONFIG or (
+        runner == "shell" and keep_configs
+    )
+    gen_dir: Path | None = None
+    gen_dir_is_persistent = False
     try:
-        gen = _make_generator(settings, manifest)
-        gen.generate_configs_into(gen_dir)
+        if needs_config:
+            if keep_configs:
+                gen_dir = workspace_path / ".agentbox" / "generated"
+                gen_dir.mkdir(parents=True, exist_ok=True)
+                gen_dir_is_persistent = True
+            else:
+                gen_dir = Path(tempfile.mkdtemp(prefix="agentbox-launch-"))
+            gen = _make_generator(settings, manifest)
+            gen.generate_configs_into(gen_dir)
 
-        _print_banner(agent, runner, model, workspace_path, is_ephemeral, creds)
+        _print_banner(
+            agent, runner, model, workspace_path, is_ephemeral, creds, gen_dir
+        )
 
-        if runner == "opencode":
-            rc = _run_opencode(agent, model, workspace_path, gen_dir)
-        else:
+        if runner == "claude":
+            assert gen_dir is not None
             rc = _run_claude(agent, model, workspace_path, gen_dir, agent_def)
+        elif runner == "opencode":
+            assert gen_dir is not None
+            rc = _run_opencode(agent, model, workspace_path, gen_dir)
+        elif runner == "codex":
+            rc = _run_codex(model, workspace_path)
+        elif runner == "pi":
+            rc = _run_pi(model, workspace_path)
+        elif runner == "shell":
+            rc = _run_shell(workspace_path)
+        else:  # pragma: no cover — guarded above
+            rc = 2
     finally:
-        shutil.rmtree(gen_dir, ignore_errors=True)
+        if gen_dir is not None and not gen_dir_is_persistent:
+            shutil.rmtree(gen_dir, ignore_errors=True)
         if is_ephemeral:
             shutil.rmtree(workspace_path, ignore_errors=True)
 
-    sys.exit(rc)
+    return rc
 
 
 # ---------------------------------------------------------------------------
@@ -77,43 +218,70 @@ def launch_cmd(
 
 
 def _resolve_workspace(
-    agent_def: AgentDef,
+    agent_def: AgentDef | None,
     workspace_override: str | None,
     force_ephemeral: bool,
     settings: Settings,
     loader: DefinitionLoader,
-) -> tuple[Path, bool, str | None]:
-    """Return (workspace_path, is_ephemeral, creds)."""
-    if force_ephemeral:
-        return Path(tempfile.mkdtemp(prefix="agentbox-ws-")), True, None
+) -> tuple[Path, bool, str | None, str | None]:
+    """Return (workspace_path, is_ephemeral, creds, workspace_name).
 
-    ws_name = workspace_override or agent_def.workspace
+    Resolution order:
+      1. ``--ephemeral`` flag → tmp dir.
+      2. Explicit ``--workspace`` name (named workspace, then explicit path).
+      3. Agent's declared workspace (when ``--agent`` is given).
+      4. ``default`` named workspace from the manifest.
+      5. Error.
+
+    ``workspace_name`` is the manifest name (used as workspace_id for
+    sync). It's ``None`` for ephemeral workspaces and for explicit-path
+    overrides that don't correspond to a named workspace.
+    """
+    if force_ephemeral:
+        return Path(tempfile.mkdtemp(prefix="agentbox-ws-")), True, None, None
+
+    ws_name = workspace_override
+    if ws_name is None and agent_def is not None:
+        ws_name = agent_def.workspace
 
     if ws_name == "<ephemeral>":
-        return Path(tempfile.mkdtemp(prefix="agentbox-ws-")), True, None
+        return Path(tempfile.mkdtemp(prefix="agentbox-ws-")), True, None, None
 
     if ws_name:
         ws_def = loader.get_workspace(ws_name)
         if ws_def is not None:
             path = settings.project_root / ws_def.path
             path.mkdir(parents=True, exist_ok=True)
-            return path, False, ws_def.creds
-        # Not a named workspace — treat as explicit relative path
-        path = settings.workspaces_root / ws_name
-        path.mkdir(parents=True, exist_ok=True)
-        return path, False, None
+            creds = getattr(ws_def, "creds", None)
+            return path, False, creds, ws_name
+        # Explicit override that isn't a named workspace → treat as relative path
+        if workspace_override is not None:
+            path = settings.workspaces_root / ws_name
+            path.mkdir(parents=True, exist_ok=True)
+            return path, False, None, None
 
-    path = settings.workspaces_root / agent_def.id
-    path.mkdir(parents=True, exist_ok=True)
-    return path, False, None
+    # Fall back to the manifest's "default" workspace
+    default_def = loader.get_workspace(DEFAULT_WORKSPACE_NAME)
+    if default_def is not None:
+        path = settings.project_root / default_def.path
+        path.mkdir(parents=True, exist_ok=True)
+        creds = getattr(default_def, "creds", None)
+        return path, False, creds, DEFAULT_WORKSPACE_NAME
+
+    console.print(
+        "[red]No workspace specified and no 'default' workspace defined.[/red]\n"
+        "Run [bold]agentbox ws ls[/bold] to see available workspaces, "
+        "or pass [bold]--workspace NAME[/bold] / [bold]--ephemeral[/bold]."
+    )
+    raise typer.Exit(1)
 
 
 def _apply_creds(creds: str | None, settings: Settings) -> None:
     """Set CLAUDE_CONFIG_DIR or ANTHROPIC_API_KEY based on the creds profile.
 
     Credential profiles live under ``AGENTBOX_CREDS_DIR`` (default:
-    ``/agentbox/creds``), not in ``Settings`` — the dataclass no longer
-    carries backend-specific paths.
+    ``/agentbox/creds``). Today only Claude OAuth profiles are wired up;
+    other backends pick up whatever is in ``$HOME`` inside the container.
     """
     creds_base = Path(os.environ.get("AGENTBOX_CREDS_DIR", "/agentbox/creds"))
     if not creds or creds == "default":
@@ -165,32 +333,34 @@ def _make_generator(settings: Settings, manifest: object) -> ConfigGenerator:
 
 
 def _run_claude(
-    agent: str,
+    agent: str | None,
     model: str | None,
     workspace_path: Path,
     gen_dir: Path,
-    agent_def: AgentDef,
+    agent_def: AgentDef | None,
 ) -> int:
-    agents_json = (gen_dir / "claude_agents.json").read_text(encoding="utf-8")
     cmd = ["claude"]
     if model:
         cmd += ["--model", model]
-    allowed_tools = (agent_def.runner.allowed_tools if agent_def.runner else [])
+    allowed_tools = (
+        agent_def.runner.allowed_tools if agent_def and agent_def.runner else []
+    )
     if allowed_tools:
         cmd += ["--allowedTools", *allowed_tools]
     cmd += [
         "--mcp-config", str(gen_dir / "claude_mcp.json"),
         "--strict-mcp-config",
         "--settings", str(gen_dir / "claude_settings.json"),
-        "--agents", agents_json,
-        "--agent", agent,
     ]
+    if agent:
+        agents_json = (gen_dir / "claude_agents.json").read_text(encoding="utf-8")
+        cmd += ["--agents", agents_json, "--agent", agent]
     result = subprocess.run(cmd, cwd=workspace_path)
     return result.returncode
 
 
 def _run_opencode(
-    agent: str,
+    agent: str | None,
     model: str | None,
     workspace_path: Path,
     gen_dir: Path,
@@ -198,10 +368,35 @@ def _run_opencode(
     oc_config = gen_dir / "opencode.json"
     if oc_config.exists():
         shutil.copy(oc_config, workspace_path / "opencode.json")
-    cmd = ["opencode", "--agent", agent]
+    cmd = ["opencode"]
+    if agent:
+        cmd += ["--agent", agent]
     if model:
         cmd += ["--model", model]
     result = subprocess.run(cmd, cwd=workspace_path)
+    return result.returncode
+
+
+def _run_codex(model: str | None, workspace_path: Path) -> int:
+    cmd = ["codex"]
+    if model:
+        cmd += ["--model", model]
+    result = subprocess.run(cmd, cwd=workspace_path)
+    return result.returncode
+
+
+def _run_pi(model: str | None, workspace_path: Path) -> int:
+    cmd = ["pi"]
+    if model:
+        cmd += ["--model", model]
+    result = subprocess.run(cmd, cwd=workspace_path)
+    return result.returncode
+
+
+def _run_shell(workspace_path: Path) -> int:
+    """Drop into ``$SHELL`` (or bash) inside the workspace."""
+    shell = os.environ.get("SHELL", "/bin/bash")
+    result = subprocess.run([shell], cwd=workspace_path)
     return result.returncode
 
 
@@ -211,18 +406,22 @@ def _run_opencode(
 
 
 def _print_banner(
-    agent: str,
+    agent: str | None,
     runner: str,
     model: str | None,
     workspace_path: Path,
     is_ephemeral: bool,
     creds: str | None,
+    gen_dir: Path | None,
 ) -> None:
     mode = "ephemeral (tmp)" if is_ephemeral else f"workspace ({workspace_path})"
     console.print("━" * 50)
-    console.print(f"[bold]CV Agents[/bold] ({runner}) — [cyan]{agent}[/cyan]")
+    label = f"[cyan]{agent}[/cyan]" if agent else "[dim]<no agent>[/dim]"
+    console.print(f"[bold]agentbox launch[/bold] ({runner}) — {label}")
     console.print("━" * 50)
     console.print(f"  model:  {model or '<runner default>'}")
     console.print(f"  mode:   {mode}")
     console.print(f"  creds:  {creds or 'default'}")
+    if gen_dir is not None:
+        console.print(f"  configs:{gen_dir}")
     console.print()

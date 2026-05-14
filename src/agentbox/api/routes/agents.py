@@ -16,25 +16,11 @@ from agentbox.core.data.manifest import AgentDef
 from agentbox.core.data.runner_profiles import RunnerProfile
 from agentbox.core.data.schema import agent_runner_profiles
 from agentbox.core.data.schema import runs as runs_table
+from agentbox.core.services.agents import list_all_agents, resolve_agent
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
-
-
-def _hydrate_from_snapshot(row: dict) -> AgentDef | None:
-    """Reconstruct an AgentDef from a version row snapshot."""
-    try:
-        return AgentDef.from_db_row(row)
-    except ValueError:
-        return None
-    except Exception:
-        logger.exception(
-            "agents list: snapshot for %r v%s failed validation",
-            row.get("agent_id"),
-            row.get("version"),
-        )
-        return None
 
 
 @router.get("")
@@ -43,7 +29,9 @@ def list_agents() -> list[dict]:
 
     DB-as-source-of-truth: every agent that has ever been imported into
     ``agent_versions`` appears here, even when its on-disk bundle is gone
-    or the loader can't see it.
+    or the loader can't see it. Resolution lives in
+    ``core.services.agents.list_all_agents`` so the MCP surface returns
+    the exact same set.
     """
     store = get_store()
     loader = get_loader()
@@ -70,56 +58,27 @@ def list_agents() -> list[dict]:
     except Exception:
         logger.exception("agents list: failed to load run counts / profile bindings")
 
-    def _enrich(
-        agent: AgentDef, *, updated_at: str | None = None, version: int | None = None
-    ) -> dict:
+    def _enrich(agent: AgentDef) -> dict:
         try:
             workspace_str = str(ws.resolve_path(agent, settings, loader)[0])
         except Exception:
             workspace_str = ""
+        active = store.get_active_version(agent.id)
+        latest = store.latest_version(agent.id)
         data = {
             **agent.model_dump(),
             "resolved_workspace": workspace_str,
             "run_count": run_counts.get(agent.id, 0),
             "runner_profile_id": profile_bindings.get(agent.id),
         }
-        if updated_at is not None:
-            data["updated_at"] = updated_at
-        if version is not None:
-            data["version"] = version
+        if latest is not None:
+            data["updated_at"] = latest.get("created_at")
+            data["version"] = (
+                active["version"] if active else latest.get("version")
+            )
         return data
 
-    latest_rows = store.list_agents_with_latest()
-    enriched: list[dict] = []
-    seen: set[str] = set()
-    for row in latest_rows:
-        agent = _hydrate_from_snapshot(row)
-        if agent is None:
-            continue
-        active = store.get_active_version(agent.id)
-        active_version = (
-            active["version"] if active else row.get("version")
-        )
-        enriched.append(
-            _enrich(
-                agent,
-                updated_at=row.get("created_at"),
-                version=active_version,
-            )
-        )
-        seen.add(agent.id)
-
-    try:
-        manifest = loader.load()
-    except Exception:
-        manifest = None
-    if manifest is not None:
-        for agent in manifest.agents:
-            if agent.id not in seen:
-                enriched.append(_enrich(agent))
-                seen.add(agent.id)
-
-    return enriched
+    return [_enrich(agent) for agent in list_all_agents(store=store, loader=loader)]
 
 
 @router.get("/{agent_id}")
@@ -127,9 +86,8 @@ def get_agent(agent_id: str) -> dict:
     loader = get_loader()
     settings = get_settings()
     store = get_store()
-    # DB-as-source-of-truth: reconstruct AgentDef from the latest version
-    # row's snapshot. Loader is only consulted if the DB has nothing.
-    agent = store.get_agent_def(agent_id) or loader.get(agent_id)
+    # Shared resolver — DB first, manifest fallback. Same call MCP makes.
+    agent = resolve_agent(agent_id, store=store, loader=loader)
     if agent is None:
         raise HTTPException(404)
     prompt = ""
@@ -216,7 +174,8 @@ def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
     # Editing agentbox.toml programmatically is fragile; the UI can
     # display the effective workspace and guide the user to edit the file.
     loader = get_loader()
-    agent = loader.get(agent_id)
+    store = get_store()
+    agent = resolve_agent(agent_id, store=store, loader=loader)
     if agent is None:
         raise HTTPException(404)
     # TODO: implement TOML editing via tomlkit
@@ -255,7 +214,7 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
         raise HTTPException(422, error_msg) from exc
 
     # Schedule webhook if agent has a webhook_url configured
-    agent = store.get_agent_def(agent_id) or loader.get(agent_id)
+    agent = resolve_agent(agent_id, store=store, loader=loader)
     if agent and agent.webhook_url:
         from agentbox.api.webhooks import schedule_agent_event_webhook
 

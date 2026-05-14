@@ -35,14 +35,12 @@ export default function AgentVersionDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [v, runsData, commentsData] = await Promise.all([
+      const [v] = await Promise.all([
         versionsApi.getVersion(agentId!, vid!),
-        versionsApi.listVersionRuns(agentId!, parseInt(vid!)).catch(() => ({ runs: [] })),
-        versionsApi.listVersionCommentsAggregated(agentId!, parseInt(vid!)).catch(() => ({ comments: [] })),
       ]);
       setVersion(v);
-      setRuns((runsData as { runs: RunRecord[] }).runs);
-      setComments((commentsData as { comments: Comment[] }).comments);
+      setRuns([]);
+      setComments(v.comments || []);
     } catch (err) {
       setError('Failed to load version details');
     } finally {

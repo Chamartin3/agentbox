@@ -11,9 +11,12 @@ export interface ResourcePickerProps {
   excludeIds?: Set<string>;
   /** Heading text shown in the modal header. Defaults derived from filterType. */
   title?: string;
-  /** When true (and filterType is set), shows an "upload new" panel that
-   *  creates a resource of `filterType` and an initial version. */
+  /** When true, shows an "upload new" panel that creates a resource and
+   *  initial version. With `filterType` the type is locked; otherwise the
+   *  user picks from document/schema/script. */
   allowUpload?: boolean;
+  /** Open the picker with the upload panel already expanded. */
+  defaultShowUpload?: boolean;
   onPick: (rs: RepoResource[]) => void;
   onClose: () => void;
 }
@@ -41,6 +44,7 @@ export default function ResourcePicker({
   excludeIds,
   title,
   allowUpload,
+  defaultShowUpload,
   onPick,
   onClose,
 }: ResourcePickerProps) {
@@ -55,11 +59,18 @@ export default function ResourcePicker({
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [showUpload, setShowUpload] = useState(false);
+  const [showUpload, setShowUpload] = useState(!!defaultShowUpload && !!allowUpload);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadSlug, setUploadSlug] = useState('');
   const [uploadName, setUploadName] = useState('');
   const [uploading, setUploading] = useState(false);
+  // Type for upload when no fixed filterType is set. Limited to single-file
+  // kinds — folder/skill need an archive workflow which lives on the
+  // resource detail page.
+  const UPLOADABLE_TYPES: RepoType[] = ['document', 'schema', 'script'];
+  const [uploadType, setUploadType] = useState<RepoType>(
+    (filterType && UPLOADABLE_TYPES.includes(filterType)) ? filterType : 'document',
+  );
 
   const onPickFile = (f: File | null) => {
     setUploadFile(f);
@@ -71,16 +82,17 @@ export default function ResourcePicker({
   };
 
   const submitUpload = async () => {
-    if (!filterType || !uploadFile || !uploadSlug.trim() || !uploadName.trim()) return;
+    const effectiveType = filterType ?? uploadType;
+    if (!effectiveType || !uploadFile || !uploadSlug.trim() || !uploadName.trim()) return;
     setUploading(true);
     setErr(null);
     try {
       const created = await repoApi.create({
         slug: uploadSlug.trim(),
-        type: filterType,
+        type: effectiveType,
         display_name: uploadName.trim(),
       });
-      if (filterType === 'schema') {
+      if (effectiveType === 'schema') {
         await repoApi.uploadSchema(created.id, uploadFile, 'initial upload');
       } else {
         await repoApi.uploadVersion(created.id, uploadFile, 'initial upload');
@@ -197,7 +209,7 @@ export default function ResourcePicker({
           <div className="row between" style={{ alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>{heading}</h3>
             <div className="row" style={{ gap: 6 }}>
-              {allowUpload && filterType && (
+              {allowUpload && (
                 <button onClick={() => setShowUpload((v) => !v)} style={{ fontSize: 11 }}>
                   {showUpload ? 'cancel upload' : '+ upload new'}
                 </button>
@@ -206,7 +218,7 @@ export default function ResourcePicker({
             </div>
           </div>
 
-          {showUpload && filterType && (
+          {showUpload && allowUpload && (
             <div
               style={{
                 border: '1px solid var(--border, #333)', borderRadius: 4,
@@ -215,8 +227,23 @@ export default function ResourcePicker({
               }}
             >
               <div className="dim" style={{ fontSize: 11 }}>
-                Upload a new {filterType}. A slug and display name are required.
+                Upload a new {filterType ?? uploadType}. A slug and display name are required.
+                {!filterType && ' Folder/skill uploads use the resource detail page.'}
               </div>
+              {!filterType && (
+                <label className="row" style={{ gap: 6, fontSize: 11, alignItems: 'center' }}>
+                  type:
+                  <select
+                    value={uploadType}
+                    onChange={(e) => setUploadType(e.target.value as RepoType)}
+                    style={{ fontSize: 11, padding: '2px 6px' }}
+                  >
+                    {UPLOADABLE_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <input
                 type="file"
                 onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}

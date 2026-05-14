@@ -55,6 +55,7 @@ class RunRecord:
     runner_profile_id: str | None = None
     resource_snapshot: str | None = None
     mcp_snapshot: str | None = None
+    runner_snapshot: str | None = None
 
 
 def now_iso() -> str:
@@ -90,4 +91,5 @@ def row_to_run(row: Row) -> RunRecord:
         runner_profile_id=m.get("runner_profile_id"),
         resource_snapshot=m.get("resource_snapshot"),
         mcp_snapshot=m.get("mcp_snapshot"),
+        runner_snapshot=m.get("runner_snapshot"),
     )

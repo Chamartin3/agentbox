@@ -1,5 +1,4 @@
-"""Executor backend selection tests — explicit backend, preference list,
-fallback to kind, unsupported_backends, NO_BACKEND_AVAILABLE."""
+"""Executor backend selection tests — explicit/effective backend only."""
 
 from __future__ import annotations
 
@@ -10,7 +9,8 @@ from agentbox.core.constants import RunnerKind
 from agentbox.core.data import SessionStore
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.executor import RunExecutor
+from agentbox.core.executor import NoBackendAvailable, RunExecutor
+from agentbox.core.runner_profiles import EffectiveRunnerConfig
 
 
 def _make_settings(tmp_path: Path) -> Settings:
@@ -64,11 +64,11 @@ def test_missing_backend_raises(tmp_path: Path) -> None:
 
     import pytest
 
-    with pytest.raises(KeyError, match="NO_BACKEND_AVAILABLE"):
+    with pytest.raises(NoBackendAvailable):
         executor._select_backend(agent, workdir, backend_override="nonexistent_backend")
 
 
-def test_fallback_to_kind_when_no_preference(tmp_path: Path) -> None:
+def test_effective_backend_is_honored(tmp_path: Path) -> None:
     settings = _make_settings(tmp_path)
     store = SessionStore(settings.db_path)
     loader = DefinitionLoader(settings.project_root)
@@ -76,17 +76,20 @@ def test_fallback_to_kind_when_no_preference(tmp_path: Path) -> None:
 
     agent = AgentDef(
         id="test",
-        runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE),
+        runner=RunnerSpec(kind=RunnerKind.TOKEN),
     )
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    adapter, _rendered = executor._select_backend(agent, workdir)
+    adapter, _rendered = executor._select_backend(
+        agent,
+        workdir,
+        runner_config=EffectiveRunnerConfig(backend="claude_code"),
+    )
     assert adapter.name == "claude_code"
 
 
-def test_unsupported_backends_skipped_in_preference(tmp_path: Path) -> None:
-    """When backend_preference contains an unsupported backend, skip it."""
+def test_no_effective_backend_raises(tmp_path: Path) -> None:
     settings = _make_settings(tmp_path)
     store = SessionStore(settings.db_path)
     loader = DefinitionLoader(settings.project_root)
@@ -95,20 +98,11 @@ def test_unsupported_backends_skipped_in_preference(tmp_path: Path) -> None:
     agent = AgentDef(
         id="test",
         runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE),
-        unsupported_backends=["claude_code", "opencode", "token"],
     )
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    # Write a manifest with backend_preference
-    toml_path = settings.project_root / "agentbox.toml"
-    toml_path.write_text(
-        'project = "test"\n'
-        'backend_preference = ["claude_code", "opencode", "token"]\n'
-    )
-
-    # The executor caches the loader result; create a new one.
     import pytest
 
-    with pytest.raises(KeyError, match="NO_BACKEND_AVAILABLE"):
+    with pytest.raises(NoBackendAvailable):
         executor._select_backend(agent, workdir)

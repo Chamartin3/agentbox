@@ -230,31 +230,29 @@ def import_repo_resources(store: SessionStore, root: Path) -> dict:
                 if not fpath.is_file():
                     continue
                 slug = f"agent/{agent_dir.name}/{fname.removesuffix('.json')}"
-
-                def _do_schema(p=fpath, s=slug, n=agent_dir.name, t=tag, fn=fname):
-                    try:
-                        content = p.read_bytes()
-                        importer = SchemaImporter(
-                            filename=fn, content=content, import_source="toml_migration"
-                        )
-                        return _import_one(
-                            store, slug=s, type_=ResourceType.SCHEMA,
-                            display_name=f"{n} {t}",
-                            description=f"Imported from {p.relative_to(root)}",
-                            importer=importer,
-                            tags=(t, n),
-                        )
-                    except ValueError:
-                        return _import_one(
-                            store, slug=s, type_=ResourceType.DOCUMENT,
-                            display_name=f"{n} {t}",
-                            description=f"Imported from {p.relative_to(root)}",
-                            importer=HostPathImporter(root=p),
-                            tags=(t, n),
-                            metadata_extra={"schema_parse_failed": True},
-                        )
-
-                _safe(slug, _do_schema)
+                try:
+                    content = fpath.read_bytes()
+                    schema_importer = SchemaImporter(
+                        filename=fname, content=content, import_source="toml_migration",
+                    )
+                    _safe(slug, lambda s=slug, n=agent_dir.name, t=tag, imp=schema_importer, p=fpath: _import_one(
+                        store, slug=s, type_="schema",
+                        display_name=f"{n} {t}",
+                        description=f"Imported from {p.relative_to(root)}",
+                        importer=imp,
+                        tags=(t, n),
+                        metadata_extra={"role": t, "agent_id": n},
+                    ))
+                except (OSError, ValueError):
+                    # Fall back to document type if schema parse fails — still surface it.
+                    _safe(slug, lambda p=fpath, s=slug, n=agent_dir.name, t=tag: _import_one(
+                        store, slug=s, type_="document",
+                        display_name=f"{n} {t}",
+                        description=f"Imported from {p.relative_to(root)}",
+                        importer=HostPathImporter(root=p),
+                        tags=(t, n),
+                        metadata_extra={"role": t, "agent_id": n, "schema_parse_failed": True},
+                    ))
             sys_prompt = agent_dir / "prompts" / "system.md"
             if sys_prompt.is_file():
                 slug = f"agent/{agent_dir.name}/system_prompt"
@@ -264,6 +262,7 @@ def import_repo_resources(store: SessionStore, root: Path) -> dict:
                     description=f"Imported from {p.relative_to(root)}",
                     importer=HostPathImporter(root=p),
                     tags=("system_prompt", n),
+                    metadata_extra={"role": "system_fragment", "agent_id": n},
                 ))
 
     # 3) Shared scopes — one folder resource per top-level subdirectory.

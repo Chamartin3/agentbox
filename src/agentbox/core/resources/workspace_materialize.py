@@ -17,6 +17,21 @@ from agentbox.core.resources.materializer import materialize_blobs
 
 DEFAULT_SKILLS_ROOT = ".claude/skills"
 
+# Resource types whose payload is a single blob (a file). For these, the
+# binding's ``target_path`` identifies a FOLDER destination and the
+# filename is resolved from the source. Anything not in this set is
+# treated as a folder/multi-blob payload where ``target_path`` IS the
+# destination directory and ``relative_path`` of each blob is preserved.
+_SINGLE_FILE_TYPES = {"document", "schema", "script"}
+
+# Fallback extensions when the source's original filename isn't
+# recoverable from ``source_metadata``.
+_TYPE_DEFAULT_EXTENSION = {
+    "document": ".md",
+    "schema": ".json",
+    "script": "",
+}
+
 
 @dataclass(frozen=True)
 class MaterializeOutcome:
@@ -31,7 +46,69 @@ class MaterializeOutcome:
     skipped_reason: str | None = None
 
 
+def _resolve_single_file_name(
+    *,
+    resource_type: str,
+    display_name: str,
+    source_metadata: dict | None,
+) -> str:
+    """Pick the filename for a single-blob resource.
+
+    Precedence:
+      1. ``source_metadata.filename`` — exact name of the file that was
+         imported. Respects the original extension.
+      2. ``source_metadata.host_path`` — basename of the host path.
+      3. ``display_name`` — used as-is if it already has an extension;
+         otherwise the type's default extension is appended.
+    """
+    meta = source_metadata or {}
+    filename = meta.get("filename")
+    if isinstance(filename, str) and filename.strip():
+        return Path(filename).name
+    host_path = meta.get("host_path")
+    if isinstance(host_path, str) and host_path.strip():
+        return Path(host_path).name
+    name = display_name.strip()
+    if not name:
+        name = "document"
+    if "." not in Path(name).name:
+        name += _TYPE_DEFAULT_EXTENSION.get(resource_type, "")
+    return Path(name).name
+
+
+def _resolve_target_path(b: dict) -> str:
+    """Return the final relative target path for a binding.
+
+    Semantics:
+      - ``skill``: ``target_path`` defaults to ``.claude/skills/<name>``.
+      - ``folder``: ``target_path`` IS the destination directory (or
+        ``display_name`` if null).
+      - single-file types (document/schema/script): ``target_path`` is a
+        FOLDER; the filename is resolved from the source. Null target_path
+        means "drop at workspace root".
+    """
+    resource_type = b["type"]
+    display_name = b.get("display_name", "") or ""
+    target_path = b.get("target_path")
+    if resource_type == "skill":
+        if target_path:
+            return target_path
+        name = (b.get("skill_meta") or {}).get("skill_name") or display_name
+        return f"{DEFAULT_SKILLS_ROOT}/{name}"
+    if resource_type in _SINGLE_FILE_TYPES:
+        filename = _resolve_single_file_name(
+            resource_type=resource_type,
+            display_name=display_name,
+            source_metadata=b.get("source_metadata"),
+        )
+        folder = (target_path or "").strip("/")
+        return f"{folder}/{filename}" if folder else filename
+    # folder / other multi-blob types
+    return target_path or display_name
+
+
 def _default_target_path(resource_type: str, display_name: str, skill_meta: dict | None) -> str:
+    """Deprecated shim — kept for backwards compatibility with old callers."""
     if resource_type == "skill":
         name = (skill_meta or {}).get("skill_name") or display_name
         return f"{DEFAULT_SKILLS_ROOT}/{name}"
@@ -68,9 +145,7 @@ def materialize_workspace(
     workdir.mkdir(parents=True, exist_ok=True)
     outcomes: list[MaterializeOutcome] = []
     for b in resolved_bindings:
-        target_rel = b.get("target_path") or _default_target_path(
-            b["type"], b.get("display_name", ""), b.get("skill_meta")
-        )
+        target_rel = _resolve_target_path(b)
         dest = _safe_target(workdir, target_rel)
         on_conflict = b.get("on_conflict", "error")
         if dest.exists():

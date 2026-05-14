@@ -19,13 +19,34 @@ ARG GID=1000
 RUN groupadd -g ${GID} appuser \
  && useradd -m -u ${UID} -g ${GID} -s /bin/bash appuser
 
+# Base tools. Node is installed separately from NodeSource because the
+# pi-coding-agent CLI bundles undici, which requires Node 21+ APIs
+# (markAsUncloneable) that Debian's default Node 20 LTS lacks.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates git jq nodejs npm tini \
+      curl ca-certificates git jq tini unzip vim \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && curl -LO https://github.com/sxyazi/yazi/releases/download/v26.5.6/yazi-x86_64-unknown-linux-gnu.deb \
+    && dpkg -i yazi-x86_64-unknown-linux-gnu.deb || apt-get install -f -y \
+    && rm -f yazi-x86_64-unknown-linux-gnu.deb \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NPM_CONFIG_PREFIX=/opt/npm-global
 ENV PATH=/opt/npm-global/bin:$PATH
 RUN mkdir -p /opt/npm-global \
+ && chown -R appuser:appuser /opt/npm-global
+
+# Backend CLIs — installed at build time so they're part of the image
+# layer (not the runtime volume). Failure of any one install fails the
+# build; if a package becomes unavailable upstream, pin or drop it here.
+# opencode-linux-x64 ships the binary one level deep in lib/, so we
+# symlink it into bin/ (its npm package skips the bin entry on purpose).
+RUN npm install -g @anthropic-ai/claude-code \
+ && npm install -g opencode-linux-x64 \
+ && ln -sf /opt/npm-global/lib/node_modules/opencode-linux-x64/bin/opencode \
+           /opt/npm-global/bin/opencode \
+ && npm install -g @openai/codex \
+ && npm install -g --ignore-scripts @earendil-works/pi-coding-agent \
  && chown -R appuser:appuser /opt/npm-global
 
 WORKDIR /opt/agentbox
@@ -37,21 +58,12 @@ COPY --from=web /web/dist /opt/agentbox/src/agentbox/ui/static/dist
 
 RUN pip install --no-cache-dir -e . websockets
 
-RUN mkdir -p /data /project /home/appuser/.claude \
- && chown -R appuser:appuser /data /opt/agentbox /home/appuser/.claude
+RUN mkdir -p /data /project /home/appuser/.claude /home/appuser/.local/share/opencode \
+ && chown -R appuser:appuser /data /opt/agentbox /home/appuser/.claude /home/appuser/.local
 
 COPY <<'EOF' /usr/local/bin/agentbox-entrypoint
 #!/usr/bin/env bash
 set -e
-if [[ ! -x /opt/npm-global/bin/claude ]]; then
-  echo "agentbox: installing @anthropic-ai/claude-code into /opt/npm-global..."
-  npm install -g @anthropic-ai/claude-code
-fi
-if [[ ! -x /opt/npm-global/bin/opencode ]]; then
-  echo "agentbox: installing opencode into /opt/npm-global (best-effort)..."
-  npm install -g opencode-ai || npm install -g @opencode-ai/opencode || echo "WARN: opencode install failed"
-fi
-
 # Apply the project-supplied user config to Claude Code's state file at
 # $CLAUDE_CONFIG_DIR/.claude.json. We MERGE on top of whatever Claude already
 # wrote so OAuth state (userID, oauthAccount) is preserved across restarts.
@@ -105,7 +117,7 @@ EOF
 RUN chmod +x /usr/local/bin/agentbox-entrypoint
 
 USER appuser
-VOLUME ["/data", "/project", "/opt/npm-global"]
+VOLUME ["/data", "/project"]
 EXPOSE 8765
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/agentbox-entrypoint"]

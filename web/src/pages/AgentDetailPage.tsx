@@ -18,8 +18,6 @@ export default function AgentDetailPage() {
   const [agentLoaded, setAgentLoaded] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('configuration');
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
-  const [selectedVersionNum, setSelectedVersionNum] = useState<number | null>(null);
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
 
   const [prompt, setPrompt] = useState<string>('');
