@@ -233,6 +233,56 @@ class ResourceBindingsMixin:
                 conn.execute(workspace_file_resource_bindings.insert(), rows)
         return self.list_workspace_file_bindings(workspace_id)
 
+    def replace_workspace_skill_bindings(
+        self,
+        workspace_id: str,
+        skill_resource_ids: Iterable[str],
+        *,
+        reason: str = "skill bindings update",
+        actor: str | None = None,
+    ) -> list[dict]:
+        """Replace ONLY the skill-type bindings for a workspace.
+
+        Bindings of other types (document, folder, schema, script) are
+        preserved exactly as-is. Skill bindings use defaults: null
+        ``target_path`` (skill name resolves via ``_default_target_path``
+        → ``.claude/skills/<name>``), ``materialize_mode=copy``,
+        ``on_conflict=skip``.
+        """
+        current = self.list_workspace_file_bindings(workspace_id)  # type: ignore[attr-defined]
+        merged: list[dict] = []
+        order = 0
+        for b in current:
+            resource = self.get_repo_resource(b["resource_id"])  # type: ignore[attr-defined]
+            if resource and resource.get("type") == "skill":
+                # Drop existing skill bindings — they will be replaced.
+                continue
+            merged.append(
+                {
+                    "resource_id": b["resource_id"],
+                    "target_path": b.get("target_path"),
+                    "pinned_version_id": b.get("pinned_version_id"),
+                    "materialize_mode": b.get("materialize_mode", "copy"),
+                    "on_conflict": b.get("on_conflict", "error"),
+                    "display_order": order,
+                }
+            )
+            order += 1
+        for rid in skill_resource_ids:
+            merged.append(
+                {
+                    "resource_id": rid,
+                    "target_path": None,
+                    "materialize_mode": "copy",
+                    "on_conflict": "skip",
+                    "display_order": order,
+                }
+            )
+            order += 1
+        return self.replace_workspace_file_bindings(
+            workspace_id, merged, reason=reason, actor=actor
+        )
+
     # --- workspace subagents (RESOURCES_PLAN Phase 2) ---
 
     def list_workspace_subagents(self, workspace_id: str) -> list[dict]:

@@ -12,12 +12,12 @@ from sqlalchemy import (
     case,
     cast,
     func,
+    literal_column,
     select,
 )
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import RunRecord, row_to_run
-from agentbox.core.data.schema import runs, usage
+from agentbox.core.data.schema import agent_versions, runs, usage
 
 
 # SQLite-specific: epoch-millis duration of a run when finished.
@@ -38,28 +38,48 @@ class AnalyticsMixin:
         agent_id: str | None = None,
         status: str | None = None,
         executor: str | None = None,
+        agent_version: int | None = None,
         q: str | None = None,
         since_iso: str | None = None,
         until_iso: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[RunRecord], int]:
-        """Paginated + filterable run listing.
+    ) -> tuple[list[dict], int]:
+        """Paginated + filterable run listing with usage + duration.
 
         Filters compose with AND. ``executor`` matches ``usage.model``
         (reported model from telemetry). ``q`` is a case-insensitive
         LIKE match against input/output/error so a user can grep for a
         job-application id, an error fragment, or an agent_task_id
-        embedded in input. Returns ``(rows, total)`` where ``total`` is
-        the un-paginated count for the same filter.
+        embedded in input.
+
+        Returns ``(rows, total)`` where each row is a dict that includes
+        all ``runs`` columns plus usage fields (input_tokens,
+        output_tokens, cache_read_tokens, cache_write_tokens, cost_usd,
+        model) and a computed ``duration_ms``.
         """
-        stmt = select(runs).select_from(runs)
-        count_stmt = select(func.count(func.distinct(runs.c.id))).select_from(runs)
+        duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
+
+        cols = [
+            runs,
+            usage.c.input_tokens,
+            usage.c.output_tokens,
+            usage.c.cache_read_tokens,
+            usage.c.cache_write_tokens,
+            usage.c.cost_usd,
+            usage.c.model,
+            cast(duration_ms, Integer).label("duration_ms"),
+        ]
+
+        stmt = select(*cols).select_from(
+            runs.outerjoin(usage, usage.c.run_id == runs.c.id)
+        )
+        count_from = runs
         if executor:
-            stmt = stmt.join(usage, usage.c.run_id == runs.c.id, isouter=True)
-            count_stmt = count_stmt.join(
-                usage, usage.c.run_id == runs.c.id, isouter=True
-            )
+            count_from = runs.outerjoin(usage, usage.c.run_id == runs.c.id)
+        count_stmt = select(func.count(func.distinct(runs.c.id))).select_from(
+            count_from
+        )
 
         conds = []
         if agent_id:
@@ -68,6 +88,21 @@ class AnalyticsMixin:
             conds.append(runs.c.status == status)
         if executor:
             conds.append(func.coalesce(usage.c.model, "unknown") == executor)
+        if agent_version is not None:
+            # Join agent_versions only when filtering — keeps the default
+            # query cost the same.
+            stmt = stmt.select_from(
+                runs.outerjoin(usage, usage.c.run_id == runs.c.id).outerjoin(
+                    agent_versions, agent_versions.c.id == runs.c.agent_version_id
+                )
+            )
+            count_from_av = count_from.outerjoin(
+                agent_versions, agent_versions.c.id == runs.c.agent_version_id
+            )
+            count_stmt = select(
+                func.count(func.distinct(runs.c.id))
+            ).select_from(count_from_av)
+            conds.append(agent_versions.c.version == agent_version)
         if since_iso:
             conds.append(runs.c.created_at >= since_iso)
         if until_iso:
@@ -93,8 +128,203 @@ class AnalyticsMixin:
 
         with self.engine.connect() as conn:
             total = int(conn.execute(count_stmt).scalar() or 0)
-            rows = [row_to_run(r) for r in conn.execute(stmt)]
+            rows = [dict(r._mapping) for r in conn.execute(stmt)]
         return rows, total
+
+    def stats_for_filters(
+        self,
+        *,
+        agent_id: str | None = None,
+        status: str | None = None,
+        executor: str | None = None,
+        agent_version: int | None = None,
+        q: str | None = None,
+        since_iso: str | None = None,
+        until_iso: str | None = None,
+    ) -> dict:
+        """Aggregate stats matching the same filter set as
+        ``list_runs_paged``. Returns totals, top agents, top models,
+        status breakdown, and a timeseries.
+
+        Bucket size is auto-picked: hourly for spans ≤ 2 days, daily
+        otherwise. Default range is last 7 days when neither
+        ``since_iso`` nor ``until_iso`` is given.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        now = datetime.now(UTC)
+        if not since_iso and not until_iso:
+            since_iso = (now - timedelta(days=7)).isoformat(timespec="seconds")
+            until_iso = now.isoformat(timespec="seconds")
+
+        # Join agent_versions only when we actually need version data —
+        # either a version filter, or producing the by_version aggregate
+        # (always emitted; cheap LEFT JOIN).
+        base_from = runs.outerjoin(usage, usage.c.run_id == runs.c.id).outerjoin(
+            agent_versions, agent_versions.c.id == runs.c.agent_version_id
+        )
+        conds: list = []
+        if agent_id:
+            conds.append(runs.c.agent_id == agent_id)
+        if status:
+            conds.append(runs.c.status == status)
+        if executor:
+            conds.append(func.coalesce(usage.c.model, "unknown") == executor)
+        if agent_version is not None:
+            conds.append(agent_versions.c.version == agent_version)
+        if since_iso:
+            conds.append(runs.c.created_at >= since_iso)
+        if until_iso:
+            conds.append(runs.c.created_at <= until_iso)
+        if q:
+            pat = f"%{q}%"
+            conds.append(
+                runs.c.input.like(pat)
+                | runs.c.output.like(pat)
+                | runs.c.error.like(pat)
+                | runs.c.id.like(pat)
+            )
+
+        duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
+        duration_or_null = case(
+            (runs.c.finished_at.isnot(None), duration_ms), else_=None
+        )
+
+        # totals
+        totals_stmt = (
+            select(
+                func.count().label("runs"),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label(
+                    "input_tokens"
+                ),
+                func.coalesce(func.sum(usage.c.output_tokens), 0).label(
+                    "output_tokens"
+                ),
+                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
+                func.coalesce(func.avg(duration_or_null), 0).label("avg_duration_ms"),
+            )
+            .select_from(base_from)
+            .where(*conds)
+        )
+
+        # by_agent
+        by_agent_stmt = (
+            select(
+                runs.c.agent_id,
+                func.count().label("runs"),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("tokens"),
+                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
+            )
+            .select_from(base_from)
+            .where(*conds)
+            .group_by(runs.c.agent_id)
+            .order_by(func.count().desc())
+            .limit(8)
+        )
+
+        # by_model
+        model_col = func.coalesce(usage.c.model, "unknown").label("model")
+        by_model_stmt = (
+            select(
+                model_col,
+                func.count().label("runs"),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("tokens"),
+                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
+            )
+            .select_from(base_from)
+            .where(*conds)
+            .group_by("model")
+            .order_by(func.count().desc())
+        )
+
+        # by_version — runs grouped by agent_version. Only meaningful in a
+        # single-agent scope; for the global view this groups by version
+        # number which is ambiguous across agents, but we emit it anyway
+        # and let the UI hide it when scope is global.
+        by_version_stmt = (
+            select(
+                agent_versions.c.version.label("version"),
+                func.count().label("runs"),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("tokens"),
+            )
+            .select_from(base_from)
+            .where(*conds, agent_versions.c.version.isnot(None))
+            .group_by(agent_versions.c.version)
+            .order_by(agent_versions.c.version)
+        )
+
+        # by_status — uses the same base_from so version/executor filters
+        # resolve correctly.
+        by_status_stmt = (
+            select(
+                runs.c.status,
+                func.count(func.distinct(runs.c.id)).label("runs"),
+            )
+            .select_from(base_from)
+            .where(*conds)
+            .group_by(runs.c.status)
+            .order_by(func.count(func.distinct(runs.c.id)).desc())
+        )
+
+        # timeseries — auto pick bucket
+        if since_iso and until_iso:
+            try:
+                span = (
+                    datetime.fromisoformat(until_iso)
+                    - datetime.fromisoformat(since_iso)
+                ).total_seconds()
+            except Exception:
+                span = 7 * 86400
+        else:
+            span = 7 * 86400
+
+        if span <= 2 * 86400:
+            bucket_expr = func.strftime(
+                "%Y-%m-%dT%H:00:00Z", runs.c.created_at
+            ).label("bucket")
+        else:
+            bucket_expr = func.date(runs.c.created_at).label("bucket")
+
+        series_stmt = (
+            select(
+                bucket_expr,
+                func.count().label("runs"),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label(
+                    "input_tokens"
+                ),
+                func.coalesce(func.sum(usage.c.output_tokens), 0).label(
+                    "output_tokens"
+                ),
+                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
+            )
+            .select_from(base_from)
+            .where(*conds)
+            .group_by(literal_column("bucket"))
+            .order_by(literal_column("bucket"))
+        )
+
+        with self.engine.connect() as conn:
+            totals_row = conn.execute(totals_stmt).first()
+            totals = dict(totals_row._mapping) if totals_row else {}
+            for k in ("runs", "input_tokens", "output_tokens"):
+                totals[k] = int(totals.get(k) or 0)
+            totals["cost_usd"] = float(totals.get("cost_usd") or 0.0)
+            totals["avg_duration_ms"] = int(totals.get("avg_duration_ms") or 0)
+
+            by_agent = [dict(r._mapping) for r in conn.execute(by_agent_stmt)]
+            by_model = [dict(r._mapping) for r in conn.execute(by_model_stmt)]
+            by_version = [dict(r._mapping) for r in conn.execute(by_version_stmt)]
+            by_status = [dict(r._mapping) for r in conn.execute(by_status_stmt)]
+            timeseries = [dict(r._mapping) for r in conn.execute(series_stmt)]
+
+        return {
+            "totals": totals,
+            "by_agent": by_agent,
+            "by_model": by_model,
+            "by_version": by_version,
+            "by_status": by_status,
+            "timeseries": timeseries,
+        }
 
     def distinct_executors(self) -> list[str]:
         """Distinct reported model values across all runs, for filter UI."""

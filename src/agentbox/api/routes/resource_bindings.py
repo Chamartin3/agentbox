@@ -494,3 +494,65 @@ def replace_workspace_subagents(
     with contextlib.suppress(Exception):
         sync_workspace_by_name(store, get_settings(), workspace_id)
     return {"items": items}
+
+
+# ---------------------------------------------------------------------------
+# Workspace skill bindings — dedicated surface for skill-type resources
+# (kept separate from generic resources to give the UI a simple bind/unbind
+# toggle that doesn't expose target_path, materialize_mode, etc.).
+# ---------------------------------------------------------------------------
+
+
+class ReplaceSkillBindings(BaseModel):
+    skill_resource_ids: list[str] = Field(default_factory=list)
+    reason: str = "skill bindings update"
+    actor: str | None = None
+
+
+@router.get("/api/workspaces/{workspace_id}/skill-bindings")
+def list_workspace_skill_bindings(
+    workspace_id: str,
+    store: Annotated[SessionStore, Depends(get_store)],
+):
+    """Return every skill-type resource in the catalog with a ``bound`` flag.
+
+    The shape is `{items: [{...resource, bound: bool}]}` so the UI can
+    render a single list of checkboxes without joining two endpoints.
+    """
+    catalog = store.list_repo_resources(type="skill", limit=500)
+    current = store.list_workspace_file_bindings(workspace_id)
+    bound_ids: set[str] = set()
+    for b in current:
+        resource = store.get_repo_resource(b["resource_id"])
+        if resource and resource.get("type") == "skill":
+            bound_ids.add(b["resource_id"])
+    items = []
+    for r in catalog:
+        items.append({**r, "bound": r["id"] in bound_ids})
+    return {"items": items}
+
+
+@router.put("/api/workspaces/{workspace_id}/skill-bindings")
+def replace_workspace_skill_bindings(
+    workspace_id: str,
+    body: ReplaceSkillBindings,
+    store: Annotated[SessionStore, Depends(get_store)],
+):
+    """Replace the workspace's skill bindings with the given resource set.
+
+    Non-skill bindings (documents/folders/schemas/scripts) are preserved.
+    After the DB write, the workspace is re-synced so SKILL.md files
+    appear under ``.claude/skills/<name>/`` immediately.
+    """
+    try:
+        items = store.replace_workspace_skill_bindings(
+            workspace_id,
+            body.skill_resource_ids,
+            reason=body.reason,
+            actor=body.actor,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    with contextlib.suppress(Exception):
+        sync_workspace_by_name(store, get_settings(), workspace_id)
+    return {"items": items}

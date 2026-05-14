@@ -20,28 +20,10 @@ import {
 } from '../api/activity';
 import RunsTable, { RunRow } from '../components/RunsTable';
 import RunDetailDrawer from '../components/RunDetailDrawer';
+import { fmtCost, fmtMs, fmtNum } from '../util/format';
 
 const RANGES: ActivityRange[] = ['7d', '30d', '90d'];
 
-function fmtMs(ms: number | null | undefined): string {
-  if (!ms && ms !== 0) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  const m = Math.floor(s / 60);
-  const rs = Math.round(s % 60);
-  return `${m}m ${rs}s`;
-}
-function fmtNum(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  return n.toLocaleString();
-}
-function fmtCost(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  if (n === 0) return '$0';
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return `$${n.toFixed(2)}`;
-}
 function fmtDateTick(iso: string): string {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()}`;

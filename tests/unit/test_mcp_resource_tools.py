@@ -177,3 +177,208 @@ class TestListHostEnvCalls:
             result = fn("run1")
         assert result["total"] == 3
         assert result["run_id"] == "run1"
+
+
+# ---------------------------------------------------------------------------
+# create_repo_resource — zip routing for folder/skill
+# ---------------------------------------------------------------------------
+
+
+def _make_zip_bytes(files: dict[str, bytes]) -> bytes:
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path, raw in files.items():
+            zf.writestr(path, raw)
+    return buf.getvalue()
+
+
+class TestCreateRepoResourceZipRouting:
+    def test_skill_requires_zip_bytes(self, tmp_path: Path):
+        import base64
+
+        ctx = _make_ctx(tmp_path)
+        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource")
+            result = fn(
+                slug="my-skill",
+                type="skill",
+                display_name="My Skill",
+                content_base64=base64.b64encode(b"not a zip").decode(),
+                changelog="initial upload",
+            )
+        assert result["error"] == "invalid_payload"
+
+    def test_document_rejects_zip_bytes(self, tmp_path: Path):
+        import base64
+
+        ctx = _make_ctx(tmp_path)
+        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "document"}
+        zip_b64 = base64.b64encode(_make_zip_bytes({"a.md": b"hi"})).decode()
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource")
+            result = fn(
+                slug="doc1",
+                type="document",
+                display_name="Doc",
+                content_base64=zip_b64,
+                changelog="initial upload",
+            )
+        assert result["error"] == "invalid_payload"
+
+    def test_skill_with_zip_routes_to_zip_importer(self, tmp_path: Path):
+        import base64
+
+        ctx = _make_ctx(tmp_path)
+        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
+        ctx.store.import_repo_version.return_value = {"id": "v1"}
+        zip_b64 = base64.b64encode(
+            _make_zip_bytes(
+                {
+                    "SKILL.md": b"---\nname: test\ndescription: x\n---\n# Test\n",
+                    "references/r1.md": b"# Ref",
+                }
+            )
+        ).decode()
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource")
+            result = fn(
+                slug="test-skill",
+                type="skill",
+                display_name="Test Skill",
+                content_base64=zip_b64,
+                changelog="initial upload",
+            )
+        assert "error" not in result
+        assert result["resource"]["id"] == "r1"
+        assert result["version"]["id"] == "v1"
+        ctx.store.import_repo_version.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# create_repo_resource_from_files
+# ---------------------------------------------------------------------------
+
+
+class TestCreateRepoResourceFromFiles:
+    def test_rejects_non_skill_or_folder(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
+            result = fn(
+                slug="x",
+                type="document",
+                display_name="X",
+                files=[{"path": "a.md", "content": "hi"}],
+                changelog="initial",
+            )
+        assert result["error"] == "invalid_type"
+
+    def test_rejects_short_changelog(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
+            result = fn(
+                slug="x",
+                type="skill",
+                display_name="X",
+                files=[{"path": "SKILL.md", "content": "x"}],
+                changelog="ab",
+            )
+        assert result["error"] == "reason_too_short"
+
+    def test_rejects_empty_files(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
+            result = fn(
+                slug="x",
+                type="skill",
+                display_name="X",
+                files=[],
+                changelog="initial upload",
+            )
+        assert result["error"] == "invalid_request"
+
+    def test_rejects_unsafe_path(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
+            result = fn(
+                slug="x",
+                type="skill",
+                display_name="X",
+                files=[{"path": "../escape.md", "content": "x"}],
+                changelog="initial upload",
+            )
+        assert result["error"] == "invalid_request"
+        assert "unsafe" in result["detail"]
+
+    def test_rejects_duplicate_path(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
+            result = fn(
+                slug="x",
+                type="skill",
+                display_name="X",
+                files=[
+                    {"path": "SKILL.md", "content": "a"},
+                    {"path": "SKILL.md", "content": "b"},
+                ],
+                changelog="initial upload",
+            )
+        assert result["error"] == "invalid_request"
+        assert "duplicate" in result["detail"]
+
+    def test_skill_requires_skill_md(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
+            result = fn(
+                slug="x",
+                type="skill",
+                display_name="X",
+                files=[{"path": "references/r.md", "content": "hi"}],
+                changelog="initial upload",
+            )
+        assert result["error"] == "invalid_request"
+        assert "SKILL.md" in result["detail"]
+
+    def test_happy_path_creates_resource_and_version(self, tmp_path: Path):
+        ctx = _make_ctx(tmp_path)
+        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
+        ctx.store.import_repo_version.return_value = {"id": "v1"}
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
+            mcp = _make_mcp()
+            fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
+            result = fn(
+                slug="my-skill",
+                type="skill",
+                display_name="My Skill",
+                files=[
+                    {
+                        "path": "SKILL.md",
+                        "content": "---\nname: my_skill\ndescription: x\n---\n# My Skill\n",
+                    },
+                    {"path": "references/clustering.md", "content": "# Clustering"},
+                ],
+                changelog="initial upload",
+            )
+        assert "error" not in result
+        assert result["resource"]["id"] == "r1"
+        assert result["version"]["id"] == "v1"
+        assert result["file_count"] == 2
+        ctx.store.import_repo_version.assert_called_once()

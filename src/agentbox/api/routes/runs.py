@@ -156,6 +156,7 @@ def list_runs(
     agent: str | None = None,
     status: str | None = None,
     executor: str | None = None,
+    agent_version: int | None = None,
     q: str | None = None,
     since: str | None = None,
     until: str | None = None,
@@ -165,14 +166,14 @@ def list_runs(
 ) -> list[dict] | dict:
     """List runs.
 
-    Backward-compatible shape: by default returns the raw list. Pass
-    ``paginated=true`` (or any filter beyond ``agent``+``limit``) to get
-    the envelope ``{items, total, offset, limit, has_more}``.
+    Backward-compatible shape: by default returns the raw list (from
+    ``list_runs``). Pass ``paginated=true`` (or any filter) to get the
+    envelope ``{items, total, offset, limit, has_more}`` with enriched
+    rows (usage + duration pre-joined).
     """
     store = get_store()
 
-    def _enrich(rec) -> dict:
-        d = rec.__dict__.copy()
+    def _enrich(d: dict) -> dict:
         vid = d.get("agent_version_id")
         if vid is not None:
             v = store.get_version_by_id(vid)
@@ -181,12 +182,15 @@ def list_runs(
             d["agent_version"] = None
         return d
 
-    if not paginated and not any([status, executor, q, since, until, offset]):
-        return [_enrich(r) for r in store.list_runs(limit=limit, agent_id=agent)]
+    if not paginated and not any(
+        [status, executor, q, since, until, offset, agent_version]
+    ):
+        return [_enrich(r.__dict__) for r in store.list_runs(limit=limit, agent_id=agent)]
     items, total = store.list_runs_paged(
         agent_id=agent,
         status=status,
         executor=executor,
+        agent_version=agent_version,
         q=q,
         since_iso=since,
         until_iso=until,
@@ -200,6 +204,30 @@ def list_runs(
         "limit": limit,
         "has_more": offset + len(items) < total,
     }
+
+
+@router.get("/_stats")
+def runs_stats(
+    agent: str | None = None,
+    status: str | None = None,
+    executor: str | None = None,
+    agent_version: int | None = None,
+    q: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+) -> dict:
+    """Aggregated stats for the run dashboard, respecting the same
+    filters as the paginated list endpoint."""
+    store = get_store()
+    return store.stats_for_filters(
+        agent_id=agent,
+        status=status,
+        executor=executor,
+        agent_version=agent_version,
+        q=q,
+        since_iso=since,
+        until_iso=until,
+    )
 
 
 class CompleteRunBody(BaseModel):
@@ -397,6 +425,24 @@ def add_comment(run_id: str, body: RunCommentBody) -> dict:
     return store.add_run_comment(run_id, body.author, body.body)
 
 
+@router.post("/{run_id}/cancel")
+async def cancel_run(run_id: str) -> dict:
+    """Cancel an in-progress run.
+
+    Marks the run ``incomplete`` and tears down the executor task. Idempotent:
+    re-cancelling a terminal or unknown run returns ``{"cancelled": False}``.
+    """
+    store = get_store()
+    existing = store.get_run(run_id)
+    if existing is None:
+        raise HTTPException(404, f"unknown run {run_id!r}")
+    if existing.status != "running":
+        return {"run_id": run_id, "cancelled": False, "status": existing.status}
+    cancelled = await get_executor().cancel_run(run_id)
+    refreshed = store.get_run(run_id) or existing
+    return {"run_id": run_id, "cancelled": cancelled, "status": refreshed.status}
+
+
 @router.get("/_facets")
 def run_facets() -> dict:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""
@@ -404,7 +450,7 @@ def run_facets() -> dict:
     return {
         "agents": store.distinct_agent_ids(),
         "executors": store.distinct_executors(),
-        "statuses": ["ok", "error", "running"],
+        "statuses": ["ok", "error", "failed", "timeout", "incomplete", "running"],
     }
 
 

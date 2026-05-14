@@ -11,6 +11,9 @@ venv/
 # Node
 node_modules/
 dist/
+dist-old/
+src/agentbox/ui/static/dist/
+src/agentbox/ui/static/dist-old/
 *.log
 
 # Editor / OS
@@ -25,6 +28,7 @@ dist/
 *.sqlite
 *.sqlite3
 workspaces/
+workdir/
 
 # Planning docs (local only)
 docs/

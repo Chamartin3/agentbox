@@ -779,6 +779,45 @@ class RunExecutor:
                 )
 
         task.cancel()
+
+        # Fire the webhook ourselves — the task's ``finally`` block
+        # normally does this after finish_run, but we just short-circuited
+        # finish_run (it's a no-op once the row is terminal) and the
+        # cancellation may unwind before the finally schedules delivery.
+        # Consumers expect a webhook for every terminal run, including
+        # incomplete/cancelled ones.
+        try:
+            refreshed = self.store.get_run(run_id)
+            if refreshed is not None:
+                agent = None
+                try:
+                    from agentbox.core.services.agents import resolve_agent
+
+                    agent = resolve_agent(
+                        refreshed.agent_id, store=self.store, loader=self.loader
+                    )
+                except Exception:
+                    logger.exception(
+                        "cancel_run: failed to resolve agent for webhook delivery (run %s)",
+                        run_id,
+                    )
+                transcript_path = (
+                    Path(refreshed.transcript_path)
+                    if refreshed.transcript_path
+                    else None
+                )
+                schedule_webhook(
+                    agent,
+                    refreshed,
+                    self.store,
+                    broadcaster,
+                    transcript_path,
+                )
+        except Exception:
+            logger.exception(
+                "cancel_run: webhook scheduling failed for %s", run_id
+            )
+
         return True
 
     def _fail_pre_run(

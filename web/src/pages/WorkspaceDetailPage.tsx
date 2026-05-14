@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { subagentsApi } from '../api/repo';
 import EnvDocEditor from '../components/EnvDocEditor';
 import WorkspaceResourcesEditor from '../components/WorkspaceResourcesEditor';
+import WorkspaceSkillsEditor from '../components/WorkspaceSkillsEditor';
 import SubagentsEditor from '../components/SubagentsEditor';
 import WorkspaceMcpEditor from '../components/WorkspaceMcpEditor';
 import WorkspaceHostEnvEditor from '../components/WorkspaceHostEnvEditor';
@@ -226,6 +227,7 @@ export default function WorkspaceDetailPage() {
           which produced visible card-in-card nesting. */}
       <EnvDocEditor workspaceId={id!} />
       <WorkspaceResourcesEditor workspaceId={id!} />
+      <WorkspaceSkillsEditor workspaceId={id!} />
       <SubagentsEditor workspaceId={id!} />
 
       {/* 4. Capabilities — single section bundling everything that controls

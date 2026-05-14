@@ -1,24 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AgentRun } from '../api/activity';
-
-function fmtDt(iso: string | null | undefined) {
-  return iso ? new Date(iso).toLocaleString() : '—';
-}
-function fmtMs(ms: number | null | undefined) {
-  if (!ms && ms !== 0) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
-}
-function fmtNum(n: number | null | undefined) {
-  return n === null || n === undefined ? '—' : n.toLocaleString();
-}
-function fmtCost(n: number | null | undefined) {
-  if (n === null || n === undefined) return '—';
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return `$${n.toFixed(2)}`;
-}
+import { fmtCost, fmtDt, fmtMs, fmtNum } from '../util/format';
 
 interface Props {
   run: AgentRun | null;

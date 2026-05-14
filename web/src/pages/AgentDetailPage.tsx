@@ -1,16 +1,182 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api, AgentDef, ApiError } from '../api/client';
+import { api, AgentDef, ApiError, RunsPage as RunsPageData, RunsStats } from '../api/client';
 import { versionsApi, VersionSummary } from '../api/versions';
 import AgentVersions from './AgentVersions';
 import ManifestEditor from '../components/ManifestEditor';
 import MarkdownEditor from '../components/MarkdownEditor';
-import AgentRunsList from '../components/AgentRunsList';
+import RunsTable, { RunRow } from '../components/RunsTable';
+import RunsDashboard from '../components/runs/RunsDashboard';
 import AgentResourcesEditor from '../components/AgentResourcesEditor';
 import Toast from '../components/Toast';
 import './AgentDetailPage.css';
 
 type TabType = 'configuration' | 'composition' | 'versions' | 'runs';
+
+const AGENT_PAGE_SIZE = 25;
+
+function AgentRunsTab({
+  agentId,
+  versions,
+}: {
+  agentId: string;
+  versions: VersionSummary[];
+}) {
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [versionFilter, setVersionFilter] = useState<number | ''>('');
+  const [data, setData] = useState<RunsPageData | null>(null);
+  const [stats, setStats] = useState<RunsStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const lastQuery = useRef('');
+
+  const isLiveView = page === 1 && !statusFilter && versionFilter === '';
+
+  const filterQuery = useMemo(
+    () => ({
+      agent: agentId,
+      status: statusFilter || undefined,
+      agent_version: versionFilter === '' ? undefined : versionFilter,
+    }),
+    [agentId, statusFilter, versionFilter],
+  );
+
+  useEffect(() => {
+    const qk = JSON.stringify({ agentId, statusFilter, versionFilter, page });
+    lastQuery.current = qk;
+    const tick = async () => {
+      if (lastQuery.current !== qk) return;
+      setLoading(true);
+      try {
+        const [d, s] = await Promise.all([
+          api.listRunsPaged({
+            ...filterQuery,
+            limit: AGENT_PAGE_SIZE,
+            offset: (page - 1) * AGENT_PAGE_SIZE,
+          }),
+          api.runStats(filterQuery),
+        ]);
+        if (lastQuery.current === qk) {
+          setData(d);
+          setStats(s);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    tick();
+    if (!isLiveView) return;
+    const h = window.setInterval(tick, 4000);
+    return () => window.clearInterval(h);
+  }, [agentId, statusFilter, page, isLiveView, filterQuery]);
+
+  const items = data?.items ?? [];
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / Math.max(1, data.limit))) : 1;
+
+  const runRows: RunRow[] = useMemo(
+    () =>
+      items.map((r) => ({
+        id: r.id,
+        agent_id: r.agent_id,
+        status: r.status,
+        started_at: r.created_at,
+        finished_at: r.finished_at,
+        backend: r.backend ?? null,
+        configured_model: r.configured_model ?? null,
+        reported_model: r.model ?? null,
+        agent_version: r.agent_version ?? null,
+        agent_version_id: r.agent_version_id ?? null,
+        input_tokens: r.input_tokens ?? null,
+        output_tokens: r.output_tokens ?? null,
+        cache_read_tokens: r.cache_read_tokens ?? null,
+        cache_creation_tokens: r.cache_write_tokens ?? null,
+        cost_usd: r.cost_usd ?? null,
+        duration_ms: r.duration_ms ?? null,
+      })),
+    [items],
+  );
+
+  const STATUSES = [
+    { value: '', label: 'All' },
+    { value: 'ok', label: 'OK' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'error', label: 'Error' },
+    { value: 'incomplete', label: 'Incomplete' },
+    { value: 'timeout', label: 'Timeout' },
+    { value: 'running', label: 'Running' },
+  ];
+
+  return (
+    <div className="tab-pane stack">
+      <div className="row between" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="range-toggle" role="tablist" aria-label="Status">
+            {STATUSES.map((s) => (
+              <button
+                key={s.value || 'all'}
+                className={statusFilter === s.value ? 'active' : ''}
+                onClick={() => {
+                  setStatusFilter(s.value);
+                  setPage(1);
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <select
+            value={versionFilter === '' ? '' : String(versionFilter)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setVersionFilter(v === '' ? '' : Number(v));
+              setPage(1);
+            }}
+            title="Filter by agent version"
+          >
+            <option value="">All versions</option>
+            {versions.map((v) => (
+              <option key={v.version} value={v.version}>
+                v{v.version}
+                {v.is_draft ? ' (draft)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <span className="dim">
+          {data ? `${data.total.toLocaleString()} match${data.total === 1 ? '' : 'es'}` : ''}
+          {loading ? ' · loading…' : ''}
+        </span>
+      </div>
+
+      <RunsDashboard stats={stats} scope={{ agentId }} />
+
+      <RunsTable
+        items={runRows}
+        columns={['run', 'version', 'status', 'started', 'duration', 'runner', 'model', 'tokens']}
+        emptyMessage="no runs for this agent"
+        loading={loading}
+      />
+
+      {data && data.total > AGENT_PAGE_SIZE && (
+        <div className="row between">
+          <span className="dim">
+            page {page} of {totalPages} · showing {items.length} of {data.total}
+          </span>
+          <div className="row">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading}>
+              ← prev
+            </button>
+            <button onClick={() => setPage((p) => p + 1)} disabled={!data.has_more || loading}>
+              next →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AgentDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -143,9 +309,6 @@ export default function AgentDetailPage() {
           {currentVersion != null && (
             <span className="tag">v{currentVersion}</span>
           )}
-          <Link to={`/runs?agent=${encodeURIComponent(agent.id)}`}>
-            View Runs →
-          </Link>
         </div>
       </header>
 
@@ -275,9 +438,7 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === 'runs' && (
-          <div className="tab-pane">
-            <AgentRunsList agentId={agent.id} />
-          </div>
+          <AgentRunsTab agentId={agent.id} versions={versions} />
         )}
       </div>
 

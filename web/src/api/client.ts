@@ -65,6 +65,13 @@ export interface RunRecord {
   backend?: string | null;
   configured_model?: string | null;
   reported_model?: string | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_tokens?: number | null;
+  cache_write_tokens?: number | null;
+  cost_usd?: number | null;
+  model?: string | null;
+  duration_ms?: number | null;
 }
 
 export interface UsageRecord {
@@ -75,6 +82,44 @@ export interface UsageRecord {
   cache_read_tokens: number;
   cache_write_tokens: number;
   cost_usd: number | null;
+}
+
+export interface RunsStats {
+  totals: {
+    runs: number;
+    input_tokens: number;
+    output_tokens: number;
+    cost_usd: number;
+    avg_duration_ms: number;
+  };
+  by_agent: Array<{
+    agent_id: string;
+    runs: number;
+    tokens: number;
+    cost_usd: number;
+  }>;
+  by_model: Array<{
+    model: string;
+    runs: number;
+    tokens: number;
+    cost_usd: number;
+  }>;
+  by_version: Array<{
+    version: number;
+    runs: number;
+    tokens: number;
+  }>;
+  by_status: Array<{
+    status: string;
+    runs: number;
+  }>;
+  timeseries: Array<{
+    bucket: string;
+    runs: number;
+    input_tokens: number;
+    output_tokens: number;
+    cost_usd: number;
+  }>;
 }
 
 export interface GuardrailRow {
@@ -386,6 +431,7 @@ export interface RunsQuery {
   agent?: string;
   status?: string;
   executor?: string;
+  agent_version?: number;
   q?: string;
   since?: string;
   until?: string;
@@ -412,6 +458,7 @@ function buildRunsQs(q: RunsQuery): string {
   if (q.agent) p.set('agent', q.agent);
   if (q.status) p.set('status', q.status);
   if (q.executor) p.set('executor', q.executor);
+  if (q.agent_version != null) p.set('agent_version', String(q.agent_version));
   if (q.q) p.set('q', q.q);
   if (q.since) p.set('since', q.since);
   if (q.until) p.set('until', q.until);
@@ -465,6 +512,11 @@ export const api = {
       `/api/runs/${id}/rerun`,
       { method: 'POST' },
     ),
+  cancelRun: (id: string) =>
+    req<{ run_id: string; cancelled: boolean; status: string }>(
+      `/api/runs/${id}/cancel`,
+      { method: 'POST' },
+    ),
   listRunComments: (id: string) =>
     req<{ run_id: string; comments: Array<{ id: number; author: string; body: string; created_at: string }> }>(
       `/api/runs/${id}/comments`,
@@ -474,6 +526,10 @@ export const api = {
       `/api/runs/${id}/comments`,
       { method: 'POST', body: JSON.stringify({ body, author }) },
     ),
+  runStats: (q?: RunsQuery) => {
+    const qs = q ? buildRunsQs(q) : '';
+    return req<RunsStats>(`/api/runs/_stats${qs ? `?${qs}` : ''}`);
+  },
   aggregateUsage: () =>
     req<{ input_tokens: number; output_tokens: number; cost_usd: number; runs: number }>(
       '/api/usage',

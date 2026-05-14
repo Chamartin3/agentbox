@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   RunsFacets,
   RunsPage as RunsPageData,
+  RunsStats,
   api,
 } from '../api/client';
 import { RunsFilterKey, RunStatus } from '../api/enums';
+import RunsTable, { RunRow } from '../components/RunsTable';
+import RunsDashboard from '../components/runs/RunsDashboard';
 
 const PAGE_SIZE = 25;
 
-// Filter state is URL-synced so shares/reloads keep the same view. The
-// query params we own:
-//   ?agent=<id>&status=ok|error|running&executor=<model>&q=<text>&page=<1-based>
-// Empty values are dropped from the URL.
 type FilterKey = RunsFilterKey;
 
 function readParam(p: URLSearchParams, k: FilterKey): string {
@@ -27,8 +26,6 @@ function setParam(
   const next = new URLSearchParams(p);
   if (v) next.set(k, v);
   else next.delete(k);
-  // Changing a filter resets pagination, except when the filter *is*
-  // the page itself.
   if (k !== RunsFilterKey.Page) next.delete(RunsFilterKey.Page);
   return next;
 }
@@ -43,6 +40,16 @@ const STATUSES = [
   { value: RunStatus.Running, label: 'Running' },
 ];
 
+
+function filtersToQuery(f: { agent: string; status: string; executor: string; q: string }) {
+  return {
+    agent: f.agent || undefined,
+    status: f.status || undefined,
+    executor: f.executor || undefined,
+    q: f.q || undefined,
+  };
+}
+
 export default function RunsPage() {
   const [params, setParams] = useSearchParams();
   const agent = readParam(params, RunsFilterKey.Agent);
@@ -51,9 +58,6 @@ export default function RunsPage() {
   const qParam = readParam(params, RunsFilterKey.Q);
   const page = Math.max(1, Number(readParam(params, RunsFilterKey.Page) || '1'));
 
-  // Local search input — debounced into the URL so we don't refetch on
-  // every keystroke. Initialised from the URL on mount and whenever the
-  // user navigates back into the page.
   const [qInput, setQInput] = useState(qParam);
   useEffect(() => setQInput(qParam), [qParam]);
   useEffect(() => {
@@ -67,14 +71,14 @@ export default function RunsPage() {
   }, [qInput]);
 
   const [data, setData] = useState<RunsPageData | null>(null);
+  const [stats, setStats] = useState<RunsStats | null>(null);
   const [facets, setFacets] = useState<RunsFacets | null>(null);
   const [loading, setLoading] = useState(false);
-  const [agg, setAgg] = useState<{ runs: number; input_tokens: number; output_tokens: number; cost_usd: number } | null>(null);
 
-  // Poll only when we're on page 1 with no filters — that's the
-  // "live activity" view. Filtered/paginated views are stable.
   const isLiveView = page === 1 && !agent && !status && !executor && !qParam;
   const lastQuery = useRef<string>('');
+
+  const filterQuery = filtersToQuery({ agent, status, executor, q: qParam });
 
   useEffect(() => {
     api.runFacets().then(setFacets).catch(console.error);
@@ -84,25 +88,20 @@ export default function RunsPage() {
     const queryKey = JSON.stringify({ agent, status, executor, q: qParam, page });
     lastQuery.current = queryKey;
     const tick = async () => {
-      // Avoid clobbering newer state if the user filtered while a
-      // previous tick was in flight.
       if (lastQuery.current !== queryKey) return;
       setLoading(true);
       try {
-        const [d, a] = await Promise.all([
+        const [d, s] = await Promise.all([
           api.listRunsPaged({
-            agent: agent || undefined,
-            status: status || undefined,
-            executor: executor || undefined,
-            q: qParam || undefined,
+            ...filterQuery,
             limit: PAGE_SIZE,
             offset: (page - 1) * PAGE_SIZE,
           }),
-          api.aggregateUsage(),
+          api.runStats(filterQuery),
         ]);
         if (lastQuery.current === queryKey) {
           setData(d);
-          setAgg(a);
+          setStats(s);
         }
       } catch (e) {
         console.error(e);
@@ -114,6 +113,7 @@ export default function RunsPage() {
     if (!isLiveView) return;
     const h = window.setInterval(tick, 4000);
     return () => window.clearInterval(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent, status, executor, qParam, page, isLiveView]);
 
   const totalPages = useMemo(() => {
@@ -136,17 +136,32 @@ export default function RunsPage() {
   const anyFilter = !!(agent || status || executor || qParam);
   const items = data?.items ?? [];
 
+  const runRows: RunRow[] = useMemo(
+    () =>
+      items.map((r) => ({
+        id: r.id,
+        agent_id: r.agent_id,
+        status: r.status,
+        started_at: r.created_at,
+        finished_at: r.finished_at,
+        backend: r.backend ?? null,
+        configured_model: r.configured_model ?? null,
+        reported_model: r.model ?? null,
+        agent_version: r.agent_version ?? null,
+        agent_version_id: r.agent_version_id ?? null,
+        input_tokens: r.input_tokens ?? null,
+        output_tokens: r.output_tokens ?? null,
+        cache_read_tokens: r.cache_read_tokens ?? null,
+        cache_creation_tokens: r.cache_write_tokens ?? null,
+        cost_usd: r.cost_usd ?? null,
+        duration_ms: r.duration_ms ?? null,
+      })),
+    [items],
+  );
+
   return (
     <div className="stack">
-      <div className="row between">
-        <h1>Runs</h1>
-        {agg && (
-          <span className="dim">
-            {agg.runs} runs · {agg.input_tokens.toLocaleString()} in ·{' '}
-            {agg.output_tokens.toLocaleString()} out · ${(agg.cost_usd || 0).toFixed(4)}
-          </span>
-        )}
-      </div>
+      <h1>Runs</h1>
 
       <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <input
@@ -190,52 +205,14 @@ export default function RunsPage() {
         </span>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Run</th>
-            <th>Agent</th>
-            <th>Version</th>
-            <th>Status</th>
-            <th>Started</th>
-            <th>Finished</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((r) => (
-            <tr key={r.id}>
-              <td><Link to={`/runs/${r.id}`}>{r.id.slice(0, 12)}</Link></td>
-              <td>
-                <Link to={`/agents/${encodeURIComponent(r.agent_id)}`} title="open agent">
-                  {r.agent_id}
-                </Link>
-              </td>
-              <td>
-                {r.agent_version != null ? (
-                  <Link
-                    to={`/agents/${encodeURIComponent(r.agent_id)}/versions?highlight=${r.agent_version_id}`}
-                    className="version-chip"
-                  >
-                    v{r.agent_version}
-                  </Link>
-                ) : (
-                  <span className="dim">—</span>
-                )}
-              </td>
-              <td><span className={`pill ${r.status}`}>{r.status}</span></td>
-              <td className="dim">{r.created_at}</td>
-              <td className="dim">{r.finished_at || ''}</td>
-            </tr>
-          ))}
-          {!items.length && !loading && (
-            <tr>
-              <td colSpan={6} className="dim">
-                {anyFilter ? 'no runs match these filters' : 'no runs yet'}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <RunsDashboard stats={stats} scope="global" />
+
+      <RunsTable
+        items={runRows}
+        columns={['run', 'status', 'started', 'duration', 'agent_version', 'runner_model', 'tokens']}
+        emptyMessage={anyFilter ? 'no runs match these filters' : 'no runs yet'}
+        loading={loading}
+      />
 
       {data && data.total > 0 && (
         <div className="row between" style={{ marginTop: 4 }}>

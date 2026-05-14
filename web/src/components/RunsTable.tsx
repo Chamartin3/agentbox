@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { RunStatus, canonicalStatus } from '../theme/statusColors';
+import { fmtCost, fmtMs, fmtNum, fmtRelative } from '../util/format';
 
 // Normalized row shape used by the shared runs table. Both the runs API
 // (RunRecord) and the activity API (AgentRun) map onto this — fields not
@@ -27,9 +28,11 @@ export interface RunRow {
 export type RunsColumn =
   | 'run'
   | 'agent'
+  | 'agent_version'
   | 'version'
   | 'runner'
   | 'model'
+  | 'runner_model'
   | 'status'
   | 'started'
   | 'finished'
@@ -59,50 +62,16 @@ export function StatusPill({ status }: { status: string }) {
   return <span className={`pill ${statusClass(status)}`}>{statusLabel(status)}</span>;
 }
 
-function fmtMs(ms: number | null | undefined): string {
-  if (ms === null || ms === undefined) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  const m = Math.floor(s / 60);
-  const rs = Math.round(s % 60);
-  return `${m}m ${rs}s`;
-}
 
-function fmtNum(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  return n.toLocaleString();
-}
-
-function fmtCost(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  if (n === 0) return '$0';
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return `$${n.toFixed(2)}`;
-}
-
-function fmtRelative(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  const diff = Date.now() - then;
-  if (diff < 0) return 'in the future';
-  const s = Math.floor(diff / 1000);
-  if (s < 45) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return `${Math.floor(d / 30)}mo ago`;
-}
 
 const COLUMN_HEADER: Record<RunsColumn, string> = {
   run: 'Run',
   agent: 'Agent',
+  agent_version: 'Agent · Version',
   version: 'Version',
   runner: 'Runner',
   model: 'Model',
+  runner_model: 'Runner · Model',
   status: 'Status',
   started: 'Started',
   finished: 'Finished',
@@ -153,6 +122,27 @@ export default function RunsTable({
             <code>{r.agent_id}</code>
           </Link>
         );
+      case 'agent_version':
+        return (
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline' }}>
+            <Link to={`/agents/${encodeURIComponent(r.agent_id)}`} onClick={stop}>
+              <code>{r.agent_id}</code>
+            </Link>
+            {r.agent_version != null && r.agent_version_id ? (
+              <>
+                <span className="dim">(</span>
+                <Link
+                  to={`/agents/${encodeURIComponent(r.agent_id)}/versions?highlight=${r.agent_version_id}`}
+                  className="version-chip"
+                  onClick={stop}
+                >
+                  v{r.agent_version}
+                </Link>
+                <span className="dim">)</span>
+              </>
+            ) : null}
+          </span>
+        );
       case 'version':
         return r.agent_version != null && r.agent_version_id ? (
           <Link
@@ -168,20 +158,38 @@ export default function RunsTable({
       case 'runner':
         return r.backend ? <code className="dim">{r.backend}</code> : <span className="dim">—</span>;
       case 'model': {
-        const primary = r.configured_model;
         const reported = r.reported_model;
+        const configured = r.configured_model;
+        const primary = reported ?? configured;
         if (!primary) return <span className="dim">—</span>;
-        if (reported && reported !== primary) {
+        if (reported && configured && reported !== configured) {
           return (
-            <code className="dim" title={`Reported as: ${reported}`}>
-              {primary}
-              <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>
-                as: {reported}
-              </span>
+            <code className="dim" title={`Configured: ${configured}`}>
+              {reported}
             </code>
           );
         }
         return <code className="dim">{primary}</code>;
+      }
+      case 'runner_model': {
+        const reported = r.reported_model;
+        const configured = r.configured_model;
+        const model = reported ?? configured;
+        if (!r.backend && !model) return <span className="dim">—</span>;
+        const modelTitle =
+          reported && configured && reported !== configured
+            ? `Configured: ${configured}`
+            : undefined;
+        return (
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline' }}>
+            {r.backend ? <code className="dim">{r.backend}</code> : null}
+            {model ? (
+              <code className="dim" title={modelTitle}>
+                {r.backend ? `· ${model}` : model}
+              </code>
+            ) : null}
+          </span>
+        );
       }
       case 'status':
         return <StatusPill status={r.status} />;

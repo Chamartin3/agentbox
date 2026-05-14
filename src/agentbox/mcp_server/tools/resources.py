@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import io
+import zipfile
 
 from fastmcp import FastMCP
 
@@ -11,6 +13,7 @@ from agentbox.core.constants import ResourceType
 from agentbox.core.env_doc.renderers import AgentsMdRenderer, ClaudeMdRenderer
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.upload import UploadImporter
+from agentbox.core.resources.importers.zip_upload import ZipUploadImporter
 from agentbox.core.resources.prompt_resolver import resolve_prompt
 from agentbox.core.run_prep import (
     resolve_agent_prompt_bindings,
@@ -19,6 +22,9 @@ from agentbox.core.run_prep import (
 from agentbox.core.services.agents import resolve_agent
 from agentbox.mcp_server.deps import get_context
 from agentbox.mcp_server.schemas import clamp_limit
+
+_ZIP_MAGIC = b"PK\x03\x04"
+_MULTI_FILE_TYPES = {"folder", "skill"}
 
 
 def _require_reason(reason: str) -> dict | None:
@@ -50,7 +56,12 @@ def register(mcp: FastMCP) -> None:
         ``type`` is one of: document, folder, skill, schema, script.
         Provide ``content`` (text) or ``content_base64`` (binary) to also
         upload an initial version; ``changelog`` (≥ 3 chars) is required
-        in that case. For folder/skill archives use the web UI / REST.
+        in that case.
+
+        For folder/skill resources, ``content_base64`` must be a ZIP archive
+        (auto-detected by magic bytes); it is dispatched to ``ZipUploadImporter``
+        with ``as_skill=(type=="skill")``. To upload a multi-file skill without
+        building a zip yourself, use ``create_repo_resource_from_files`` instead.
         """
         try:
             rtype = ResourceType(type)
@@ -85,8 +96,34 @@ def register(mcp: FastMCP) -> None:
         else:
             raw = (content or "").encode("utf-8")
 
-        fname = filename or f"{slug.replace('/', '_')}.md"
-        importer = UploadImporter(filename=fname, content=raw, mime_type=mime_type)
+        is_zip = raw[:4] == _ZIP_MAGIC
+        if rtype.value in _MULTI_FILE_TYPES:
+            if not is_zip:
+                return {
+                    "error": "invalid_payload",
+                    "detail": (
+                        f"resource type {rtype.value!r} requires a ZIP archive in "
+                        "`content_base64` (or use create_repo_resource_from_files)"
+                    ),
+                    "resource": resource,
+                }
+            importer = ZipUploadImporter(
+                filename=filename or f"{slug.replace('/', '_')}.zip",
+                content=raw,
+                as_skill=(rtype.value == "skill"),
+            )
+        else:
+            if is_zip:
+                return {
+                    "error": "invalid_payload",
+                    "detail": (
+                        f"ZIP archive given for resource type {rtype.value!r}; "
+                        "ZIP uploads are only valid for type=folder or type=skill"
+                    ),
+                    "resource": resource,
+                }
+            fname = filename or f"{slug.replace('/', '_')}.md"
+            importer = UploadImporter(filename=fname, content=raw, mime_type=mime_type)
         try:
             imported = importer.run(ImporterContext(actor=None, changelog=changelog))
             version = ctx.store.import_repo_version(
@@ -102,6 +139,113 @@ def register(mcp: FastMCP) -> None:
             return {"error": "import_failed", "detail": str(exc), "resource": resource}
         result["version"] = version
         return result
+
+    @mcp.tool
+    def create_repo_resource_from_files(
+        slug: str,
+        type: str,
+        display_name: str,
+        files: list[dict],
+        changelog: str,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        draft: bool = False,
+    ) -> dict:
+        """Create a folder/skill resource from an in-line list of files.
+
+        For MCP-only callers that cannot build a ZIP themselves. Each file
+        is ``{"path": <relative path>, "content": <text>}`` or
+        ``{"path": ..., "content_base64": <base64 bytes>}``. The server
+        zips them and routes through ``ZipUploadImporter``.
+
+        ``type`` must be ``"folder"`` or ``"skill"``. Skill resources
+        require a ``SKILL.md`` (at the root of the supplied paths).
+        ``changelog`` must be ≥ 3 chars.
+
+        Paths must be relative POSIX paths (no leading slash, no ``..``).
+        Symlinks cannot be represented; pre-resolve them at the caller.
+        """
+        if type not in _MULTI_FILE_TYPES:
+            return {
+                "error": "invalid_type",
+                "detail": f"type must be 'folder' or 'skill' (got {type!r})",
+            }
+        err = _require_reason(changelog)
+        if err:
+            return err
+        if not files:
+            return {"error": "invalid_request", "detail": "files must be non-empty"}
+
+        seen_paths: set[str] = set()
+        entries: list[tuple[str, bytes]] = []
+        for idx, item in enumerate(files):
+            path = (item.get("path") or "").strip()
+            if not path:
+                return {"error": "invalid_request", "detail": f"files[{idx}] missing 'path'"}
+            if path.startswith("/") or ".." in path.split("/") or "\\" in path:
+                return {"error": "invalid_request", "detail": f"unsafe path: {path!r}"}
+            if path in seen_paths:
+                return {"error": "invalid_request", "detail": f"duplicate path: {path!r}"}
+            seen_paths.add(path)
+
+            if "content_base64" in item and item["content_base64"] is not None:
+                try:
+                    raw = base64.b64decode(item["content_base64"], validate=True)
+                except (binascii.Error, ValueError) as exc:
+                    return {"error": "invalid_base64", "detail": f"files[{idx}]: {exc}"}
+            elif "content" in item and item["content"] is not None:
+                raw = str(item["content"]).encode("utf-8")
+            else:
+                return {
+                    "error": "invalid_request",
+                    "detail": f"files[{idx}] requires 'content' or 'content_base64'",
+                }
+            entries.append((path, raw))
+
+        if type == "skill" and not any(p.lower() == "skill.md" for p, _ in entries):
+            return {
+                "error": "invalid_request",
+                "detail": "skill resources require a SKILL.md at the archive root",
+            }
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path, raw in entries:
+                zf.writestr(path, raw)
+        zip_bytes = buf.getvalue()
+
+        ctx = get_context()
+        try:
+            resource = ctx.store.create_repo_resource(
+                slug=slug,
+                type=type,
+                display_name=display_name,
+                description=description,
+                tags=tags or [],
+            )
+        except ValueError as exc:
+            return {"error": "invalid_request", "detail": str(exc)}
+
+        importer = ZipUploadImporter(
+            filename=f"{slug.replace('/', '_')}.zip",
+            content=zip_bytes,
+            as_skill=(type == "skill"),
+        )
+        try:
+            imported = importer.run(ImporterContext(actor=None, changelog=changelog))
+            version = ctx.store.import_repo_version(
+                resource["id"],
+                imported.blobs,
+                import_source=imported.import_source,
+                changelog=changelog,
+                source_metadata=imported.source_metadata,
+                metadata=imported.metadata,
+                draft=draft,
+            )
+        except ValueError as exc:
+            return {"error": "import_failed", "detail": str(exc), "resource": resource}
+
+        return {"resource": resource, "version": version, "file_count": len(entries)}
 
     @mcp.tool
     def set_prompt_resources(

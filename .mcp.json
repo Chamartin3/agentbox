@@ -18,7 +18,12 @@
     },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser", "chromium",
+        "--output-dir", "/home/omidev/Code/ai/cv_agents/libs/agentbox/workdir/playwright"
+      ]
     }
   }
 }

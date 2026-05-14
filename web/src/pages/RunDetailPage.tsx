@@ -4,52 +4,16 @@ import { AgentDef, GuardrailRow, PromptFragment, RunPromptDoc, RunRecord, UsageR
 import EventStream from '../components/EventStream';
 import ConversationView from '../components/ConversationView';
 import RunCommentThread from '../components/RunCommentThread';
+import { fmtCost, fmtDt, fmtMs, fmtNum, fmtRelative } from '../util/format';
+
+function durationMs(r: RunRecord): number | null {
+  if (!r.finished_at) return null;
+  return new Date(r.finished_at).getTime() - new Date(r.created_at).getTime();
+}
 
 interface StreamEvent {
   type: string;
   [k: string]: unknown;
-}
-
-// ────────────────────────────────────────────────────────────────── formatters
-
-function fmtDt(iso: string | null | undefined): string {
-  return iso ? new Date(iso).toLocaleString() : '—';
-}
-function fmtRelative(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  const diff = Date.now() - then;
-  if (diff < 0) return 'in the future';
-  const s = Math.floor(diff / 1000);
-  if (s < 45) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  if (d < 30) return `${Math.floor(d / 7)}w ago`;
-  return `${Math.floor(d / 30)}mo ago`;
-}
-function fmtMs(ms: number | null | undefined): string {
-  if (!ms && ms !== 0) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
-}
-function fmtNum(n: number | null | undefined): string {
-  return n === null || n === undefined ? '—' : n.toLocaleString();
-}
-function fmtCost(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  if (n === 0) return '$0';
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  return `$${n.toFixed(2)}`;
-}
-function durationMs(r: RunRecord): number | null {
-  if (!r.finished_at) return null;
-  return new Date(r.finished_at).getTime() - new Date(r.created_at).getTime();
 }
 
 // ────────────────────────────────────────────────────────────── error parsing
@@ -408,6 +372,7 @@ export default function RunDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [rerunning, setRerunning] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [usage, setUsage] = useState<UsageRecord | null>(null);
   const [guards, setGuards] = useState<GuardrailRow[]>([]);
@@ -611,6 +576,29 @@ export default function RunDetailPage() {
         {runnerProfileName && <span className="stat">profile<strong>{runnerProfileName}</strong></span>}
         {modelName && <span className="stat">model<strong>{modelName}</strong></span>}
         <span className="spacer" />
+        {run.status === 'running' && (
+          <button
+            disabled={cancelling}
+            onClick={async () => {
+              if (!confirm('Cancel this run? The agent will be stopped and marked incomplete.')) return;
+              setCancelling(true);
+              try {
+                await api.cancelRun(id);
+                const r = await api.getRun(id);
+                setRun(r.run);
+              } catch (e) {
+                console.error(e);
+                alert('cancel failed');
+              } finally {
+                setCancelling(false);
+              }
+            }}
+            title="Stop this run and mark it incomplete"
+            style={{ marginRight: 8 }}
+          >
+            {cancelling ? 'Stopping…' : '■ Stop'}
+          </button>
+        )}
         <button
           disabled={rerunning}
           onClick={async () => {
