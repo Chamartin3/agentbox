@@ -66,8 +66,50 @@ services:
       - CLAUDE_CONFIG_DIR=/agentbox/creds/claude
       # LLM provider keys — forwarded from parent compose .env when set.
       - OPENROUTER_API_KEY=${OPEN_ROUTER_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DS_AGNETBOX:-}
+      # Ollama hostname rewrite (empty string disables rewriting).
+      - AGENTBOX_OLLAMA_URL_REWRITE=${AGENTBOX_OLLAMA_URL_REWRITE:-}
     networks:
       - default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  # agentbox-mcp — long-running MCP HTTP server (FastMCP, streamable-http).
+  # Shares the agentbox image + DB volume so it sees the same agent_versions,
+  # prompts, runs, etc. Claude/OpenCode workspaces connect to this via
+  # `http://agentbox-mcp:8766/mcp/` over the agentbox network.
+  agentbox-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    container_name: ${AGENTBOX_MCP_CONTAINER_NAME:-agentbox-mcp}
+    user: "${UID:-1000}:${GID:-1000}"
+    command: ["python3", "-m", "agentbox.mcp.server"]
+    ports:
+      - "${AGENTBOX_MCP_PORT:-8766}:8766"
+    volumes:
+      - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml
+      - agentbox-data:/data
+    environment:
+      - AGENTBOX_DATA_DIR=/data
+      - AGENTBOX_MANIFEST=/agentbox/manifest.toml
+      - AGENTBOX_MCP_TRANSPORT=http
+      - AGENTBOX_MCP_HOST=0.0.0.0
+      - AGENTBOX_MCP_PORT=8766
+      - HOME=/home/appuser
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -X POST http://localhost:8766/mcp/ -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"healthcheck\",\"version\":\"0\"}}}' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
     logging:
       driver: "json-file"
       options:
