@@ -7,16 +7,17 @@ a mandatory reason. Includes a preview/dry-run endpoint per side.
 from __future__ import annotations
 
 import contextlib
-import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_settings, get_store
-from agentbox.core.composition import _append_input_schema, _append_schema
 from agentbox.core.data.store import SessionStore
-from agentbox.core.resources.prompt_resolver import resolve_prompt
+from agentbox.core.resources.prompt_preview import (
+    PreviewError,
+    render_agent_prompt_preview,
+)
 from agentbox.core.resources.rendering import render_for_type
 from agentbox.core.workspace_sync import sync_workspace_by_name
 
@@ -69,102 +70,6 @@ class ReplaceWorkspaceBindings(BaseModel):
     bindings: list[WorkspaceBindingIn]
     reason: str = Field(default="ui edit", min_length=1)
     actor: str | None = None
-
-
-# --- helpers ---
-
-
-def _resolve_binding_for_prompt(store: SessionStore, b: dict) -> dict:
-    resource = store.get_repo_resource(b["resource_id"])
-    if not resource:
-        raise HTTPException(status_code=400, detail=f"resource {b['resource_id']!r} not found")
-    version_id = b.get("pinned_version_id")
-    if not version_id:
-        active = store.get_active_repo_version(b["resource_id"])
-        if not active:
-            raise HTTPException(
-                status_code=400,
-                detail=f"resource {b['resource_id']!r} has no active version",
-            )
-        version_id = active["id"]
-    version = store.get_repo_version(version_id)
-    blobs = list(store.iter_repo_blobs(version_id))
-    return {
-        "binding_id": b["id"],
-        "marker": b.get("marker"),
-        "slot": b.get("slot"),
-        "attach_as_reference": bool(b.get("attach_as_reference")),
-        "resource_id": b["resource_id"],
-        "resource_slug": resource["slug"],
-        "version_id": version_id,
-        "content_hash": version["content_hash"],
-        "type": resource["type"],
-        "mode": b.get("mode"),
-        "display_name": resource["display_name"],
-        "required": bool(b.get("required", 1)),
-        "blobs": blobs,
-    }
-
-
-def _render_references_block(
-    resolved: list[dict],
-) -> tuple[str, list[dict], list[dict]]:
-    """Render the References section for prompt bindings flagged
-    ``attach_as_reference``. Returns ``(text, refs_meta, per_ref_chars)``.
-
-    ``per_ref_chars`` is a list of ``{label, chars}`` entries (one per
-    rendered reference) suitable for inclusion in the char-breakdown
-    visualization.
-    """
-    parts: list[str] = []
-    refs_meta: list[dict] = []
-    per_ref_chars: list[dict] = []
-    for b in resolved:
-        if not b.get("attach_as_reference"):
-            continue
-        # Slot bindings (system/user_template/input_schema/output_schema)
-        # have dedicated rendering — skip them here to avoid duplication.
-        if b.get("slot"):
-            continue
-        if b["type"] not in ("document", "folder"):
-            continue
-        rendered = render_for_type(b["type"], b.get("blobs") or [])
-        heading = b.get("display_name") or b.get("resource_slug") or b["resource_id"]
-        body = rendered.get("text") or ""
-        if body:
-            entry = f"## {heading}\n\n{body}"
-            parts.append(entry)
-            # +2 for the "\n\n" separator joining entries
-            per_ref_chars.append({"label": heading, "chars": len(entry) + 2})
-        refs_meta.append(
-            {
-                "binding_id": b["binding_id"],
-                "resource_id": b["resource_id"],
-                "version_id": b["version_id"],
-                "display_name": b.get("display_name"),
-            }
-        )
-    if not parts:
-        return "", refs_meta, per_ref_chars
-    # Account for the "## References\n\n" header chars on the first entry.
-    if per_ref_chars:
-        per_ref_chars[0]["chars"] += len("## References\n\n")
-    return "## References\n\n" + "\n\n".join(parts), refs_meta, per_ref_chars
-
-
-def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
-    for b in resolved:
-        if b.get("slot") == slot and b.get("attach_as_reference"):
-            rendered = render_for_type(b["type"], b.get("blobs") or [])
-            return {
-                "binding_id": b["binding_id"],
-                "resource_id": b["resource_id"],
-                "version_id": b["version_id"],
-                "display_name": b.get("display_name"),
-                "content_hash": b["content_hash"],
-                "text": rendered.get("text") or "",
-            }
-    return None
 
 
 # --- prompt bindings (Plan 02) ---
@@ -223,95 +128,18 @@ def preview_prompt(
     body: PreviewPromptBody,
     store: Annotated[SessionStore, Depends(get_store)],
 ):
-    # Use posted bindings if provided, else live bindings.
-    if body.bindings is not None:
-        raw = [{**b.model_dump(), "id": f"preview-{i}"} for i, b in enumerate(body.bindings)]
-    else:
-        raw = store.list_prompt_bindings(agent_id)
-    resolved = [_resolve_binding_for_prompt(store, b) for b in raw]
-    # When a system slot binding is active, its rendered text replaces
-    # the posted template (which is the legacy on-disk prompt). This
-    # makes the preview match what BindingsBundleSource feeds the runner.
-    system_view = _schema_for_slot(resolved, "system")
-    template_text = (
-        system_view["text"] if system_view and system_view.get("text")
-        else body.template
+    override = (
+        [b.model_dump() for b in body.bindings] if body.bindings is not None else None
     )
-    # Only marker-style (non-slot) bindings participate in splicing.
-    splice_bindings = [b for b in resolved if b.get("marker") and b.get("mode")]
-    result = resolve_prompt(template_text, splice_bindings)
-
-    refs_text, refs_meta, per_ref_chars = _render_references_block(resolved)
-    base_prompt = result.rendered_prompt
-    composed = base_prompt
-
-    input_schema = _schema_for_slot(resolved, "input_schema")
-    output_schema = _schema_for_slot(resolved, "output_schema")
-    raw_text_output = output_schema is None
-
-    # Inline schemas via the same runtime helpers
-    # (core/composition/prompts/{input,output}_schema.md). Falls back to
-    # raw text if the schema is not valid JSON.
-    def _schema_block(slot: str, schema_view: dict | None) -> str:
-        if not schema_view or not schema_view.get("text"):
-            return ""
-        text = schema_view["text"]
-        try:
-            parsed = json.loads(text)
-        except (TypeError, ValueError):
-            parsed = None
-        if isinstance(parsed, dict):
-            if slot == "input_schema":
-                return _append_input_schema("", parsed)
-            return _append_schema("", parsed)
-        header = (
-            "# Input Format" if slot == "input_schema" else "# Required Output"
+    try:
+        return render_agent_prompt_preview(
+            store,
+            agent_id=agent_id,
+            template=body.template,
+            bindings_override=override,
         )
-        return f"{header}\n\n## JSON Schema\n\n```json\n{text}\n```"
-
-    input_schema_block = _schema_block("input_schema", input_schema)
-    if input_schema_block:
-        composed = composed.rstrip() + "\n\n" + input_schema_block
-
-    if refs_text:
-        composed = composed.rstrip() + "\n\n" + refs_text
-
-    output_schema_block = _schema_block("output_schema", output_schema)
-    if output_schema_block:
-        composed = composed.rstrip() + "\n\n" + output_schema_block
-
-    parts = [
-        {"label": "prompt template", "chars": len(base_prompt)},
-    ]
-    if input_schema_block:
-        parts.append({"label": "input_schema block", "chars": len(input_schema_block) + 2})
-    if refs_text:
-        parts.extend(per_ref_chars)
-    if output_schema_block:
-        parts.append({"label": "output_schema block", "chars": len(output_schema_block) + 2})
-
-    return {
-        "rendered_prompt": composed,
-        "unresolved_markers": result.unresolved_markers,
-        "warnings": result.warnings,
-        "references": refs_meta,
-        "input_schema": input_schema,
-        "output_schema": output_schema,
-        "raw_text_output": raw_text_output,
-        "char_breakdown": parts,
-        "total_chars": len(composed),
-        "snapshot": [
-            {
-                "binding_id": rb.binding_id,
-                "marker": rb.marker,
-                "resource_id": rb.resource_id,
-                "version_id": rb.version_id,
-                "content_hash": rb.content_hash,
-                "mode": rb.mode,
-            }
-            for rb in result.snapshot
-        ],
-    }
+    except PreviewError as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
 
 
 # --- workspace file bindings (Plan 03) ---

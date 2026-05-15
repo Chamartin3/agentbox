@@ -14,9 +14,11 @@ from agentbox.core.env_doc.renderers import AgentsMdRenderer, ClaudeMdRenderer
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.upload import UploadImporter
 from agentbox.core.resources.importers.zip_upload import ZipUploadImporter
-from agentbox.core.resources.prompt_resolver import resolve_prompt
+from agentbox.core.resources.prompt_preview import (
+    PreviewError,
+    render_agent_prompt_preview,
+)
 from agentbox.core.run_prep import (
-    resolve_agent_prompt_bindings,
     resolve_workspace_resources,
 )
 from agentbox.core.services.agents import resolve_agent
@@ -140,7 +142,7 @@ def register(mcp: FastMCP) -> None:
         result["version"] = version
         return result
 
-    @mcp.tool
+    @mcp.tool(timeout=30)
     def create_repo_resource_from_files(
         slug: str,
         type: str,
@@ -248,50 +250,228 @@ def register(mcp: FastMCP) -> None:
         return {"resource": resource, "version": version, "file_count": len(entries)}
 
     @mcp.tool
+    def get_prompt_resources(agent_id: str) -> dict:
+        """List the prompt resource bindings currently attached to an agent.
+
+        Each item includes the binding id (use it for ``unbind_prompt_resource``),
+        marker, mode, slot, ``attach_as_reference`` flag, pinned version, and
+        enriched resource metadata (slug, type, display_name, active_version_id).
+        Mirrors ``GET /api/agents/{agent_id}/prompt-resources``."""
+        ctx = get_context()
+        rows = ctx.store.list_prompt_bindings(agent_id)
+        enriched: list[dict] = []
+        for b in rows:
+            resource = ctx.store.get_repo_resource(b["resource_id"])
+            active = (
+                ctx.store.get_active_repo_version(b["resource_id"]) if resource else None
+            )
+            enriched.append(
+                {
+                    **b,
+                    "attach_as_reference": bool(b.get("attach_as_reference")),
+                    "resource_slug": resource["slug"] if resource else None,
+                    "resource_type": resource["type"] if resource else None,
+                    "resource_display_name": resource["display_name"] if resource else None,
+                    "active_version_id": active["id"] if active else None,
+                }
+            )
+        return {"agent_id": agent_id, "items": enriched, "count": len(enriched)}
+
+    @mcp.tool
     def set_prompt_resources(
         agent_id: str,
         bindings: list[dict],
         reason: str,
     ) -> dict:
-        """Replace all prompt resource bindings for an agent.
+        """Replace all prompt resource bindings for an agent (atomic).
 
-        Each binding: {marker: str, resource_id: str, mode: 'embed'|'attach'}
-        ``reason`` is stored as changelog; must be ≥ 3 chars."""
+        Each binding: ``{resource_id, marker?, mode?, slot?,
+        attach_as_reference?, pinned_version_id?, required?, display_order?}``.
+        Pass an empty list to clear all bindings. ``reason`` ≥ 3 chars.
+
+        For incremental edits prefer ``bind_prompt_resource`` /
+        ``unbind_prompt_resource`` so you don't have to re-send the full list."""
         err = _require_reason(reason)
         if err:
             return err
         ctx = get_context()
-        rows = ctx.store.replace_prompt_bindings(agent_id, bindings, reason=reason)
-        return {"agent_id": agent_id, "bindings": rows}
+        try:
+            rows = ctx.store.replace_prompt_bindings(agent_id, bindings, reason=reason)
+        except ValueError as exc:
+            return {"error": "invalid_binding", "detail": str(exc)}
+        return {"agent_id": agent_id, "bindings": rows, "count": len(rows)}
+
+    @mcp.tool
+    def bind_prompt_resource(
+        agent_id: str,
+        resource_id: str,
+        reason: str,
+        marker: str | None = None,
+        mode: str | None = None,
+        slot: str | None = None,
+        attach_as_reference: bool = False,
+        pinned_version_id: str | None = None,
+        required: bool = True,
+        display_order: int | None = None,
+    ) -> dict:
+        """Attach a single resource to an agent's prompt (incremental).
+
+        Reads the current bindings, appends one, and writes the set back
+        atomically. ``reason`` ≥ 3 chars.
+
+        Provide ``marker`` + ``mode`` for splice bindings, ``slot`` for
+        system/user_template/input_schema/output_schema bindings, or
+        neither (with ``attach_as_reference=True``) for a reference-only
+        binding appended under ``## References``."""
+        err = _require_reason(reason)
+        if err:
+            return err
+        ctx = get_context()
+        current = ctx.store.list_prompt_bindings(agent_id)
+        existing = [
+            {
+                "resource_id": b["resource_id"],
+                "marker": b.get("marker"),
+                "mode": b.get("mode"),
+                "slot": b.get("slot"),
+                "attach_as_reference": bool(b.get("attach_as_reference")),
+                "pinned_version_id": b.get("pinned_version_id"),
+                "required": bool(b.get("required", 1)),
+                "display_order": int(b.get("display_order", 0)),
+            }
+            for b in current
+        ]
+        next_order = (
+            display_order
+            if display_order is not None
+            else (max((b["display_order"] for b in existing), default=-1) + 1)
+        )
+        new_binding = {
+            "resource_id": resource_id,
+            "marker": marker,
+            "mode": mode,
+            "slot": slot,
+            "attach_as_reference": attach_as_reference,
+            "pinned_version_id": pinned_version_id,
+            "required": required,
+            "display_order": next_order,
+        }
+        try:
+            rows = ctx.store.replace_prompt_bindings(
+                agent_id, [*existing, new_binding], reason=reason
+            )
+        except ValueError as exc:
+            return {"error": "invalid_binding", "detail": str(exc)}
+        added = next(
+            (
+                r
+                for r in rows
+                if r["resource_id"] == resource_id
+                and r.get("marker") == new_binding["marker"]
+                and r.get("slot") == new_binding["slot"]
+                and int(r.get("display_order", -1)) == next_order
+            ),
+            None,
+        )
+        return {
+            "agent_id": agent_id,
+            "added": added,
+            "bindings": rows,
+            "count": len(rows),
+        }
+
+    @mcp.tool
+    def unbind_prompt_resource(
+        agent_id: str,
+        reason: str,
+        binding_id: str | None = None,
+        resource_id: str | None = None,
+        marker: str | None = None,
+        slot: str | None = None,
+    ) -> dict:
+        """Detach prompt resource binding(s) from an agent (incremental).
+
+        Identify what to remove by EITHER ``binding_id`` (most specific)
+        OR a filter of ``resource_id`` / ``marker`` / ``slot`` (any
+        combination — all provided fields must match). At least one
+        identifier is required. ``reason`` ≥ 3 chars."""
+        err = _require_reason(reason)
+        if err:
+            return err
+        if not any([binding_id, resource_id, marker, slot]):
+            return {
+                "error": "invalid_request",
+                "detail": "provide binding_id, or any of resource_id/marker/slot",
+            }
+        ctx = get_context()
+        current = ctx.store.list_prompt_bindings(agent_id)
+
+        def _matches(b: dict) -> bool:
+            if binding_id is not None:
+                return b["id"] == binding_id
+            if resource_id is not None and b["resource_id"] != resource_id:
+                return False
+            if marker is not None and b.get("marker") != marker:
+                return False
+            return not (slot is not None and b.get("slot") != slot)
+
+        removed = [b for b in current if _matches(b)]
+        if not removed:
+            return {"error": "not_found", "agent_id": agent_id, "removed": []}
+
+        keep = [
+            {
+                "resource_id": b["resource_id"],
+                "marker": b.get("marker"),
+                "mode": b.get("mode"),
+                "slot": b.get("slot"),
+                "attach_as_reference": bool(b.get("attach_as_reference")),
+                "pinned_version_id": b.get("pinned_version_id"),
+                "required": bool(b.get("required", 1)),
+                "display_order": int(b.get("display_order", 0)),
+            }
+            for b in current
+            if not _matches(b)
+        ]
+        try:
+            rows = ctx.store.replace_prompt_bindings(agent_id, keep, reason=reason)
+        except ValueError as exc:
+            return {"error": "invalid_binding", "detail": str(exc)}
+        return {
+            "agent_id": agent_id,
+            "removed": [{"binding_id": b["id"], "resource_id": b["resource_id"],
+                          "marker": b.get("marker"), "slot": b.get("slot")} for b in removed],
+            "bindings": rows,
+            "count": len(rows),
+        }
 
     @mcp.tool
     def preview_prompt(
         agent_id: str,
         template_override: str | None = None,
     ) -> dict:
-        """Render the agent's system prompt with resource bindings substituted.
+        """Render the agent's fully composed prompt with all bindings applied.
 
-        Returns the rendered text plus any unresolved markers."""
+        Returns the final ``rendered_prompt`` plus a ``char_breakdown``
+        showing how many characters each piece contributes (base template,
+        each appended reference, input/output schema blocks), plus a
+        ``snapshot`` of every resolved binding (resource_id, version_id,
+        content_hash, chars). Use ``template_override`` to preview with a
+        candidate prompt body instead of the agent's current one."""
         ctx = get_context()
-        bindings = resolve_agent_prompt_bindings(ctx.store, agent_id)
-
-        if template_override:
-            template = template_override
-        else:
+        if template_override is None:
             agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
             if agent is None:
                 return {"error": "agent_not_found", "agent_id": agent_id}
             template = agent.prompt or ""
-
-        if not bindings:
-            return {"rendered_prompt": template, "unresolved_markers": [], "resolved_count": 0}
-
-        resolution = resolve_prompt(template, bindings)
-        return {
-            "rendered_prompt": resolution.rendered_prompt,
-            "unresolved_markers": resolution.unresolved_markers,
-            "resolved_count": len(resolution.resolved_markers),
-        }
+        else:
+            template = template_override
+        try:
+            return render_agent_prompt_preview(
+                ctx.store, agent_id=agent_id, template=template
+            )
+        except PreviewError as exc:
+            return {"error": exc.code, "detail": exc.detail}
 
     @mcp.tool
     def set_workspace_resources(

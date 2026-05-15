@@ -104,6 +104,13 @@ class BindingsBundleSource:
     store: Any  # SessionStore — avoid circular import
     composition: dict[str, Any] = field(init=False)
 
+    # Files attached to the active agent_version row (relative_path → content).
+    # Populated when falling back to ``agent_versions`` for the system prompt
+    # so the composer can read schemas declared in agent.toml's
+    # ``[composition].output_schema`` / ``input_schema`` paths without
+    # requiring an explicit slot binding.
+    _av_files: dict[str, str] = field(init=False, default_factory=dict)
+
     def __post_init__(self) -> None:
         # Resolve once; downstream methods reuse the same view so we
         # don't re-query for every read_*.
@@ -180,6 +187,22 @@ class BindingsBundleSource:
             if isinstance(cfg, dict):
                 self._av_config = cfg
 
+            # Load version files so schemas declared in agent.toml
+            # ([composition].output_schema = "output_schema.json") can be
+            # resolved from the active agent_version row when no explicit
+            # output_schema binding exists. Production stores these via
+            # POST /agents/{id}/versions/{v}/files.
+            try:
+                version_id = av.get("id") if isinstance(av, dict) else None
+                if version_id is not None:
+                    self._av_files = {
+                        row["relative_path"]: row["content"]
+                        for row in self.store.list_version_files(version_id)
+                        if row.get("relative_path")
+                    }
+            except Exception:
+                self._av_files = {}
+
         # Synthesize a composition dict so the existing composer
         # branches (which check ``composition['user_template']`` etc.)
         # continue to work without a special case.
@@ -188,9 +211,15 @@ class BindingsBundleSource:
             comp["system"] = _SYS_PSEUDO
         if self._find_user_template() is not None:
             comp["user_template"] = _USER_PSEUDO
-        if self._find_active_slot("input_schema") is not None:
+        if (
+            self._find_active_slot("input_schema") is not None
+            or self._av_schema_path("input_schema") is not None
+        ):
             comp["input_schema"] = _INPUT_SCHEMA_PSEUDO
-        if self._find_active_slot("output_schema") is not None:
+        if (
+            self._find_active_slot("output_schema") is not None
+            or self._av_schema_path("output_schema") is not None
+        ):
             comp["output_schema"] = _OUTPUT_SCHEMA_PSEUDO
         comp["references"] = [
             {
@@ -284,10 +313,38 @@ class BindingsBundleSource:
                 return self._render_blob_text(b)
         raise FileNotFoundError(f"Reference not found in bindings: {ref.path!r}")
 
+    def _av_schema_path(self, slot: str) -> str | None:
+        """Return the schema path declared in the agent_version's
+        composition snapshot (TOML-shaped), when the schema file is also
+        present in ``agent_version_files``. Acts as the DB-side analogue
+        of reading ``output_schema.json`` from the bundle on disk."""
+        comp = self._av_config.get("composition") if isinstance(self._av_config, dict) else None
+        if not isinstance(comp, dict):
+            return None
+        path = comp.get(slot)
+        if not isinstance(path, str) or not path:
+            return None
+        return path if path in self._av_files else None
+
     def _read_schema_slot(self, slot: str) -> OutputSchemaInfo | None:
         b = self._find_active_slot(slot)
         if b is None:
-            return None
+            path = self._av_schema_path(slot)
+            if path is None:
+                return None
+            text = self._av_files[path]
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"agent {self.agent_id!r} {slot} file {path!r} is not valid JSON: {exc}"
+                ) from exc
+            return OutputSchemaInfo(
+                schema=parsed,
+                relative_path=(
+                    _INPUT_SCHEMA_PSEUDO if slot == "input_schema" else _OUTPUT_SCHEMA_PSEUDO
+                ),
+            )
         text = self._render_blob_text(b)
         try:
             parsed = json.loads(text)

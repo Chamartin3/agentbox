@@ -77,7 +77,7 @@ class TestSetPromptResources:
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_prompt_resources")
             result = fn("ag1", [], "add first binding")
-        assert result == {"agent_id": "ag1", "bindings": []}
+        assert result == {"agent_id": "ag1", "bindings": [], "count": 0}
         ctx.store.replace_prompt_bindings.assert_called_once_with("ag1", [], reason="add first binding")
 
 
@@ -95,21 +95,24 @@ class TestPreviewPrompt:
         # fallback). Stub both sides so the resolver returns this agent.
         ctx.store.get_agent_def.return_value = agent
         ctx.loader.get.return_value = agent
-        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx), \
-             patch("agentbox.mcp_server.tools.resources.resolve_agent_prompt_bindings", return_value=[]):
+        ctx.store.list_prompt_bindings.return_value = []
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "preview_prompt")
             result = fn("ag1")
-        assert result["rendered_prompt"] == "Hello {{resource:foo}}"
-        assert result["unresolved_markers"] == []
+        # Unresolved markers are stripped from the rendered text and surfaced.
+        assert result["rendered_prompt"] == "Hello "
+        assert result["unresolved_markers"] == ["foo"]
+        assert result["snapshot"] == []
+        assert result["total_chars"] == len("Hello ")
+        assert result["char_breakdown"][0]["label"] == "prompt template"
 
     def test_agent_not_found(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
         # Both DB and manifest must miss for resolve_agent to return None.
         ctx.store.get_agent_def.return_value = None
         ctx.loader.get.return_value = None
-        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx), \
-             patch("agentbox.mcp_server.tools.resources.resolve_agent_prompt_bindings", return_value=[{"marker": "x"}]):
+        with patch("agentbox.mcp_server.tools.resources.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "preview_prompt")
             result = fn("missing")

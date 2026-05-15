@@ -9,11 +9,11 @@ import {
 } from 'recharts';
 
 interface Props {
-  data: Array<{ version: number; runs: number; tokens: number }>;
+  data?: Array<{ version: number; runs: number; tokens: number }> | null;
 }
 
 export default function VersionBar({ data }: Props) {
-  const rows = data.map((d) => ({ ...d, label: `v${d.version}` }));
+  const rows = (data ?? []).map((d) => ({ ...d, label: `v${d.version}` }));
   return (
     <div className="chart-box">
       <h4>Runs by Version</h4>

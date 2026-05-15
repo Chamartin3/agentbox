@@ -10,6 +10,7 @@ from pathlib import Path
 from agentbox.api.events import DoneEvent, RunEvent, TextEvent
 from agentbox.config import Settings
 from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.validation import validate_output as _validate_output_default
 from agentbox.core.data import SessionStore
 from agentbox.core.definitions import DefinitionLoader
 from agentbox.core.executor import RunExecutor
@@ -35,6 +36,9 @@ class _EchoAdapter:
         text = input.split("\n\n# Required Output", 1)[0]
         yield TextEvent(run_id=run_id, text=text)
         yield DoneEvent(run_id=run_id, ok=True)
+
+    def validate_output(self, agent, workdir, output, *, project_root=None):
+        return _validate_output_default(agent, workdir, output, project_root=project_root)
 
 
 def _settings(tmp_path: Path) -> Settings:
@@ -66,6 +70,32 @@ def _executor(tmp_path: Path) -> RunExecutor:
     return RunExecutor(store, settings, DefinitionLoader(settings.project_root))
 
 
+def _seed_active_version(
+    store: SessionStore,
+    agent_id: str,
+    prompt: str,
+    composition: dict | None = None,
+    files: list[dict] | None = None,
+) -> None:
+    """DB-as-source-of-truth: seed an active agent_versions row with
+    ``prompt_content`` (and optional composition snapshot + version
+    files) so the composer's BindingsBundleSource can resolve the
+    system prompt and output_schema without explicit slot bindings."""
+    config_json = json.dumps({"composition": composition}) if composition else None
+    version = store.create_version(
+        agent_id=agent_id,
+        source_path=f"agents/{agent_id}/agent.toml",
+        source_format="toml",
+        content_snapshot="",
+        prompt_snapshot=prompt,
+        content_hash="test",
+        prompt_content=prompt,
+        config_json=config_json,
+        files=files or [],
+    )
+    store.activate_version(agent_id, version["id"])
+
+
 def _write_bundle(tmp_path: Path) -> Path:
     bundle = tmp_path / "agents" / "test.agent"
     bundle.mkdir(parents=True)
@@ -92,6 +122,33 @@ def _write_bundle(tmp_path: Path) -> Path:
     return bundle
 
 
+_SCHEMA_FILE = {
+    "relative_path": "output_schema.json",
+    "kind": "other",
+    "content": json.dumps(
+        {
+            "type": "object",
+            "properties": {"result": {"type": "string"}},
+            "required": ["result"],
+        }
+    ),
+}
+_COMPOSITION = {
+    "system_prompt": "prompts/system.md",
+    "output_schema": "output_schema.json",
+}
+
+
+def _seed_test_agent(store: SessionStore) -> None:
+    _seed_active_version(
+        store,
+        "test.agent",
+        prompt="You are {role}.",
+        composition=_COMPOSITION,
+        files=[_SCHEMA_FILE],
+    )
+
+
 class TestValidationModes:
     def test_strict_mode_fails_on_invalid_output(
         self, tmp_path: Path, monkeypatch
@@ -104,6 +161,7 @@ class TestValidationModes:
         loader = DefinitionLoader(tmp_path)
         agent = loader.get("test.agent")
         assert agent is not None
+        _seed_test_agent(executor.store)
         # Ensure strict mode
         agent = agent.model_copy(
             update={
@@ -149,6 +207,7 @@ class TestValidationModes:
         loader = DefinitionLoader(tmp_path)
         agent = loader.get("test.agent")
         assert agent is not None
+        _seed_test_agent(executor.store)
         agent = agent.model_copy(
             update={
                 "composition": agent.composition.model_copy(
@@ -187,6 +246,7 @@ class TestValidationModes:
         loader = DefinitionLoader(tmp_path)
         agent = loader.get("test.agent")
         assert agent is not None
+        _seed_test_agent(executor.store)
         agent = agent.model_copy(
             update={
                 "composition": agent.composition.model_copy(
@@ -224,6 +284,7 @@ class TestValidationModes:
         loader = DefinitionLoader(tmp_path)
         agent = loader.get("test.agent")
         assert agent is not None
+        _seed_test_agent(executor.store)
         # Allow one retry
         agent = agent.model_copy(
             update={
@@ -267,6 +328,7 @@ class TestValidationModes:
         loader = DefinitionLoader(tmp_path)
         agent = loader.get("test.agent")
         assert agent is not None
+        _seed_test_agent(executor.store)
         agent = agent.model_copy(
             update={
                 "composition": agent.composition.model_copy(

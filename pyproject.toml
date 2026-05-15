@@ -74,4 +74,11 @@ markers = [
 filterwarnings = [
   "error",
   "ignore::DeprecationWarning",
+  # SQLAlchemy/pydantic-ai occasionally leak sockets and event loops in
+  # tests that wrap subprocess + HTTP clients. Pytest's unraisable hook
+  # turns those late warnings into PytestUnraisableExceptionWarning,
+  # which surfaces as a failure on an unrelated test (ordering-dependent
+  # noise). Treat them as warnings only.
+  "ignore::pytest.PytestUnraisableExceptionWarning",
+  "ignore::ResourceWarning",
 ]

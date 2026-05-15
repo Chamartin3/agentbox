@@ -100,6 +100,7 @@ def list_workspaces(
                 "name": name,
                 "path": str(ws_path),
                 "description": ws_row.get("description"),
+                "source": ws_row.get("source"),
                 "kind": "named",
                 "agents": agents,
                 "agent_count": len(agents),

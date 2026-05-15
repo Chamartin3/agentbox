@@ -214,6 +214,33 @@ def _ingest_runner_profile(
         )
 
 
+def _collect_version_files(agent: AgentDef) -> list[dict] | None:
+    """Snapshot bundle files referenced by composition (schemas, etc.)
+    into agent_version_files so the composer can resolve them from the
+    active version row without re-reading disk."""
+    if agent.composition is None or agent.source_path is None:
+        return None
+    bundle_dir = agent.source_path.parent
+    files: list[dict] = []
+    for slot in ("output_schema", "input_schema", "user_template"):
+        rel = getattr(agent.composition, slot, None)
+        if not rel:
+            continue
+        p = bundle_dir / rel
+        if not p.is_file():
+            continue
+        try:
+            content = p.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        files.append({
+            "relative_path": rel,
+            "kind": slot if slot != "user_template" else "user_template",
+            "content": content,
+        })
+    return files or None
+
+
 def startup_sweep(
     agents: list[AgentDef],
     store: AgentVersionsMixin,
@@ -238,6 +265,13 @@ def startup_sweep(
             _heal_active_pointer(agent.id, store)
             if status == AgentDriftStatus.NEW:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
+                prompt_text = (
+                    agent.load_prompt(
+                        agent.source_path.parent if agent.source_path else Path()
+                    )
+                    if hasattr(agent, "load_prompt") and agent.source_path
+                    else ""
+                )
                 store.create_version(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
@@ -245,15 +279,13 @@ def startup_sweep(
                         agent.source_format.value if agent.source_format else "unknown"
                     ),
                     content_snapshot=_build_snapshot(agent),
-                    prompt_snapshot=agent.load_prompt(
-                        agent.source_path.parent if agent.source_path else Path()
-                    )
-                    if hasattr(agent, "load_prompt") and agent.source_path
-                    else "",
+                    prompt_snapshot=prompt_text,
                     content_hash=file_hash,
                     author="filesystem",
                     changelog="initial import",
-                    files=None,
+                    prompt_content=prompt_text or None,
+                    config_json=_build_config_json(agent),
+                    files=_collect_version_files(agent),
                 )
                 logger.info("versioning: created v1 for new agent %r", agent.id)
                 # Import runner profile if agent has [runner] block

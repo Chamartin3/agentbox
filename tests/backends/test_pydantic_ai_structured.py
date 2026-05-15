@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -123,14 +124,19 @@ class TestTokenBackendRender:
             description="t",
             runner=RunnerSpec(
                 kind="token",
-                model="openai:gpt-4o",
                 output_schema_path="output_schema.json",
-                timeout_seconds=60,
             ),
         )
 
         backend = TokenBackend()
-        rendered = backend.render(agent, tmp_path)
+        rendered = backend.render(
+            agent,
+            tmp_path,
+            runner_config=SimpleNamespace(
+                model="openai:gpt-4o",
+                timeout_seconds=60,
+            ),
+        )
 
         assert rendered.agent_meta["model"] == "openai:gpt-4o"
         assert rendered.agent_meta["output_schema"] == schema

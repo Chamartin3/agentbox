@@ -177,17 +177,26 @@ async def test_missing_api_key_still_emits_done_error() -> None:
     assert "AGENTBOX_MISSING_KEY" in (events[-1].error or "")
 
 
-def test_role_filter_in_executor_does_not_include_system_or_user_text_in_output() -> None:
-    executor = object.__new__(RunExecutor)
-    executor.store = SimpleNamespace(record_usage=lambda *args, **kwargs: None)
-    output_text: list[str] = []
+def test_role_filter_in_session_does_not_include_system_or_user_text_in_output() -> None:
+    """System/user TextEvents are transcribed + broadcast but not added to
+    the run output — only assistant turns contribute to ``output_text``.
+    Logic lives on ``RunStreamSession.emit`` post-Plan 16."""
+    from agentbox.core.streaming.session import RunStreamSession
+
     tf = StringIO()
+    broadcaster = SimpleNamespace(publish=lambda ev: None)
+    session = RunStreamSession(
+        run_id="rid",
+        broadcaster=broadcaster,
+        transcript_path=Path("/dev/null"),
+    )
+    session._transcript_fh = tf
 
-    executor._handle_event("rid", TextEvent(run_id="rid", role="system", text="sys"), output_text, tf)
-    executor._handle_event("rid", TextEvent(run_id="rid", role="user", text="usr"), output_text, tf)
-    executor._handle_event("rid", TextEvent(run_id="rid", role="assistant", text="out"), output_text, tf)
+    session.emit(TextEvent(run_id="rid", role="system", text="sys"))
+    session.emit(TextEvent(run_id="rid", role="user", text="usr"))
+    session.emit(TextEvent(run_id="rid", role="assistant", text="out"))
 
-    assert output_text == ["out"]
+    assert session.output_text == ["out"]
     assert '"role":"system"' in tf.getvalue()
     assert '"role":"user"' in tf.getvalue()
 

@@ -64,8 +64,17 @@ class OpenCodeBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
     ) -> RenderedConfig:
-        extra_args = list(getattr(runner_config, "extra_args", None) or [])
-        model = getattr(runner_config, "model", None) or self.default_model
+        agent_runner = getattr(agent, "runner", None)
+        extra_args = list(
+            getattr(runner_config, "extra_args", None)
+            or getattr(agent_runner, "extra_args", None)
+            or []
+        )
+        model = (
+            getattr(runner_config, "model", None)
+            or getattr(agent_runner, "model", None)
+            or self.default_model
+        )
 
         argv: list[str] = [
             "opencode",
@@ -83,6 +92,7 @@ class OpenCodeBackend(BackendAdapter):
 
         timeout_seconds = (
             getattr(runner_config, "timeout_seconds", None)
+            or getattr(agent_runner, "timeout_seconds", None)
             or DEFAULT_RUNNER_TIMEOUT_SECONDS
         )
 

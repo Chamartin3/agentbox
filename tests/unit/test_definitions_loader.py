@@ -21,15 +21,14 @@ def test_missing_manifest_returns_empty(tmp_path: Path) -> None:
     assert m.workspaces == []
 
 
-def test_markdown_only_agent_auto_discovered(tmp_path: Path) -> None:
-    """An agent dir with only prompts/system.md becomes a default token agent."""
+def test_markdown_only_agent_not_auto_discovered(tmp_path: Path) -> None:
+    """A directory with only prompts/system.md but no agent.toml is NOT
+    treated as an agent — see agents_dir._load_legacy_dir_agent docstring.
+    With DB as source of truth, bare directories must not spawn ghost
+    manifest rows."""
     _write(tmp_path / "agents" / "writer" / "prompts" / "system.md", "be helpful")
     m = DefinitionLoader(tmp_path).load()
-    assert [a.id for a in m.agents] == ["writer"]
-    agent = m.agents[0]
-    assert agent.runner.kind == RunnerKind.TOKEN
-    assert agent.workspace == "default"
-    assert agent.prompt_path is not None and agent.prompt_path.endswith("system.md")
+    assert m.agents == []
 
 
 def test_agent_toml_overrides_defaults(tmp_path: Path) -> None:

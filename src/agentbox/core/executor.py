@@ -1267,7 +1267,8 @@ class RunExecutor:
                         break
 
                     # --- Validation retry (output schema check) -----------
-                    if has_schema:
+                    mode = getattr(agent, "_composed_validation_mode", "strict")
+                    if has_schema and mode != "off":
                         result = adapter.validate_output(
                             agent,
                             workdir,
@@ -1275,7 +1276,6 @@ class RunExecutor:
                             project_root=self.settings.project_root,
                         )
                         schema_validated_via = result.engine
-                        mode = getattr(agent, "_composed_validation_mode", "strict")
                         session.emit_validation(
                             ok=result.ok,
                             attempt=attempt + 1,

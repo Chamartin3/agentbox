@@ -104,7 +104,7 @@ export interface RunsStats {
     tokens: number;
     cost_usd: number;
   }>;
-  by_version: Array<{
+  by_version?: Array<{
     version: number;
     runs: number;
     tokens: number;

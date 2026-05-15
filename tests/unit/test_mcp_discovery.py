@@ -12,8 +12,17 @@ from unittest.mock import patch
 
 
 def _run(coro):  # type: ignore[no-untyped-def]
-    """Run a coroutine in a fresh event loop."""
-    return asyncio.get_event_loop().run_until_complete(coro)
+    """Run a coroutine in a fresh event loop.
+
+    Use a dedicated loop (created+closed inside this helper) instead of
+    ``asyncio.get_event_loop()`` so the loop is guaranteed to be closed
+    before the test exits — otherwise pytest's unraisable collection
+    surfaces ResourceWarnings from leftover loops in later tests."""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 # ---------------------------------------------------------------------------
