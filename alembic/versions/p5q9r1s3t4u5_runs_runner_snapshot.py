@@ -23,6 +23,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    existing = {row[1] for row in bind.exec_driver_sql("PRAGMA table_info(runs)").fetchall()}
+    if "runner_snapshot" in existing:
+        return
     with op.batch_alter_table("runs") as batch:
         batch.add_column(sa.Column("runner_snapshot", sa.String(), nullable=True))
 
