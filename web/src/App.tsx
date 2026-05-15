@@ -30,6 +30,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<ActivityPage />} />
           <Route path="/runs" element={<RunsPage />} />
+          <Route path="/runs/profiles" element={<RunsPage />} />
           <Route path="/runs/:id" element={<RunDetailPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/agents/new" element={<AgentNew />} />
@@ -46,13 +47,13 @@ export default function App() {
 
           {/* Settings (providers/runners are a sub-section). */}
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/settings/providers" element={<SettingsPage />} />
           <Route path="/settings/base" element={<SettingsPage />} />
           <Route path="/settings/api-tokens" element={<SettingsPage />} />
 
           {/* Legacy redirects (one-release grace period). */}
-          <Route path="/runners" element={<Navigate to="/settings/providers" replace />} />
-          <Route path="/runner-profiles" element={<Navigate to="/settings/providers" replace />} />
+          <Route path="/runners" element={<Navigate to="/runs/profiles" replace />} />
+          <Route path="/runner-profiles" element={<Navigate to="/runs/profiles" replace />} />
+          <Route path="/settings/providers" element={<Navigate to="/runs/profiles" replace />} />
           <Route path="/resources" element={<Navigate to="/workspaces/resources" replace />} />
           <Route path="/resources/:id" element={<LegacyResourceRedirect />} />
         </Routes>

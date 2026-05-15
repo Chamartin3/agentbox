@@ -17,6 +17,19 @@ interface ConversationMessage {
   fromDelta?: boolean;
 }
 
+function prettyExcerpt(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v, null, 2); } catch { return String(v); }
+  }
+  const s = String(v);
+  const trimmed = s.trim();
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { /* not valid JSON */ }
+  }
+  return s;
+}
+
 function fmtDt(iso: string | null | undefined): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -26,31 +39,49 @@ function fmtDt(iso: string | null | undefined): string {
 function buildConversation(events: StreamEvent[]): ConversationMessage[] {
   const msgs: ConversationMessage[] = [];
   let pendingToolCalls: StreamEvent[] = [];
+  const thinkingBuf: { texts: string[]; firstTs?: string } = { texts: [] };
+
+  const flushThinking = () => {
+    if (thinkingBuf.texts.length === 0) return;
+    const joined = thinkingBuf.texts.join('').trim();
+    const ts = thinkingBuf.firstTs;
+    msgs.push({
+      id: `${msgs.length}-thinking`,
+      role: 'meta',
+      ts,
+      content: (
+        <details className="conversation-thinking">
+          <summary className="conversation-thinking-header">
+            <span className="conversation-role">thinking</span>
+            <span className="dim">{joined.length} chars</span>
+          </summary>
+          <pre className="conversation-thinking-body">{joined}</pre>
+        </details>
+      ),
+    });
+    thinkingBuf.texts = [];
+    thinkingBuf.firstTs = undefined;
+  };
 
   for (const ev of events) {
     const t = String(ev.type || '');
     const ts = typeof ev.ts === 'string' ? ev.ts : undefined;
 
-    switch (t) {
-      case 'thinking': {
-        const text = String(ev.text || '');
-        if (!text.trim()) continue;
-        msgs.push({
-          id: `${msgs.length}-thinking`,
-          role: 'meta',
-          ts,
-          content: (
-            <details className="conversation-thinking">
-              <summary className="conversation-thinking-header">
-                <span className="conversation-role">thinking</span>
-                <span className="dim">{text.length} chars</span>
-              </summary>
-              <pre className="conversation-thinking-body">{text}</pre>
-            </details>
-          ),
-        });
-        break;
+    // Group consecutive thinking events (across interleaved usage/log noise too)
+    // so the conversation stays readable. Non-noise events flush the buffer.
+    if (t === 'thinking') {
+      const text = String(ev.text || '');
+      if (text.trim()) {
+        if (thinkingBuf.texts.length === 0) thinkingBuf.firstTs = ts;
+        thinkingBuf.texts.push(text);
       }
+      continue;
+    }
+    if (t !== 'usage' && t !== 'log') {
+      flushThinking();
+    }
+
+    switch (t) {
       case 'text': {
         const role = String(ev.role || 'assistant');
         const text = String(ev.text || '');
@@ -111,13 +142,13 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
               {matched?.arguments !== undefined && matched?.arguments !== null && (
                 <details>
                   <summary className="dim" style={{ fontSize: 11, cursor: 'pointer' }}>arguments</summary>
-                  <pre style={{ fontSize: 11, margin: '4px 0 0' }}>{JSON.stringify(matched.arguments, null, 2) ?? ''}</pre>
+                  <pre style={{ fontSize: 11, margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{prettyExcerpt(matched.arguments)}</pre>
                 </details>
               )}
               {ev.result_excerpt !== undefined && ev.result_excerpt !== null && (
                 <details>
                   <summary className="dim" style={{ fontSize: 11, cursor: 'pointer' }}>result</summary>
-                  <pre style={{ fontSize: 11, margin: '4px 0 0' }}>{String(ev.result_excerpt)}</pre>
+                  <pre style={{ fontSize: 11, margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{prettyExcerpt(ev.result_excerpt)}</pre>
                 </details>
               )}
             </div>
@@ -280,6 +311,8 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
     }
   }
 
+  flushThinking();
+
   // Flush any unmatched tool calls
   for (const tc of pendingToolCalls) {
     msgs.push({
@@ -323,7 +356,7 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
                   {m.ts && <span className="conversation-ts">{fmtDt(m.ts)}</span>}
                 </div>
                 <div className="conversation-turn-body">
-                  <pre className="conversation-text">{String(m.content)}</pre>
+                  <pre className="conversation-text">{typeof m.content === 'string' ? prettyExcerpt(m.content) : m.content}</pre>
                 </div>
               </div>
             );
