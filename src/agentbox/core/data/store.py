@@ -134,6 +134,7 @@ class _CoreStore:
             ("runs", "runner_snapshot", "TEXT"),
             ("prompt_versions", "content_hash", "TEXT"),
             ("agent_meta", "deleted_at", "TEXT"),
+            ("runner_profiles", "output_mode", "TEXT NOT NULL DEFAULT 'auto'"),
         ]
         with self.engine.begin() as conn:
             for table, col, col_type in _add_column_if_missing:
@@ -161,6 +162,7 @@ class _CoreStore:
                         timeout_seconds INTEGER,
                         base_url TEXT,
                         api_key_env TEXT,
+                        output_mode TEXT NOT NULL DEFAULT 'auto',
                         params_json TEXT NOT NULL DEFAULT '{}',
                         headers_json TEXT NOT NULL DEFAULT '{}',
                         extra_args_json TEXT NOT NULL DEFAULT '[]',

@@ -32,6 +32,7 @@ class RunnerProfile(BaseModel):
     base_url: str | None = None
     api_key_env: str | None = None
     api_token_id: str | None = None
+    output_mode: str = "auto"
     params: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     extra_args: list[str] = Field(default_factory=list)
@@ -54,6 +55,7 @@ class RunnerProfileCreate(BaseModel):
     base_url: str | None = None
     api_key_env: str | None = None
     api_token_id: str | None = None
+    output_mode: str = "auto"
     params: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
     extra_args: list[str] = Field(default_factory=list)
@@ -73,6 +75,7 @@ class RunnerProfilePatch(BaseModel):
     base_url: str | None = None
     api_key_env: str | None = None
     api_token_id: str | None = None
+    output_mode: str | None = None
     params: dict[str, Any] | None = None
     headers: dict[str, str] | None = None
     extra_args: list[str] | None = None
@@ -128,6 +131,7 @@ def _row_to_profile(row: Row) -> RunnerProfile:
         base_url=m.get("base_url"),
         api_key_env=m.get("api_key_env"),
         api_token_id=m.get("api_token_id"),
+        output_mode=m.get("output_mode") or "auto",
         params=_json.loads(m.get("params_json") or "{}"),
         headers=_json.loads(m.get("headers_json") or "{}"),
         extra_args=_json.loads(m.get("extra_args_json") or "[]"),
@@ -187,6 +191,7 @@ class RunnerProfilesMixin:
                     base_url=data.base_url,
                     api_key_env=data.api_key_env,
                     api_token_id=data.api_token_id,
+                    output_mode=data.output_mode,
                     params_json=_json.dumps(data.params),
                     headers_json=_json.dumps(data.headers),
                     extra_args_json=_json.dumps(data.extra_args),
@@ -207,6 +212,7 @@ class RunnerProfilesMixin:
             timeout_seconds=data.timeout_seconds,
             base_url=data.base_url,
             api_key_env=data.api_key_env,
+            output_mode=data.output_mode,
             params=data.params,
             headers=data.headers,
             extra_args=data.extra_args,
@@ -279,6 +285,8 @@ class RunnerProfilesMixin:
             values["base_url"] = patch.base_url
         if patch.api_key_env is not None:
             values["api_key_env"] = patch.api_key_env
+        if patch.output_mode is not None:
+            values["output_mode"] = patch.output_mode
         if patch.api_token_id is not None:
             values["api_token_id"] = patch.api_token_id or None
         if patch.params is not None:

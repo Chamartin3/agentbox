@@ -58,6 +58,14 @@ services:
       # Named volumes — persisted, container-owned
       - agentbox-data:/data
       - agentbox-claude:/agentbox/creds/claude
+    env_file:
+      # Local secrets (LLM provider API keys etc). Lives next to this
+      # compose file so it travels with the agentbox lib. Top-level
+      # compose `include:` does NOT auto-load this file for variable
+      # interpolation — using env_file injects values straight into the
+      # container env instead.
+      - path: .env
+        required: false
     environment:
       - AGENTBOX_DATA_DIR=/data
       - AGENTBOX_MANIFEST=/agentbox/manifest.toml
@@ -66,7 +74,6 @@ services:
       - CLAUDE_CONFIG_DIR=/agentbox/creds/claude
       # LLM provider keys — forwarded from parent compose .env when set.
       - OPENROUTER_API_KEY=${OPEN_ROUTER_API_KEY:-}
-      - DEEPSEEK_API_KEY=${DS_AGNETBOX:-}
       # Ollama hostname rewrite (empty string disables rewriting).
       - AGENTBOX_OLLAMA_URL_REWRITE=${AGENTBOX_OLLAMA_URL_REWRITE:-}
     networks:

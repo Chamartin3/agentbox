@@ -288,6 +288,7 @@ runner_profiles = Table(
     Column("timeout_seconds", Integer),
     Column("base_url", String),
     Column("api_key_env", String),
+    Column("output_mode", String, nullable=False, server_default="auto"),
     Column("params_json", String, nullable=False, server_default="{}"),
     Column("headers_json", String, nullable=False, server_default="{}"),
     Column("extra_args_json", String, nullable=False, server_default="[]"),

@@ -24,11 +24,34 @@ import httpx
 from agentbox.api.events import LogEvent, RunEvent
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, RunRecord, SessionStore
+from agentbox.core.run.validation import extract_json
 
 logger = logging.getLogger(__name__)
 
 _RETRY_DELAYS_S = (1.0, 3.0, 9.0)
 _HTTP_TIMEOUT_S = 10.0
+
+
+def _parsed_output(run: RunRecord) -> Any:
+    """Return ``run.output`` parsed into a dict/list when it represents
+    structured JSON.
+
+    Schema-validated runs (``validation_status == "ok"``) are guaranteed
+    to carry a JSON payload — the validator already parsed it, possibly
+    after stripping markdown fences. We re-run the same extraction so the
+    webhook envelope ships the structured form, not the raw fenced
+    string. Returns the raw output unchanged on parse failure or for
+    non-structured runs.
+    """
+    raw = run.output
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+    if run.validation_status != "ok":
+        return raw
+    try:
+        return json.loads(extract_json(raw))
+    except (ValueError, TypeError):
+        return raw
 
 
 def webhook_payload(
@@ -42,7 +65,7 @@ def webhook_payload(
         "agent_id": run.agent_id,
         "session_id": run.session_id,
         "status": run.status,
-        "output": run.output,
+        "output": _parsed_output(run),
         "error": run.error,
         "started_at": run.created_at,
         "finished_at": run.finished_at,
