@@ -16,8 +16,8 @@ from rich.table import Table
 
 from agentbox.api.deps import get_store
 from agentbox.cli._common import console
+from agentbox.core.agent.providers import list_providers
 from agentbox.core.data.runner_profiles import RunnerProfileCreate
-from agentbox.core.providers import list_providers
 
 runner_profile_app = typer.Typer(
     name="runner-profile",
@@ -114,7 +114,6 @@ def runner_profile_create(
     ),
     provider: str | None = typer.Option(None, help="Provider ID"),
     model: str | None = typer.Option(None, help="Model identifier"),
-    timeout_seconds: int | None = typer.Option(None, help="Timeout in seconds"),
     base_url: str | None = typer.Option(None, help="Custom base URL"),
     api_key_env: str | None = typer.Option(
         None, help="Environment variable name for API key"
@@ -133,7 +132,6 @@ def runner_profile_create(
         backend=backend,
         provider=provider,
         model=model,
-        timeout_seconds=timeout_seconds,
         base_url=base_url,
         api_key_env=api_key_env,
         description=description,
@@ -337,7 +335,7 @@ def runner_provider_models(
     refresh: bool = typer.Option(False, help="Bypass cache and fetch fresh models"),
 ) -> None:
     """List available models for a provider."""
-    from agentbox.core.providers import get_provider
+    from agentbox.core.agent.providers import get_provider
 
     store = get_store()
 
@@ -413,7 +411,7 @@ def runner_provider_models(
 @runner_provider_app.command("refresh")
 def runner_provider_refresh() -> None:
     """Re-discover dynamic providers (currently: opencode CLI)."""
-    from agentbox.core.providers.registry import refresh_opencode_providers
+    from agentbox.core.agent.providers.registry import refresh_opencode_providers
 
     discovered = refresh_opencode_providers()
     if not discovered:

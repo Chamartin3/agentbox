@@ -28,7 +28,6 @@ class RunnerProfile(BaseModel):
     backend: str
     provider: str | None = None
     model: str | None = None
-    timeout_seconds: int | None = None
     base_url: str | None = None
     api_key_env: str | None = None
     api_token_id: str | None = None
@@ -51,7 +50,6 @@ class RunnerProfileCreate(BaseModel):
     backend: str
     provider: str | None = None
     model: str | None = None
-    timeout_seconds: int | None = None
     base_url: str | None = None
     api_key_env: str | None = None
     api_token_id: str | None = None
@@ -71,7 +69,6 @@ class RunnerProfilePatch(BaseModel):
     backend: str | None = None
     provider: str | None = None
     model: str | None = None
-    timeout_seconds: int | None = None
     base_url: str | None = None
     api_key_env: str | None = None
     api_token_id: str | None = None
@@ -127,7 +124,6 @@ def _row_to_profile(row: Row) -> RunnerProfile:
         backend=m["backend"],
         provider=m.get("provider"),
         model=m.get("model"),
-        timeout_seconds=m.get("timeout_seconds"),
         base_url=m.get("base_url"),
         api_key_env=m.get("api_key_env"),
         api_token_id=m.get("api_token_id"),
@@ -187,7 +183,6 @@ class RunnerProfilesMixin:
                     backend=data.backend,
                     provider=data.provider,
                     model=data.model,
-                    timeout_seconds=data.timeout_seconds,
                     base_url=data.base_url,
                     api_key_env=data.api_key_env,
                     api_token_id=data.api_token_id,
@@ -209,7 +204,6 @@ class RunnerProfilesMixin:
             backend=data.backend,
             provider=data.provider,
             model=data.model,
-            timeout_seconds=data.timeout_seconds,
             base_url=data.base_url,
             api_key_env=data.api_key_env,
             output_mode=data.output_mode,
@@ -279,8 +273,6 @@ class RunnerProfilesMixin:
             values["provider"] = patch.provider
         if patch.model is not None:
             values["model"] = patch.model
-        if patch.timeout_seconds is not None:
-            values["timeout_seconds"] = patch.timeout_seconds
         if patch.base_url is not None:
             values["base_url"] = patch.base_url
         if patch.api_key_env is not None:

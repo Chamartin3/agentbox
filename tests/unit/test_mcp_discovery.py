@@ -1,4 +1,4 @@
-"""Unit tests for agentbox.core.mcp.discovery.discover_tools."""
+"""Unit tests for agentbox.core.workspace.mcp.client.discovery.discover_tools."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _run(coro):  # type: ignore[no-untyped-def]
 
 
 def test_empty_server_list_returns_empty_dict() -> None:
-    from agentbox.core.mcp.discovery import discover_tools
+    from agentbox.core.workspace.mcp.client.discovery import discover_tools
 
     result = _run(discover_tools([]))
     assert result == {}
@@ -44,13 +44,13 @@ def test_empty_server_list_returns_empty_dict() -> None:
 
 def test_stdio_failure_returns_empty_list_for_server() -> None:
     """If the subprocess raises an exception, the server's result is []."""
-    from agentbox.core.mcp.discovery import discover_tools
+    from agentbox.core.workspace.mcp.client.discovery import discover_tools
 
     server = {"name": "broken-stdio", "command": "nonexistent-bin", "args": []}
 
     # Patch asyncio.create_subprocess_exec to raise immediately
     with patch(
-        "agentbox.core.mcp.discovery.asyncio.create_subprocess_exec",
+        "agentbox.core.workspace.mcp.client.discovery.asyncio.create_subprocess_exec",
         side_effect=FileNotFoundError("no such file"),
     ):
         result = _run(discover_tools([server], timeout=2.0))
@@ -61,12 +61,12 @@ def test_stdio_failure_returns_empty_list_for_server() -> None:
 def test_http_failure_returns_empty_list_for_server() -> None:
     """If the HTTP request raises, the server's result is []."""
     import httpx
-    from agentbox.core.mcp.discovery import discover_tools
+    from agentbox.core.workspace.mcp.client.discovery import discover_tools
 
     server = {"name": "broken-http", "url": "http://localhost:19999"}
 
     with patch(
-        "agentbox.core.mcp.discovery.httpx.AsyncClient",
+        "agentbox.core.workspace.mcp.client.discovery.httpx.AsyncClient",
         side_effect=httpx.ConnectError("refused"),
     ):
         result = _run(discover_tools([server], timeout=2.0))
@@ -77,7 +77,7 @@ def test_http_failure_returns_empty_list_for_server() -> None:
 def test_mixed_servers_partial_failure() -> None:
     """One failing server must not prevent results for the others."""
     import httpx
-    from agentbox.core.mcp.discovery import discover_tools
+    from agentbox.core.workspace.mcp.client.discovery import discover_tools
 
     servers = [
         {"name": "bad", "url": "http://localhost:19999"},
@@ -86,11 +86,11 @@ def test_mixed_servers_partial_failure() -> None:
 
     with (
         patch(
-            "agentbox.core.mcp.discovery.httpx.AsyncClient",
+            "agentbox.core.workspace.mcp.client.discovery.httpx.AsyncClient",
             side_effect=httpx.ConnectError("refused"),
         ),
         patch(
-            "agentbox.core.mcp.discovery.asyncio.create_subprocess_exec",
+            "agentbox.core.workspace.mcp.client.discovery.asyncio.create_subprocess_exec",
             side_effect=FileNotFoundError("no such file"),
         ),
     ):
@@ -101,7 +101,7 @@ def test_mixed_servers_partial_failure() -> None:
 
 def test_server_without_url_or_command_returns_empty_list() -> None:
     """A server dict with only a name should return [] gracefully."""
-    from agentbox.core.mcp.discovery import discover_tools
+    from agentbox.core.workspace.mcp.client.discovery import discover_tools
 
     server = {"name": "mystery"}
     result = _run(discover_tools([server], timeout=2.0))
@@ -114,7 +114,7 @@ def test_server_without_url_or_command_returns_empty_list() -> None:
 
 
 def test_extract_tool_names_valid_response() -> None:
-    from agentbox.core.mcp.discovery import _extract_tool_names
+    from agentbox.core.workspace.mcp.client.discovery import _extract_tool_names
 
     payload = json.dumps(
         {
@@ -132,20 +132,20 @@ def test_extract_tool_names_valid_response() -> None:
 
 
 def test_extract_tool_names_empty_tools() -> None:
-    from agentbox.core.mcp.discovery import _extract_tool_names
+    from agentbox.core.workspace.mcp.client.discovery import _extract_tool_names
 
     payload = json.dumps({"jsonrpc": "2.0", "id": 2, "result": {"tools": []}})
     assert _extract_tool_names(payload) == []
 
 
 def test_extract_tool_names_invalid_json_returns_empty() -> None:
-    from agentbox.core.mcp.discovery import _extract_tool_names
+    from agentbox.core.workspace.mcp.client.discovery import _extract_tool_names
 
     assert _extract_tool_names("not json at all") == []
 
 
 def test_extract_tool_names_no_result_key() -> None:
-    from agentbox.core.mcp.discovery import _extract_tool_names
+    from agentbox.core.workspace.mcp.client.discovery import _extract_tool_names
 
     payload = json.dumps({"jsonrpc": "2.0", "id": 2, "error": {"code": -1}})
     assert _extract_tool_names(payload) == []

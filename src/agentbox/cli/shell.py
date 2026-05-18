@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import sys
 from pathlib import Path
 
 import typer
@@ -23,8 +22,8 @@ from agentbox.cli._common import console
 from agentbox.cli.launch import _apply_creds, _make_generator, _resolve_workspace
 from agentbox.config import load_settings
 from agentbox.core.data.store import SessionStore
-from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.run_prep import render_env_doc
+from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.run.run_prep import render_env_doc
 
 
 def shell_cmd(

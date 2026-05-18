@@ -14,12 +14,12 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_settings, get_store
 from agentbox.core.data.store import SessionStore
-from agentbox.core.resources.prompt_preview import (
+from agentbox.core.prompt.preview import (
     PreviewError,
     render_agent_prompt_preview,
 )
-from agentbox.core.resources.rendering import render_for_type
-from agentbox.core.workspace_sync import sync_workspace_by_name
+from agentbox.core.prompt.rendering import render_for_type
+from agentbox.core.workspace.sync import sync_workspace_by_name
 
 router = APIRouter(tags=["resource-bindings"])
 

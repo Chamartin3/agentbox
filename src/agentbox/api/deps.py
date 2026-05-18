@@ -6,9 +6,9 @@ from functools import lru_cache
 
 from agentbox.config import Settings, load_settings
 from agentbox.core.data import SessionStore
-from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.executor import RunExecutor
-from agentbox.core.mcp import McpRegistry
+from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.run.executor import RunExecutor
+from agentbox.core.workspace.mcp.client import McpRegistry
 
 
 @lru_cache(maxsize=1)

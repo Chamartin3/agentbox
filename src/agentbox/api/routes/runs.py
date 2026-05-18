@@ -11,10 +11,10 @@ from pydantic import BaseModel
 
 from agentbox.api.deps import get_executor, get_loader, get_store
 from agentbox.api.webhooks import schedule_webhook
+from agentbox.core.agent.plugins import backend_load_failure, backends
 from agentbox.core.data import read_transcript
-from agentbox.core.executor import NoBackendAvailable
-from agentbox.core.plugins import backend_load_failure, backends
-from agentbox.core.services.agents import resolve_agent
+from agentbox.core.run.executor import NoBackendAvailable
+from agentbox.core.service.agents import resolve_agent
 
 
 def _no_backend_detail(exc: NoBackendAvailable) -> str:

@@ -5,9 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
-
 from agentbox.cli import app
+from typer.testing import CliRunner
 
 runner = CliRunner()
 

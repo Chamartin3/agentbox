@@ -10,11 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
-
-import pytest
-
+from unittest.mock import MagicMock
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -77,27 +73,27 @@ def _simple_prompt_binding(bid: str = "pb1", resource_id: str = "r1") -> dict:
 
 class TestResolveWorkspaceResources:
     def test_ephemeral_workspace_returns_empty(self):
-        from agentbox.core.run_prep import resolve_workspace_resources
+        from agentbox.core.run.run_prep import resolve_workspace_resources
 
         store = _make_store()
         assert resolve_workspace_resources(store, "<ephemeral>") == []
         store.list_workspace_file_bindings.assert_not_called()
 
     def test_none_workspace_returns_empty(self):
-        from agentbox.core.run_prep import resolve_workspace_resources
+        from agentbox.core.run.run_prep import resolve_workspace_resources
 
         store = _make_store()
         assert resolve_workspace_resources(store, "") == []
 
     def test_no_bindings_returns_empty(self):
-        from agentbox.core.run_prep import resolve_workspace_resources
+        from agentbox.core.run.run_prep import resolve_workspace_resources
 
         store = _make_store(workspace_bindings=[])
         result = resolve_workspace_resources(store, "ws1")
         assert result == []
 
     def test_hydrates_binding_with_active_version(self):
-        from agentbox.core.run_prep import resolve_workspace_resources
+        from agentbox.core.run.run_prep import resolve_workspace_resources
 
         binding = _simple_binding(target_path="docs/")
         resource = {"id": "r1", "slug": "my-doc", "type": "document", "display_name": "my-doc"}
@@ -125,14 +121,14 @@ class TestResolveWorkspaceResources:
         assert r["blobs"] == blobs
 
     def test_skips_binding_with_missing_resource(self):
-        from agentbox.core.run_prep import resolve_workspace_resources
+        from agentbox.core.run.run_prep import resolve_workspace_resources
 
         store = _make_store(workspace_bindings=[_simple_binding()], resource=None)
         result = resolve_workspace_resources(store, "ws1")
         assert result == []
 
     def test_skips_binding_with_no_active_version(self):
-        from agentbox.core.run_prep import resolve_workspace_resources
+        from agentbox.core.run.run_prep import resolve_workspace_resources
 
         resource = {"id": "r1", "slug": "x", "type": "document", "display_name": "x"}
         store = _make_store(
@@ -144,7 +140,7 @@ class TestResolveWorkspaceResources:
         assert result == []
 
     def test_uses_pinned_version_id(self):
-        from agentbox.core.run_prep import resolve_workspace_resources
+        from agentbox.core.run.run_prep import resolve_workspace_resources
 
         binding = {**_simple_binding(), "pinned_version_id": "pinned-v99"}
         resource = {"id": "r1", "slug": "x", "type": "document", "display_name": "x"}
@@ -169,13 +165,13 @@ class TestResolveWorkspaceResources:
 
 class TestResolveAgentPromptBindings:
     def test_no_bindings_returns_empty(self):
-        from agentbox.core.run_prep import resolve_agent_prompt_bindings
+        from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
 
         store = _make_store(prompt_bindings=[])
         assert resolve_agent_prompt_bindings(store, "agent1") == []
 
     def test_hydrates_binding(self):
-        from agentbox.core.run_prep import resolve_agent_prompt_bindings
+        from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
 
         binding = _simple_prompt_binding()
         resource = {"id": "r1", "slug": "docs", "type": "document", "display_name": "My Docs"}
@@ -202,13 +198,13 @@ class TestResolveAgentPromptBindings:
         assert r["required"] is True
 
     def test_skips_missing_resource(self):
-        from agentbox.core.run_prep import resolve_agent_prompt_bindings
+        from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
 
         store = _make_store(prompt_bindings=[_simple_prompt_binding()], resource=None)
         assert resolve_agent_prompt_bindings(store, "agent1") == []
 
     def test_skips_no_active_version(self):
-        from agentbox.core.run_prep import resolve_agent_prompt_bindings
+        from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
 
         resource = {"id": "r1", "slug": "x", "type": "document", "display_name": "x"}
         store = _make_store(
@@ -226,7 +222,7 @@ class TestResolveAgentPromptBindings:
 
 class TestRenderEnvDoc:
     def test_ephemeral_workspace_skips(self, tmp_path: Path):
-        from agentbox.core.run_prep import render_env_doc
+        from agentbox.core.run.run_prep import render_env_doc
 
         store = _make_store()
         result = render_env_doc(store, "<ephemeral>", tmp_path)
@@ -234,14 +230,14 @@ class TestRenderEnvDoc:
         assert not (tmp_path / "CLAUDE.md").exists()
 
     def test_no_active_doc_skips(self, tmp_path: Path):
-        from agentbox.core.run_prep import render_env_doc
+        from agentbox.core.run.run_prep import render_env_doc
 
         store = _make_store(active_env_doc=None)
         result = render_env_doc(store, "ws1", tmp_path)
         assert result == []
 
     def test_renders_both_files(self, tmp_path: Path):
-        from agentbox.core.run_prep import render_env_doc
+        from agentbox.core.run.run_prep import render_env_doc
 
         doc_content = {
             "project_name": "Test Project",
@@ -271,7 +267,7 @@ class TestRenderEnvDoc:
             assert e["bytes"] > 0
 
     def test_invalid_content_json_returns_empty(self, tmp_path: Path):
-        from agentbox.core.run_prep import render_env_doc
+        from agentbox.core.run.run_prep import render_env_doc
 
         env_doc = {"id": "ver2", "content_json": "not-json{{{"}
         store = _make_store(active_env_doc=env_doc)
@@ -279,7 +275,7 @@ class TestRenderEnvDoc:
         assert result == []
 
     def test_dict_content_json(self, tmp_path: Path):
-        from agentbox.core.run_prep import render_env_doc
+        from agentbox.core.run.run_prep import render_env_doc
 
         doc_content = {"project_name": "Dict Project", "overview": "", "sections": []}
         env_doc = {"id": "ver3", "content_json": doc_content}
@@ -297,8 +293,8 @@ class TestRenderEnvDoc:
 
 class TestSnapshotHelpers:
     def test_workspace_outcomes_to_snapshot(self):
-        from agentbox.core.resources.workspace_materialize import MaterializeOutcome
-        from agentbox.core.run_prep import workspace_outcomes_to_snapshot
+        from agentbox.core.resource.workspace_materialize import MaterializeOutcome
+        from agentbox.core.run.run_prep import workspace_outcomes_to_snapshot
 
         outcomes = [
             MaterializeOutcome(
@@ -320,8 +316,8 @@ class TestSnapshotHelpers:
         assert e["skipped"] is False
 
     def test_prompt_resolution_to_snapshot(self):
-        from agentbox.core.resources.prompt_resolver import PromptResolution, ResolvedBinding
-        from agentbox.core.run_prep import prompt_resolution_to_snapshot
+        from agentbox.core.prompt.resolver import PromptResolution, ResolvedBinding
+        from agentbox.core.run.run_prep import prompt_resolution_to_snapshot
 
         rb = ResolvedBinding(
             binding_id="pb1",

@@ -25,10 +25,10 @@ import typer
 
 from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
-from agentbox.core.config_generation import ConfigGenerator
 from agentbox.core.data.manifest import AgentDef
-from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.mcp import McpRegistry
+from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.workspace.mcp.client import McpRegistry
 
 SUPPORTED_RUNNERS = ("claude", "opencode", "codex", "pi", "shell")
 DEFAULT_WORKSPACE_NAME = "default"
@@ -154,7 +154,7 @@ def _launch_session(
     # workspaces (sync_workspace also no-ops on those).
     if workspace_name and not is_ephemeral:
         from agentbox.api.deps import get_store
-        from agentbox.core.workspace_sync import sync_workspace
+        from agentbox.core.workspace.sync import sync_workspace
 
         try:
             sync_result = sync_workspace(
@@ -169,9 +169,11 @@ def _launch_session(
         except Exception as e:
             console.print(f"[yellow]workspace sync failed:[/yellow] {e}")
 
-    needs_config = runner in _RUNNERS_NEEDING_CONFIG or (
-        runner == "shell" and keep_configs
-    )
+    # shell mode also needs configs now — we materialize a workspace
+    # `.mcp.json` from the resolved per-workspace MCP set so an
+    # interactively-launched Claude (run from inside the shell) picks
+    # up the workspace-scoped MCP list instead of the global one.
+    needs_config = runner in _RUNNERS_NEEDING_CONFIG or runner == "shell"
     gen_dir: Path | None = None
     gen_dir_is_persistent = False
     try:
@@ -182,8 +184,13 @@ def _launch_session(
                 gen_dir_is_persistent = True
             else:
                 gen_dir = Path(tempfile.mkdtemp(prefix="agentbox-launch-"))
-            gen = _make_generator(settings, manifest)
+            gen = _make_generator(settings, manifest, workspace_name)
             gen.generate_configs_into(gen_dir)
+            # Workspace-local `.mcp.json` for shell mode (and anything
+            # else that runs Claude from inside the workspace cwd).
+            claude_mcp_src = gen_dir / "claude_mcp.json"
+            if claude_mcp_src.is_file():
+                shutil.copy(claude_mcp_src, workspace_path / ".mcp.json")
 
         _print_banner(
             agent, runner, model, workspace_path, is_ephemeral, creds, gen_dir
@@ -254,6 +261,21 @@ def _resolve_workspace(
             path.mkdir(parents=True, exist_ok=True)
             creds = getattr(ws_def, "creds", None)
             return path, False, creds, ws_name
+        # Manifest miss — try the DB registry (db-only workspaces created
+        # via the API/UI). Returning the name lets sync_workspace
+        # materialize env-doc + resource bindings.
+        from agentbox.api.deps import get_store
+
+        db_row = get_store().get_workspace(ws_name)
+        if db_row is not None:
+            rel_path = db_row.get("path")
+            path = (
+                settings.project_root / rel_path
+                if rel_path
+                else settings.workspaces_root / ws_name
+            )
+            path.mkdir(parents=True, exist_ok=True)
+            return path, False, None, ws_name
         # Explicit override that isn't a named workspace → treat as relative path
         if workspace_override is not None:
             path = settings.workspaces_root / ws_name
@@ -303,18 +325,53 @@ def _apply_creds(creds: str | None, settings: Settings) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_generator(settings: Settings, manifest: object) -> ConfigGenerator:
+def _make_generator(
+    settings: Settings,
+    manifest: object,
+    workspace_id: str | None = None,
+) -> ConfigGenerator:
     mcp_server_name = "mcp"
     mcp_command: list[str] = ["mcp_serve.sh"]
     mcp_url: str | None = None
     mcp_transport: str = "http"
+    manifest_specs: list[object] = []
     if hasattr(manifest, "mcp_servers") and manifest.mcp_servers:
-        srv = manifest.mcp_servers[0]
+        manifest_specs = list(manifest.mcp_servers)
+        srv = manifest_specs[0]
         mcp_server_name = srv.name
         mcp_url = srv.url
         mcp_transport = srv.transport
         if srv.command:
             mcp_command = srv.command
+
+    # Per-workspace MCP isolation: resolve overrides and only emit
+    # enabled servers. Without a workspace_id we fall back to a single
+    # legacy entry (build_claude_mcp_config back-compat path).
+    servers: list[dict] | None = None
+    if workspace_id and manifest_specs:
+        from agentbox.api.deps import get_store
+
+        manifest_dicts = [
+            {"name": s.name, "config": s.model_dump(exclude={"name"})}
+            for s in manifest_specs
+        ]
+        resolved = get_store().resolve_workspace_mcp(workspace_id, manifest_dicts)
+        servers = []
+        for entry in resolved.get("servers", []):
+            if not entry.get("enabled"):
+                continue
+            cfg = entry.get("config") or {}
+            if not cfg.get("url") and not cfg.get("command"):
+                continue
+            servers.append(
+                {
+                    "name": entry["name"],
+                    "url": cfg.get("url"),
+                    "transport": cfg.get("transport", "http"),
+                    "command": cfg.get("command"),
+                }
+            )
+
     mcp_registry = McpRegistry(settings.mcp_cache_dir)
     return ConfigGenerator(
         agentbox_toml=settings.manifest_path,
@@ -323,6 +380,7 @@ def _make_generator(settings: Settings, manifest: object) -> ConfigGenerator:
         mcp_command=mcp_command,
         mcp_url=mcp_url,
         mcp_transport=mcp_transport,
+        servers=servers,
         verbose=False,
     )
 

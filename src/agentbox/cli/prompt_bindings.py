@@ -9,8 +9,8 @@ from rich.table import Table
 
 from agentbox.api.deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.resources.prompt_resolver import resolve_prompt
-from agentbox.core.run_prep import resolve_agent_prompt_bindings
+from agentbox.core.prompt.resolver import resolve_prompt
+from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
 
 prompt_bindings_app = typer.Typer(
     name="prompt-bindings",

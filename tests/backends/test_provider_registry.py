@@ -13,15 +13,15 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from agentbox.core.providers.base import ProviderDescriptor, ProviderModel
-from agentbox.core.providers.registry import (
+from agentbox.core.agent.profiles import EffectiveRunnerConfig
+from agentbox.core.agent.providers.base import ProviderDescriptor, ProviderModel
+from agentbox.core.agent.providers.registry import (
     _get_cached_models,
     _set_cached_models,
     get_provider,
     list_models,
     list_providers,
 )
-from agentbox.core.runner_profiles import EffectiveRunnerConfig
 
 
 class TestProviderRegistry:
@@ -131,7 +131,7 @@ class TestProviderRegistry:
     @pytest.mark.asyncio
     async def test_list_models_refresh_bypasses_cache(self) -> None:
         """list_models() with refresh=True fetches fresh data."""
-        from agentbox.core.providers.registry import _MODEL_CACHE
+        from agentbox.core.agent.providers.registry import _MODEL_CACHE
 
         _MODEL_CACHE.clear()  # Clear cache from previous tests
         adapter = get_provider("openai")
@@ -295,7 +295,7 @@ class TestProviderRegistry:
         ``opencode-openai``; ``ollama`` declares opencode compat so it is
         left untouched.
         """
-        from agentbox.core.providers import cli, registry
+        from agentbox.core.agent.providers import cli, registry
 
         with patch.object(
             cli,
@@ -328,7 +328,7 @@ class TestProviderRegistry:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Forcing in-container mode rewrites localhost → host.docker.internal."""
-        from agentbox.core.providers.ollama import rewrite_ollama_url
+        from agentbox.core.agent.providers.ollama import rewrite_ollama_url
 
         monkeypatch.setenv("AGENTBOX_IN_CONTAINER", "1")
         monkeypatch.delenv("AGENTBOX_OLLAMA_URL_REWRITE", raising=False)
@@ -348,7 +348,7 @@ class TestProviderRegistry:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Empty AGENTBOX_OLLAMA_URL_REWRITE disables the default rewrite."""
-        from agentbox.core.providers.ollama import rewrite_ollama_url
+        from agentbox.core.agent.providers.ollama import rewrite_ollama_url
 
         monkeypatch.setenv("AGENTBOX_IN_CONTAINER", "1")
         monkeypatch.setenv("AGENTBOX_OLLAMA_URL_REWRITE", "")
@@ -357,7 +357,7 @@ class TestProviderRegistry:
 
     def test_ollama_url_rewrite_custom_map(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Explicit override map wins over the container default."""
-        from agentbox.core.providers.ollama import rewrite_ollama_url
+        from agentbox.core.agent.providers.ollama import rewrite_ollama_url
 
         monkeypatch.setenv(
             "AGENTBOX_OLLAMA_URL_REWRITE", "localhost=ollama-svc,my-host=other"
@@ -373,7 +373,7 @@ class TestProviderRegistry:
 
     def test_opencode_provider_parser_filters_provider(self) -> None:
         """OpenCode CLI provider adapters keep only their provider-qualified ids."""
-        from agentbox.core.providers.cli import _parse_opencode_lines
+        from agentbox.core.agent.providers.cli import _parse_opencode_lines
 
         models = _parse_opencode_lines(
             "opencode/gpt-5\nopencode-go/qwen3.5\nopenai/gpt-5\n",
@@ -384,7 +384,7 @@ class TestProviderRegistry:
 
     def test_cache_key_generation(self) -> None:
         """Cache key correctly encodes provider, base_url, api_key_env, and backend."""
-        from agentbox.core.providers.registry import _cache_key
+        from agentbox.core.agent.providers.registry import _cache_key
 
         key1 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token")
         key2 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token")
@@ -400,7 +400,7 @@ class TestProviderRegistry:
 
     def test_cache_ttl_expiration(self) -> None:
         """_get_cached_models returns None after TTL expires."""
-        from agentbox.core.providers.registry import (
+        from agentbox.core.agent.providers.registry import (
             _CACHE_TTL_SECONDS,
             _MODEL_CACHE,
         )

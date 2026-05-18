@@ -1,7 +1,7 @@
 """Declarative agent + workspace models loaded from agentbox.toml.
 
 These are the parsed shapes — not persisted to SQLite. The loader logic
-lives in ``agentbox.core.definitions.loader``; this module only defines
+lives in ``agentbox.core.deprecated.definitions.loader``; this module only defines
 the typed structures.
 """
 
@@ -85,7 +85,7 @@ class RunnerSpec(BaseModel):
 
     # --- Shared across all runners ---
 
-    timeout_seconds: int = 120
+    timeout_seconds: int | None = None
 
     extra_args: list[str] = Field(default_factory=list)
     """Extra CLI args passed verbatim (claude_code / opencode only)."""
@@ -231,7 +231,7 @@ class CompositionConfig(BaseModel):
     """Prompt-composition recipe for an agent bundle.
 
     When present, agentbox owns prompt rendering via
-    ``agentbox.core.composition.compose()``.
+    ``agentbox.core.prompt.composition.compose()``.
 
     Supports both filesystem paths and shared resource references:
     - File paths: ``"prompts/system.md"`` or ``"shared://root/path.md"``
@@ -406,7 +406,7 @@ class RunnerManifest(BaseModel):
 
     allowed_tools: list[str] = Field(default_factory=list)
     extra_args: list[str] = Field(default_factory=list)
-    timeout_seconds: int = 120
+    timeout_seconds: int | None = None
 
     output_schema_path: str | None = None
     max_validation_retries: int = 0

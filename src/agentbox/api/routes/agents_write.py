@@ -17,8 +17,8 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core.data.manifest import AgentDef, AgentSource
-from agentbox.core.definitions import ManifestWriter
-from agentbox.core.services.agents import resolve_agent
+from agentbox.core.deprecated.definitions import ManifestWriter
+from agentbox.core.service.agents import resolve_agent
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
 
 
 def _validate_runner_against_registry(agent: AgentDef) -> None:
-    from agentbox.core.plugins import backend_load_failure, backends
+    from agentbox.core.agent.plugins import backend_load_failure, backends
 
     kind = agent.runner.kind
     name = kind.value if hasattr(kind, "value") else str(kind)
@@ -134,7 +134,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     On-disk files are not written by this endpoint — use
     ``POST /api/agents/{id}/export`` for that.
     """
-    from agentbox.core.versioning.drift import _build_snapshot
+    from agentbox.core.prompt.versioning.drift import _build_snapshot
 
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
     if not patch:
@@ -325,13 +325,17 @@ def import_agent_from_file(body: ImportRequest):
     agent_def = None
     try:
         if inferred_format == "markdown":
-            from agentbox.core.definitions.markdown import load_markdown_agent
+            from agentbox.core.deprecated.definitions.markdown import (
+                load_markdown_agent,
+            )
 
             agent_def = load_markdown_agent(file_path)
             if not isinstance(agent_def, AgentDef):
                 agent_def = AgentDef.model_validate(agent_def)
         elif inferred_format == "legacy_dir":
-            from agentbox.core.definitions.agents_dir import _load_legacy_dir_agent
+            from agentbox.core.deprecated.definitions.agents_dir import (
+                _load_legacy_dir_agent,
+            )
 
             agent_def = _load_legacy_dir_agent(file_path, file_path.name)
             if not isinstance(agent_def, AgentDef):
@@ -357,7 +361,7 @@ def import_agent_from_file(body: ImportRequest):
     agent_id = agent_def.id
     existing = store.latest_version(agent_id)
 
-    from agentbox.core.agent_config import build_config_json_payload
+    from agentbox.core.agent.config import build_config_json_payload
 
     config_dict = agent_def.model_dump(mode="python", exclude_none=False)
     if "source_path" in config_dict and isinstance(config_dict["source_path"], Path):

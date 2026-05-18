@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.backends.token import TokenBackend
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.run.backends.token import TokenBackend
 
 DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.TOKEN)
 

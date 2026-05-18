@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from agentbox.core.mcp.grouping import derive_groups, resolve_group_ref
-from agentbox.core.mcp.tool_manifest import Tool
+from agentbox.core.workspace.mcp.client.grouping import derive_groups, resolve_group_ref
+from agentbox.core.workspace.mcp.client.tool_manifest import Tool
 
 
 def _tool(name: str) -> Tool:

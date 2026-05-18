@@ -20,10 +20,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.backends.claude_code import ClaudeCodeBackend
-from agentbox.core.backends.opencode import OpenCodeBackend
 from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS, RunnerKind
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
+from agentbox.core.run.backends.opencode import OpenCodeBackend
 
 
 def _agent(runner_kind: RunnerKind, timeout: int, model: str | None = "haiku") -> AgentDef:

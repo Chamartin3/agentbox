@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from agentbox.core.data.store import SessionStore
 
 
-def backfill(store: "SessionStore") -> int:
+def backfill(store: SessionStore) -> int:
     """Run the backfill. Returns the number of rows updated."""
     sql = text(
         """

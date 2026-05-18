@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.validation import (
+from agentbox.core.run.validation import (
     ValidationResult,
     extract_json,
     validate_jsonschema,
@@ -151,7 +151,7 @@ def test_backend_adapter_default_validate_output(tmp_path: Path) -> None:
     from collections.abc import AsyncIterator
 
     from agentbox.api.events import RunEvent
-    from agentbox.core.backends.base import BackendAdapter, RenderedConfig
+    from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
 
     class _Stub(BackendAdapter):
         name = "stub"

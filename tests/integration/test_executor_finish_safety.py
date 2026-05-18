@@ -13,16 +13,20 @@ from pathlib import Path
 
 from agentbox.api.events import DoneEvent, RunEvent, TextEvent
 from agentbox.config import load_settings
-from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.data import SessionStore
-from agentbox.core.definitions import (
+from agentbox.core.deprecated.definitions import (
     AgentDef,
     DefinitionLoader,
     GuardrailRef,
     RunnerSpec,
 )
-from agentbox.core.executor import RunExecutor
-from agentbox.core.guardrails.base import Guardrail, GuardrailContext, GuardrailResult
+from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.run.executor import RunExecutor
+from agentbox.core.run.guardrails.base import (
+    Guardrail,
+    GuardrailContext,
+    GuardrailResult,
+)
 
 
 class _OkAdapter:
@@ -68,7 +72,7 @@ def _make_executor(tmp_path: Path) -> tuple[RunExecutor, SessionStore]:
 
 
 def _register_backend(name: str, adapter_cls: type) -> None:
-    import agentbox.core.plugins as plugins
+    import agentbox.core.agent.plugins as plugins
 
     plugins.backends()
     plugins._BACKEND_CLASSES[name] = adapter_cls  # type: ignore[index]
@@ -92,7 +96,7 @@ def test_finish_run_called_when_guardrail_raises(tmp_path: Path) -> None:
     executor, store = _make_executor(tmp_path)
     _register_backend("fake", _OkAdapter)
 
-    import agentbox.core.plugins as plugins
+    import agentbox.core.agent.plugins as plugins
 
     plugins._GUARDRAIL_CLASSES = {"boom": _BoomGuardrail}  # type: ignore[attr-defined]
 

@@ -20,10 +20,13 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from agentbox.api.deps import get_store
-from agentbox.core.providers import get_provider, list_providers
-from agentbox.core.providers.base import ProviderDescriptor, ProviderModel
-from agentbox.core.providers.registry import list_models, refresh_opencode_providers
-from agentbox.core.runner_profiles import EffectiveRunnerConfig
+from agentbox.core.agent.profiles import EffectiveRunnerConfig
+from agentbox.core.agent.providers import get_provider, list_providers
+from agentbox.core.agent.providers.base import ProviderDescriptor, ProviderModel
+from agentbox.core.agent.providers.registry import (
+    list_models,
+    refresh_opencode_providers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +57,7 @@ async def refresh_providers(backend: str | None = Query(None)) -> dict[str, Any]
     credentials — and clears the shared model-listing cache so the next
     ``/models`` call hits the live source for every provider.
     """
-    from agentbox.core.providers.registry import _MODEL_CACHE
+    from agentbox.core.agent.providers.registry import _MODEL_CACHE
 
     discovered = refresh_opencode_providers()
     _MODEL_CACHE.clear()

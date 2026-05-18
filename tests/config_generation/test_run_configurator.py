@@ -6,13 +6,13 @@ import json
 from pathlib import Path
 
 import pytest
-from agentbox.core.config_generation.backends import get_generator, list_generators
-from agentbox.core.config_generation.run_configurator import (
+from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.run.config.backends import get_generator, list_generators
+from agentbox.core.run.config.run_configurator import (
     ComposedMetadata,
     RunConfigurator,
 )
-from agentbox.core.config_generation.skills.filter import filter_skills_for_backend
-from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.run.config.skills.filter import filter_skills_for_backend
 
 
 def _make_agent(**overrides: object) -> AgentDef:
@@ -277,7 +277,7 @@ class TestSkills:
 
 class TestSkillFilter:
     def test_no_runners_means_all_backends(self) -> None:
-        from agentbox.core.skills import SkillPack
+        from agentbox.core.resource.skills import SkillPack
 
         skill = SkillPack(
             name="generic",
@@ -288,7 +288,7 @@ class TestSkillFilter:
         assert filter_skills_for_backend([skill], "claude_code") == [skill]
 
     def test_runners_field_filters(self) -> None:
-        from agentbox.core.skills import SkillPack
+        from agentbox.core.resource.skills import SkillPack
 
         opencode_only = SkillPack(
             name="oc",
@@ -304,7 +304,7 @@ class TestSkillFilter:
         assert filter_skills_for_backend([opencode_only, claude_only], "claude_code") == [claude_only]
 
     def test_multiple_backends_in_runners(self) -> None:
-        from agentbox.core.skills import SkillPack
+        from agentbox.core.resource.skills import SkillPack
 
         shared = SkillPack(
             name="shared",
@@ -325,7 +325,7 @@ class TestGeneratorRegistry:
         assert set(list_generators()) == {"opencode", "claude_code", "codex", "pi"}
 
     def test_get_generator_returns_instance(self) -> None:
-        from agentbox.core.config_generation.backends.opencode import (
+        from agentbox.core.run.config.backends.opencode import (
             OpenCodeConfigGenerator,
         )
 
@@ -338,7 +338,7 @@ class TestGeneratorRegistry:
 
 class TestMcpConfig:
     def test_opencode_generates_mcp_config(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
-        from agentbox.core.config_generation.backends.base import McpConfig
+        from agentbox.core.run.config.backends.base import McpConfig
 
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
@@ -359,7 +359,7 @@ class TestMcpConfig:
         assert data["mcp"]["test-mcp"]["url"] == "http://localhost:3000"
 
     def test_claude_generates_mcp_config(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
-        from agentbox.core.config_generation.backends.base import McpConfig
+        from agentbox.core.run.config.backends.base import McpConfig
 
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
@@ -398,7 +398,7 @@ class TestMcpConfig:
         assert not (run_cfg.backend_dir / "claude_mcp.json").exists()
 
     def test_opencode_mcp_local_mode(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
-        from agentbox.core.config_generation.backends.base import McpConfig
+        from agentbox.core.run.config.backends.base import McpConfig
 
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)

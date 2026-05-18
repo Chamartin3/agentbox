@@ -19,12 +19,12 @@ from collections.abc import AsyncIterator
 
 import pytest
 from agentbox.api.events import DoneEvent, RunEvent, TextEvent
-from agentbox.core.backends.base import (
+from agentbox.core.run.backends.base import (
     BackendAdapter,
     RenderedConfig,
 )
-from agentbox.core.executor import _adapter_run_into_session
-from agentbox.core.streaming.session import CaptureSession
+from agentbox.core.run.executor import _adapter_run_into_session
+from agentbox.core.run.streaming.session import CaptureSession
 
 
 class _SlowBackend(BackendAdapter):

@@ -202,7 +202,7 @@ def resource_migrate_composition(
     ),
 ) -> None:
     """Migrate composition slots (input/output_schema, user_template) → resource bindings."""
-    from agentbox.core.resources.composition_to_bindings import (
+    from agentbox.core.resource.composition_to_bindings import (
         migrate_composition_to_bindings,
     )
 

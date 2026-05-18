@@ -10,14 +10,14 @@ from pydantic import BaseModel
 
 from agentbox.api.deps import get_settings, get_store
 from agentbox.core.data.store import SessionStore
-from agentbox.core.env_doc.renderers import (
+from agentbox.core.workspace.env_doc.renderers import (
     AgentsMdRenderer,
     ClaudeMdRenderer,
     RuntimeContext,
 )
-from agentbox.core.env_doc.renderers.base import ReferenceEntry
-from agentbox.core.env_doc.schema import EnvDocContent
-from agentbox.core.workspace_sync import sync_workspace_by_name
+from agentbox.core.workspace.env_doc.renderers.base import ReferenceEntry
+from agentbox.core.workspace.env_doc.schema import EnvDocContent
+from agentbox.core.workspace.sync import sync_workspace_by_name
 
 router = APIRouter(tags=["env-doc"])
 

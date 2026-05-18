@@ -11,7 +11,8 @@ contract.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, TypedDict
+from collections.abc import Callable, Iterable
+from typing import Any, TypedDict
 
 
 class PaginatedEnvelope(TypedDict):

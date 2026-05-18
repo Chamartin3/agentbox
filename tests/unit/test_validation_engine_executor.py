@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
-from agentbox.core.validation import validate_output
+from agentbox.core.run.validation import validate_output
 
 
 def _validate(output: str, agent: AgentDef, workdir: Path) -> tuple[bool, str, str]:

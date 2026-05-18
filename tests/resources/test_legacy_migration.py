@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data.store import SessionStore
-from agentbox.core.resources.legacy_migration import (
+from agentbox.core.resource.legacy_migration import (
     KIND_TO_TYPE,
     migrate_shared_resources_to_repo,
 )

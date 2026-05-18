@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.resources.subagent_render import (
+from agentbox.core.resource.subagent_render import (
     BACKEND_AGENT_DIRS,
     materialize_subagents,
 )

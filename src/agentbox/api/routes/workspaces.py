@@ -12,11 +12,11 @@ from pydantic import BaseModel
 from agentbox.api._pagination import paginate_list
 from agentbox.api.deps import get_loader, get_mcp_registry, get_settings, get_store
 from agentbox.core import workspaces as ws
-from agentbox.core.config_generation import ConfigGenerator
-from agentbox.core.config_generation.constants import (
+from agentbox.core.resource.skills import discover_skills
+from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.run.config.constants import (
     READ_PREFIXES,
 )
-from agentbox.core.skills import discover_skills
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
@@ -490,7 +490,7 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
     # imply. Best-effort; failures are logged inside.
     try:
         from agentbox.api.deps import get_settings as _get_settings
-        from agentbox.core.workspace_sync import sync_workspace_by_name
+        from agentbox.core.workspace.sync import sync_workspace_by_name
 
         sync_workspace_by_name(store, _get_settings(), name)
     except Exception:
@@ -719,7 +719,7 @@ def list_skills_by_name(name: str) -> dict:
 
 @router.get("/by-name/{name}/skills/{skill_name}")
 def get_skill_content_by_name(name: str, skill_name: str) -> dict:
-    from agentbox.core.skills import find_skill
+    from agentbox.core.resource.skills import find_skill
 
     ws_path, _ = _resolve_workspace(name)
     skill_md = find_skill(ws_path, skill_name)

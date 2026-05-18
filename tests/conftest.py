@@ -11,7 +11,7 @@ Conventions:
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Thread
 
 import pytest
-from agentbox.core.resources.cache import ensure_cached, prune_cache
+from agentbox.core.resource.cache import ensure_cached, prune_cache
 
 
 def _blobs(names: list[str]) -> list[dict]:

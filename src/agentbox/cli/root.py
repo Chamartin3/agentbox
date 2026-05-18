@@ -16,9 +16,9 @@ from rich.text import Text
 from agentbox.api.deps import get_store
 from agentbox.cli._common import console, event_color
 from agentbox.config import load_settings
-from agentbox.core.config_generation import ConfigGenerator
-from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.mcp import McpRegistry
+from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.workspace.mcp.client import McpRegistry
 
 app = typer.Typer(
     name="agentbox",

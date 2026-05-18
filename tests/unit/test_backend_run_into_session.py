@@ -11,17 +11,15 @@ the executor handles the final emit after validation.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest
-
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent
-from agentbox.core.backends.base import (
+from agentbox.core.run.backends.base import (
     BackendAdapter,
     BackendRunResult,
     RenderedConfig,
 )
-from agentbox.core.streaming.session import CaptureSession
+from agentbox.core.run.streaming.session import CaptureSession
 
 
 class _IteratorBackend(BackendAdapter):

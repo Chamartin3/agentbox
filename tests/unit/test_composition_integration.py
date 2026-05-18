@@ -83,8 +83,8 @@ class TestCompositionStore:
 
 class TestPromptCaptureComposed:
     def test_build_fragments_uses_composed_system(self, tmp_path: Path) -> None:
-        from agentbox.core.definitions import AgentDef, RunnerSpec
-        from agentbox.core.prompt_capture import build_fragments
+        from agentbox.core.deprecated.definitions import AgentDef, RunnerSpec
+        from agentbox.core.prompt.capture import build_fragments
 
         agent = AgentDef(id="test", runner=RunnerSpec())
         agent.__dict__["_composed_system"] = "Composed system prompt"
@@ -104,8 +104,8 @@ class TestPromptCaptureComposed:
         assert '"type": "object"' in schema_frag.content
 
     def test_build_fragments_falls_back_to_prompt_path(self, tmp_path: Path) -> None:
-        from agentbox.core.definitions import AgentDef, RunnerSpec
-        from agentbox.core.prompt_capture import build_fragments
+        from agentbox.core.deprecated.definitions import AgentDef, RunnerSpec
+        from agentbox.core.prompt.capture import build_fragments
 
         (tmp_path / "prompts").mkdir()
         (tmp_path / "prompts" / "system.md").write_text("Legacy prompt")

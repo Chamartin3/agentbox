@@ -6,7 +6,10 @@ from pathlib import Path
 
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import AgentDef, AgentSource, RunnerSpec
-from agentbox.core.definitions.markdown import load_markdown_agent, write_markdown_agent
+from agentbox.core.deprecated.definitions.markdown import (
+    load_markdown_agent,
+    write_markdown_agent,
+)
 
 
 def _round_trip(tmp_path: Path, agent: AgentDef) -> AgentDef:

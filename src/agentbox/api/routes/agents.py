@@ -10,13 +10,13 @@ from sqlalchemy import func, select
 
 from agentbox.api.deps import get_loader, get_settings, get_store
 from agentbox.core import workspaces as ws
-from agentbox.core.composition import compose_from_source
-from agentbox.core.composition.loader import load_bundle_from_bindings
 from agentbox.core.data.manifest import AgentDef
 from agentbox.core.data.runner_profiles import RunnerProfile
 from agentbox.core.data.schema import agent_runner_profiles
 from agentbox.core.data.schema import runs as runs_table
-from agentbox.core.services.agents import list_all_agents, resolve_agent
+from agentbox.core.prompt.composition import compose_from_source
+from agentbox.core.prompt.composition.loader import load_bundle_from_bindings
+from agentbox.core.service.agents import list_all_agents, resolve_agent
 
 logger = logging.getLogger(__name__)
 

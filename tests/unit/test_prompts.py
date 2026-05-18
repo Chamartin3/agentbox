@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core import prompts
-from agentbox.core.definitions import AgentDef, RunnerSpec
+from agentbox.core.deprecated.definitions import AgentDef, RunnerSpec
 
 
 def _agent(prompt_path: str | None = "prompts/main.md") -> AgentDef:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.data.manifest import AgentSource
-from agentbox.core.definitions.agents_dir import scan_agents_dir
+from agentbox.core.deprecated.definitions.agents_dir import scan_agents_dir
 
 
 def _write(path: Path, content: str) -> None:

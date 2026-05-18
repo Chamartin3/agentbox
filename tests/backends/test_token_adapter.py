@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import contextlib
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from agentbox.api.events import TextEvent
-from agentbox.core.backends.base import RenderedConfig
-from agentbox.core.backends.token import TokenBackend
-from agentbox.core.executor import RunExecutor
+from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.run.backends.token import TokenBackend
 from pydantic import BaseModel, ValidationError
 
 
@@ -46,14 +46,54 @@ def _fake_result(output: object = "assistant text", messages: list[object] | Non
     return result
 
 
+def _streaming_mock(result: object | None = None, side_effect: Exception | None = None):
+    """Build a *run_stream_events* mock compatible with ``async with`` +
+    ``async for`` that yields a single ``AgentRunResultEvent``.
+    """
+    if side_effect is not None:
+
+        @contextlib.asynccontextmanager
+        async def _stream_side_effect(*_args, **_kwargs):
+            raise side_effect
+            yield  # pragma: no cover
+
+        return _stream_side_effect
+
+    result_event = MagicMock()
+    res = result if result is not None else _fake_result()
+    result_event.result = res
+
+    @contextlib.asynccontextmanager
+    async def _stream(*_args, **_kwargs):
+        class _Stream:
+            def __aiter__(self):
+                return _StreamIterator([result_event])
+
+        class _StreamIterator:
+            def __init__(self, items):
+                self._items = iter(items)
+
+            async def __anext__(self):
+                try:
+                    return next(self._items)
+                except StopIteration:
+                    raise StopAsyncIteration
+
+        yield _Stream()
+
+    return _stream
+
+
 async def test_direct_mode_emits_system_user_assistant_on_success() -> None:
     fake_agent = MagicMock()
-    fake_agent.run = AsyncMock(return_value=_fake_result("assistant text"))
+    fake_agent.run_stream_events = _streaming_mock(_fake_result("assistant text"))
 
     with patch("pydantic_ai.Agent", return_value=fake_agent):
         events = await _collect(TokenBackend().run(_direct_rendered(), "hello", "rid"))
 
-    assert [e.type for e in events] == ["log", "text", "text", "text", "usage", "done"]
+    assert [e.type for e in events] == [
+        "log", "text", "text", "log", "text", "usage", "done"
+    ]
     assert [getattr(e, "role", None) for e in events if e.type == "text"] == [
         "system",
         "user",
@@ -72,7 +112,9 @@ async def test_direct_mode_surfaces_openrouter_finish_reason_error() -> None:
         provider_exc = exc
 
     fake_agent = MagicMock()
-    fake_agent.run = AsyncMock(side_effect=provider_exc)
+    fake_agent.run_stream_events = _streaming_mock(
+        side_effect=provider_exc,
+    )
 
     rendered = _direct_rendered(provider="openrouter")
     with patch("pydantic_ai.Agent", return_value=fake_agent):
@@ -111,7 +153,9 @@ async def test_direct_mode_emits_tool_call_and_result_from_message_history() -> 
         ),
     ]
     fake_agent = MagicMock()
-    fake_agent.run = AsyncMock(return_value=_fake_result("5", messages))
+    fake_agent.run_stream_events = _streaming_mock(
+        _fake_result("5", messages)
+    )
 
     with patch("pydantic_ai.Agent", return_value=fake_agent):
         events = await _collect(TokenBackend().run(_direct_rendered(), "2+3", "rid"))
@@ -181,7 +225,7 @@ def test_role_filter_in_session_does_not_include_system_or_user_text_in_output()
     """System/user TextEvents are transcribed + broadcast but not added to
     the run output — only assistant turns contribute to ``output_text``.
     Logic lives on ``RunStreamSession.emit`` post-Plan 16."""
-    from agentbox.core.streaming.session import RunStreamSession
+    from agentbox.core.run.streaming.session import RunStreamSession
 
     tf = StringIO()
     broadcaster = SimpleNamespace(publish=lambda ev: None)
@@ -202,7 +246,7 @@ def test_role_filter_in_session_does_not_include_system_or_user_text_in_output()
 
 
 def test_transcript_conversation_source_preserves_prompt_roles_and_tool_payloads() -> None:
-    from agentbox.core.conversations.sources.transcript import (
+    from agentbox.core.run.history.sources.transcript import (
         _events_to_conversation_view,
     )
 

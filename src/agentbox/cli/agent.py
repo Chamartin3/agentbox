@@ -199,7 +199,7 @@ def agent_create(
     The config file must be a JSON object matching ``AgentDef``. No on-disk
     backing file is created; the agent lives entirely in the DB.
     """
-    from agentbox.core.agent_config import build_config_json_payload
+    from agentbox.core.agent.config import build_config_json_payload
     from agentbox.core.data.manifest import AgentDef
 
     data = json.loads(config.read_text(encoding="utf-8"))
@@ -253,7 +253,7 @@ def agent_edit(
     import hashlib
 
     from agentbox.core.data.manifest import AgentDef
-    from agentbox.core.versioning.drift import _build_snapshot
+    from agentbox.core.prompt.versioning.drift import _build_snapshot
 
     if not set_:
         console.print("[red]nothing to set; pass --set k=v[/red]")
@@ -324,7 +324,7 @@ def agent_export(
 ) -> None:
     """Dump the active agent version to disk as TOML/markdown."""
     from agentbox.core.data.manifest import AgentDef, AgentSource
-    from agentbox.core.definitions import ManifestWriter
+    from agentbox.core.deprecated.definitions import ManifestWriter
 
     store = get_store()
     settings = get_settings()
@@ -397,13 +397,15 @@ def agent_import(
             inferred = "standalone_toml"
 
     if inferred == "markdown":
-        from agentbox.core.definitions.markdown import load_markdown_agent
+        from agentbox.core.deprecated.definitions.markdown import load_markdown_agent
 
         agent_def = load_markdown_agent(path)
         if not isinstance(agent_def, AgentDef):
             agent_def = AgentDef.model_validate(agent_def)
     elif inferred == "legacy_dir":
-        from agentbox.core.definitions.agents_dir import _load_legacy_dir_agent
+        from agentbox.core.deprecated.definitions.agents_dir import (
+            _load_legacy_dir_agent,
+        )
 
         agent_def = _load_legacy_dir_agent(path, path.name)
         if not isinstance(agent_def, AgentDef):
@@ -416,7 +418,7 @@ def agent_import(
 
     store = get_store()
     settings = get_settings()
-    from agentbox.core.agent_config import build_config_json_payload
+    from agentbox.core.agent.config import build_config_json_payload
 
     config_dict = agent_def.model_dump(mode="python", exclude_none=False)
     if isinstance(config_dict.get("source_path"), Path):

@@ -9,11 +9,11 @@ from pathlib import Path
 
 from agentbox.api.events import DoneEvent, RunEvent, TextEvent
 from agentbox.config import Settings
-from agentbox.core.backends.base import RenderedConfig
-from agentbox.core.validation import validate_output as _validate_output_default
 from agentbox.core.data import SessionStore
-from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.executor import RunExecutor
+from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.run.executor import RunExecutor
+from agentbox.core.run.validation import validate_output as _validate_output_default
 
 
 class _EchoAdapter:
@@ -58,7 +58,7 @@ def _settings(tmp_path: Path) -> Settings:
 
 
 def _register(name: str, cls: type) -> None:
-    import agentbox.core.plugins as plugins
+    import agentbox.core.agent.plugins as plugins
 
     plugins.backends()
     plugins._BACKEND_CLASSES[name] = cls  # type: ignore[index]

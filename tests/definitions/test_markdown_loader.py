@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data.manifest import AgentSource
-from agentbox.core.definitions.markdown import load_markdown_agent
+from agentbox.core.deprecated.definitions.markdown import load_markdown_agent
 
 
 def _write(path: Path, content: str) -> None:

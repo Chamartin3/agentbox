@@ -9,8 +9,12 @@ def test_imports(isolated_data_dir: Path) -> None:
     from agentbox.api.app import create_app
     from agentbox.api.events import DoneEvent, ToolCallEvent, UsageEvent
     from agentbox.core.data import SessionStore
-    from agentbox.core.definitions import AgentDef, DefinitionLoader, RunnerSpec
-    from agentbox.core.executor import RunExecutor
+    from agentbox.core.deprecated.definitions import (
+        AgentDef,
+        DefinitionLoader,
+        RunnerSpec,
+    )
+    from agentbox.core.run.executor import RunExecutor
 
     assert create_app() is not None
     assert DoneEvent(run_id="x", ok=True).type == "done"
@@ -21,7 +25,7 @@ def test_imports(isolated_data_dir: Path) -> None:
 
 
 def test_manifest_parses(tmp_path: Path) -> None:
-    from agentbox.core.definitions import DefinitionLoader
+    from agentbox.core.deprecated.definitions import DefinitionLoader
 
     (tmp_path / "agentbox.toml").write_text(
         """

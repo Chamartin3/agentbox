@@ -285,7 +285,6 @@ runner_profiles = Table(
     Column("backend", String, nullable=False),
     Column("provider", String),
     Column("model", String),
-    Column("timeout_seconds", Integer),
     Column("base_url", String),
     Column("api_key_env", String),
     Column("output_mode", String, nullable=False, server_default="auto"),

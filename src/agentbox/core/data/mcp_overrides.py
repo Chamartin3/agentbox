@@ -230,31 +230,40 @@ class McpOverridesMixin:
         for t in self.list_workspace_mcp_tool_overrides(workspace_id):
             tool_overrides[(t["server_name"], t["tool_name"])] = bool(t["enabled"])
 
+        manifest_by_name = {s["name"]: s for s in manifest_servers}
+        # Union: every server visible in either manifest or overrides.
+        all_names = list(manifest_by_name.keys())
+        for n in server_overrides:
+            if n not in manifest_by_name:
+                all_names.append(n)
+
         out_servers = []
-        for s in manifest_servers:
-            name = s["name"]
+        for name in all_names:
+            manifest_entry = manifest_by_name.get(name)
             override = server_overrides.get(name)
             if override is not None:
                 enabled = bool(override["enabled"])
             else:
                 enabled = policy == "allow_all_unless_disabled"
-            cfg = _shallow_merge(
-                s.get("config"),
-                (override or {}).get("config_overrides"),
-            )
+            base_cfg = manifest_entry.get("config") if manifest_entry else None
+            cfg = _shallow_merge(base_cfg, (override or {}).get("config_overrides"))
             disabled_tools: list[str] = []
             if enabled and discovered_tools:
                 for tool in discovered_tools.get(name, []):
                     flag = tool_overrides.get((name, tool))
                     if flag is False:
                         disabled_tools.append(tool)
+            if manifest_entry is not None:
+                source = "override" if override else "default"
+            else:
+                source = "override_only"
             out_servers.append(
                 {
                     "name": name,
                     "enabled": enabled,
                     "config": cfg,
                     "disabled_tools": disabled_tools,
-                    "source": "override" if override else "default",
+                    "source": source,
                 }
             )
         return {"servers": out_servers, "policy": policy}

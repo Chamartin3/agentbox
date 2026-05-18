@@ -21,7 +21,7 @@ from agentbox.core.data.manifest import (
     CompositionConfig,
     SharedRef,
 )
-from agentbox.core.definitions import DefinitionLoader, ManifestWriter
+from agentbox.core.deprecated.definitions import DefinitionLoader, ManifestWriter
 
 
 @pytest.fixture

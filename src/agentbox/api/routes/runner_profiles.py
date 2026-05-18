@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from agentbox.api._pagination import paginate_list
 from agentbox.api.deps import get_store
+from agentbox.core.agent.plugins import backend_load_failure, backends, get_backend
+from agentbox.core.agent.providers import get_provider, list_providers
 from agentbox.core.data import SessionStore
 from agentbox.core.data.runner_profiles import (
     RunnerProfile,
@@ -15,8 +17,6 @@ from agentbox.core.data.runner_profiles import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.plugins import backend_load_failure, backends, get_backend
-from agentbox.core.providers import get_provider, list_providers
 
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
 
@@ -55,14 +55,6 @@ def _validate_provider(provider: str | None) -> None:
     provider_ids = {p.id for p in list_providers()}
     if provider not in provider_ids:
         raise HTTPException(400, f"unknown provider: {provider!r}")
-
-
-def _validate_timeout_seconds(timeout_seconds: int | None) -> None:
-    """Validate timeout_seconds is positive. Raises HTTPException 400 if invalid."""
-    if timeout_seconds is None:
-        return
-    if timeout_seconds <= 0:
-        raise HTTPException(400, "timeout_seconds must be positive")
 
 
 def _validate_base_url(base_url: str | None) -> None:
@@ -138,7 +130,6 @@ def _validate_create_body(data: RunnerProfileCreate) -> None:
     _validate_backend(data.backend)
     _validate_provider(data.provider)
     _validate_backend_provider_compat(data.backend, data.provider)
-    _validate_timeout_seconds(data.timeout_seconds)
     _validate_base_url(data.base_url)
     _validate_api_key_env(data.api_key_env)
     _validate_headers(data.headers)
@@ -160,7 +151,6 @@ def _validate_patch_body(
     effective_backend = patch.backend or current_backend
     if patch.provider is not None or patch.backend is not None:
         _validate_backend_provider_compat(effective_backend, patch.provider)
-    _validate_timeout_seconds(patch.timeout_seconds)
     _validate_base_url(patch.base_url)
     _validate_api_key_env(patch.api_key_env)
     _validate_headers(patch.headers)

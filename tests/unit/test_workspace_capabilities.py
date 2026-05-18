@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agentbox.core.workspaces import (
+from agentbox.core.workspace.manager import (
     capabilities_path,
     load_capabilities,
 )

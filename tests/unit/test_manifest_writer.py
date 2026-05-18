@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.definitions import ManifestWriter, PatchError
+from agentbox.core.deprecated.definitions import ManifestWriter, PatchError
 
 SAMPLE = """\
 project = "demo"

@@ -22,23 +22,23 @@ dependencies = [
 
 [project.scripts]
 agentbox = "agentbox.cli:app"
-agentbox-mcp = "agentbox.mcp_server.server:main"
+agentbox-mcp = "agentbox.mcp.server:main"
 
 [project.entry-points."agentbox.backends"]
-claude_code = "agentbox.core.backends.claude_code:ClaudeCodeBackend"
-opencode = "agentbox.core.backends.opencode:OpenCodeBackend"
-token = "agentbox.core.backends.token:TokenBackend"
-codex = "agentbox.core.backends.codex:CodexBackend"
-pi = "agentbox.core.backends.pi:PiBackend"
+claude_code = "agentbox.core.run.backends.claude_code:ClaudeCodeBackend"
+opencode = "agentbox.core.run.backends.opencode:OpenCodeBackend"
+token = "agentbox.core.run.backends.token:TokenBackend"
+codex = "agentbox.core.run.backends.codex:CodexBackend"
+pi = "agentbox.core.run.backends.pi:PiBackend"
 
 
 [project.entry-points."agentbox.conversations"]
-claude-cli-jsonl = "agentbox.core.conversations.sources.claude_cli:ClaudeCliJsonlSource"
-opencode-session = "agentbox.core.conversations.sources.opencode:OpencodeSessionSource"
-pydantic-ai-history = "agentbox.core.conversations.sources.pydantic_ai:PydanticAiHistorySource"
-agentbox-transcript = "agentbox.core.conversations.sources.transcript:TranscriptSource"
-codex-session = "agentbox.core.conversations.sources.codex:CodexSessionSource"
-pi-session = "agentbox.core.conversations.sources.pi:PiSessionSource"
+claude-cli-jsonl = "agentbox.core.run.history.sources.claude_cli:ClaudeCliJsonlSource"
+opencode-session = "agentbox.core.run.history.sources.opencode:OpencodeSessionSource"
+pydantic-ai-history = "agentbox.core.run.history.sources.pydantic_ai:PydanticAiHistorySource"
+agentbox-transcript = "agentbox.core.run.history.sources.transcript:TranscriptSource"
+codex-session = "agentbox.core.run.history.sources.codex:CodexSessionSource"
+pi-session = "agentbox.core.run.history.sources.pi:PiSessionSource"
 
 # Register guardrails by adding entries here or in a plugin package:
 # [project.entry-points."agentbox.guardrails"]

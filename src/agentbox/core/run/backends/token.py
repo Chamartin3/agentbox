@@ -37,7 +37,11 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, Union
 
-from agentbox.core.agent.config import PythonAgentConfig
+from pydantic import BaseModel, ValidationError, create_model
+from pydantic_ai import NativeOutput, PromptedOutput
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
+
 from agentbox.api.events import (
     DoneEvent,
     LogEvent,
@@ -48,11 +52,8 @@ from agentbox.api.events import (
     ToolResultEvent,
     UsageEvent,
 )
+from agentbox.core.agent.config import PythonAgentConfig
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
-from pydantic import BaseModel, ValidationError, create_model
-from pydantic_ai import NativeOutput, PromptedOutput
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openai import OpenAIProvider
 
 _NAME = "token"
 
@@ -349,7 +350,7 @@ class TokenBackend(BackendAdapter):
             "agent_id": agent.id,
             "model": model,
             "output_schema": output_schema,
-            "timeout_seconds": getattr(runner_config, "timeout_seconds", None),
+            "timeout_seconds": getattr(getattr(agent, "runner", None), "timeout_seconds", None),
         }
 
         # Store provider routing info from runner_config if present.

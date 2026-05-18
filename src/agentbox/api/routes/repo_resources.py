@@ -19,13 +19,13 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_store
 from agentbox.core.constants import ResourceType
 from agentbox.core.data.store import SessionStore
-from agentbox.core.resources.importers.host_path import HostPathImporter
-from agentbox.core.resources.importers.schema import SchemaImporter
-from agentbox.core.resources.importers.script import ScriptImporter
-from agentbox.core.resources.importers.skill import SkillImporter
-from agentbox.core.resources.importers.upload import UploadImporter
-from agentbox.core.resources.importers.zip_upload import ZipUploadImporter
-from agentbox.core.resources.rendering import render_for_type
+from agentbox.core.prompt.rendering import render_for_type
+from agentbox.core.resource.importers.host_path import HostPathImporter
+from agentbox.core.resource.importers.schema import SchemaImporter
+from agentbox.core.resource.importers.script import ScriptImporter
+from agentbox.core.resource.importers.skill import SkillImporter
+from agentbox.core.resource.importers.upload import UploadImporter
+from agentbox.core.resource.importers.zip_upload import ZipUploadImporter
 
 router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])
 
@@ -200,7 +200,7 @@ async def upload_version(
         content=content,
         mime_type=file.content_type,
     )
-    from agentbox.core.resources.importers.base import ImporterContext
+    from agentbox.core.resource.importers.base import ImporterContext
 
     result = importer.run(ImporterContext(actor=actor, changelog=changelog))
     try:
@@ -234,7 +234,7 @@ def host_path_version(
         include=tuple(body.include),
         exclude=tuple(body.exclude) or importer_cls.__dataclass_fields__["exclude"].default_factory(),  # type: ignore[attr-defined]
     )
-    from agentbox.core.resources.importers.base import ImporterContext
+    from agentbox.core.resource.importers.base import ImporterContext
 
     try:
         result = importer.run(ImporterContext(actor=body.actor, changelog=body.changelog))
@@ -391,7 +391,7 @@ async def upload_zip_version(
             detail=f"zip upload only valid for folder/skill (got {resource['type']!r})",
         )
     content = await file.read()
-    from agentbox.core.resources.importers.base import ImporterContext
+    from agentbox.core.resource.importers.base import ImporterContext
 
     try:
         result = ZipUploadImporter(
@@ -435,7 +435,7 @@ async def upload_schema_version(
             status_code=400, detail="resource is not of type 'schema'"
         )
     content = await file.read()
-    from agentbox.core.resources.importers.base import ImporterContext
+    from agentbox.core.resource.importers.base import ImporterContext
 
     try:
         result = SchemaImporter(
@@ -479,7 +479,7 @@ async def upload_script_version(
             status_code=400, detail="resource is not of type 'script'"
         )
     content = await file.read()
-    from agentbox.core.resources.importers.base import ImporterContext
+    from agentbox.core.resource.importers.base import ImporterContext
 
     try:
         result = ScriptImporter(
@@ -531,7 +531,7 @@ def export_pydantic(
     if not blob:
         raise HTTPException(status_code=404, detail="schema blob not found")
 
-    from agentbox.core.resources.pydantic_export import schema_to_pydantic
+    from agentbox.core.resource.pydantic_export import schema_to_pydantic
 
     schema_text = blob.get("content_text") or blob["content"].decode("utf-8")
     try:

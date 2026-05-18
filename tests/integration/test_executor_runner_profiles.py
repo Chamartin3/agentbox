@@ -14,13 +14,13 @@ from typing import Any
 import pytest
 from agentbox.api.events import DoneEvent, RunEvent, TextEvent
 from agentbox.config import Settings
-from agentbox.core.backends.base import RenderedConfig
+from agentbox.core.agent.profiles import RunnerProfileResolver
 from agentbox.core.data import SessionStore
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 from agentbox.core.data.runner_profiles import RunnerProfileCreate
-from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.executor import RunExecutor
-from agentbox.core.runner_profiles import RunnerProfileResolver
+from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.run.executor import RunExecutor
 
 # ============================================================================
 # Minimal BackendAdapter for executor tests
@@ -73,7 +73,7 @@ def _settings(tmp_path: Path) -> Settings:
 
 def _register_backend(name: str, adapter_cls: type) -> None:
     """Register a fake backend for testing."""
-    import agentbox.core.plugins as plugins
+    import agentbox.core.agent.plugins as plugins
 
     plugins.backends()  # warm cache
     plugins._BACKEND_CLASSES[name] = adapter_cls  # type: ignore[index]

@@ -5,7 +5,7 @@ from rich.tree import Tree
 
 from agentbox.cli._common import console
 from agentbox.config import load_settings
-from agentbox.core.definitions import DefinitionLoader
+from agentbox.core.deprecated.definitions import DefinitionLoader
 
 mf_app = typer.Typer(
     name="mf",

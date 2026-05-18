@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data.store import SessionStore
-from agentbox.core.resources.boot_import import (
+from agentbox.core.resource.boot_import import (
     import_one_skill,
     import_repo_resources,
     resolve_skill_roots,
@@ -50,7 +50,7 @@ def test_duplicate_skill_names_log_warning(
     _make_skill(tmp_path / "apps" / "cvman" / "mcp" / "skills", "dup", body="A")
     _make_skill(tmp_path / "agentbox" / "skills", "dup", body="B")
 
-    with caplog.at_level(logging.WARNING, logger="agentbox.core.resources.boot_import"):
+    with caplog.at_level(logging.WARNING, logger="agentbox.core.resource.boot_import"):
         import_repo_resources(store, tmp_path)
 
     msgs = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]

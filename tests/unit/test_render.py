@@ -27,8 +27,8 @@ def _settings(tmp_path):
 
 def _executor(tmp_path):
     from agentbox.core.data import SessionStore
-    from agentbox.core.definitions import DefinitionLoader
-    from agentbox.core.executor import RunExecutor
+    from agentbox.core.deprecated.definitions import DefinitionLoader
+    from agentbox.core.run.executor import RunExecutor
 
     settings = _settings(tmp_path)
     store = SessionStore(settings.db_path)
@@ -37,8 +37,8 @@ def _executor(tmp_path):
 
 
 def test_materialize_rendered_config_writes_files(tmp_path: Path) -> None:
-    from agentbox.core.backends.base import RenderedConfig
-    from agentbox.core.render import materialize_rendered_config
+    from agentbox.core.run.backends.base import RenderedConfig
+    from agentbox.core.run.render import materialize_rendered_config
 
     run_dir = tmp_path / "run-files"
     rendered = RenderedConfig(
@@ -54,8 +54,8 @@ def test_materialize_rendered_config_writes_files(tmp_path: Path) -> None:
 
 
 def test_materialize_rendered_config_empty_files(tmp_path: Path) -> None:
-    from agentbox.core.backends.base import RenderedConfig
-    from agentbox.core.render import materialize_rendered_config
+    from agentbox.core.run.backends.base import RenderedConfig
+    from agentbox.core.run.render import materialize_rendered_config
 
     run_dir = tmp_path / "run-empty"
     rendered = RenderedConfig(files={})
@@ -65,8 +65,8 @@ def test_materialize_rendered_config_empty_files(tmp_path: Path) -> None:
 
 
 def test_materialize_rendered_config_sets_file_permissions(tmp_path: Path) -> None:
-    from agentbox.core.backends.base import RenderedConfig
-    from agentbox.core.render import materialize_rendered_config
+    from agentbox.core.run.backends.base import RenderedConfig
+    from agentbox.core.run.render import materialize_rendered_config
 
     run_dir = tmp_path / "run-perm"
     rendered = RenderedConfig(
@@ -78,8 +78,8 @@ def test_materialize_rendered_config_sets_file_permissions(tmp_path: Path) -> No
 
 
 def test_materialize_rendered_config_existing_dir_raises(tmp_path: Path) -> None:
-    from agentbox.core.backends.base import RenderedConfig
-    from agentbox.core.render import RunDirExists, materialize_rendered_config
+    from agentbox.core.run.backends.base import RenderedConfig
+    from agentbox.core.run.render import RunDirExists, materialize_rendered_config
 
     run_dir = tmp_path / "run-collision"
     run_dir.mkdir()  # pre-exist
@@ -89,8 +89,8 @@ def test_materialize_rendered_config_existing_dir_raises(tmp_path: Path) -> None
 
 
 def test_materialize_rendered_config_parent_dirs_auto_created(tmp_path: Path) -> None:
-    from agentbox.core.backends.base import RenderedConfig
-    from agentbox.core.render import materialize_rendered_config
+    from agentbox.core.run.backends.base import RenderedConfig
+    from agentbox.core.run.render import materialize_rendered_config
 
     run_dir = tmp_path / "deep" / "nested" / "run-xyz"
     rendered = RenderedConfig(files={Path("a/b/c.json"): b"data"})
@@ -99,7 +99,7 @@ def test_materialize_rendered_config_parent_dirs_auto_created(tmp_path: Path) ->
 
 
 def test_cleanup_run_dir_removes_directory(tmp_path: Path) -> None:
-    from agentbox.core.executor import RunExecutor
+    from agentbox.core.run.executor import RunExecutor
 
     run_dir = tmp_path / "run-abc"
     run_dir.mkdir()
@@ -110,7 +110,7 @@ def test_cleanup_run_dir_removes_directory(tmp_path: Path) -> None:
 
 
 def test_cleanup_run_dir_skips_when_env_set(tmp_path: Path, monkeypatch) -> None:
-    from agentbox.core.executor import RunExecutor
+    from agentbox.core.run.executor import RunExecutor
 
     monkeypatch.setenv("AGENTBOX_KEEP_RUN_DIRS", "1")
     run_dir = tmp_path / "run-abc"
@@ -122,7 +122,7 @@ def test_cleanup_run_dir_skips_when_env_set(tmp_path: Path, monkeypatch) -> None
 
 
 def test_cleanup_run_dir_none_no_error() -> None:
-    from agentbox.core.executor import RunExecutor
+    from agentbox.core.run.executor import RunExecutor
 
     RunExecutor._cleanup_run_dir(None)
 
@@ -130,8 +130,8 @@ def test_cleanup_run_dir_none_no_error() -> None:
 def test_render_for_run_creates_run_dir_and_generates_configs(
     tmp_path: Path, monkeypatch
 ) -> None:
-    from agentbox.core.backends.claude_code import ClaudeCodeBackend
     from agentbox.core.data.manifest import AgentDef, RunnerSpec
+    from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
 
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     executor = _executor(tmp_path)
@@ -158,8 +158,8 @@ def test_render_for_run_creates_run_dir_and_generates_configs(
 
 
 def test_render_for_run_copies_claude_md(tmp_path: Path) -> None:
-    from agentbox.core.backends.claude_code import ClaudeCodeBackend
     from agentbox.core.data.manifest import AgentDef, RunnerSpec
+    from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
 
     executor = _executor(tmp_path)
 
@@ -184,9 +184,9 @@ def test_runs_tmpfs_dir_default(tmp_path: Path) -> None:
 
 
 def test_backend_includes_claude_md_in_files(tmp_path: Path) -> None:
-    from agentbox.core.backends.claude_code import ClaudeCodeBackend
-    from agentbox.core.backends.opencode import OpenCodeBackend
     from agentbox.core.data.manifest import AgentDef, RunnerSpec
+    from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
+    from agentbox.core.run.backends.opencode import OpenCodeBackend
 
     workdir = tmp_path / "workdir"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -205,10 +205,10 @@ def test_backend_includes_claude_md_in_files(tmp_path: Path) -> None:
 
 
 def test_backend_cwd_is_relative(tmp_path: Path) -> None:
-    from agentbox.core.backends.claude_code import ClaudeCodeBackend
-    from agentbox.core.backends.opencode import OpenCodeBackend
-    from agentbox.core.backends.token import TokenBackend
     from agentbox.core.data.manifest import AgentDef, RunnerSpec
+    from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
+    from agentbox.core.run.backends.opencode import OpenCodeBackend
+    from agentbox.core.run.backends.token import TokenBackend
 
     agent = AgentDef(id="t", runner=RunnerSpec(kind="claude_code"))
     workdir = tmp_path / "workdir"

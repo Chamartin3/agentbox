@@ -24,7 +24,7 @@ def test_jsonschema_importable() -> None:
 
 def test_no_basic_shape_check_fallback() -> None:
     """The executor must not have a _basic_shape_check fallback method."""
-    from agentbox.core.executor import RunExecutor
+    from agentbox.core.run.executor import RunExecutor
 
     assert not hasattr(RunExecutor, "_basic_shape_check"), (
         "_basic_shape_check was deleted in plan-011 — if it's back, "
@@ -41,10 +41,10 @@ class _ValidatorShim:
     shim adapts the new shape to the old tuple.
     """
 
-    def _validate_output(  # noqa: D401 - matches old signature exactly
+    def _validate_output(
         self, output: str, agent, workdir: Path
     ) -> tuple[bool, str, str]:
-        from agentbox.core.validation import validate_output
+        from agentbox.core.run.validation import validate_output
 
         r = validate_output(agent, workdir, output)
         return r.ok, r.error, r.engine

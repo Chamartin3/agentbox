@@ -60,6 +60,22 @@ def get_effective_mcp(
     return store.resolve_workspace_mcp(workspace_id, servers)
 
 
+@router.get("/api/workspaces/{workspace_id}/mcp/servers")
+def get_effective_servers(
+    workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
+):
+    """Effective per-workspace MCP servers — union of manifest + overrides."""
+    servers = _manifest_servers(store)
+    return store.resolve_workspace_mcp(workspace_id, servers)
+
+
+@router.get("/api/workspaces/{workspace_id}/mcp/policy")
+def get_policy(
+    workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
+):
+    return {"policy": store.get_workspace_mcp_policy(workspace_id)}
+
+
 @router.put("/api/workspaces/{workspace_id}/mcp/policy")
 def set_policy(
     workspace_id: str,

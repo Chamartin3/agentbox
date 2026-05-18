@@ -8,7 +8,7 @@ to narrow the set when desired.
 
 from __future__ import annotations
 
-from agentbox.core.backends.claude_code import _intersect_allowed_tools
+from agentbox.core.run.backends.claude_code import _intersect_allowed_tools
 
 
 def test_both_empty_returns_empty() -> None:

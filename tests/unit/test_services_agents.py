@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from agentbox.core.data.manifest import AgentDef, ProjectManifest
 from agentbox.core.data.store import SessionStore
-from agentbox.core.services.agents import list_all_agents, resolve_agent
+from agentbox.core.service.agents import list_all_agents, resolve_agent
 
 
 def _make_agent_def(agent_id: str, description: str = "") -> AgentDef:

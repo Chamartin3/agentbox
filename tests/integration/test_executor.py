@@ -8,16 +8,20 @@ from pathlib import Path
 
 from agentbox.api.events import DoneEvent, RunEvent, TextEvent
 from agentbox.config import Settings
-from agentbox.core.backends.base import RenderedConfig
 from agentbox.core.data import SessionStore, read_transcript
-from agentbox.core.definitions import (
+from agentbox.core.deprecated.definitions import (
     AgentDef,
     DefinitionLoader,
     GuardrailRef,
     RunnerSpec,
 )
-from agentbox.core.executor import RunExecutor
-from agentbox.core.guardrails.base import Guardrail, GuardrailContext, GuardrailResult
+from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.run.executor import RunExecutor
+from agentbox.core.run.guardrails.base import (
+    Guardrail,
+    GuardrailContext,
+    GuardrailResult,
+)
 
 
 class _EchoAdapter:
@@ -59,7 +63,7 @@ def _settings(tmp_path: Path) -> Settings:
 
 
 def _register(name: str, adapter_cls: type) -> None:
-    import agentbox.core.plugins as plugins
+    import agentbox.core.agent.plugins as plugins
 
     plugins.backends()  # warm cache
     plugins._BACKEND_CLASSES[name] = adapter_cls  # type: ignore[index]
@@ -73,7 +77,7 @@ def test_executor_runs_and_invokes_guardrail(tmp_path: Path, monkeypatch) -> Non
 
     _register("echo_backend", _EchoAdapter)
 
-    import agentbox.core.plugins as plugins
+    import agentbox.core.agent.plugins as plugins
 
     plugins._GUARDRAIL_CLASSES = {"echo": _ContainsHello}  # type: ignore[attr-defined]
 

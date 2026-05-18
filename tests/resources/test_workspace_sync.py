@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from agentbox.core.data.store import SessionStore
-from agentbox.core.workspace_sync import sync_workspace, sync_workspace_by_name
+from agentbox.core.workspace.sync import sync_workspace, sync_workspace_by_name
 
 
 @pytest.fixture

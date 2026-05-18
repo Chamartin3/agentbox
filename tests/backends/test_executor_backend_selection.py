@@ -5,12 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.config import Settings
+from agentbox.core.agent.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data import SessionStore
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
-from agentbox.core.definitions import DefinitionLoader
-from agentbox.core.executor import NoBackendAvailable, RunExecutor
-from agentbox.core.runner_profiles import EffectiveRunnerConfig
+from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.run.executor import NoBackendAvailable, RunExecutor
 
 
 def _make_settings(tmp_path: Path) -> Settings:

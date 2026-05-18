@@ -46,18 +46,18 @@ from agentbox.api.routes import (
 from agentbox.api.routes import (
     settings as settings_routes,
 )
-from agentbox.core.resources.boot_import import (
+from agentbox.core.prompt.versioning.drift import startup_sweep
+from agentbox.core.resource.boot_import import (
     import_composition_references,
     import_repo_resources,
     sweep_workspace_skill_bindings,
 )
-from agentbox.core.resources.composition_to_bindings import (
+from agentbox.core.resource.composition_to_bindings import (
     migrate_composition_to_bindings,
 )
-from agentbox.core.resources.legacy_migration import (
+from agentbox.core.resource.legacy_migration import (
     migrate_shared_resources_to_repo,
 )
-from agentbox.core.versioning.drift import startup_sweep
 
 SPA_DIR = Path(__file__).parent.parent / "ui" / "static" / "dist"
 

@@ -23,8 +23,8 @@ from pathlib import Path
 
 import pytest
 from agentbox.api.events import DoneEvent, LogEvent, TextEvent
-from agentbox.core.backends.base import RenderedConfig
-from agentbox.core.backends.token import TokenBackend
+from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.run.backends.token import TokenBackend
 
 pytestmark = [
     pytest.mark.live_ollama,

@@ -61,7 +61,7 @@ manifest_dir = "{agents_dir}"
     manifest_obj = loader.load()
     agent = [a for a in manifest_obj.agents if a.id == "test_agent"][0]
 
-    from agentbox.core.versioning.drift import startup_sweep
+    from agentbox.core.prompt.versioning.drift import startup_sweep
 
     startup_sweep([agent], store, project_root=tmp_path)
 
@@ -141,7 +141,7 @@ manifest_dir = "{agents_dir}"
     manifest_obj = loader.load()
     agent = [a for a in manifest_obj.agents if a.id == "test_agent"][0]
 
-    from agentbox.core.versioning.drift import startup_sweep
+    from agentbox.core.prompt.versioning.drift import startup_sweep
 
     startup_sweep([agent], store, project_root=tmp_path)
 

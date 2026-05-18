@@ -14,8 +14,8 @@ from rich.tree import Tree
 from agentbox.api.deps import get_loader
 from agentbox.cli._common import console
 from agentbox.config import load_settings
-from agentbox.core.config_generation import ConfigGenerator
-from agentbox.core.mcp import McpRegistry
+from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.workspace.mcp.client import McpRegistry
 
 cfg_app = typer.Typer(
     name="cfg",

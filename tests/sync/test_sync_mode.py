@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data.store import SessionStore
-from agentbox.core.definitions.loader import DefinitionLoader
-from agentbox.core.sync.watcher import _process_changes
+from agentbox.core.deprecated.definitions.loader import DefinitionLoader
+from agentbox.core.infra.sync.watcher import _process_changes
 
 
 @pytest.fixture

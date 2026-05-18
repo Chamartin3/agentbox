@@ -32,7 +32,7 @@ def _register_noop_backend() -> None:
     while the actual subprocess is never invoked.
     """
     from agentbox.api.events import DoneEvent, RunEvent
-    from agentbox.core.backends.base import RenderedConfig
+    from agentbox.core.run.backends.base import RenderedConfig
 
     class _NoopBackend:
         name = "claude_code"
@@ -45,7 +45,7 @@ def _register_noop_backend() -> None:
         ) -> AsyncIterator[RunEvent]:
             yield DoneEvent(run_id=run_id, ok=True, output="noop done")
 
-    import agentbox.core.plugins as _plugins
+    import agentbox.core.agent.plugins as _plugins
 
     _plugins.backends()  # warm the cache
     _plugins._BACKEND_CLASSES["claude_code"] = _NoopBackend  # type: ignore[index]
@@ -175,7 +175,7 @@ def test_mcp_servers_in_manifest_parse(isolated_data_dir: Path) -> None:
     manifest = isolated_data_dir / "manifest.toml"
     manifest.write_text(_NOOP_MCP_SERVER_TOML)
 
-    from agentbox.core.definitions import DefinitionLoader
+    from agentbox.core.deprecated.definitions import DefinitionLoader
 
     loader = DefinitionLoader(isolated_data_dir)
     m = loader.load()

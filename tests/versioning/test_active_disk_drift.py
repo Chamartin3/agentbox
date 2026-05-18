@@ -12,8 +12,8 @@ import json
 from pathlib import Path
 
 from agentbox.core.data.manifest import AgentDef, AgentSource, RunnerSpec
-from agentbox.core.definitions.loader import DefinitionLoader
-from agentbox.core.versioning.drift import _build_config_json, startup_sweep
+from agentbox.core.deprecated.definitions.loader import DefinitionLoader
+from agentbox.core.prompt.versioning.drift import _build_config_json, startup_sweep
 
 
 def _write_agent(root: Path, agent_id: str, timeout_seconds: int) -> Path:
