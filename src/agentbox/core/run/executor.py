@@ -38,10 +38,10 @@ from agentbox.core.agent.profiles import (
     EffectiveRunnerConfig,
     RunnerProfileResolver,
 )
-from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS, RunStatus
+from agentbox.core.constants import RunStatus
 from agentbox.core.data import SessionStore
+from agentbox.core.data.manifest import AgentDef
 from agentbox.core.data.schema import runs as _runs_table
-from agentbox.core.deprecated.definitions import AgentDef, DefinitionLoader
 from agentbox.core.infra.host_env.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
@@ -166,48 +166,38 @@ def _classify_terminal_error(err: str | None) -> str | None:
 def _load_workspace_permissions(
     workdir: Path,
     agent: AgentDef,
-    loader: DefinitionLoader,
     settings: Settings,
     store: SessionStore | None = None,
 ) -> dict:
-    """Resolve effective workspace permissions: WorkspaceDef <- DB overlay.
+    """Resolve effective workspace permissions from the DB overlay.
 
-    1. Manifest defaults from ``WorkspaceDef``.
-    2. DB overlay row from ``workspace_runtime_permissions`` (single source
-       of truth for built-in tools, file scopes, max_tokens, flags).
-    3. ``capabilities.json`` is no longer consulted — it is a derived
-       artifact written by the workspaces route + config generator.
+    ``workspace_runtime_permissions`` is the single source of truth for
+    built-in tools, file scopes, max_tokens, and network/write flags.
+    Workspaces with no overlay row receive an empty permissions dict —
+    callers downstream treat that as "no constraints declared".
     """
+    if not agent.workspace or agent.workspace == "<ephemeral>":
+        return {}
+    if store is None:
+        return {}
     try:
-        if not agent.workspace or agent.workspace == "<ephemeral>":
-            return {}
-        ws_def = loader.get_workspace(agent.workspace)
-        if ws_def is None:
-            return {}
-        perms: dict = {
-            "allowed_tools": list(ws_def.allowed_tools),
-            "allowed_builtin_tools": list(ws_def.allowed_builtin_tools),
-            "files": [f.model_dump() for f in ws_def.files],
-            "max_tokens": ws_def.max_tokens,
-            "allow_file_write": ws_def.allow_file_write,
-            "allow_network": ws_def.allow_network,
-        }
-        if store is not None:
-            overlay = store.get_workspace_runtime_permissions(agent.workspace)
-            if overlay:
-                if overlay.get("allowed_builtin_tools") is not None:
-                    perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
-                if overlay.get("files") is not None:
-                    perms["files"] = overlay["files"]
-                if overlay.get("max_tokens") is not None:
-                    perms["max_tokens"] = overlay["max_tokens"]
-                if overlay.get("allow_file_write") is not None:
-                    perms["allow_file_write"] = bool(overlay["allow_file_write"])
-                if overlay.get("allow_network") is not None:
-                    perms["allow_network"] = bool(overlay["allow_network"])
-        return perms
+        overlay = store.get_workspace_runtime_permissions(agent.workspace)
     except Exception:
         return {}
+    if not overlay:
+        return {}
+    perms: dict = {}
+    if overlay.get("allowed_builtin_tools") is not None:
+        perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
+    if overlay.get("files") is not None:
+        perms["files"] = overlay["files"]
+    if overlay.get("max_tokens") is not None:
+        perms["max_tokens"] = overlay["max_tokens"]
+    if overlay.get("allow_file_write") is not None:
+        perms["allow_file_write"] = bool(overlay["allow_file_write"])
+    if overlay.get("allow_network") is not None:
+        perms["allow_network"] = bool(overlay["allow_network"])
+    return perms
 
 
 class NoBackendAvailable(RuntimeError):
@@ -262,12 +252,10 @@ class RunExecutor:
         self,
         store: SessionStore,
         settings: Settings,
-        loader: DefinitionLoader,
         mcp_registry: McpRegistry | None = None,
     ):
         self.store = store
         self.settings = settings
-        self.loader = loader
         self._mcp_registry = mcp_registry
         self._broadcasters: dict[str, RunBroadcaster] = {}
         # Strong references to in-flight run tasks. asyncio only holds
@@ -282,20 +270,19 @@ class RunExecutor:
         self._profile_resolver = RunnerProfileResolver()
 
     def _make_generator(self) -> ConfigGenerator:
-        manifest = self.loader.load()
-        agentbox_toml = self.loader.manifest_path
+        project_root = self.settings.project_root
+        agentbox_toml = project_root / "agentbox.toml"
         mcp_manifest = self._try_get_mcp_manifest()
-        mcp_spec = manifest.mcp_servers[0] if manifest.mcp_servers else None
+        servers = self.store.get_project_mcp_servers()
+        mcp_spec = servers[0] if servers else None
         mcp_server_name = mcp_spec.name if mcp_spec else "mcp"
         mcp_url = mcp_spec.url if mcp_spec else None
         mcp_transport = str(mcp_spec.transport) if mcp_spec else "http"
         mcp_command = mcp_spec.command if mcp_spec and mcp_spec.command else ["mcp_serve.sh"]
-        # Static tool_manifest.json fallback (resolved relative to
-        # manifest.toml's parent) — used by discovery when the runtime
-        # MCP manifest is empty (server down, transport mismatch, etc.).
         static_manifest_path: Path | None = None
-        if manifest.tool_manifest_path:
-            candidate = agentbox_toml.parent / manifest.tool_manifest_path
+        tool_manifest_path = self.store.get_tool_manifest_path()
+        if tool_manifest_path:
+            candidate = project_root / tool_manifest_path
             if candidate.exists():
                 static_manifest_path = candidate
         return ConfigGenerator(
@@ -403,10 +390,9 @@ class RunExecutor:
                 load_bundle_from_bindings,
             )
 
-            manifest = self.loader.load()
             shared_roots = {
                 k: self.settings.project_root / v
-                for k, v in (manifest.shared_assets or {}).items()
+                for k, v in self.store.get_project_shared_assets().items()
             }
 
             # DB-as-source-of-truth (Plan 18): bundle inputs come from
@@ -432,9 +418,17 @@ class RunExecutor:
 
                 system_text = _append_validation_engine_hint(system_text, engine)
 
-            # Attach composed metadata so backend adapters can read it
+            # Attach composed metadata so backend adapters can read it.
+            # ``_composed_system`` is the fully-rendered system prompt
+            # (with input/output schema blocks + references appended) —
+            # what string-prompt backends use. The token backend reads
+            # the structured parts instead so it can feed pydantic-ai
+            # natively without duplicating schema injection.
             agent = agent.model_copy(deep=True)
             agent.__dict__["_composed_system"] = system_text
+            agent.__dict__["_composed_system_base"] = composed_result.system_base
+            agent.__dict__["_composed_references"] = composed_result.references
+            agent.__dict__["_composed_input_schema"] = composed_result.input_schema
             agent.__dict__["_composed_user"] = composed_result.user
             agent.__dict__["_composed_schema"] = composed_result.schema
             agent.__dict__["_composed_bundle_sha"] = composed_result.bundle_sha
@@ -600,6 +594,7 @@ class RunExecutor:
                     runner_profile_id_param=runner_profile,
                     runner_config_param=runner_config,
                     timeout_override=timeout_seconds,
+                    agent=agent,
                 ),
             )
         except Exception:
@@ -656,10 +651,9 @@ class RunExecutor:
         _mcp_snapshot: dict | None = None
         if _workspace_id:
             try:
-                manifest = self.loader.load()
                 manifest_servers = [
                     {"name": s.name, "config": {"url": s.url, "transport": str(s.transport)}}
-                    for s in (manifest.mcp_servers or [])
+                    for s in self.store.get_project_mcp_servers()
                 ]
                 _mcp_snapshot = self.store.resolve_workspace_mcp(
                     _workspace_id, manifest_servers
@@ -795,9 +789,7 @@ class RunExecutor:
                 try:
                     from agentbox.core.service.agents import resolve_agent
 
-                    agent = resolve_agent(
-                        refreshed.agent_id, store=self.store, loader=self.loader
-                    )
+                    agent = resolve_agent(refreshed.agent_id, store=self.store)
                 except Exception:
                     logger.exception(
                         "cancel_run: failed to resolve agent for webhook delivery (run %s)",
@@ -906,6 +898,7 @@ class RunExecutor:
         runner_profile_id_param: str | None,
         runner_config_param: dict[str, Any] | None,
         timeout_override: int | None,
+        agent: AgentDef | None = None,
     ) -> dict[str, Any]:
         """Compose the append-only runner_snapshot dict for a run.
 
@@ -941,12 +934,14 @@ class RunExecutor:
         if timeout_override:
             overrides_applied["timeout_seconds"] = timeout_override
 
+        effective_timeout = timeout_override or agent.runner.timeout_seconds
+
         return {
             "profile_id": effective.profile_id,
             "profile_name": profile_name,
             "backend": effective.backend,
             "model": rendered_model or effective.model,
-            "timeout_seconds": effective.timeout_seconds,
+            "timeout_seconds": effective_timeout,
             "provider": effective.provider,
             "extra_args": list(effective.extra_args or []),
             "source": effective.source,
@@ -964,14 +959,14 @@ class RunExecutor:
             original = agent.workspace
             agent.workspace = workspace_override
             try:
-                path, ephemeral = resolve_path(agent, self.settings, self.loader)
+                path, ephemeral = resolve_path(agent, self.settings, self.store)
             finally:
                 agent.workspace = original
             if not ephemeral:
                 path.mkdir(parents=True, exist_ok=True)
                 return path, session_id
 
-        path, ephemeral = resolve_path(agent, self.settings, self.loader)
+        path, ephemeral = resolve_path(agent, self.settings, self.store)
         if not ephemeral:
             path.mkdir(parents=True, exist_ok=True)
             return path, session_id
@@ -1008,7 +1003,7 @@ class RunExecutor:
         materialize_rendered_config(rendered, run_dir)
 
         permissions = _load_workspace_permissions(
-            workdir, agent, self.loader, self.settings, self.store
+            workdir, agent, self.settings, self.store
         )
         generator = self._make_generator()
         generator.generate_configs_into(
@@ -1120,8 +1115,10 @@ class RunExecutor:
         max_attempts = 1 + error_retries_left + validation_retries_left
 
         timeout = (
-            effective.timeout_seconds if effective is not None else None
-        ) or DEFAULT_RUNNER_TIMEOUT_SECONDS
+            effective.timeout_seconds
+            if effective is not None and effective.timeout_seconds
+            else agent.runner.timeout_seconds
+        )
 
         # ``timeout`` is the per-RUN wall-clock budget, shared across every
         # error/validation retry attempt below — not a per-attempt allowance.

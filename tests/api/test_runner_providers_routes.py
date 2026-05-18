@@ -79,17 +79,6 @@ def test_list_provider_models_returns_descriptors(client: Any) -> None:
     assert len(expected_providers & provider_ids) > 0
 
 
-def test_deprecated_manifest_runner_models(client: Any) -> None:
-    """Test the deprecated /api/manifest/runner-models endpoint now includes deprecation notice."""
-    resp = client.get("/api/manifest/runner-models", params={"kind": "claude_code"})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "deprecated" in data
-    assert data["deprecated"] is True
-    assert "replacement" in data
-    assert "/api/runner-providers" in data["replacement"]
-
-
 def test_list_provider_models_with_profile_id(client: Any) -> None:
     """Test listing models using a stored runner profile for configuration."""
     # First, create a runner profile

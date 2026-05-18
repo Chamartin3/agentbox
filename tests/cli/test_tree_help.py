@@ -13,7 +13,6 @@ def test_root_help() -> None:
     assert "ws" in result.output
     assert "runs" in result.output
     assert "cfg" in result.output
-    assert "mf" in result.output
     assert "mcp" in result.output
     assert "migrate" in result.output
     assert "serve" in result.output
@@ -53,13 +52,6 @@ def test_cfg_help() -> None:
     assert "show" in result.output
     assert "paths" in result.output
     assert "gen" in result.output
-
-
-def test_mf_help() -> None:
-    result = runner.invoke(app, ["mf", "--help"])
-    assert result.exit_code == 0
-    assert "show" in result.output
-    assert "check" in result.output
 
 
 def test_mcp_help() -> None:

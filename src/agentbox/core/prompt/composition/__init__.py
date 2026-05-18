@@ -125,14 +125,41 @@ def _append_validation_engine_hint(
 
 
 @dataclass(frozen=True)
+class ComposedReference:
+    """One reference section as composed (raw, rendered text)."""
+
+    path: str
+    heading: str
+    content: str
+
+
+@dataclass(frozen=True)
 class ComposeResult:
-    """Result of composing a prompt bundle."""
+    """Result of composing a prompt bundle.
+
+    ``system`` is the fully-composed system prompt (base + input schema
+    block + references + output schema block) — what file-based backends
+    (claude_code, opencode, codex, pi) need.
+
+    ``system_base`` is the raw rendered system prompt **without** the
+    auto-appended schema/reference blocks. The token backend uses this
+    because pydantic-ai injects its own schema description and the
+    reference content goes via deps; appending the schema again would
+    duplicate (and potentially conflict with) what pydantic-ai sends.
+
+    ``references`` and ``input_schema`` are likewise the structured
+    pieces, available so backends can route them to native channels
+    instead of string-concatenation.
+    """
 
     system: str
     user: str
     schema: dict[str, Any] | None
     schema_sha: str | None
     bundle_sha: str
+    system_base: str = ""
+    references: tuple[ComposedReference, ...] = ()
+    input_schema: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -433,19 +460,28 @@ def compose_from_source(
     (the raw braces and any Jinja-style ``{% %}`` blocks are kept verbatim).
     """
     system_raw = source.read_system()
-    system_rendered = _format_template(system_raw, variables) if render else system_raw
+    system_base = _format_template(system_raw, variables) if render else system_raw
+
+    # Build the "full" composed system for backends that send everything as
+    # a single prompt string. ``system_base`` stays clean for backends that
+    # have native channels for schemas/references (token → pydantic-ai).
+    system_rendered = system_base
 
     input_schema_info = source.read_input_schema()
+    input_schema: dict[str, Any] | None = None
     if input_schema_info is not None:
-        system_rendered = _append_input_schema(
-            system_rendered, input_schema_info.schema
-        )
+        input_schema = input_schema_info.schema
+        system_rendered = _append_input_schema(system_rendered, input_schema)
 
     refs = source.references()
+    composed_refs: list[ComposedReference] = []
     ref_parts: list[str] = []
     for ref in refs:
         content = source.read_reference(ref)
         heading = ref.heading or _ref_heading_fallback(ref.path)
+        composed_refs.append(
+            ComposedReference(path=ref.path, heading=heading, content=content)
+        )
         ref_parts.append(f"## {heading}\n\n{content}")
     if ref_parts:
         system_rendered = system_rendered + "\n\n" + "\n\n".join(ref_parts)
@@ -478,6 +514,9 @@ def compose_from_source(
         schema=schema,
         schema_sha=schema_sha,
         bundle_sha=bundle_sha,
+        system_base=system_base,
+        references=tuple(composed_refs),
+        input_schema=input_schema,
     )
 
 
@@ -485,6 +524,7 @@ __all__ = [
     "BindingsBundleSource",
     "BundleSource",
     "ComposeResult",
+    "ComposedReference",
     "CompositionPreview",
     "ReferencePreview",
     "compose",

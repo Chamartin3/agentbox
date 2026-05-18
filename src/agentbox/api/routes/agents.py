@@ -60,7 +60,7 @@ def list_agents() -> list[dict]:
 
     def _enrich(agent: AgentDef) -> dict:
         try:
-            workspace_str = str(ws.resolve_path(agent, settings, loader)[0])
+            workspace_str = str(ws.resolve_path(agent, settings, store)[0])
         except Exception:
             workspace_str = ""
         active = store.get_active_version(agent.id)
@@ -96,7 +96,7 @@ def get_agent(agent_id: str) -> dict:
             prompt = agent.load_prompt(settings.project_root)
         except FileNotFoundError:
             prompt = ""
-    workspace_path, ephemeral = ws.resolve_path(agent, settings, loader)
+    workspace_path, ephemeral = ws.resolve_path(agent, settings, store)
 
     # Composed view — render the DB bundle the same way the runner would.
     # Returns the fully assembled system prompt (with references appended)

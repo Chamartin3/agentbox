@@ -30,6 +30,7 @@ from agentbox.core.data.env_docs import EnvDocsMixin
 from agentbox.core.data.host_env import HostEnvMixin
 from agentbox.core.data.mcp_discovery import McpDiscoveryMixin
 from agentbox.core.data.mcp_overrides import McpOverridesMixin
+from agentbox.core.data.project_config import ProjectConfigMixin
 from agentbox.core.data.prompts import PromptVersionsMixin
 from agentbox.core.data.records import RunRecord, now_iso, row_to_run
 from agentbox.core.data.resource_bindings import ResourceBindingsMixin
@@ -743,6 +744,7 @@ class SessionStore(
     HostEnvMixin,
     RunnerProfilesMixin,
     SettingsMixin,
+    ProjectConfigMixin,
     ApiTokensMixin,
     AnalyticsMixin,
     _CoreStore,

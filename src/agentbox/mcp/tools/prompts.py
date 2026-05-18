@@ -220,10 +220,9 @@ def register(mcp: FastMCP) -> None:
         if not (bundle_path / "agent.toml").exists():
             return {"error": "not_a_bundle", "agent_id": agent_id,
                     "detail": f"no agent.toml in {bundle_path}"}
-        manifest = ctx.loader.load()
         shared_roots: dict[str, Path] = {
             key: ctx.settings.project_root / rel
-            for key, rel in (manifest.shared_assets or {}).items()
+            for key, rel in (ctx.store.get_project_shared_assets() or {}).items()
         }
         try:
             prev = preview_composition(bundle_path, shared_roots)

@@ -25,7 +25,7 @@ export default function ManifestEditor({ agent, onSaved, onError }: Props) {
 
   // Runner config (kind+model live on the bound runner profile; only
   // agent-level execution overrides are edited here).
-  const [timeout, setTimeoutSec] = useState(String(agent.runner.timeout_seconds));
+  const [timeout, setTimeoutSec] = useState((agent.runner.timeout_seconds == null ? '' : String(agent.runner.timeout_seconds)));
   const [maxValidationRetries, setMaxValidationRetries] = useState(
     String(agent.runner.max_validation_retries),
   );
@@ -42,7 +42,7 @@ export default function ManifestEditor({ agent, onSaved, onError }: Props) {
     setTags(agent.tags);
     setTagInput('');
     setWebhookUrl(agent.webhook_url || '');
-    setTimeoutSec(String(agent.runner.timeout_seconds));
+    setTimeoutSec((agent.runner.timeout_seconds == null ? '' : String(agent.runner.timeout_seconds)));
     setMaxValidationRetries(String(agent.runner.max_validation_retries));
     setMaxErrorRetries(String(agent.runner.max_error_retries));
     setValidationEngine(agent.runner.output_validation_engine || 'both');
@@ -105,7 +105,7 @@ export default function ManifestEditor({ agent, onSaved, onError }: Props) {
     workspace !== (agent.workspace || '') ||
     tagsDirty ||
     webhookUrl !== (agent.webhook_url || '') ||
-    timeout !== String(agent.runner.timeout_seconds) ||
+    timeout !== (agent.runner.timeout_seconds == null ? '' : String(agent.runner.timeout_seconds)) ||
     maxValidationRetries !== String(agent.runner.max_validation_retries) ||
     maxErrorRetries !== String(agent.runner.max_error_retries) ||
     validationEngine !== (agent.runner.output_validation_engine || 'both');
@@ -131,7 +131,7 @@ export default function ManifestEditor({ agent, onSaved, onError }: Props) {
       patch.webhook_url = webhookUrl.trim() || null;
     }
 
-    if (timeout !== String(agent.runner.timeout_seconds)) {
+    if (timeout !== (agent.runner.timeout_seconds == null ? '' : String(agent.runner.timeout_seconds))) {
       const n = parseInt(timeout, 10);
       if (Number.isFinite(n) && n > 0) runnerPatch.timeout_seconds = n;
     }

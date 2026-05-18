@@ -19,12 +19,6 @@ from agentbox.core.data.mcp_overrides import VALID_POLICIES
 from agentbox.core.data.runner_profiles import RunnerProfile, RunnerProfileCreate
 from agentbox.core.data.store import SessionStore
 
-# ── Deprecated ────────────────────────────────────────────────────────
-from agentbox.core.deprecated.definitions import (
-    DefinitionLoader,
-    ManifestWriter,
-)
-
 # ── Infra ─────────────────────────────────────────────────────────────
 from agentbox.core.infra.host_env import CAPABILITIES
 

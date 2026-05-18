@@ -85,7 +85,10 @@ class RunnerSpec(BaseModel):
 
     # --- Shared across all runners ---
 
-    timeout_seconds: int | None = None
+    timeout_seconds: int = 1200
+    """Run timeout in seconds. The agent's runner config is the single source
+    of truth — runner profiles do not carry a timeout. A per-run override on
+    ``POST /api/runs`` wins over this value."""
 
     extra_args: list[str] = Field(default_factory=list)
     """Extra CLI args passed verbatim (claude_code / opencode only)."""

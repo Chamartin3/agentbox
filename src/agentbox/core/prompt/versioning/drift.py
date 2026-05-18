@@ -65,7 +65,7 @@ def _build_config_json(agent: AgentDef) -> str:
     ``config_json`` is the DB-as-source-of-truth payload consumed by
     ``AgentDef.from_db_row`` at runtime, so it MUST round-trip every
     runner field — defaults included — to prevent silent revert to the
-    pydantic default (e.g. ``timeout_seconds=120``).
+    pydantic default at read time.
     """
     from agentbox.core.agent.config import build_config_json_payload
 

@@ -27,8 +27,8 @@ from agentbox.api.routes import (
     env_doc,
     health,
     host_env,
-    manifest,
     mcp,
+    project_settings,
     prompts,
     providers_alias,
     repo_resources,
@@ -115,10 +115,11 @@ def _on_startup() -> None:
         _log.warning("manifest load failed: %s; continuing anyway", exc)
 
     # Phase 2: MCP (best-effort, non-blocking)
-    if loaded_manifest and loaded_manifest.mcp_servers:
+    project_mcp_servers = store.get_project_mcp_servers()
+    if project_mcp_servers:
         try:
             registry = _deps.get_mcp_registry()
-            specs = [s.model_dump() for s in loaded_manifest.mcp_servers]
+            specs = [s.model_dump() for s in project_mcp_servers]
             task = asyncio.ensure_future(registry.sync_servers(specs))
             task.add_done_callback(
                 lambda t: t.exception() if not t.cancelled() else None
@@ -141,7 +142,7 @@ def _on_startup() -> None:
             _project_root = settings.project_root
             _shared_roots = {
                 k: (_project_root / v).resolve()
-                for k, v in (loaded_manifest.shared_assets or {}).items()
+                for k, v in store.get_project_shared_assets().items()
             }
             startup_sweep(
                 loaded_manifest.agents,
@@ -248,16 +249,8 @@ def _on_startup() -> None:
     #      manifest, have no agent referencing them, and have no rows in
     #      any satellite table. On-disk dirs are left alone.
     try:
-        if loaded_manifest and loaded_manifest.workspaces:
-            store.sync_workspaces_from_manifest(
-                [
-                    {"name": w.name, "description": w.description, "path": w.path}
-                    for w in loaded_manifest.workspaces
-                ]
-            )
         keep_names: set[str] = {"default"}
         if loaded_manifest:
-            keep_names |= {w.name for w in loaded_manifest.workspaces}
             keep_names |= {a.workspace or "default" for a in loaded_manifest.agents}
         pruned = store.prune_phantom_workspaces(keep=keep_names)
         if pruned:
@@ -280,20 +273,25 @@ def _on_startup() -> None:
     # never ran. SessionStore._init reaps orphans synchronously at
     # construction time, before the event loop exists — so schedule_webhook
     # couldn't have fired then. We do it here, once the loop is up.
-    if loaded_manifest and loaded_manifest.agents:
-        try:
-            from agentbox.api.webhooks import schedule_webhook
+    #
+    # Agents are resolved via ``resolve_agent`` (DB first, manifest fallback)
+    # so DB-only agents and agents missing from the in-memory manifest still
+    # get their completion webhooks delivered.
+    try:
+        from agentbox.api.webhooks import schedule_webhook
+        from agentbox.core.service.agents import resolve_agent
 
-            agents_by_id = {a.id: a for a in loaded_manifest.agents}
-            pending = store.list_orphaned_unnotified_runs()
-            if pending:
-                _log.warning(
-                    "scheduling webhooks for %d orphan-reaped run(s)", len(pending)
-                )
-            for run in pending:
-                schedule_webhook(agents_by_id.get(run.agent_id), run, store)
-        except Exception:
-            _log.exception("orphan webhook dispatch failed")
+        loader = _deps.get_loader()
+        pending = store.list_orphaned_unnotified_runs()
+        if pending:
+            _log.warning(
+                "scheduling webhooks for %d orphan-reaped run(s)", len(pending)
+            )
+        for run in pending:
+            agent = resolve_agent(run.agent_id, store=store, loader=loader)
+            schedule_webhook(agent, run, store)
+    except Exception:
+        _log.exception("orphan webhook dispatch failed")
 
 
 def create_app() -> FastAPI:
@@ -328,7 +326,6 @@ def create_app() -> FastAPI:
     app.include_router(agents.router)
     app.include_router(usage.router)
     app.include_router(workspaces.router)
-    app.include_router(manifest.router)
     app.include_router(prompts.router)
     app.include_router(resources.router)
     app.include_router(repo_resources.router)
@@ -345,6 +342,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(versions.router)
     app.include_router(settings_routes.router)
+    app.include_router(project_settings.router)
     app.include_router(api_tokens.router)
 
     # SPA assets.

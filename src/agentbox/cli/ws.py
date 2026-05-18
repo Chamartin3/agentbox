@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 from rich.text import Text
 
-from agentbox.api.deps import get_loader, get_settings
+from agentbox.api.deps import get_settings, get_store
 from agentbox.cli._common import checkmark, console, resolve_agent
 from agentbox.core import workspaces as ws
 
@@ -31,9 +31,8 @@ def ws_ls() -> None:
     """List all configured agents and their workspaces."""
     from rich.table import Table
 
-    loader = get_loader()
     settings = get_settings()
-    rows = ws.list_all(loader, settings)
+    rows = ws.list_all(get_store(), settings)
     if not rows:
         console.print("[yellow]No agents declared.[/yellow]")
         return
@@ -87,7 +86,7 @@ def ws_path(
 def ws_new(agent: str, scaffold: bool = True) -> None:
     """Create the workspace directory (and scaffold a starter CLAUDE.md)."""
     a = resolve_agent(agent)
-    path = ws.ensure(a, get_settings(), get_loader(), scaffold=scaffold)
+    path = ws.ensure(a, get_settings(), get_store(), scaffold=scaffold)
     console.print(f"[green]✓[/green] workspace ready: [bold]{path}[/bold]")
 
 
@@ -103,7 +102,7 @@ def ws_reset(
         )
         raise typer.Exit(2)
     a = resolve_agent(agent)
-    path = ws.reset(a, get_settings(), get_loader())
+    path = ws.reset(a, get_settings(), get_store())
     console.print(f"[yellow]↻[/yellow] reset: [bold]{path}[/bold]")
 
 
@@ -114,7 +113,7 @@ def ws_edit(
 ) -> None:
     """Open a workspace file in $EDITOR (falls back to vi)."""
     a = resolve_agent(agent)
-    path = ws.ensure(a, get_settings(), get_loader(), scaffold=True)
+    path = ws.ensure(a, get_settings(), get_store(), scaffold=True)
     editor = os.environ.get("EDITOR", "vi")
     subprocess.call([editor, str(path / file)])
 
@@ -133,16 +132,16 @@ def _resolve_workspace(
     Returns (path, label) where label is the display name.
     """
     settings = get_settings()
-    loader = get_loader()
+    store = get_store()
 
-    ws_def = loader.get_workspace(name)
-    if ws_def is not None:
-        path = settings.project_root / ws_def.path
+    row = store.get_workspace(name) if hasattr(store, "get_workspace") else None
+    if row and row.get("path"):
+        path = settings.project_root / row["path"]
         path.mkdir(parents=True, exist_ok=True)
         return path, name
 
     a = resolve_agent(name)
-    path = ws.ensure(a, settings, loader, scaffold=True)
+    path = ws.ensure(a, settings, store, scaffold=True)
     return path, name
 
 
@@ -155,11 +154,12 @@ def _delegate_shell(name: str | None, generate: bool) -> int:
     """
     from agentbox.cli.launch import _launch_session
 
-    loader = get_loader()
+    store = get_store()
     workspace_arg: str | None = None
     agent_arg: str | None = None
     if name and name != "default":
-        if loader.get_workspace(name) is not None:
+        row = store.get_workspace(name) if hasattr(store, "get_workspace") else None
+        if row:
             workspace_arg = name
         else:
             agent_arg = name

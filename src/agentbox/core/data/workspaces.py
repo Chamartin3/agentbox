@@ -242,22 +242,3 @@ class WorkspacesMixin:
                 deleted.append(name)
         return deleted
 
-    def sync_workspaces_from_manifest(self, manifest_workspaces: list[dict]) -> None:
-        """Reconcile manifest-declared workspaces into the registry.
-
-        Called on boot with a list of ``{name, description, path}`` dicts
-        from the parsed agentbox.toml. Upserts with source='manifest'.
-        Does NOT delete: removing a workspace from the manifest just
-        changes its source back to 'db' (so a manual delete is required
-        to remove it). This avoids data loss on transient manifest reads.
-        """
-        for w in manifest_workspaces:
-            name = w.get("name")
-            if not name:
-                continue
-            self.upsert_workspace(
-                name,
-                description=w.get("description"),
-                path=w.get("path"),
-                source="manifest",
-            )

@@ -20,7 +20,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS, RunnerKind
+from agentbox.core.constants import RunnerKind
+
+_DEFAULT_AGENT_TIMEOUT = 1200
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
 from agentbox.core.run.backends.opencode import OpenCodeBackend
@@ -102,15 +104,14 @@ def test_active_version_always_overrides_default_timeout(
 ) -> None:
     """The active version's timeout must always override the default.
 
-    The fallback ``DEFAULT_RUNNER_TIMEOUT_SECONDS`` exists only as a
-    safety net for hand-constructed configs. Any agent rendered through
-    a backend must populate ``agent_meta["timeout_seconds"]`` with the
-    agent's own value — never leave it unset and never let the default
-    leak through. We pick an explicit value distinct from the default so
-    a regression that drops the field (``.get(...)`` returning the
-    default) would be caught.
+    The agent's runner config is the single source of truth for
+    timeout. Any agent rendered through a backend must populate
+    ``agent_meta["timeout_seconds"]`` with the agent's own value — never
+    leave it unset. We pick an explicit value distinct from the
+    ``RunnerSpec`` default so a regression that drops the field would
+    be caught.
     """
-    explicit_timeout = DEFAULT_RUNNER_TIMEOUT_SECONDS + 137
+    explicit_timeout = _DEFAULT_AGENT_TIMEOUT + 137
     agent = _agent(runner_kind, timeout=explicit_timeout)
     rendered = backend_cls().render(agent, tmp_path)
 
@@ -119,7 +120,7 @@ def test_active_version_always_overrides_default_timeout(
         "from the active config — never leave the runner to fall back to the default"
     )
     assert rendered.agent_meta["timeout_seconds"] == explicit_timeout
-    assert rendered.agent_meta["timeout_seconds"] != DEFAULT_RUNNER_TIMEOUT_SECONDS, (
-        "active version's value must override the default; if these match by "
-        "coincidence the test is not exercising the override path"
+    assert rendered.agent_meta["timeout_seconds"] != _DEFAULT_AGENT_TIMEOUT, (
+        "active version's value must override the RunnerSpec default; if these "
+        "match by coincidence the test is not exercising the override path"
     )

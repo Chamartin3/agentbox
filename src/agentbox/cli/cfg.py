@@ -11,7 +11,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.tree import Tree
 
-from agentbox.api.deps import get_loader
+from agentbox.api.deps import get_store
 from agentbox.cli._common import console
 from agentbox.config import load_settings
 from agentbox.core.run.config import ConfigGenerator
@@ -91,10 +91,11 @@ def cfg_paths() -> None:
         _add(settings.outputs_dir, tree, "outputs/")
 
     ws = tree.add("[bold]workspaces/[/bold]")
-    for a in get_loader().load().agents:
-        from agentbox.core import workspaces as ws_mod
+    from agentbox.core import workspaces as ws_mod
+    from agentbox.core.service.agents import list_all_agents
 
-        path, _eph = ws_mod.resolve_path(a, settings, get_loader())
+    for a in list_all_agents(store=get_store()):
+        path, _eph = ws_mod.resolve_path(a, settings, get_store())
         _add(path, ws, a.id + (" [yellow](ephemeral)[/yellow]" if _eph else ""))
 
     data = tree.add("[bold]/data[/bold]")
@@ -112,16 +113,16 @@ def cfg_gen(
 ) -> None:
     """Generate runner configs into a temp dir and print the JSON (diagnostic dry-run)."""
     settings = load_settings()
-    loader = get_loader()
-    manifest = loader.load()
+    from agentbox.core.service.agents import list_all_agents
 
+    all_agents = list_all_agents(store=get_store())
     if agent is not None:
-        target_agents = [a for a in manifest.agents if a.id == agent]
+        target_agents = [a for a in all_agents if a.id == agent]
         if not target_agents:
             console.print(f"[red]unknown agent[/red] {agent!r}")
             raise typer.Exit(2)
     else:
-        target_agents = manifest.agents
+        target_agents = all_agents
 
     if not target_agents:
         console.print("[yellow]No agents to generate configs for.[/yellow]")
@@ -133,8 +134,9 @@ def cfg_gen(
     mcp_url: str | None = None
     mcp_transport: str = "http"
 
-    if manifest.mcp_servers:
-        srv = manifest.mcp_servers[0]
+    servers = get_store().get_project_mcp_servers()
+    if servers:
+        srv = servers[0]
         mcp_server_name = srv.name
         mcp_url = srv.url
         mcp_transport = srv.transport

@@ -8,26 +8,38 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 from agentbox.config import Settings, load_settings
 from agentbox.core.data import SessionStore
-from agentbox.core.deprecated.definitions import DefinitionLoader
+from agentbox.core.data.manifest import ProjectManifest
+
+
+class _NoopLoader:
+    """Empty loader stub — see ``agentbox.api.deps._NoopLoader``."""
+
+    def get(self, agent_id: str) -> Any:
+        return None
+
+    def load(self) -> ProjectManifest:
+        return ProjectManifest()
+
+    def get_workspace(self, name: str) -> Any:
+        return None
+
+    def list_workspaces(self) -> list:
+        return []
 
 
 @dataclass(frozen=True)
 class Context:
     settings: Settings
     store: SessionStore
-    loader: DefinitionLoader
+    loader: _NoopLoader
 
 
 @lru_cache(maxsize=1)
 def get_context() -> Context:
     settings = load_settings()
     store = SessionStore(settings.db_path)
-    loader = DefinitionLoader(
-        settings.project_root,
-        manifest_path=settings.manifest_path,
-        agents_bundle_dir=settings.agents_bundle_dir,
-    )
-    return Context(settings=settings, store=store, loader=loader)
+    return Context(settings=settings, store=store, loader=_NoopLoader())

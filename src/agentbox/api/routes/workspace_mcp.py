@@ -38,17 +38,12 @@ def _manifest_servers(store: SessionStore) -> list[dict]:
     not require any other fields. If the manifest is not loaded, returns
     an empty list — callers see the "no manifest" case explicitly.
     """
-    try:
-        from agentbox.api.deps import get_loader
-
-        manifest = get_loader().load()
-    except Exception:
-        return []
-    if not manifest or not manifest.mcp_servers:
+    servers = store.get_project_mcp_servers()
+    if not servers:
         return []
     return [
         {"name": s.name, "config": s.model_dump(exclude={"name"})}
-        for s in manifest.mcp_servers
+        for s in servers
     ]
 
 

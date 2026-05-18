@@ -5,11 +5,9 @@
 #   include:
 #     - libs/agentbox/docker-compose.yml
 #
-# Required env (in the project's .env):
-#   AGENTBOX_MANIFEST       host path to the project's agentbox.toml,
-#                           bind-mounted read-only into the container as
-#                           /agentbox/manifest.toml.  The container will
-#                           refuse to start if this file is absent.
+# All project-level config is now DB-backed (SQLite in the agentbox-data
+# volume).  Run ``agentbox migrate import-manifest`` once if migrating from
+# a legacy agentbox.toml file.
 #
 # Optional env — add the corresponding volumes block to your override file
 #   when you need these mounts (see "Optional bind-mounts" in README):
@@ -53,8 +51,6 @@ services:
     tmpfs:
       - /run/agentbox:size=256m,mode=0700
     volumes:
-      # Required: project manifest (agentbox.toml on host → manifest.toml in container)
-      - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml
       # Named volumes — persisted, container-owned
       - agentbox-data:/data
       - agentbox-claude:/agentbox/creds/claude
@@ -68,7 +64,6 @@ services:
         required: false
     environment:
       - AGENTBOX_DATA_DIR=/data
-      - AGENTBOX_MANIFEST=/agentbox/manifest.toml
       - AGENTBOX_PORT=8765
       - HOME=/home/appuser
       - CLAUDE_CONFIG_DIR=/agentbox/creds/claude
@@ -101,11 +96,9 @@ services:
     ports:
       - "${AGENTBOX_MCP_PORT:-8766}:8766"
     volumes:
-      - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml
       - agentbox-data:/data
     environment:
       - AGENTBOX_DATA_DIR=/data
-      - AGENTBOX_MANIFEST=/agentbox/manifest.toml
       - AGENTBOX_MCP_TRANSPORT=http
       - AGENTBOX_MCP_HOST=0.0.0.0
       - AGENTBOX_MCP_PORT=8766

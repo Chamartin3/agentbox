@@ -13,7 +13,7 @@ from agentbox.config import Settings
 from agentbox.core.resource.skills import discover_skills
 
 if TYPE_CHECKING:
-    from agentbox.core.deprecated.definitions import AgentDef, DefinitionLoader
+    from agentbox.core.data.manifest import AgentDef
 
 
 @dataclass(frozen=True)
@@ -29,34 +29,37 @@ class WorkspaceInfo:
 
 
 def resolve_path(
-    agent: AgentDef, settings: Settings, loader: DefinitionLoader
+    agent: AgentDef,
+    settings: Settings,
+    store: object | None = None,
 ) -> tuple[Path, bool]:
     """Return (workspace_path, is_ephemeral) for an agent.
 
     Resolution order:
-    1. Named workspace reference → look up in manifest workspaces table
-    2. "<ephemeral>" → tmp dir per run
+    1. "<ephemeral>" → tmp dir per run
+    2. Named workspace reference → DB workspaces table
     3. Explicit path → project-relative path
     4. Omitted → auto-resolved to ``<workspaces_root>/<agent_id>/``
     """
     if agent.workspace == "<ephemeral>":
         return settings.workspaces_root / agent.id, True
 
-    # Named workspace lookup
     if agent.workspace:
-        named = loader.get_workspace(agent.workspace)
-        if named is not None:
-            return settings.project_root / named.path, False
-        # Not a named workspace → treat as explicit path
+        if store is not None:
+            get_ws = getattr(store, "get_workspace", None)
+            if callable(get_ws):
+                row = get_ws(agent.workspace)
+                if row and row.get("path"):
+                    return settings.project_root / row["path"], False
         return settings.project_root / agent.workspace, False
 
     return settings.workspaces_root / agent.id, False
 
 
 def info(
-    agent: AgentDef, settings: Settings, loader: DefinitionLoader
+    agent: AgentDef, settings: Settings, store: object | None = None
 ) -> WorkspaceInfo:
-    path, ephemeral = resolve_path(agent, settings, loader)
+    path, ephemeral = resolve_path(agent, settings, store)
     has_claude_md = (path / "CLAUDE.md").exists() if path.exists() else False
     skill_count = len(discover_skills(path)) if path.exists() else 0
     return WorkspaceInfo(
@@ -84,10 +87,10 @@ Edit freely — changes take effect on the next run.
 
 
 def ensure(
-    agent: AgentDef, settings: Settings, loader: DefinitionLoader, scaffold: bool = True
+    agent: AgentDef, settings: Settings, store: object | None = None, scaffold: bool = True
 ) -> Path:
     """Create the workspace if missing. Optionally scaffold a starter CLAUDE.md."""
-    path, _ = resolve_path(agent, settings, loader)
+    path, _ = resolve_path(agent, settings, store)
     path.mkdir(parents=True, exist_ok=True)
     if scaffold and not (path / "CLAUDE.md").exists():
         (path / "CLAUDE.md").write_text(
@@ -96,16 +99,19 @@ def ensure(
     return path
 
 
-def reset(agent: AgentDef, settings: Settings, loader: DefinitionLoader) -> Path:
+def reset(agent: AgentDef, settings: Settings, store: object | None = None) -> Path:
     """Delete and recreate the workspace (drops everything inside)."""
-    path, _ = resolve_path(agent, settings, loader)
+    path, _ = resolve_path(agent, settings, store)
     if path.exists():
         shutil.rmtree(path)
-    return ensure(agent, settings, loader, scaffold=True)
+    return ensure(agent, settings, store, scaffold=True)
 
 
-def list_all(loader: DefinitionLoader, settings: Settings) -> list[WorkspaceInfo]:
-    return [info(a, settings, loader) for a in loader.load().agents]
+def list_all(store: object, settings: Settings) -> list[WorkspaceInfo]:
+    """List a WorkspaceInfo for every agent known to the DB."""
+    from agentbox.core.service.agents import list_all_agents
+
+    return [info(a, settings, store) for a in list_all_agents(store=store)]
 
 
 # ---------------------------------------------------------------------------

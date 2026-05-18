@@ -23,10 +23,12 @@ from pathlib import Path
 
 import typer
 
+from agentbox.api.deps import (
+    get_loader as _get_loader,  # _NoopLoader stub
+)
 from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
 from agentbox.core.data.manifest import AgentDef
-from agentbox.core.deprecated.definitions import DefinitionLoader
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.workspace.mcp.client import McpRegistry
 
@@ -133,12 +135,14 @@ def _launch_session(
     _require_binary(runner)
 
     settings = load_settings()
-    loader = DefinitionLoader(settings.project_root)
+    loader = _get_loader()
     manifest = loader.load()
 
     agent_def: AgentDef | None = None
     if agent:
-        agent_def = next((a for a in manifest.agents if a.id == agent), None)
+        from agentbox.api.deps import get_store as _gs
+
+        agent_def = _gs().get_agent_def(agent)
         if agent_def is None:
             console.print(f"[red]Unknown agent:[/red] {agent!r}")
             raise typer.Exit(1)
@@ -229,7 +233,7 @@ def _resolve_workspace(
     workspace_override: str | None,
     force_ephemeral: bool,
     settings: Settings,
-    loader: DefinitionLoader,
+    loader: object,
 ) -> tuple[Path, bool, str | None, str | None]:
     """Return (workspace_path, is_ephemeral, creds, workspace_name).
 
@@ -330,13 +334,14 @@ def _make_generator(
     manifest: object,
     workspace_id: str | None = None,
 ) -> ConfigGenerator:
+    from agentbox.api.deps import get_store
+
     mcp_server_name = "mcp"
     mcp_command: list[str] = ["mcp_serve.sh"]
     mcp_url: str | None = None
     mcp_transport: str = "http"
-    manifest_specs: list[object] = []
-    if hasattr(manifest, "mcp_servers") and manifest.mcp_servers:
-        manifest_specs = list(manifest.mcp_servers)
+    manifest_specs = list(get_store().get_project_mcp_servers())
+    if manifest_specs:
         srv = manifest_specs[0]
         mcp_server_name = srv.name
         mcp_url = srv.url
@@ -349,8 +354,6 @@ def _make_generator(
     # legacy entry (build_claude_mcp_config back-compat path).
     servers: list[dict] | None = None
     if workspace_id and manifest_specs:
-        from agentbox.api.deps import get_store
-
         manifest_dicts = [
             {"name": s.name, "config": s.model_dump(exclude={"name"})}
             for s in manifest_specs

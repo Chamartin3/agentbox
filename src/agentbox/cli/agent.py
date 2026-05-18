@@ -8,9 +8,10 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.api.deps import get_loader, get_settings, get_store
+from agentbox.api.deps import get_settings, get_store
 from agentbox.cli._common import console, resolve_agent
 from agentbox.core import prompts
+from agentbox.core.service.agents import list_all_agents
 
 agent_app = typer.Typer(
     name="agent",
@@ -21,12 +22,10 @@ agent_app = typer.Typer(
 
 @agent_app.command("ls")
 def agent_ls() -> None:
-    """List agents declared in the project manifest."""
-    rows = get_loader().load().agents
+    """List agents registered in the DB."""
+    rows = list_all_agents(store=get_store())
     if not rows:
-        console.print(
-            "[yellow]No agents declared.[/yellow] Create an agentbox.toml at the project root."
-        )
+        console.print("[yellow]No agents registered.[/yellow]")
         return
 
     table = Table(
@@ -112,12 +111,12 @@ def agent_show(agent_id: str) -> None:
             gt.add_row(g.name, opts)
         console.print(Panel(gt, title="Guardrails", border_style="magenta"))
 
-    manifest = get_loader().load()
-    if manifest.mcp_servers:
+    servers = get_store().get_project_mcp_servers()
+    if servers:
         mcp_list = Table.grid(padding=(0, 2))
         mcp_list.add_column(style="dim")
         mcp_list.add_column()
-        for s in manifest.mcp_servers:
+        for s in servers:
             mcp_list.add_row(s.name, s.url or " ".join(s.command or []))
         console.print(Panel(mcp_list, title="MCP Servers", border_style="yellow"))
 
@@ -261,7 +260,7 @@ def agent_edit(
 
     store = get_store()
     settings = get_settings()
-    current = store.get_agent_def(agent_id) or get_loader().get(agent_id)
+    current = store.get_agent_def(agent_id)
     if current is None:
         console.print(f"[red]agent {agent_id!r} not found[/red]")
         raise typer.Exit(1)
@@ -308,169 +307,6 @@ def agent_edit(
         f"(draft={rec.get('is_draft', False)}) — publish with `agent publish`"
     )
 
-
-@agent_app.command("export")
-def agent_export(
-    agent_id: str,
-    out: Path | None = typer.Option(
-        None, "--out", help="Output file path (default: agents.d/<id>.md)."
-    ),
-    fmt: str = typer.Option(
-        "markdown",
-        "--format",
-        "-f",
-        help="Format: markdown | standalone_toml | legacy_dir.",
-    ),
-) -> None:
-    """Dump the active agent version to disk as TOML/markdown."""
-    from agentbox.core.data.manifest import AgentDef, AgentSource
-    from agentbox.core.deprecated.definitions import ManifestWriter
-
-    store = get_store()
-    settings = get_settings()
-    active = store.get_active_version(agent_id)
-    if active is None:
-        console.print(f"[red]agent {agent_id!r} has no active version[/red]")
-        raise typer.Exit(1)
-
-    if active.get("config_json"):
-        raw = active["config_json"]
-        data = json.loads(raw) if isinstance(raw, str) else raw
-        agent_def = AgentDef.model_validate(data)
-    else:
-        agent_def = AgentDef.from_db_row(active)
-
-    if out is not None:
-        target = out
-    else:
-        agents_d = settings.project_root / "agents.d"
-        if fmt == "legacy_dir":
-            target = settings.project_root / "agents" / agent_id / "agent.toml"
-        elif fmt == "standalone_toml":
-            target = agents_d / f"{agent_id}.toml"
-        else:
-            target = agents_d / f"{agent_id}.md"
-
-    agent_def.source_path = target
-    agent_def.source_format = AgentSource(fmt)
-    written = ManifestWriter(settings.project_root).save_agent(agent_def)
-    console.print(f"[green]wrote[/green] {written}")
-
-
-@agent_app.command("import")
-def agent_import(
-    path: Path = typer.Argument(..., exists=True, readable=True),
-    fmt: str = typer.Option(
-        "auto",
-        "--format",
-        "-f",
-        help="auto | markdown | standalone_toml | legacy_dir.",
-    ),
-    strategy: str = typer.Option(
-        "new_agent",
-        "--strategy",
-        help="new_agent | new_version | skip | overwrite.",
-    ),
-    author: str = typer.Option(..., "--author"),
-    changelog: str = typer.Option(
-        "import from file", "--changelog", help="Changelog (min 3 chars)."
-    ),
-) -> None:
-    """Migration helper: import an agent from a TOML/markdown file into the DB.
-
-    Plan 18 retires filesystem-driven config. Use this only for one-shot
-    migrations of an existing on-disk bundle.
-    """
-    import hashlib
-
-    from agentbox.core.data.manifest import AgentDef
-
-    inferred = fmt
-    if inferred == "auto":
-        if path.suffix == ".md":
-            inferred = "markdown"
-        elif path.suffix == ".toml":
-            inferred = "standalone_toml"
-        elif path.is_dir():
-            inferred = "legacy_dir"
-        else:
-            inferred = "standalone_toml"
-
-    if inferred == "markdown":
-        from agentbox.core.deprecated.definitions.markdown import load_markdown_agent
-
-        agent_def = load_markdown_agent(path)
-        if not isinstance(agent_def, AgentDef):
-            agent_def = AgentDef.model_validate(agent_def)
-    elif inferred == "legacy_dir":
-        from agentbox.core.deprecated.definitions.agents_dir import (
-            _load_legacy_dir_agent,
-        )
-
-        agent_def = _load_legacy_dir_agent(path, path.name)
-        if not isinstance(agent_def, AgentDef):
-            agent_def = AgentDef.model_validate(agent_def)
-    else:
-        import tomllib
-
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
-        agent_def = AgentDef.model_validate(data)
-
-    store = get_store()
-    settings = get_settings()
-    from agentbox.core.agent.config import build_config_json_payload
-
-    config_dict = agent_def.model_dump(mode="python", exclude_none=False)
-    if isinstance(config_dict.get("source_path"), Path):
-        config_dict["source_path"] = str(config_dict["source_path"])
-    config_dict.update(build_config_json_payload(agent_def))
-    config_json = json.dumps(config_dict, sort_keys=True, default=str)
-    content_hash = hashlib.sha256(config_json.encode("utf-8")).hexdigest()
-    try:
-        prompt_content = agent_def.load_prompt(settings.project_root)
-    except FileNotFoundError:
-        prompt_content = agent_def.prompt or ""
-
-    existing = store.latest_version(agent_def.id)
-    if existing is not None and strategy == "new_agent":
-        console.print(f"[red]agent {agent_def.id!r} already exists[/red]")
-        raise typer.Exit(1)
-    if existing is not None and strategy == "skip":
-        console.print(f"[yellow]skipped[/yellow] {agent_def.id!r}")
-        return
-    if existing is not None:
-        rec = store.create_version(
-            agent_id=agent_def.id,
-            source_path=str(path),
-            source_format=inferred,
-            content_snapshot="",
-            prompt_snapshot=prompt_content or "",
-            content_hash=content_hash,
-            author=author,
-            changelog=changelog,
-            config_json=config_json,
-            prompt_content=prompt_content,
-            source="import",
-            is_draft=(strategy == "new_version"),
-        )
-        if strategy == "overwrite":
-            store.publish_version(agent_def.id, rec["version"], "imported")
-    else:
-        rec = store.create_agent(
-            agent_id=agent_def.id,
-            config_json=config_dict,
-            prompt_content=prompt_content,
-            author=author,
-            changelog=changelog,
-            source="import",
-            source_path=str(path),
-            source_format=inferred,
-            export_to_disk=False,
-        )
-    console.print(
-        f"[green]imported[/green] {agent_def.id!r} v{rec['version']} "
-        f"from {path}"
-    )
 
 
 @agent_app.command("delete")

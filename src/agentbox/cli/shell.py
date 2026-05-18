@@ -18,11 +18,11 @@ from pathlib import Path
 
 import typer
 
+from agentbox.api.deps import get_loader as _get_loader
 from agentbox.cli._common import console
 from agentbox.cli.launch import _apply_creds, _make_generator, _resolve_workspace
 from agentbox.config import load_settings
 from agentbox.core.data.store import SessionStore
-from agentbox.core.deprecated.definitions import DefinitionLoader
 from agentbox.core.run.run_prep import render_env_doc
 
 
@@ -48,10 +48,10 @@ def shell_cmd(
     ``<workspace>/.agentbox/generated/`` and are overwritten each invocation.
     """
     settings = load_settings()
-    loader = DefinitionLoader(settings.project_root)
-    manifest = loader.load()
+    loader = _get_loader()
+    from agentbox.api.deps import get_store as _gs
 
-    agent_def = next((a for a in manifest.agents if a.id == agent), None)
+    agent_def = _gs().get_agent_def(agent)
     if agent_def is None:
         console.print(f"[red]Unknown agent:[/red] {agent!r}")
         raise typer.Exit(1)

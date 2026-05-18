@@ -13,10 +13,10 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from agentbox.api.deps import get_loader as _DefinitionLoaderShim
 from agentbox.api.deps import get_store
 from agentbox.cli._common import console, event_color
 from agentbox.config import load_settings
-from agentbox.core.deprecated.definitions import DefinitionLoader
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.workspace.mcp.client import McpRegistry
 
@@ -120,7 +120,7 @@ def doctor() -> None:
         _fail("Manifest exists", f"not found at {path}")
 
     # 2. Manifest parses
-    loader = DefinitionLoader(settings.project_root)
+    loader = _DefinitionLoaderShim()
     try:
         manifest = loader.load()
         _ok(
@@ -132,9 +132,9 @@ def doctor() -> None:
 
     # 3. All workspaces resolvable
     try:
+        from agentbox.api.deps import get_store as _gs
         from agentbox.core import workspaces as ws
-
-        rows = ws.list_all(loader, settings)
+        rows = ws.list_all(_gs(), settings)
         resolvable = True
         for w in rows:
             if not w.exists and not w.ephemeral:
@@ -171,8 +171,9 @@ def doctor() -> None:
         mcp_registry = McpRegistry(settings.mcp_cache_dir)
         mcp_server_name = "mcp"
         mcp_command = ["mcp_serve.sh"]
-        if hasattr(manifest, "mcp_servers") and manifest.mcp_servers:
-            srv = manifest.mcp_servers[0]
+        servers = store.get_project_mcp_servers()
+        if servers:
+            srv = servers[0]
             mcp_server_name = srv.name
             if srv.command:
                 mcp_command = srv.command

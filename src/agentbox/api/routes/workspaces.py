@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from agentbox.api._pagination import paginate_list
 from agentbox.api.deps import get_loader, get_mcp_registry, get_settings, get_store
 from agentbox.core import workspaces as ws
+from agentbox.core.data.store import SessionStore
 from agentbox.core.resource.skills import discover_skills
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.run.config.constants import (
@@ -213,11 +214,11 @@ def _resolve_workspace(name: str) -> tuple[Path, Path]:
     return ws_path, settings.project_root
 
 
-def _make_generator(project_root: Path, loader) -> ConfigGenerator:
-    """Build a ConfigGenerator from the manifest."""
-    manifest = loader.load()
+def _make_generator(project_root: Path, store: SessionStore) -> ConfigGenerator:
+    """Build a ConfigGenerator from project settings."""
+    servers = store.get_project_mcp_servers()
     agentbox_toml = project_root / "agentbox.toml"
-    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+    mcp_server_name = servers[0].name if servers else "mcp"
     return ConfigGenerator(
         agentbox_toml=agentbox_toml,
         mcp_manifest=_try_get_mcp_manifest(),
@@ -351,18 +352,13 @@ def _derive_allowed_tools(workspace_id: str) -> list[str]:
     expects. Returns ``[]`` when no MCP manifest is loaded.
     """
     settings = _get_settings()
-    loader = _get_loader()
     tool_manifest = _load_tool_manifest(settings.project_root)
     if not tool_manifest:
         return []
-    try:
-        manifest = loader.load()
-    except Exception:
-        return []
-    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
-    claude_prefix = f"mcp__{mcp_server_name}__"
-
     store = get_store()
+    servers = store.get_project_mcp_servers()
+    mcp_server_name = servers[0].name if servers else "mcp"
+    claude_prefix = f"mcp__{mcp_server_name}__"
     discovered = {mcp_server_name: [t for tools in tool_manifest.values() for t in tools]}
     resolved = store.resolve_workspace_mcp(
         workspace_id,
@@ -389,18 +385,14 @@ def _apply_allowed_tools(workspace_id: str, allowed_tools: list[str]) -> None:
     current tool manifest — unknown prefixed names are ignored.
     """
     settings = _get_settings()
-    loader = _get_loader()
     tool_manifest = _load_tool_manifest(settings.project_root)
     if not tool_manifest:
         return
-    try:
-        manifest = loader.load()
-    except Exception:
-        return
-    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+    store = get_store()
+    servers = store.get_project_mcp_servers()
+    mcp_server_name = servers[0].name if servers else "mcp"
     claude_prefix = f"mcp__{mcp_server_name}__"
     allowed = set(allowed_tools)
-    store = get_store()
     for tools in tool_manifest.values():
         for tool in tools:
             prefixed = f"{claude_prefix}{tool}"
@@ -453,7 +445,6 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
     capabilities.json is rewritten as a derived artifact for the executor
     fallback path; it is not read by ``GET /permissions``.
     """
-    loader = _get_loader()
     store = get_store()
     ws_path, project_root = _resolve_workspace(name)
 
@@ -476,7 +467,7 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
     _write_capabilities_artifact(ws_path, effective)
 
     allowed_tools = set(effective.get("allowed_tools") or [])
-    generator = _make_generator(project_root, loader)
+    generator = _make_generator(project_root, get_store())
     generated_paths = generator.generate_for_workspace(
         ws_path,
         allowed_tools=allowed_tools if allowed_tools else None,
@@ -549,12 +540,11 @@ def get_workspace_mcp_tools(name: str) -> dict:
     currently assigned to agents in the workspace. The UI uses this to
     let users toggle permissions for any available capability.
     """
-    loader = _get_loader()
     settings = _get_settings()
-    manifest = loader.load()
+    store = get_store()
+    servers = store.get_project_mcp_servers()
 
-    # Determine MCP server name from manifest.
-    mcp_server_name = manifest.mcp_servers[0].name if manifest.mcp_servers else "mcp"
+    mcp_server_name = servers[0].name if servers else "mcp"
     claude_prefix = f"mcp__{mcp_server_name}__"
     opencode_prefix = f"{mcp_server_name}_"
 
@@ -616,7 +606,6 @@ def get_workspace_mcp_tools(name: str) -> dict:
 
 @router.post("/by-name/{name}/generate-configs")
 def generate_configs_by_name(name: str) -> dict:
-    loader = _get_loader()
     ws_path, project_root = _resolve_workspace(name)
 
     # Read workspace permissions and respect them when generating.
@@ -625,7 +614,7 @@ def generate_configs_by_name(name: str) -> dict:
     allowed_builtin_tools = permissions.get("allowed_builtin_tools") or []
     files = permissions.get("files") or []
 
-    generator = _make_generator(project_root, loader)
+    generator = _make_generator(project_root, get_store())
     paths = generator.generate_for_workspace(
         ws_path,
         allowed_tools=allowed_tools if allowed_tools else None,
@@ -803,7 +792,7 @@ def create_workspace(agent_id: str) -> dict:
     agent = loader.get(agent_id)
     if agent is None:
         raise HTTPException(404)
-    path = ws.ensure(agent, settings, loader, scaffold=True)
+    path = ws.ensure(agent, settings, get_store(), scaffold=True)
     return {"path": str(path)}
 
 
@@ -814,7 +803,7 @@ def reset_workspace(agent_id: str) -> dict:
     agent = loader.get(agent_id)
     if agent is None:
         raise HTTPException(404)
-    path = ws.reset(agent, settings, loader)
+    path = ws.reset(agent, settings, get_store())
     return {"path": str(path)}
 
 
@@ -825,9 +814,9 @@ def generate_configs(agent_id: str) -> dict:
     agent = loader.get(agent_id)
     if agent is None:
         raise HTTPException(404)
-    workspace_path, _ = ws.resolve_path(agent, settings, loader)
+    workspace_path, _ = ws.resolve_path(agent, settings, get_store())
     permissions = _load_permissions(workspace_path, agent.workspace)
-    generator = _make_generator(settings.project_root, loader)
+    generator = _make_generator(settings.project_root, get_store())
     paths = generator.generate_for_workspace(
         workspace_path,
         allowed_builtin_tools=permissions.get("allowed_builtin_tools") or [],
@@ -847,7 +836,7 @@ def list_skills(agent_id: str) -> dict:
     agent = loader.get(agent_id)
     if agent is None:
         raise HTTPException(404)
-    workspace_path, _ = ws.resolve_path(agent, settings, loader)
+    workspace_path, _ = ws.resolve_path(agent, settings, get_store())
     skills = discover_skills(workspace_path)
     return {
         "agent_id": agent_id,
@@ -870,7 +859,7 @@ def read_file(agent_id: str, path: str) -> dict:
     agent = loader.get(agent_id)
     if agent is None:
         raise HTTPException(404)
-    ws_path, _ = ws.resolve_path(agent, settings, loader)
+    ws_path, _ = ws.resolve_path(agent, settings, get_store())
     target = (ws_path / path).resolve()
     if not str(target).startswith(str(ws_path.resolve())):
         raise HTTPException(400, "path escapes workspace")
@@ -886,7 +875,7 @@ def write_file(agent_id: str, body: FileBody) -> dict:
     agent = loader.get(agent_id)
     if agent is None:
         raise HTTPException(404)
-    ws_path = ws.ensure(agent, settings, loader, scaffold=False)
+    ws_path = ws.ensure(agent, settings, get_store(), scaffold=False)
     target = (ws_path / body.path).resolve()
     if not str(target).startswith(str(ws_path.resolve())):
         raise HTTPException(400, "path escapes workspace")

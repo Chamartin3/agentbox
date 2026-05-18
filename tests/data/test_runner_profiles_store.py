@@ -17,7 +17,6 @@ class TestRunnerProfilesCRUD:
             backend="token",
             provider="openai",
             model="openai:gpt-4o",
-            timeout_seconds=60,
             base_url="https://api.openai.com/v1",
             api_key_env="OPENAI_API_KEY",
             params={"temperature": 0.7},
@@ -34,7 +33,6 @@ class TestRunnerProfilesCRUD:
         assert profile.backend == "token"
         assert profile.provider == "openai"
         assert profile.model == "openai:gpt-4o"
-        assert profile.timeout_seconds == 60
         assert profile.base_url == "https://api.openai.com/v1"
         assert profile.api_key_env == "OPENAI_API_KEY"
         assert profile.params == {"temperature": 0.7}
@@ -150,7 +148,6 @@ class TestRunnerProfilesCRUD:
                 backend="token",
                 provider="openai",
                 model="gpt-3.5-turbo",
-                timeout_seconds=30,
                 params={"temp": 0.5},
             )
         )
@@ -164,13 +161,11 @@ class TestRunnerProfilesCRUD:
             "p1",
             RunnerProfilePatch(
                 name="Updated Name",
-                timeout_seconds=120,
             ),
         )
 
         assert updated.id == "p1"
         assert updated.name == "Updated Name"
-        assert updated.timeout_seconds == 120
         # Preserved fields
         assert updated.backend == "token"
         assert updated.provider == "openai"

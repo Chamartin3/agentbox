@@ -10,7 +10,6 @@ from agentbox.cli.host_env import host_env_app
 from agentbox.cli.launch import launch_cmd
 from agentbox.cli.mcp import mcp_app
 from agentbox.cli.mcp_workspace import mcp_workspace_app
-from agentbox.cli.mf import mf_app
 from agentbox.cli.migrate import migrate_app
 from agentbox.cli.prompt_bindings import prompt_bindings_app
 from agentbox.cli.resource import resource_app
@@ -24,7 +23,6 @@ app.add_typer(agent_app, name="agent")
 app.add_typer(ws_app, name="ws")
 app.add_typer(runs_app, name="runs")
 app.add_typer(cfg_app, name="cfg")
-app.add_typer(mf_app, name="mf")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(migrate_app, name="migrate")
 app.add_typer(runner_profile_app, name="runner-profile")

@@ -222,7 +222,6 @@ class RunnerProfileResolver:
             backend=profile_dict.get("backend"),
             provider=profile_dict.get("provider"),
             model=profile_dict.get("model"),
-            timeout_seconds=profile_dict.get("timeout_seconds"),
             base_url=profile_dict.get("base_url"),
             api_key_env=profile_dict.get("api_key_env"),
             output_mode=profile_dict.get("output_mode") or "auto",

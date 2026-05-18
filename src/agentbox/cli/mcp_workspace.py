@@ -6,7 +6,7 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from agentbox.api.deps import get_loader, get_store
+from agentbox.api.deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.data.mcp_overrides import VALID_POLICIES
 
@@ -21,8 +21,7 @@ mcp_workspace_app = typer.Typer(
 def mcp_show(workspace_id: str) -> None:
     """Show MCP policy and server overrides for a workspace."""
     store = get_store()
-    loader = get_loader()
-    manifest = loader.load()
+    servers = store.get_project_mcp_servers()
 
     policy = store.get_workspace_mcp_policy(workspace_id)
     server_overrides = store.list_workspace_mcp_server_overrides(workspace_id)
@@ -33,7 +32,7 @@ def mcp_show(workspace_id: str) -> None:
     meta.add_column()
     meta.add_row("workspace_id", workspace_id)
     meta.add_row("policy", f"[bold]{policy}[/bold]")
-    meta.add_row("manifest_servers", str(len(manifest.mcp_servers or [])))
+    meta.add_row("project_servers", str(len(servers)))
     console.print(Panel(meta, title="MCP workspace config", border_style="cyan"))
 
     if server_overrides:
@@ -129,12 +128,10 @@ def mcp_disable(
 def mcp_refresh(workspace_id: str) -> None:
     """Invalidate the MCP server cache for all servers in this workspace."""
     store = get_store()
-    loader = get_loader()
-    manifest = loader.load()
 
     overrides = store.list_workspace_mcp_server_overrides(workspace_id)
     server_names = {o["server_name"] for o in overrides}
-    for s in manifest.mcp_servers or []:
+    for s in store.get_project_mcp_servers():
         server_names.add(s.name)
 
     if not server_names:

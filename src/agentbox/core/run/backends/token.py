@@ -34,11 +34,12 @@ import os
 import sys
 import time
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Union
 
 from pydantic import BaseModel, ValidationError, create_model
-from pydantic_ai import NativeOutput, PromptedOutput
+from pydantic_ai import NativeOutput, PromptedOutput, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -53,7 +54,33 @@ from agentbox.api.events import (
     UsageEvent,
 )
 from agentbox.core.agent.config import PythonAgentConfig
+from agentbox.core.run.backends._schema_to_model import (
+    UnsupportedSchema,
+    json_schema_to_pydantic_model,
+)
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
+
+
+@dataclass(frozen=True)
+class _RefSection:
+    heading: str
+    content: str
+
+
+@dataclass(frozen=True)
+class TokenDeps:
+    """Runtime deps injected into pydantic-ai's ``RunContext``.
+
+    Reference documents (markdown, skills, attached resources) ride
+    through deps rather than being concatenated into the system prompt
+    string. A dynamic ``@system_prompt`` reads ``ctx.deps.references``
+    and renders the headings inline — this keeps the *base* system
+    prompt small and lets the same backend handle agents with very
+    different reference payloads without rebuilding the prompt string.
+    """
+
+    references: tuple[_RefSection, ...] = ()
+
 
 _NAME = "token"
 
@@ -344,12 +371,28 @@ class TokenBackend(BackendAdapter):
                         schema_path.read_text(encoding="utf-8")
                     )
 
+        # Prefer the clean, schema-free base prompt when composition ran.
+        # Pydantic-ai handles schema injection itself; the bundled
+        # references go through deps. Falling back to ``_resolve_prompt``
+        # (which returns the fully-composed string) keeps legacy callers
+        # working — those won't have a schema mismatch since no result_type
+        # is being attached either.
+        system_base = getattr(agent, "_composed_system_base", None)
+        prompt = system_base if isinstance(system_base, str) and system_base else self._resolve_prompt(agent, workdir)
+
+        references = getattr(agent, "_composed_references", ()) or ()
+        input_schema = getattr(agent, "_composed_input_schema", None)
+
         agent_meta: dict[str, Any] = {
             "agent_module": python_cfg.agent_module,
-            "prompt": self._resolve_prompt(agent, workdir),
+            "prompt": prompt,
             "agent_id": agent.id,
             "model": model,
             "output_schema": output_schema,
+            "input_schema": input_schema if isinstance(input_schema, dict) else None,
+            "references": [
+                {"heading": r.heading, "content": r.content} for r in references
+            ],
             "timeout_seconds": getattr(getattr(agent, "runner", None), "timeout_seconds", None),
         }
 
@@ -550,24 +593,74 @@ class TokenBackend(BackendAdapter):
             )
             return
 
-        # Build result_type from schema when present.
+        # Build result_type from output schema when present. The strict
+        # converter preserves enums, length/pattern, ranges and
+        # ``additionalProperties=false`` so pydantic-ai's own validation
+        # matches the JSON Schema the agent was authored against. If the
+        # schema uses a construct the strict converter can't translate,
+        # fall back to the loose converter (basic types only) and log a
+        # warning rather than failing the run — losing some constraints
+        # is better than aborting.
+        input_schema = rendered.agent_meta.get("input_schema")
         result_type: Any = None
         if output_schema:
             try:
-                result_type = _json_schema_to_pydantic_model(
+                result_type = json_schema_to_pydantic_model(
                     output_schema,
                     model_name="AgentOutput",
                 )
-            except Exception as exc:
+            except UnsupportedSchema as exc:
                 yield LogEvent(
                     run_id=run_id,
                     level="warn",
-                    message=f"failed to build pydantic model from schema: {exc}",
+                    message=(
+                        f"strict schema conversion failed ({exc}); "
+                        "falling back to loose conversion — pydantic-ai "
+                        "validation will be looser than the JSON Schema."
+                    ),
                 )
+                try:
+                    result_type = _json_schema_to_pydantic_model(
+                        output_schema,
+                        model_name="AgentOutput",
+                    )
+                except Exception as fallback_exc:
+                    yield DoneEvent(
+                        run_id=run_id,
+                        ok=False,
+                        error=f"schema-to-model conversion error: {fallback_exc}",
+                    )
+                    return
+            except Exception as exc:
                 yield DoneEvent(
                     run_id=run_id,
                     ok=False,
                     error=f"schema-to-model conversion error: {exc}",
+                )
+                return
+
+        # Validate input against input_schema if declared. Mirrors the
+        # full-agent mode contract — the agent's instructions reference
+        # the input shape; sending a payload that doesn't match wastes
+        # tokens and confuses the model.
+        if isinstance(input_schema, dict) and isinstance(input_data, dict):
+            try:
+                input_model = json_schema_to_pydantic_model(
+                    input_schema,
+                    model_name="AgentInput",
+                )
+                input_model.model_validate(input_data)
+            except UnsupportedSchema as exc:
+                yield LogEvent(
+                    run_id=run_id,
+                    level="warn",
+                    message=f"could not validate input against input_schema: {exc}",
+                )
+            except ValidationError as exc:
+                yield DoneEvent(
+                    run_id=run_id,
+                    ok=False,
+                    error=f"input validation error: {exc}",
                 )
                 return
 
@@ -595,6 +688,27 @@ class TokenBackend(BackendAdapter):
             else:
                 wrapped_output_type = result_type
 
+        # Build reference deps. References ride through pydantic-ai's
+        # ``RunContext`` instead of being concatenated onto the system
+        # prompt — a dynamic ``@system_prompt`` handler renders them
+        # below. This keeps the static base prompt small and makes the
+        # references inspectable as deps rather than buried in a string.
+        ref_payload = rendered.agent_meta.get("references") or []
+        deps = TokenDeps(
+            references=tuple(
+                _RefSection(heading=r["heading"], content=r["content"])
+                for r in ref_payload
+                if isinstance(r, dict) and r.get("heading") and r.get("content")
+            )
+        )
+
+        common_kwargs: dict[str, Any] = {
+            "system_prompt": prompt,
+            "deps_type": TokenDeps,
+        }
+        if wrapped_output_type is not None:
+            common_kwargs["output_type"] = wrapped_output_type
+
         if base_url:
             # Strip provider prefix (e.g. "openrouter:google/gemini-2.5-flash-lite"
             # → "google/gemini-2.5-flash-lite") for OpenAI-compatible endpoints.
@@ -607,20 +721,18 @@ class TokenBackend(BackendAdapter):
                 base_url=base_url,
             )
             pai_model = OpenAIModel(short_model, provider=provider_obj)
-            agent_kwargs: dict[str, Any] = {
-                "system_prompt": prompt,
-            }
-            if wrapped_output_type is not None:
-                agent_kwargs["output_type"] = wrapped_output_type
-            pai_agent = Agent(pai_model, **agent_kwargs)
+            pai_agent = Agent(pai_model, **common_kwargs)
         else:
-            agent_kwargs = {
-                "model": model_str,
-                "system_prompt": prompt,
-            }
-            if wrapped_output_type is not None:
-                agent_kwargs["output_type"] = wrapped_output_type
-            pai_agent = Agent(**agent_kwargs)
+            pai_agent = Agent(model_str, **common_kwargs)
+
+        @pai_agent.system_prompt
+        def _render_refs(ctx: RunContext[TokenDeps]) -> str:
+            sections = ctx.deps.references if ctx.deps else ()
+            if not sections:
+                return ""
+            return "\n\n".join(
+                f"## {s.heading}\n\n{s.content}" for s in sections
+            )
 
         # We're inside an async generator — pydantic-ai's run_sync() would
         # try to start its own event loop and fail. Use the async API.
@@ -637,7 +749,7 @@ class TokenBackend(BackendAdapter):
         text_accum: dict[int, str] = {}
         final_result: Any = None
         try:
-            async with pai_agent.run_stream_events(user_message) as stream:
+            async with pai_agent.run_stream_events(user_message, deps=deps) as stream:
                 async for event in stream:
                     et = type(event).__name__
                     if et == "PartStartEvent":

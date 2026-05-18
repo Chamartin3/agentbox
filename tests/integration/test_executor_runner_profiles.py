@@ -180,7 +180,6 @@ class TestResolverPureLogic:
                 name="Profile 1",
                 backend="token",
                 model="openai:gpt-4o",
-                timeout_seconds=60,
             )
         )
         store.set_agent_runner_profile(agent.id, profile.id)
@@ -200,7 +199,6 @@ class TestResolverPureLogic:
         assert config.source == "agent_profile"
         assert config.backend == "token"
         assert config.model == "openai:gpt-4o"
-        assert config.timeout_seconds == 60
 
     def test_system_default_used_when_no_binding(self, tmp_path: Path) -> None:
         """System default profile is used when agent has no binding."""
@@ -214,7 +212,6 @@ class TestResolverPureLogic:
                 name="System Default",
                 backend="token",
                 model="openai:gpt-3.5-turbo",
-                timeout_seconds=30,
                 is_system_default=True,
             )
         )
@@ -348,7 +345,7 @@ class TestResolverPureLogic:
             )
 
     def test_per_run_timeout_overrides_profile(self, tmp_path: Path) -> None:
-        """Per-run timeout_seconds overrides profile.timeout_seconds."""
+        """Per-run timeout_seconds overrides profile default (no profile timeout)."""
         store = SessionStore(tmp_path / "db.sqlite")
         agent = _fake_agent("test-agent")
 
@@ -357,7 +354,6 @@ class TestResolverPureLogic:
                 id="profile",
                 name="Profile",
                 backend="claude_code",
-                timeout_seconds=60,
             )
         )
 

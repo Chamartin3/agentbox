@@ -125,6 +125,7 @@ class TestTokenBackendRender:
             runner=RunnerSpec(
                 kind="token",
                 output_schema_path="output_schema.json",
+                timeout_seconds=60,
             ),
         )
 
@@ -134,7 +135,6 @@ class TestTokenBackendRender:
             tmp_path,
             runner_config=SimpleNamespace(
                 model="openai:gpt-4o",
-                timeout_seconds=60,
             ),
         )
 

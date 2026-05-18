@@ -5,7 +5,7 @@ import json
 import typer
 from rich.table import Table
 
-from agentbox.api.deps import get_loader
+from agentbox.api.deps import get_store
 from agentbox.cli._common import console
 from agentbox.config import load_settings
 
@@ -20,11 +20,10 @@ mcp_app = typer.Typer(
 def mcp_ls() -> None:
     """List MCP servers declared in the manifest with cached health."""
     settings = load_settings()
-    loader = get_loader()
-    manifest = loader.load()
+    servers = get_store().get_project_mcp_servers()
 
-    if not manifest.mcp_servers:
-        console.print("[yellow]No MCP servers declared in manifest.[/yellow]")
+    if not servers:
+        console.print("[yellow]No MCP servers configured.[/yellow]")
         return
 
     table = Table(
@@ -40,7 +39,7 @@ def mcp_ls() -> None:
     table.add_column("Status")
     table.add_column("Last sync")
 
-    for s in manifest.mcp_servers:
+    for s in servers:
         if s.url:
             transport = s.transport
             endpoint = s.url

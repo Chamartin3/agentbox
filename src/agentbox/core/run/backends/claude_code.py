@@ -26,7 +26,6 @@ from agentbox.api.events import (
     UsageEvent,
 )
 from agentbox.core.agent.config import RuntimeConfig
-from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.run.streaming.rate_limit import detect_in_text_line
 from agentbox.core.workspace.manager import load_capabilities
@@ -97,10 +96,7 @@ class ClaudeCodeBackend(BackendAdapter):
         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             env.pop(k, None)
 
-        timeout_seconds = (
-            getattr(agent_runner, "timeout_seconds", None)
-            or DEFAULT_RUNNER_TIMEOUT_SECONDS
-        )
+        timeout_seconds = agent_runner.timeout_seconds
 
         return RenderedConfig(
             argv=argv,
@@ -131,7 +127,7 @@ class ClaudeCodeBackend(BackendAdapter):
             list(rendered.argv),
             rendered.cwd,
             dict(rendered.env),
-            rendered.agent_meta.get("timeout_seconds", DEFAULT_RUNNER_TIMEOUT_SECONDS),
+            rendered.agent_meta["timeout_seconds"],
             stdin_data=input.encode("utf-8"),
         ):
             yield ev

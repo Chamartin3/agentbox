@@ -164,7 +164,6 @@ export default function RunnerProfileModal({
         backend: formData.backend,
         provider: formData.provider || null,
         model: formData.model ? encodeModel(formData.model, formData.provider, formData.backend) : null,
-        timeout_seconds: formData.timeout_seconds || null,
         base_url: formData.base_url || null,
         api_key_env: formData.api_key_env || null,
         api_token_id: formData.api_token_id || null,
@@ -194,7 +193,6 @@ export default function RunnerProfileModal({
             : formData.model
               ? encodeModel(formData.model, formData.provider, formData.backend)
               : null,
-        timeout_seconds: formData.timeout_seconds ?? undefined,
         base_url: credentialsUnlocked ? (formData.base_url ?? undefined) : undefined,
         api_key_env: credentialsUnlocked ? (formData.api_key_env ?? undefined) : undefined,
         api_token_id: formData.api_token_id ?? undefined,
@@ -382,17 +380,6 @@ export default function RunnerProfileModal({
                 )}
               </div>
 
-              <div className="form-field">
-                <label>Timeout (seconds)</label>
-                <input
-                  type="number"
-                  value={formData.timeout_seconds || ''}
-                  onChange={(e) =>
-                    handleFormChange('timeout_seconds', e.target.value ? parseInt(e.target.value) : null)
-                  }
-                  placeholder="300"
-                />
-              </div>
             </div>
           </section>
 

@@ -4,7 +4,7 @@ import typer
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.api.deps import get_loader, get_settings, get_store
+from agentbox.api.deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.migrations import migrate_capabilities_to_manifest
 from agentbox.core.prompt.versioning.drift import _build_config_json
@@ -68,7 +68,6 @@ def migrate_to_db_only(agent_id: str) -> None:
     Idempotent: running twice will not create duplicate versions.
     """
     store = get_store()
-    loader = get_loader()
 
     # Get active version
     active = store.get_active_version(agent_id)
@@ -80,10 +79,10 @@ def migrate_to_db_only(agent_id: str) -> None:
 
     # If config_json is empty, load the agent and populate it
     if not active.get("config_json"):
-        agent = loader.get(agent_id)
+        agent = store.get_agent_def(agent_id)
         if agent is None:
             console.print(
-                f"[red]error:[/red] could not load agent {agent_id!r} from manifest"
+                f"[red]error:[/red] could not load agent {agent_id!r} from DB"
             )
             raise typer.Exit(1)
 
@@ -107,6 +106,109 @@ def migrate_to_db_only(agent_id: str) -> None:
     )
     console.print("  sync_mode: watch → off")
     console.print(f"  export_to_disk: {bool(result.get('export_to_disk'))}")
+
+
+@migrate_app.command("import-manifest")
+def import_manifest(
+    from_path: str | None = typer.Option(
+        None, "--from", help="Path to agentbox.toml (defaults to project layout)."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite existing settings when a key already exists."
+    ),
+) -> None:
+    """Import project-level settings from ``agentbox.toml`` into the DB.
+
+    Idempotent: keys already present in the DB are skipped unless
+    ``--force`` is set. Run once per environment after upgrading; the
+    on-disk manifest is no longer read at runtime.
+
+    Imports:
+    - ``[[mcp_servers]]`` → settings section ``project_mcp_servers``
+    - ``[shared_assets]`` → settings section ``project_shared_assets``
+    - ``backend_preference``/``tool_manifest_path``/``project`` →
+      section ``project_runtime``
+    """
+    import tomllib
+    from pathlib import Path
+
+    from agentbox.core.data.manifest import ProjectManifest
+    from agentbox.core.data.project_config import (
+        PROJECT_MCP_SERVERS,
+        PROJECT_RUNTIME,
+        PROJECT_SHARED_ASSETS,
+    )
+
+    settings = get_settings()
+    store = get_store()
+
+    if from_path:
+        manifest_path = Path(from_path).expanduser()
+    else:
+        candidate_new = settings.project_root / "manifest.toml"
+        candidate_old = settings.project_root / "agentbox.toml"
+        manifest_path = candidate_new if candidate_new.exists() else candidate_old
+
+    if not manifest_path.exists():
+        console.print(
+            f"[yellow]no manifest at {manifest_path}; nothing to import[/yellow]"
+        )
+        return
+
+    with manifest_path.open("rb") as f:
+        data = tomllib.load(f)
+    manifest = ProjectManifest.model_validate(data)
+
+    existing_servers = store.get_settings_section(PROJECT_MCP_SERVERS)
+    existing_assets = store.get_settings_section(PROJECT_SHARED_ASSETS)
+    existing_runtime = store.get_settings_section(PROJECT_RUNTIME)
+
+    table = Table(
+        title=f"Importing {manifest_path}",
+        title_style="bold",
+        header_style="bold cyan",
+        padding=(0, 1),
+    )
+    table.add_column("Section")
+    table.add_column("Key", style="bold")
+    table.add_column("Action", justify="center")
+
+    def _row(section: str, key: str, action: str, style: str) -> None:
+        table.add_row(section, key, Text(action, style=style))
+
+    for spec in manifest.mcp_servers or []:
+        if not force and spec.name in existing_servers:
+            _row(PROJECT_MCP_SERVERS, spec.name, "skip", "dim")
+            continue
+        store.set_project_mcp_server(spec, author="migrate:import-manifest")
+        _row(PROJECT_MCP_SERVERS, spec.name, "write", "green")
+
+    for name, path in (manifest.shared_assets or {}).items():
+        if not force and name in existing_assets:
+            _row(PROJECT_SHARED_ASSETS, name, "skip", "dim")
+            continue
+        store.set_project_shared_asset(name, path, author="migrate:import-manifest")
+        _row(PROJECT_SHARED_ASSETS, name, "write", "green")
+
+    runtime_writes: list[tuple[str, object]] = []
+    if manifest.backend_preference:
+        runtime_writes.append(("backend_preference", list(manifest.backend_preference)))
+    if manifest.tool_manifest_path:
+        runtime_writes.append(("tool_manifest_path", manifest.tool_manifest_path))
+    if manifest.project and manifest.project != "default":
+        runtime_writes.append(("project_name", manifest.project))
+
+    for key, value in runtime_writes:
+        if not force and key in existing_runtime:
+            _row(PROJECT_RUNTIME, key, "skip", "dim")
+            continue
+        store.set_setting(
+            PROJECT_RUNTIME, key, value, author="migrate:import-manifest"
+        )
+        _row(PROJECT_RUNTIME, key, "write", "green")
+
+    console.print(table)
+    console.print("[green]done.[/green] manifest file may now be removed.")
 
 
 @migrate_app.command("prompt-versions")

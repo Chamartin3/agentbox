@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from agentbox.api.deps import get_loader
+from agentbox.api.deps import get_store
 from agentbox.core.constants import EventType
 
 console = Console()
@@ -26,7 +26,7 @@ EVENT_STYLES: dict[str, str] = {
 
 
 def resolve_agent(agent_id: str):
-    a = get_loader().get(agent_id)
+    a = get_store().get_agent_def(agent_id)
     if a is None:
         console.print(f"[red]unknown agent[/red] {agent_id!r}")
         raise typer.Exit(2)

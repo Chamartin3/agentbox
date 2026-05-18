@@ -23,7 +23,6 @@ from agentbox.api.events import (
     ThinkingEvent,
     TimeoutEvent,
 )
-from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
 
 _NAME = "opencode"
@@ -90,10 +89,7 @@ class OpenCodeBackend(BackendAdapter):
         env = dict(os.environ)
         env["PWD"] = str(workdir)
 
-        timeout_seconds = (
-            getattr(agent_runner, "timeout_seconds", None)
-            or DEFAULT_RUNNER_TIMEOUT_SECONDS
-        )
+        timeout_seconds = agent_runner.timeout_seconds
 
         return RenderedConfig(
             argv=argv,
@@ -128,7 +124,7 @@ class OpenCodeBackend(BackendAdapter):
             rendered.argv,
             rendered.cwd,
             dict(rendered.env),
-            timeout=rendered.agent_meta.get("timeout_seconds", DEFAULT_RUNNER_TIMEOUT_SECONDS),
+            timeout=rendered.agent_meta["timeout_seconds"],
             stdin_data=stdin_data,
         ):
             yield ev
@@ -139,7 +135,7 @@ class OpenCodeBackend(BackendAdapter):
         argv: list[str],
         cwd: Path,
         env: dict[str, str],
-        timeout: int = DEFAULT_RUNNER_TIMEOUT_SECONDS,
+        timeout: int = 1200,
         stdin_data: bytes | None = None,
     ) -> AsyncIterator[RunEvent]:
         import asyncio

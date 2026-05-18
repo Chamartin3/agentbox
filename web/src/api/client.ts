@@ -142,7 +142,7 @@ export interface RunnerSpec {
   command: string[] | null;
   allowed_tools: string[];
   extra_args: string[];
-  timeout_seconds: number;
+  timeout_seconds: number | null;
   output_schema_path: string | null;
   output_validation_engine: 'jsonschema' | 'pydantic' | 'both';
   max_validation_retries: number;
@@ -359,7 +359,6 @@ export interface RunnerProfile {
   backend: string;
   provider: string | null;
   model: string | null;
-  timeout_seconds: number | null;
   base_url: string | null;
   api_key_env: string | null;
   api_token_id: string | null;
@@ -379,7 +378,6 @@ export interface RunnerProfileCreate {
   backend: string;
   provider?: string | null;
   model?: string | null;
-  timeout_seconds?: number | null;
   base_url?: string | null;
   api_key_env?: string | null;
   api_token_id?: string | null;

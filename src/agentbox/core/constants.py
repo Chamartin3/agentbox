@@ -8,16 +8,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-DEFAULT_RUNNER_TIMEOUT_SECONDS = 1200
-"""Fallback runner timeout when ``RenderedConfig.agent_meta`` omits one.
-
-The active DB version's ``timeout_seconds`` must always populate
-``agent_meta`` via the backend's ``render()``. This default exists as a
-safety net for hand-constructed ``RenderedConfig``s in tests; production
-runs should never fall back to it.
-"""
-
-
 class RunnerKind(StrEnum):
     """Supported agent runner implementations."""
 

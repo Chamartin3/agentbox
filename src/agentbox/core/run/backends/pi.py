@@ -19,7 +19,6 @@ from agentbox.api.events import (
     ThinkingEvent,
     UsageEvent,
 )
-from agentbox.core.constants import DEFAULT_RUNNER_TIMEOUT_SECONDS
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.run.streaming.jsonl import stream_jsonl_subprocess
 
@@ -129,10 +128,7 @@ class PiBackend(BackendAdapter):
 
         env = dict(os.environ)
 
-        timeout_seconds = (
-            getattr(agent_runner, "timeout_seconds", None)
-            or DEFAULT_RUNNER_TIMEOUT_SECONDS
-        )
+        timeout_seconds = agent_runner.timeout_seconds
 
         return RenderedConfig(
             argv=argv,
@@ -158,9 +154,7 @@ class PiBackend(BackendAdapter):
             message=f"$ {' '.join(rendered.argv)} (cwd={rendered.cwd})",
         )
 
-        timeout = rendered.agent_meta.get(
-            "timeout_seconds", DEFAULT_RUNNER_TIMEOUT_SECONDS
-        )
+        timeout = rendered.agent_meta["timeout_seconds"]
 
         async for ev, sid in stream_jsonl_subprocess(
             run_id=run_id,

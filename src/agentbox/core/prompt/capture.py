@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.constants import RunnerKind
-from agentbox.core.deprecated.definitions import AgentDef
+from agentbox.core.data.manifest import AgentDef
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore

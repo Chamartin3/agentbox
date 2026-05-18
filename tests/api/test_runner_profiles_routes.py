@@ -43,7 +43,6 @@ class TestCreateRunnerProfile:
             "backend": "token",
             "provider": "openai",
             "model": "openai:gpt-4o",
-            "timeout_seconds": 30,
             "base_url": "https://api.openai.com",
             "api_key_env": "OPENAI_API_KEY",
             "params": {"temperature": 0.7},
@@ -58,7 +57,6 @@ class TestCreateRunnerProfile:
         assert data["id"] == "full-profile"
         assert data["provider"] == "openai"
         assert data["model"] == "openai:gpt-4o"
-        assert data["timeout_seconds"] == 30
         assert data["base_url"] == "https://api.openai.com"
         assert data["api_key_env"] == "OPENAI_API_KEY"
         assert data["params"]["temperature"] == 0.7
@@ -163,19 +161,6 @@ class TestCreateRunnerProfile:
         resp = client.post("/api/runner-profiles", json=req)
         assert resp.status_code == 400
         assert "authorization" in resp.json()["detail"].lower()
-
-    def test_create_profile_negative_timeout_rejected(self, client: Any) -> None:
-        """timeout_seconds=0 or -1 → 400."""
-        for timeout in [0, -1, -10]:
-            req = {
-                "id": f"neg-timeout-{timeout}",
-                "name": f"Negative Timeout {timeout}",
-                "backend": "token",
-                "timeout_seconds": timeout,
-            }
-            resp = client.post("/api/runner-profiles", json=req)
-            assert resp.status_code == 400
-            assert "positive" in resp.json()["detail"].lower()
 
     def test_create_profile_without_id_auto_slugifies(self, client: Any) -> None:
         """POST without id derives it from slugify(name)."""
