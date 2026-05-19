@@ -50,19 +50,13 @@ class TestValidateWithPydantic:
         assert ok
         assert err == ""
 
-    def test_missing_required_field_fails(self) -> None:
-        payload = {"summary": "A valid summary with enough characters"}
-        ok, err = validate_with_pydantic(json.dumps(payload), _schema())
-        assert not ok
-        assert "key_skills" in err or "experience" in err or "required" in err.lower()
-
     def test_wrong_type_fails(self) -> None:
         payload = {
             "summary": 123,
             "key_skills": ["Python"],
             "experience": [{"position_id": 1, "achievements": ["x"]}],
         }
-        ok, err = validate_with_pydantic(json.dumps(payload), _schema())
+        ok, _err = validate_with_pydantic(json.dumps(payload), _schema())
         assert not ok
 
     def test_missing_required_field_fails(self) -> None:
@@ -77,7 +71,7 @@ class TestValidateWithPydantic:
         assert "JSON" in err
 
     def test_empty_output_fails(self) -> None:
-        ok, err = validate_with_pydantic("", _schema())
+        ok, _err = validate_with_pydantic("", _schema())
         assert not ok
 
     def test_code_fence_stripped(self) -> None:
@@ -98,7 +92,7 @@ class TestValidateWithPydantic:
             "key_skills": ["Python"],
             "experience": [{"achievements": ["x"]}],  # missing position_id
         }
-        ok, err = validate_with_pydantic(json.dumps(payload), _schema())
+        _ok, _err = validate_with_pydantic(json.dumps(payload), _schema())
         # Note: pydantic's create_model may not enforce nested required fields
         # when the input is a dict rather than a model instance. The jsonschema
         # engine catches this; pydantic validates types but not nested dicts.

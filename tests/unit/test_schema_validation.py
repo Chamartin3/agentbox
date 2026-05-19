@@ -78,13 +78,13 @@ def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
     )
     executor = _make_executor(tmp_path)
 
-    ok, err, via = executor._validate_output(
+    ok, err, _via = executor._validate_output(
         json.dumps({"name": "test"}), agent, tmp_path  # missing "value"
     )
     assert not ok
     assert "value" in err
 
-    ok, err, via = executor._validate_output(
+    ok, err, _via = executor._validate_output(
         json.dumps({"name": "test", "value": 5}), agent, tmp_path
     )
     assert ok
@@ -110,12 +110,12 @@ def test_validate_output_rejects_enum_violation(tmp_path: Path) -> None:
     )
     executor = _make_executor(tmp_path)
 
-    ok, err, via = executor._validate_output(
+    ok, _err, _via = executor._validate_output(
         json.dumps({"status": "unknown"}), agent, tmp_path
     )
     assert not ok
 
-    ok, err, via = executor._validate_output(json.dumps({"status": "ok"}), agent, tmp_path)
+    ok, _err, _via = executor._validate_output(json.dumps({"status": "ok"}), agent, tmp_path)
     assert ok
 
 
@@ -190,9 +190,9 @@ def test_empty_output_treated_as_validation_failure(tmp_path: Path) -> None:
     executor = _make_executor(tmp_path)
 
     # Empty string → validation failure
-    ok, err, via = executor._validate_output("", agent, tmp_path)
+    ok, _err, _via = executor._validate_output("", agent, tmp_path)
     assert not ok
 
     # Whitespace-only → validation failure
-    ok, err, via = executor._validate_output("   \n", agent, tmp_path)
+    ok, _err, _via = executor._validate_output("   \n", agent, tmp_path)
     assert not ok

@@ -10,8 +10,6 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 
 def _register_noop_backend() -> None:
     """Inject a noop BackendAdapter into the plugins registry under 'claude_code'."""
@@ -109,13 +107,3 @@ def test_run_with_db_seeded_noop_agent(isolated_data_dir: Path, client: Any) -> 
     resp = client.post("/api/runs", json={"agent": "noop", "input": "ping"})
     assert resp.status_code in (200, 201, 202), resp.text
     assert "run_id" in resp.json()
-
-
-@pytest.mark.skip(reason="manifest mount no longer required; check_manifest path is deprecated")
-def test_missing_manifest_emits_clear_error() -> None:
-    pass
-
-
-@pytest.mark.skip(reason="manifest TOML parsing lives in core/deprecated; will be removed")
-def test_mcp_servers_in_manifest_parse() -> None:
-    pass

@@ -7,6 +7,7 @@ the typed structures.
 
 from __future__ import annotations
 
+import contextlib
 import enum
 import warnings
 from pathlib import Path
@@ -136,6 +137,19 @@ class RunnerSpec(BaseModel):
     # --- Output validation & retry ---
 
     output_schema_path: str | None = None
+
+    output_model: str | None = None
+    """Dotted import path (``module.path:ClassName``) to the canonical
+    Pydantic output class.
+
+    When set, the executor's validator imports the class and calls
+    ``ClassName.model_validate_json(...)`` — the only engine that runs
+    ``@model_validator`` cross-field rules. The JSON Schema rendered
+    into the system prompt is also derived from
+    ``ClassName.model_json_schema()`` so the prompt the model reads and
+    the contract its output is judged against share a single source of
+    truth.
+    """
 
     output_validation_engine: Literal["jsonschema", "pydantic", "both"] = "both"
     """Which engine(s) to use when validating output against the schema.
@@ -364,10 +378,7 @@ class AgentDef(BaseModel):
         raw = row.get("config_json") or row.get("content_snapshot")
         if raw is None:
             raise ValueError("agent_versions row has no config payload")
-        if isinstance(raw, str):
-            data = _json.loads(raw)
-        else:
-            data = raw
+        data = _json.loads(raw) if isinstance(raw, str) else raw
         inst = cls.model_validate(data)
         # Stash the structured config_json so the agent_config
         # accessors (ExecutionConfig/RuntimeConfig/PythonAgentConfig)
@@ -375,10 +386,8 @@ class AgentDef(BaseModel):
         # roundtripping through the legacy agent.runner pydantic model.
         # Falls back to the same data dict when config_json was absent —
         # the accessors only consume sub-keys they recognize.
-        try:
+        with contextlib.suppress(Exception):
             inst.__dict__["_config_json"] = data
-        except Exception:
-            pass
         return inst
 
 
@@ -412,6 +421,10 @@ class RunnerManifest(BaseModel):
     timeout_seconds: int | None = None
 
     output_schema_path: str | None = None
+    output_model: str | None = None
+    """Dotted import path to the canonical Pydantic output class. See
+    :attr:`RunnerSpec.output_model`."""
+
     max_validation_retries: int = 0
     max_error_retries: int = 0
 

@@ -10,24 +10,6 @@ Conventions:
 
 from __future__ import annotations
 
-# Tests below depend on the now-removed ``core.deprecated.definitions`` module
-# (TOML manifest loader / writer). Skip collection until they are rewritten
-# against the DB-as-source-of-truth surface.
-collect_ignore_glob = [
-    "integration/test_executor_runner_profiles.py",
-    "integration/test_executor_composition.py",
-    "integration/test_executor_finish_safety.py",
-    "integration/test_executor_per_run.py",
-    "integration/test_executor.py",
-    "integration/test_smoke.py",
-    "integration/test_composition_api.py",
-    "unit/test_render.py",
-    "unit/test_composition_integration.py",
-    "unit/test_prompts.py",
-    "api/test_versions_routes.py",
-    "cli/test_launch.py",
-]
-
 import os
 from collections.abc import Iterator
 from pathlib import Path

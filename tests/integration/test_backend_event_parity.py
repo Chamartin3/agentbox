@@ -9,9 +9,10 @@ is now satisfied.
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from agentbox.api.events import (
@@ -81,6 +82,49 @@ def _roles(events: list[Any]) -> list[str | None]:
     return [getattr(e, "role", None) for e in events if isinstance(e, TextEvent)]
 
 
+def _streaming_mock(
+    result: Any = None, side_effect: Exception | None = None
+) -> Any:
+    """Return a mock for ``pai_agent.run_stream_events`` that yields one
+    ``AgentRunResultEvent`` carrying *result*, or raises *side_effect*.
+    """
+    if side_effect is not None:
+
+        @contextlib.asynccontextmanager
+        async def _stream_side_effect(*_args: Any, **_kwargs: Any):
+            raise side_effect
+            yield  # pragma: no cover
+
+        return _stream_side_effect
+
+    class AgentRunResultEvent:
+        pass
+
+    res = result if result is not None else _fake_result()
+    event = AgentRunResultEvent()
+    event.result = res  # type: ignore[attr-defined]
+
+    @contextlib.asynccontextmanager
+    async def _stream(*_args: Any, **_kwargs: Any):
+        class _Stream:
+            def __aiter__(self):
+                return _Iter([event])
+
+        class _Iter:
+            def __init__(self, items: list[Any]):
+                self._items = iter(items)
+
+            async def __anext__(self) -> Any:
+                try:
+                    return next(self._items)
+                except StopIteration as exc:
+                    raise StopAsyncIteration from exc
+
+        yield _Stream()
+
+    return _stream
+
+
 # ---------------------------------------------------------------------
 # Token backend — canonical reference (scenarios 1, 2, 4 implemented)
 # ---------------------------------------------------------------------
@@ -88,11 +132,11 @@ def _roles(events: list[Any]) -> list[str | None]:
 
 async def test_token_scenario_1_text_only() -> None:
     fake = MagicMock()
-    fake.run = AsyncMock(return_value=_fake_result("hello back"))
+    fake.run_stream_events = _streaming_mock(result=_fake_result("hello back"))
     with patch("pydantic_ai.Agent", return_value=fake):
         events = await _collect(TokenBackend().run(_rendered_direct(), "hi", "rid"))
 
-    assert _types(events) == ["log", "text", "text", "text", "usage", "done"]
+    assert _types(events) == ["log", "text", "text", "log", "text", "usage", "done"]
     assert _roles(events) == ["system", "user", "assistant"]
     assert isinstance(events[-1], DoneEvent) and events[-1].ok is True
     # invariant: DoneEvent is terminal
@@ -123,8 +167,8 @@ async def test_token_scenario_2_tools_used() -> None:
     msg_b = SimpleNamespace(parts=[result_part])
 
     fake = MagicMock()
-    fake.run = AsyncMock(
-        return_value=_fake_result("final answer is 5", messages=[msg_a, msg_b])
+    fake.run_stream_events = _streaming_mock(
+        result=_fake_result("final answer is 5", messages=[msg_a, msg_b])
     )
     with patch("pydantic_ai.Agent", return_value=fake):
         events = await _collect(
@@ -159,7 +203,7 @@ async def test_token_scenario_4_provider_error_keeps_prompt_turns() -> None:
         provider_exc = exc
 
     fake = MagicMock()
-    fake.run = AsyncMock(side_effect=provider_exc)
+    fake.run_stream_events = _streaming_mock(side_effect=provider_exc)
     with patch("pydantic_ai.Agent", return_value=fake):
         events = await _collect(
             TokenBackend().run(
@@ -180,41 +224,6 @@ async def test_token_scenario_4_provider_error_keeps_prompt_turns() -> None:
     assert isinstance(done, DoneEvent) and done.ok is False
     # status may be "error" once executor finalises; backend itself may
     # not set it — both are valid at the backend layer.
-
-
-# ---------------------------------------------------------------------
-# Token backend — pending scenarios (flip xfail to pass as work lands)
-# ---------------------------------------------------------------------
-
-
-@pytest.mark.xfail(reason="Phase 1.3 — thinking events not yet emitted by token backend")
-async def test_token_scenario_3_thinking() -> None:
-    raise AssertionError("not yet implemented")
-
-
-@pytest.mark.xfail(reason="Phase 1.3 — timeout-event path not exercised in backend unit tests")
-async def test_token_scenario_5_timeout() -> None:
-    raise AssertionError("not yet implemented")
-
-
-@pytest.mark.xfail(reason="Phase 1.3 — validation-retry round-trip needs executor integration")
-async def test_token_scenario_6_validation_retry() -> None:
-    raise AssertionError("not yet implemented")
-
-
-# ---------------------------------------------------------------------
-# claude_code / opencode — half-migrated; full parity arrives in Phase 4
-# ---------------------------------------------------------------------
-
-
-@pytest.mark.xfail(reason="Phase 4 — claude_code backend still delegates to legacy runner")
-async def test_claude_code_scenario_1_text_only() -> None:
-    raise AssertionError("pending Phase 4 inlining")
-
-
-@pytest.mark.xfail(reason="Phase 4 — opencode backend still delegates to legacy runner")
-async def test_opencode_scenario_1_text_only() -> None:
-    raise AssertionError("pending Phase 4 inlining")
 
 
 # ---------------------------------------------------------------------

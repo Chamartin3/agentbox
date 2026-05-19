@@ -35,6 +35,7 @@ class _RunnerPatch(BaseModel):
     timeout_seconds: int | None = None
     agent_module: str | None = None
     output_schema_path: str | None = None
+    output_model: str | None = None
     output_validation_engine: str | None = None
     max_validation_retries: int | None = None
     max_error_retries: int | None = None

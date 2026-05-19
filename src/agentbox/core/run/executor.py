@@ -50,6 +50,10 @@ from agentbox.core.prompt.resolver import resolve_prompt
 from agentbox.core.prompt.versioning.drift import check_drift, startup_sweep
 from agentbox.core.resource.subagent_render import materialize_subagents
 from agentbox.core.resource.workspace_materialize import materialize_workspace
+from agentbox.core.run.backends._schema_to_model import (
+    InconsistentSchema,
+    assert_schema_consistent,
+)
 from agentbox.core.run.backends.base import RenderedConfig
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.run.guardrails.base import GuardrailContext
@@ -516,6 +520,25 @@ class RunExecutor:
                         agent.__dict__["_composed_schema"] = _schema
                     break
                 break
+
+        # Fail-fast on internally-inconsistent output schemas before any
+        # backend tries to convert them into a structured-output contract.
+        # An invalid schema (e.g. ``required`` naming properties not in
+        # ``properties``) cannot be satisfied by any model — every backend
+        # would either silently drop fields or burn tokens retrying. Better
+        # to surface the authoring bug with a precise message at the
+        # boundary than wait for an opaque downstream failure.
+        _composed_schema = agent.__dict__.get("_composed_schema")
+        if isinstance(_composed_schema, dict):
+            try:
+                assert_schema_consistent(_composed_schema)
+            except InconsistentSchema as exc:
+                msg = (
+                    f"output schema for agent {agent.id!r} is internally "
+                    f"inconsistent: {exc}"
+                )
+                logger.error("executor: %s", msg)
+                raise ValueError(msg) from exc
 
         # Resolve effective runner config and select backend adapter
         try:

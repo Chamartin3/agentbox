@@ -38,7 +38,7 @@ class TestJsonSchemaToPydanticModel:
             "properties": {"name": {"type": "string"}},
         }
         Model = to_model(schema)
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             Model()
 
     def test_optional_field_defaults_to_none(self) -> None:

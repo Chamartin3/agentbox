@@ -13,6 +13,8 @@ that read more clearly as SQL expressions than as ORM relationships.
 
 from __future__ import annotations
 
+import contextlib
+import logging
 import uuid
 from pathlib import Path
 
@@ -50,6 +52,8 @@ from agentbox.core.data.schema import (
 from agentbox.core.data.settings import SettingsMixin
 from agentbox.core.data.shared_resources import SharedResourcesMixin
 from agentbox.core.data.workspaces import WorkspacesMixin
+
+logger = logging.getLogger(__name__)
 
 
 class _CoreStore:
@@ -188,7 +192,7 @@ class _CoreStore:
                 pass
 
             # Create agent_runner_profiles table if missing
-            try:
+            with contextlib.suppress(Exception):
                 conn.exec_driver_sql(
                     """CREATE TABLE IF NOT EXISTS agent_runner_profiles (
                         agent_id TEXT PRIMARY KEY,
@@ -198,8 +202,6 @@ class _CoreStore:
                         FOREIGN KEY(runner_profile_id) REFERENCES runner_profiles(id)
                     )"""
                 )
-            except Exception:
-                pass
 
             # Extend resources.type CHECK constraint to include schema/script
             try:
@@ -229,13 +231,11 @@ class _CoreStore:
                 logger.exception("migrate: failed to extend resources_type_check")
 
             # Create index on runs.runner_profile_id
-            try:
+            with contextlib.suppress(Exception):
                 conn.exec_driver_sql(
                     "CREATE INDEX IF NOT EXISTS idx_runs_runner_profile_id "
                     "ON runs(runner_profile_id)"
                 )
-            except Exception:
-                pass
 
     def _reap_orphaned_runs(self) -> None:
         """Mark any pre-existing 'running' rows as ``incomplete`` on startup.

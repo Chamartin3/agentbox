@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+
 class RunnerKind(StrEnum):
     """Supported agent runner implementations."""
 

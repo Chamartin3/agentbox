@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from agentbox.core.data.manifest import RunnerSpec
+from pydantic import ValidationError
 
 
 class TestOutputValidationEngine:
@@ -24,7 +25,7 @@ class TestOutputValidationEngine:
         assert spec.output_validation_engine == "both"
 
     def test_rejects_invalid_value(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             RunnerSpec(output_validation_engine="invalid")
 
     def test_roundtrips_with_other_fields(self) -> None:

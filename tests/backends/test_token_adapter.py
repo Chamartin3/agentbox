@@ -59,9 +59,12 @@ def _streaming_mock(result: object | None = None, side_effect: Exception | None 
 
         return _stream_side_effect
 
-    result_event = MagicMock()
+    class AgentRunResultEvent:
+        pass
+
     res = result if result is not None else _fake_result()
-    result_event.result = res
+    result_event = AgentRunResultEvent()
+    result_event.result = res  # type: ignore[attr-defined]
 
     @contextlib.asynccontextmanager
     async def _stream(*_args, **_kwargs):
@@ -76,8 +79,8 @@ def _streaming_mock(result: object | None = None, side_effect: Exception | None 
             async def __anext__(self):
                 try:
                     return next(self._items)
-                except StopIteration:
-                    raise StopAsyncIteration
+                except StopIteration as exc:
+                    raise StopAsyncIteration from exc
 
         yield _Stream()
 

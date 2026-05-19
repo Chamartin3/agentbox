@@ -237,7 +237,7 @@ class TestAgentLifecycle:
         assert active["version"] == 1
 
     def test_publish_appends_to_existing_changelog(self, session_store) -> None:
-        v1 = session_store.create_agent(
+        session_store.create_agent(
             agent_id="changelog-agent",
             config_json={"id": "changelog-agent"},
             author="user",
@@ -345,7 +345,7 @@ class TestAgentLifecycle:
     def test_branch_draft_does_not_change_active_pointer(
         self, session_store
     ) -> None:
-        v1 = session_store.create_agent(
+        session_store.create_agent(
             agent_id="multi-draft",
             config_json={"id": "multi-draft"},
             author="user",

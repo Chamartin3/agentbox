@@ -91,15 +91,50 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
   const [search, setSearch] = useState('');
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
 
+  // Coalesce consecutive streaming-delta events (text/thinking) so each
+  // streamed token doesn't produce its own row. A run with thousands of
+  // 1-char deltas would otherwise render thousands of components.
+  const coalesced = useMemo(() => {
+    const out: StreamEvent[] = [];
+    for (const ev of events) {
+      const t = String(ev.type || '');
+      const isDelta =
+        (t === 'text' || t === 'thinking') && Boolean(ev.delta);
+      if (isDelta && out.length > 0) {
+        const prev = out[out.length - 1];
+        const prevIsDelta =
+          String(prev.type || '') === t &&
+          Boolean(prev.delta) &&
+          (prev as { _coalesced?: boolean })._coalesced !== false &&
+          String(prev.role ?? '') === String(ev.role ?? '');
+        if (prevIsDelta) {
+          // Merge into a single virtual event. Clone so we don't mutate
+          // the parent's events array (kept referentially stable for memo).
+          const merged: StreamEvent = {
+            ...prev,
+            text: String(prev.text ?? '') + String(ev.text ?? ''),
+            ts: prev.ts ?? ev.ts,
+            _coalesced: true,
+            _coalesced_count: Number((prev as { _coalesced_count?: number })._coalesced_count ?? 1) + 1,
+          };
+          out[out.length - 1] = merged;
+          continue;
+        }
+      }
+      out.push(ev);
+    }
+    return out;
+  }, [events]);
+
   // Build type counts.
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const ev of events) {
+    for (const ev of coalesced) {
       const t = String(ev.type || 'unknown');
       c[t] = (c[t] ?? 0) + 1;
     }
     return c;
-  }, [events]);
+  }, [coalesced]);
 
   const allTypes = useMemo(() => Object.keys(counts).sort(), [counts]);
 
@@ -108,7 +143,7 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return events
+    return coalesced
       .map((ev, idx) => ({ ev, idx }))
       .filter(({ ev }) => {
         const t = String(ev.type || '');
@@ -116,7 +151,7 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
         if (!q) return true;
         return JSON.stringify(ev).toLowerCase().includes(q);
       });
-  }, [events, visibleTypes, search]);
+  }, [coalesced, visibleTypes, search]);
 
   // Auto-scroll to bottom when new events arrive.
   useEffect(() => {
@@ -228,6 +263,11 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
                   </span>
                   <span className="event-relative">{ts ? fmtRelativeShort(ts) : ''}</span>
                   <span className="event-summary">{summary}</span>
+                  {(ev as { _coalesced_count?: number })._coalesced_count && (
+                    <span className="dim" style={{ fontSize: 10, marginLeft: 4 }}>
+                      ×{String((ev as { _coalesced_count?: number })._coalesced_count)}
+                    </span>
+                  )}
                   <span className="event-toggle">{isOpen ? '−' : '+'}</span>
                 </div>
                 {isOpen && (
@@ -245,6 +285,9 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
       <div className="event-stream-footer">
         <span className="dim">
           showing {filtered.length} of {events.length} events
+          {coalesced.length !== events.length && (
+            <> · {events.length - coalesced.length} deltas coalesced</>
+          )}
         </span>
         {search && (
           <span className="dim">

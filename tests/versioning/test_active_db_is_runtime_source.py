@@ -21,11 +21,11 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.constants import RunnerKind
-
-_DEFAULT_AGENT_TIMEOUT = 1200
 from agentbox.core.data.manifest import AgentDef, RunnerSpec
 from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
 from agentbox.core.run.backends.opencode import OpenCodeBackend
+
+_DEFAULT_AGENT_TIMEOUT = 1200
 
 
 def _agent(runner_kind: RunnerKind, timeout: int, model: str | None = "haiku") -> AgentDef:

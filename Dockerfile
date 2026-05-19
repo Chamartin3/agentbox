@@ -2,9 +2,9 @@
 
 FROM node:20-alpine AS web
 WORKDIR /web
-COPY web/package.json ./
+COPY libs/agentbox/web/package.json ./
 RUN npm install --no-audit --no-fund
-COPY web/ ./
+COPY libs/agentbox/web/ ./
 # Vite builds into /opt/agentbox/src/agentbox/ui/static/dist via vite.config.ts;
 # we redirect the output here instead.
 RUN npx vite build --outDir /web/dist
@@ -50,16 +50,33 @@ RUN npm install -g @anthropic-ai/claude-code \
  && chown -R appuser:appuser /opt/npm-global
 
 WORKDIR /opt/agentbox
-COPY pyproject.toml ./
-COPY src ./src
+COPY libs/agentbox/pyproject.toml ./
+COPY libs/agentbox/src ./src
 
 # Drop the SPA into the place FastAPI expects.
 COPY --from=web /web/dist /opt/agentbox/src/agentbox/ui/static/dist
 
 RUN pip install --no-cache-dir -e . websockets
 
+# Project plugins: shared I/O schemas + cvman guardrails entrypoint group.
+# Both must be installed editable so agentbox can resolve their
+# `agentbox.guardrails` entry points and `cv_schemas.*` imports at
+# runtime validation. They live in the parent project repo and are
+# copied into the image so the runtime container doesn't depend on a
+# host bind-mount to find them.
+COPY libs/cv_schemas /opt/cv_schemas
+COPY libs/cvman_agentbox /opt/cvman_agentbox
+# editable_mode=compat writes the .pth file into site-packages instead of
+# into the source tree, so the bind mount `./libs/cv_schemas:/opt/cv_schemas`
+# (see docker-compose.override.yml) does NOT shadow the install metadata.
+# Without this, the container ends up with no importable `cv_schemas` at
+# runtime and agentbox's output-model validation silently no-ops — letting
+# under-length / malformed payloads through that Django then rejects.
+RUN pip install --no-cache-dir -e /opt/cv_schemas --config-settings editable_mode=compat \
+ && pip install --no-cache-dir -e /opt/cvman_agentbox --config-settings editable_mode=compat
+
 RUN mkdir -p /data /project /home/appuser/.claude /home/appuser/.local/share/opencode \
- && chown -R appuser:appuser /data /opt/agentbox /home/appuser/.claude /home/appuser/.local
+ && chown -R appuser:appuser /data /opt/agentbox /opt/cv_schemas /opt/cvman_agentbox /home/appuser/.claude /home/appuser/.local
 
 COPY <<'EOF' /usr/local/bin/agentbox-entrypoint
 #!/usr/bin/env bash

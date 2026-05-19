@@ -203,7 +203,7 @@ class TestCaching:
             runs_tmpfs_dir=tmp_runs_dir,
             max_cache_age_seconds=0,  # immediately stale
         )
-        r1 = cfg.prepare_run_dir(
+        cfg.prepare_run_dir(
             workdir=Path("/tmp/workspace"),
             agent=agent,
             backend="opencode",

@@ -14,6 +14,7 @@ either call this directly or short-circuit with their own
 
 from __future__ import annotations
 
+import importlib
 import json
 import re
 from dataclasses import dataclass
@@ -21,11 +22,18 @@ from pathlib import Path
 from typing import Any, Literal
 
 import jsonschema as _jsonschema
+from pydantic import BaseModel, ValidationError
 
 # Engine label for the validator that produced the verdict. ``off`` means
 # no schema is configured and validation was skipped; ``none`` means a
 # schema was expected but the input was unrunnable (empty / unparseable).
-ValidationEngine = Literal["jsonschema", "pydantic", "both", "none", "off"]
+# ``pydantic-class`` means we validated against the canonical Pydantic
+# class declared by ``output_model`` — the only engine that runs
+# ``@model_validator`` rules (cross-field invariants that JSON Schema
+# cannot express).
+ValidationEngine = Literal[
+    "jsonschema", "pydantic", "pydantic-class", "both", "none", "off"
+]
 
 
 @dataclass(frozen=True)
@@ -141,13 +149,74 @@ def validate_jsonschema(output: str, schema: dict[str, Any]) -> ValidationResult
 
 
 def validate_pydantic(output: str, schema: dict[str, Any]) -> ValidationResult:
-    """Run Pydantic validation — catches cross-field constraints jsonschema can't."""
+    """Run Pydantic validation — catches cross-field constraints jsonschema can't.
+
+    NOTE: this builds a *throwaway* pydantic model from the JSON Schema
+    dict, which drops ``@model_validator`` rules and most ``Field(...)``
+    constraints (they don't exist in JSON Schema). For cross-field
+    invariants to actually run, the agent must declare ``output_model``
+    and the executor will dispatch to :func:`validate_pydantic_class`
+    instead.
+    """
     from agentbox.core.prompt.composition.pydantic_validate import (
         validate_with_pydantic,
     )
 
     ok, err = validate_with_pydantic(output, schema)
     return ValidationResult(ok=ok, error=err, engine="pydantic")
+
+
+def load_output_model(dotted: str) -> type[BaseModel]:
+    """Import a Pydantic class from a ``"module.path:ClassName"`` string.
+
+    Raises :class:`ImportError` / :class:`AttributeError` / :class:`TypeError`
+    on misconfiguration so the executor can surface a clear validation
+    error rather than silently falling back to a weaker engine.
+    """
+    if ":" not in dotted:
+        raise ValueError(
+            f"output_model must be 'module.path:ClassName', got {dotted!r}"
+        )
+    module_path, cls_name = dotted.split(":", 1)
+    module = importlib.import_module(module_path)
+    cls = getattr(module, cls_name, None)
+    if cls is None:
+        raise ImportError(f"{cls_name!r} not found in {module_path}")
+    if not (isinstance(cls, type) and issubclass(cls, BaseModel)):
+        raise TypeError(
+            f"output_model {dotted!r} must point at a pydantic.BaseModel subclass"
+        )
+    return cls
+
+
+def validate_pydantic_class(
+    output: str, model_cls: type[BaseModel]
+) -> ValidationResult:
+    """Validate ``output`` against the *canonical* Pydantic class.
+
+    This is the only engine that runs ``@model_validator`` rules and
+    full ``Field(...)`` constraints. Both Django and agentbox call into
+    the same class, so a payload accepted here is accepted there.
+    """
+    try:
+        payload = extract_json(output)
+    except Exception as exc:  # defensive — extract_json is forgiving
+        return ValidationResult(
+            ok=False, error=f"could not extract JSON: {exc}", engine="pydantic-class"
+        )
+    try:
+        instance = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        return ValidationResult(
+            ok=False, error=f"output is not valid JSON: {exc}", engine="pydantic-class"
+        )
+    try:
+        model_cls.model_validate(instance)
+    except ValidationError as exc:
+        return ValidationResult(
+            ok=False, error=str(exc), engine="pydantic-class"
+        )
+    return ValidationResult(ok=True, engine="pydantic-class")
 
 
 def resolve_schema(
@@ -161,6 +230,13 @@ def resolve_schema(
     no schema is configured (caller should treat the run as no-validation),
     or when the schema file is missing/unreadable (caller should surface
     ``error_msg`` as a validation failure).
+
+    Resolution order:
+      1. ``agent._composed_schema`` (already-rendered binding).
+      2. ``python.output_model`` (dotted Pydantic class) — derives the
+         schema via ``model_json_schema()`` so the prompt and the
+         validator share a single source of truth.
+      3. ``python.output_schema_path`` (legacy file-based contract).
     """
     from agentbox.core.agent.config import PythonAgentConfig
 
@@ -169,6 +245,16 @@ def resolve_schema(
         return composed, ""
 
     python_cfg = PythonAgentConfig.from_agent(agent)
+    if python_cfg.output_model:
+        try:
+            cls = load_output_model(python_cfg.output_model)
+        except (ImportError, AttributeError, TypeError, ValueError) as exc:
+            return None, f"cannot load output_model {python_cfg.output_model!r}: {exc}"
+        try:
+            return cls.model_json_schema(), ""
+        except Exception as exc:  # pydantic emits various errors here
+            return None, f"cannot derive JSON schema from {python_cfg.output_model!r}: {exc}"
+
     schema_rel = python_cfg.output_schema_path
     if not schema_rel:
         return None, ""
@@ -202,8 +288,14 @@ def validate_output(
 
     Backends that produce already-typed outputs (e.g. pydantic-ai
     structured returns) may bypass this and synthesize their own result.
+
+    When ``python.output_model`` is configured we short-circuit to
+    :func:`validate_pydantic_class` regardless of
+    ``output_validation_engine`` — the canonical class is the only
+    engine that runs cross-field invariants, so honoring the legacy
+    ``jsonschema`` / ``pydantic`` knobs would silently weaken the check.
     """
-    from agentbox.core.agent.config import ExecutionConfig
+    from agentbox.core.agent.config import ExecutionConfig, PythonAgentConfig
 
     schema, schema_err = resolve_schema(agent, workdir, project_root)
     if schema is None:
@@ -217,6 +309,18 @@ def validate_output(
             error="output is empty but an output schema is required",
             engine="none",
         )
+
+    output_model_path = PythonAgentConfig.from_agent(agent).output_model
+    if output_model_path:
+        try:
+            model_cls = load_output_model(output_model_path)
+        except (ImportError, AttributeError, TypeError, ValueError) as exc:
+            return ValidationResult(
+                ok=False,
+                error=f"cannot load output_model {output_model_path!r}: {exc}",
+                engine="none",
+            )
+        return validate_pydantic_class(output, model_cls)
 
     engine = ExecutionConfig.from_agent(agent).output_validation_engine
 

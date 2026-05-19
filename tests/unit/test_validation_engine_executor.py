@@ -47,7 +47,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="jsonschema",
             ),
         )
-        ok, err, via = _validate(_VALID, agent, tmp_path)
+        ok, _err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "jsonschema"
 
@@ -62,7 +62,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="jsonschema",
             ),
         )
-        ok, err, via = _validate(_INVALID, agent, tmp_path)
+        ok, _err, via = _validate(_INVALID, agent, tmp_path)
         assert not ok
         assert via == "jsonschema"
 
@@ -77,7 +77,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="pydantic",
             ),
         )
-        ok, err, via = _validate(_VALID, agent, tmp_path)
+        ok, _err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "pydantic"
 
@@ -92,7 +92,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="pydantic",
             ),
         )
-        ok, err, via = _validate(_INVALID, agent, tmp_path)
+        ok, _err, via = _validate(_INVALID, agent, tmp_path)
         assert not ok
         assert via == "pydantic"
 
@@ -107,7 +107,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="both",
             ),
         )
-        ok, err, via = _validate(_VALID, agent, tmp_path)
+        ok, _err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "both"
 
@@ -123,7 +123,7 @@ class TestValidationEngineSelection:
                 output_validation_engine="both",
             ),
         )
-        ok, err, via = _validate(_INVALID, agent, tmp_path)
+        ok, _err, via = _validate(_INVALID, agent, tmp_path)
         assert not ok
         assert via == "jsonschema"
 
@@ -138,6 +138,6 @@ class TestValidationEngineSelection:
                 output_schema_path="schema.json",
             ),
         )
-        ok, err, via = _validate(_VALID, agent, tmp_path)
+        ok, _err, via = _validate(_VALID, agent, tmp_path)
         assert ok
         assert via == "both"

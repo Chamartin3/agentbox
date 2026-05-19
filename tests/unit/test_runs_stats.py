@@ -43,7 +43,7 @@ def test_stats_totals(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_stats_by_agent(tmp_path: Path) -> None:
     store = SessionStore(tmp_path / "db.sqlite")
-    r1 = _seed(store, "agent_a", "ok", "haiku")
+    _seed(store, "agent_a", "ok", "haiku")
     _seed(store, "agent_b", "ok", "sonnet")
     _seed(store, "agent_b", "error", "sonnet")
 

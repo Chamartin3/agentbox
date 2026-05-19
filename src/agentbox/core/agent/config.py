@@ -129,11 +129,20 @@ class PythonAgentConfig:
     the runtime locates the schema for the executor's validation loop.
     Long-term it should move to a binding (per the original plan); for
     now we keep the path-based contract.
+
+    ``output_model`` is a dotted import path (``"pkg.module:ClassName"``)
+    pointing at the canonical Pydantic output class. When set, the
+    executor's validator imports the class and runs
+    ``ClassName.model_validate_json(...)`` — catching cross-field
+    ``@model_validator`` rules that ``model_json_schema()`` cannot
+    express. The schema embedded in the system prompt is also derived
+    from the same class so the prompt and the validator can't drift.
     """
 
     agent_module: str | None = None
     deps_factory: str | None = None
     output_schema_path: str | None = None
+    output_model: str | None = None
 
     @classmethod
     def from_agent(cls, agent: Any) -> PythonAgentConfig:
@@ -153,6 +162,11 @@ class PythonAgentConfig:
                 sub.get("output_schema_path")
                 if "output_schema_path" in sub
                 else _runner_attr(agent, "output_schema_path", None)
+            ),
+            output_model=(
+                sub.get("output_model")
+                if "output_model" in sub
+                else _runner_attr(agent, "output_model", None)
             ),
         )
 
@@ -181,6 +195,7 @@ def build_config_json_payload(agent: Any) -> dict[str, Any]:
             "agent_module": python_cfg.agent_module,
             "deps_factory": python_cfg.deps_factory,
             "output_schema_path": python_cfg.output_schema_path,
+            "output_model": python_cfg.output_model,
         },
     }
     return payload

@@ -99,7 +99,7 @@ def test_upload_file_to_published_returns_409(client: Any) -> None:
     }
     create_resp = client.post("/api/agents", json=create_req)
     assert create_resp.status_code == 201
-    version_id = create_resp.json()["version_id"]
+    create_resp.json()["version_id"]
 
     # Publish the version
     store = _get_store(client)

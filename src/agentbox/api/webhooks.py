@@ -13,6 +13,7 @@ Spawned as a background task so the request that finalised the run
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from datetime import datetime
@@ -33,25 +34,36 @@ _HTTP_TIMEOUT_S = 10.0
 
 
 def _parsed_output(run: RunRecord) -> Any:
-    """Return ``run.output`` parsed into a dict/list when it represents
-    structured JSON.
+    """Return ``run.output`` as a raw string, always.
 
-    Schema-validated runs (``validation_status == "ok"``) are guaranteed
-    to carry a JSON payload — the validator already parsed it, possibly
-    after stripping markdown fences. We re-run the same extraction so the
-    webhook envelope ships the structured form, not the raw fenced
-    string. Returns the raw output unchanged on parse failure or for
-    non-structured runs.
+    The webhook ``output`` field is unconditionally the verbatim string
+    stored on the run — regardless of backend or validation status.
+    This keeps the webhook contract stable: receivers can always treat
+    ``output`` as a string without worrying about backend-specific
+    pre-parsing.
+
+    For the structured (dict/list) form when a schema was validated,
+    use :func:`_parsed_output_structured`.
+    """
+    return run.output or ""
+
+
+def _parsed_output_structured(run: RunRecord) -> dict[str, Any] | list | None:
+    """Return ``run.output`` as a structured dict/list when applicable.
+
+    Only returns a non-null value when the run was schema-validated
+    (``validation_status == "ok"``) and the output is parseable JSON.
+    For raw-text or non-validated runs returns ``None``.
     """
     raw = run.output
     if not isinstance(raw, str) or not raw.strip():
-        return raw
+        return None
     if run.validation_status != "ok":
-        return raw
+        return None
     try:
         return json.loads(extract_json(raw))
     except (ValueError, TypeError):
-        return raw
+        return None
 
 
 def webhook_payload(
@@ -66,6 +78,7 @@ def webhook_payload(
         "session_id": run.session_id,
         "status": run.status,
         "output": _parsed_output(run),
+        "output_structured": _parsed_output_structured(run),
         "error": run.error,
         "started_at": run.created_at,
         "finished_at": run.finished_at,
@@ -255,7 +268,7 @@ async def _deliver_with_events(
     """Wrap deliver_webhook with per-attempt event emission and persistence."""
     body = json.dumps(payload, default=str)
     last_error: str = ""
-    start_time = datetime.now()
+    datetime.now()
     for attempt, delay in enumerate(_RETRY_DELAYS_S):
         attempt_start = datetime.now()
         try:
@@ -266,7 +279,8 @@ async def _deliver_with_events(
                     headers={"Content-Type": "application/json"},
                 )
             latency = int((datetime.now() - attempt_start).total_seconds() * 1000)
-            if 200 <= resp.status_code < 300:
+            body_signals_failure = _response_signals_failure(resp.text)
+            if 200 <= resp.status_code < 300 and not body_signals_failure:
                 _record_delivery(
                     store, run_id, attempt + 1, url, payload,
                     status=resp.status_code, body=resp.text[:500],
@@ -282,7 +296,13 @@ async def _deliver_with_events(
                     ),
                 )
                 return True
-            last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            if body_signals_failure:
+                last_error = (
+                    f"HTTP {resp.status_code} but body signals failure: "
+                    f"{resp.text[:200]}"
+                )
+            else:
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
             _record_delivery(
                 store, run_id, attempt + 1, url, payload,
                 status=resp.status_code, body=resp.text[:500],
@@ -315,6 +335,30 @@ async def _deliver_with_events(
         ),
     )
     return False
+
+
+def _response_signals_failure(body: str) -> bool:
+    """Detect consumer-side failure in a 2xx webhook response.
+
+    Some receivers (Django views, mostly) historically returned 200 OK with
+    ``{"ok": false}`` even when the post-processor blew up. That swallows the
+    failure: agentbox marked the run delivered, but no data was persisted.
+    Inspect the JSON body when present and treat ``ok: false`` / ``status:
+    error``/``failed`` as a delivery failure so the run gets retried and then
+    flipped to ``failed`` if it never recovers.
+    """
+    if not body:
+        return False
+    try:
+        parsed = json.loads(body)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(parsed, dict):
+        return False
+    if parsed.get("ok") is False:
+        return True
+    status_field = parsed.get("status")
+    return bool(isinstance(status_field, str) and status_field.lower() in {"error", "failed", "fail"})
 
 
 def _record_delivery(
@@ -352,10 +396,8 @@ def _emit(
 ) -> None:
     """Publish an event and persist it to the transcript, best-effort."""
     if broadcaster is not None:
-        try:
+        with contextlib.suppress(Exception):
             broadcaster.publish(ev)
-        except Exception:
-            pass
     if transcript_path is not None:
         try:
             with transcript_path.open("a", encoding="utf-8") as tf:

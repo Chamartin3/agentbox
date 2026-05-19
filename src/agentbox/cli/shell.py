@@ -67,7 +67,7 @@ def shell_cmd(
         shutil.rmtree(gen_dir)
     gen_dir.mkdir(parents=True, exist_ok=True)
 
-    gen = _make_generator(settings, manifest)
+    gen = _make_generator(settings, None)
     gen.generate_configs_into(gen_dir)
 
     env_doc_rendered = _render_env_doc(settings, workspace, agent_def, workspace_path)

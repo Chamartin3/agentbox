@@ -5,7 +5,7 @@ Pagination envelope is shared across all ``list_*`` / ``search_*`` tools.
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,7 @@ T = TypeVar("T")
 MAX_LIMIT = 100
 
 
-class Page(BaseModel, Generic[T]):
+class Page[T](BaseModel):
     items: list[T]
     total: int
     limit: int

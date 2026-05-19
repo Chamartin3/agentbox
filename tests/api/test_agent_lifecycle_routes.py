@@ -347,7 +347,7 @@ class TestPublishWebhook:
         with patch(
             "agentbox.api.webhooks.schedule_agent_event_webhook",
             side_effect=RuntimeError("Webhook dispatch failed"),
-        ) as mock_schedule:
+        ):
             resp = client.post(
                 f"/api/agents/test-agent/versions/{draft['version']}/publish",
                 json={"reason": "Test webhook failure"},
