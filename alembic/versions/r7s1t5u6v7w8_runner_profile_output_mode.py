@@ -28,7 +28,17 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+def _has_column(table: str, column: str) -> bool:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    return any(c["name"] == column for c in inspector.get_columns(table))
+
+
 def upgrade() -> None:
+    # Idempotent: legacy SessionStore._migrate() may have added this column
+    # already on older DBs that booted before alembic was wired in.
+    if _has_column("runner_profiles", "output_mode"):
+        return
     with op.batch_alter_table("runner_profiles") as batch:
         batch.add_column(
             sa.Column(
@@ -41,5 +51,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if not _has_column("runner_profiles", "output_mode"):
+        return
     with op.batch_alter_table("runner_profiles") as batch:
         batch.drop_column("output_mode")

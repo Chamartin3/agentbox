@@ -13,6 +13,7 @@ import json
 from typing import TYPE_CHECKING
 
 from agentbox.core.prompt.composition import _append_input_schema, _append_schema
+from agentbox.core.prompt.output_contract import render as _render_output_contract
 from agentbox.core.prompt.rendering import render_for_type
 from agentbox.core.prompt.resolver import resolve_prompt
 
@@ -117,6 +118,89 @@ def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
     return None
 
 
+def _validation_block_for_preview(
+    store: SessionStore, agent_id: str
+) -> tuple[str, dict | None]:
+    """Render the rules + validators hint block from the agent's bound
+    output-direction validation contract.
+
+    Schema is intentionally NOT rendered here — it already appears as
+    the output_schema block above (single source of truth: the binding).
+    Returns ``(rendered_text, view_dict)`` where view_dict is the
+    structured payload returned to the UI under ``validation``.
+    """
+    from agentbox.core.agent.config import (
+        HttpValidatorConfig,
+        OutputConfig,
+        ScriptValidatorConfig,
+    )
+
+    active = store.get_active_version(agent_id)
+    if not active or active.get("id") is None:
+        return "", None
+    contract = store.resolve_agent_version_contract(int(active["id"]), "output")
+    if not contract:
+        return "", None
+    rules = [r for r in contract.get("rules") or [] if isinstance(r, str)]
+    validators_meta: list[dict] = []
+    runtime_validators: list = []
+    for entry in contract.get("validators") or []:
+        if not isinstance(entry, dict):
+            continue
+        kind = entry.get("kind")
+        if kind == "http":
+            validators_meta.append(
+                {
+                    "kind": "http",
+                    "endpoint": entry.get("endpoint", ""),
+                    "timeout_seconds": int(entry.get("timeout_seconds", 5)),
+                }
+            )
+            runtime_validators.append(
+                HttpValidatorConfig(
+                    kind="http",
+                    endpoint=entry.get("endpoint", ""),
+                    timeout_seconds=int(entry.get("timeout_seconds", 5)),
+                )
+            )
+        elif kind == "script":
+            rid = entry.get("resource_id", "")
+            resource = store.get_repo_resource(rid) if rid else None
+            validators_meta.append(
+                {
+                    "kind": "script",
+                    "resource_id": rid,
+                    "resource_slug": (resource or {}).get("slug"),
+                    "resource_display_name": (resource or {}).get("display_name"),
+                    "pinned_version_id": entry.get("pinned_version_id"),
+                }
+            )
+            # No source pre-load needed for preview text — the runtime
+            # hint block is generic and doesn't quote the script body.
+            runtime_validators.append(
+                ScriptValidatorConfig(
+                    kind="script",
+                    resource_id=rid,
+                    resource_version_id=entry.get("pinned_version_id"),
+                    source_code="",
+                )
+            )
+    rendered = _render_output_contract(
+        OutputConfig(
+            json_schema=None,
+            rules=rules,
+            validators=tuple(runtime_validators),
+        )
+    )
+    view = {
+        "contract_id": contract.get("id"),
+        "contract_name": contract.get("name"),
+        "rules": rules,
+        "validators": validators_meta,
+    }
+    return rendered, view
+
+
 def _schema_block(slot: str, schema_view: dict | None) -> str:
     if not schema_view or not schema_view.get("text"):
         return ""
@@ -192,6 +276,16 @@ def render_agent_prompt_preview(
     if output_schema_block:
         composed = composed.rstrip() + "\n\n" + output_schema_block
 
+    # Validation contract — rules + a short validators hint, mirroring
+    # what core/prompt/output_contract.append() does at runtime so the
+    # preview reflects what the model actually sees. The schema piece is
+    # intentionally omitted (already rendered above from the binding).
+    validation_block, validation_view = _validation_block_for_preview(
+        store, agent_id
+    )
+    if validation_block:
+        composed = composed.rstrip() + "\n\n" + validation_block
+
     parts: list[dict] = [
         {"label": "prompt template", "chars": len(base_prompt)},
     ]
@@ -207,14 +301,29 @@ def render_agent_prompt_preview(
         )
     if refs_text:
         parts.extend(per_ref_chars)
+    # Validator-sourced blocks share the "validator:" prefix so they're
+    # visually grouped in the composer breakdown chart — schema (implicit
+    # validator), rules, and the validation hint all originate from the
+    # validation contract surface.
     if output_schema_block:
         parts.append(
             {
-                "label": "output_schema block",
+                "label": "validator: output schema (json-schema gate)",
+                "kind": "validator",
                 "chars": len(output_schema_block) + 2,
                 "binding_id": output_schema["binding_id"],
                 "resource_id": output_schema["resource_id"],
                 "version_id": output_schema["version_id"],
+            }
+        )
+    if validation_block:
+        parts.append(
+            {
+                "label": "validator: rules + post-hoc validators",
+                "kind": "validator",
+                "chars": len(validation_block) + 2,
+                "contract_id": (validation_view or {}).get("contract_id"),
+                "contract_name": (validation_view or {}).get("contract_name"),
             }
         )
 
@@ -227,6 +336,7 @@ def render_agent_prompt_preview(
         "references": refs_meta,
         "input_schema": input_schema,
         "output_schema": output_schema,
+        "validation": validation_view,
         "raw_text_output": raw_text_output,
         "char_breakdown": parts,
         "total_chars": len(composed),

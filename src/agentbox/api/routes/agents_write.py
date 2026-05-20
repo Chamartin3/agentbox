@@ -35,7 +35,6 @@ class _RunnerPatch(BaseModel):
     timeout_seconds: int | None = None
     agent_module: str | None = None
     output_schema_path: str | None = None
-    output_model: str | None = None
     output_validation_engine: str | None = None
     max_validation_retries: int | None = None
     max_error_retries: int | None = None
@@ -166,6 +165,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
             prompt_text = ""
     snapshot = _build_snapshot(updated)
     config_json = _build_config_json(updated)
+
     try:
         store.create_version(
             agent_id=updated.id,

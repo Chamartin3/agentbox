@@ -1,33 +1,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Marked } from 'marked';
-import { markedHighlight } from 'marked-highlight';
-import hljs from 'highlight.js/lib/core';
-import json from 'highlight.js/lib/languages/json';
-import 'highlight.js/styles/github-dark.css';
 import { ApiError } from '../api/client';
-
-hljs.registerLanguage('json', json);
-
-const marked = new Marked(
-  markedHighlight({
-    emptyLangClass: 'hljs',
-    langPrefix: 'hljs language-',
-    highlight(code, lang) {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-          return hljs.highlight(code, { language: lang }).value;
-        } catch {
-          /* fall through */
-        }
-      }
-      return code;
-    },
-  }),
-);
 import { repoApi, type RepoResource, type RepoType, type RepoVersion } from '../api/repo';
 import ResourcePicker from './ResourcePicker';
 import Toast from './Toast';
+import LiveComposedPromptPreview from './LiveComposedPromptPreview';
 
 type PromptMode = 'inline' | 'skill_primer' | 'name_only' | 'manifest';
 type SchemaSlot = 'input_schema' | 'output_schema';
@@ -121,6 +98,7 @@ interface Props {
   onPreview?: (result: PreviewResult | null) => void;
   outputValidation?: string;
   onChangeOutputValidation?: (next: string) => void;
+  hideInlinePreview?: boolean;
 }
 
 export default function AgentResourcesEditor({
@@ -129,6 +107,7 @@ export default function AgentResourcesEditor({
   onPreview,
   outputValidation,
   onChangeOutputValidation,
+  hideInlinePreview,
 }: Props) {
   const [bindings, setBindings] = useState<Binding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -386,19 +365,18 @@ export default function AgentResourcesEditor({
   if (loading) return <p className="dim">loading agent resources…</p>;
 
   return (
-    <section className="form-panel">
-      <div className="row between" style={{ marginBottom: 8 }}>
-        <div>
-          <h3 style={{ marginTop: 0, marginBottom: 2 }}>Resource bindings</h3>
-          <p className="dim" style={{ fontSize: 12, margin: 0 }}>
-            Schemas (input/output) and reference documents attached to the
-            composed prompt. Use the row menu for advanced options.
-          </p>
-        </div>
-        <div className="row" style={{ gap: 8 }}>
-          <button onClick={() => setPicker({ kind: 'binding' })}>+ add resource</button>
+    <section className="composition-section">
+      <div className="composition-section-header">
+        <h3>Resource bindings</h3>
+        <div className="composition-section-meta">
+          <button onClick={() => setPicker({ kind: 'binding' })} style={{ fontSize: 11, padding: '4px 10px' }}>
+            + add resource
+          </button>
         </div>
       </div>
+      <p className="composition-section-subtitle">
+        Schemas (input/output) and reference documents attached to the composed prompt. Use the row menu for advanced options.
+      </p>
 
       {markerBindings.length === 0 ? (
         <p className="dim">No bindings yet. Click "+ add resource" to attach one.</p>
@@ -683,93 +661,7 @@ export default function AgentResourcesEditor({
         </div>
       )}
 
-      {preview && (
-        <div style={{ marginTop: 16 }}>
-          <div className="row between" style={{ marginBottom: 8, alignItems: 'baseline' }}>
-            <h3 style={{ marginTop: 0, marginBottom: 0 }}>
-              Live composed prompt
-              {preview.raw_text_output && (
-                <span className="tag" style={{ marginLeft: 8 }}>raw-text output</span>
-              )}
-            </h3>
-            <div style={{ textAlign: 'right', lineHeight: 1.1 }}>
-              <div style={{ fontSize: 32, fontWeight: 700 }}>
-                {(preview.total_chars ?? preview.rendered_prompt.length).toLocaleString()}
-                <span style={{ fontSize: 14, fontWeight: 500, opacity: 0.7, marginLeft: 6 }}>
-                  chars
-                </span>
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                ≈ {Math.round((preview.total_chars ?? preview.rendered_prompt.length) / 4).toLocaleString()} tokens
-              </div>
-            </div>
-          </div>
-          {preview.char_breakdown && preview.char_breakdown.length > 0 && (() => {
-            const total = preview.total_chars ?? preview.rendered_prompt.length;
-            const n = preview.char_breakdown.length;
-            const colors = preview.char_breakdown.map((_, i) =>
-              `hsl(${Math.round((i * 360) / Math.max(n, 1))}, 65%, 55%)`
-            );
-            return (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{
-                  display: 'flex', height: 18, borderRadius: 4, overflow: 'hidden',
-                  border: '1px solid var(--border, #333)', marginBottom: 6,
-                }}>
-                  {preview.char_breakdown.map((p, i) => {
-                    const pct = total > 0 ? (p.chars / total) * 100 : 0;
-                    return (
-                      <div
-                        key={p.label}
-                        title={`${p.label}: ${p.chars.toLocaleString()} chars (${pct.toFixed(1)}%)`}
-                        style={{
-                          background: colors[i % colors.length],
-                          width: `${pct}%`,
-                          minWidth: pct > 0 ? 2 : 0,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="row" style={{ gap: 12, flexWrap: 'wrap', fontSize: 12 }}>
-                  {preview.char_breakdown.map((p, i) => {
-                    const pct = total > 0 ? (p.chars / total) * 100 : 0;
-                    return (
-                      <div key={p.label} className="row" style={{ gap: 5, alignItems: 'center' }}>
-                        <span style={{
-                          width: 10, height: 10, borderRadius: 2,
-                          background: colors[i % colors.length], display: 'inline-block',
-                        }} />
-                        <span style={{ fontWeight: 500 }}>{p.label}</span>
-                        <span style={{ opacity: 0.8 }}>
-                          {p.chars.toLocaleString()}
-                          <span style={{ opacity: 0.5 }}> ({pct.toFixed(0)}%)</span>
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-          {preview.warnings.length > 0 && (
-            <ul className="dim" style={{ fontSize: 11, marginTop: 4 }}>
-              {preview.warnings.map((w, i) => <li key={i}>{w}</li>)}
-            </ul>
-          )}
-          <div
-            className="md-preview"
-            style={{
-              background: 'var(--bg-soft, #111)', padding: 14, borderRadius: 4,
-              fontSize: 13, maxHeight: 600, overflow: 'auto',
-              lineHeight: 1.5,
-            }}
-            dangerouslySetInnerHTML={{
-              __html: marked.parse(preview.rendered_prompt || '', { async: false }) as string,
-            }}
-          />
-        </div>
-      )}
+      {!hideInlinePreview && preview && <LiveComposedPromptPreview preview={preview} />}
 
       {picker?.kind === 'binding' && (
         <ResourcePicker

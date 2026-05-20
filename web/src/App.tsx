@@ -4,7 +4,6 @@ import RunsPage from './pages/RunsPage';
 import RunDetailPage from './pages/RunDetailPage';
 import AgentsPage from './pages/AgentsPage';
 import AgentDetailPage from './pages/AgentDetailPage';
-import AgentVersions from './pages/AgentVersions';
 import AgentVersionDiff from './pages/AgentVersionDiff';
 import AgentVersionDetailPage from './pages/AgentVersionDetailPage';
 import AgentNew from './pages/AgentNew';
@@ -35,9 +34,9 @@ export default function App() {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/agents/new" element={<AgentNew />} />
           <Route path="/agents/:id" element={<AgentDetailPage />} />
-          <Route path="/agents/:id/versions/:vid" element={<AgentVersionDetailPage />} />
-          <Route path="/agents/:id/versions" element={<AgentVersions />} />
           <Route path="/agents/:id/versions/diff" element={<AgentVersionDiff />} />
+          <Route path="/agents/:id/versions/:vid" element={<AgentVersionDetailPage />} />
+          <Route path="/agents/:id/:tab" element={<AgentDetailPage />} />
 
           {/* Workspaces section: workspaces table + resources sub-section. */}
           <Route path="/workspaces" element={<WorkspacesSection />} />

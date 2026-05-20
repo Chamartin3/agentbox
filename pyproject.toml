@@ -73,6 +73,7 @@ markers = [
   "integration: cross-module / executor / API / store tests",
   "slow: tests that take noticeable wall-time",
   "live_ollama: requires a running Ollama instance (set OLLAMA_HOST)",
+  "live_callback: requires a consumer Django service reachable at CVMAN_BASE_URL",
 ]
 filterwarnings = [
   "error",

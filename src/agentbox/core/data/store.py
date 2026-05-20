@@ -53,6 +53,7 @@ from agentbox.core.data.schema import (
 )
 from agentbox.core.data.settings import SettingsMixin
 from agentbox.core.data.shared_resources import SharedResourcesMixin
+from agentbox.core.data.validation import ValidationContractsMixin
 from agentbox.core.data.workspaces import WorkspacesMixin
 
 logger = logging.getLogger(__name__)
@@ -773,6 +774,7 @@ class SessionStore(
     SharedResourcesMixin,
     ResourcesMixin,
     ResourceBindingsMixin,
+    ValidationContractsMixin,
     WorkspacesMixin,
     EnvDocsMixin,
     McpOverridesMixin,

@@ -269,6 +269,7 @@ class BackendAdapter(ABC):
         output: str | None,
         *,
         project_root: Path | None = None,
+        store: Any | None = None,
     ) -> ValidationResult:
         """Validate ``output`` against the agent's declared schema.
 
@@ -289,7 +290,9 @@ class BackendAdapter(ABC):
         ``BackendAdapter`` ABC own the full "render → run → validate"
         contract.
         """
-        return validate_output(agent, workdir, output, project_root=project_root)
+        return validate_output(
+            agent, workdir, output, project_root=project_root, store=store
+        )
 
     # ----- protected helpers (shared across backends) ----------------------
 

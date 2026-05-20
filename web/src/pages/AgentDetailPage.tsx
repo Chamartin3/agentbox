@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError, RunsPage as RunsPageData, RunsStats } from '../api/client';
 import { versionsApi, VersionSummary } from '../api/versions';
 import AgentVersions from './AgentVersions';
@@ -8,10 +8,18 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import RunsTable, { RunRow } from '../components/RunsTable';
 import RunsDashboard from '../components/runs/RunsDashboard';
 import AgentResourcesEditor from '../components/AgentResourcesEditor';
+import AgentValidationEditor from '../components/AgentValidationEditor';
+import LiveComposedPromptPreview, { type PreviewResult } from '../components/LiveComposedPromptPreview';
 import Toast from '../components/Toast';
 import './AgentDetailPage.css';
 
 type TabType = 'configuration' | 'composition' | 'versions' | 'runs';
+
+const TABS: TabType[] = ['configuration', 'composition', 'versions', 'runs'];
+
+function parseTab(value: string | undefined): TabType {
+  return (TABS as string[]).includes(value ?? '') ? (value as TabType) : 'configuration';
+}
 
 const AGENT_PAGE_SIZE = 25;
 
@@ -179,11 +187,15 @@ function AgentRunsTab({
 }
 
 export default function AgentDetailPage() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id = '', tab: tabParam } = useParams<{ id: string; tab?: string }>();
+  const navigate = useNavigate();
+  const activeTab = parseTab(tabParam);
+  const setActiveTab = (next: TabType) => {
+    navigate(`/agents/${encodeURIComponent(id)}/${next}`);
+  };
   const [agent, setAgent] = useState<AgentDef | null>(null);
   const [agentLoaded, setAgentLoaded] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('configuration');
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
 
   const [prompt, setPrompt] = useState<string>('');
@@ -193,6 +205,7 @@ export default function AgentDetailPage() {
   const [activeVersion, setActiveVersion] = useState<number | null>(null);
   const [draftVersion, setDraftVersion] = useState<number | null>(null);
   const [changelog, setChangelog] = useState('');
+  const [composedPreview, setComposedPreview] = useState<PreviewResult | null>(null);
 
   useEffect(() => {
     loadAgent();
@@ -355,13 +368,13 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === 'composition' && (
-          <div className="tab-pane stack">
-            <section className="section">
-              <div className="row between" style={{ marginBottom: 8 }}>
-                <h2 style={{ border: 'none', margin: 0 }}>Prompt</h2>
-                <div className="row" style={{ gap: 6 }}>
+          <div className="tab-pane">
+            <section className="composition-section">
+              <div className="composition-section-header">
+                <h3>Prompt</h3>
+                <div className="composition-section-meta">
                   {activeVersion != null && (
-                    <span className="dim" style={{ fontSize: 11 }}>
+                    <span>
                       active v{activeVersion}
                       {draftVersion != null && (
                         <span className="dirty"> · draft v{draftVersion}</span>
@@ -414,6 +427,8 @@ export default function AgentDetailPage() {
             <AgentResourcesEditor
               agentId={id}
               promptTemplate={prompt}
+              hideInlinePreview
+              onPreview={setComposedPreview}
               outputValidation={agent.composition?.output_validation || 'strict'}
               onChangeOutputValidation={async (next) => {
                 try {
@@ -428,6 +443,13 @@ export default function AgentDetailPage() {
                 }
               }}
             />
+
+            <AgentValidationEditor
+              agentId={id}
+              hasOutputSchema={!!composedPreview?.output_schema}
+            />
+
+            {composedPreview && <LiveComposedPromptPreview preview={composedPreview} />}
           </div>
         )}
 

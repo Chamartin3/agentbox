@@ -1,7 +1,7 @@
 """Prompt composition — shared bundle renderer for agentbox and callers.
 
 This module is intentionally HTTP-free and side-effect-free so that caller
-projects (e.g. cvman) can import it without pulling in the agentbox server
+projects can import it without pulling in the agentbox server
 runtime.
 
 """

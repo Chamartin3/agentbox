@@ -497,9 +497,59 @@ class RunExecutor:
                 agent.id,
             )
 
+        # Wire new-contract output.json_schema → _composed_schema so the
+        # token backend builds its result_type from the same schema the
+        # executor validates against. Skipped when something earlier
+        # (composition pipeline) already produced one.
+        from agentbox.core.agent.config import resolve_output_config as _resolve_out
+        _out_cfg = _resolve_out(self.store, agent)
+        if not isinstance(agent.__dict__.get("_composed_schema"), dict):
+            if isinstance(_out_cfg.json_schema, dict):
+                agent.__dict__["_composed_schema"] = _out_cfg.json_schema
+
+        # Render the unified output-contract block (schema + rules +
+        # validation hint) once, here, so every backend sees the same
+        # bytes. The token backend strips the JSON-Schema portion from
+        # its own injection but keeps the rules + validation hint.
+        if (
+            _out_cfg.rules
+            or _out_cfg.validators
+            or isinstance(_out_cfg.json_schema, dict)
+        ):
+            from agentbox.core.prompt.output_contract import append as _append_contract
+
+            _composed_system = agent.__dict__.get("_composed_system")
+            if not isinstance(_composed_system, str):
+                # No composition pipeline ran — seed from the inline prompt
+                # so the contract block still reaches the model. Without
+                # this, agents that declare bindings via the
+                # validation-contracts surface (no [composition] block) would
+                # have their rules/schema only checked post-hoc, never shown
+                # to the model — defeating the "tell the model what we'll
+                # validate" half of the two-gate design.
+                _composed_system = agent.prompt or ""
+            agent.__dict__["_composed_system"] = _append_contract(
+                _composed_system, _out_cfg
+            )
+            _composed_system_base = agent.__dict__.get("_composed_system_base")
+            if isinstance(_composed_system_base, str):
+                # Token backend reads system_base + injects schema via
+                # pydantic-ai. We still append rules+validation hint so
+                # those constraints reach the model.
+                from agentbox.core.agent.config import OutputConfig as _OC2
+
+                _rules_only = _OC2(
+                    json_schema=None,
+                    rules=list(_out_cfg.rules),
+                    validators=_out_cfg.validators,
+                )
+                agent.__dict__["_composed_system_base"] = _append_contract(
+                    _composed_system_base, _rules_only
+                )
+
         # Wire output_schema binding → _composed_schema for runtime validation.
         # Covers legacy_dir agents that declare output schemas via resource
-        # bindings (sync_agent_schemas) but have no [composition] block.
+        # bindings but have no [composition] block.
         if prompt_bindings and not isinstance(agent.__dict__.get("_composed_schema"), dict):
             for _b in prompt_bindings:
                 if _b.get("slot") != "output_schema":
@@ -682,6 +732,24 @@ class RunExecutor:
                     "system": composed_result.system,
                     "user": composed_result.user,
                     "schema": composed_result.schema,
+                },
+                variables=variables or {},
+            )
+        else:
+            # Non-composition path (most agents): persist the final composed
+            # system prompt — base + resource bindings + output-contract block —
+            # so the run page can display exactly what the model received.
+            _final_system = agent.__dict__.get("_composed_system")
+            if not isinstance(_final_system, str):
+                _final_system = agent.prompt or ""
+            _final_schema = agent.__dict__.get("_composed_schema")
+            self.store.save_run_composition(
+                run_id=run_id,
+                composition_snapshot=None,
+                rendered_prompt={
+                    "system": _final_system,
+                    "user": input_,
+                    "schema": _final_schema if isinstance(_final_schema, dict) else None,
                 },
                 variables=variables or {},
             )
@@ -1309,8 +1377,13 @@ class RunExecutor:
                     # write tools), prefer the file content if the text
                     # output doesn't parse as JSON. Only kicks in when an
                     # output schema is configured.
-                    has_schema = python_cfg.output_schema_path or isinstance(
-                        agent.__dict__.get("_composed_schema"), dict
+                    from agentbox.core.agent.config import resolve_output_config as _resolve_oc
+                    _oc = _resolve_oc(self.store, agent)
+                    has_schema = bool(
+                        python_cfg.output_schema_path
+                        or isinstance(agent.__dict__.get("_composed_schema"), dict)
+                        or _oc.json_schema is not None
+                        or bool(_oc.validators)
                     )
                     if has_schema:
                         output = self._maybe_load_output_file(output, workdir)
@@ -1352,6 +1425,7 @@ class RunExecutor:
                             workdir,
                             output,
                             project_root=self.settings.project_root,
+                            store=self.store,
                         )
                         schema_validated_via = result.engine
                         session.emit_validation(

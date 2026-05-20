@@ -132,7 +132,7 @@ export default function RunsTable({
               <>
                 <span className="dim">(</span>
                 <Link
-                  to={`/agents/${encodeURIComponent(r.agent_id)}/versions?highlight=${r.agent_version_id}`}
+                  to={`/agents/${encodeURIComponent(r.agent_id)}/versions/${r.agent_version}`}
                   className="version-chip"
                   onClick={stop}
                 >
@@ -146,7 +146,7 @@ export default function RunsTable({
       case 'version':
         return r.agent_version != null && r.agent_version_id ? (
           <Link
-            to={`/agents/${encodeURIComponent(r.agent_id)}/versions?highlight=${r.agent_version_id}`}
+            to={`/agents/${encodeURIComponent(r.agent_id)}/versions/${r.agent_version}`}
             className="version-chip"
             onClick={stop}
           >

@@ -171,6 +171,8 @@ export interface AgentDef {
   unsupported_backends: string[];
   source_format: string | null;
   updated_at?: string | null;
+  last_run_at?: string | null;
+  last_activity_at?: string | null;
   resolved_workspace?: string;
   version?: number | null;
   total_versions?: number | null;
@@ -422,6 +424,71 @@ export interface RunnerBackend {
   accepts_no_provider: boolean;
 }
 
+
+// ---- validation contracts ------------------------------------------------
+
+export interface HttpValidator {
+  kind: 'http';
+  endpoint: string;
+  timeout_seconds?: number;
+  description?: string;
+}
+
+export interface ScriptValidator {
+  kind: 'script';
+  resource_id: string;
+  pinned_version_id?: string | null;
+  description?: string;
+}
+
+export type Validator = HttpValidator | ScriptValidator | { kind: string; [k: string]: unknown };
+
+export interface ValidationContract {
+  id: string;
+  name: string;
+  description?: string | null;
+  rules: string[];
+  validators: Validator[];
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+  reference_count?: number;
+}
+
+export interface ValidationContractCreate {
+  name: string;
+  description?: string | null;
+  rules?: string[];
+  validators?: Validator[];
+  actor?: string;
+}
+
+export interface ValidationContractPatch {
+  name?: string;
+  description?: string | null;
+  rules?: string[];
+  validators?: Validator[];
+}
+
+export interface AgentValidationView {
+  agent_id: string;
+  agent_version_id: number | null;
+  input: {
+    contract_id: string;
+    contract_name: string | null;
+    description?: string | null;
+    rules: string[];
+    validators: Validator[];
+  } | null;
+  output: AgentValidationView['input'];
+}
+
+export interface AgentValidationPut {
+  input?: { contract_id?: string | null } | null;
+  output?: { contract_id?: string | null } | null;
+  reason: string;
+  actor?: string;
+}
 
 // ---- endpoints ---------------------------------------------------------
 
@@ -804,6 +871,43 @@ export const api = {
       }>
     >(`/api/runner-providers/${providerId}/models${qs ? `?${qs}` : ''}`);
   },
+
+  // ---- validation contracts ----------------------------------------------
+
+  listValidationContracts: (params?: { query?: string; limit?: number; offset?: number }) => {
+    const p = new URLSearchParams();
+    if (params?.query) p.set('query', params.query);
+    if (params?.limit != null) p.set('limit', String(params.limit));
+    if (params?.offset != null) p.set('offset', String(params.offset));
+    const qs = p.toString();
+    return req<{ items: ValidationContract[] }>(
+      `/api/validation-contracts${qs ? `?${qs}` : ''}`,
+    );
+  },
+  getValidationContract: (id: string) =>
+    req<ValidationContract>(`/api/validation-contracts/${encodeURIComponent(id)}`),
+  createValidationContract: (body: ValidationContractCreate) =>
+    req<ValidationContract>('/api/validation-contracts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchValidationContract: (id: string, body: ValidationContractPatch) =>
+    req<ValidationContract>(`/api/validation-contracts/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteValidationContract: (id: string) =>
+    req<{ deleted: string }>(`/api/validation-contracts/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  getAgentValidation: (agentId: string) =>
+    req<AgentValidationView>(`/api/agents/${encodeURIComponent(agentId)}/validation`),
+  setAgentValidation: (agentId: string, body: AgentValidationPut) =>
+    req<AgentValidationView>(`/api/agents/${encodeURIComponent(agentId)}/validation`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 
   // legacy agent-centric workspace endpoints
   getWorkspace: (agentId: string) => req<Record<string, unknown>>(`/api/workspaces/${agentId}`),

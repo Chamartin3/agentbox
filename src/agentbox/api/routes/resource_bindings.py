@@ -118,7 +118,7 @@ def replace_prompt_resources(
 
 
 class PreviewPromptBody(BaseModel):
-    template: str
+    template: str | None = None
     bindings: list[PromptBindingIn] | None = None
 
 
@@ -131,11 +131,24 @@ def preview_prompt(
     override = (
         [b.model_dump() for b in body.bindings] if body.bindings is not None else None
     )
+    template = body.template
+    if template is None:
+        # No candidate template provided — preview the agent's currently
+        # active prompt. Lets the UI's "Preview composed prompt" button
+        # show the live composition (base + bindings + contract block)
+        # without re-supplying the prompt body.
+        active = store.get_active_version(agent_id) or store.latest_version(agent_id)
+        if active is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"no agent version found for {agent_id!r}",
+            )
+        template = active.get("prompt_content") or ""
     try:
         return render_agent_prompt_preview(
             store,
             agent_id=agent_id,
-            template=body.template,
+            template=template,
             bindings_override=override,
         )
     except PreviewError as exc:

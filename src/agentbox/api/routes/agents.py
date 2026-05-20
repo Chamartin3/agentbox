@@ -39,15 +39,21 @@ def list_agents() -> list[dict]:
 
     # Per-agent run counts and bound runner profiles, in two cheap queries.
     run_counts: dict[str, int] = {}
+    last_run_at: dict[str, str] = {}
     profile_bindings: dict[str, str] = {}
     try:
         with store.engine.connect() as conn:
-            for agent_id, n in conn.execute(
-                select(runs_table.c.agent_id, func.count().label("n"))
-                .group_by(runs_table.c.agent_id)
+            for agent_id, n, last in conn.execute(
+                select(
+                    runs_table.c.agent_id,
+                    func.count().label("n"),
+                    func.max(runs_table.c.created_at).label("last"),
+                ).group_by(runs_table.c.agent_id)
             ):
                 if agent_id:
                     run_counts[agent_id] = int(n)
+                    if last:
+                        last_run_at[agent_id] = str(last)
             for agent_id, profile_id in conn.execute(
                 select(
                     agent_runner_profiles.c.agent_id,
@@ -69,6 +75,7 @@ def list_agents() -> list[dict]:
             **agent.model_dump(),
             "resolved_workspace": workspace_str,
             "run_count": run_counts.get(agent.id, 0),
+            "last_run_at": last_run_at.get(agent.id),
             "runner_profile_id": profile_bindings.get(agent.id),
         }
         if latest is not None:
@@ -76,6 +83,10 @@ def list_agents() -> list[dict]:
             data["version"] = (
                 active["version"] if active else latest.get("version")
             )
+        data["last_activity_at"] = max(
+            (t for t in (data.get("updated_at"), data.get("last_run_at")) if t),
+            default=None,
+        )
         return data
 
     return [_enrich(agent) for agent in list_all_agents(store=store, loader=loader)]
@@ -90,12 +101,6 @@ def get_agent(agent_id: str) -> dict:
     agent = resolve_agent(agent_id, store=store, loader=loader)
     if agent is None:
         raise HTTPException(404)
-    prompt = ""
-    if agent.prompt_path:
-        try:
-            prompt = agent.load_prompt(settings.project_root)
-        except FileNotFoundError:
-            prompt = ""
     workspace_path, ephemeral = ws.resolve_path(agent, settings, store)
 
     # Composed view — render the DB bundle the same way the runner would.
@@ -104,6 +109,18 @@ def get_agent(agent_id: str) -> dict:
     composed_system: str | None = None
     composed_user: str | None = None
     latest_row = store.get_active_version(agent_id) or store.latest_version(agent_id)
+    # DB is source of truth — surface the active version's prompt_content;
+    # only fall back to the on-disk prompt_path file when the DB row has no
+    # stored content (legacy / unmigrated agents).
+    prompt = ""
+    db_prompt = (latest_row or {}).get("prompt_content")
+    if isinstance(db_prompt, str) and db_prompt:
+        prompt = db_prompt
+    elif agent.prompt_path:
+        try:
+            prompt = agent.load_prompt(settings.project_root)
+        except FileNotFoundError:
+            prompt = ""
     try:
         bundle = load_bundle_from_bindings(
             agent_id=agent_id,
@@ -137,6 +154,7 @@ def get_agent(agent_id: str) -> dict:
                 "created_at": v["created_at"],
                 "has_comments": len(comments) > 0,
                 "rating": rating["rating"] if rating else None,
+                "config_json": v.get("config_json"),
             }
         )
     return {

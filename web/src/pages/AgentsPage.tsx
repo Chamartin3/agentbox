@@ -119,7 +119,7 @@ export default function AgentsPage() {
       sortKey === AgentSortKey.Id ? x.id
       : sortKey === AgentSortKey.Runner ? x.runner.kind
       : sortKey === AgentSortKey.Model ? (x.runner.model || null)
-      : (x.updated_at || null);
+      : (x.last_activity_at || x.updated_at || null);
     const av = pick(a);
     const bv = pick(b);
     if (av == null && bv == null) return a.id.localeCompare(b.id);
@@ -171,7 +171,7 @@ export default function AgentsPage() {
             <th>Workspace</th>
             <th>Description</th>
             <th>v</th>
-            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.UpdatedAt)}>Last changed{ind(AgentSortKey.UpdatedAt)}</th>
+            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.UpdatedAt)}>Last activity{ind(AgentSortKey.UpdatedAt)}</th>
             <th>Runs</th>
           </tr>
         </thead>
@@ -215,7 +215,7 @@ export default function AgentsPage() {
                 ) : '—'}
               </td>
               <td className="dim" style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
-                {formatUpdated(a.updated_at)}
+                {formatUpdated(a.last_activity_at || a.updated_at)}
               </td>
               <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right' }}>
                 <Link to={`/runs?agent=${encodeURIComponent(a.id)}`} title="view runs">

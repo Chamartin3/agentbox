@@ -138,19 +138,6 @@ class RunnerSpec(BaseModel):
 
     output_schema_path: str | None = None
 
-    output_model: str | None = None
-    """Dotted import path (``module.path:ClassName``) to the canonical
-    Pydantic output class.
-
-    When set, the executor's validator imports the class and calls
-    ``ClassName.model_validate_json(...)`` — the only engine that runs
-    ``@model_validator`` cross-field rules. The JSON Schema rendered
-    into the system prompt is also derived from
-    ``ClassName.model_json_schema()`` so the prompt the model reads and
-    the contract its output is judged against share a single source of
-    truth.
-    """
-
     output_validation_engine: Literal["jsonschema", "pydantic", "both"] = "both"
     """Which engine(s) to use when validating output against the schema.
 
@@ -421,9 +408,6 @@ class RunnerManifest(BaseModel):
     timeout_seconds: int | None = None
 
     output_schema_path: str | None = None
-    output_model: str | None = None
-    """Dotted import path to the canonical Pydantic output class. See
-    :attr:`RunnerSpec.output_model`."""
 
     max_validation_retries: int = 0
     max_error_retries: int = 0

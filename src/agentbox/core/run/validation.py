@@ -14,7 +14,6 @@ either call this directly or short-circuit with their own
 
 from __future__ import annotations
 
-import importlib
 import json
 import re
 from dataclasses import dataclass
@@ -22,17 +21,15 @@ from pathlib import Path
 from typing import Any, Literal
 
 import jsonschema as _jsonschema
-from pydantic import BaseModel, ValidationError
 
 # Engine label for the validator that produced the verdict. ``off`` means
 # no schema is configured and validation was skipped; ``none`` means a
 # schema was expected but the input was unrunnable (empty / unparseable).
-# ``pydantic-class`` means we validated against the canonical Pydantic
-# class declared by ``output_model`` — the only engine that runs
-# ``@model_validator`` rules (cross-field invariants that JSON Schema
-# cannot express).
 ValidationEngine = Literal[
-    "jsonschema", "pydantic", "pydantic-class", "both", "none", "off"
+    "jsonschema", "pydantic", "both",
+    "json-schema", "http-callback", "script",
+    "json-schema+http-callback", "json-schema+script",
+    "none", "off",
 ]
 
 
@@ -154,9 +151,8 @@ def validate_pydantic(output: str, schema: dict[str, Any]) -> ValidationResult:
     NOTE: this builds a *throwaway* pydantic model from the JSON Schema
     dict, which drops ``@model_validator`` rules and most ``Field(...)``
     constraints (they don't exist in JSON Schema). For cross-field
-    invariants to actually run, the agent must declare ``output_model``
-    and the executor will dispatch to :func:`validate_pydantic_class`
-    instead.
+    invariants to actually run, configure the agent's two-gate output
+    contract (``config_json["output"]``) with an HTTP validator callback.
     """
     from agentbox.core.prompt.composition.pydantic_validate import (
         validate_with_pydantic,
@@ -166,57 +162,134 @@ def validate_pydantic(output: str, schema: dict[str, Any]) -> ValidationResult:
     return ValidationResult(ok=ok, error=err, engine="pydantic")
 
 
-def load_output_model(dotted: str) -> type[BaseModel]:
-    """Import a Pydantic class from a ``"module.path:ClassName"`` string.
+def run_json_schema(schema: dict[str, Any], output: str) -> ValidationResult:
+    """Gate 1: structural JSON Schema validation (local, no network)."""
+    return validate_jsonschema(output, schema)
 
-    Raises :class:`ImportError` / :class:`AttributeError` / :class:`TypeError`
-    on misconfiguration so the executor can surface a clear validation
-    error rather than silently falling back to a weaker engine.
+
+def call_http_validator(validator_cfg: Any, output: str) -> ValidationResult:
+    """Gate 2: semantic validation via HTTP callback to the consumer.
+
+    Sends ``{"output": <raw_output>}`` and expects ``{"ok": bool, "error": str}``.
+    Failure to reach the endpoint surfaces as a hard failure — we never
+    silently skip validation when the callback is configured.
     """
-    if ":" not in dotted:
-        raise ValueError(
-            f"output_model must be 'module.path:ClassName', got {dotted!r}"
+    import hashlib
+    import hmac
+    import json
+    import os
+
+    import httpx
+
+    body = json.dumps({"output": output}).encode("utf-8")
+
+    secret = os.environ.get("AGENTBOX_WEBHOOK_SECRET", "")
+    sig = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest() if secret else ""
+
+    headers = {"Content-Type": "application/json"}
+    if sig:
+        headers["X-Agentbox-Signature"] = sig
+
+    try:
+        resp = httpx.post(
+            validator_cfg.endpoint,
+            content=body,
+            headers=headers,
+            timeout=validator_cfg.timeout_seconds,
         )
-    module_path, cls_name = dotted.split(":", 1)
-    module = importlib.import_module(module_path)
-    cls = getattr(module, cls_name, None)
-    if cls is None:
-        raise ImportError(f"{cls_name!r} not found in {module_path}")
-    if not (isinstance(cls, type) and issubclass(cls, BaseModel)):
-        raise TypeError(
-            f"output_model {dotted!r} must point at a pydantic.BaseModel subclass"
+        resp.raise_for_status()
+        data = resp.json()
+    except httpx.TimeoutException:
+        return ValidationResult(
+            ok=False,
+            error=f"callback unreachable: timed out after {validator_cfg.timeout_seconds}s",
+            engine="http-callback",
         )
-    return cls
+    except httpx.HTTPStatusError as exc:
+        return ValidationResult(
+            ok=False,
+            error=f"callback returned HTTP {exc.response.status_code}",
+            engine="http-callback",
+        )
+    except Exception as exc:
+        return ValidationResult(
+            ok=False,
+            error=f"callback unreachable: {exc}",
+            engine="http-callback",
+        )
+
+    if data.get("ok"):
+        return ValidationResult(ok=True, engine="http-callback")
+    return ValidationResult(
+        ok=False,
+        error=data.get("error") or "validation failed (no error detail)",
+        engine="http-callback",
+    )
 
 
-def validate_pydantic_class(
-    output: str, model_cls: type[BaseModel]
-) -> ValidationResult:
-    """Validate ``output`` against the *canonical* Pydantic class.
+def call_script_validator(validator_cfg: Any, output: str) -> ValidationResult:
+    """Run a Python script validator in-process.
 
-    This is the only engine that runs ``@model_validator`` rules and
-    full ``Field(...)`` constraints. Both Django and agentbox call into
-    the same class, so a payload accepted here is accepted there.
+    Convention: the script must define a top-level callable::
+
+        def validate(output: str) -> dict:  # {"ok": bool, "error": str}
+
+    Security note: the script runs in this process with full privileges.
+    Operators upload it as a versioned ``script`` resource, so trust is
+    the same as the agent's own prompt and tool grants. A subprocess /
+    sandbox boundary can be layered in later without changing the
+    contract above.
     """
-    try:
-        payload = extract_json(output)
-    except Exception as exc:  # defensive — extract_json is forgiving
+    src = (validator_cfg.source_code or "").strip()
+    if not src:
         return ValidationResult(
-            ok=False, error=f"could not extract JSON: {exc}", engine="pydantic-class"
+            ok=False,
+            error=(
+                f"script validator for resource {validator_cfg.resource_id!r} "
+                "has no source — the resource version may have no blob"
+            ),
+            engine="script",
+        )
+    namespace: dict[str, Any] = {"__name__": "agentbox_script_validator"}
+    try:
+        exec(compile(src, "<script_validator>", "exec"), namespace)  # noqa: S102
+    except Exception as exc:  # noqa: BLE001
+        return ValidationResult(
+            ok=False,
+            error=f"script validator failed to load: {exc}",
+            engine="script",
+        )
+    fn = namespace.get("validate")
+    if not callable(fn):
+        return ValidationResult(
+            ok=False,
+            error="script validator must define a top-level `validate(output: str)` function",
+            engine="script",
         )
     try:
-        instance = json.loads(payload)
-    except json.JSONDecodeError as exc:
+        result = fn(output)
+    except Exception as exc:  # noqa: BLE001
         return ValidationResult(
-            ok=False, error=f"output is not valid JSON: {exc}", engine="pydantic-class"
+            ok=False,
+            error=f"script validator raised: {exc}",
+            engine="script",
         )
-    try:
-        model_cls.model_validate(instance)
-    except ValidationError as exc:
+    if not isinstance(result, dict):
         return ValidationResult(
-            ok=False, error=str(exc), engine="pydantic-class"
+            ok=False,
+            error=(
+                "script validator returned "
+                f"{type(result).__name__!s}; expected a dict {{ok, error}}"
+            ),
+            engine="script",
         )
-    return ValidationResult(ok=True, engine="pydantic-class")
+    if result.get("ok"):
+        return ValidationResult(ok=True, engine="script")
+    return ValidationResult(
+        ok=False,
+        error=str(result.get("error") or "script validator returned ok=False"),
+        engine="script",
+    )
 
 
 def resolve_schema(
@@ -233,10 +306,7 @@ def resolve_schema(
 
     Resolution order:
       1. ``agent._composed_schema`` (already-rendered binding).
-      2. ``python.output_model`` (dotted Pydantic class) — derives the
-         schema via ``model_json_schema()`` so the prompt and the
-         validator share a single source of truth.
-      3. ``python.output_schema_path`` (legacy file-based contract).
+      2. ``python.output_schema_path`` (legacy file-based contract).
     """
     from agentbox.core.agent.config import PythonAgentConfig
 
@@ -245,16 +315,6 @@ def resolve_schema(
         return composed, ""
 
     python_cfg = PythonAgentConfig.from_agent(agent)
-    if python_cfg.output_model:
-        try:
-            cls = load_output_model(python_cfg.output_model)
-        except (ImportError, AttributeError, TypeError, ValueError) as exc:
-            return None, f"cannot load output_model {python_cfg.output_model!r}: {exc}"
-        try:
-            return cls.model_json_schema(), ""
-        except Exception as exc:  # pydantic emits various errors here
-            return None, f"cannot derive JSON schema from {python_cfg.output_model!r}: {exc}"
-
     schema_rel = python_cfg.output_schema_path
     if not schema_rel:
         return None, ""
@@ -277,26 +337,82 @@ def validate_output(
     output: str | None,
     *,
     project_root: Path | None = None,
+    store: Any | None = None,
 ) -> ValidationResult:
     """Validate ``output`` against the agent's declared schema.
+
+    Two-gate architecture:
+      Gate 1 (structural): JSON Schema from the agent's ``output_schema``
+        resource binding. Catches malformed JSON, missing required fields,
+        wrong types, per-field min/max constraints.
+      Gate 2..N (semantic): explicit validators (``http``, ``script``, …)
+        listed in the agent version's bound validation contract. Run only
+        when that contract carries entries.
+
+    ``store`` is needed to resolve the output binding + bound contract.
+    When omitted, the function falls back to the legacy on-disk schema
+    path (``runner.output_schema_path``). New code must pass ``store``.
 
     Returns:
       - ``ok=True, engine="off"`` when no schema is configured.
       - ``ok=False, engine="none"`` for empty output when a schema exists.
-      - The result of the configured engine otherwise
-        (``jsonschema`` / ``pydantic`` / ``both``).
-
-    Backends that produce already-typed outputs (e.g. pydantic-ai
-    structured returns) may bypass this and synthesize their own result.
-
-    When ``python.output_model`` is configured we short-circuit to
-    :func:`validate_pydantic_class` regardless of
-    ``output_validation_engine`` — the canonical class is the only
-    engine that runs cross-field invariants, so honoring the legacy
-    ``jsonschema`` / ``pydantic`` knobs would silently weaken the check.
     """
-    from agentbox.core.agent.config import ExecutionConfig, PythonAgentConfig
+    from agentbox.core.agent.config import ExecutionConfig, resolve_output_config
 
+    # --- Validation: schema (implicit) + contract validators (explicit) ---
+    output_cfg = resolve_output_config(store, agent)
+    if output_cfg.json_schema is not None or output_cfg.validators:
+        if not output:
+            return ValidationResult(
+                ok=False,
+                error="output is empty but an output schema is required",
+                engine="none",
+            )
+        # Gate 1: implicit jsonschema validator (from the agent's
+        # output_schema binding). Skipped only when no schema exists.
+        if output_cfg.json_schema is not None:
+            result = run_json_schema(output_cfg.json_schema, output)
+            if not result.ok:
+                return result
+        # Gate 2..N: explicit validators from the bound contract.
+        # Dispatch by kind. Adding a new kind here is the only runtime
+        # change required to support it end-to-end.
+        ran_http = False
+        ran_script = False
+        for vcfg in output_cfg.validators:
+            if vcfg.kind == "http":
+                result = call_http_validator(vcfg, output)
+                if not result.ok:
+                    return result
+                ran_http = True
+            elif vcfg.kind == "script":
+                result = call_script_validator(vcfg, output)
+                if not result.ok:
+                    return result
+                ran_script = True
+            else:
+                return ValidationResult(
+                    ok=False,
+                    error=f"unknown validator kind: {vcfg.kind}",
+                    engine="none",
+                )
+        # Compose engine label so the recorded run reflects which gates fired.
+        engine: ValidationEngine
+        if output_cfg.json_schema is not None and ran_http:
+            engine = "json-schema+http-callback"
+        elif output_cfg.json_schema is not None and ran_script:
+            engine = "json-schema+script"
+        elif ran_http:
+            engine = "http-callback"
+        elif ran_script:
+            engine = "script"
+        elif output_cfg.json_schema is not None:
+            engine = "json-schema"
+        else:
+            engine = "off"
+        return ValidationResult(ok=True, engine=engine)
+
+    # --- Legacy path: schema file ---
     schema, schema_err = resolve_schema(agent, workdir, project_root)
     if schema is None:
         if schema_err:
@@ -310,23 +426,11 @@ def validate_output(
             engine="none",
         )
 
-    output_model_path = PythonAgentConfig.from_agent(agent).output_model
-    if output_model_path:
-        try:
-            model_cls = load_output_model(output_model_path)
-        except (ImportError, AttributeError, TypeError, ValueError) as exc:
-            return ValidationResult(
-                ok=False,
-                error=f"cannot load output_model {output_model_path!r}: {exc}",
-                engine="none",
-            )
-        return validate_pydantic_class(output, model_cls)
+    engine_name = ExecutionConfig.from_agent(agent).output_validation_engine
 
-    engine = ExecutionConfig.from_agent(agent).output_validation_engine
-
-    if engine == "jsonschema":
+    if engine_name == "jsonschema":
         return validate_jsonschema(output, schema)
-    if engine == "pydantic":
+    if engine_name == "pydantic":
         return validate_pydantic(output, schema)
 
     # ``both`` — jsonschema first (cheap, catches shape), then pydantic

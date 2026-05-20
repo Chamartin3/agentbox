@@ -41,6 +41,7 @@ from agentbox.api.routes import (
     runner_providers,
     runs,
     usage,
+    validation_contracts,
     versions,
     workspace_mcp,
     workspaces,
@@ -341,6 +342,7 @@ def create_app() -> FastAPI:
     app.include_router(resources.router)
     app.include_router(repo_resources.router)
     app.include_router(resource_bindings.router)
+    app.include_router(validation_contracts.router)
     app.include_router(env_doc.router)
     app.include_router(workspace_mcp.router)
     app.include_router(host_env.router)

@@ -411,6 +411,15 @@ class TokenBackend(BackendAdapter):
             if getattr(runner_config, "output_mode", None):
                 agent_meta["output_mode"] = runner_config.output_mode
 
+        # Surface the agent's validation-retry budget so pydantic-ai's
+        # own structured-output retry loop matches the executor's retry
+        # budget. Default 1 (pydantic-ai default) is too low for local
+        # models which routinely need 2-3 tries to produce schema-valid
+        # JSON, especially in ``prompted`` output mode.
+        _max_retries = getattr(getattr(agent, "runner", None), "max_validation_retries", None)
+        if isinstance(_max_retries, int) and _max_retries > 0:
+            agent_meta["output_retries"] = _max_retries
+
         return RenderedConfig(
             cwd=Path("."),
             files=self._collect_system_files(agent, workdir),
@@ -708,6 +717,9 @@ class TokenBackend(BackendAdapter):
         }
         if wrapped_output_type is not None:
             common_kwargs["output_type"] = wrapped_output_type
+        _output_retries = rendered.agent_meta.get("output_retries")
+        if isinstance(_output_retries, int) and _output_retries > 0:
+            common_kwargs["output_retries"] = _output_retries
 
         if base_url:
             # Strip provider prefix (e.g. "openrouter:google/gemini-2.5-flash-lite"

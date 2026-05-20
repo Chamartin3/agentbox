@@ -453,6 +453,58 @@ agent_prompt_resource_bindings = Table(
     ),
 )
 
+# --- Validation contracts (rules + validators, reusable across agent versions) ---
+
+validation_contracts = Table(
+    "validation_contracts",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("name", String, nullable=False),
+    Column("description", String, nullable=True),
+    Column("rules", String, nullable=False, server_default="[]"),
+    # validators: JSON list of {kind, ...} entries. The jsonschema
+    # validator is implicit from the agent's output_schema binding and
+    # is NOT listed here. Today the only explicit kind is 'http';
+    # adding a new kind means extending the runtime dispatch in
+    # core/run/validation.py — no migration needed.
+    Column("validators", String, nullable=False, server_default="[]"),
+    Column("created_at", String, nullable=False),
+    Column("updated_at", String, nullable=False),
+    Column("created_by", String, nullable=True),
+    UniqueConstraint("name", name="uq_validation_contracts_name"),
+)
+
+agent_version_validation_bindings = Table(
+    "agent_version_validation_bindings",
+    metadata,
+    Column(
+        "agent_version_id",
+        Integer,
+        ForeignKey("agent_versions.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("direction", String, nullable=False),
+    Column(
+        "contract_id",
+        String,
+        ForeignKey("validation_contracts.id", ondelete="RESTRICT"),
+        nullable=False,
+    ),
+    Column("created_at", String, nullable=False),
+    Column("created_by", String, nullable=True),
+    CheckConstraint(
+        "direction IN ('input', 'output')",
+        name="agent_version_validation_direction_check",
+    ),
+    UniqueConstraint(
+        "agent_version_id", "direction", name="pk_agent_version_validation"
+    ),
+    Index(
+        "ix_agent_version_validation_version", "agent_version_id"
+    ),
+    Index("ix_agent_version_validation_contract", "contract_id"),
+)
+
 # --- Plan 03: workspace file-materialize bindings ---
 
 workspace_file_resource_bindings = Table(

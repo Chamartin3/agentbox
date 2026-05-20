@@ -22,11 +22,10 @@ class _FakeAgent:
         composed_schema: dict | None = None,
         output_schema_path: str | None = None,
         engine: str = "jsonschema",
-        output_model: str | None = None,
     ) -> None:
         self._composed_schema = composed_schema
         # Mirror the shape AgentDef exposes via PythonAgentConfig.from_agent.
-        self.runner = _FakeRunner(output_schema_path, output_model=output_model)
+        self.runner = _FakeRunner(output_schema_path)
         self._engine = engine
         # ExecutionConfig.from_agent reads .runner.output_validation_engine
         self.runner.output_validation_engine = engine
@@ -41,10 +40,8 @@ class _FakeRunner:
     def __init__(
         self,
         output_schema_path: str | None,
-        output_model: str | None = None,
     ) -> None:
         self.output_schema_path = output_schema_path
-        self.output_model = output_model
         self.output_validation_engine = "jsonschema"
         # PythonAgentConfig.from_agent inspects these too:
         self.kind = "token"
@@ -150,63 +147,6 @@ def test_validate_pydantic_smoke() -> None:
     deep coverage lives in ``test_pydantic_validate``."""
     result = validate_pydantic('{"name": "x"}', _SCHEMA)
     assert result.engine == "pydantic"
-
-
-def test_validate_output_dispatches_to_output_model(tmp_path: Path) -> None:
-    """When ``output_model`` is set, executor uses the real Pydantic class.
-
-    This is the only engine that runs ``@model_validator`` cross-field
-    rules — the bug we are fixing was that JSON-Schema and synthetic
-    pydantic both accepted payloads that the real class rejects.
-    """
-    # The real class lives in this test module so the importer can reach
-    # it via a dotted path under pytest's rootdir.
-    result = validate_output(
-        _FakeAgent(output_model=f"{__name__}:_OutputWithInvariant"),
-        tmp_path,
-        '{"value": 1}',  # below the model_validator threshold
-    )
-    assert not result.ok
-    assert result.engine == "pydantic-class"
-    assert "must be >= 10" in result.error
-
-
-def test_validate_output_output_model_accepts_valid_payload(tmp_path: Path) -> None:
-    result = validate_output(
-        _FakeAgent(output_model=f"{__name__}:_OutputWithInvariant"),
-        tmp_path,
-        '{"value": 42}',
-    )
-    assert result.ok
-    assert result.engine == "pydantic-class"
-
-
-def test_validate_output_output_model_invalid_dotted(tmp_path: Path) -> None:
-    """A typo'd dotted path surfaces as a validation failure, not a 500."""
-    result = validate_output(
-        _FakeAgent(output_model="this.module:DoesNotExist"),
-        tmp_path,
-        '{"name": "x"}',
-    )
-    assert not result.ok
-    assert result.engine == "none"
-    assert "cannot load output_model" in result.error
-
-
-# Real Pydantic class with a cross-field invariant — JSON Schema cannot
-# express the ``value >= 10`` rule, so only the canonical class catches it.
-from pydantic import BaseModel as _BM  # noqa: E402
-from pydantic import model_validator as _mv  # noqa: E402
-
-
-class _OutputWithInvariant(_BM):
-    value: int
-
-    @_mv(mode="after")
-    def _enforce_min(self) -> _OutputWithInvariant:
-        if self.value < 10:
-            raise ValueError("value must be >= 10")
-        return self
 
 
 def test_backend_adapter_default_validate_output(tmp_path: Path) -> None:

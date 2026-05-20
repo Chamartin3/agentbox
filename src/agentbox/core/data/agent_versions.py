@@ -320,6 +320,23 @@ class AgentVersionsMixin:
         active_vid = active["id"]
         is_draft = 0 if activate else 1
 
+        # Keep config_json["prompt"] in sync with the new prompt_content.
+        # AgentDef.from_db_row rehydrates `agent.prompt` from config_json,
+        # so a stale value here makes the runtime + preview render the
+        # old body even though prompt_content is current.
+        cloned_config = active.get("config_json")
+        if cloned_config:
+            try:
+                cfg_dict = (
+                    json.loads(cloned_config)
+                    if isinstance(cloned_config, str)
+                    else dict(cloned_config)
+                )
+                cfg_dict["prompt"] = prompt_content
+                cloned_config = json.dumps(cfg_dict)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         with self.engine.begin() as conn:
             result = conn.execute(
                 agent_versions.insert().values(
@@ -334,8 +351,127 @@ class AgentVersionsMixin:
                     changelog=changelog or f"prompt edit from v{active['version']}",
                     is_legacy=0,
                     created_at=now_iso(),
-                    config_json=active.get("config_json"),
+                    config_json=cloned_config,
                     prompt_content=prompt_content,
+                    source=active.get("source", "ui"),
+                    is_draft=is_draft,
+                )
+            )
+            new_vid = int(result.inserted_primary_key[0])
+
+            files = conn.execute(
+                agent_version_files.select().where(
+                    agent_version_files.c.version_id == active_vid
+                )
+            ).fetchall()
+            if files:
+                conn.execute(
+                    agent_version_files.insert(),
+                    [
+                        {
+                            "version_id": new_vid,
+                            "relative_path": f._mapping["relative_path"],
+                            "kind": f._mapping["kind"],
+                            "content": f._mapping["content"],
+                            "sha256": f._mapping["sha256"],
+                            "source_uri": f._mapping.get("source_uri"),
+                            "position": f._mapping.get("position", 0),
+                            "created_at": now_iso(),
+                        }
+                        for f in files
+                    ],
+                )
+
+            if activate:
+                conn.execute(
+                    active_agent_versions.delete().where(
+                        active_agent_versions.c.agent_id == agent_id
+                    )
+                )
+                conn.execute(
+                    active_agent_versions.insert().values(
+                        agent_id=agent_id,
+                        version_id=new_vid,
+                        activated_at=now_iso(),
+                    )
+                )
+
+        # Carry validation bindings forward so a prompt edit does not silently
+        # drop the agent's contracts. Mirrors ``upsert_version`` below.
+        try:
+            self.clone_validation_bindings(  # type: ignore[attr-defined]
+                from_version_id=active_vid, to_version_id=new_vid
+            )
+        except Exception:  # noqa: BLE001 — best-effort, never block prompt edit
+            pass
+
+        return self.get_version_by_id(new_vid) or {}
+
+    def save_config_revision(
+        self,
+        agent_id: str,
+        *,
+        config_patch: dict,
+        author: str,
+        changelog: str = "",
+        activate: bool = True,
+    ) -> dict:
+        """Create a new agent_version with config_json merged from ``config_patch``.
+
+        Deep-merges ``config_patch`` into the active version's ``config_json``
+        (top-level keys are replaced wholesale; e.g. passing ``{"output": {...}}``
+        replaces the entire ``output`` block). Carries prompt_content and files
+        forward unchanged. Used by the push_agent_schemas tool to update the
+        ``output`` contract block from the consumer.
+
+        Args:
+            agent_id: Agent identifier.
+            config_patch: Top-level keys to merge into config_json.
+            author: Author label.
+            changelog: Short message stored on the new row.
+            activate: If True (default), the new version is activated.
+
+        Returns:
+            New AgentVersionRecord (dict).
+
+        Raises:
+            ValueError: if no active version exists to clone from.
+        """
+        active = self.get_active_version(agent_id) or self.latest_version(agent_id)
+        if active is None:
+            raise ValueError(f"No version to clone for agent {agent_id}")
+
+        raw = active.get("config_json")
+        try:
+            current_cfg = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+        except (ValueError, TypeError):
+            current_cfg = {}
+        if not isinstance(current_cfg, dict):
+            current_cfg = {}
+        merged = {**current_cfg, **(config_patch or {})}
+        new_config_str = json.dumps(merged, sort_keys=True)
+        new_hash = hashlib.sha256(new_config_str.encode("utf-8")).hexdigest()
+
+        next_v = self._next_version(agent_id)
+        active_vid = active["id"]
+        is_draft = 0 if activate else 1
+
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version=next_v,
+                    source_path=active.get("source_path") or "",
+                    source_format=active.get("source_format") or "",
+                    content_snapshot=active.get("content_snapshot") or "",
+                    prompt_snapshot=active.get("prompt_snapshot") or "",
+                    content_hash=new_hash,
+                    author=author,
+                    changelog=changelog or f"config edit from v{active['version']}",
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    config_json=new_config_str,
+                    prompt_content=active.get("prompt_content"),
                     source=active.get("source", "ui"),
                     is_draft=is_draft,
                 )
@@ -497,6 +633,14 @@ class AgentVersionsMixin:
     ) -> dict:
         prepared = _prepare_files(files) if files else []
         version = self._next_version(agent_id)
+        # Resolve the prior active version *before* the new insert, so we
+        # know whose validation bindings to carry forward.
+        prior_active = self.get_active_version(agent_id)  # type: ignore[attr-defined]
+        prior_version_id = (
+            int(prior_active["id"])
+            if prior_active and prior_active.get("id") is not None
+            else None
+        )
         with self.engine.begin() as conn:
             result = conn.execute(
                 agent_versions.insert().values(
@@ -526,6 +670,16 @@ class AgentVersionsMixin:
                         for row in prepared
                     ],
                 )
+        # Carry validation bindings forward from the previous active row
+        # so contracts follow the agent across edits unless explicitly
+        # changed via the validation endpoint.
+        if prior_version_id is not None:
+            try:
+                self.clone_validation_bindings(  # type: ignore[attr-defined]
+                    from_version_id=prior_version_id, to_version_id=version_id
+                )
+            except Exception:  # noqa: BLE001 — best-effort, never block version create
+                pass
         return self.get_version(agent_id, version)
 
     # ------------------------------------------------------------------
