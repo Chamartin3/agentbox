@@ -128,6 +128,7 @@ agent_versions = Table(
     Column("prompt_content", String, nullable=True),
     Column("source", String, nullable=False, server_default="manifest"),
     Column("is_draft", Integer, nullable=False, server_default="0"),
+    Column("resolved_tool_grants", JSON, nullable=True),  # list[str], frozen at publish
     Index("idx_agent_versions_agent", "agent_id", "version", unique=True),
 )
 
@@ -598,9 +599,39 @@ host_env_call_log = Table(
     Column("params", JSON, nullable=True),
     Column("status", String, nullable=False),
     Column("error", String, nullable=True),
+    Column("surface", String, nullable=False, server_default="host_env"),
     Column("created_at", String, nullable=False),
     Index("ix_host_env_call_log_run", "run_id"),
     Index("ix_host_env_call_log_workspace", "workspace_id"),
+)
+
+agents = Table(
+    "agents",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("name", String, nullable=False),
+    Column("created_at", String, nullable=False),
+)
+
+agent_tool_grants = Table(
+    "agent_tool_grants",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column(
+        "agent_id",
+        String,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("tool_name", String, nullable=False),
+    Column("changelog", String, nullable=False),  # min 3 chars, enforced in mixin
+    Column("granted_at", String, nullable=False),
+    Column("granted_by", String, nullable=True),
+    Column("revoked_at", String, nullable=True),  # NULL = active; set to iso timestamp on revoke
+    Column("revoked_by", String, nullable=True),
+    Column("revoke_changelog", String, nullable=True),
+    Index("ix_agent_tool_grants_agent", "agent_id"),
+    UniqueConstraint("agent_id", "tool_name", name="uq_agent_tool_grant"),
 )
 
 workspace_runtime_permissions = Table(

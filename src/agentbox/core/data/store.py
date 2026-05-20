@@ -7,6 +7,7 @@ that read more clearly as SQL expressions than as ORM relationships.
 
 ``SessionStore`` is composed from:
 - ``_CoreStore``  — connection mgmt + sessions/runs/usage/guardrails CRUD
+- ``AgentToolGrantsMixin`` — agent-scoped tool grant/revoke CRUD
 - ``AnalyticsMixin``       — read-only rollups and time-series
 - ``PromptVersionsMixin``  — draft/publish/rollback for prompt history
 """
@@ -25,6 +26,7 @@ from sqlalchemy.engine import Engine
 from agentbox.core.constants import RunStatus
 from agentbox.core.data.agent_config_events import AgentConfigEventsMixin
 from agentbox.core.data.agent_sync import AgentSyncMixin
+from agentbox.core.data.agent_tool_grants import AgentToolGrantsMixin
 from agentbox.core.data.agent_versions import AgentVersionsMixin
 from agentbox.core.data.analytics import AnalyticsMixin
 from agentbox.core.data.api_tokens import ApiTokensMixin
@@ -140,6 +142,8 @@ class _CoreStore:
             ("prompt_versions", "content_hash", "TEXT"),
             ("agent_meta", "deleted_at", "TEXT"),
             ("runner_profiles", "output_mode", "TEXT NOT NULL DEFAULT 'auto'"),
+            ("agent_versions", "resolved_tool_grants", "TEXT"),
+            ("host_env_call_log", "surface", "TEXT DEFAULT 'host_env'"),
         ]
         with self.engine.begin() as conn:
             for table, col, col_type in _add_column_if_missing:
@@ -235,6 +239,38 @@ class _CoreStore:
                 conn.exec_driver_sql(
                     "CREATE INDEX IF NOT EXISTS idx_runs_runner_profile_id "
                     "ON runs(runner_profile_id)"
+                )
+
+            # Create agents table if missing (needed for FK references)
+            with contextlib.suppress(Exception):
+                conn.exec_driver_sql(
+                    """CREATE TABLE IF NOT EXISTS agents (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )"""
+                )
+
+            # Create agent_tool_grants table if missing
+            with contextlib.suppress(Exception):
+                conn.exec_driver_sql(
+                    """CREATE TABLE IF NOT EXISTS agent_tool_grants (
+                        id TEXT PRIMARY KEY,
+                        agent_id TEXT NOT NULL
+                            REFERENCES agents(id) ON DELETE CASCADE,
+                        tool_name TEXT NOT NULL,
+                        changelog TEXT NOT NULL,
+                        granted_at TEXT NOT NULL,
+                        granted_by TEXT,
+                        revoked_at TEXT,
+                        revoked_by TEXT,
+                        revoke_changelog TEXT,
+                        UNIQUE(agent_id, tool_name)
+                    )"""
+                )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_agent_tool_grants_agent "
+                    "ON agent_tool_grants(agent_id)"
                 )
 
     def _reap_orphaned_runs(self) -> None:
@@ -733,6 +769,7 @@ class SessionStore(
     AgentVersionsMixin,
     AgentSyncMixin,
     AgentConfigEventsMixin,
+    AgentToolGrantsMixin,
     SharedResourcesMixin,
     ResourcesMixin,
     ResourceBindingsMixin,

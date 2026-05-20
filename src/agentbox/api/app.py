@@ -20,6 +20,8 @@ from starlette.requests import Request
 
 from agentbox.api.routes import (
     activity,
+    agent_tool_grants,
+    agent_tools_discovery,
     agents,
     agents_create,
     agents_write,
@@ -97,6 +99,15 @@ def _on_startup() -> None:
 
     settings = _deps.get_settings()
     store = _deps.get_store()
+
+    # Populate the shared agent_tools registry from installed entry points so
+    # /api/agent_tools and the control-plane MCP can list discovered tools.
+    try:
+        from agentbox.agent_tools.discovery import discover_tools
+
+        discover_tools()
+    except Exception:
+        _log.exception("agent_tools discovery failed")
 
     # Phase 0: check runtime sources (manifest-free startup support)
     # Always returns True; no longer raises on missing manifest.
@@ -344,6 +355,8 @@ def create_app() -> FastAPI:
     app.include_router(settings_routes.router)
     app.include_router(project_settings.router)
     app.include_router(api_tokens.router)
+    app.include_router(agent_tool_grants.router)
+    app.include_router(agent_tools_discovery.router)
 
     # SPA assets.
     assets_dir = SPA_DIR / "assets"

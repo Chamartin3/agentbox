@@ -6,10 +6,27 @@ import os
 
 from fastmcp import FastMCP
 
-from agentbox.mcp.tools import agents, prompts, resources, runs, stats, time
+from agentbox.mcp.tools import (
+    agent_tools,
+    agents,
+    prompts,
+    resources,
+    runs,
+    stats,
+    time,
+)
 
 
 def build_server() -> FastMCP:
+    # Populate the shared agent_tools registry so list_agent_tools sees
+    # consumer-registered entry points.
+    try:
+        from agentbox.agent_tools.discovery import discover_tools
+
+        discover_tools()
+    except Exception:
+        pass
+
     mcp = FastMCP(
         name="agentbox",
         instructions=(
@@ -24,6 +41,7 @@ def build_server() -> FastMCP:
     stats.register(mcp)
     time.register(mcp)
     resources.register(mcp)
+    agent_tools.register(mcp)
     return mcp
 
 

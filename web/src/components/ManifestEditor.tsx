@@ -2,6 +2,7 @@ import { useEffect, useState, KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError } from '../api/client';
 import { RunnerProfileSection } from './RunnerProfileSection';
+import { AgentToolGrantsPicker } from './AgentToolGrantsPicker';
 
 interface Props {
   agent: AgentDef;
@@ -312,6 +313,8 @@ export default function ManifestEditor({ agent, onSaved, onError }: Props) {
 
       {/* ---- Execution -------------------------------------------------- */}
       <RunnerProfileSection agentId={agent.id} />
+
+      <AgentToolGrantsPicker agentId={agent.id} />
 
       <fieldset className="config-fieldset">
         <legend>execution</legend>

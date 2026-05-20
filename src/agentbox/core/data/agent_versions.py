@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from typing import Any
 
 from sqlalchemy import func, select
@@ -22,6 +23,8 @@ from agentbox.core.data.schema import (
     agent_version_ratings,
     agent_versions,
 )
+
+logger = logging.getLogger(__name__)
 
 _VALID_FILE_KINDS = {
     "system",
@@ -179,6 +182,23 @@ class AgentVersionsMixin:
                 .where(agent_versions.c.id == version_id)
                 .values(is_draft=0, changelog=new_changelog)
             )
+
+            # Snapshot current active grants onto this version row
+            try:
+                active_grants = sorted(self.list_active_grants(agent_id))
+                conn.execute(
+                    agent_versions.update()
+                    .where(agent_versions.c.id == version_id)
+                    .values(resolved_tool_grants=active_grants)
+                )
+            except Exception:
+                logger.warning(
+                    "publish_version: failed to snapshot tool grants for agent %r v%d",
+                    agent_id,
+                    version,
+                    exc_info=True,
+                )
+
             # Upsert active pointer
             conn.execute(
                 active_agent_versions.delete().where(

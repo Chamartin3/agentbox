@@ -590,6 +590,22 @@ class RunExecutor:
                     _workspace_id,
                 )
 
+        # --- agent-tools MCP server injection (Plan 19) -----------------------
+        try:
+            _agent_tool_grants = self.store.list_active_grants(agent.id)
+            if _agent_tool_grants:
+                self._inject_agent_tools_mcp(
+                    run_dir=run_dir,
+                    grants=_agent_tool_grants,
+                    agent_id=agent.id,
+                    workdir=workdir,
+                )
+        except Exception:
+            logger.exception(
+                "executor: agent-tools MCP injection failed for agent %r",
+                agent.id,
+            )
+
         transcripts_dir = self.settings.data_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)
         transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
@@ -1094,6 +1110,46 @@ class RunExecutor:
             "executor: injected host-env MCP server for workspace %r with caps: %s",
             workspace_id,
             list(grants.keys()),
+        )
+
+    def _inject_agent_tools_mcp(
+        self,
+        run_dir: Path,
+        grants: set[str],
+        agent_id: str,
+        workdir: Path,
+    ) -> None:
+        """Inject the agent_tools stdio MCP server into the run's MCP config."""
+        import json as _json
+        import sys
+
+        mcp_path = run_dir / "claude_mcp.json"
+        if not mcp_path.exists():
+            mcp_data: dict = {"mcpServers": {}}
+        else:
+            mcp_data = _json.loads(mcp_path.read_text())
+        mcp_data.setdefault("mcpServers", {})
+
+        env_vars: dict[str, str] = {
+            "AGENTBOX_AGENT_TOOLS_GRANTS_JSON": _json.dumps(sorted(grants)),
+            "AGENTBOX_AGENT_TOOLS_AGENT_ID": agent_id,
+            "AGENTBOX_AGENT_TOOLS_RUN_ID": "",
+            "AGENTBOX_AGENT_TOOLS_WORKDIR": str(workdir),
+            "AGENTBOX_DB_PATH": str(self.settings.db_path),
+        }
+        mcp_data["mcpServers"]["agentbox-agent-tools"] = {
+            "command": sys.executable,
+            "args": ["-m", "agentbox.core.workspace.mcp.servers.agent_tools"],
+            "env": env_vars,
+        }
+        mcp_path.write_text(
+            _json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        logger.debug(
+            "executor: injected agent-tools MCP server for agent %r with tools: %s",
+            agent_id,
+            sorted(grants),
         )
 
     @staticmethod

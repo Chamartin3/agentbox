@@ -159,6 +159,7 @@ class HostEnvMixin:
         params: dict | None,
         status: str,
         error: str | None = None,
+        surface: str = "host_env",
     ) -> str:
         row_id = uuid.uuid4().hex
         with self.engine.begin() as conn:
@@ -171,6 +172,7 @@ class HostEnvMixin:
                     params=params,
                     status=status,
                     error=error,
+                    surface=surface,
                     created_at=now_iso(),
                 )
             )

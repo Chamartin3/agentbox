@@ -40,6 +40,9 @@ agentbox-transcript = "agentbox.core.run.history.sources.transcript:TranscriptSo
 codex-session = "agentbox.core.run.history.sources.codex:CodexSessionSource"
 pi-session = "agentbox.core.run.history.sources.pi:PiSessionSource"
 
+[project.entry-points."agentbox.agent_tools"]
+# consumers register their tools here; agentbox ships none by default
+
 # Register guardrails by adding entries here or in a plugin package:
 # [project.entry-points."agentbox.guardrails"]
 # my_guardrail = "mypackage.guardrails:MyGuardrail"
