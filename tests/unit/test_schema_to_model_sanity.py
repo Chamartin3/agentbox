@@ -67,11 +67,19 @@ def test_nested_oneOf_branch_inconsistency_caught() -> None:
             {
                 "type": "object",
                 "title": "Success",
-                "required": ["role_summary", "seniority_level", "role_type", "keywords"],
+                "required": [
+                    "role_summary",
+                    "seniority_level",
+                    "role_type",
+                    "keywords",
+                ],
                 "properties": {
                     "keywords": {
                         "type": "array",
-                        "items": {"type": "object", "properties": {"k": {"type": "string"}}},
+                        "items": {
+                            "type": "object",
+                            "properties": {"k": {"type": "string"}},
+                        },
                         "minItems": 1,
                     },
                 },
@@ -179,7 +187,12 @@ def test_extract_keywords_actual_broken_schema_caught() -> None:
                         "minItems": 1,
                         "items": {
                             "type": "object",
-                            "required": ["keyword", "category", "importance", "frequency"],
+                            "required": [
+                                "keyword",
+                                "category",
+                                "importance",
+                                "frequency",
+                            ],
                             "properties": {
                                 "keyword": {"type": "string"},
                                 "category": {"enum": ["a", "b"]},

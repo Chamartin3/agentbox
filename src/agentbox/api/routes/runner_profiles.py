@@ -21,7 +21,6 @@ from agentbox.core.data.runner_profiles import (
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
 
 
-
 def _validate_backend(backend: str) -> None:
     """Validate ``backend`` resolves in the live plugin registry.
 
@@ -43,8 +42,7 @@ def _validate_backend(backend: str) -> None:
             ) from exc
         raise HTTPException(
             400,
-            f"unknown backend: {backend!r}. "
-            f"Registered: {sorted(backends().keys())}.",
+            f"unknown backend: {backend!r}. Registered: {sorted(backends().keys())}.",
         ) from exc
 
 
@@ -92,9 +90,7 @@ def _validate_api_key_env(api_key_env: str | None) -> None:
         )
 
 
-def _validate_backend_provider_compat(
-    backend: str, provider: str | None
-) -> None:
+def _validate_backend_provider_compat(backend: str, provider: str | None) -> None:
     """Reject (backend, provider) pairs that the provider doesn't declare.
 
     Skipped when provider is None (no provider is always valid — backends
@@ -135,9 +131,7 @@ def _validate_create_body(data: RunnerProfileCreate) -> None:
     _validate_headers(data.headers)
 
 
-def _validate_patch_body(
-    patch: RunnerProfilePatch, current_backend: str
-) -> None:
+def _validate_patch_body(patch: RunnerProfilePatch, current_backend: str) -> None:
     """Validate all fields in a RunnerProfilePatch.
 
     ``current_backend`` is the profile's existing backend, used to enforce
@@ -257,5 +251,3 @@ def get_runner_profile_stats(
     if store.get_runner_profile(profile_id) is None:
         raise HTTPException(404, f"runner profile not found: {profile_id!r}")
     return store.runner_profile_stats(profile_id, since=since, until=until)
-
-

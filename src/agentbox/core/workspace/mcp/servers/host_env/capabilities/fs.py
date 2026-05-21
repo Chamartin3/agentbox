@@ -22,7 +22,9 @@ def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
         ctx.audit("fs.read", {"path": path}, outcome="ok")
         return content
 
-    @mcp.tool(name="fs.list", description="List directory entries. Requires fs.list grant.")
+    @mcp.tool(
+        name="fs.list", description="List directory entries. Requires fs.list grant."
+    )
     def fs_list(path: str) -> list[str]:
         ctx = ctx_factory()
         try:
@@ -39,7 +41,9 @@ def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
         ctx = ctx_factory()
         size_hint = len(content.encode())
         try:
-            check_capability(ctx.grants, "fs.write", {"path": path, "size_hint": size_hint})
+            check_capability(
+                ctx.grants, "fs.write", {"path": path, "size_hint": size_hint}
+            )
         except GrantViolation as exc:
             ctx.audit("fs.write", {"path": path}, outcome="denied", error=str(exc))
             raise

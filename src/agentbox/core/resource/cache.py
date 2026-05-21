@@ -40,9 +40,7 @@ def ensure_cached(version_id: str, blobs: list[dict], cache_root: Path) -> Path:
 
     # Write to a uniquely-named tmp dir in the same parent so the rename
     # is on the same filesystem (required for atomic os.rename on Linux).
-    tmp_dir = Path(
-        tempfile.mkdtemp(prefix=f"_tmp_{version_id}_", dir=cache_root)
-    )
+    tmp_dir = Path(tempfile.mkdtemp(prefix=f"_tmp_{version_id}_", dir=cache_root))
     try:
         for blob in blobs:
             rel = blob.get("path", "")

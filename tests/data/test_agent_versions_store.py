@@ -243,9 +243,7 @@ class TestAgentLifecycle:
             author="user",
             changelog="Initial changelog",
         )
-        published = session_store.publish_version(
-            "changelog-agent", 1, "Now ready"
-        )
+        published = session_store.publish_version("changelog-agent", 1, "Now ready")
         assert "Initial changelog" in published["changelog"]
         assert "publish: Now ready" in published["changelog"]
 
@@ -329,9 +327,7 @@ class TestAgentLifecycle:
         assert v2_files[0]["relative_path"] == "prompt.md"
         assert v2_files[0]["content"] == "System prompt"
 
-    def test_branch_draft_raises_without_active_version(
-        self, session_store
-    ) -> None:
+    def test_branch_draft_raises_without_active_version(self, session_store) -> None:
         session_store.create_agent(
             agent_id="no-active",
             config_json={"id": "no-active"},
@@ -342,9 +338,7 @@ class TestAgentLifecycle:
         with pytest.raises(ValueError, match="No active version"):
             session_store.branch_draft("no-active", author="user")
 
-    def test_branch_draft_does_not_change_active_pointer(
-        self, session_store
-    ) -> None:
+    def test_branch_draft_does_not_change_active_pointer(self, session_store) -> None:
         session_store.create_agent(
             agent_id="multi-draft",
             config_json={"id": "multi-draft"},
@@ -360,9 +354,7 @@ class TestAgentLifecycle:
         assert active_before["version"] == active_after["version"]
         assert active_after["version"] == 1
 
-    def test_rollback_creates_new_version_and_activates_it(
-        self, session_store
-    ) -> None:
+    def test_rollback_creates_new_version_and_activates_it(self, session_store) -> None:
         # Create v1, publish
         v1 = session_store.create_agent(
             agent_id="rollback-agent",
@@ -460,9 +452,7 @@ class TestAgentLifecycle:
         with pytest.raises(ValueError, match="at least 3 characters"):
             session_store.rollback_to("rollback-reason", 1, "no", author="user")
 
-    def test_rollback_raises_for_missing_target_version(
-        self, session_store
-    ) -> None:
+    def test_rollback_raises_for_missing_target_version(self, session_store) -> None:
         session_store.create_agent(
             agent_id="rollback-missing",
             config_json={"id": "rollback-missing"},
@@ -472,6 +462,4 @@ class TestAgentLifecycle:
         session_store.publish_version("rollback-missing", 1, "Pub")
 
         with pytest.raises(ValueError, match="not found"):
-            session_store.rollback_to(
-                "rollback-missing", 99, "Rollback", author="user"
-            )
+            session_store.rollback_to("rollback-missing", 99, "Rollback", author="user")

@@ -75,8 +75,12 @@ class EnvDocsMixin:
         now = now_iso()
         with self.engine.begin() as conn:
             next_num = conn.execute(
-                select(func.coalesce(func.max(workspace_env_doc_versions.c.version_number), 0) + 1)
-                .where(workspace_env_doc_versions.c.workspace_id == workspace_id)
+                select(
+                    func.coalesce(
+                        func.max(workspace_env_doc_versions.c.version_number), 0
+                    )
+                    + 1
+                ).where(workspace_env_doc_versions.c.workspace_id == workspace_id)
             ).scalar_one()
             conn.execute(
                 workspace_env_doc_versions.insert().values(
@@ -127,7 +131,9 @@ class EnvDocsMixin:
                 )
             ).first()
             if not ver:
-                raise ValueError(f"env doc version {version_id!r} not found for workspace")
+                raise ValueError(
+                    f"env doc version {version_id!r} not found for workspace"
+                )
             conn.execute(
                 workspace_env_doc_versions.update()
                 .where(workspace_env_doc_versions.c.id == version_id)
@@ -164,7 +170,9 @@ class EnvDocsMixin:
     ) -> dict:
         target = self.get_env_doc_version(target_version_id)
         if not target or target["workspace_id"] != workspace_id:
-            raise ValueError(f"env doc version {target_version_id!r} not found for workspace")
+            raise ValueError(
+                f"env doc version {target_version_id!r} not found for workspace"
+            )
         return self.save_env_doc(
             workspace_id,
             target["content_json"],

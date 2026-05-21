@@ -110,7 +110,9 @@ class HTTPProviderAdapter(ABC):
         return self.descriptor.requires_api_key
 
     def _resolve(self, config: Any) -> tuple[str, str | None]:
-        base_url = (getattr(config, "base_url", None) or self.descriptor.default_base_url) or ""
+        base_url = (
+            getattr(config, "base_url", None) or self.descriptor.default_base_url
+        ) or ""
         api_key_env = (
             getattr(config, "api_key_env", None) or self.descriptor.default_api_key_env
         )
@@ -124,7 +126,11 @@ class HTTPProviderAdapter(ABC):
         api_key = os.environ.get(api_key_env) if api_key_env else None
 
         if self._auth_required_for_listing() and not api_key:
-            logger.info("%s: no api key, returning %d static models", self.provider.value, len(self.static_models))
+            logger.info(
+                "%s: no api key, returning %d static models",
+                self.provider.value,
+                len(self.static_models),
+            )
             return self._static()
 
         headers: dict[str, str] = {}
@@ -142,5 +148,9 @@ class HTTPProviderAdapter(ABC):
                 data = resp.json()
             return self._parse_response(data)
         except Exception as exc:
-            logger.warning("%s: live model listing failed (%s); using static fallback", self.provider.value, exc)
+            logger.warning(
+                "%s: live model listing failed (%s); using static fallback",
+                self.provider.value,
+                exc,
+            )
             return self._static()

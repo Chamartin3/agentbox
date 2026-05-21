@@ -71,5 +71,7 @@ class AnthropicAdapter(HTTPProviderAdapter):
                 resp.raise_for_status()
                 return self._parse_response(resp.json())
         except Exception as exc:
-            logger.warning("anthropic: live listing failed (%s); using static fallback", exc)
+            logger.warning(
+                "anthropic: live listing failed (%s); using static fallback", exc
+            )
             return self._static()

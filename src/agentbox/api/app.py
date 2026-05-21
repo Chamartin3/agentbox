@@ -22,6 +22,7 @@ from agentbox.api.routes import (
     activity,
     agent_tool_grants,
     agent_tools_discovery,
+    agent_validation,
     agents,
     agents_create,
     agents_write,
@@ -41,7 +42,6 @@ from agentbox.api.routes import (
     runner_providers,
     runs,
     usage,
-    validation_contracts,
     versions,
     workspace_mcp,
     workspaces,
@@ -190,8 +190,10 @@ def _on_startup() -> None:
             if summary["created"] or summary["updated"]:
                 _log.info(
                     "boot-import repo_resources: created=%d updated=%d skipped=%d failed=%d",
-                    summary["created"], summary["updated"],
-                    summary["skipped"], summary["failed"],
+                    summary["created"],
+                    summary["updated"],
+                    summary["skipped"],
+                    summary["failed"],
                 )
             # Plan 01 legacy sweep: move shared_resources rows into the
             # unified repo. Runs after import_repo_resources so that
@@ -202,7 +204,8 @@ def _on_startup() -> None:
                 _summary = legacy_report.summary()
                 if _summary["migrated"] or _summary["failed"]:
                     _log.info(
-                        "legacy shared_resources sweep: %s", _summary,
+                        "legacy shared_resources sweep: %s",
+                        _summary,
                     )
                 else:
                     _log.debug("legacy shared_resources sweep: %s", _summary)
@@ -213,11 +216,14 @@ def _on_startup() -> None:
             if ws_summary["bindings_added"]:
                 _log.info(
                     "boot-import workspace bindings: wired %d workspace(s), %d binding(s)",
-                    ws_summary["workspaces_wired"], ws_summary["bindings_added"],
+                    ws_summary["workspaces_wired"],
+                    ws_summary["bindings_added"],
                 )
 
             ref_summary = import_composition_references(
-                store, settings.project_root, loaded_manifest,
+                store,
+                settings.project_root,
+                loaded_manifest,
             )
             if ref_summary["bindings_added"]:
                 _log.info(
@@ -232,16 +238,19 @@ def _on_startup() -> None:
             if os.environ.get("AGENTBOX_MIGRATE_COMPOSITION"):
                 try:
                     comp_report = migrate_composition_to_bindings(
-                        store, project_root=settings.project_root,
+                        store,
+                        project_root=settings.project_root,
                     )
                     _comp_summary = comp_report.summary()
                     if _comp_summary["bindings_created"] or _comp_summary["failed"]:
                         _log.info(
-                            "composition→bindings migration: %s", _comp_summary,
+                            "composition→bindings migration: %s",
+                            _comp_summary,
                         )
                     else:
                         _log.debug(
-                            "composition→bindings migration: %s", _comp_summary,
+                            "composition→bindings migration: %s",
+                            _comp_summary,
                         )
                 except Exception:
                     _log.exception("composition→bindings migration failed")
@@ -268,7 +277,8 @@ def _on_startup() -> None:
         if pruned:
             _log.info(
                 "pruned %d phantom workspace registry rows: %s",
-                len(pruned), sorted(pruned),
+                len(pruned),
+                sorted(pruned),
             )
     except Exception:
         _log.exception("workspaces registry sync failed")
@@ -317,9 +327,7 @@ def create_app() -> FastAPI:
         # then have to crack open server logs to see what went wrong. Render a
         # JSON envelope with the exception type + message so consumers (and
         # the UI) can surface the real cause directly.
-        _log.exception(
-            "unhandled exception on %s %s", request.method, request.url.path
-        )
+        _log.exception("unhandled exception on %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=500,
             content={
@@ -342,7 +350,7 @@ def create_app() -> FastAPI:
     app.include_router(resources.router)
     app.include_router(repo_resources.router)
     app.include_router(resource_bindings.router)
-    app.include_router(validation_contracts.router)
+    app.include_router(agent_validation.router)
     app.include_router(env_doc.router)
     app.include_router(workspace_mcp.router)
     app.include_router(host_env.router)

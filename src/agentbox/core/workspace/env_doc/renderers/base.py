@@ -54,17 +54,23 @@ def _render_references(content: EnvDocContent, ctx: RuntimeContext) -> str:
     parts: list[str] = []
     if refs.include_skills and ctx.skills:
         parts.append("**Skills available:**")
-        parts.extend(f"- {s.label}" + (f" — {s.detail}" if s.detail else "") for s in ctx.skills)
+        parts.extend(
+            f"- {s.label}" + (f" — {s.detail}" if s.detail else "") for s in ctx.skills
+        )
     if refs.include_folders and ctx.folders:
         parts.append("**Folders:**")
-        parts.extend(f"- {f.label}" + (f" — {f.detail}" if f.detail else "") for f in ctx.folders)
+        parts.extend(
+            f"- {f.label}" + (f" — {f.detail}" if f.detail else "") for f in ctx.folders
+        )
     if refs.custom_links:
         parts.append("**Links:**")
         parts.extend(f"- [{link.label}]({link.url})" for link in refs.custom_links)
     return "\n".join(parts)
 
 
-def _render_body(content: EnvDocContent, ctx: RuntimeContext, audience: Visibility) -> str:
+def _render_body(
+    content: EnvDocContent, ctx: RuntimeContext, audience: Visibility
+) -> str:
     blocks: list[str] = []
     if content.project_name:
         blocks.append(f"# {content.project_name}")

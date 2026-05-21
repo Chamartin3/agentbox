@@ -189,7 +189,9 @@ def create_resource(body: CreateResourceRequest) -> SharedResourceResponse:
     if not body.author or not body.author.strip():
         raise HTTPException(400, "author is required and must be non-empty")
     if not body.changelog or len(body.changelog) < 3:
-        raise HTTPException(400, "changelog is required and must be at least 3 characters")
+        raise HTTPException(
+            400, "changelog is required and must be at least 3 characters"
+        )
 
     store = get_store()
     try:
@@ -254,7 +256,9 @@ def create_resource_version(
     if not body.author or not body.author.strip():
         raise HTTPException(400, "author is required and must be non-empty")
     if not body.changelog or len(body.changelog) < 3:
-        raise HTTPException(400, "changelog is required and must be at least 3 characters")
+        raise HTTPException(
+            400, "changelog is required and must be at least 3 characters"
+        )
 
     store = get_store()
     fields_to_update = {}
@@ -290,7 +294,9 @@ def create_resource_version(
 
 
 @router.post("/{id}/activate", status_code=200)
-def activate_resource_version(id: str, body: ActivateVersionRequest) -> SharedResourceResponse:
+def activate_resource_version(
+    id: str, body: ActivateVersionRequest
+) -> SharedResourceResponse:
     """Atomically activate a specific version and deactivate others.
 
     Returns 404 if resource/version doesn't exist.

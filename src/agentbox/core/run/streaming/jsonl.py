@@ -154,7 +154,10 @@ async def stream_jsonl_subprocess(
         stderr_task.cancel()
         for sl in stderr_lines:
             if sl.strip():
-                yield LogEvent(run_id=run_id, level="warn", message=sl), captured_session_id
+                yield (
+                    LogEvent(run_id=run_id, level="warn", message=sl),
+                    captured_session_id,
+                )
         yield (
             TimeoutEvent(
                 run_id=run_id,

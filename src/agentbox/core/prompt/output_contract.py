@@ -41,27 +41,26 @@ def render(output_config: OutputConfig) -> str:
         )
         parts.append("## JSON Schema")
         parts.append(
-            "```json\n"
-            + json.dumps(output_config.json_schema, indent=2)
-            + "\n```"
+            "```json\n" + json.dumps(output_config.json_schema, indent=2) + "\n```"
         )
 
     # Plan 22: validators carry their own constraint text (description).
     # Build the Constraints bullets from each validator's description.
-    # Legacy fallback: if no validator carries a description AND the
-    # contract still has rules[], render those bullets instead. This
-    # fallback gets dropped in Plan 22 / Phase 3 once migrations land.
-    validator_bullets = [
-        v.description.strip()
-        for v in output_config.validators
-        if getattr(v, "description", "").strip()
-    ]
-    if validator_bullets:
+    # Multi-line descriptions explode into one bullet per non-empty line
+    # so legacy multi-rule descriptions migrated by Plan 22 Phase 3 stay
+    # rendered as discrete bullets (not a single multi-line bullet).
+    bullets: list[str] = []
+    for v in output_config.validators:
+        desc = getattr(v, "description", "")
+        if not isinstance(desc, str):
+            continue
+        for line in desc.splitlines():
+            stripped = line.strip()
+            if stripped:
+                bullets.append(stripped)
+    if bullets:
         parts.append("## Constraints")
-        parts.append("\n".join(f"- {b}" for b in validator_bullets))
-    elif output_config.rules:
-        parts.append("## Constraints")
-        parts.append("\n".join(f"- {rule}" for rule in output_config.rules))
+        parts.append("\n".join(f"- {b}" for b in bullets))
 
     return "\n\n".join(parts).rstrip()
 

@@ -99,9 +99,9 @@ class AnalyticsMixin:
             count_from_av = count_from.outerjoin(
                 agent_versions, agent_versions.c.id == runs.c.agent_version_id
             )
-            count_stmt = select(
-                func.count(func.distinct(runs.c.id))
-            ).select_from(count_from_av)
+            count_stmt = select(func.count(func.distinct(runs.c.id))).select_from(
+                count_from_av
+            )
             conds.append(agent_versions.c.version == agent_version)
         if since_iso:
             conds.append(runs.c.created_at >= since_iso)
@@ -194,9 +194,7 @@ class AnalyticsMixin:
         totals_stmt = (
             select(
                 func.count().label("runs"),
-                func.coalesce(func.sum(usage.c.input_tokens), 0).label(
-                    "input_tokens"
-                ),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
                 func.coalesce(func.sum(usage.c.output_tokens), 0).label(
                     "output_tokens"
                 ),
@@ -279,9 +277,9 @@ class AnalyticsMixin:
             span = 7 * 86400
 
         if span <= 2 * 86400:
-            bucket_expr = func.strftime(
-                "%Y-%m-%dT%H:00:00Z", runs.c.created_at
-            ).label("bucket")
+            bucket_expr = func.strftime("%Y-%m-%dT%H:00:00Z", runs.c.created_at).label(
+                "bucket"
+            )
         else:
             bucket_expr = func.date(runs.c.created_at).label("bucket")
 
@@ -289,9 +287,7 @@ class AnalyticsMixin:
             select(
                 bucket_expr,
                 func.count().label("runs"),
-                func.coalesce(func.sum(usage.c.input_tokens), 0).label(
-                    "input_tokens"
-                ),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
                 func.coalesce(func.sum(usage.c.output_tokens), 0).label(
                     "output_tokens"
                 ),

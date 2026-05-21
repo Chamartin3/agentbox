@@ -78,7 +78,9 @@ class TestSetPromptResources:
             fn = _get_tool_fn(mcp, "set_prompt_resources")
             result = fn("ag1", [], "add first binding")
         assert result == {"agent_id": "ag1", "bindings": [], "count": 0}
-        ctx.store.replace_prompt_bindings.assert_called_once_with("ag1", [], reason="add first binding")
+        ctx.store.replace_prompt_bindings.assert_called_once_with(
+            "ag1", [], reason="add first binding"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -128,8 +130,13 @@ class TestDryRunWorkspaceResources:
     def test_returns_binding_count(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
         fake = [{"dest_path": "docs/ref.md", "resource_id": "r1"}]
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx), \
-             patch("agentbox.mcp.tools.resources.resolve_workspace_resources", return_value=fake):
+        with (
+            patch("agentbox.mcp.tools.resources.get_context", return_value=ctx),
+            patch(
+                "agentbox.mcp.tools.resources.resolve_workspace_resources",
+                return_value=fake,
+            ),
+        ):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "dry_run_workspace_resources")
             result = fn("ws1")
@@ -159,7 +166,9 @@ class TestSetHostEnvGrants:
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_host_env_grants")
             result = fn("ws1", grants, "grant fs read")
-        ctx.store.set_workspace_host_env.assert_called_once_with("ws1", overrides=grants, changelog="grant fs read")
+        ctx.store.set_workspace_host_env.assert_called_once_with(
+            "ws1", overrides=grants, changelog="grant fs read"
+        )
         assert result == {"workspace_id": "ws1"}
 
 

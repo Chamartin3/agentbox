@@ -52,7 +52,9 @@ class TestTokenProviderRouting:
             source="run_override",
         )
 
-        rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=runner_config)
+        rendered = adapter.render(
+            agent, Path("/tmp/workdir"), runner_config=runner_config
+        )
 
         # Assert provider routing is stored
         assert rendered.agent_meta.get("provider") == "openai"
@@ -65,7 +67,10 @@ class TestTokenProviderRouting:
         assert rendered.model == "openai:gpt-4o"
 
         # Assert no secret value is stored
-        assert "api_key" not in rendered.agent_meta or rendered.agent_meta.get("api_key") is None
+        assert (
+            "api_key" not in rendered.agent_meta
+            or rendered.agent_meta.get("api_key") is None
+        )
 
     def test_render_without_runner_config_ignores_legacy_runner_model(self) -> None:
         """render() does not read agent.runner.model as runtime config."""
@@ -97,7 +102,9 @@ class TestTokenProviderRouting:
             source="run_override",
         )
 
-        rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=runner_config)
+        rendered = adapter.render(
+            agent, Path("/tmp/workdir"), runner_config=runner_config
+        )
 
         assert rendered.model == "override:model"
 
@@ -112,15 +119,22 @@ class TestTokenProviderRouting:
             source="run_override",
         )
 
-        rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=runner_config)
+        rendered = adapter.render(
+            agent, Path("/tmp/workdir"), runner_config=runner_config
+        )
 
         # Store the env var name, not the key
         assert rendered.agent_meta.get("api_key_env") == "OPENAI_API_KEY"
         # No secret in agent_meta
-        assert "api_key" not in rendered.agent_meta or rendered.agent_meta.get("api_key") is None
+        assert (
+            "api_key" not in rendered.agent_meta
+            or rendered.agent_meta.get("api_key") is None
+        )
 
     @pytest.mark.asyncio
-    async def test_run_missing_api_key_env_emits_done_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_run_missing_api_key_env_emits_done_failure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """run() with api_key_env not set in environment emits DoneEvent(ok=False)."""
         # Ensure the env var is not set
         monkeypatch.delenv("TEST_MISSING_KEY", raising=False)
@@ -134,7 +148,9 @@ class TestTokenProviderRouting:
             source="run_override",
         )
 
-        rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=runner_config)
+        rendered = adapter.render(
+            agent, Path("/tmp/workdir"), runner_config=runner_config
+        )
 
         # Collect all events from run()
         events = []
@@ -154,7 +170,9 @@ class TestTokenProviderRouting:
         assert not message.startswith("sk-")
 
     @pytest.mark.asyncio
-    async def test_run_with_env_set_resolves_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_run_with_env_set_resolves_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """run() resolves api_key from environment when api_key_env is set.
 
         This test mocks importlib to verify that api_key,
@@ -179,10 +197,14 @@ class TestTokenProviderRouting:
             source="run_override",
         )
 
-        rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=runner_config)
+        rendered = adapter.render(
+            agent, Path("/tmp/workdir"), runner_config=runner_config
+        )
 
         # Mock importlib to capture the kwargs passed to it
-        with patch("agentbox.core.run.backends.token.importlib.import_module") as mock_import:
+        with patch(
+            "agentbox.core.run.backends.token.importlib.import_module"
+        ) as mock_import:
             # Create a mock module with a mock Agent class
             mock_module = MagicMock()
             mock_import.return_value = mock_module

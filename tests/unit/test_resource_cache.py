@@ -83,6 +83,7 @@ class TestEnsureCached:
         # ensure_cached won't re-write because the dir still exists (idempotent)
         # Caller must remove the dir to trigger re-materialization
         import shutil
+
         shutil.rmtree(cache / "v1")
         result = ensure_cached("v1", _blobs(["a.txt"]), cache)
         assert (result / "a.txt").exists()
@@ -113,7 +114,9 @@ class TestPruneCache:
 
 
 class TestSettingsResourceCacheDir:
-    def test_default_is_data_dir_resource_cache(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    def test_default_is_data_dir_resource_cache(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ):
         monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
         monkeypatch.delenv("AGENTBOX_RESOURCE_CACHE_DIR", raising=False)
         from agentbox.config import load_settings

@@ -60,9 +60,8 @@ def recent_runs(
             profile = None
         backend = None
         if profile is not None:
-            backend = (
-                getattr(profile, "backend", None)
-                or (profile.get("backend") if hasattr(profile, "get") else None)
+            backend = getattr(profile, "backend", None) or (
+                profile.get("backend") if hasattr(profile, "get") else None
             )
         profile_backend_cache[profile_id] = backend
         return backend
@@ -75,9 +74,8 @@ def recent_runs(
         except Exception:
             profile = None
         if profile is not None:
-            return (
-                getattr(profile, "model", None)
-                or (profile.get("model") if hasattr(profile, "get") else None)
+            return getattr(profile, "model", None) or (
+                profile.get("model") if hasattr(profile, "get") else None
             )
         return None
 

@@ -20,7 +20,9 @@ from agentbox.core.agent.providers.base import (
 logger = logging.getLogger(__name__)
 
 
-_DEFAULT_CONTAINER_REWRITE = "localhost=host.docker.internal,127.0.0.1=host.docker.internal"
+_DEFAULT_CONTAINER_REWRITE = (
+    "localhost=host.docker.internal,127.0.0.1=host.docker.internal"
+)
 
 
 def _running_in_container() -> bool:
@@ -121,8 +123,11 @@ class OllamaAdapter(HTTPProviderAdapter):
         base_url, _api_key_env = self._resolve(config)
         effective_url = rewrite_ollama_url(base_url)
         if effective_url != base_url:
-            logger.debug("ollama: rewriting %s -> %s for in-container lookup",
-                         base_url, effective_url)
+            logger.debug(
+                "ollama: rewriting %s -> %s for in-container lookup",
+                base_url,
+                effective_url,
+            )
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.get(

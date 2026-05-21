@@ -68,7 +68,9 @@ def mcp_show(workspace_id: str) -> None:
 def mcp_policy(
     workspace_id: str,
     policy_name: str,
-    reason: str | None = typer.Option(None, "--reason", "-r", help="Reason (unused, for logging)"),
+    reason: str | None = typer.Option(
+        None, "--reason", "-r", help="Reason (unused, for logging)"
+    ),
 ) -> None:
     """Set the default MCP policy for a workspace."""
     if policy_name not in VALID_POLICIES:
@@ -88,7 +90,9 @@ def mcp_policy(
 def mcp_enable(
     workspace_id: str,
     server_name: str,
-    reason: str = typer.Option("", "--reason", "-r", help="Reason for change (min 3 chars)"),
+    reason: str = typer.Option(
+        "", "--reason", "-r", help="Reason for change (min 3 chars)"
+    ),
 ) -> None:
     """Enable a specific MCP server for a workspace."""
     if len(reason.strip()) < 3:
@@ -108,7 +112,9 @@ def mcp_enable(
 def mcp_disable(
     workspace_id: str,
     server_name: str,
-    reason: str = typer.Option("", "--reason", "-r", help="Reason for change (min 3 chars)"),
+    reason: str = typer.Option(
+        "", "--reason", "-r", help="Reason for change (min 3 chars)"
+    ),
 ) -> None:
     """Disable a specific MCP server for a workspace."""
     if len(reason.strip()) < 3:
@@ -135,7 +141,9 @@ def mcp_refresh(workspace_id: str) -> None:
         server_names.add(s.name)
 
     if not server_names:
-        console.print(f"[yellow]No servers to refresh for workspace {workspace_id!r}.[/yellow]")
+        console.print(
+            f"[yellow]No servers to refresh for workspace {workspace_id!r}.[/yellow]"
+        )
         return
 
     from agentbox.api.deps import get_mcp_registry, get_settings

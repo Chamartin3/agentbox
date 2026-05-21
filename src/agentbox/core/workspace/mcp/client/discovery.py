@@ -77,7 +77,9 @@ async def _discover_stdio(
             proc.communicate(input=payload), timeout=timeout
         )
     except TimeoutError:
-        _log.warning("mcp-discovery: stdio server %r timed out after %ss", name, timeout)
+        _log.warning(
+            "mcp-discovery: stdio server %r timed out after %ss", name, timeout
+        )
         with contextlib.suppress(Exception):
             proc.kill()
         return []

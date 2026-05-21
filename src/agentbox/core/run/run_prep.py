@@ -229,7 +229,9 @@ def render_env_doc(
         try:
             content_json = json.loads(content_json)
         except Exception:
-            logger.warning("run_prep: env doc version %s has invalid content_json", doc.get("id"))
+            logger.warning(
+                "run_prep: env doc version %s has invalid content_json", doc.get("id")
+            )
             return []
 
     from agentbox.core.workspace.env_doc.renderers.agents_md import AgentsMdRenderer
@@ -240,7 +242,9 @@ def render_env_doc(
     try:
         content = EnvDocContent.model_validate(content_json)
     except Exception:
-        logger.warning("run_prep: could not parse env doc content for workspace %s", workspace_id)
+        logger.warning(
+            "run_prep: could not parse env doc content for workspace %s", workspace_id
+        )
         return []
 
     ctx = RuntimeContext()

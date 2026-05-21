@@ -28,7 +28,9 @@ class HostEnvMixin:
 
     def list_host_env_profiles(self) -> list[dict]:
         with self.engine.connect() as conn:
-            rows = conn.execute(host_env_profiles.select().order_by(host_env_profiles.c.name))
+            rows = conn.execute(
+                host_env_profiles.select().order_by(host_env_profiles.c.name)
+            )
             return [dict(r._mapping) for r in rows]
 
     def get_host_env_profile(self, profile_id: str) -> dict | None:
@@ -108,9 +110,7 @@ class HostEnvMixin:
             if existing:
                 conn.execute(
                     workspace_host_env_grants.update()
-                    .where(
-                        workspace_host_env_grants.c.workspace_id == workspace_id
-                    )
+                    .where(workspace_host_env_grants.c.workspace_id == workspace_id)
                     .values(
                         profile_id=profile_id,
                         overrides=overrides,
@@ -139,9 +139,13 @@ class HostEnvMixin:
         if not row:
             return {"grants": resolve_grants(None, None), "profile_id": None}
         profile = (
-            self.get_host_env_profile(row["profile_id"]) if row.get("profile_id") else None
+            self.get_host_env_profile(row["profile_id"])
+            if row.get("profile_id")
+            else None
         )
-        grants = resolve_grants(profile["grants"] if profile else None, row.get("overrides"))
+        grants = resolve_grants(
+            profile["grants"] if profile else None, row.get("overrides")
+        )
         return {
             "grants": grants,
             "profile_id": row.get("profile_id"),

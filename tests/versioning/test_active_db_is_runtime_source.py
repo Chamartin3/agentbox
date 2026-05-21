@@ -28,7 +28,9 @@ from agentbox.core.run.backends.opencode import OpenCodeBackend
 _DEFAULT_AGENT_TIMEOUT = 1200
 
 
-def _agent(runner_kind: RunnerKind, timeout: int, model: str | None = "haiku") -> AgentDef:
+def _agent(
+    runner_kind: RunnerKind, timeout: int, model: str | None = "haiku"
+) -> AgentDef:
     return AgentDef(
         id="stage.example",
         runner=RunnerSpec(kind=runner_kind, model=model, timeout_seconds=timeout),

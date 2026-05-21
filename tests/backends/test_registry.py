@@ -44,7 +44,9 @@ def test_fake_adapter_can_be_registered(monkeypatch) -> None:
     class FakeBackend:
         name = "fake"
 
-        def render(self, agent, workdir, mcp_tools=None, creds=None, runner_config=None) -> RenderedConfig:
+        def render(
+            self, agent, workdir, mcp_tools=None, creds=None, runner_config=None
+        ) -> RenderedConfig:
             return RenderedConfig(cwd=workdir)
 
         async def run(self, rendered, input, run_id):

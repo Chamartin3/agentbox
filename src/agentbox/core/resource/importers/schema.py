@@ -36,7 +36,9 @@ class SchemaImporter(ResourceImporter):
         try:
             doc = json.loads(text)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Schema file {self.filename!r} is not valid JSON: {exc}") from exc
+            raise ValueError(
+                f"Schema file {self.filename!r} is not valid JSON: {exc}"
+            ) from exc
         if not isinstance(doc, dict):
             raise ValueError(f"Schema file {self.filename!r} must be a JSON object")
 

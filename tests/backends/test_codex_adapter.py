@@ -44,7 +44,9 @@ def test_render_appends_effective_extra_args() -> None:
     rendered = CodexBackend().render(
         agent,
         Path("/tmp/wd"),
-        runner_config=EffectiveRunnerConfig(backend="codex", extra_args=["--cwd", "/x"]),
+        runner_config=EffectiveRunnerConfig(
+            backend="codex", extra_args=["--cwd", "/x"]
+        ),
     )
     assert "--cwd" in rendered.argv and "/x" in rendered.argv
 
@@ -64,7 +66,9 @@ def test_build_codex_argv_uses_default_when_no_spec_model() -> None:
 
 
 def test_build_codex_argv_skips_default_when_extra_args_has_model() -> None:
-    argv = build_codex_argv(None, ["--model", "custom"], default_model="o4-mini-default")
+    argv = build_codex_argv(
+        None, ["--model", "custom"], default_model="o4-mini-default"
+    )
     # Only one --model expected (the one inside extra_args)
     assert argv.count("--model") == 1
     assert "custom" in argv and "o4-mini-default" not in argv

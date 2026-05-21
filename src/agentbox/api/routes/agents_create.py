@@ -43,7 +43,9 @@ class AgentCreateRequest(BaseModel):
 class FileUploadRequest(BaseModel):
     """Request body for uploading a file to a version."""
 
-    kind: Literal["output_schema", "input_schema", "user_template", "system", "reference"]
+    kind: Literal[
+        "output_schema", "input_schema", "user_template", "system", "reference"
+    ]
     name: str
     content: str
 
@@ -121,7 +123,9 @@ def create_agent(req: AgentCreateRequest) -> AgentCreateResponse:
 
 
 @router.post("/{agent_id}/versions/{version}/files", status_code=201)
-def upload_file(agent_id: str, version: int, req: FileUploadRequest) -> FileUploadResponse:
+def upload_file(
+    agent_id: str, version: int, req: FileUploadRequest
+) -> FileUploadResponse:
     """Upload a file to a draft version.
 
     File must be uploaded to a draft version (is_draft=True).
@@ -137,7 +141,9 @@ def upload_file(agent_id: str, version: int, req: FileUploadRequest) -> FileUplo
 
     # Check draft status
     if not version_record.get("is_draft"):
-        raise HTTPException(409, {"code": "not_draft", "detail": "cannot modify published version"})
+        raise HTTPException(
+            409, {"code": "not_draft", "detail": "cannot modify published version"}
+        )
 
     # Compute sha256
     sha256_hash = hashlib.sha256(req.content.encode()).hexdigest()

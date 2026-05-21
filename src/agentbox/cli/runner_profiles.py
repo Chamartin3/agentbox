@@ -45,9 +45,7 @@ def runner_profile_ls(
     provider: str | None = typer.Option(
         None, help="Filter by provider (e.g. 'openai', 'openrouter')"
     ),
-    enabled: bool | None = typer.Option(
-        None, help="Filter by enabled status"
-    ),
+    enabled: bool | None = typer.Option(None, help="Filter by enabled status"),
 ) -> None:
     """List runner profiles with optional filters."""
     store = get_store()
@@ -119,9 +117,7 @@ def runner_profile_create(
         None, help="Environment variable name for API key"
     ),
     description: str | None = typer.Option(None, help="Profile description"),
-    system_default: bool = typer.Option(
-        False, help="Set as system default profile"
-    ),
+    system_default: bool = typer.Option(False, help="Set as system default profile"),
 ) -> None:
     """Create a new runner profile."""
     store = get_store()
@@ -139,9 +135,7 @@ def runner_profile_create(
     )
 
     profile = store.create_runner_profile(profile_data)
-    console.print(
-        f"[green]Created runner profile[/green] [bold]{profile.id}[/bold]"
-    )
+    console.print(f"[green]Created runner profile[/green] [bold]{profile.id}[/bold]")
     console.print(JSON(_json.dumps(profile.model_dump(), indent=2)))
 
 
@@ -251,9 +245,7 @@ def runner_profile_stats(
 @runner_profile_app.command("delete")
 def runner_profile_delete(
     profile_id: str = typer.Argument(..., help="Profile ID to delete"),
-    yes: bool = typer.Option(
-        False, "--yes", "-y", help="Skip confirmation prompt"
-    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Delete a runner profile."""
     store = get_store()
@@ -329,9 +321,7 @@ def runner_provider_models(
     base_url: str | None = typer.Option(
         None, help="Override base URL (for custom endpoints)"
     ),
-    api_key_env: str | None = typer.Option(
-        None, help="Override API key env var name"
-    ),
+    api_key_env: str | None = typer.Option(None, help="Override API key env var name"),
     refresh: bool = typer.Option(False, help="Bypass cache and fetch fresh models"),
 ) -> None:
     """List available models for a provider."""
@@ -346,6 +336,7 @@ def runner_provider_models(
         if not profile:
             console.print(f"[red]Profile not found:[/red] {profile_id}")
             raise typer.Exit(1)
+
         # Create a mock config from profile
         class MockConfig:
             pass

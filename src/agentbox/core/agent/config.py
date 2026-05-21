@@ -24,7 +24,7 @@ from ``runner_profiles`` by ``RunnerProfileResolver``.
 from __future__ import annotations
 
 import json as _json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal
 
 
@@ -206,23 +206,91 @@ ValidatorConfig = HttpValidatorConfig | ScriptValidatorConfig
 class OutputConfig:
     """Resolved output validation surface for a single run.
 
-    Three independent pieces:
+    Two independent pieces (Plan 22 retired the floating ``rules[]``):
 
     - ``json_schema`` — Gate-1 structural validation. Sourced from the
       agent's ``slot='output_schema'`` resource binding. Its existence
       *is* the implicit jsonschema validator — never listed in
       ``validators``.
-    - ``rules`` — plain-English constraints injected into the system
-      prompt. Not enforced post-hoc; the model is asked to honour them.
     - ``validators`` — explicit polymorphic post-hoc checkers from the
-      bound validation contract. Today only ``kind='http'``; new kinds
-      add a dispatch branch in ``core/run/validation.validate_output``
-      with no DB migration.
+      bound validation contract. Each validator carries its own
+      ``description`` (rendered into the prompt as a constraint bullet)
+      and the actual check (HTTP endpoint, script resource, …). Today
+      ``kind='http'`` and ``kind='script'``; new kinds add a dispatch
+      branch in ``core/run/validation.validate_output`` with no DB
+      migration.
     """
 
     json_schema: dict[str, Any] | None = None
-    rules: list[str] = field(default_factory=list)
     validators: tuple[ValidatorConfig, ...] = ()
+
+
+def _normalize_validator_entries(
+    store: Any, entries: list[dict]
+) -> list[ValidatorConfig]:
+    """Turn raw validator dicts (from inline config_json or a contract
+    row) into typed :class:`ValidatorConfig`s.
+
+    Script validators pre-load their source code so the runtime needs
+    no DB access during dispatch. Unknown kinds are skipped silently —
+    a newer writer may have introduced a kind this reader doesn't know.
+    """
+    out: list[ValidatorConfig] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        kind = entry.get("kind", "http")
+        description = str(entry.get("description", "") or "")
+        if kind == "http":
+            out.append(
+                HttpValidatorConfig(
+                    kind="http",
+                    endpoint=entry.get("endpoint", ""),
+                    timeout_seconds=int(entry.get("timeout_seconds", 5)),
+                    description=description,
+                )
+            )
+        elif kind == "script":
+            rid = entry.get("resource_id")
+            if not rid:
+                continue
+            pinned = entry.get("pinned_version_id")
+            ver = None
+            if store is not None:
+                try:
+                    if pinned:
+                        ver = store.get_repo_version(pinned)
+                    else:
+                        ver = store.get_active_repo_version(rid)
+                except Exception:
+                    ver = None
+            source = ""
+            if ver and store is not None:
+                try:
+                    blob = store.read_repo_blob(ver["id"], "")
+                except Exception:
+                    blob = None
+                if blob:
+                    text = blob.get("content_text") or ""
+                    if not text:
+                        raw_b = blob.get("content")
+                        if isinstance(raw_b, (bytes, bytearray)):
+                            try:
+                                text = raw_b.decode("utf-8")
+                            except UnicodeDecodeError:
+                                text = ""
+                    source = text
+            out.append(
+                ScriptValidatorConfig(
+                    kind="script",
+                    resource_id=rid,
+                    resource_version_id=(ver or {}).get("id"),
+                    source_code=source,
+                    description=description,
+                )
+            )
+    return out
+
 
 def resolve_output_config(store: Any, agent: Any) -> OutputConfig:
     """Resolve the agent's output contract — single source of truth.
@@ -231,17 +299,14 @@ def resolve_output_config(store: Any, agent: Any) -> OutputConfig:
 
     1. **Schema** — from the agent's active ``slot='output_schema'``
        prompt binding (resolved blob of the pinned-or-active version).
-    2. **Rules + validators** — from the validation contract bound to
-       the active agent_version's ``direction='output'`` row.
+    2. **Validators** — inline ``config_json["output"].validators`` on
+       the active agent_version (the only path after Plan 23).
 
-    Either may be absent. The legacy ``config_json["output"]`` inline
-    block was removed in Step 9; backfill the older rows with
-    ``bin/backfill_output_contracts.py`` before upgrading.
+    Either may be absent.
     """
     agent_id = getattr(agent, "id", None)
     schema: dict[str, Any] | None = None
-    rules: list[str] = []
-    validators: list[ValidatorConfig] = []
+    validators_raw: list[dict] = []
 
     if store is not None and agent_id:
         # --- schema from output_schema binding ---
@@ -249,9 +314,7 @@ def resolve_output_config(store: Any, agent: Any) -> OutputConfig:
             bindings = store.list_prompt_bindings(agent_id)
         except Exception:
             bindings = []
-        binding = next(
-            (b for b in bindings if b.get("slot") == "output_schema"), None
-        )
+        binding = next((b for b in bindings if b.get("slot") == "output_schema"), None)
         if binding is not None:
             vid = binding.get("pinned_version_id")
             try:
@@ -281,85 +344,18 @@ def resolve_output_config(store: Any, agent: Any) -> OutputConfig:
                         except (ValueError, TypeError):
                             schema = None
 
-        # --- rules + validator from the validation contract ---
-        active_ver = None
-        try:
-            active_ver = store.get_active_version(agent_id)
-        except Exception:
-            active_ver = None
-        if active_ver and active_ver.get("id") is not None:
-            try:
-                contract = store.resolve_agent_version_contract(
-                    int(active_ver["id"]), "output"
-                )
-            except Exception:
-                contract = None
-            if contract:
-                raw_rules = contract.get("rules") or []
-                if isinstance(raw_rules, list):
-                    rules = [r for r in raw_rules if isinstance(r, str)]
-                for entry in contract.get("validators") or []:
-                    if not isinstance(entry, dict):
-                        continue
-                    kind = entry.get("kind", "http")
-                    if kind == "http":
-                        validators.append(
-                            HttpValidatorConfig(
-                                kind="http",
-                                endpoint=entry.get("endpoint", ""),
-                                timeout_seconds=int(
-                                    entry.get("timeout_seconds", 5)
-                                ),
-                                description=str(entry.get("description", "") or ""),
-                            )
-                        )
-                    elif kind == "script":
-                        # Pre-load script source so the runtime needs
-                        # no DB access during dispatch. Pinned version
-                        # wins; falls back to the resource's active.
-                        rid = entry.get("resource_id")
-                        pinned = entry.get("pinned_version_id")
-                        if not rid:
-                            continue
-                        ver = None
-                        try:
-                            if pinned:
-                                ver = store.get_repo_version(pinned)
-                            else:
-                                ver = store.get_active_repo_version(rid)
-                        except Exception:
-                            ver = None
-                        source = ""
-                        if ver:
-                            try:
-                                blob = store.read_repo_blob(ver["id"], "")
-                            except Exception:
-                                blob = None
-                            if blob:
-                                text = blob.get("content_text") or ""
-                                if not text:
-                                    raw_b = blob.get("content")
-                                    if isinstance(raw_b, (bytes, bytearray)):
-                                        try:
-                                            text = raw_b.decode("utf-8")
-                                        except UnicodeDecodeError:
-                                            text = ""
-                                source = text
-                        validators.append(
-                            ScriptValidatorConfig(
-                                kind="script",
-                                resource_id=rid,
-                                resource_version_id=(ver or {}).get("id"),
-                                source_code=source,
-                                description=str(entry.get("description", "") or ""),
-                            )
-                        )
-                    # Unknown kinds are skipped silently — a newer writer
-                    # may have introduced a kind this reader doesn't know.
+        # --- validators from inline config_json["output"].validators ---
+        inline_section = _config_section(agent, "output")
+        inline_list = inline_section.get("validators")
+        if isinstance(inline_list, list):
+            validators_raw = [v for v in inline_list if isinstance(v, dict)]
+
+    validators = (
+        _normalize_validator_entries(store, validators_raw) if validators_raw else []
+    )
 
     return OutputConfig(
         json_schema=schema if isinstance(schema, dict) else None,
-        rules=rules,
         validators=tuple(validators),
     )
 

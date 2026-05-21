@@ -79,9 +79,7 @@ def test_script_upload_and_validate(client: Any) -> None:
     assert r.status_code == 201
     _publish_latest(client, rid)
 
-    r = client.post(
-        f"/api/repo-resources/{rid}/validate", json={"sample": {"x": 1}}
-    )
+    r = client.post(f"/api/repo-resources/{rid}/validate", json={"sample": {"x": 1}})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["valid"] is True

@@ -137,7 +137,9 @@ class TestCreateRunnerProfile:
         detail = resp.json()["detail"].lower()
         assert "secret" in detail or "looks like" in detail
 
-    def test_create_profile_invalid_api_key_env_format_rejected(self, client: Any) -> None:
+    def test_create_profile_invalid_api_key_env_format_rejected(
+        self, client: Any
+    ) -> None:
         """api_key_env with invalid chars (lowercase, hyphens) → 400."""
         req = {
             "id": "invalid-env-name",
@@ -173,11 +175,14 @@ class TestCreateRunnerProfile:
 
     def test_create_profile_without_id_avoids_collision(self, client: Any) -> None:
         """When slug already exists, append a numeric suffix."""
-        client.post("/api/runner-profiles", json={
-            "id": "collision-test",
-            "name": "Collision Test",
-            "backend": "token",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "collision-test",
+                "name": "Collision Test",
+                "backend": "token",
+            },
+        )
         req = {"name": "Collision Test", "backend": "token"}
         resp = client.post("/api/runner-profiles", json=req)
         assert resp.status_code == 201
@@ -244,18 +249,24 @@ class TestListRunnerProfiles:
     def test_list_profiles_filters_by_backend(self, client: Any) -> None:
         """Create two with different backends, GET with ?backend=... returns subset."""
         # Create pydantic_ai profile
-        client.post("/api/runner-profiles", json={
-            "id": "pydantic-profile",
-            "name": "Pydantic Profile",
-            "backend": "token",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "pydantic-profile",
+                "name": "Pydantic Profile",
+                "backend": "token",
+            },
+        )
 
         # Create claude_code profile
-        client.post("/api/runner-profiles", json={
-            "id": "claude-profile",
-            "name": "Claude Profile",
-            "backend": "claude_code",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "claude-profile",
+                "name": "Claude Profile",
+                "backend": "claude_code",
+            },
+        )
 
         # Filter by pydantic_ai
         resp = client.get("/api/runner-profiles", params={"backend": "token"})
@@ -274,20 +285,26 @@ class TestListRunnerProfiles:
     def test_list_profiles_filters_by_provider(self, client: Any) -> None:
         """Create profiles with different providers, filter by provider."""
         # Create openai profile
-        client.post("/api/runner-profiles", json={
-            "id": "openai-profile",
-            "name": "OpenAI Profile",
-            "backend": "token",
-            "provider": "openai",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "openai-profile",
+                "name": "OpenAI Profile",
+                "backend": "token",
+                "provider": "openai",
+            },
+        )
 
         # Create openrouter profile
-        client.post("/api/runner-profiles", json={
-            "id": "openrouter-profile",
-            "name": "OpenRouter Profile",
-            "backend": "token",
-            "provider": "openrouter",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "openrouter-profile",
+                "name": "OpenRouter Profile",
+                "backend": "token",
+                "provider": "openrouter",
+            },
+        )
 
         # Filter by openai
         resp = client.get("/api/runner-profiles", params={"provider": "openai"})
@@ -299,20 +316,26 @@ class TestListRunnerProfiles:
     def test_list_profiles_filters_by_enabled(self, client: Any) -> None:
         """Create enabled/disabled profiles, filter by enabled status."""
         # Create enabled profile
-        client.post("/api/runner-profiles", json={
-            "id": "enabled-profile",
-            "name": "Enabled Profile",
-            "backend": "token",
-            "is_enabled": True,
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "enabled-profile",
+                "name": "Enabled Profile",
+                "backend": "token",
+                "is_enabled": True,
+            },
+        )
 
         # Create disabled profile
-        client.post("/api/runner-profiles", json={
-            "id": "disabled-profile",
-            "name": "Disabled Profile",
-            "backend": "token",
-            "is_enabled": False,
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "disabled-profile",
+                "name": "Disabled Profile",
+                "backend": "token",
+                "is_enabled": False,
+            },
+        )
 
         # Filter by enabled
         resp = client.get("/api/runner-profiles", params={"enabled": True})
@@ -335,13 +358,16 @@ class TestPatchRunnerProfile:
     def test_patch_profile_updates_fields(self, client: Any) -> None:
         """update name + model, others preserved."""
         # Create profile
-        client.post("/api/runner-profiles", json={
-            "id": "patch-test",
-            "name": "Original Name",
-            "backend": "token",
-            "provider": "openai",
-            "model": "openai:gpt-3.5-turbo",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "patch-test",
+                "name": "Original Name",
+                "backend": "token",
+                "provider": "openai",
+                "model": "openai:gpt-3.5-turbo",
+            },
+        )
 
         # Patch
         patch_req = {
@@ -368,11 +394,14 @@ class TestPatchRunnerProfile:
     def test_patch_profile_validates_backend(self, client: Any) -> None:
         """PATCH with invalid backend → 400."""
         # Create valid profile
-        client.post("/api/runner-profiles", json={
-            "id": "valid-profile",
-            "name": "Valid",
-            "backend": "token",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "valid-profile",
+                "name": "Valid",
+                "backend": "token",
+            },
+        )
 
         # Try to patch with invalid backend
         resp = client.patch(
@@ -389,11 +418,14 @@ class TestDeleteRunnerProfile:
     def test_delete_profile_removes_it(self, client: Any) -> None:
         """DELETE then GET → 404."""
         # Create
-        client.post("/api/runner-profiles", json={
-            "id": "delete-test",
-            "name": "Delete Test",
-            "backend": "token",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "delete-test",
+                "name": "Delete Test",
+                "backend": "token",
+            },
+        )
 
         # Delete
         delete_resp = client.delete("/api/runner-profiles/delete-test")
@@ -415,11 +447,14 @@ class TestRunnerProfileStats:
     def test_profile_stats_endpoint(self, client: Any) -> None:
         """POST profile, GET /stats returns RunnerProfileStats schema with zero counts."""
         # Create profile
-        client.post("/api/runner-profiles", json={
-            "id": "stats-test",
-            "name": "Stats Test",
-            "backend": "token",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "stats-test",
+                "name": "Stats Test",
+                "backend": "token",
+            },
+        )
 
         # Get stats
         resp = client.get("/api/runner-profiles/stats-test/stats")
@@ -447,11 +482,14 @@ class TestAgentRunnerProfileBinding:
     def test_bind_agent_to_profile_and_get(self, client: Any) -> None:
         """PATCH /api/agents/{aid}/runner-profile then GET returns the profile."""
         # Create profile
-        client.post("/api/runner-profiles", json={
-            "id": "binding-test-profile",
-            "name": "Binding Test Profile",
-            "backend": "token",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "binding-test-profile",
+                "name": "Binding Test Profile",
+                "backend": "token",
+            },
+        )
 
         # Bind to agent
         bind_resp = client.patch(
@@ -485,11 +523,14 @@ class TestAgentRunnerProfileBinding:
     def test_clear_agent_binding(self, client: Any) -> None:
         """DELETE then GET → 404."""
         # Create and bind profile
-        client.post("/api/runner-profiles", json={
-            "id": "clear-test-profile",
-            "name": "Clear Test Profile",
-            "backend": "token",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "clear-test-profile",
+                "name": "Clear Test Profile",
+                "backend": "token",
+            },
+        )
         client.patch(
             "/api/agents/test-agent-2/runner-profile",
             json={"runner_profile_id": "clear-test-profile"},
@@ -506,17 +547,23 @@ class TestAgentRunnerProfileBinding:
     def test_change_agent_binding(self, client: Any) -> None:
         """Bind agent to one profile, then change to another."""
         # Create two profiles
-        client.post("/api/runner-profiles", json={
-            "id": "profile-a",
-            "name": "Profile A",
-            "backend": "token",
-            "model": "openai:gpt-4o",
-        })
-        client.post("/api/runner-profiles", json={
-            "id": "profile-b",
-            "name": "Profile B",
-            "backend": "claude_code",
-        })
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "profile-a",
+                "name": "Profile A",
+                "backend": "token",
+                "model": "openai:gpt-4o",
+            },
+        )
+        client.post(
+            "/api/runner-profiles",
+            json={
+                "id": "profile-b",
+                "name": "Profile B",
+                "backend": "claude_code",
+            },
+        )
 
         # Bind to profile-a
         resp1 = client.patch(
@@ -540,7 +587,9 @@ class TestAgentRunnerProfileBinding:
 class TestApiNeverReturnsSecrets:
     """Verify API responses never include resolved secret values."""
 
-    def test_api_returns_env_var_name_not_value(self, client: Any, monkeypatch: Any) -> None:
+    def test_api_returns_env_var_name_not_value(
+        self, client: Any, monkeypatch: Any
+    ) -> None:
         """Set api_key_env and read profile back; ensure response contains name only, no resolved value."""
         # Set an env var with a secret
         monkeypatch.setenv("TEST_API_KEY", "secret-key-123")

@@ -44,9 +44,7 @@ class Bundle:
         shared_roots: dict[str, Path] | None = None,
     ) -> ComposeResult:
         if self.source is None:
-            raise ValueError(
-                f"Bundle for {self.agent_id!r} has no source"
-            )
+            raise ValueError(f"Bundle for {self.agent_id!r} has no source")
         return compose_from_source(self.source, variables)
 
 
@@ -72,5 +70,3 @@ def load_bundle_from_bindings(
         composition=composition,
         source=source,
     )
-
-

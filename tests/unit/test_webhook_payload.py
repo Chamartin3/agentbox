@@ -111,6 +111,9 @@ def test_parsed_output_always_string():
 
 def test_parsed_output_structured_none_when_invalid():
     """``_parsed_output_structured`` returns None on non-validated runs."""
-    assert _parsed_output_structured(_make_run('{"a": 1}', validation_status="fail")) is None
+    assert (
+        _parsed_output_structured(_make_run('{"a": 1}', validation_status="fail"))
+        is None
+    )
     assert _parsed_output_structured(_make_run("not json")) is None
     assert _parsed_output_structured(_make_run("")) is None

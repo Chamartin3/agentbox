@@ -45,10 +45,10 @@ class RunConfig:
     """Result of preparing a run directory."""
 
     run_dir: Path
-    backend_dir: Path       # e.g. run_dir / "backends" / "opencode"
-    prompt_dir: Path        # run_dir / "prompts"
-    meta: dict[str, Any]    # Parsed .agentbox/meta.json
-    is_fresh: bool          # True if we regenerated this run_dir
+    backend_dir: Path  # e.g. run_dir / "backends" / "opencode"
+    prompt_dir: Path  # run_dir / "prompts"
+    meta: dict[str, Any]  # Parsed .agentbox/meta.json
+    is_fresh: bool  # True if we regenerated this run_dir
 
 
 class RunConfigurator:
@@ -222,6 +222,7 @@ class RunConfigurator:
     def _write_prompts(self, prompt_dir: Path, composed: ComposedMetadata) -> None:
         """Write the canonical prompt files via PromptComposer."""
         from agentbox.core.run.config.prompt_composer import PromptComposer
+
         PromptComposer.write_prompts(prompt_dir, composed)
 
     def _copy_skills(self, backend_dir: Path, skills: list[Any]) -> None:

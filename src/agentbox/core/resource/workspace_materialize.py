@@ -107,7 +107,9 @@ def _resolve_target_path(b: dict) -> str:
     return target_path or display_name
 
 
-def _default_target_path(resource_type: str, display_name: str, skill_meta: dict | None) -> str:
+def _default_target_path(
+    resource_type: str, display_name: str, skill_meta: dict | None
+) -> str:
     """Deprecated shim — kept for backwards compatibility with old callers."""
     if resource_type == "skill":
         name = (skill_meta or {}).get("skill_name") or display_name
@@ -197,7 +199,9 @@ def materialize_workspace(
             continue
 
         # copy (default) — also the fallback for symlink without cache_root
-        written = materialize_blobs(b["blobs"], dest, overwrite=(on_conflict == "overwrite"))
+        written = materialize_blobs(
+            b["blobs"], dest, overwrite=(on_conflict == "overwrite")
+        )
         outcomes.append(
             MaterializeOutcome(
                 binding_id=b["binding_id"],

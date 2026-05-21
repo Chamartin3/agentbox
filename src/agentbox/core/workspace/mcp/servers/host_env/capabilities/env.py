@@ -9,7 +9,10 @@ from fastmcp import FastMCP
 
 
 def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
-    @mcp.tool(name="env.get", description="Read an allowlisted environment variable. Requires env.get grant.")
+    @mcp.tool(
+        name="env.get",
+        description="Read an allowlisted environment variable. Requires env.get grant.",
+    )
     def env_get(name: str) -> str | None:
         ctx = ctx_factory()
         try:

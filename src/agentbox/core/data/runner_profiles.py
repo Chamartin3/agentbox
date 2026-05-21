@@ -336,9 +336,7 @@ class RunnerProfilesMixin:
                 runner_profiles.delete().where(runner_profiles.c.id == profile_id)
             )
 
-    def set_agent_runner_profile(
-        self, agent_id: str, profile_id: str
-    ) -> RunnerProfile:
+    def set_agent_runner_profile(self, agent_id: str, profile_id: str) -> RunnerProfile:
         """Bind a runner profile to an agent."""
         from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -376,7 +374,8 @@ class RunnerProfilesMixin:
 
         with self.engine.connect() as conn:
             row = conn.execute(
-                select(runner_profiles).join(
+                select(runner_profiles)
+                .join(
                     agent_runner_profiles,
                     agent_runner_profiles.c.runner_profile_id == runner_profiles.c.id,
                 )
@@ -425,11 +424,9 @@ class RunnerProfilesMixin:
         stmt = (
             select(
                 func.count().label("runs"),
-                func.sum(
-                    func.cast(
-                        (runs.c.status == "ok"), type_=Integer
-                    )
-                ).label("succeeded"),
+                func.sum(func.cast((runs.c.status == "ok"), type_=Integer)).label(
+                    "succeeded"
+                ),
                 func.sum(
                     func.cast(
                         (
@@ -440,9 +437,7 @@ class RunnerProfilesMixin:
                         type_=Integer,
                     )
                 ).label("failed"),
-                func.coalesce(func.sum(usage.c.input_tokens), 0).label(
-                    "input_tokens"
-                ),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
                 func.coalesce(func.sum(usage.c.output_tokens), 0).label(
                     "output_tokens"
                 ),
@@ -492,11 +487,9 @@ class RunnerProfilesMixin:
             select(
                 runs.c.runner_profile_id.label("profile_id"),
                 func.count().label("runs"),
-                func.sum(
-                    func.cast(
-                        (runs.c.status == "ok"), type_=Integer
-                    )
-                ).label("succeeded"),
+                func.sum(func.cast((runs.c.status == "ok"), type_=Integer)).label(
+                    "succeeded"
+                ),
                 func.sum(
                     func.cast(
                         (
@@ -507,9 +500,7 @@ class RunnerProfilesMixin:
                         type_=Integer,
                     )
                 ).label("failed"),
-                func.coalesce(func.sum(usage.c.input_tokens), 0).label(
-                    "input_tokens"
-                ),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
                 func.coalesce(func.sum(usage.c.output_tokens), 0).label(
                     "output_tokens"
                 ),

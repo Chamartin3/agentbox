@@ -103,7 +103,9 @@ class ClaudeCodeConfigGenerator(BackendConfigGenerator):
         else:
             entry = {
                 "command": mcp.command[0] if mcp.command else "mcp_serve.sh",
-                "args": list(mcp.command[1:]) if mcp.command and len(mcp.command) > 1 else [],
+                "args": list(mcp.command[1:])
+                if mcp.command and len(mcp.command) > 1
+                else [],
             }
         data = {"mcpServers": {mcp.server_name: entry}}
         mcp_json.write_text(json.dumps(data, indent=2), encoding="utf-8")

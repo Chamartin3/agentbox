@@ -22,7 +22,10 @@ def _run_git(args: list[str], cwd: str) -> str:
 
 
 def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
-    @mcp.tool(name="git.status", description="git status in a repo directory. Requires git.status grant.")
+    @mcp.tool(
+        name="git.status",
+        description="git status in a repo directory. Requires git.status grant.",
+    )
     def git_status(path: str) -> str:
         ctx = ctx_factory()
         try:
@@ -34,7 +37,10 @@ def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
         ctx.audit("git.status", {"path": path}, outcome="ok")
         return out
 
-    @mcp.tool(name="git.log", description="git log in a repo directory. Requires git.log grant.")
+    @mcp.tool(
+        name="git.log",
+        description="git log in a repo directory. Requires git.log grant.",
+    )
     def git_log(path: str, n: int = 20) -> str:
         ctx = ctx_factory()
         try:
@@ -46,7 +52,10 @@ def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
         ctx.audit("git.log", {"path": path}, outcome="ok")
         return out
 
-    @mcp.tool(name="git.diff", description="git diff in a repo directory. Requires git.diff grant.")
+    @mcp.tool(
+        name="git.diff",
+        description="git diff in a repo directory. Requires git.diff grant.",
+    )
     def git_diff(path: str, ref: str | None = None) -> str:
         ctx = ctx_factory()
         try:

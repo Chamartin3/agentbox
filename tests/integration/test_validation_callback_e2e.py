@@ -130,11 +130,11 @@ class TestValidationCallbackGateUnit:
     def test_fenced_json_is_extracted(self):
         # Output wrapped in markdown fence — should still validate
         fenced = (
-            '```json\n'
+            "```json\n"
             '{"title": "CitrusBoard Dashboard", '
             '"bullets": ["Manages project tasks", "Used by product teams", "Built to replace spreadsheets"], '
             '"summary": "CitrusBoard is an internal project management tool that gives teams real-time visibility."}'
-            '\n```'
+            "\n```"
         )
         payload = {"output": fenced}
         r = httpx.post(

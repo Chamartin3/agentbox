@@ -409,9 +409,11 @@ def _run_claude(
     if allowed_tools:
         cmd += ["--allowedTools", *allowed_tools]
     cmd += [
-        "--mcp-config", str(gen_dir / "claude_mcp.json"),
+        "--mcp-config",
+        str(gen_dir / "claude_mcp.json"),
         "--strict-mcp-config",
-        "--settings", str(gen_dir / "claude_settings.json"),
+        "--settings",
+        str(gen_dir / "claude_settings.json"),
     ]
     if agent:
         agents_json = (gen_dir / "claude_agents.json").read_text(encoding="utf-8")

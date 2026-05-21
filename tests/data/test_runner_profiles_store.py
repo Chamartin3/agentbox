@@ -349,9 +349,7 @@ class TestDisabledProfiles:
         assert profile is not None
         assert profile.is_enabled is False
 
-    def test_list_profiles_includes_disabled_by_default(
-        self, session_store
-    ) -> None:
+    def test_list_profiles_includes_disabled_by_default(self, session_store) -> None:
         """list_runner_profiles includes disabled unless filtered."""
         session_store.create_runner_profile(
             RunnerProfileCreate(

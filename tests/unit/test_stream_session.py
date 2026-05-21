@@ -139,9 +139,7 @@ def test_validation_mode_engine_are_clamped(tmp_path: Path) -> None:
         broadcaster=RunBroadcaster(),
         transcript_path=tmp_path / "t.jsonl",
     ) as s:
-        s.emit_validation(
-            ok=False, mode="garbage", engine="garbage", error="x"
-        )
+        s.emit_validation(ok=False, mode="garbage", engine="garbage", error="x")
 
     row = _read_transcript(tmp_path / "t.jsonl")[0]
     assert row["mode"] == "strict"

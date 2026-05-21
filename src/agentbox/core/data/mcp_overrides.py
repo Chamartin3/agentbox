@@ -179,7 +179,9 @@ class McpOverridesMixin:
                 conn.execute(
                     workspace_mcp_tool_overrides.update()
                     .where(workspace_mcp_tool_overrides.c.id == existing.id)
-                    .values(enabled=1 if enabled else 0, created_at=now, created_by=actor)
+                    .values(
+                        enabled=1 if enabled else 0, created_at=now, created_by=actor
+                    )
                 )
                 row_id = existing.id
             else:

@@ -15,9 +15,7 @@ def store(tmp_path: Path) -> SessionStore:
 
 def _seed_resource(store: SessionStore, slug: str, rtype: str = "document") -> str:
     """Create a minimal resource and return its id."""
-    row = store.create_repo_resource(
-        slug=slug, type=rtype, display_name=slug
-    )
+    row = store.create_repo_resource(slug=slug, type=rtype, display_name=slug)
     return row["id"]
 
 

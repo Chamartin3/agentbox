@@ -54,7 +54,11 @@ class GoogleAdapter(HTTPProviderAdapter):
         out: list[ProviderModel] = []
         for item in data.get("models", []):
             raw_id = item.get("name", "")
-            short = raw_id.removeprefix("models/") if raw_id.startswith("models/") else raw_id
+            short = (
+                raw_id.removeprefix("models/")
+                if raw_id.startswith("models/")
+                else raw_id
+            )
             if not short:
                 continue
             out.append(
@@ -82,5 +86,7 @@ class GoogleAdapter(HTTPProviderAdapter):
                 resp.raise_for_status()
                 return self._parse_response(resp.json())
         except Exception as exc:
-            logger.warning("google: live listing failed (%s); using static fallback", exc)
+            logger.warning(
+                "google: live listing failed (%s); using static fallback", exc
+            )
             return self._static()

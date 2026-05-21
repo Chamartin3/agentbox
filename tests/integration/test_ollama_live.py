@@ -63,30 +63,20 @@ async def test_ollama_text_only_run() -> None:
     types_ = [e.type for e in events]
     assert types_[0] == "log"
     assert isinstance(events[-1], DoneEvent) and events[-1].ok is True
-    roles = [
-        e.role for e in events if isinstance(e, TextEvent) and not e.delta
-    ]
-    assert roles[:2] == ["system", "user"], (
-        "system + user turns must be present"
-    )
+    roles = [e.role for e in events if isinstance(e, TextEvent) and not e.delta]
+    assert roles[:2] == ["system", "user"], "system + user turns must be present"
     assert "assistant" in roles, "assistant turn must be present"
 
 
 async def test_ollama_invalid_model_surfaces_clear_error() -> None:
     """Scenario 4 — provider error keeps prompt turns + surfaces a log."""
     events = await _collect(
-        TokenBackend().run(
-            _rendered("ollama:does-not-exist-xyz"), "hi", "rid"
-        )
+        TokenBackend().run(_rendered("ollama:does-not-exist-xyz"), "hi", "rid")
     )
     assert isinstance(events[-1], DoneEvent) and events[-1].ok is False
-    roles = [
-        e.role for e in events if isinstance(e, TextEvent) and not e.delta
-    ]
+    roles = [e.role for e in events if isinstance(e, TextEvent) and not e.delta]
     assert roles[:2] == ["system", "user"], (
         "system + user turns must persist even on provider error"
     )
-    err_logs = [
-        e for e in events if isinstance(e, LogEvent) and e.level == "error"
-    ]
+    err_logs = [e for e in events if isinstance(e, LogEvent) and e.level == "error"]
     assert err_logs, "missing-model error must surface a LogEvent(level='error')"

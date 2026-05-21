@@ -124,10 +124,18 @@ def register(mcp: FastMCP) -> None:
         store = get_context().store
         rec = store.get_run(run_id)
         if rec is None or not rec.transcript_path:
-            return {"items": [], "total": 0, "limit": limit, "offset": offset,
-                    "has_more": False}
+            return {
+                "items": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False,
+            }
         from pathlib import Path
-        events = read_transcript(Path(rec.transcript_path), get_context().settings.data_dir)
+
+        events = read_transcript(
+            Path(rec.transcript_path), get_context().settings.data_dir
+        )
         total = len(events)
         page = events[offset : offset + limit]
         return {
@@ -245,10 +253,18 @@ def register(mcp: FastMCP) -> None:
         store = get_context().store
         rec = store.get_run(run_id)
         if rec is None or not rec.transcript_path:
-            return {"items": [], "total": 0, "limit": limit, "offset": offset,
-                    "has_more": False}
+            return {
+                "items": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False,
+            }
         from pathlib import Path
-        events = read_transcript(Path(rec.transcript_path), get_context().settings.data_dir)
+
+        events = read_transcript(
+            Path(rec.transcript_path), get_context().settings.data_dir
+        )
         logs = [e for e in events if e.get("type") == "log"]
         if level:
             logs = [e for e in logs if e.get("level") == level]

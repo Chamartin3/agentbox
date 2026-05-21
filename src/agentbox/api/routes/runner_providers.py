@@ -128,7 +128,9 @@ async def list_provider_models(
         store = get_store()
         profile = store.get_runner_profile(profile_id)
         if not profile:
-            raise HTTPException(404, {"error": f"Runner profile not found: {profile_id}"})
+            raise HTTPException(
+                404, {"error": f"Runner profile not found: {profile_id}"}
+            )
 
         config = EffectiveRunnerConfig(
             backend=profile.backend,

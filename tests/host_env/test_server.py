@@ -108,7 +108,9 @@ def _make_fs_fns(ctx_factory):
         ctx = ctx_factory()
         size_hint = len(content.encode())
         try:
-            check_capability(ctx.grants, "fs.write", {"path": path, "size_hint": size_hint})
+            check_capability(
+                ctx.grants, "fs.write", {"path": path, "size_hint": size_hint}
+            )
         except GrantViolation as exc:
             ctx.audit("fs.write", {"path": path}, outcome="denied", error=str(exc))
             raise
@@ -222,11 +224,19 @@ def _make_shell_fn(ctx_factory):
         effective_timeout = int(grant.get("timeout_seconds", timeout))
         effective_cwd = cwd or grant.get("cwd") or None
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True,
-            timeout=effective_timeout, cwd=effective_cwd,
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=effective_timeout,
+            cwd=effective_cwd,
         )
         ctx.audit("shell.exec", {"cmd": cmd}, outcome="ok")
-        return {"returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+        return {
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
 
     return shell_exec
 
@@ -274,10 +284,16 @@ class TestHttpCapability:
             check_capability,
         )
 
-        grants = _make_grants(**{"http.fetch": {"host_allowlist": ["allowed.example.com"]}})
+        grants = _make_grants(
+            **{"http.fetch": {"host_allowlist": ["allowed.example.com"]}}
+        )
 
         with pytest.raises(GrantViolation, match="not allowlisted"):
-            check_capability(grants, "http.fetch", {"url": "http://evil.example.com/data", "method": "GET"})
+            check_capability(
+                grants,
+                "http.fetch",
+                {"url": "http://evil.example.com/data", "method": "GET"},
+            )
 
     def test_blocked_method_raises(self, tmp_path: Path):
         from agentbox.core.infra.host_env.permissions import (
@@ -285,10 +301,16 @@ class TestHttpCapability:
             check_capability,
         )
 
-        grants = _make_grants(**{"http.fetch": {"host_allowlist": ["safe.com"], "methods": ["GET"]}})
+        grants = _make_grants(
+            **{"http.fetch": {"host_allowlist": ["safe.com"], "methods": ["GET"]}}
+        )
 
         with pytest.raises(GrantViolation, match="not allowed"):
-            check_capability(grants, "http.fetch", {"url": "http://safe.com/data", "method": "DELETE"})
+            check_capability(
+                grants,
+                "http.fetch",
+                {"url": "http://safe.com/data", "method": "DELETE"},
+            )
 
 
 # ---------------------------------------------------------------------------

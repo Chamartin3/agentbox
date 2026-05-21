@@ -92,6 +92,8 @@ class SettingsMixin:
         """Return the distinct section names that have at least one key set."""
         with self.engine.connect() as conn:
             rows = conn.execute(
-                settings_table.select().with_only_columns(settings_table.c.section).distinct()
+                settings_table.select()
+                .with_only_columns(settings_table.c.section)
+                .distinct()
             )
             return [r._mapping["section"] for r in rows]

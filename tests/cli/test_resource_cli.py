@@ -96,7 +96,15 @@ def test_resource_upload_creates_version(store_fixture, tmp_path: Path) -> None:
     # Create the resource first
     store_fixture.create_repo_resource("upload-test", "document", "Upload Test")
     result = runner.invoke(
-        app, ["resource", "upload", "upload-test", str(src), "--changelog", "initial upload"]
+        app,
+        [
+            "resource",
+            "upload",
+            "upload-test",
+            str(src),
+            "--changelog",
+            "initial upload",
+        ],
     )
     assert result.exit_code == 0
     assert "version" in result.output
@@ -114,7 +122,8 @@ def test_resource_upload_rejects_short_changelog(store_fixture, tmp_path: Path) 
 
 def test_resource_upload_missing_file(store_fixture) -> None:
     result = runner.invoke(
-        app, ["resource", "upload", "x", "/no/such/path.txt", "--changelog", "valid reason"]
+        app,
+        ["resource", "upload", "x", "/no/such/path.txt", "--changelog", "valid reason"],
     )
     assert result.exit_code == 2
 
@@ -166,7 +175,15 @@ def test_prompt_bindings_set_rejects_short_reason(store_fixture) -> None:
 def test_prompt_bindings_set_missing_resource(store_fixture) -> None:
     result = runner.invoke(
         app,
-        ["prompt-bindings", "set", "agent-x", "DOCS", "no-resource", "--reason", "valid reason"],
+        [
+            "prompt-bindings",
+            "set",
+            "agent-x",
+            "DOCS",
+            "no-resource",
+            "--reason",
+            "valid reason",
+        ],
     )
     assert result.exit_code == 2
 
@@ -175,7 +192,17 @@ def test_prompt_bindings_set_and_list(store_fixture) -> None:
     store_fixture.create_repo_resource("kb-docs", "document", "KB Docs")
     result = runner.invoke(
         app,
-        ["prompt-bindings", "set", "agent-x", "DOCS", "kb-docs", "--mode", "inline", "--reason", "adding knowledge base"],
+        [
+            "prompt-bindings",
+            "set",
+            "agent-x",
+            "DOCS",
+            "kb-docs",
+            "--mode",
+            "inline",
+            "--reason",
+            "adding knowledge base",
+        ],
     )
     assert result.exit_code == 0
 
@@ -212,7 +239,15 @@ def test_workspace_resources_set_rejects_short_reason(store_fixture) -> None:
 def test_workspace_resources_set_missing_resource(store_fixture) -> None:
     result = runner.invoke(
         app,
-        ["workspace-resources", "set", "ws-x", "docs/", "missing-slug", "--reason", "good reason"],
+        [
+            "workspace-resources",
+            "set",
+            "ws-x",
+            "docs/",
+            "missing-slug",
+            "--reason",
+            "good reason",
+        ],
     )
     assert result.exit_code == 2
 
@@ -246,16 +281,21 @@ def test_env_doc_versions_empty(store_fixture) -> None:
 
 
 def test_env_doc_edit_rejects_short_changelog(store_fixture) -> None:
-    result = runner.invoke(
-        app, ["env-doc", "edit", "ws-x", "{}", "--changelog", "ab"]
-    )
+    result = runner.invoke(app, ["env-doc", "edit", "ws-x", "{}", "--changelog", "ab"])
     assert result.exit_code == 1
 
 
 def test_env_doc_edit_saves_and_shows(store_fixture) -> None:
     result = runner.invoke(
         app,
-        ["env-doc", "edit", "ws-test", '{"note": "hello"}', "--changelog", "initial doc"],
+        [
+            "env-doc",
+            "edit",
+            "ws-test",
+            '{"note": "hello"}',
+            "--changelog",
+            "initial doc",
+        ],
     )
     assert result.exit_code == 0
     assert "version" in result.output
@@ -325,7 +365,14 @@ def test_mcp_workspace_enable_rejects_short_reason(store_fixture) -> None:
 def test_mcp_workspace_enable_valid(store_fixture) -> None:
     result = runner.invoke(
         app,
-        ["mcp-workspace", "enable", "ws-x", "my-server", "--reason", "enabling for test"],
+        [
+            "mcp-workspace",
+            "enable",
+            "ws-x",
+            "my-server",
+            "--reason",
+            "enabling for test",
+        ],
     )
     assert result.exit_code == 0
 
@@ -333,6 +380,13 @@ def test_mcp_workspace_enable_valid(store_fixture) -> None:
 def test_mcp_workspace_disable_valid(store_fixture) -> None:
     result = runner.invoke(
         app,
-        ["mcp-workspace", "disable", "ws-x", "my-server", "--reason", "disabling for test"],
+        [
+            "mcp-workspace",
+            "disable",
+            "ws-x",
+            "my-server",
+            "--reason",
+            "disabling for test",
+        ],
     )
     assert result.exit_code == 0

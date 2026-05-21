@@ -59,7 +59,9 @@ def _format_template(text: str, variables: dict[str, str]) -> str:
 
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
-_OUTPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "output_schema.md").read_text(encoding="utf-8")
+_OUTPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "output_schema.md").read_text(
+    encoding="utf-8"
+)
 _INPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "input_schema.md").read_text(encoding="utf-8")
 
 
@@ -91,9 +93,7 @@ def _append_schema(text: str, schema: dict[str, Any]) -> str:
     return f"{base}\n\n{block}" if base else block
 
 
-def _append_validation_engine_hint(
-    text: str, engine: str
-) -> str:
+def _append_validation_engine_hint(text: str, engine: str) -> str:
     """Append a short note about which validation engine will be enforced.
 
     This tells the LLM how strictly its output will be checked so it can
@@ -307,9 +307,7 @@ def compose(
         config = tomllib.load(f)
 
     if "composition" not in config:
-        raise ValueError(
-            f"agent.toml at {bundle_path} is missing [composition] block"
-        )
+        raise ValueError(f"agent.toml at {bundle_path} is missing [composition] block")
     composition = config.get("composition") or {}
 
     # -- system prompt -------------------------------------------------

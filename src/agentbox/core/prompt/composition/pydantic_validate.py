@@ -39,7 +39,9 @@ def _json_type_to_python(
     if "$ref" in field_schema:
         ref_name = field_schema["$ref"].split("/")[-1]
         resolved = defs.get(ref_name, {})
-        return _build_model_from_schema(resolved, name=ref_name, defs=defs, depth=depth + 1)
+        return _build_model_from_schema(
+            resolved, name=ref_name, defs=defs, depth=depth + 1
+        )
 
     typ = field_schema.get("type")
     if typ == "string":
@@ -55,7 +57,9 @@ def _json_type_to_python(
         if "$ref" in items:
             ref_name = items["$ref"].split("/")[-1]
             resolved = defs.get(ref_name, {})
-            item_model = _build_model_from_schema(resolved, name=ref_name, defs=defs, depth=depth + 1)
+            item_model = _build_model_from_schema(
+                resolved, name=ref_name, defs=defs, depth=depth + 1
+            )
             return list[item_model]
         item_type = _json_type_to_python(items, defs, depth + 1)
         return list[item_type] if item_type else list

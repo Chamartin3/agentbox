@@ -44,7 +44,7 @@ class SkillImporter(HostPathImporter):
             raise ValueError(
                 f"Skill folder {self.root} is missing required entry file {ENTRY_FILE!r}"
             )
-        text = (entry[3] or entry[1].decode("utf-8", errors="replace"))
+        text = entry[3] or entry[1].decode("utf-8", errors="replace")
         fm = _parse_frontmatter(text)
         skill_name = fm.get("name") or self.root.name
         skill_desc = fm.get("description")

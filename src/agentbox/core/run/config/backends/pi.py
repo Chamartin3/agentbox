@@ -29,9 +29,7 @@ class PiConfigGenerator(BackendConfigGenerator):
     ) -> None:
         self._write_claude_md(backend_dir, composed)
 
-    def _write_claude_md(
-        self, backend_dir: Path, composed: ComposedMetadata
-    ) -> None:
+    def _write_claude_md(self, backend_dir: Path, composed: ComposedMetadata) -> None:
         claude_md = backend_dir / "CLAUDE.md"
         if claude_md.exists():
             return

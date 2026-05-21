@@ -33,7 +33,9 @@ class PreviewError(Exception):
 def _resolve_binding(store: SessionStore, b: dict) -> dict:
     resource = store.get_repo_resource(b["resource_id"])
     if not resource:
-        raise PreviewError("resource_not_found", f"resource {b['resource_id']!r} not found")
+        raise PreviewError(
+            "resource_not_found", f"resource {b['resource_id']!r} not found"
+        )
     version_id = b.get("pinned_version_id")
     if not version_id:
         active = store.get_active_repo_version(b["resource_id"])
@@ -121,14 +123,16 @@ def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
 def _validation_block_for_preview(
     store: SessionStore, agent_id: str
 ) -> tuple[str, dict | None]:
-    """Render the rules + validators hint block from the agent's bound
-    output-direction validation contract.
+    """Render the validators hint block from the agent's inline
+    ``config_json["output"].validators`` on the active version.
 
     Schema is intentionally NOT rendered here — it already appears as
     the output_schema block above (single source of truth: the binding).
     Returns ``(rendered_text, view_dict)`` where view_dict is the
     structured payload returned to the UI under ``validation``.
     """
+    import json as _json
+
     from agentbox.core.agent.config import (
         HttpValidatorConfig,
         OutputConfig,
@@ -138,22 +142,38 @@ def _validation_block_for_preview(
     active = store.get_active_version(agent_id)
     if not active or active.get("id") is None:
         return "", None
-    contract = store.resolve_agent_version_contract(int(active["id"]), "output")
-    if not contract:
+    raw_cfg = active.get("config_json")
+    if isinstance(raw_cfg, str):
+        try:
+            cfg = _json.loads(raw_cfg)
+        except (ValueError, TypeError):
+            cfg = {}
+    elif isinstance(raw_cfg, dict):
+        cfg = raw_cfg
+    else:
+        cfg = {}
+    output_section = cfg.get("output") if isinstance(cfg, dict) else None
+    entries = (
+        output_section.get("validators") if isinstance(output_section, dict) else None
+    )
+    if not isinstance(entries, list) or not entries:
         return "", None
-    rules = [r for r in contract.get("rules") or [] if isinstance(r, str)]
     validators_meta: list[dict] = []
     runtime_validators: list = []
-    for entry in contract.get("validators") or []:
+    for entry in entries:
         if not isinstance(entry, dict):
             continue
         kind = entry.get("kind")
+        description = entry.get("description") or ""
+        if not isinstance(description, str):
+            description = ""
         if kind == "http":
             validators_meta.append(
                 {
                     "kind": "http",
                     "endpoint": entry.get("endpoint", ""),
                     "timeout_seconds": int(entry.get("timeout_seconds", 5)),
+                    "description": description,
                 }
             )
             runtime_validators.append(
@@ -161,6 +181,7 @@ def _validation_block_for_preview(
                     kind="http",
                     endpoint=entry.get("endpoint", ""),
                     timeout_seconds=int(entry.get("timeout_seconds", 5)),
+                    description=description,
                 )
             )
         elif kind == "script":
@@ -173,29 +194,27 @@ def _validation_block_for_preview(
                     "resource_slug": (resource or {}).get("slug"),
                     "resource_display_name": (resource or {}).get("display_name"),
                     "pinned_version_id": entry.get("pinned_version_id"),
+                    "description": description,
                 }
             )
-            # No source pre-load needed for preview text — the runtime
-            # hint block is generic and doesn't quote the script body.
             runtime_validators.append(
                 ScriptValidatorConfig(
                     kind="script",
                     resource_id=rid,
                     resource_version_id=entry.get("pinned_version_id"),
                     source_code="",
+                    description=description,
                 )
             )
+    if not runtime_validators:
+        return "", None
     rendered = _render_output_contract(
         OutputConfig(
             json_schema=None,
-            rules=rules,
             validators=tuple(runtime_validators),
         )
     )
     view = {
-        "contract_id": contract.get("id"),
-        "contract_name": contract.get("name"),
-        "rules": rules,
         "validators": validators_meta,
     }
     return rendered, view
@@ -280,9 +299,7 @@ def render_agent_prompt_preview(
     # what core/prompt/output_contract.append() does at runtime so the
     # preview reflects what the model actually sees. The schema piece is
     # intentionally omitted (already rendered above from the binding).
-    validation_block, validation_view = _validation_block_for_preview(
-        store, agent_id
-    )
+    validation_block, validation_view = _validation_block_for_preview(store, agent_id)
     if validation_block:
         composed = composed.rstrip() + "\n\n" + validation_block
 
@@ -319,11 +336,9 @@ def render_agent_prompt_preview(
     if validation_block:
         parts.append(
             {
-                "label": "validator: rules + post-hoc validators",
+                "label": "validator: constraints + post-hoc validators",
                 "kind": "validator",
                 "chars": len(validation_block) + 2,
-                "contract_id": (validation_view or {}).get("contract_id"),
-                "contract_name": (validation_view or {}).get("contract_name"),
             }
         )
 

@@ -26,12 +26,16 @@ class AgentToolGrantsMixin:
 
         now = now_iso()
         with self.engine.begin() as conn:  # type: ignore[attr-defined]
-            existing = conn.execute(
-                select(agent_tool_grants).where(
-                    agent_tool_grants.c.agent_id == agent_id,
-                    agent_tool_grants.c.tool_name == tool_name,
+            existing = (
+                conn.execute(
+                    select(agent_tool_grants).where(
+                        agent_tool_grants.c.agent_id == agent_id,
+                        agent_tool_grants.c.tool_name == tool_name,
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
 
             if existing is None:
                 row_id = str(uuid.uuid4())
@@ -119,12 +123,16 @@ class AgentToolGrantsMixin:
 
     def _get_grant_row(self, agent_id: str, tool_name: str) -> dict:
         with self.engine.connect() as conn:  # type: ignore[attr-defined]
-            row = conn.execute(
-                select(agent_tool_grants).where(
-                    agent_tool_grants.c.agent_id == agent_id,
-                    agent_tool_grants.c.tool_name == tool_name,
+            row = (
+                conn.execute(
+                    select(agent_tool_grants).where(
+                        agent_tool_grants.c.agent_id == agent_id,
+                        agent_tool_grants.c.tool_name == tool_name,
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
             if row is None:
                 raise RuntimeError("grant row missing after write")
             return dict(row)

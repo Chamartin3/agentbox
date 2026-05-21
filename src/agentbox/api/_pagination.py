@@ -49,6 +49,7 @@ def paginate_list(
     `sort_key` lets the caller override how a field is extracted (default
     is `item.get(field)` for dicts, `getattr(item, field, None)` otherwise).
     """
+
     def _get(item: Any, field: str) -> Any:
         if sort_key is not None:
             return sort_key(item, field)
@@ -60,11 +61,9 @@ def paginate_list(
     if q:
         needle = q.lower()
         filtered = [
-            it for it in items
-            if any(
-                needle in str(_get(it, f) or "").lower()
-                for f in q_fields
-            )
+            it
+            for it in items
+            if any(needle in str(_get(it, f) or "").lower() for f in q_fields)
         ]
 
     if sort:

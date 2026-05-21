@@ -187,9 +187,7 @@ class RunStreamSession:
         self, *, attempt: int, reason: str, error: str | None = None
     ) -> None:
         self.emit(
-            RetryEvent(
-                run_id=self.run_id, attempt=attempt, reason=reason, error=error
-            )
+            RetryEvent(run_id=self.run_id, attempt=attempt, reason=reason, error=error)
         )
 
     def emit_timeout(self, *, timeout_seconds: int, error: str | None) -> None:

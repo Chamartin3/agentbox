@@ -41,10 +41,7 @@ def _manifest_servers(store: SessionStore) -> list[dict]:
     servers = store.get_project_mcp_servers()
     if not servers:
         return []
-    return [
-        {"name": s.name, "config": s.model_dump(exclude={"name"})}
-        for s in servers
-    ]
+    return [{"name": s.name, "config": s.model_dump(exclude={"name"})} for s in servers]
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp")
@@ -65,9 +62,7 @@ def get_effective_servers(
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp/policy")
-def get_policy(
-    workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
-):
+def get_policy(workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]):
     return {"policy": store.get_workspace_mcp_policy(workspace_id)}
 
 
@@ -105,7 +100,9 @@ def set_server_override(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.put("/api/workspaces/{workspace_id}/mcp/servers/{server_name}/tools/{tool_name}")
+@router.put(
+    "/api/workspaces/{workspace_id}/mcp/servers/{server_name}/tools/{tool_name}"
+)
 def set_tool_override(
     workspace_id: str,
     server_name: str,

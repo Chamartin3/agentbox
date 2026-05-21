@@ -57,9 +57,7 @@ def _path_within_allowlist(path: str, allowed: list[str]) -> bool:
     return False
 
 
-def check_capability(
-    grants: dict, capability: str, params: dict | None = None
-) -> None:
+def check_capability(grants: dict, capability: str, params: dict | None = None) -> None:
     """Raise ``GrantViolation`` if ``capability`` is not allowed by ``grants``.
 
     Validates per-capability constraints (path scoping, command allowlist,
@@ -73,7 +71,14 @@ def check_capability(
     grant = grants[capability] or {}
     params = params or {}
 
-    if capability in {"fs.read", "fs.list", "fs.write", "git.status", "git.log", "git.diff"}:
+    if capability in {
+        "fs.read",
+        "fs.list",
+        "fs.write",
+        "git.status",
+        "git.log",
+        "git.diff",
+    }:
         path = params.get("path")
         if not path:
             raise GrantViolation(f"{capability}: missing required 'path' param")

@@ -53,7 +53,6 @@ from agentbox.core.data.schema import (
 )
 from agentbox.core.data.settings import SettingsMixin
 from agentbox.core.data.shared_resources import SharedResourcesMixin
-from agentbox.core.data.validation import ValidationContractsMixin
 from agentbox.core.data.workspaces import WorkspacesMixin
 
 logger = logging.getLogger(__name__)
@@ -228,9 +227,7 @@ class _CoreStore:
                         cur_ver = conn.exec_driver_sql(
                             "PRAGMA schema_version"
                         ).fetchone()[0]
-                        conn.exec_driver_sql(
-                            f"PRAGMA schema_version={cur_ver + 1}"
-                        )
+                        conn.exec_driver_sql(f"PRAGMA schema_version={cur_ver + 1}")
                         conn.exec_driver_sql("PRAGMA writable_schema=OFF")
             except Exception:
                 logger.exception("migrate: failed to extend resources_type_check")
@@ -438,9 +435,7 @@ class _CoreStore:
             values["conversation_uri"] = conversation_uri
         if values:
             with self.engine.begin() as conn:
-                conn.execute(
-                    runs.update().where(runs.c.id == run_id).values(**values)
-                )
+                conn.execute(runs.update().where(runs.c.id == run_id).values(**values))
 
     def set_run_post_outcome(
         self,
@@ -514,9 +509,7 @@ class _CoreStore:
         """Update only the status column. Used for post-terminal transitions
         like flipping ``ok`` ↔ ``failed`` based on webhook delivery."""
         with self.engine.begin() as conn:
-            conn.execute(
-                runs.update().where(runs.c.id == run_id).values(status=status)
-            )
+            conn.execute(runs.update().where(runs.c.id == run_id).values(status=status))
 
     def get_run(self, run_id: str) -> RunRecord | None:
         with self.engine.connect() as conn:
@@ -774,7 +767,6 @@ class SessionStore(
     SharedResourcesMixin,
     ResourcesMixin,
     ResourceBindingsMixin,
-    ValidationContractsMixin,
     WorkspacesMixin,
     EnvDocsMixin,
     McpOverridesMixin,

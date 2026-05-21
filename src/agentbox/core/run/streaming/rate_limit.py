@@ -145,7 +145,7 @@ def _format_opencode_log_line(s: str) -> str | None:
     err_obj: dict[str, Any] | None = None
     idx = s.find("error=")
     if idx != -1:
-        err_obj = _try_parse_trailing_json(s[idx + len("error="):])
+        err_obj = _try_parse_trailing_json(s[idx + len("error=") :])
 
     name: str | None = None
     status: int | None = None
@@ -156,7 +156,11 @@ def _format_opencode_log_line(s: str) -> str | None:
             status, name, message = found
         else:
             # Fall back to top-level fields on the error envelope.
-            inner = err_obj.get("error") if isinstance(err_obj.get("error"), dict) else err_obj
+            inner = (
+                err_obj.get("error")
+                if isinstance(err_obj.get("error"), dict)
+                else err_obj
+            )
             if isinstance(inner, dict):
                 name = inner.get("name") or inner.get("type")
                 status = inner.get("statusCode") or inner.get("status")

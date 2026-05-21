@@ -143,9 +143,7 @@ class AgentVersionsMixin:
 
         return self.get_version_by_id(version_id) or {}
 
-    def publish_version(
-        self, agent_id: str, version: int, reason: str
-    ) -> dict:
+    def publish_version(self, agent_id: str, version: int, reason: str) -> dict:
         """Flip is_draft flag and set as active version.
 
         Args:
@@ -170,9 +168,7 @@ class AgentVersionsMixin:
         version_id = row["id"]
         old_changelog = row.get("changelog") or ""
         new_changelog = (
-            f"{old_changelog}\n\npublish: {reason}"
-            if old_changelog
-            else reason
+            f"{old_changelog}\n\npublish: {reason}" if old_changelog else reason
         )
 
         with self.engine.begin() as conn:
@@ -396,15 +392,6 @@ class AgentVersionsMixin:
                     )
                 )
 
-        # Carry validation bindings forward so a prompt edit does not silently
-        # drop the agent's contracts. Mirrors ``upsert_version`` below.
-        try:
-            self.clone_validation_bindings(  # type: ignore[attr-defined]
-                from_version_id=active_vid, to_version_id=new_vid
-            )
-        except Exception:  # noqa: BLE001 — best-effort, never block prompt edit
-            pass
-
         return self.get_version_by_id(new_vid) or {}
 
     def save_config_revision(
@@ -443,7 +430,9 @@ class AgentVersionsMixin:
 
         raw = active.get("config_json")
         try:
-            current_cfg = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+            current_cfg = (
+                json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+            )
         except (ValueError, TypeError):
             current_cfg = {}
         if not isinstance(current_cfg, dict):
@@ -633,14 +622,6 @@ class AgentVersionsMixin:
     ) -> dict:
         prepared = _prepare_files(files) if files else []
         version = self._next_version(agent_id)
-        # Resolve the prior active version *before* the new insert, so we
-        # know whose validation bindings to carry forward.
-        prior_active = self.get_active_version(agent_id)  # type: ignore[attr-defined]
-        prior_version_id = (
-            int(prior_active["id"])
-            if prior_active and prior_active.get("id") is not None
-            else None
-        )
         with self.engine.begin() as conn:
             result = conn.execute(
                 agent_versions.insert().values(
@@ -670,16 +651,6 @@ class AgentVersionsMixin:
                         for row in prepared
                     ],
                 )
-        # Carry validation bindings forward from the previous active row
-        # so contracts follow the agent across edits unless explicitly
-        # changed via the validation endpoint.
-        if prior_version_id is not None:
-            try:
-                self.clone_validation_bindings(  # type: ignore[attr-defined]
-                    from_version_id=prior_version_id, to_version_id=version_id
-                )
-            except Exception:  # noqa: BLE001 — best-effort, never block version create
-                pass
         return self.get_version(agent_id, version)
 
     # ------------------------------------------------------------------
@@ -704,9 +675,7 @@ class AgentVersionsMixin:
             rows = conn.execute(
                 agent_version_files.select()
                 .where(agent_version_files.c.version_id == version_id)
-                .order_by(
-                    agent_version_files.c.position, agent_version_files.c.id
-                )
+                .order_by(agent_version_files.c.position, agent_version_files.c.id)
             )
             return [dict(r._mapping) for r in rows]
 
@@ -732,9 +701,7 @@ class AgentVersionsMixin:
         """Delete a single version file by ID."""
         with self.engine.begin() as conn:
             conn.execute(
-                agent_version_files.delete().where(
-                    agent_version_files.c.id == file_id
-                )
+                agent_version_files.delete().where(agent_version_files.c.id == file_id)
             )
 
     def latest_version(self, agent_id: str) -> dict | None:
@@ -966,9 +933,7 @@ class AgentVersionsMixin:
             deleted_ids = {
                 r._mapping["agent_id"]
                 for r in conn.execute(
-                    agent_meta.select().where(
-                        agent_meta.c.deleted_at.isnot(None)
-                    )
+                    agent_meta.select().where(agent_meta.c.deleted_at.isnot(None))
                 )
             }
             return [

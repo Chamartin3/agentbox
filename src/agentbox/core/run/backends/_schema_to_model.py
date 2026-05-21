@@ -72,21 +72,15 @@ def assert_schema_consistent(
 
     def _resolve(ref: str, where: str) -> dict[str, Any]:
         if not ref.startswith("#/"):
-            raise InconsistentSchema(
-                f"{where}: external $ref not supported: {ref!r}"
-            )
+            raise InconsistentSchema(f"{where}: external $ref not supported: {ref!r}")
         parts = ref.lstrip("#/").split("/")
         node: Any = schema
         for p in parts:
             if not isinstance(node, dict) or p not in node:
-                raise InconsistentSchema(
-                    f"{where}: $ref target missing: {ref!r}"
-                )
+                raise InconsistentSchema(f"{where}: $ref target missing: {ref!r}")
             node = node[p]
         if not isinstance(node, dict):
-            raise InconsistentSchema(
-                f"{where}: $ref target is not an object: {ref!r}"
-            )
+            raise InconsistentSchema(f"{where}: $ref target is not an object: {ref!r}")
         return node
 
     def _walk(node: Any, where: str) -> None:
@@ -219,7 +213,9 @@ def json_schema_to_pydantic_model(
             # ["string", "null"] → Optional[str]
             non_null = [t for t in typ if t != "null"]
             if len(non_null) == 1 and "null" in typ:
-                inner = type_for({**field_schema, "type": non_null[0]}, name_hint=name_hint)
+                inner = type_for(
+                    {**field_schema, "type": non_null[0]}, name_hint=name_hint
+                )
                 return inner | None  # type: ignore[operator]
             raise UnsupportedSchema(f"union type {typ!r} not supported")
 
@@ -312,7 +308,11 @@ def json_schema_to_pydantic_model(
             field_default = field_for(prop_schema, required=is_required)
             fields[prop_name] = (py_type, field_default)
 
-        config = ConfigDict(extra="forbid") if additional_properties is False else ConfigDict()
+        config = (
+            ConfigDict(extra="forbid")
+            if additional_properties is False
+            else ConfigDict()
+        )
         if fields:
             model = create_model(name, __config__=config, **fields)
         else:
@@ -349,4 +349,7 @@ def json_schema_to_pydantic_model(
 
 
 def _capitalize(s: str) -> str:
-    return "".join(p[:1].upper() + p[1:] for p in s.replace("-", "_").split("_") if p) or "Field"
+    return (
+        "".join(p[:1].upper() + p[1:] for p in s.replace("-", "_").split("_") if p)
+        or "Field"
+    )

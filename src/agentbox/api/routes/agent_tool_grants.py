@@ -30,7 +30,9 @@ def list_grants(
     include_revoked: bool = False,
     store: Annotated[SessionStore, Depends(get_store)] = ...,
 ):
-    return {"items": store.list_agent_tool_grants(agent_id, include_revoked=include_revoked)}
+    return {
+        "items": store.list_agent_tool_grants(agent_id, include_revoked=include_revoked)
+    }
 
 
 @router.post("/{agent_id}/tool_grants", status_code=201)

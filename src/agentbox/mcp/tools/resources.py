@@ -31,7 +31,10 @@ _MULTI_FILE_TYPES = {"folder", "skill"}
 
 def _require_reason(reason: str) -> dict | None:
     if not reason or len(reason.strip()) < 3:
-        return {"error": "reason_too_short", "detail": "reason must be at least 3 characters"}
+        return {
+            "error": "reason_too_short",
+            "detail": "reason must be at least 3 characters",
+        }
     return None
 
 
@@ -68,7 +71,10 @@ def register(mcp: FastMCP) -> None:
         try:
             rtype = ResourceType(type)
         except ValueError:
-            return {"error": "invalid_type", "detail": f"type must be one of {[t.value for t in ResourceType]}"}
+            return {
+                "error": "invalid_type",
+                "detail": f"type must be one of {[t.value for t in ResourceType]}",
+            }
 
         ctx = get_context()
         try:
@@ -88,13 +94,21 @@ def register(mcp: FastMCP) -> None:
 
         err = _require_reason(changelog or "")
         if err:
-            return {**err, "resource": resource, "hint": "provide `changelog` (≥ 3 chars) when uploading content"}
+            return {
+                **err,
+                "resource": resource,
+                "hint": "provide `changelog` (≥ 3 chars) when uploading content",
+            }
 
         if content_base64 is not None:
             try:
                 raw = base64.b64decode(content_base64, validate=True)
             except (binascii.Error, ValueError) as exc:
-                return {"error": "invalid_base64", "detail": str(exc), "resource": resource}
+                return {
+                    "error": "invalid_base64",
+                    "detail": str(exc),
+                    "resource": resource,
+                }
         else:
             raw = (content or "").encode("utf-8")
 
@@ -183,11 +197,17 @@ def register(mcp: FastMCP) -> None:
         for idx, item in enumerate(files):
             path = (item.get("path") or "").strip()
             if not path:
-                return {"error": "invalid_request", "detail": f"files[{idx}] missing 'path'"}
+                return {
+                    "error": "invalid_request",
+                    "detail": f"files[{idx}] missing 'path'",
+                }
             if path.startswith("/") or ".." in path.split("/") or "\\" in path:
                 return {"error": "invalid_request", "detail": f"unsafe path: {path!r}"}
             if path in seen_paths:
-                return {"error": "invalid_request", "detail": f"duplicate path: {path!r}"}
+                return {
+                    "error": "invalid_request",
+                    "detail": f"duplicate path: {path!r}",
+                }
             seen_paths.add(path)
 
             if "content_base64" in item and item["content_base64"] is not None:
@@ -263,7 +283,9 @@ def register(mcp: FastMCP) -> None:
         for b in rows:
             resource = ctx.store.get_repo_resource(b["resource_id"])
             active = (
-                ctx.store.get_active_repo_version(b["resource_id"]) if resource else None
+                ctx.store.get_active_repo_version(b["resource_id"])
+                if resource
+                else None
             )
             enriched.append(
                 {
@@ -271,7 +293,9 @@ def register(mcp: FastMCP) -> None:
                     "attach_as_reference": bool(b.get("attach_as_reference")),
                     "resource_slug": resource["slug"] if resource else None,
                     "resource_type": resource["type"] if resource else None,
-                    "resource_display_name": resource["display_name"] if resource else None,
+                    "resource_display_name": resource["display_name"]
+                    if resource
+                    else None,
                     "active_version_id": active["id"] if active else None,
                 }
             )
@@ -439,8 +463,15 @@ def register(mcp: FastMCP) -> None:
             return {"error": "invalid_binding", "detail": str(exc)}
         return {
             "agent_id": agent_id,
-            "removed": [{"binding_id": b["id"], "resource_id": b["resource_id"],
-                          "marker": b.get("marker"), "slot": b.get("slot")} for b in removed],
+            "removed": [
+                {
+                    "binding_id": b["id"],
+                    "resource_id": b["resource_id"],
+                    "marker": b.get("marker"),
+                    "slot": b.get("slot"),
+                }
+                for b in removed
+            ],
             "bindings": rows,
             "count": len(rows),
         }
@@ -487,7 +518,9 @@ def register(mcp: FastMCP) -> None:
         if err:
             return err
         ctx = get_context()
-        rows = ctx.store.replace_workspace_file_bindings(workspace_id, bindings, reason=reason)
+        rows = ctx.store.replace_workspace_file_bindings(
+            workspace_id, bindings, reason=reason
+        )
         return {"workspace_id": workspace_id, "bindings": rows}
 
     @mcp.tool
@@ -634,7 +667,9 @@ def register(mcp: FastMCP) -> None:
         if err:
             return err
         ctx = get_context()
-        row = ctx.store.set_workspace_host_env(workspace_id, overrides=grants, changelog=reason)
+        row = ctx.store.set_workspace_host_env(
+            workspace_id, overrides=grants, changelog=reason
+        )
         return row
 
     @mcp.tool

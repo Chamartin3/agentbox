@@ -216,8 +216,7 @@ class NoBackendAvailable(RuntimeError):
         self.agent_id = agent_id
         self.attempted = list(attempted)
         super().__init__(
-            f"no backend available for agent {agent_id!r} "
-            f"(attempted: {self.attempted})"
+            f"no backend available for agent {agent_id!r} (attempted: {self.attempted})"
         )
 
 
@@ -282,7 +281,9 @@ class RunExecutor:
         mcp_server_name = mcp_spec.name if mcp_spec else "mcp"
         mcp_url = mcp_spec.url if mcp_spec else None
         mcp_transport = str(mcp_spec.transport) if mcp_spec else "http"
-        mcp_command = mcp_spec.command if mcp_spec and mcp_spec.command else ["mcp_serve.sh"]
+        mcp_command = (
+            mcp_spec.command if mcp_spec and mcp_spec.command else ["mcp_serve.sh"]
+        )
         static_manifest_path: Path | None = None
         tool_manifest_path = self.store.get_tool_manifest_path()
         if tool_manifest_path:
@@ -343,10 +344,13 @@ class RunExecutor:
                 ws_bindings = resolve_workspace_resources(self.store, _workspace_id)
                 if ws_bindings:
                     outcomes = materialize_workspace(
-                        workdir, ws_bindings,
+                        workdir,
+                        ws_bindings,
                         cache_root=self.settings.resource_cache_dir,
                     )
-                    _resource_snapshot_entries.extend(workspace_outcomes_to_snapshot(outcomes))
+                    _resource_snapshot_entries.extend(
+                        workspace_outcomes_to_snapshot(outcomes)
+                    )
             except Exception:
                 logger.exception(
                     "executor: workspace resource materialization failed for workspace %r",
@@ -502,20 +506,18 @@ class RunExecutor:
         # executor validates against. Skipped when something earlier
         # (composition pipeline) already produced one.
         from agentbox.core.agent.config import resolve_output_config as _resolve_out
-        _out_cfg = _resolve_out(self.store, agent)
-        if not isinstance(agent.__dict__.get("_composed_schema"), dict):
-            if isinstance(_out_cfg.json_schema, dict):
-                agent.__dict__["_composed_schema"] = _out_cfg.json_schema
 
-        # Render the unified output-contract block (schema + rules +
-        # validation hint) once, here, so every backend sees the same
-        # bytes. The token backend strips the JSON-Schema portion from
-        # its own injection but keeps the rules + validation hint.
-        if (
-            _out_cfg.rules
-            or _out_cfg.validators
-            or isinstance(_out_cfg.json_schema, dict)
+        _out_cfg = _resolve_out(self.store, agent)
+        if not isinstance(agent.__dict__.get("_composed_schema"), dict) and isinstance(
+            _out_cfg.json_schema, dict
         ):
+            agent.__dict__["_composed_schema"] = _out_cfg.json_schema
+
+        # Render the unified output-contract block (schema + validator
+        # descriptions) once, here, so every backend sees the same
+        # bytes. The token backend strips the JSON-Schema portion from
+        # its own injection but keeps the constraint bullets.
+        if _out_cfg.validators or isinstance(_out_cfg.json_schema, dict):
             from agentbox.core.prompt.output_contract import append as _append_contract
 
             _composed_system = agent.__dict__.get("_composed_system")
@@ -524,9 +526,9 @@ class RunExecutor:
                 # so the contract block still reaches the model. Without
                 # this, agents that declare bindings via the
                 # validation-contracts surface (no [composition] block) would
-                # have their rules/schema only checked post-hoc, never shown
-                # to the model — defeating the "tell the model what we'll
-                # validate" half of the two-gate design.
+                # have their schema/constraints only checked post-hoc, never
+                # shown to the model — defeating the "tell the model what
+                # we'll validate" half of the two-gate design.
                 _composed_system = agent.prompt or ""
             agent.__dict__["_composed_system"] = _append_contract(
                 _composed_system, _out_cfg
@@ -534,23 +536,24 @@ class RunExecutor:
             _composed_system_base = agent.__dict__.get("_composed_system_base")
             if isinstance(_composed_system_base, str):
                 # Token backend reads system_base + injects schema via
-                # pydantic-ai. We still append rules+validation hint so
-                # those constraints reach the model.
+                # pydantic-ai. We still append validator-derived constraint
+                # bullets so those reach the model.
                 from agentbox.core.agent.config import OutputConfig as _OC2
 
-                _rules_only = _OC2(
+                _constraints_only = _OC2(
                     json_schema=None,
-                    rules=list(_out_cfg.rules),
                     validators=_out_cfg.validators,
                 )
                 agent.__dict__["_composed_system_base"] = _append_contract(
-                    _composed_system_base, _rules_only
+                    _composed_system_base, _constraints_only
                 )
 
         # Wire output_schema binding → _composed_schema for runtime validation.
         # Covers legacy_dir agents that declare output schemas via resource
         # bindings but have no [composition] block.
-        if prompt_bindings and not isinstance(agent.__dict__.get("_composed_schema"), dict):
+        if prompt_bindings and not isinstance(
+            agent.__dict__.get("_composed_schema"), dict
+        ):
             for _b in prompt_bindings:
                 if _b.get("slot") != "output_schema":
                     continue
@@ -625,7 +628,11 @@ class RunExecutor:
                 resolved_he = self.store.resolve_workspace_host_env(_workspace_id)
                 grants = resolved_he.get("grants") or {}
                 # Only inject if there's more than the default-granted workspace_info cap
-                non_default = {k for k, v in _HOST_ENV_CAPABILITIES.items() if not v.default_granted}
+                non_default = {
+                    k
+                    for k, v in _HOST_ENV_CAPABILITIES.items()
+                    if not v.default_granted
+                }
                 if grants.keys() & non_default:
                     _host_env_grants = grants
                     self._inject_host_env_mcp(
@@ -687,9 +694,7 @@ class RunExecutor:
                 ),
             )
         except Exception:
-            logger.exception(
-                "failed to persist runner_snapshot for run %s", run_id
-            )
+            logger.exception("failed to persist runner_snapshot for run %s", run_id)
 
         # Record the effective model immediately at run creation — before
         # the runner task starts — so every run has a model name in the
@@ -700,9 +705,7 @@ class RunExecutor:
             try:
                 self.store.record_usage(run_id, {"model": rendered.model})
             except Exception:
-                logger.exception(
-                    "failed to pre-record model for run %s", run_id
-                )
+                logger.exception("failed to pre-record model for run %s", run_id)
 
         # Persist conversation metadata from the backend adapter
         conv_format: str | None = getattr(adapter, "conversation_format", None)
@@ -749,7 +752,9 @@ class RunExecutor:
                 rendered_prompt={
                     "system": _final_system,
                     "user": input_,
-                    "schema": _final_schema if isinstance(_final_schema, dict) else None,
+                    "schema": _final_schema
+                    if isinstance(_final_schema, dict)
+                    else None,
                 },
                 variables=variables or {},
             )
@@ -759,7 +764,10 @@ class RunExecutor:
         if _workspace_id:
             try:
                 manifest_servers = [
-                    {"name": s.name, "config": {"url": s.url, "transport": str(s.transport)}}
+                    {
+                        "name": s.name,
+                        "config": {"url": s.url, "transport": str(s.transport)},
+                    }
                     for s in self.store.get_project_mcp_servers()
                 ]
                 _mcp_snapshot = self.store.resolve_workspace_mcp(
@@ -770,12 +778,15 @@ class RunExecutor:
                     _mcp_snapshot["host_env_injected"] = True
             except Exception:
                 logger.exception(
-                    "executor: MCP snapshot capture failed for workspace %r", _workspace_id
+                    "executor: MCP snapshot capture failed for workspace %r",
+                    _workspace_id,
                 )
         try:
             self.store.save_resource_snapshots(
                 run_id,
-                resource_snapshot=_resource_snapshot_entries if _resource_snapshot_entries else None,
+                resource_snapshot=_resource_snapshot_entries
+                if _resource_snapshot_entries
+                else None,
                 mcp_snapshot=_mcp_snapshot,
             )
         except Exception:
@@ -864,7 +875,9 @@ class RunExecutor:
                 status=RunStatus.INCOMPLETE.value,
             )
         except Exception:
-            logger.exception("cancel_run: failed to persist incomplete status for %s", run_id)
+            logger.exception(
+                "cancel_run: failed to persist incomplete status for %s", run_id
+            )
 
         broadcaster = self._broadcasters.get(run_id)
         if broadcaster is not None:
@@ -915,9 +928,7 @@ class RunExecutor:
                     transcript_path,
                 )
         except Exception:
-            logger.exception(
-                "cancel_run: webhook scheduling failed for %s", run_id
-            )
+            logger.exception("cancel_run: webhook scheduling failed for %s", run_id)
 
         return True
 
@@ -986,9 +997,7 @@ class RunExecutor:
         for name in candidates:
             adapter = _try_backend(name)
             if adapter is not None:
-                rendered = adapter.render(
-                    agent, workdir, runner_config=runner_config
-                )
+                rendered = adapter.render(agent, workdir, runner_config=runner_config)
                 return adapter, rendered
 
         # Carry the list of attempted names so the HTTP layer can tell the
@@ -1289,9 +1298,11 @@ class RunExecutor:
             transcript_path=transcript_path,
         )
         session.add_observer(
-            lambda ev: self.store.record_usage(run_id, ev.model_dump())
-            if isinstance(ev, UsageEvent)
-            else None
+            lambda ev: (
+                self.store.record_usage(run_id, ev.model_dump())
+                if isinstance(ev, UsageEvent)
+                else None
+            )
         )
 
         try:
@@ -1316,9 +1327,7 @@ class RunExecutor:
                         final_error = run_error
                         final_ok = False
                         final_status = RunStatus.TIMEOUT.value
-                        session.emit_timeout(
-                            timeout_seconds=timeout, error=run_error
-                        )
+                        session.emit_timeout(timeout_seconds=timeout, error=run_error)
                         session.emit_log(level="error", message=run_error)
                         break
 
@@ -1359,8 +1368,11 @@ class RunExecutor:
                             )
                     except Exception as exc:
                         import traceback as _tb
+
                         tb_text = _tb.format_exc()
-                        run_error = f"executor error: {type(exc).__name__}: {exc}\n{tb_text}"
+                        run_error = (
+                            f"executor error: {type(exc).__name__}: {exc}\n{tb_text}"
+                        )
                         final_error = run_error
                         final_ok = False
                         logging.getLogger("agentbox.executor").exception(
@@ -1377,7 +1389,10 @@ class RunExecutor:
                     # write tools), prefer the file content if the text
                     # output doesn't parse as JSON. Only kicks in when an
                     # output schema is configured.
-                    from agentbox.core.agent.config import resolve_output_config as _resolve_oc
+                    from agentbox.core.agent.config import (
+                        resolve_output_config as _resolve_oc,
+                    )
+
                     _oc = _resolve_oc(self.store, agent)
                     has_schema = bool(
                         python_cfg.output_schema_path
@@ -1482,9 +1497,7 @@ class RunExecutor:
                     )
                 except Exception as exc:
                     suffix = f"guardrail error: {exc}"
-                    final_error = (
-                        f"{final_error} | {suffix}" if final_error else suffix
-                    )
+                    final_error = f"{final_error} | {suffix}" if final_error else suffix
                 if schema_validated_via is None:
                     mode = getattr(agent, "_composed_validation_mode", "strict")
                     if mode == "off":
@@ -1532,7 +1545,9 @@ class RunExecutor:
             try:
                 refreshed = self.store.get_run(run_id)
                 if refreshed is not None:
-                    schedule_webhook(agent, refreshed, self.store, broadcaster, transcript_path)
+                    schedule_webhook(
+                        agent, refreshed, self.store, broadcaster, transcript_path
+                    )
             except Exception:
                 pass
             with contextlib.suppress(Exception):

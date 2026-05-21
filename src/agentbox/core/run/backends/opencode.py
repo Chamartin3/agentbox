@@ -239,9 +239,7 @@ class OpenCodeBackend(BackendAdapter):
                             await asyncio.sleep(0.5)
                             continue
                         if line.startswith("ERROR"):
-                            await stderr_queue.put(
-                                f"opencode-log: {line.rstrip()}"
-                            )
+                            await stderr_queue.put(f"opencode-log: {line.rstrip()}")
             except (OSError, asyncio.CancelledError):
                 return
 
@@ -268,9 +266,7 @@ class OpenCodeBackend(BackendAdapter):
                     msg = stderr_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
-                out.append(
-                    LogEvent(run_id=run_id, level="warn", message=msg)
-                )
+                out.append(LogEvent(run_id=run_id, level="warn", message=msg))
                 if fatal is None:
                     fatal = detect_in_text_line(msg)
             return out, fatal
@@ -401,7 +397,9 @@ class OpenCodeBackend(BackendAdapter):
             # replay when streaming already surfaced them live.
             raw = "".join(stdout_chunks).strip()
             if raw and not streamed_text_parts:
-                text_parts, thinking_parts, parsed_sid, _parse_failed = _parse_event_stream_with_thinking(raw)
+                text_parts, thinking_parts, parsed_sid, _parse_failed = (
+                    _parse_event_stream_with_thinking(raw)
+                )
                 if parsed_sid:
                     self._session_id = parsed_sid
                 for tt in thinking_parts:
@@ -459,7 +457,9 @@ class OpenCodeBackend(BackendAdapter):
             )
             return
 
-        text_parts, thinking_parts, parsed_sid, parse_failed = _parse_event_stream_with_thinking(raw)
+        text_parts, thinking_parts, parsed_sid, parse_failed = (
+            _parse_event_stream_with_thinking(raw)
+        )
         if parsed_sid:
             self._session_id = parsed_sid
         if parse_failed and not text_parts:
@@ -496,7 +496,9 @@ class OpenCodeBackend(BackendAdapter):
         )
 
 
-def _parse_event_stream_with_thinking(raw: str) -> tuple[list[str], list[str], str | None, bool]:
+def _parse_event_stream_with_thinking(
+    raw: str,
+) -> tuple[list[str], list[str], str | None, bool]:
     """Parse opencode --format json output, extracting text and thinking parts.
 
     Returns (text_parts, thinking_parts, session_id, parse_failed).

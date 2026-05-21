@@ -146,7 +146,9 @@ def _parse_opencode_lines(output: str, provider_id: str) -> list[ProviderModel]:
         # future version prints columns, use the first qualified token.
         if "/" not in model_id:
             tokens = model_id.replace("│", " ").replace("┃", " ").split()
-            model_id = next((token.strip("`\"',") for token in tokens if "/" in token), "")
+            model_id = next(
+                (token.strip("`\"',") for token in tokens if "/" in token), ""
+            )
         if not model_id.startswith(prefix):
             continue
         if model_id in seen:

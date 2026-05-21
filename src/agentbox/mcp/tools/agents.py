@@ -45,12 +45,15 @@ def register(mcp: FastMCP) -> None:
         Same source as the REST ``GET /api/agents`` endpoint."""
         limit = clamp_limit(limit)
         ctx = get_context()
-        agents = [_agent_dict(a) for a in list_all_agents(store=ctx.store, loader=ctx.loader)]
+        agents = [
+            _agent_dict(a) for a in list_all_agents(store=ctx.store, loader=ctx.loader)
+        ]
         if tag:
             agents = [a for a in agents if tag in (a.get("tags") or [])]
         if runner:
             agents = [
-                a for a in agents
+                a
+                for a in agents
                 if (a.get("runner") or {}).get("kind") == runner
                 or a.get("runner") == runner
             ]
@@ -65,11 +68,13 @@ def register(mcp: FastMCP) -> None:
         results = []
         for a in list_all_agents(store=ctx.store, loader=ctx.loader):
             d = _agent_dict(a)
-            hay = " ".join([
-                str(d.get("id") or ""),
-                str(d.get("description") or ""),
-                " ".join(d.get("tags") or []),
-            ]).lower()
+            hay = " ".join(
+                [
+                    str(d.get("id") or ""),
+                    str(d.get("description") or ""),
+                    " ".join(d.get("tags") or []),
+                ]
+            ).lower()
             if q in hay:
                 results.append(d)
         return _paginate(results, limit, offset)

@@ -34,9 +34,7 @@ def shell_cmd(
     ephemeral: bool = typer.Option(
         False, "--ephemeral", "-e", help="Force an ephemeral (tmp) workspace"
     ),
-    yazi: bool = typer.Option(
-        False, "--yazi", help="Exec yazi instead of $SHELL"
-    ),
+    yazi: bool = typer.Option(False, "--yazi", help="Exec yazi instead of $SHELL"),
     shell_bin: str | None = typer.Option(
         None, "--shell", help="Shell binary to exec (default: $SHELL or bash)"
     ),
@@ -121,11 +119,17 @@ def _print_banner(
     console.print("━" * 60)
     console.print(f"[bold]agentbox shell[/bold] — [cyan]{agent}[/cyan]")
     console.print("━" * 60)
-    console.print(f"  workdir:   {workspace_path}{'  (ephemeral)' if is_ephemeral else ''}")
+    console.print(
+        f"  workdir:   {workspace_path}{'  (ephemeral)' if is_ephemeral else ''}"
+    )
     console.print(f"  configs:   {gen_dir}")
-    console.print(f"  env-doc:   {'rendered (CLAUDE.md / AGENTS.md)' if env_doc_rendered else 'none'}")
+    console.print(
+        f"  env-doc:   {'rendered (CLAUDE.md / AGENTS.md)' if env_doc_rendered else 'none'}"
+    )
     console.print(f"  creds:     {creds or 'default'}")
     console.print()
-    console.print("  Browse with [bold]yazi[/bold] or [bold]ls -R .agentbox/generated[/bold].")
+    console.print(
+        "  Browse with [bold]yazi[/bold] or [bold]ls -R .agentbox/generated[/bold]."
+    )
     console.print("  Exit the shell to return.")
     console.print()

@@ -28,7 +28,9 @@ def _seed_run(
         )
     if status != "running":
         ok = status == "ok"
-        store.finish_run(rid, ok=ok, output="out" if ok else None, error=None if ok else "err")
+        store.finish_run(
+            rid, ok=ok, output="out" if ok else None, error=None if ok else "err"
+        )
     return rid
 
 

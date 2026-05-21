@@ -148,7 +148,9 @@ def get_resource(
     if rid is None:
         raise HTTPException(status_code=404, detail="resource not found")
     r = store.get_repo_resource(rid)
-    active = store.get_active_repo_version(rid) if r and r.get("active_version_id") else None
+    active = (
+        store.get_active_repo_version(rid) if r and r.get("active_version_id") else None
+    )
     return {"resource": r, "active_version": active}
 
 
@@ -232,12 +234,15 @@ def host_path_version(
     importer = importer_cls(
         root=Path(body.path),
         include=tuple(body.include),
-        exclude=tuple(body.exclude) or importer_cls.__dataclass_fields__["exclude"].default_factory(),  # type: ignore[attr-defined]
+        exclude=tuple(body.exclude)
+        or importer_cls.__dataclass_fields__["exclude"].default_factory(),  # type: ignore[attr-defined]
     )
     from agentbox.core.resource.importers.base import ImporterContext
 
     try:
-        result = importer.run(ImporterContext(actor=body.actor, changelog=body.changelog))
+        result = importer.run(
+            ImporterContext(actor=body.actor, changelog=body.changelog)
+        )
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -431,9 +436,7 @@ async def upload_schema_version(
     if not resource:
         raise HTTPException(status_code=404, detail="resource not found")
     if resource["type"] != "schema":
-        raise HTTPException(
-            status_code=400, detail="resource is not of type 'schema'"
-        )
+        raise HTTPException(status_code=400, detail="resource is not of type 'schema'")
     content = await file.read()
     from agentbox.core.resource.importers.base import ImporterContext
 
@@ -475,9 +478,7 @@ async def upload_script_version(
     if not resource:
         raise HTTPException(status_code=404, detail="resource not found")
     if resource["type"] != "script":
-        raise HTTPException(
-            status_code=400, detail="resource is not of type 'script'"
-        )
+        raise HTTPException(status_code=400, detail="resource is not of type 'script'")
     content = await file.read()
     from agentbox.core.resource.importers.base import ImporterContext
 
@@ -519,9 +520,7 @@ def export_pydantic(
     if not resource:
         raise HTTPException(status_code=404, detail="resource not found")
     if resource["type"] != "schema":
-        raise HTTPException(
-            status_code=400, detail="resource is not of type 'schema'"
-        )
+        raise HTTPException(status_code=400, detail="resource is not of type 'schema'")
     if version_id is None:
         active = store.get_active_repo_version(resource_id)
         if not active:
@@ -557,9 +556,7 @@ def validate_script_sample(
     if not resource:
         raise HTTPException(status_code=404, detail="resource not found")
     if resource["type"] != "script":
-        raise HTTPException(
-            status_code=400, detail="resource is not of type 'script'"
-        )
+        raise HTTPException(status_code=400, detail="resource is not of type 'script'")
     active = store.get_active_repo_version(resource_id)
     if not active:
         raise HTTPException(status_code=404, detail="no active version")
@@ -582,7 +579,9 @@ def validate_script_sample(
 
     schema_active = store.get_active_repo_version(schema_id)
     if not schema_active:
-        raise HTTPException(status_code=400, detail="bound schema has no active version")
+        raise HTTPException(
+            status_code=400, detail="bound schema has no active version"
+        )
     schema_blob = store.read_repo_blob(schema_active["id"], "")
     if not schema_blob:
         raise HTTPException(status_code=400, detail="schema blob missing")

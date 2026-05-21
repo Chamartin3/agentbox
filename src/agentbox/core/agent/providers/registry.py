@@ -9,7 +9,9 @@ from agentbox.core.agent.providers.base import ProviderAdapter, ProviderDescript
 logger = logging.getLogger(__name__)
 
 # Module-level cache: (provider_id, base_url, api_key_env, backend) -> (models, timestamp)
-_MODEL_CACHE: dict[tuple[str, str | None, str | None, str | None], tuple[Any, float]] = {}
+_MODEL_CACHE: dict[
+    tuple[str, str | None, str | None, str | None], tuple[Any, float]
+] = {}
 _CACHE_TTL_SECONDS = 60
 
 

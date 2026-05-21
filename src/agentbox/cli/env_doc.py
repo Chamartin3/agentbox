@@ -38,7 +38,9 @@ def env_doc_show(workspace_id: str) -> None:
     store = get_store()
     doc = store.get_active_env_doc(workspace_id)
     if not doc:
-        console.print(f"[yellow]No active env doc for workspace {workspace_id!r}.[/yellow]")
+        console.print(
+            f"[yellow]No active env doc for workspace {workspace_id!r}.[/yellow]"
+        )
         return
 
     meta = Table.grid(padding=(0, 2))
@@ -46,7 +48,10 @@ def env_doc_show(workspace_id: str) -> None:
     meta.add_column()
     meta.add_row("id", doc["id"])
     meta.add_row("version_number", str(doc["version_number"]))
-    meta.add_row("is_draft", "[yellow]draft[/yellow]" if doc.get("is_draft") else "[green]published[/green]")
+    meta.add_row(
+        "is_draft",
+        "[yellow]draft[/yellow]" if doc.get("is_draft") else "[green]published[/green]",
+    )
     meta.add_row("changelog", doc.get("changelog") or "—")
     meta.add_row("created_at", doc.get("created_at") or "—")
     console.print(Panel(meta, title=f"Env doc — {workspace_id}", border_style="cyan"))
@@ -70,7 +75,9 @@ def env_doc_versions(workspace_id: str) -> None:
     store = get_store()
     rows = store.list_env_doc_versions(workspace_id)
     if not rows:
-        console.print(f"[yellow]No env doc versions for workspace {workspace_id!r}.[/yellow]")
+        console.print(
+            f"[yellow]No env doc versions for workspace {workspace_id!r}.[/yellow]"
+        )
         return
 
     table = Table(
@@ -85,7 +92,11 @@ def env_doc_versions(workspace_id: str) -> None:
     table.add_column("Changelog")
     table.add_column("Created at", style="dim")
     for v in rows:
-        draft = "[yellow]draft[/yellow]" if v.get("is_draft") else "[green]published[/green]"
+        draft = (
+            "[yellow]draft[/yellow]"
+            if v.get("is_draft")
+            else "[green]published[/green]"
+        )
         table.add_row(
             str(v["version_number"]),
             v["id"],
@@ -100,7 +111,9 @@ def env_doc_versions(workspace_id: str) -> None:
 def env_doc_edit(
     workspace_id: str,
     content_or_file: str,
-    changelog: str = typer.Option(..., "--changelog", help="Changelog (required, min 3 chars)"),
+    changelog: str = typer.Option(
+        ..., "--changelog", help="Changelog (required, min 3 chars)"
+    ),
 ) -> None:
     """Save a new env doc version (JSON content or path to a JSON file)."""
     if len(changelog.strip()) < 3:
@@ -131,7 +144,9 @@ def env_doc_publish(workspace_id: str, version_id: str) -> None:
 def env_doc_rollback(
     workspace_id: str,
     version_id: str,
-    changelog: str = typer.Option(..., "--changelog", help="Reason for rollback (required, min 3 chars)"),
+    changelog: str = typer.Option(
+        ..., "--changelog", help="Reason for rollback (required, min 3 chars)"
+    ),
 ) -> None:
     """Roll back to a previous env doc version (creates new version with old content)."""
     if len(changelog.strip()) < 3:

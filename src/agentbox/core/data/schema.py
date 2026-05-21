@@ -69,7 +69,9 @@ runs = Table(
     Column("resource_snapshot", String),
     Column("mcp_snapshot", String),
     Column("runner_snapshot", String),
-    Column("prompt_version_id", Integer, ForeignKey("prompt_versions.id"), nullable=True),
+    Column(
+        "prompt_version_id", Integer, ForeignKey("prompt_versions.id"), nullable=True
+    ),
     Index("runs_by_agent", "agent_id", "created_at"),
     Index("runs_by_status", "status", "created_at"),
     Index("idx_runs_runner_profile_id", "runner_profile_id"),
@@ -298,7 +300,9 @@ runner_profiles = Table(
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
     CheckConstraint("is_enabled IN (0, 1)", name="runner_profiles_is_enabled_bool"),
-    CheckConstraint("is_system_default IN (0, 1)", name="runner_profiles_is_system_default_bool"),
+    CheckConstraint(
+        "is_system_default IN (0, 1)", name="runner_profiles_is_system_default_bool"
+    ),
     Index("idx_runner_profiles_backend_provider", "backend", "provider"),
     Index("idx_runner_profiles_enabled", "is_enabled"),
 )
@@ -307,7 +311,9 @@ agent_runner_profiles = Table(
     "agent_runner_profiles",
     metadata,
     Column("agent_id", String, primary_key=True),
-    Column("runner_profile_id", String, ForeignKey("runner_profiles.id"), nullable=False),
+    Column(
+        "runner_profile_id", String, ForeignKey("runner_profiles.id"), nullable=False
+    ),
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
 )
@@ -415,7 +421,9 @@ agent_prompt_resource_bindings = Table(
         nullable=False,
         server_default="0",
     ),
-    Column("pinned_version_id", String, ForeignKey("resource_versions.id"), nullable=True),
+    Column(
+        "pinned_version_id", String, ForeignKey("resource_versions.id"), nullable=True
+    ),
     Column("display_order", Integer, nullable=False, server_default="0"),
     Column("required", Integer, nullable=False, server_default="1"),
     Column("changelog", String, nullable=False),
@@ -441,69 +449,25 @@ agent_prompt_resource_bindings = Table(
         name="agent_prompt_bindings_reference_bool",
     ),
     UniqueConstraint(
-        "agent_id", "marker", "resource_id",
+        "agent_id",
+        "marker",
+        "resource_id",
         name="uq_agent_prompt_bindings_triple",
     ),
     Index("ix_agent_prompt_bindings_agent", "agent_id"),
     Index(
         "uq_agent_prompt_bindings_slot",
-        "agent_id", "slot",
+        "agent_id",
+        "slot",
         unique=True,
         sqlite_where=text("slot IS NOT NULL"),
     ),
 )
 
-# --- Validation contracts (rules + validators, reusable across agent versions) ---
-
-validation_contracts = Table(
-    "validation_contracts",
-    metadata,
-    Column("id", String, primary_key=True),
-    Column("name", String, nullable=False),
-    Column("description", String, nullable=True),
-    Column("rules", String, nullable=False, server_default="[]"),
-    # validators: JSON list of {kind, ...} entries. The jsonschema
-    # validator is implicit from the agent's output_schema binding and
-    # is NOT listed here. Today the only explicit kind is 'http';
-    # adding a new kind means extending the runtime dispatch in
-    # core/run/validation.py — no migration needed.
-    Column("validators", String, nullable=False, server_default="[]"),
-    Column("created_at", String, nullable=False),
-    Column("updated_at", String, nullable=False),
-    Column("created_by", String, nullable=True),
-    UniqueConstraint("name", name="uq_validation_contracts_name"),
-)
-
-agent_version_validation_bindings = Table(
-    "agent_version_validation_bindings",
-    metadata,
-    Column(
-        "agent_version_id",
-        Integer,
-        ForeignKey("agent_versions.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    Column("direction", String, nullable=False),
-    Column(
-        "contract_id",
-        String,
-        ForeignKey("validation_contracts.id", ondelete="RESTRICT"),
-        nullable=False,
-    ),
-    Column("created_at", String, nullable=False),
-    Column("created_by", String, nullable=True),
-    CheckConstraint(
-        "direction IN ('input', 'output')",
-        name="agent_version_validation_direction_check",
-    ),
-    UniqueConstraint(
-        "agent_version_id", "direction", name="pk_agent_version_validation"
-    ),
-    Index(
-        "ix_agent_version_validation_version", "agent_version_id"
-    ),
-    Index("ix_agent_version_validation_contract", "contract_id"),
-)
+# Plan 23: validation contracts / bindings retired. Validators now live
+# inline on agent_versions.config_json["{input,output}"].validators —
+# see core/agent/config.resolve_output_config and
+# api/routes/agent_validation.
 
 # --- Plan 03: workspace file-materialize bindings ---
 
@@ -514,7 +478,9 @@ workspace_file_resource_bindings = Table(
     Column("workspace_id", String, nullable=False),
     Column("resource_id", String, ForeignKey("resources.id"), nullable=False),
     Column("target_path", String, nullable=True),
-    Column("pinned_version_id", String, ForeignKey("resource_versions.id"), nullable=True),
+    Column(
+        "pinned_version_id", String, ForeignKey("resource_versions.id"), nullable=True
+    ),
     Column("materialize_mode", String, nullable=False, server_default="copy"),
     Column("on_conflict", String, nullable=False, server_default="error"),
     Column("display_order", Integer, nullable=False, server_default="0"),
@@ -530,7 +496,9 @@ workspace_file_resource_bindings = Table(
         name="workspace_file_bindings_on_conflict_check",
     ),
     UniqueConstraint(
-        "workspace_id", "resource_id", "target_path",
+        "workspace_id",
+        "resource_id",
+        "target_path",
         name="uq_workspace_file_bindings_triple",
     ),
     Index("ix_workspace_file_bindings_workspace", "workspace_id"),
@@ -561,7 +529,9 @@ workspace_env_doc_versions = Table(
     Column("changelog", String, nullable=False),
     Column("created_at", String, nullable=False),
     Column("created_by", String, nullable=True),
-    UniqueConstraint("workspace_id", "version_number", name="uq_workspace_env_doc_version"),
+    UniqueConstraint(
+        "workspace_id", "version_number", name="uq_workspace_env_doc_version"
+    ),
     Index("ix_workspace_env_doc_versions_workspace_id", "workspace_id"),
 )
 
@@ -591,7 +561,9 @@ workspace_mcp_tool_overrides = Table(
     Column("created_at", String, nullable=False),
     Column("created_by", String, nullable=True),
     UniqueConstraint(
-        "workspace_id", "server_name", "tool_name",
+        "workspace_id",
+        "server_name",
+        "tool_name",
         name="uq_workspace_mcp_tool_override",
     ),
     Index("ix_workspace_mcp_tool_overrides_workspace", "workspace_id"),
@@ -679,7 +651,9 @@ agent_tool_grants = Table(
     Column("changelog", String, nullable=False),  # min 3 chars, enforced in mixin
     Column("granted_at", String, nullable=False),
     Column("granted_by", String, nullable=True),
-    Column("revoked_at", String, nullable=True),  # NULL = active; set to iso timestamp on revoke
+    Column(
+        "revoked_at", String, nullable=True
+    ),  # NULL = active; set to iso timestamp on revoke
     Column("revoked_by", String, nullable=True),
     Column("revoke_changelog", String, nullable=True),
     Index("ix_agent_tool_grants_agent", "agent_id"),
@@ -768,9 +742,7 @@ mcp_tool_discovery_cache = Table(
     Column("config_hash", String, nullable=False),
     Column("tools_json", String, nullable=False),
     Column("discovered_at", String, nullable=False),
-    UniqueConstraint(
-        "server_name", "config_hash", name="uq_mcp_discovery_server_hash"
-    ),
+    UniqueConstraint("server_name", "config_hash", name="uq_mcp_discovery_server_hash"),
     Index("ix_mcp_discovery_server", "server_name"),
 )
 

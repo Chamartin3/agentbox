@@ -170,7 +170,9 @@ class TestProviderRegistry:
 
         # Mock to raise ValueError for missing key
         with patch.object(adapter, "list_models", new_callable=AsyncMock) as mock_list:
-            mock_list.side_effect = ValueError("API key env NONEXISTENT_API_KEY not set")
+            mock_list.side_effect = ValueError(
+                "API key env NONEXISTENT_API_KEY not set"
+            )
 
             with pytest.raises(ValueError, match="API key env"):
                 await list_models("openai", config)
@@ -355,21 +357,17 @@ class TestProviderRegistry:
 
         assert rewrite_ollama_url("http://localhost:11434") == "http://localhost:11434"
 
-    def test_ollama_url_rewrite_custom_map(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_ollama_url_rewrite_custom_map(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Explicit override map wins over the container default."""
         from agentbox.core.agent.providers.ollama import rewrite_ollama_url
 
         monkeypatch.setenv(
             "AGENTBOX_OLLAMA_URL_REWRITE", "localhost=ollama-svc,my-host=other"
         )
-        assert (
-            rewrite_ollama_url("http://localhost:11434")
-            == "http://ollama-svc:11434"
-        )
-        assert (
-            rewrite_ollama_url("http://my-host/api")
-            == "http://other/api"
-        )
+        assert rewrite_ollama_url("http://localhost:11434") == "http://ollama-svc:11434"
+        assert rewrite_ollama_url("http://my-host/api") == "http://other/api"
 
     def test_opencode_provider_parser_filters_provider(self) -> None:
         """OpenCode CLI provider adapters keep only their provider-qualified ids."""
@@ -386,10 +384,16 @@ class TestProviderRegistry:
         """Cache key correctly encodes provider, base_url, api_key_env, and backend."""
         from agentbox.core.agent.providers.registry import _cache_key
 
-        key1 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token")
-        key2 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token")
+        key1 = _cache_key(
+            "openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token"
+        )
+        key2 = _cache_key(
+            "openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "token"
+        )
         key3 = _cache_key("openai", "https://custom.com/v1", "OPENAI_API_KEY", "token")
-        key4 = _cache_key("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "opencode")
+        key4 = _cache_key(
+            "openai", "https://api.openai.com/v1", "OPENAI_API_KEY", "opencode"
+        )
 
         # Same inputs produce same key
         assert key1 == key2

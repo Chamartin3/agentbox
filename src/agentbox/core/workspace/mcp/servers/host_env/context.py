@@ -57,7 +57,14 @@ class HostEnvContext:
             pass
         return self._store
 
-    def audit(self, capability: str, params: dict | None, *, outcome: str, error: str | None = None) -> None:
+    def audit(
+        self,
+        capability: str,
+        params: dict | None,
+        *,
+        outcome: str,
+        error: str | None = None,
+    ) -> None:
         s = self.store
         if s is None:
             return

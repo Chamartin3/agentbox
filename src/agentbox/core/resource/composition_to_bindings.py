@@ -108,11 +108,17 @@ def _get_or_create_resource(
         return existing["id"]
 
     pretty_kind = (
-        "input schema" if "input_schema" in relative_path
-        else "output schema" if "output_schema" in relative_path
+        "input schema"
+        if "input_schema" in relative_path
+        else "output schema"
+        if "output_schema" in relative_path
         else relative_path
     )
-    display = f"{agent_id} {pretty_kind}" if type_ == "schema" else f"{agent_id} {relative_path}"
+    display = (
+        f"{agent_id} {pretty_kind}"
+        if type_ == "schema"
+        else f"{agent_id} {relative_path}"
+    )
     res = store.create_repo_resource(
         slug=slug,
         type=type_,
@@ -210,7 +216,9 @@ def _migrate_one_agent(
     }
 
     new_inputs = [_binding_to_input(b) for b in existing_bindings]
-    next_order = max((b.get("display_order", 0) for b in existing_bindings), default=-1) + 1
+    next_order = (
+        max((b.get("display_order", 0) for b in existing_bindings), default=-1) + 1
+    )
     added = 0
 
     def _maybe_add_slot(slot: str, kind: str, type_: str) -> None:
@@ -227,11 +235,7 @@ def _migrate_one_agent(
         if not rel and slot != "system":
             return
         # For system, allow any kind='system' row regardless of rel.
-        f = (
-            files_by_kind_path.get((kind, rel))
-            if rel is not None
-            else None
-        )
+        f = files_by_kind_path.get((kind, rel)) if rel is not None else None
         if f is None and slot == "system":
             for (k, _p), row in files_by_kind_path.items():
                 if k == "system":
@@ -244,16 +248,18 @@ def _migrate_one_agent(
         else:
             # Disk fallback: agent_version_files row missing but the
             # composition declares a path. Read directly from the bundle dir.
-            disk_rel = rel or (
-                "prompts/system.md" if slot == "system" else None
-            )
+            disk_rel = rel or ("prompts/system.md" if slot == "system" else None)
             content_text = _read_disk_file(bundle_dir, disk_rel)
             content_rel = disk_rel or ""
             if content_text is None:
                 logger.warning(
                     "composition migration: agent %s declares %s=%r but neither "
                     "agent_version_files (kind=%r, version %s) nor disk has it",
-                    agent_id, slot, rel, kind, version_id,
+                    agent_id,
+                    slot,
+                    rel,
+                    kind,
+                    version_id,
                 )
                 return
         resource_id = _get_or_create_resource(
@@ -296,7 +302,9 @@ def _migrate_one_agent(
                 logger.warning(
                     "composition migration: agent %s declares user_template=%r but "
                     "neither agent_version_files (version %s) nor disk has it",
-                    agent_id, user_template_rel, version_id,
+                    agent_id,
+                    user_template_rel,
+                    version_id,
                 )
                 content_text = None
             else:
@@ -306,10 +314,14 @@ def _migrate_one_agent(
             candidate_slug = _slug_for("document", sha12)
             existing = store.get_repo_resource_by_slug(candidate_slug)
             candidate_resource_id = existing["id"] if existing else None
-            already_bound = candidate_resource_id is not None and (
-                candidate_resource_id,
-                USER_TEMPLATE_MARKER,
-            ) in existing_marker_pairs
+            already_bound = (
+                candidate_resource_id is not None
+                and (
+                    candidate_resource_id,
+                    USER_TEMPLATE_MARKER,
+                )
+                in existing_marker_pairs
+            )
 
             if not already_bound:
                 resource_id = _get_or_create_resource(

@@ -9,7 +9,10 @@ from fastmcp import FastMCP
 
 
 def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
-    @mcp.tool(name="shell.exec", description="Run an allowlisted shell command. Requires shell.exec grant.")
+    @mcp.tool(
+        name="shell.exec",
+        description="Run an allowlisted shell command. Requires shell.exec grant.",
+    )
     def shell_exec(cmd: str, cwd: str | None = None, timeout: int = 30) -> dict:
         ctx = ctx_factory()
         try:

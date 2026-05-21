@@ -280,8 +280,10 @@ class SharedResourcesMixin:
         from sqlalchemy import func, or_, select
 
         with self.engine.connect() as conn:
-            query = select(func.count()).select_from(shared_resources).where(
-                shared_resources.c.is_active == 1
+            query = (
+                select(func.count())
+                .select_from(shared_resources)
+                .where(shared_resources.c.is_active == 1)
             )
             if kind:
                 query = query.where(shared_resources.c.kind == kind)

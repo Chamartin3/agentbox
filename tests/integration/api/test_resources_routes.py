@@ -199,7 +199,9 @@ def test_create_resource_short_changelog_returns_400(client) -> None:  # type: i
             "changelog": "ab",  # Too short (< 3 chars)
         },
     )
-    assert resp.status_code == 400, f"Expected 400, got {resp.status_code}: {resp.json()}"
+    assert resp.status_code == 400, (
+        f"Expected 400, got {resp.status_code}: {resp.json()}"
+    )
 
 
 def test_create_version_missing_resource_returns_404(client) -> None:  # type: ignore[no-untyped-def]

@@ -80,9 +80,7 @@ def list_agents() -> list[dict]:
         }
         if latest is not None:
             data["updated_at"] = latest.get("created_at")
-            data["version"] = (
-                active["version"] if active else latest.get("version")
-            )
+            data["version"] = active["version"] if active else latest.get("version")
         data["last_activity_at"] = max(
             (t for t in (data.get("updated_at"), data.get("last_run_at")) if t),
             default=None,
@@ -135,9 +133,7 @@ def get_agent(agent_id: str) -> dict:
             agent_id,
         )
     except Exception:
-        logger.exception(
-            "agents detail: composition preview failed for %r", agent_id
-        )
+        logger.exception("agents detail: composition preview failed for %r", agent_id)
 
     versions = store.list_versions(agent_id)
     enriched = []
@@ -310,9 +306,7 @@ def get_agent_runner_profile(
     store = get_store()
     profile = store.get_agent_runner_profile(agent_id)
     if profile is None:
-        raise HTTPException(
-            404, f"no runner profile bound to agent {agent_id!r}"
-        )
+        raise HTTPException(404, f"no runner profile bound to agent {agent_id!r}")
     return profile
 
 

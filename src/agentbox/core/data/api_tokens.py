@@ -71,9 +71,7 @@ class ApiTokensMixin:
                 for r in rows
             ]
 
-    def create_api_token(
-        self, *, environment: str, name: str, secret: str
-    ) -> dict:
+    def create_api_token(self, *, environment: str, name: str, secret: str) -> dict:
         if len(secret) < 4:
             raise ValueError("secret must be at least 4 characters")
         token_id = uuid.uuid4().hex
@@ -175,6 +173,10 @@ class ApiTokensMixin:
             if row is None:
                 return None
             try:
-                return self._fernet().decrypt(row._mapping["secret_encrypted"].encode()).decode()
+                return (
+                    self._fernet()
+                    .decrypt(row._mapping["secret_encrypted"].encode())
+                    .decode()
+                )
             except InvalidToken:
                 return None

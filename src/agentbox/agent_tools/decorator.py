@@ -27,9 +27,7 @@ def agent_tool(
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         sig = inspect.signature(fn)
-        params = [
-            p for p in sig.parameters.values() if p.name != "self"
-        ]
+        params = [p for p in sig.parameters.values() if p.name != "self"]
         if len(params) != 1:
             raise TypeError(
                 f"@agent_tool {name!r}: function must take exactly one "
@@ -37,7 +35,10 @@ def agent_tool(
             )
         input_model = params[0].annotation
         output_model = sig.return_annotation
-        if input_model is inspect.Parameter.empty or output_model is inspect.Parameter.empty:
+        if (
+            input_model is inspect.Parameter.empty
+            or output_model is inspect.Parameter.empty
+        ):
             raise TypeError(
                 f"@agent_tool {name!r}: input and return type annotations are required"
             )

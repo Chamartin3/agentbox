@@ -134,6 +134,7 @@ def doctor() -> None:
     try:
         from agentbox.api.deps import get_store as _gs
         from agentbox.core import workspaces as ws
+
         rows = ws.list_all(_gs(), settings)
         resolvable = True
         for w in rows:

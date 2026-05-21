@@ -1,4 +1,4 @@
-"""Phase 2 — single-source-of-truth renderer for the output-contract block."""
+"""Plan 22 — single-source-of-truth renderer for the output-contract block."""
 
 from __future__ import annotations
 
@@ -18,21 +18,12 @@ def test_render_schema_only() -> None:
     assert "## Validation" not in out
 
 
-def test_render_legacy_rules_fallback() -> None:
-    # Backwards-compat: when no validator carries a description,
-    # contract-level rules[] still render as bullets.
-    out = render(OutputConfig(rules=["Rule A.", "Rule B."]))
-    assert "## Constraints" in out
-    assert "- Rule A." in out
-    assert "- Rule B." in out
-    assert "# Required Output" not in out
-
-
 def test_render_validator_descriptions() -> None:
-    # Plan 22: validators own their constraint text via `description`.
     cfg = OutputConfig(
         validators=(
-            HttpValidatorConfig(endpoint="http://x/api", description="Sum must be > 100."),
+            HttpValidatorConfig(
+                endpoint="http://x/api", description="Sum must be > 100."
+            ),
             HttpValidatorConfig(endpoint="http://y/api", description="No nulls."),
         ),
     )
@@ -42,22 +33,46 @@ def test_render_validator_descriptions() -> None:
     assert "- No nulls." in out
 
 
-def test_render_validator_descriptions_win_over_legacy_rules() -> None:
+def test_render_multiline_description_splits_into_bullets() -> None:
     cfg = OutputConfig(
-        rules=["legacy rule"],
-        validators=(HttpValidatorConfig(endpoint="http://x/api", description="new rule"),),
+        validators=(
+            HttpValidatorConfig(
+                endpoint="http://x/api",
+                description="First constraint.\nSecond constraint.\nThird.",
+            ),
+        ),
     )
     out = render(cfg)
-    assert "- new rule" in out
-    assert "legacy rule" not in out
+    assert "- First constraint." in out
+    assert "- Second constraint." in out
+    assert "- Third." in out
+
+
+def test_render_skips_validators_without_description() -> None:
+    cfg = OutputConfig(
+        validators=(
+            HttpValidatorConfig(endpoint="http://x/api"),
+            HttpValidatorConfig(endpoint="http://y/api", description="present."),
+        ),
+    )
+    out = render(cfg)
+    assert "- present." in out
 
 
 def test_render_full_block_byte_stable() -> None:
     cfg = OutputConfig(
-        json_schema={"type": "object", "required": ["x"], "properties": {"x": {"type": "integer"}}},
+        json_schema={
+            "type": "object",
+            "required": ["x"],
+            "properties": {"x": {"type": "integer"}},
+        },
         validators=(
-            HttpValidatorConfig(endpoint="http://x/api", description="Sum must be > 100."),
-            HttpValidatorConfig(endpoint="http://y/api", description="No nulls allowed."),
+            HttpValidatorConfig(
+                endpoint="http://x/api", description="Sum must be > 100."
+            ),
+            HttpValidatorConfig(
+                endpoint="http://y/api", description="No nulls allowed."
+            ),
         ),
     )
     a = render(cfg)

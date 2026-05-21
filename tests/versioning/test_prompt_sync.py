@@ -8,9 +8,7 @@ from agentbox.core.data.manifest import AgentDef, AgentSource, RunnerSpec
 from agentbox.core.prompt.versioning.drift import startup_sweep
 
 
-def _agent_with_prompt(
-    agent_id: str, source_path: Path, prompt_path: str
-) -> AgentDef:
+def _agent_with_prompt(agent_id: str, source_path: Path, prompt_path: str) -> AgentDef:
     return AgentDef(
         id=agent_id,
         source_path=source_path,
@@ -81,9 +79,7 @@ class TestSyncPromptFromDisk:
 
 
 class TestStartupSweepPromptSync:
-    def test_sweep_captures_prompt_on_first_load(
-        self, session_store, tmp_path
-    ) -> None:
+    def test_sweep_captures_prompt_on_first_load(self, session_store, tmp_path) -> None:
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
         toml_path = agents_dir / "a.toml"
@@ -141,9 +137,7 @@ class TestStartupSweepPromptSync:
         versions = session_store.list_prompt_versions("c")
         assert len(versions) == 1
 
-    def test_sweep_skips_agents_without_prompt(
-        self, session_store, tmp_path
-    ) -> None:
+    def test_sweep_skips_agents_without_prompt(self, session_store, tmp_path) -> None:
         toml_path = tmp_path / "d.toml"
         toml_path.write_text("id = 'd'")
         agent = AgentDef(

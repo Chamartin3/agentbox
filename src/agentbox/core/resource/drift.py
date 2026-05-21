@@ -38,7 +38,9 @@ def _blobs_hash(filename: str, data: bytes) -> str:
     return h.hexdigest()
 
 
-def _blob_tuple(filename: str, data: bytes) -> tuple[str, bytes, str | None, str | None]:
+def _blob_tuple(
+    filename: str, data: bytes
+) -> tuple[str, bytes, str | None, str | None]:
     mime = "text/plain" if filename.endswith((".md", ".txt")) else None
     try:
         text = data.decode("utf-8")
@@ -176,12 +178,14 @@ def propose_prompt_bindings(
         resource = store.get_repo_resource_by_slug(marker)
         if resource is None:
             continue
-        proposals.append({
-            "marker": marker,
-            "resource_id": resource["id"],
-            "resource_slug": marker,
-            "mode": "embed",
-        })
+        proposals.append(
+            {
+                "marker": marker,
+                "resource_id": resource["id"],
+                "resource_slug": marker,
+                "mode": "embed",
+            }
+        )
     return proposals
 
 
@@ -212,14 +216,16 @@ def detect_resource_hash_mismatches(
         stored_hash = active.get("content_hash")
         disk_hash = _blobs_hash(path.name, path.read_bytes())
         if stored_hash != disk_hash:
-            mismatches.append({
-                "slug": slug,
-                "resource_id": resource["id"],
-                "version_id": active["id"],
-                "stored_hash": stored_hash,
-                "disk_hash": disk_hash,
-                "path": str(path),
-            })
+            mismatches.append(
+                {
+                    "slug": slug,
+                    "resource_id": resource["id"],
+                    "version_id": active["id"],
+                    "stored_hash": stored_hash,
+                    "disk_hash": disk_hash,
+                    "path": str(path),
+                }
+            )
     return mismatches
 
 

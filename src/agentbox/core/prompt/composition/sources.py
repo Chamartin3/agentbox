@@ -318,7 +318,11 @@ class BindingsBundleSource:
         composition snapshot (TOML-shaped), when the schema file is also
         present in ``agent_version_files``. Acts as the DB-side analogue
         of reading ``output_schema.json`` from the bundle on disk."""
-        comp = self._av_config.get("composition") if isinstance(self._av_config, dict) else None
+        comp = (
+            self._av_config.get("composition")
+            if isinstance(self._av_config, dict)
+            else None
+        )
         if not isinstance(comp, dict):
             return None
         path = comp.get(slot)
@@ -342,7 +346,9 @@ class BindingsBundleSource:
             return OutputSchemaInfo(
                 schema=parsed,
                 relative_path=(
-                    _INPUT_SCHEMA_PSEUDO if slot == "input_schema" else _OUTPUT_SCHEMA_PSEUDO
+                    _INPUT_SCHEMA_PSEUDO
+                    if slot == "input_schema"
+                    else _OUTPUT_SCHEMA_PSEUDO
                 ),
             )
         text = self._render_blob_text(b)
@@ -355,7 +361,9 @@ class BindingsBundleSource:
         return OutputSchemaInfo(
             schema=parsed,
             relative_path=(
-                _INPUT_SCHEMA_PSEUDO if slot == "input_schema" else _OUTPUT_SCHEMA_PSEUDO
+                _INPUT_SCHEMA_PSEUDO
+                if slot == "input_schema"
+                else _OUTPUT_SCHEMA_PSEUDO
             ),
         )
 
@@ -376,7 +384,9 @@ class BindingsBundleSource:
         if ut_b is not None:
             files[_USER_PSEUDO] = self._render_blob_text(ut_b)
         for b in self._reference_bindings():
-            files[f"bindings://reference/{b['resource_id']}"] = self._render_blob_text(b)
+            files[f"bindings://reference/{b['resource_id']}"] = self._render_blob_text(
+                b
+            )
         inp = self._read_schema_slot("input_schema")
         if inp is not None:
             files[_INPUT_SCHEMA_PSEUDO] = json.dumps(inp.schema, sort_keys=True)

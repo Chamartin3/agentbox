@@ -64,12 +64,18 @@ def test_filename_uses_display_name_extension_when_present() -> None:
 
 
 def test_filename_appends_type_extension_when_missing() -> None:
-    assert _resolve_single_file_name(
-        resource_type="document", display_name="Voice", source_metadata=None
-    ) == "Voice.md"
-    assert _resolve_single_file_name(
-        resource_type="schema", display_name="config", source_metadata=None
-    ) == "config.json"
+    assert (
+        _resolve_single_file_name(
+            resource_type="document", display_name="Voice", source_metadata=None
+        )
+        == "Voice.md"
+    )
+    assert (
+        _resolve_single_file_name(
+            resource_type="schema", display_name="config", source_metadata=None
+        )
+        == "config.json"
+    )
 
 
 def test_target_path_folder_semantic_for_documents() -> None:

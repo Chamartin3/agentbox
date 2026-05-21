@@ -308,7 +308,6 @@ def agent_edit(
     )
 
 
-
 @agent_app.command("delete")
 def agent_delete(
     agent_id: str,
@@ -316,9 +315,7 @@ def agent_delete(
 ) -> None:
     """Soft-delete an agent. Version history is retained."""
     if not yes:
-        confirm = typer.confirm(
-            f"Soft-delete agent {agent_id!r}? (history retained)"
-        )
+        confirm = typer.confirm(f"Soft-delete agent {agent_id!r}? (history retained)")
         if not confirm:
             raise typer.Exit(0)
     store = get_store()

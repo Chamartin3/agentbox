@@ -70,6 +70,4 @@ class AgentSyncMixin:
 
     def delete_agent_sync(self, agent_id: str) -> None:
         with self.engine.begin() as conn:
-            conn.execute(
-                agent_sync.delete().where(agent_sync.c.agent_id == agent_id)
-            )
+            conn.execute(agent_sync.delete().where(agent_sync.c.agent_id == agent_id))

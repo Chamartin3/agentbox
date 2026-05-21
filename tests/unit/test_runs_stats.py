@@ -20,7 +20,12 @@ def _seed(
         {"model": model, "input_tokens": 100, "output_tokens": 50, "cost_usd": 0.01},
     )
     if status != "running":
-        store.finish_run(rid, ok=(status == "ok"), output="out" if status == "ok" else None, error=None if status == "ok" else "err")
+        store.finish_run(
+            rid,
+            ok=(status == "ok"),
+            output="out" if status == "ok" else None,
+            error=None if status == "ok" else "err",
+        )
     return rid
 
 

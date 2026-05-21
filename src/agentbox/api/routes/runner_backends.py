@@ -46,9 +46,7 @@ def list_runner_backends() -> list[BackendDescriptor]:
     providers = list_providers()
     out: list[BackendDescriptor] = []
     for name, cls in sorted(registered_backends().items()):
-        compatible = [
-            p.id for p in providers if name in (p.compatible_backends or [])
-        ]
+        compatible = [p.id for p in providers if name in (p.compatible_backends or [])]
         out.append(
             BackendDescriptor(
                 id=name,

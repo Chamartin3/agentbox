@@ -367,9 +367,7 @@ class TokenBackend(BackendAdapter):
                 import contextlib
 
                 with contextlib.suppress(json.JSONDecodeError, OSError):
-                    output_schema = json.loads(
-                        schema_path.read_text(encoding="utf-8")
-                    )
+                    output_schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
         # Prefer the clean, schema-free base prompt when composition ran.
         # Pydantic-ai handles schema injection itself; the bundled
@@ -378,7 +376,11 @@ class TokenBackend(BackendAdapter):
         # working — those won't have a schema mismatch since no result_type
         # is being attached either.
         system_base = getattr(agent, "_composed_system_base", None)
-        prompt = system_base if isinstance(system_base, str) and system_base else self._resolve_prompt(agent, workdir)
+        prompt = (
+            system_base
+            if isinstance(system_base, str) and system_base
+            else self._resolve_prompt(agent, workdir)
+        )
 
         references = getattr(agent, "_composed_references", ()) or ()
         input_schema = getattr(agent, "_composed_input_schema", None)
@@ -393,7 +395,9 @@ class TokenBackend(BackendAdapter):
             "references": [
                 {"heading": r.heading, "content": r.content} for r in references
             ],
-            "timeout_seconds": getattr(getattr(agent, "runner", None), "timeout_seconds", None),
+            "timeout_seconds": getattr(
+                getattr(agent, "runner", None), "timeout_seconds", None
+            ),
         }
 
         # Store provider routing info from runner_config if present.
@@ -416,7 +420,9 @@ class TokenBackend(BackendAdapter):
         # budget. Default 1 (pydantic-ai default) is too low for local
         # models which routinely need 2-3 tries to produce schema-valid
         # JSON, especially in ``prompted`` output mode.
-        _max_retries = getattr(getattr(agent, "runner", None), "max_validation_retries", None)
+        _max_retries = getattr(
+            getattr(agent, "runner", None), "max_validation_retries", None
+        )
         if isinstance(_max_retries, int) and _max_retries > 0:
             agent_meta["output_retries"] = _max_retries
 
@@ -548,9 +554,7 @@ class TokenBackend(BackendAdapter):
                     exc, model=model_str, provider=provider
                 )
                 yield LogEvent(run_id=run_id, level="error", message=err_text)
-                yield DoneEvent(
-                    run_id=run_id, ok=False, error=err_text, status="error"
-                )
+                yield DoneEvent(run_id=run_id, ok=False, error=err_text, status="error")
                 return
             _elapsed = time.monotonic() - start
 
@@ -596,8 +600,7 @@ class TokenBackend(BackendAdapter):
                 run_id=run_id,
                 ok=False,
                 error=(
-                    "pydantic-ai is not installed. "
-                    "Install it to use the token backend."
+                    "pydantic-ai is not installed. Install it to use the token backend."
                 ),
             )
             return
@@ -675,7 +678,9 @@ class TokenBackend(BackendAdapter):
 
         # Build user message.
         user_message = (
-            json.dumps(input_data, indent=2) if isinstance(input_data, dict) else str(input_data)
+            json.dumps(input_data, indent=2)
+            if isinstance(input_data, dict)
+            else str(input_data)
         )
 
         # Instantiate and run pydantic-ai Agent.
@@ -742,9 +747,7 @@ class TokenBackend(BackendAdapter):
             sections = ctx.deps.references if ctx.deps else ()
             if not sections:
                 return ""
-            return "\n\n".join(
-                f"## {s.heading}\n\n{s.content}" for s in sections
-            )
+            return "\n\n".join(f"## {s.heading}\n\n{s.content}" for s in sections)
 
         # We're inside an async generator — pydantic-ai's run_sync() would
         # try to start its own event loop and fail. Use the async API.
@@ -776,7 +779,9 @@ class TokenBackend(BackendAdapter):
                         dn = type(event.delta).__name__
                         delta_text: str = getattr(event.delta, "content_delta", "")
                         if "Thinking" in dn and delta_text:
-                            thinking_accum[idx] = thinking_accum.get(idx, "") + delta_text
+                            thinking_accum[idx] = (
+                                thinking_accum.get(idx, "") + delta_text
+                            )
                             yield ThinkingEvent(run_id=run_id, text=delta_text)
                         elif "Text" in dn and delta_text:
                             text_accum[idx] = text_accum.get(idx, "") + delta_text
@@ -809,9 +814,7 @@ class TokenBackend(BackendAdapter):
                     message=f"model raw response: {body}",
                 )
             yield LogEvent(run_id=run_id, level="error", message=err_text)
-            yield DoneEvent(
-                run_id=run_id, ok=False, error=err_text, status="error"
-            )
+            yield DoneEvent(run_id=run_id, ok=False, error=err_text, status="error")
             return
         _elapsed = time.monotonic() - start
 

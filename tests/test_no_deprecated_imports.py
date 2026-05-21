@@ -37,6 +37,5 @@ def test_no_imports_from_core_deprecated() -> None:
 
     assert not offenders, (
         "core/deprecated/ must not participate in the live runtime. "
-        f"Found {len(offenders)} importer(s):\n  - "
-        + "\n  - ".join(sorted(offenders))
+        f"Found {len(offenders)} importer(s):\n  - " + "\n  - ".join(sorted(offenders))
     )

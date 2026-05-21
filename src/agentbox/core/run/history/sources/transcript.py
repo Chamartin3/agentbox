@@ -94,6 +94,7 @@ def _events_to_conversation_view(
             tool_name = ev.get("tool_name") or ev.get("tool") or ev.get("name", "")
             inp = ev.get("input") or ev.get("arguments", {})
             import json as _json
+
             body_str = _json.dumps(inp) if inp else ""
             parts = [
                 ContentPart(

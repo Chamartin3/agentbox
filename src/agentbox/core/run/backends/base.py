@@ -296,9 +296,7 @@ class BackendAdapter(ABC):
 
     # ----- protected helpers (shared across backends) ----------------------
 
-    def _collect_system_files(
-        self, agent: Any, workdir: Path
-    ) -> dict[Path, bytes]:
+    def _collect_system_files(self, agent: Any, workdir: Path) -> dict[Path, bytes]:
         """Collect the CLAUDE.md system-context file for materialisation.
 
         Prefers the in-memory ``_composed_system`` attached to the agent

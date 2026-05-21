@@ -47,9 +47,7 @@ def extract_run_cwd(transcript_path: Path) -> str | None:
     return None
 
 
-def find_session_log(
-    transcript_path: Path, claude_projects_root: Path
-) -> Path | None:
+def find_session_log(transcript_path: Path, claude_projects_root: Path) -> Path | None:
     """Locate the Claude CLI session log for a given agentbox run.
 
     Returns the most recently modified ``*.jsonl`` under the run's project
@@ -100,8 +98,13 @@ def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:
     parts: list[ContentPart] = []
     if not isinstance(items, list):
         if isinstance(items, str):
-            parts.append(ContentPart(type="text", length=len(items),
-                                     body=items if include_bodies else None))
+            parts.append(
+                ContentPart(
+                    type="text",
+                    length=len(items),
+                    body=items if include_bodies else None,
+                )
+            )
         return parts
     for c in items:
         if not isinstance(c, dict):
@@ -109,25 +112,36 @@ def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:
         t = c.get("type", "?")
         if t == "text":
             body = c.get("text", "") or ""
-            parts.append(ContentPart(type=t, length=len(body),
-                                     body=body if include_bodies else None))
+            parts.append(
+                ContentPart(
+                    type=t, length=len(body), body=body if include_bodies else None
+                )
+            )
         elif t == "thinking":
             body = c.get("thinking", "") or ""
-            parts.append(ContentPart(type=t, length=len(body),
-                                     body=body if include_bodies else None))
+            parts.append(
+                ContentPart(
+                    type=t, length=len(body), body=body if include_bodies else None
+                )
+            )
         elif t == "tool_use":
             tool_input = c.get("input")
-            parts.append(ContentPart(
-                type=t,
-                length=len(json.dumps(tool_input)) if tool_input is not None else 0,
-                tool_name=c.get("name"),
-                tool_input=tool_input if include_bodies else None,
-            ))
+            parts.append(
+                ContentPart(
+                    type=t,
+                    length=len(json.dumps(tool_input)) if tool_input is not None else 0,
+                    tool_name=c.get("name"),
+                    tool_input=tool_input if include_bodies else None,
+                )
+            )
         elif t == "tool_result":
             content = c.get("content")
             body = json.dumps(content) if not isinstance(content, str) else content
-            parts.append(ContentPart(type=t, length=len(body),
-                                     body=body if include_bodies else None))
+            parts.append(
+                ContentPart(
+                    type=t, length=len(body), body=body if include_bodies else None
+                )
+            )
         else:
             parts.append(ContentPart(type=t, length=0))
     return parts
@@ -158,8 +172,9 @@ def parse_session_log(
         "stop_end_turn": 0,
     }
     if not path.exists():
-        return ConversationSummary(session_id=None, log_path=str(path), turns=[],
-                                   totals=totals)
+        return ConversationSummary(
+            session_id=None, log_path=str(path), turns=[], totals=totals
+        )
     idx = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -200,10 +215,16 @@ def parse_session_log(
             totals["stop_max_tokens"] += 1
         elif stop_reason == "end_turn":
             totals["stop_end_turn"] += 1
-        turns.append(Turn(
-            index=idx, role=role, ts=ts, stop_reason=stop_reason,
-            usage=usage, content=parts,
-        ))
+        turns.append(
+            Turn(
+                index=idx,
+                role=role,
+                ts=ts,
+                stop_reason=stop_reason,
+                usage=usage,
+                content=parts,
+            )
+        )
         idx += 1
     return ConversationSummary(
         session_id=session_id,

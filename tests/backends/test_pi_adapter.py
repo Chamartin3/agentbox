@@ -84,7 +84,10 @@ def test_parse_pi_event_session_id() -> None:
 def test_digest_stable_across_identical_inputs() -> None:
     a = _agent()
     backend = PiBackend()
-    assert backend.render(a, Path("/tmp/wd")).digest == backend.render(a, Path("/tmp/wd")).digest
+    assert (
+        backend.render(a, Path("/tmp/wd")).digest
+        == backend.render(a, Path("/tmp/wd")).digest
+    )
 
 
 def test_parse_pi_event_ignores_unknown() -> None:

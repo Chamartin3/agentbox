@@ -81,9 +81,10 @@ class TestAgentDefFromDbRow:
             "content_snapshot": None,
         }
 
-        with pytest.raises(ValueError, match="agent_versions row has no config payload"):
+        with pytest.raises(
+            ValueError, match="agent_versions row has no config payload"
+        ):
             AgentDef.from_db_row(row)
-
 
     def test_handles_json_string_config_json(self) -> None:
         """config_json as JSON string (not dict) is parsed."""
@@ -164,5 +165,7 @@ class TestAgentDefFromDbRow:
         """Row with neither config_json nor content_snapshot key raises."""
         row: dict[str, Any] = {}
 
-        with pytest.raises(ValueError, match="agent_versions row has no config payload"):
+        with pytest.raises(
+            ValueError, match="agent_versions row has no config payload"
+        ):
             AgentDef.from_db_row(row)

@@ -22,7 +22,9 @@ resource_app = typer.Typer(
 @resource_app.command("list")
 def resource_list(
     type: str | None = typer.Option(None, "--type", help="Filter by resource type"),
-    tag: str | None = typer.Option(None, "--tag", help="Filter by tag (substring match)"),
+    tag: str | None = typer.Option(
+        None, "--tag", help="Filter by tag (substring match)"
+    ),
     limit: int = typer.Option(50, "--limit", help="Max rows to return"),
 ) -> None:
     """List resources in the repository."""
@@ -92,7 +94,11 @@ def resource_show(slug: str) -> None:
     vtable.add_column("Changelog")
     vtable.add_column("Created at", style="dim")
     for v in versions:
-        draft = "[yellow]draft[/yellow]" if v.get("is_draft") else "[green]published[/green]"
+        draft = (
+            "[yellow]draft[/yellow]"
+            if v.get("is_draft")
+            else "[green]published[/green]"
+        )
         vtable.add_row(
             str(v["version_number"]),
             v["id"],
@@ -108,7 +114,9 @@ def resource_show(slug: str) -> None:
 def resource_upload(
     slug: str,
     file_path: str,
-    changelog: str = typer.Option("cli upload", "--changelog", help="Changelog for this version"),
+    changelog: str = typer.Option(
+        "cli upload", "--changelog", help="Changelog for this version"
+    ),
 ) -> None:
     """Upload a file as a new resource version (creates resource if absent)."""
     if len(changelog.strip()) < 3:
@@ -128,7 +136,9 @@ def resource_upload(
     store = get_store()
     resource = store.get_repo_resource_by_slug(slug)
     if not resource:
-        console.print(f"[yellow]Resource {slug!r} not found — creating it as 'document'.[/yellow]")
+        console.print(
+            f"[yellow]Resource {slug!r} not found — creating it as 'document'.[/yellow]"
+        )
         resource = store.create_repo_resource(slug, "document", slug)
 
     version = store.import_repo_version(
@@ -172,7 +182,9 @@ def resource_publish(
 def resource_rollback(
     slug: str,
     version_number: int,
-    changelog: str = typer.Option(..., "--changelog", help="Reason for rollback (required)"),
+    changelog: str = typer.Option(
+        ..., "--changelog", help="Reason for rollback (required)"
+    ),
 ) -> None:
     """Roll back to a previous version (creates new version with old content)."""
     if len(changelog.strip()) < 3:
@@ -185,7 +197,9 @@ def resource_rollback(
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
 
-    version = store.rollback_repo_resource(resource["id"], version_number, reason=changelog)
+    version = store.rollback_repo_resource(
+        resource["id"], version_number, reason=changelog
+    )
     console.print(
         f"[green]✓[/green] rolled back to version {version_number} — "
         f"new version [bold]{version['version_number']}[/bold] for resource [bold]{slug}[/bold]"
@@ -223,7 +237,9 @@ def resource_migrate_composition(
     )
     summary = report.summary()
 
-    table = Table(title="Composition Migration", header_style="bold cyan", padding=(0, 2))
+    table = Table(
+        title="Composition Migration", header_style="bold cyan", padding=(0, 2)
+    )
     table.add_column("Metric", style="bold")
     table.add_column("Count", justify="right")
     for k, v in summary.items():
@@ -231,9 +247,7 @@ def resource_migrate_composition(
     console.print(table)
 
     if report.agents_migrated:
-        console.print(
-            f"[green]migrated:[/green] {', '.join(report.agents_migrated)}"
-        )
+        console.print(f"[green]migrated:[/green] {', '.join(report.agents_migrated)}")
     if report.failed:
         console.print("[red]failed:[/red]")
         for agent_id, err in report.failed:

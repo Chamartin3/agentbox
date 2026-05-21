@@ -43,7 +43,9 @@ def _runtime_context(store: SessionStore, workspace_id: str) -> RuntimeContext:
         resource = store.get_repo_resource(b["resource_id"])
         if not resource:
             continue
-        entry = ReferenceEntry(label=resource["display_name"], detail=b.get("target_path") or "")
+        entry = ReferenceEntry(
+            label=resource["display_name"], detail=b.get("target_path") or ""
+        )
         if resource["type"] == "skill":
             skills.append(entry)
         elif resource["type"] == "folder":
@@ -113,5 +115,3 @@ def preview_env_doc(
         content = EnvDocContent.model_validate(active["content_json"])
     ctx = _runtime_context(store, workspace_id)
     return _render_both(content, ctx)
-
-

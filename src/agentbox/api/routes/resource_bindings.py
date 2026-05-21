@@ -219,7 +219,10 @@ def dry_run_workspace_resources(
         resource = store.get_repo_resource(b["resource_id"])
         if not resource:
             conflicts.append(
-                {"binding_id": b["id"], "issue": f"resource {b['resource_id']!r} not found"}
+                {
+                    "binding_id": b["id"],
+                    "issue": f"resource {b['resource_id']!r} not found",
+                }
             )
             continue
         version_id = b.get("pinned_version_id")

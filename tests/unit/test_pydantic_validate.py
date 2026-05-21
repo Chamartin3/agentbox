@@ -42,9 +42,7 @@ class TestValidateWithPydantic:
         payload = {
             "summary": "A valid summary with enough characters",
             "key_skills": ["Python", "Django"],
-            "experience": [
-                {"position_id": 1, "achievements": ["Built a thing"]}
-            ],
+            "experience": [{"position_id": 1, "achievements": ["Built a thing"]}],
         }
         ok, err = validate_with_pydantic(json.dumps(payload), _schema())
         assert ok

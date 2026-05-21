@@ -159,7 +159,9 @@ def test_backend_adapter_default_validate_output(tmp_path: Path) -> None:
     class _Stub(BackendAdapter):
         name = "stub"
 
-        def render(self, agent, workdir, mcp_tools=None, creds=None, runner_config=None):  # type: ignore[no-untyped-def]
+        def render(
+            self, agent, workdir, mcp_tools=None, creds=None, runner_config=None
+        ):  # type: ignore[no-untyped-def]
             return RenderedConfig()
 
         async def run(self, rendered, input, run_id) -> AsyncIterator[RunEvent]:  # type: ignore[override]

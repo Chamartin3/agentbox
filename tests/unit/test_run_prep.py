@@ -96,7 +96,12 @@ class TestResolveWorkspaceResources:
         from agentbox.core.run.run_prep import resolve_workspace_resources
 
         binding = _simple_binding(target_path="docs/")
-        resource = {"id": "r1", "slug": "my-doc", "type": "document", "display_name": "my-doc"}
+        resource = {
+            "id": "r1",
+            "slug": "my-doc",
+            "type": "document",
+            "display_name": "my-doc",
+        }
         active_v = {"id": "v1"}
         version = {"content_hash": "deadbeef"}
         blobs = [{"path": "README.md", "content": b"hello"}]
@@ -174,7 +179,12 @@ class TestResolveAgentPromptBindings:
         from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
 
         binding = _simple_prompt_binding()
-        resource = {"id": "r1", "slug": "docs", "type": "document", "display_name": "My Docs"}
+        resource = {
+            "id": "r1",
+            "slug": "docs",
+            "type": "document",
+            "display_name": "My Docs",
+        }
         active_v = {"id": "v2"}
         version = {"content_hash": "cafebabe"}
         blobs = [{"path": "content.md", "content": b"# Hello"}]

@@ -425,7 +425,7 @@ export interface RunnerBackend {
 }
 
 
-// ---- validation contracts ------------------------------------------------
+// ---- inline per-agent validators ----------------------------------------
 
 export interface HttpValidator {
   kind: 'http';
@@ -443,49 +443,16 @@ export interface ScriptValidator {
 
 export type Validator = HttpValidator | ScriptValidator | { kind: string; [k: string]: unknown };
 
-export interface ValidationContract {
-  id: string;
-  name: string;
-  description?: string | null;
-  rules: string[];
-  validators: Validator[];
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string | null;
-  reference_count?: number;
-}
-
-export interface ValidationContractCreate {
-  name: string;
-  description?: string | null;
-  rules?: string[];
-  validators?: Validator[];
-  actor?: string;
-}
-
-export interface ValidationContractPatch {
-  name?: string;
-  description?: string | null;
-  rules?: string[];
-  validators?: Validator[];
-}
-
 export interface AgentValidationView {
   agent_id: string;
   agent_version_id: number | null;
-  input: {
-    contract_id: string;
-    contract_name: string | null;
-    description?: string | null;
-    rules: string[];
-    validators: Validator[];
-  } | null;
-  output: AgentValidationView['input'];
+  input: { validators: Validator[] } | null;
+  output: { validators: Validator[] } | null;
 }
 
 export interface AgentValidationPut {
-  input?: { contract_id?: string | null } | null;
-  output?: { contract_id?: string | null } | null;
+  input?: { validators: Validator[] } | null;
+  output?: { validators: Validator[] } | null;
   reason: string;
   actor?: string;
 }
@@ -872,34 +839,7 @@ export const api = {
     >(`/api/runner-providers/${providerId}/models${qs ? `?${qs}` : ''}`);
   },
 
-  // ---- validation contracts ----------------------------------------------
-
-  listValidationContracts: (params?: { query?: string; limit?: number; offset?: number }) => {
-    const p = new URLSearchParams();
-    if (params?.query) p.set('query', params.query);
-    if (params?.limit != null) p.set('limit', String(params.limit));
-    if (params?.offset != null) p.set('offset', String(params.offset));
-    const qs = p.toString();
-    return req<{ items: ValidationContract[] }>(
-      `/api/validation-contracts${qs ? `?${qs}` : ''}`,
-    );
-  },
-  getValidationContract: (id: string) =>
-    req<ValidationContract>(`/api/validation-contracts/${encodeURIComponent(id)}`),
-  createValidationContract: (body: ValidationContractCreate) =>
-    req<ValidationContract>('/api/validation-contracts', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  patchValidationContract: (id: string, body: ValidationContractPatch) =>
-    req<ValidationContract>(`/api/validation-contracts/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
-  deleteValidationContract: (id: string) =>
-    req<{ deleted: string }>(`/api/validation-contracts/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    }),
+  // ---- per-agent inline validators ---------------------------------------
 
   getAgentValidation: (agentId: string) =>
     req<AgentValidationView>(`/api/agents/${encodeURIComponent(agentId)}/validation`),

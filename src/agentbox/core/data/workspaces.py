@@ -41,9 +41,7 @@ class WorkspacesMixin:
 
     def list_workspaces(self) -> list[dict]:
         with self.engine.connect() as conn:
-            rows = conn.execute(
-                workspaces.select().order_by(workspaces.c.name)
-            )
+            rows = conn.execute(workspaces.select().order_by(workspaces.c.name))
             return [dict(r._mapping) for r in rows]
 
     def get_workspace(self, name: str) -> dict | None:
@@ -151,9 +149,7 @@ class WorkspacesMixin:
                 except Exception:
                     # Table may not exist in older deployments; skip.
                     continue
-            result = conn.execute(
-                workspaces.delete().where(workspaces.c.name == name)
-            )
+            result = conn.execute(workspaces.delete().where(workspaces.c.name == name))
             counts["workspaces"] = result.rowcount or 0
         return counts
 
@@ -171,9 +167,7 @@ class WorkspacesMixin:
         with self.engine.begin() as conn:
             existing_names = {
                 r[0]
-                for r in conn.execute(
-                    text("SELECT name FROM workspaces")
-                ).fetchall()
+                for r in conn.execute(text("SELECT name FROM workspaces")).fetchall()
             }
             seen: set[str] = set()
             for table in _SATELLITE_TABLES:
@@ -211,9 +205,7 @@ class WorkspacesMixin:
         """
         deleted: list[str] = []
         with self.engine.begin() as conn:
-            rows = conn.execute(
-                text("SELECT name, source FROM workspaces")
-            ).fetchall()
+            rows = conn.execute(text("SELECT name, source FROM workspaces")).fetchall()
             for name, source in rows:
                 if name in keep:
                     continue
@@ -241,4 +233,3 @@ class WorkspacesMixin:
                 )
                 deleted.append(name)
         return deleted
-

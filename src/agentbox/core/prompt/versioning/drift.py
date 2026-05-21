@@ -233,11 +233,13 @@ def _collect_version_files(agent: AgentDef) -> list[dict] | None:
             content = p.read_text(encoding="utf-8")
         except OSError:
             continue
-        files.append({
-            "relative_path": rel,
-            "kind": slot if slot != "user_template" else "user_template",
-            "content": content,
-        })
+        files.append(
+            {
+                "relative_path": rel,
+                "kind": slot if slot != "user_template" else "user_template",
+                "content": content,
+            }
+        )
     return files or None
 
 

@@ -47,7 +47,9 @@ def composed() -> ComposedMetadata:
 
 
 class TestCacheKey:
-    def test_cache_key_is_stable(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_cache_key_is_stable(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         key1 = cfg._compute_cache_key(agent, "opencode", composed)
@@ -55,7 +57,9 @@ class TestCacheKey:
         assert key1 == key2
         assert len(key1) == 64  # SHA-256 hex
 
-    def test_cache_key_changes_with_agent_id(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_cache_key_changes_with_agent_id(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         a1 = _make_agent(id="agent.a")
         a2 = _make_agent(id="agent.b")
@@ -63,7 +67,9 @@ class TestCacheKey:
         k2 = cfg._compute_cache_key(a2, "opencode", composed)
         assert k1 != k2
 
-    def test_cache_key_changes_with_backend(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_cache_key_changes_with_backend(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         k1 = cfg._compute_cache_key(agent, "opencode", composed)
@@ -77,7 +83,9 @@ class TestCacheKey:
 
 
 class TestPrepareRunDirFresh:
-    def test_creates_prompts(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_creates_prompts(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         run_cfg = cfg.prepare_run_dir(
@@ -95,7 +103,9 @@ class TestPrepareRunDirFresh:
         system_text = (run_cfg.prompt_dir / "system.md").read_text()
         assert "Do the thing." in system_text
 
-    def test_creates_backend_dir(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_creates_backend_dir(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         run_cfg = cfg.prepare_run_dir(
@@ -121,7 +131,9 @@ class TestPrepareRunDirFresh:
         assert "cache_key" in meta
         assert "created_at" in meta
 
-    def test_creates_opencode_markdown_agent(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_creates_opencode_markdown_agent(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         run_cfg = cfg.prepare_run_dir(
@@ -137,7 +149,9 @@ class TestPrepareRunDirFresh:
         assert "System Instructions" in content
         assert "Task Input" in content
 
-    def test_creates_claude_markdown_agent(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_creates_claude_markdown_agent(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         run_cfg = cfg.prepare_run_dir(
@@ -153,13 +167,16 @@ class TestPrepareRunDirFresh:
         assert "name: test.agent" in content
         assert "System Instructions" in content
 
+
 # ---------------------------------------------------------------------------
 # Caching
 # ---------------------------------------------------------------------------
 
 
 class TestCaching:
-    def test_cache_hit_reuses_directory(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_cache_hit_reuses_directory(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         r1 = cfg.prepare_run_dir(
@@ -177,7 +194,9 @@ class TestCaching:
         assert r1.run_dir == r2.run_dir
         assert r2.is_fresh is False
 
-    def test_force_regenerates(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_force_regenerates(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
         r1 = cfg.prepare_run_dir(
@@ -196,7 +215,9 @@ class TestCaching:
         assert r1.run_dir != r2.run_dir
         assert r2.is_fresh is True
 
-    def test_stale_cache_is_ignored(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_stale_cache_is_ignored(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(
             Path("/tmp"),
@@ -229,7 +250,9 @@ class TestCaching:
 
 
 class TestSkills:
-    def test_copies_skills_for_opencode(self, tmp_runs_dir: Path, composed: ComposedMetadata, tmp_path: Path) -> None:
+    def test_copies_skills_for_opencode(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata, tmp_path: Path
+    ) -> None:
         # Seed a workspace with a skill
         ws = tmp_path / "workspace"
         skill_dir = ws / ".opencode" / "skills" / "resume-writing"
@@ -250,7 +273,9 @@ class TestSkills:
         assert copied_skill.exists()
         assert "Resume Writing" in copied_skill.read_text()
 
-    def test_copies_skills_for_claude(self, tmp_runs_dir: Path, composed: ComposedMetadata, tmp_path: Path) -> None:
+    def test_copies_skills_for_claude(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata, tmp_path: Path
+    ) -> None:
         ws = tmp_path / "workspace"
         skill_dir = ws / ".claude" / "skills" / "resume-writing"
         skill_dir.mkdir(parents=True)
@@ -300,8 +325,12 @@ class TestSkillFilter:
             path=Path("/tmp/skills/cc"),
             content="---\nrunners: [claude_code]\n---\n\n# CC\n",
         )
-        assert filter_skills_for_backend([opencode_only, claude_only], "opencode") == [opencode_only]
-        assert filter_skills_for_backend([opencode_only, claude_only], "claude_code") == [claude_only]
+        assert filter_skills_for_backend([opencode_only, claude_only], "opencode") == [
+            opencode_only
+        ]
+        assert filter_skills_for_backend(
+            [opencode_only, claude_only], "claude_code"
+        ) == [claude_only]
 
     def test_multiple_backends_in_runners(self) -> None:
         from agentbox.core.resource.skills import SkillPack
@@ -337,12 +366,16 @@ class TestGeneratorRegistry:
 
 
 class TestMcpConfig:
-    def test_opencode_generates_mcp_config(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_opencode_generates_mcp_config(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         from agentbox.core.run.config.backends.base import McpConfig
 
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
-        mcp = McpConfig(server_name="test-mcp", url="http://localhost:3000", transport="http")
+        mcp = McpConfig(
+            server_name="test-mcp", url="http://localhost:3000", transport="http"
+        )
         run_cfg = cfg.prepare_run_dir(
             workdir=Path("/tmp/workspace"),
             agent=agent,
@@ -358,7 +391,9 @@ class TestMcpConfig:
         assert data["mcp"]["test-mcp"]["type"] == "remote"
         assert data["mcp"]["test-mcp"]["url"] == "http://localhost:3000"
 
-    def test_claude_generates_mcp_config(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_claude_generates_mcp_config(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         from agentbox.core.run.config.backends.base import McpConfig
 
         agent = _make_agent()
@@ -383,7 +418,9 @@ class TestMcpConfig:
         assert data["mcpServers"]["test-mcp"]["command"] == "python"
         assert data["mcpServers"]["test-mcp"]["args"] == ["-m", "mcp_server"]
 
-    def test_generators_skip_mcp_when_none(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_generators_skip_mcp_when_none(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
 
@@ -397,7 +434,9 @@ class TestMcpConfig:
         )
         assert not (run_cfg.backend_dir / "claude_mcp.json").exists()
 
-    def test_opencode_mcp_local_mode(self, tmp_runs_dir: Path, composed: ComposedMetadata) -> None:
+    def test_opencode_mcp_local_mode(
+        self, tmp_runs_dir: Path, composed: ComposedMetadata
+    ) -> None:
         from agentbox.core.run.config.backends.base import McpConfig
 
         agent = _make_agent()

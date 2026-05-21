@@ -72,9 +72,7 @@ def migrate_to_db_only(agent_id: str) -> None:
     # Get active version
     active = store.get_active_version(agent_id)
     if active is None:
-        console.print(
-            f"[red]error:[/red] agent {agent_id!r} has no active version"
-        )
+        console.print(f"[red]error:[/red] agent {agent_id!r} has no active version")
         raise typer.Exit(1)
 
     # If config_json is empty, load the agent and populate it
@@ -96,14 +94,10 @@ def migrate_to_db_only(agent_id: str) -> None:
     # Update agent_meta: sync_mode="off", export_to_disk=True
     result = store.update_agent_meta(agent_id, sync_mode="off", export_to_disk=True)
     if result is None:
-        console.print(
-            f"[red]error:[/red] agent_meta row not found for {agent_id!r}"
-        )
+        console.print(f"[red]error:[/red] agent_meta row not found for {agent_id!r}")
         raise typer.Exit(1)
 
-    console.print(
-        f"[green]✓[/green] migrated {agent_id!r} to DB-only management"
-    )
+    console.print(f"[green]✓[/green] migrated {agent_id!r} to DB-only management")
     console.print("  sync_mode: watch → off")
     console.print(f"  export_to_disk: {bool(result.get('export_to_disk'))}")
 
@@ -202,9 +196,7 @@ def import_manifest(
         if not force and key in existing_runtime:
             _row(PROJECT_RUNTIME, key, "skip", "dim")
             continue
-        store.set_setting(
-            PROJECT_RUNTIME, key, value, author="migrate:import-manifest"
-        )
+        store.set_setting(PROJECT_RUNTIME, key, value, author="migrate:import-manifest")
         _row(PROJECT_RUNTIME, key, "write", "green")
 
     console.print(table)

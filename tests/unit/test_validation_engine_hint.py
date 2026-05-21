@@ -13,12 +13,16 @@ class TestAppendValidationEngineHint:
         assert "pydantic" in result
 
     def test_jsonschema_engine_hint(self) -> None:
-        result = _append_validation_engine_hint("## Role\n\nYou are a helper.", "jsonschema")
+        result = _append_validation_engine_hint(
+            "## Role\n\nYou are a helper.", "jsonschema"
+        )
         assert "JSON Schema" in result
         assert "validated twice" not in result
 
     def test_pydantic_engine_hint(self) -> None:
-        result = _append_validation_engine_hint("## Role\n\nYou are a helper.", "pydantic")
+        result = _append_validation_engine_hint(
+            "## Role\n\nYou are a helper.", "pydantic"
+        )
         assert "pydantic" in result
         assert "validated twice" not in result
 
@@ -27,5 +31,7 @@ class TestAppendValidationEngineHint:
         assert "## Validation" in result
 
     def test_unknown_engine_defaults_to_both(self) -> None:
-        result = _append_validation_engine_hint("## Role\n\nYou are a helper.", "unknown")
+        result = _append_validation_engine_hint(
+            "## Role\n\nYou are a helper.", "unknown"
+        )
         assert "validated twice" in result

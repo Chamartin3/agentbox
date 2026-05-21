@@ -26,10 +26,16 @@ import jsonschema as _jsonschema
 # no schema is configured and validation was skipped; ``none`` means a
 # schema was expected but the input was unrunnable (empty / unparseable).
 ValidationEngine = Literal[
-    "jsonschema", "pydantic", "both",
-    "json-schema", "http-callback", "script",
-    "json-schema+http-callback", "json-schema+script",
-    "none", "off",
+    "jsonschema",
+    "pydantic",
+    "both",
+    "json-schema",
+    "http-callback",
+    "script",
+    "json-schema+http-callback",
+    "json-schema+script",
+    "none",
+    "off",
 ]
 
 
@@ -84,9 +90,7 @@ def format_jsonschema_error(exc: _jsonschema.ValidationError) -> str:
     instance preview so the retry prompt is actionable.
     """
     instance_pointer = (
-        "/" + "/".join(str(p) for p in exc.absolute_path)
-        if exc.absolute_path
-        else "/"
+        "/" + "/".join(str(p) for p in exc.absolute_path) if exc.absolute_path else "/"
     )
     schema_pointer = (
         "/" + "/".join(str(p) for p in exc.absolute_schema_path)
@@ -184,7 +188,11 @@ def call_http_validator(validator_cfg: Any, output: str) -> ValidationResult:
     body = json.dumps({"output": output}).encode("utf-8")
 
     secret = os.environ.get("AGENTBOX_WEBHOOK_SECRET", "")
-    sig = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest() if secret else ""
+    sig = (
+        hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+        if secret
+        else ""
+    )
 
     headers = {"Content-Type": "application/json"}
     if sig:
@@ -252,8 +260,8 @@ def call_script_validator(validator_cfg: Any, output: str) -> ValidationResult:
         )
     namespace: dict[str, Any] = {"__name__": "agentbox_script_validator"}
     try:
-        exec(compile(src, "<script_validator>", "exec"), namespace)  # noqa: S102
-    except Exception as exc:  # noqa: BLE001
+        exec(compile(src, "<script_validator>", "exec"), namespace)
+    except Exception as exc:
         return ValidationResult(
             ok=False,
             error=f"script validator failed to load: {exc}",
@@ -268,7 +276,7 @@ def call_script_validator(validator_cfg: Any, output: str) -> ValidationResult:
         )
     try:
         result = fn(output)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return ValidationResult(
             ok=False,
             error=f"script validator raised: {exc}",
@@ -310,7 +318,9 @@ def resolve_schema(
     """
     from agentbox.core.agent.config import PythonAgentConfig
 
-    composed = agent.__dict__.get("_composed_schema") if hasattr(agent, "__dict__") else None
+    composed = (
+        agent.__dict__.get("_composed_schema") if hasattr(agent, "__dict__") else None
+    )
     if isinstance(composed, dict):
         return composed, ""
 

@@ -19,7 +19,14 @@ def _register_noop_backend() -> None:
     class _NoopBackend:
         name = "claude_code"
 
-        def render(self, agent: Any, workdir: Path, mcp_tools: Any = None, creds: Any = None, runner_config: Any = None) -> RenderedConfig:
+        def render(
+            self,
+            agent: Any,
+            workdir: Path,
+            mcp_tools: Any = None,
+            creds: Any = None,
+            runner_config: Any = None,
+        ) -> RenderedConfig:
             return RenderedConfig(files={}, argv=["true"], env={}, cwd=Path("."))
 
         async def run(  # type: ignore[override]

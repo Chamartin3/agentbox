@@ -83,11 +83,7 @@ class RuntimePermissionsMixin:
         stmt = sqlite_insert(workspace_runtime_permissions).values(**values)
         stmt = stmt.on_conflict_do_update(
             index_elements=[workspace_runtime_permissions.c.workspace_id],
-            set_={
-                k: v
-                for k, v in values.items()
-                if k != "workspace_id"
-            },
+            set_={k: v for k, v in values.items() if k != "workspace_id"},
         )
         with self.engine.begin() as conn:
             conn.execute(stmt)

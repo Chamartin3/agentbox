@@ -7,8 +7,16 @@ from fastmcp import FastMCP
 
 
 def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
-    @mcp.tool(name="http.fetch", description="HTTP request to an allowlisted host. Requires http.fetch grant.")
-    def http_fetch(url: str, method: str = "GET", body: str | None = None, headers: dict | None = None) -> dict:
+    @mcp.tool(
+        name="http.fetch",
+        description="HTTP request to an allowlisted host. Requires http.fetch grant.",
+    )
+    def http_fetch(
+        url: str,
+        method: str = "GET",
+        body: str | None = None,
+        headers: dict | None = None,
+    ) -> dict:
         import urllib.error
         import urllib.request
 
@@ -16,7 +24,12 @@ def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
         try:
             check_capability(ctx.grants, "http.fetch", {"url": url, "method": method})
         except GrantViolation as exc:
-            ctx.audit("http.fetch", {"url": url, "method": method}, outcome="denied", error=str(exc))
+            ctx.audit(
+                "http.fetch",
+                {"url": url, "method": method},
+                outcome="denied",
+                error=str(exc),
+            )
             raise
         req = urllib.request.Request(url, method=method.upper())
         for k, v in (headers or {}).items():

@@ -101,21 +101,23 @@ def test_digest_changes_when_effective_extra_args_change() -> None:
     r_a = adapter.render(
         agent,
         Path("/tmp/workdir"),
-        runner_config=EffectiveRunnerConfig(backend="opencode", extra_args=["--agent", "a"]),
+        runner_config=EffectiveRunnerConfig(
+            backend="opencode", extra_args=["--agent", "a"]
+        ),
     )
     r_b = adapter.render(
         agent,
         Path("/tmp/workdir"),
-        runner_config=EffectiveRunnerConfig(backend="opencode", extra_args=["--agent", "b"]),
+        runner_config=EffectiveRunnerConfig(
+            backend="opencode", extra_args=["--agent", "b"]
+        ),
     )
 
     assert r_a.digest != r_b.digest
 
 
 def test_effective_model_is_passed_even_when_agent_has_legacy_model() -> None:
-    agent = _make_agent(
-        runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, model="haiku")
-    )
+    agent = _make_agent(runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, model="haiku"))
     adapter = OpenCodeBackend()
     rendered = adapter.render(
         agent,

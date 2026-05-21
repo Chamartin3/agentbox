@@ -44,6 +44,7 @@ def _no_backend_detail(exc: NoBackendAvailable) -> str:
         f"Registered backends: {sorted(loaded)}."
     )
 
+
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 
@@ -185,7 +186,9 @@ def list_runs(
     if not paginated and not any(
         [status, executor, q, since, until, offset, agent_version]
     ):
-        return [_enrich(r.__dict__) for r in store.list_runs(limit=limit, agent_id=agent)]
+        return [
+            _enrich(r.__dict__) for r in store.list_runs(limit=limit, agent_id=agent)
+        ]
     items, total = store.list_runs_paged(
         agent_id=agent,
         status=status,
@@ -486,9 +489,7 @@ def get_run(run_id: str) -> dict:
     # Derive stable top-level fields so the UI doesn't have to drill
     # into the snapshot blob.
     run_dict["backend"] = snap.get("backend") if isinstance(snap, dict) else None
-    run_dict["configured_model"] = (
-        snap.get("model") if isinstance(snap, dict) else None
-    )
+    run_dict["configured_model"] = snap.get("model") if isinstance(snap, dict) else None
     run_dict["reported_model"] = usage.get("model") if usage else None
 
     return {"run": run_dict, "usage": usage, "guardrails": guardrails}

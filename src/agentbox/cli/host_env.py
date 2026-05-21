@@ -51,7 +51,9 @@ def he_grants(workspace_id: str) -> None:
     store = get_store()
     row = store.get_workspace_host_env(workspace_id)
     if not row:
-        console.print(f"[yellow]No host-env grant for workspace {workspace_id!r}.[/yellow]")
+        console.print(
+            f"[yellow]No host-env grant for workspace {workspace_id!r}.[/yellow]"
+        )
         return
 
     meta = Table.grid(padding=(0, 2))
@@ -61,7 +63,9 @@ def he_grants(workspace_id: str) -> None:
     meta.add_row("profile_id", row.get("profile_id") or "—")
     meta.add_row("changelog", row.get("changelog") or "—")
     meta.add_row("created_at", row.get("created_at") or "—")
-    console.print(Panel(meta, title=f"Host-env grant — {workspace_id}", border_style="cyan"))
+    console.print(
+        Panel(meta, title=f"Host-env grant — {workspace_id}", border_style="cyan")
+    )
 
     resolved = store.resolve_workspace_host_env(workspace_id)
     grants = resolved.get("grants") or {}
@@ -83,7 +87,9 @@ def he_audit(run_id: str) -> None:
     store = get_store()
     rows = store.list_host_env_calls_for_run(run_id)
     if not rows:
-        console.print(f"[yellow]No host-env calls recorded for run {run_id!r}.[/yellow]")
+        console.print(
+            f"[yellow]No host-env calls recorded for run {run_id!r}.[/yellow]"
+        )
         return
 
     table = Table(
@@ -100,7 +106,9 @@ def he_audit(run_id: str) -> None:
     table.add_column("Created at", style="dim")
     for r in rows:
         status = r.get("status") or ""
-        status_display = "[green]ok[/green]" if status == "ok" else f"[red]{status}[/red]"
+        status_display = (
+            "[green]ok[/green]" if status == "ok" else f"[red]{status}[/red]"
+        )
         table.add_row(
             r["id"],
             r.get("workspace_id") or "—",

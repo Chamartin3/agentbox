@@ -37,9 +37,12 @@ def _load_group(group: str) -> dict[str, type]:
         if ep.name in out:
             logger.warning(
                 "agentbox: duplicate plugin name %r in %r; %s.%s overwritten by %s.%s",
-                ep.name, group,
-                out[ep.name].__module__, out[ep.name].__name__,
-                cls.__module__, cls.__name__,
+                ep.name,
+                group,
+                out[ep.name].__module__,
+                out[ep.name].__name__,
+                cls.__module__,
+                cls.__name__,
             )
         out[ep.name] = cls
     _LOAD_FAILURES[group] = failures

@@ -22,7 +22,9 @@ def wr_list(workspace_id: str) -> None:
     store = get_store()
     rows = store.list_workspace_file_bindings(workspace_id)
     if not rows:
-        console.print(f"[yellow]No file bindings for workspace {workspace_id!r}.[/yellow]")
+        console.print(
+            f"[yellow]No file bindings for workspace {workspace_id!r}.[/yellow]"
+        )
         return
 
     table = Table(
@@ -54,8 +56,12 @@ def wr_set(
     workspace_id: str,
     dest_path: str,
     resource_slug: str,
-    mode: str = typer.Option("copy", "--mode", help="Materialize mode: copy|symlink|mount"),
-    reason: str = typer.Option("", "--reason", "-r", help="Reason for change (min 3 chars)"),
+    mode: str = typer.Option(
+        "copy", "--mode", help="Materialize mode: copy|symlink|mount"
+    ),
+    reason: str = typer.Option(
+        "", "--reason", "-r", help="Reason for change (min 3 chars)"
+    ),
 ) -> None:
     """Add or replace a workspace file binding for a dest_path.
 
@@ -95,7 +101,9 @@ def wr_dry_run(workspace_id: str) -> None:
     store = get_store()
     resolved = resolve_workspace_resources(store, workspace_id)
     if not resolved:
-        console.print(f"[yellow]No workspace resource bindings for {workspace_id!r}.[/yellow]")
+        console.print(
+            f"[yellow]No workspace resource bindings for {workspace_id!r}.[/yellow]"
+        )
         return
 
     table = Table(

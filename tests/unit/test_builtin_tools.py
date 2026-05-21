@@ -40,17 +40,20 @@ class TestRegistry:
 
 
 class TestBackendNames:
-    @pytest.mark.parametrize("tool_name,runner,expected", [
-        ("fs.read", "claude_code", "Read"),
-        ("fs.write", "claude_code", "Write"),
-        ("fs.list", "claude_code", "LS"),
-        ("shell.exec", "claude_code", "Bash"),
-        ("http.fetch", "claude_code", "WebFetch"),
-        ("web.search", "claude_code", "WebSearch"),
-        ("fs.read", "opencode", "read_file"),
-        ("fs.write", "opencode", "write_file"),
-        ("shell.exec", "opencode", "run_command"),
-    ])
+    @pytest.mark.parametrize(
+        "tool_name,runner,expected",
+        [
+            ("fs.read", "claude_code", "Read"),
+            ("fs.write", "claude_code", "Write"),
+            ("fs.list", "claude_code", "LS"),
+            ("shell.exec", "claude_code", "Bash"),
+            ("http.fetch", "claude_code", "WebFetch"),
+            ("web.search", "claude_code", "WebSearch"),
+            ("fs.read", "opencode", "read_file"),
+            ("fs.write", "opencode", "write_file"),
+            ("shell.exec", "opencode", "run_command"),
+        ],
+    )
     def test_parity_matrix(self, tool_name: str, runner: str, expected: str):
         result = backend_tool_name(tool_name, runner)
         assert result == expected, (

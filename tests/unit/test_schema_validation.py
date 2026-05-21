@@ -79,7 +79,9 @@ def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
     executor = _make_executor(tmp_path)
 
     ok, err, _via = executor._validate_output(
-        json.dumps({"name": "test"}), agent, tmp_path  # missing "value"
+        json.dumps({"name": "test"}),
+        agent,
+        tmp_path,  # missing "value"
     )
     assert not ok
     assert "value" in err
@@ -115,7 +117,9 @@ def test_validate_output_rejects_enum_violation(tmp_path: Path) -> None:
     )
     assert not ok
 
-    ok, _err, _via = executor._validate_output(json.dumps({"status": "ok"}), agent, tmp_path)
+    ok, _err, _via = executor._validate_output(
+        json.dumps({"status": "ok"}), agent, tmp_path
+    )
     assert ok
 
 

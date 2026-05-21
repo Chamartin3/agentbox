@@ -62,7 +62,9 @@ class XAIAdapter(HTTPProviderAdapter):
         for url in (self._models_url(base_url), self._fallback_url(base_url)):
             try:
                 async with httpx.AsyncClient() as client:
-                    resp = await client.get(url, headers=headers, timeout=self.request_timeout_s)
+                    resp = await client.get(
+                        url, headers=headers, timeout=self.request_timeout_s
+                    )
                     resp.raise_for_status()
                     return self._parse_response(resp.json())
             except Exception as exc:

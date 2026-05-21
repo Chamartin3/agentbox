@@ -21,11 +21,7 @@ from agentbox.mcp.schemas import clamp_limit
 
 def _version_prompt_content(version: dict) -> str:
     """Return the prompt body stored on an ``agent_versions`` row."""
-    return (
-        version.get("prompt_content")
-        or version.get("prompt_snapshot")
-        or ""
-    )
+    return version.get("prompt_content") or version.get("prompt_snapshot") or ""
 
 
 def _version_meta(version: dict) -> dict:
@@ -63,8 +59,7 @@ def register(mcp: FastMCP) -> None:
         if version is not None:
             row = ctx.store.get_version(agent_id, version)
             if row is None:
-                return {"error": "not_found", "agent_id": agent_id,
-                        "version": version}
+                return {"error": "not_found", "agent_id": agent_id, "version": version}
             return {
                 "content": _version_prompt_content(row),
                 **_version_meta(row),
@@ -128,8 +123,10 @@ def register(mcp: FastMCP) -> None:
         ``reason`` is required (min length 3) and stored as the version's
         changelog."""
         if not reason or len(reason.strip()) < 3:
-            return {"error": "reason_required",
-                    "detail": "reason must be at least 3 characters"}
+            return {
+                "error": "reason_required",
+                "detail": "reason must be at least 3 characters",
+            }
         ctx = get_context()
         if resolve_agent(agent_id, store=ctx.store, loader=ctx.loader) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
@@ -161,8 +158,10 @@ def register(mcp: FastMCP) -> None:
         clones ``target_version``'s config + prompt into a new row and
         pins it active."""
         if not reason or len(reason.strip()) < 3:
-            return {"error": "reason_required",
-                    "detail": "reason must be at least 3 characters"}
+            return {
+                "error": "reason_required",
+                "detail": "reason must be at least 3 characters",
+            }
         ctx = get_context()
         if resolve_agent(agent_id, store=ctx.store, loader=ctx.loader) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
@@ -178,24 +177,28 @@ def register(mcp: FastMCP) -> None:
         }
 
     @mcp.tool
-    def get_prompt_diff(
-        agent_id: str, from_version: int, to_version: int
-    ) -> dict:
+    def get_prompt_diff(agent_id: str, from_version: int, to_version: int) -> dict:
         """Unified diff of ``prompt_content`` between two agent versions."""
         store = get_context().store
         a = store.get_version(agent_id, from_version)
         b = store.get_version(agent_id, to_version)
         if a is None or b is None:
-            return {"error": "version_not_found",
-                    "from": from_version, "to": to_version}
+            return {
+                "error": "version_not_found",
+                "from": from_version,
+                "to": to_version,
+            }
         diff = difflib.unified_diff(
             _version_prompt_content(a).splitlines(keepends=True),
             _version_prompt_content(b).splitlines(keepends=True),
             fromfile=f"v{from_version}",
             tofile=f"v{to_version}",
         )
-        return {"diff": "".join(diff),
-                "from_version": from_version, "to_version": to_version}
+        return {
+            "diff": "".join(diff),
+            "from_version": from_version,
+            "to_version": to_version,
+        }
 
     @mcp.tool
     def get_agent_prompt_fragments(agent_id: str) -> dict:
@@ -214,12 +217,18 @@ def register(mcp: FastMCP) -> None:
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if agent.source_path is None:
-            return {"error": "not_a_bundle", "agent_id": agent_id,
-                    "detail": "agent has no bundle source_path"}
+            return {
+                "error": "not_a_bundle",
+                "agent_id": agent_id,
+                "detail": "agent has no bundle source_path",
+            }
         bundle_path = Path(agent.source_path).parent
         if not (bundle_path / "agent.toml").exists():
-            return {"error": "not_a_bundle", "agent_id": agent_id,
-                    "detail": f"no agent.toml in {bundle_path}"}
+            return {
+                "error": "not_a_bundle",
+                "agent_id": agent_id,
+                "detail": f"no agent.toml in {bundle_path}",
+            }
         shared_roots: dict[str, Path] = {
             key: ctx.settings.project_root / rel
             for key, rel in (ctx.store.get_project_shared_assets() or {}).items()
@@ -260,11 +269,17 @@ def register(mcp: FastMCP) -> None:
             return {"error": "not_found", "run_id": run_id}
         raw = store.get_run_prompt(run_id)
         if raw is None:
-            return {"run_id": run_id, "fragments": [],
-                    "detail": "no fragments captured for this run"}
+            return {
+                "run_id": run_id,
+                "fragments": [],
+                "detail": "no fragments captured for this run",
+            }
         try:
             fragments = json.loads(raw)
         except json.JSONDecodeError as exc:
-            return {"error": "fragments_unreadable", "run_id": run_id,
-                    "detail": str(exc)}
+            return {
+                "error": "fragments_unreadable",
+                "run_id": run_id,
+                "detail": str(exc),
+            }
         return {"run_id": run_id, "fragments": fragments}

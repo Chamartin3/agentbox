@@ -21,7 +21,12 @@ from agentbox.core.resource.importers.base import (
     ResourceImporter,
 )
 
-TEXT_MIME_PREFIXES = ("text/", "application/json", "application/xml", "application/yaml")
+TEXT_MIME_PREFIXES = (
+    "text/",
+    "application/json",
+    "application/xml",
+    "application/yaml",
+)
 DEFAULT_EXCLUDES = (
     ".git/*",
     "__pycache__/*",

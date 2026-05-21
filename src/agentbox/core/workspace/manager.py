@@ -87,7 +87,10 @@ Edit freely — changes take effect on the next run.
 
 
 def ensure(
-    agent: AgentDef, settings: Settings, store: object | None = None, scaffold: bool = True
+    agent: AgentDef,
+    settings: Settings,
+    store: object | None = None,
+    scaffold: bool = True,
 ) -> Path:
     """Create the workspace if missing. Optionally scaffold a starter CLAUDE.md."""
     path, _ = resolve_path(agent, settings, store)

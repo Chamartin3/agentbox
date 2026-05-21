@@ -58,8 +58,12 @@ def pb_set(
     agent_id: str,
     marker: str,
     resource_slug: str,
-    mode: str = typer.Option("inline", "--mode", help="Binding mode: inline|skill_primer|name_only|manifest"),
-    reason: str = typer.Option("", "--reason", "-r", help="Reason for change (min 3 chars)"),
+    mode: str = typer.Option(
+        "inline", "--mode", help="Binding mode: inline|skill_primer|name_only|manifest"
+    ),
+    reason: str = typer.Option(
+        "", "--reason", "-r", help="Reason for change (min 3 chars)"
+    ),
 ) -> None:
     """Add or replace a single prompt binding for an agent.
 

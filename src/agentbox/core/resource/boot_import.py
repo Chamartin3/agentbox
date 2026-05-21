@@ -209,7 +209,9 @@ def import_repo_resources(store: SessionStore, root: Path) -> dict:
             if name in seen_skill_names:
                 logger.warning(
                     "boot-import skills: duplicate skill %r at %s (already imported from %s) — skipping",
-                    name, skill_dir, seen_skill_names[name],
+                    name,
+                    skill_dir,
+                    seen_skill_names[name],
                 )
                 continue
             seen_skill_names[name] = skill_dir
@@ -233,37 +235,60 @@ def import_repo_resources(store: SessionStore, root: Path) -> dict:
                 try:
                     content = fpath.read_bytes()
                     schema_importer = SchemaImporter(
-                        filename=fname, content=content, import_source="toml_migration",
+                        filename=fname,
+                        content=content,
+                        import_source="toml_migration",
                     )
-                    _safe(slug, lambda s=slug, n=agent_dir.name, t=tag, imp=schema_importer, p=fpath: _import_one(
-                        store, slug=s, type_="schema",
-                        display_name=f"{n} {t}",
-                        description=f"Imported from {p.relative_to(root)}",
-                        importer=imp,
-                        tags=(t, n),
-                        metadata_extra={"role": t, "agent_id": n},
-                    ))
+                    _safe(
+                        slug,
+                        lambda s=slug, n=agent_dir.name, t=tag, imp=schema_importer, p=fpath: (
+                            _import_one(
+                                store,
+                                slug=s,
+                                type_="schema",
+                                display_name=f"{n} {t}",
+                                description=f"Imported from {p.relative_to(root)}",
+                                importer=imp,
+                                tags=(t, n),
+                                metadata_extra={"role": t, "agent_id": n},
+                            )
+                        ),
+                    )
                 except (OSError, ValueError):
                     # Fall back to document type if schema parse fails — still surface it.
-                    _safe(slug, lambda p=fpath, s=slug, n=agent_dir.name, t=tag: _import_one(
-                        store, slug=s, type_="document",
-                        display_name=f"{n} {t}",
-                        description=f"Imported from {p.relative_to(root)}",
-                        importer=HostPathImporter(root=p),
-                        tags=(t, n),
-                        metadata_extra={"role": t, "agent_id": n, "schema_parse_failed": True},
-                    ))
+                    _safe(
+                        slug,
+                        lambda p=fpath, s=slug, n=agent_dir.name, t=tag: _import_one(
+                            store,
+                            slug=s,
+                            type_="document",
+                            display_name=f"{n} {t}",
+                            description=f"Imported from {p.relative_to(root)}",
+                            importer=HostPathImporter(root=p),
+                            tags=(t, n),
+                            metadata_extra={
+                                "role": t,
+                                "agent_id": n,
+                                "schema_parse_failed": True,
+                            },
+                        ),
+                    )
             sys_prompt = agent_dir / "prompts" / "system.md"
             if sys_prompt.is_file():
                 slug = f"agent/{agent_dir.name}/system_prompt"
-                _safe(slug, lambda p=sys_prompt, s=slug, n=agent_dir.name: _import_one(
-                    store, slug=s, type_=ResourceType.DOCUMENT,
-                    display_name=f"{n} system prompt",
-                    description=f"Imported from {p.relative_to(root)}",
-                    importer=HostPathImporter(root=p),
-                    tags=("system_prompt", n),
-                    metadata_extra={"role": "system_fragment", "agent_id": n},
-                ))
+                _safe(
+                    slug,
+                    lambda p=sys_prompt, s=slug, n=agent_dir.name: _import_one(
+                        store,
+                        slug=s,
+                        type_=ResourceType.DOCUMENT,
+                        display_name=f"{n} system prompt",
+                        description=f"Imported from {p.relative_to(root)}",
+                        importer=HostPathImporter(root=p),
+                        tags=("system_prompt", n),
+                        metadata_extra={"role": "system_fragment", "agent_id": n},
+                    ),
+                )
 
     # 3) Shared scopes — one folder resource per top-level subdirectory.
     shared_root = root / DEFAULT_SHARED_DIR
@@ -272,15 +297,25 @@ def import_repo_resources(store: SessionStore, root: Path) -> dict:
             if not scope_dir.is_dir():
                 continue
             slug = f"shared:{scope_dir.name}"
-            _safe(slug, lambda d=scope_dir, s=slug: _import_one(
-                store, slug=s, type_=ResourceType.FOLDER,
-                display_name=d.name,
-                description=f"Imported from {d.relative_to(root)}",
-                importer=HostPathImporter(root=d),
-                tags=("reference", d.name),
-            ))
+            _safe(
+                slug,
+                lambda d=scope_dir, s=slug: _import_one(
+                    store,
+                    slug=s,
+                    type_=ResourceType.FOLDER,
+                    display_name=d.name,
+                    description=f"Imported from {d.relative_to(root)}",
+                    importer=HostPathImporter(root=d),
+                    tags=("reference", d.name),
+                ),
+            )
 
-    summary = {"created": created, "updated": updated, "skipped": skipped, "failed": failed}
+    summary = {
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "failed": failed,
+    }
     logger.info("boot-import repo_resources: %s", summary)
     return summary
 
@@ -313,21 +348,27 @@ def sweep_workspace_skill_bindings(store: SessionStore, manifest) -> dict:
             if res is None:
                 logger.warning(
                     "boot-import bindings: workspace %r references missing skill %r",
-                    ws.name, skill_name,
+                    ws.name,
+                    skill_name,
                 )
                 continue
-            bindings.append({
-                "resource_id": res["id"],
-                "target_path": f".claude/skills/{skill_name}",
-                "materialize_mode": "symlink",
-                "on_conflict": "overwrite",
-            })
+            bindings.append(
+                {
+                    "resource_id": res["id"],
+                    "target_path": f".claude/skills/{skill_name}",
+                    "materialize_mode": "symlink",
+                    "on_conflict": "overwrite",
+                }
+            )
 
         if not bindings:
             continue
         try:
             store.replace_workspace_file_bindings(
-                ws.name, bindings, reason=DEFAULT_BINDING_REASON, actor="boot_sweep",
+                ws.name,
+                bindings,
+                reason=DEFAULT_BINDING_REASON,
+                actor="boot_sweep",
             )
             workspaces_wired += 1
             bindings_added += len(bindings)
@@ -352,17 +393,19 @@ def _slug_for_ref_path(path_str: str, bundle_rel: str | None) -> str:
         ``agent/draft.writer/prompts/refs/voice.md``
     """
     if path_str.startswith("shared://"):
-        return f"shared:{path_str[len('shared://'):]}"
+        return f"shared:{path_str[len('shared://') :]}"
     return f"agent/{bundle_rel}/{path_str}" if bundle_rel else path_str
 
 
-def _resolve_ref_file(path_str: str, project_root: Path, bundle_dir: Path | None) -> Path | None:
+def _resolve_ref_file(
+    path_str: str, project_root: Path, bundle_dir: Path | None
+) -> Path | None:
     """Return the absolute path for a composition reference entry.
 
     Returns None when the file cannot be located on disk.
     """
     if path_str.startswith("shared://"):
-        candidate = project_root / "shared" / path_str[len("shared://"):]
+        candidate = project_root / "shared" / path_str[len("shared://") :]
     elif bundle_dir is not None:
         candidate = bundle_dir / path_str
     else:
@@ -412,17 +455,20 @@ def import_composition_references(store: SessionStore, root: Path, manifest) -> 
                 if existing_res is None:
                     logger.warning(
                         "boot-import refs: agent %s references missing shared resource %r",
-                        agent.id, shared_id,
+                        agent.id,
+                        shared_id,
                     )
                     continue
-                bindings.append({
-                    "resource_id": existing_res["id"],
-                    "marker": f"ref_{idx}",
-                    "mode": "inline",
-                    "attach_as_reference": True,
-                    "required": False,
-                    "display_order": idx,
-                })
+                bindings.append(
+                    {
+                        "resource_id": existing_res["id"],
+                        "marker": f"ref_{idx}",
+                        "mode": "inline",
+                        "attach_as_reference": True,
+                        "required": False,
+                        "display_order": idx,
+                    }
+                )
                 continue
 
             if not path_str:
@@ -434,7 +480,8 @@ def import_composition_references(store: SessionStore, root: Path, manifest) -> 
             if fpath is None:
                 logger.warning(
                     "boot-import refs: agent %s reference %r not found on disk",
-                    agent.id, path_str,
+                    agent.id,
+                    path_str,
                 )
                 continue
 
@@ -442,10 +489,13 @@ def import_composition_references(store: SessionStore, root: Path, manifest) -> 
 
             def _do_doc(p=fpath, s=slug, dn=display_name):
                 return _import_one(
-                    store, slug=s, type_=ResourceType.DOCUMENT,
+                    store,
+                    slug=s,
+                    type_=ResourceType.DOCUMENT,
                     display_name=dn,
                     description=f"Imported from {p.relative_to(root)}"
-                        if root in p.parents else f"Imported from {p}",
+                    if root in p.parents
+                    else f"Imported from {p}",
                     importer=HostPathImporter(root=p),
                     tags=("reference",),
                 )
@@ -457,27 +507,31 @@ def import_composition_references(store: SessionStore, root: Path, manifest) -> 
             except Exception:
                 logger.exception(
                     "boot-import refs: failed to import %r for agent %s",
-                    path_str, agent.id,
+                    path_str,
+                    agent.id,
                 )
                 continue
 
             res = store.get_repo_resource_by_slug(slug)
             if res is None:
                 continue
-            bindings.append({
-                "resource_id": res["id"],
-                "marker": f"ref_{idx}",
-                "mode": "inline",
-                "attach_as_reference": True,
-                "required": False,
-                "display_order": idx,
-            })
+            bindings.append(
+                {
+                    "resource_id": res["id"],
+                    "marker": f"ref_{idx}",
+                    "mode": "inline",
+                    "attach_as_reference": True,
+                    "required": False,
+                    "display_order": idx,
+                }
+            )
 
         if not bindings:
             continue
         try:
             store.replace_prompt_bindings(
-                agent.id, bindings,
+                agent.id,
+                bindings,
                 reason="boot: auto-imported from composition.references",
                 actor="boot_sweep",
             )
@@ -485,7 +539,8 @@ def import_composition_references(store: SessionStore, root: Path, manifest) -> 
             bindings_added += len(bindings)
         except Exception:
             logger.exception(
-                "boot-import refs: failed to write bindings for agent %s", agent.id,
+                "boot-import refs: failed to write bindings for agent %s",
+                agent.id,
             )
 
     summary = {

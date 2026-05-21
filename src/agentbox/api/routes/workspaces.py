@@ -66,7 +66,11 @@ def list_workspaces(
     ws_root = settings.workspaces_root
     disk_ids: set[str] = set()
     if ws_root.exists():
-        disk_ids = {p.name for p in ws_root.iterdir() if p.is_dir() and not p.name.startswith(".")}
+        disk_ids = {
+            p.name
+            for p in ws_root.iterdir()
+            if p.is_dir() and not p.name.startswith(".")
+        }
 
     # Agent assignments from the manifest (decoration only).
     workspace_agents: dict[str, list[str]] = {}
@@ -175,8 +179,10 @@ def delete_workspace_registry(name: str, purge_disk: bool = False) -> dict:
     counts = store.delete_workspace_cascade(name)
     disk_removed = False
     if purge_disk:
-        ws_path = settings.project_root / existing["path"] if existing.get("path") else (
-            settings.workspaces_root / name
+        ws_path = (
+            settings.project_root / existing["path"]
+            if existing.get("path")
+            else (settings.workspaces_root / name)
         )
         if ws_path.exists() and ws_path.is_dir():
             shutil.rmtree(ws_path)
@@ -209,7 +215,9 @@ def _resolve_workspace(name: str) -> tuple[Path, Path]:
         if w is not None and w.path:
             rel_path = w.path
     ws_path = (
-        settings.project_root / rel_path if rel_path else settings.workspaces_root / name
+        settings.project_root / rel_path
+        if rel_path
+        else settings.workspaces_root / name
     )
     return ws_path, settings.project_root
 
@@ -246,10 +254,12 @@ _FILE_HIDE_PREFIXES = (
 # executor / env-doc renderer / config generator). They have dedicated UI
 # surfaces, so excluding them from the Files list avoids confusing users into
 # editing files that will be silently overwritten.
-_RENDERED_ARTIFACT_FILES = frozenset({
-    "CLAUDE.md",
-    "AGENTS.md",
-})
+_RENDERED_ARTIFACT_FILES = frozenset(
+    {
+        "CLAUDE.md",
+        "AGENTS.md",
+    }
+)
 
 
 def _is_user_file(rel_path: str) -> bool:
@@ -359,7 +369,9 @@ def _derive_allowed_tools(workspace_id: str) -> list[str]:
     servers = store.get_project_mcp_servers()
     mcp_server_name = servers[0].name if servers else "mcp"
     claude_prefix = f"mcp__{mcp_server_name}__"
-    discovered = {mcp_server_name: [t for tools in tool_manifest.values() for t in tools]}
+    discovered = {
+        mcp_server_name: [t for tools in tool_manifest.values() for t in tools]
+    }
     resolved = store.resolve_workspace_mcp(
         workspace_id,
         [{"name": mcp_server_name, "config": {}}],

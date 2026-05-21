@@ -144,7 +144,9 @@ class ResourcesMixin:
         created_by: str | None = None,
     ) -> dict:
         if type not in RESOURCE_TYPES:
-            raise ValueError(f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}")
+            raise ValueError(
+                f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}"
+            )
         if not slug or not slug.strip():
             raise ValueError("slug is required")
         rid = uuid.uuid4().hex
@@ -180,7 +182,9 @@ class ResourcesMixin:
         values: dict = {}
         if type is not None:
             if type not in RESOURCE_TYPES:
-                raise ValueError(f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}")
+                raise ValueError(
+                    f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}"
+                )
             values["type"] = type
         if display_name is not None:
             values["display_name"] = display_name
@@ -238,7 +242,11 @@ class ResourcesMixin:
             )
         if clauses:
             stmt = stmt.where(and_(*clauses))
-        stmt = stmt.order_by(resources_table.c.updated_at.desc()).limit(limit).offset(offset)
+        stmt = (
+            stmt.order_by(resources_table.c.updated_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         with self.engine.connect() as conn:
             return [dict(r._mapping) for r in conn.execute(stmt)]
 
@@ -274,8 +282,9 @@ class ResourcesMixin:
     def _next_version_number(self, resource_id: str) -> int:
         with self.engine.connect() as conn:
             row = conn.execute(
-                select(func.coalesce(func.max(resource_versions.c.version_number), 0))
-                .where(resource_versions.c.resource_id == resource_id)
+                select(
+                    func.coalesce(func.max(resource_versions.c.version_number), 0)
+                ).where(resource_versions.c.resource_id == resource_id)
             ).first()
         return int(row[0]) + 1 if row else 1
 
@@ -326,7 +335,9 @@ class ResourcesMixin:
                     else None,
                     content_hash=content_hash,
                     byte_size=byte_size,
-                    metadata_json=json.dumps(metadata) if metadata is not None else None,
+                    metadata_json=json.dumps(metadata)
+                    if metadata is not None
+                    else None,
                     changelog=changelog,
                     created_at=now,
                     created_by=created_by,

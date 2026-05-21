@@ -50,7 +50,12 @@ def test_string_constraints_enforced() -> None:
         {
             "type": "object",
             "properties": {
-                "code": {"type": "string", "minLength": 3, "maxLength": 4, "pattern": "^[A-Z]+$"}
+                "code": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 4,
+                    "pattern": "^[A-Z]+$",
+                }
             },
             "required": ["code"],
         }

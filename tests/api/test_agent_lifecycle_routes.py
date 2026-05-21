@@ -207,9 +207,7 @@ class TestRollbackVersion:
 
 
 class TestPublishWebhook:
-    def test_publish_fires_webhook_when_configured(
-        self, isolated_data_dir
-    ) -> None:
+    def test_publish_fires_webhook_when_configured(self, isolated_data_dir) -> None:
         import json
 
         from sqlalchemy import update
@@ -261,9 +259,7 @@ class TestPublishWebhook:
         assert call_kwargs["webhook_url"] == "http://example.com/webhook"
         assert call_kwargs["reason"] == "Test publish webhook"
 
-    def test_publish_skips_webhook_when_url_missing(
-        self, isolated_data_dir
-    ) -> None:
+    def test_publish_skips_webhook_when_url_missing(self, isolated_data_dir) -> None:
         import json
 
         from sqlalchemy import update

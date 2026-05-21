@@ -66,7 +66,11 @@ def migrate_shared_resources_to_repo(store) -> MigrationReport:
 
         slug = _slug_for(rec)
         existing = next(
-            (r for r in store.list_repo_resources(query=slug, limit=10) if r["slug"] == slug),
+            (
+                r
+                for r in store.list_repo_resources(query=slug, limit=10)
+                if r["slug"] == slug
+            ),
             None,
         )
         if existing:
@@ -93,7 +97,9 @@ def migrate_shared_resources_to_repo(store) -> MigrationReport:
                     "legacy_version": rec.version,
                     "legacy_kind": rec.kind,
                 },
-                metadata={"legacy_role": rec.kind} if target_type == "document" else None,
+                metadata={"legacy_role": rec.kind}
+                if target_type == "document"
+                else None,
                 draft=False,
                 created_by=rec.author,
             )

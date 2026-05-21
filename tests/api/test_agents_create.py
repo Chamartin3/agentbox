@@ -77,9 +77,7 @@ def test_upload_file_to_draft_succeeds(client: Any) -> None:
         "name": "system.md",
         "content": "# System Prompt\nYou are helpful.",
     }
-    upload_resp = client.post(
-        "/api/agents/test_agent/versions/1/files", json=file_req
-    )
+    upload_resp = client.post("/api/agents/test_agent/versions/1/files", json=file_req)
     assert upload_resp.status_code == 201
     data = upload_resp.json()
     assert isinstance(data["file_id"], int)
@@ -111,9 +109,7 @@ def test_upload_file_to_published_returns_409(client: Any) -> None:
         "name": "system.md",
         "content": "# System Prompt",
     }
-    upload_resp = client.post(
-        "/api/agents/test_agent/versions/1/files", json=file_req
-    )
+    upload_resp = client.post("/api/agents/test_agent/versions/1/files", json=file_req)
     assert upload_resp.status_code == 409
 
 
@@ -136,9 +132,7 @@ def test_upload_duplicate_sha_returns_409(client: Any) -> None:
         "name": "system.md",
         "content": "Same content",
     }
-    upload_resp1 = client.post(
-        "/api/agents/test_agent/versions/1/files", json=file_req
-    )
+    upload_resp1 = client.post("/api/agents/test_agent/versions/1/files", json=file_req)
     assert upload_resp1.status_code == 201
 
     # Try to upload same content again (different name, same sha256)
@@ -172,16 +166,12 @@ def test_delete_file_from_draft_succeeds_returns_204(client: Any) -> None:
         "name": "system.md",
         "content": "# System Prompt",
     }
-    upload_resp = client.post(
-        "/api/agents/test_agent/versions/1/files", json=file_req
-    )
+    upload_resp = client.post("/api/agents/test_agent/versions/1/files", json=file_req)
     assert upload_resp.status_code == 201
     file_id = upload_resp.json()["file_id"]
 
     # Delete file
-    delete_resp = client.delete(
-        f"/api/agents/test_agent/versions/1/files/{file_id}"
-    )
+    delete_resp = client.delete(f"/api/agents/test_agent/versions/1/files/{file_id}")
     assert delete_resp.status_code == 204
 
     # Verify file is gone
@@ -209,9 +199,7 @@ def test_delete_file_from_published_returns_409(client: Any) -> None:
         "name": "system.md",
         "content": "# System Prompt",
     }
-    upload_resp = client.post(
-        "/api/agents/test_agent/versions/1/files", json=file_req
-    )
+    upload_resp = client.post("/api/agents/test_agent/versions/1/files", json=file_req)
     assert upload_resp.status_code == 201
     file_id = upload_resp.json()["file_id"]
 
@@ -220,9 +208,7 @@ def test_delete_file_from_published_returns_409(client: Any) -> None:
     store.publish_version("test_agent", 1, "Published")
 
     # Try to delete from published version
-    delete_resp = client.delete(
-        f"/api/agents/test_agent/versions/1/files/{file_id}"
-    )
+    delete_resp = client.delete(f"/api/agents/test_agent/versions/1/files/{file_id}")
     assert delete_resp.status_code == 409
 
 

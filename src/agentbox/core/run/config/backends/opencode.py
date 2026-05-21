@@ -57,9 +57,7 @@ class OpenCodeConfigGenerator(BackendConfigGenerator):
         }
 
         if mcp is not None:
-            config["mcp"] = {
-                mcp.server_name: self._build_mcp_entry(mcp)
-            }
+            config["mcp"] = {mcp.server_name: self._build_mcp_entry(mcp)}
 
         oc_json.write_text(json.dumps(config, indent=2), encoding="utf-8")
 

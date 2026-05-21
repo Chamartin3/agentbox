@@ -56,9 +56,7 @@ class ZipUploadImporter(ResourceImporter):
 
             entries = list(root.iterdir())
             single_root = (
-                entries[0]
-                if len(entries) == 1 and entries[0].is_dir()
-                else root
+                entries[0] if len(entries) == 1 and entries[0].is_dir() else root
             )
 
             importer_cls = SkillImporter if self.as_skill else HostPathImporter

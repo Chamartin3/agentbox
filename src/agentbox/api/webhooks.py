@@ -145,9 +145,7 @@ def _resolve_webhook_url(agent: AgentDef | None) -> str | None:
     return getattr(settings, "completion_webhook_url", None)
 
 
-def _build_payload(
-    run: RunRecord, store: SessionStore
-) -> dict[str, Any]:
+def _build_payload(run: RunRecord, store: SessionStore) -> dict[str, Any]:
     usage = store.get_usage(run.id)
     duration_ms: int | None = None
     if run.created_at and run.finished_at:
@@ -181,9 +179,7 @@ def _on_delivery_done(
     _apply_delivery_outcome(store, run_id, delivered)
 
 
-def _apply_delivery_outcome(
-    store: SessionStore, run_id: str, delivered: bool
-) -> None:
+def _apply_delivery_outcome(store: SessionStore, run_id: str, delivered: bool) -> None:
     """Update a run's status based on webhook delivery outcome.
 
     Shared by the background done-callback and the synchronous
@@ -282,8 +278,13 @@ async def _deliver_with_events(
             body_signals_failure = _response_signals_failure(resp.text)
             if 200 <= resp.status_code < 300 and not body_signals_failure:
                 _record_delivery(
-                    store, run_id, attempt + 1, url, payload,
-                    status=resp.status_code, body=resp.text[:500],
+                    store,
+                    run_id,
+                    attempt + 1,
+                    url,
+                    payload,
+                    status=resp.status_code,
+                    body=resp.text[:500],
                     latency=latency,
                 )
                 _emit(
@@ -304,16 +305,27 @@ async def _deliver_with_events(
             else:
                 last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
             _record_delivery(
-                store, run_id, attempt + 1, url, payload,
-                status=resp.status_code, body=resp.text[:500],
-                latency=latency, error=last_error,
+                store,
+                run_id,
+                attempt + 1,
+                url,
+                payload,
+                status=resp.status_code,
+                body=resp.text[:500],
+                latency=latency,
+                error=last_error,
             )
         except httpx.HTTPError as exc:
             latency = int((datetime.now() - attempt_start).total_seconds() * 1000)
             last_error = f"{type(exc).__name__}: {exc}"
             _record_delivery(
-                store, run_id, attempt + 1, url, payload,
-                latency=latency, error=last_error,
+                store,
+                run_id,
+                attempt + 1,
+                url,
+                payload,
+                latency=latency,
+                error=last_error,
             )
         _emit(
             broadcaster,
@@ -358,7 +370,10 @@ def _response_signals_failure(body: str) -> bool:
     if parsed.get("ok") is False:
         return True
     status_field = parsed.get("status")
-    return bool(isinstance(status_field, str) and status_field.lower() in {"error", "failed", "fail"})
+    return bool(
+        isinstance(status_field, str)
+        and status_field.lower() in {"error", "failed", "fail"}
+    )
 
 
 def _record_delivery(

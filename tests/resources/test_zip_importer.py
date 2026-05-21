@@ -20,9 +20,7 @@ def _make_zip(files: dict[str, bytes]) -> bytes:
 
 def test_folder_zip_extracts_blobs():
     payload = _make_zip({"docs/a.txt": b"alpha", "docs/b.txt": b"beta"})
-    result = ZipUploadImporter(filename="x.zip", content=payload).run(
-        ImporterContext()
-    )
+    result = ZipUploadImporter(filename="x.zip", content=payload).run(ImporterContext())
     rel_paths = sorted(b[0] for b in result.blobs)
     assert rel_paths == ["a.txt", "b.txt"]
     assert result.suggested_type == "folder"
@@ -35,9 +33,9 @@ def test_skill_zip_requires_skill_md():
             "myskill/helper.py": b"x = 1\n",
         }
     )
-    result = ZipUploadImporter(
-        filename="s.zip", content=payload, as_skill=True
-    ).run(ImporterContext())
+    result = ZipUploadImporter(filename="s.zip", content=payload, as_skill=True).run(
+        ImporterContext()
+    )
     assert result.suggested_type == "skill"
     assert result.metadata is not None
     assert result.metadata["skill_name"] == "myskill"
@@ -55,6 +53,4 @@ def test_zip_slip_rejected():
 
 def test_bad_zip_rejected():
     with pytest.raises(ValueError, match="Not a valid zip"):
-        ZipUploadImporter(filename="x.zip", content=b"not-a-zip").run(
-            ImporterContext()
-        )
+        ZipUploadImporter(filename="x.zip", content=b"not-a-zip").run(ImporterContext())

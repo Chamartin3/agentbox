@@ -138,18 +138,14 @@ class RunnerProfileResolver:
         if runner_profile_id:
             profile = store.get_runner_profile(runner_profile_id)
             if not profile:
-                raise ValueError(
-                    f"runner profile {runner_profile_id!r} not found"
-                )
+                raise ValueError(f"runner profile {runner_profile_id!r} not found")
             is_enabled = (
                 getattr(profile, "is_enabled", True)
                 if hasattr(profile, "is_enabled")
                 else profile.get("is_enabled", True)
             )
             if not is_enabled:
-                raise ValueError(
-                    f"runner profile {runner_profile_id!r} is disabled"
-                )
+                raise ValueError(f"runner profile {runner_profile_id!r} is disabled")
             config = self._build_from_profile(
                 profile,
                 source="run_profile",
@@ -262,6 +258,4 @@ class RunnerProfileResolver:
         try:
             get_backend(backend)
         except KeyError as exc:
-            raise ValueError(
-                f"unknown backend {backend!r}: {exc}"
-            ) from exc
+            raise ValueError(f"unknown backend {backend!r}: {exc}") from exc

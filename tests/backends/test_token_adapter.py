@@ -38,7 +38,9 @@ class _Usage:
     model = "openrouter:test/model"
 
 
-def _fake_result(output: object = "assistant text", messages: list[object] | None = None):
+def _fake_result(
+    output: object = "assistant text", messages: list[object] | None = None
+):
     result = MagicMock()
     result.output = output
     result.usage = MagicMock(return_value=_Usage())
@@ -95,7 +97,13 @@ async def test_direct_mode_emits_system_user_assistant_on_success() -> None:
         events = await _collect(TokenBackend().run(_direct_rendered(), "hello", "rid"))
 
     assert [e.type for e in events] == [
-        "log", "text", "text", "log", "text", "usage", "done"
+        "log",
+        "text",
+        "text",
+        "log",
+        "text",
+        "usage",
+        "done",
     ]
     assert [getattr(e, "role", None) for e in events if e.type == "text"] == [
         "system",
@@ -156,9 +164,7 @@ async def test_direct_mode_emits_tool_call_and_result_from_message_history() -> 
         ),
     ]
     fake_agent = MagicMock()
-    fake_agent.run_stream_events = _streaming_mock(
-        _fake_result("5", messages)
-    )
+    fake_agent.run_stream_events = _streaming_mock(_fake_result("5", messages))
 
     with patch("pydantic_ai.Agent", return_value=fake_agent):
         events = await _collect(TokenBackend().run(_direct_rendered(), "2+3", "rid"))
@@ -215,7 +221,9 @@ async def test_full_agent_mode_emits_system_user_assistant() -> None:
 
 
 async def test_missing_api_key_still_emits_done_error() -> None:
-    rendered = _direct_rendered(provider="openrouter", api_key_env="AGENTBOX_MISSING_KEY")
+    rendered = _direct_rendered(
+        provider="openrouter", api_key_env="AGENTBOX_MISSING_KEY"
+    )
 
     events = await _collect(TokenBackend().run(rendered, "hello", "rid"))
 
@@ -224,7 +232,9 @@ async def test_missing_api_key_still_emits_done_error() -> None:
     assert "AGENTBOX_MISSING_KEY" in (events[-1].error or "")
 
 
-def test_role_filter_in_session_does_not_include_system_or_user_text_in_output() -> None:
+def test_role_filter_in_session_does_not_include_system_or_user_text_in_output() -> (
+    None
+):
     """System/user TextEvents are transcribed + broadcast but not added to
     the run output — only assistant turns contribute to ``output_text``.
     Logic lives on ``RunStreamSession.emit`` post-Plan 16."""
@@ -248,7 +258,9 @@ def test_role_filter_in_session_does_not_include_system_or_user_text_in_output()
     assert '"role":"user"' in tf.getvalue()
 
 
-def test_transcript_conversation_source_preserves_prompt_roles_and_tool_payloads() -> None:
+def test_transcript_conversation_source_preserves_prompt_roles_and_tool_payloads() -> (
+    None
+):
     from agentbox.core.run.history.sources.transcript import (
         _events_to_conversation_view,
     )

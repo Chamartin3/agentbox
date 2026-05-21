@@ -82,9 +82,7 @@ def _roles(events: list[Any]) -> list[str | None]:
     return [getattr(e, "role", None) for e in events if isinstance(e, TextEvent)]
 
 
-def _streaming_mock(
-    result: Any = None, side_effect: Exception | None = None
-) -> Any:
+def _streaming_mock(result: Any = None, side_effect: Exception | None = None) -> Any:
     """Return a mock for ``pai_agent.run_stream_events`` that yields one
     ``AgentRunResultEvent`` carrying *result*, or raises *side_effect*.
     """
@@ -140,9 +138,9 @@ async def test_token_scenario_1_text_only() -> None:
     assert _roles(events) == ["system", "user", "assistant"]
     assert isinstance(events[-1], DoneEvent) and events[-1].ok is True
     # invariant: DoneEvent is terminal
-    assert not any(
-        isinstance(e, DoneEvent) for e in events[:-1]
-    ), "DoneEvent must be the final event"
+    assert not any(isinstance(e, DoneEvent) for e in events[:-1]), (
+        "DoneEvent must be the final event"
+    )
 
 
 async def test_token_scenario_2_tools_used() -> None:
@@ -206,9 +204,7 @@ async def test_token_scenario_4_provider_error_keeps_prompt_turns() -> None:
     fake.run_stream_events = _streaming_mock(side_effect=provider_exc)
     with patch("pydantic_ai.Agent", return_value=fake):
         events = await _collect(
-            TokenBackend().run(
-                _rendered_direct(provider="openrouter"), "hi", "rid"
-            )
+            TokenBackend().run(_rendered_direct(provider="openrouter"), "hi", "rid")
         )
 
     types_ = _types(events)
@@ -255,7 +251,10 @@ async def test_codex_scenario_1_text_only() -> None:
     )
     fake_events = [
         (TextEvent(run_id="rid", text="hello", delta=True), None),
-        (UsageEvent(run_id="rid", input_tokens=3, output_tokens=4, model="o4-mini"), None),
+        (
+            UsageEvent(run_id="rid", input_tokens=3, output_tokens=4, model="o4-mini"),
+            None,
+        ),
         (DoneEvent(run_id="rid", ok=True), None),
     ]
     gen = await _fake_jsonl_stream(fake_events)
