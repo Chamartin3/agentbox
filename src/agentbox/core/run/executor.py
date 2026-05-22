@@ -32,7 +32,6 @@ from agentbox.api.events import (
 )
 from agentbox.api.webhooks import schedule_webhook
 from agentbox.config import Settings
-from agentbox.core.agent.config import ExecutionConfig
 from agentbox.core.agent.plugins import get_backend, get_guardrail
 from agentbox.core.agent.profiles import (
     EffectiveRunnerConfig,
@@ -46,25 +45,11 @@ from agentbox.core.infra.host_env.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
 from agentbox.core.prompt.capture import build_fragments, fragments_to_json
-from agentbox.core.prompt.resolver import resolve_prompt
-from agentbox.core.resource.subagent_render import materialize_subagents
-from agentbox.core.resource.workspace_materialize import materialize_workspace
-from agentbox.core.run.backends._schema_to_model import (
-    InconsistentSchema,
-    assert_schema_consistent,
-)
 from agentbox.core.run.backends.base import RenderedConfig
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.run.guardrails.base import GuardrailContext
+from agentbox.core.run.prepare import prepare_run_resources
 from agentbox.core.run.render import materialize_rendered_config
-from agentbox.core.run.run_prep import (
-    prompt_resolution_to_snapshot,
-    render_env_doc,
-    resolve_agent_prompt_bindings,
-    resolve_workspace_resources,
-    resolve_workspace_subagents,
-    workspace_outcomes_to_snapshot,
-)
 from agentbox.core.run.streaming.session import RunStreamSession
 from agentbox.core.run.validation import extract_json
 from agentbox.core.workspace.manager import resolve_path
@@ -335,262 +320,23 @@ class RunExecutor:
         if webhook_url is not None:
             agent = agent.model_copy(update={"webhook_url": webhook_url})
 
-        # --- resource prep (Plan 08 Phase 1) ---------------------------------
-        _resource_snapshot_entries: list[dict] = []
-        _workspace_id = agent.workspace if agent.workspace != "<ephemeral>" else None
-        if _workspace_id:
-            try:
-                ws_bindings = resolve_workspace_resources(self.store, _workspace_id)
-                if ws_bindings:
-                    outcomes = materialize_workspace(
-                        workdir,
-                        ws_bindings,
-                        cache_root=self.settings.resource_cache_dir,
-                    )
-                    _resource_snapshot_entries.extend(
-                        workspace_outcomes_to_snapshot(outcomes)
-                    )
-            except Exception:
-                logger.exception(
-                    "executor: workspace resource materialization failed for workspace %r",
-                    _workspace_id,
-                )
+        # --- resource prep (extracted to core/run/prepare/resources.py) -----
+        # Raises ValueError on schema-consistency failure — propagates to caller.
+        prepared = prepare_run_resources(
+            store=self.store,
+            settings=self.settings,
+            agent=agent,
+            input_=input_,
+            variables=variables,
+            workdir=workdir,
+        )
 
-            try:
-                env_doc_entries = render_env_doc(self.store, _workspace_id, workdir)
-                _resource_snapshot_entries.extend(env_doc_entries)
-            except Exception:
-                logger.exception(
-                    "executor: env doc rendering failed for workspace %r",
-                    _workspace_id,
-                )
-
-            # Workspace subagents (RESOURCES_PLAN E3): write
-            # .{claude,opencode,codex}/agents/<alias>.md per registered
-            # subagent so the active backend can delegate to them.
-            try:
-                resolved_subagents = resolve_workspace_subagents(
-                    self.store, _workspace_id
-                )
-                if resolved_subagents:
-                    sub_outcomes = materialize_subagents(workdir, resolved_subagents)
-                    for o in sub_outcomes:
-                        _resource_snapshot_entries.append(
-                            {
-                                "role": "workspace_subagent",
-                                "workspace_id": o.workspace_id,
-                                "agent_id": o.agent_id,
-                                "alias": o.alias,
-                                "files_written": o.files_written,
-                            }
-                        )
-            except Exception:
-                logger.exception(
-                    "executor: workspace subagent materialization failed for workspace %r",
-                    _workspace_id,
-                )
-
-        # --- composition path ------------------------------------------------
-        composed_result = None
-        if agent.composition is not None and variables is not None:
-            from agentbox.core.prompt.composition.loader import (
-                load_bundle_from_bindings,
-            )
-
-            shared_roots = {
-                k: self.settings.project_root / v
-                for k, v in self.store.get_project_shared_assets().items()
-            }
-
-            # DB-as-source-of-truth (Plan 18): bundle inputs come from
-            # ``agent_prompt_resource_bindings`` first, with a fallback
-            # to ``agent_versions.prompt_content`` for agents that have
-            # not been migrated to bindings. The on-disk bundle is no
-            # longer read at runtime — only at import time.
-            bundle = load_bundle_from_bindings(
-                agent_id=agent.id,
-                store=self.store,
-            )
-            composed_result = bundle.compose(variables, shared_roots)
-
-            # Append validation-engine hint to system prompt when a schema
-            # is present so the LLM knows how strictly its output will be
-            # checked.
-            system_text = composed_result.system
-            if composed_result.schema is not None:
-                engine = ExecutionConfig.from_agent(agent).output_validation_engine
-                from agentbox.core.prompt.composition import (
-                    _append_validation_engine_hint,
-                )
-
-                system_text = _append_validation_engine_hint(system_text, engine)
-
-            # Attach composed metadata so backend adapters can read it.
-            # ``_composed_system`` is the fully-rendered system prompt
-            # (with input/output schema blocks + references appended) —
-            # what string-prompt backends use. The token backend reads
-            # the structured parts instead so it can feed pydantic-ai
-            # natively without duplicating schema injection.
-            agent = agent.model_copy(deep=True)
-            agent.__dict__["_composed_system"] = system_text
-            agent.__dict__["_composed_system_base"] = composed_result.system_base
-            agent.__dict__["_composed_references"] = composed_result.references
-            agent.__dict__["_composed_input_schema"] = composed_result.input_schema
-            agent.__dict__["_composed_user"] = composed_result.user
-            agent.__dict__["_composed_schema"] = composed_result.schema
-            agent.__dict__["_composed_bundle_sha"] = composed_result.bundle_sha
-            input_ = composed_result.user
-
-        # Wire output schema into runner spec for the executor's retry loop.
-        # Runs whether or not the composition path executed — callers that
-        # pass a raw `input_` (no `variables`) still get schema validation
-        # when the agent declares an output schema. Mirrors the composer's
-        # auto-detection: bundles shipping output_schema.json without
-        # declaring it in [composition].output_schema still engage validation.
-        comp = agent.composition
-        if comp is not None:
-            if composed_result is None:
-                agent = agent.model_copy(deep=True)
-            # Schema location: when composition resolved a schema (via
-            # bindings or agent_versions), it's already attached to
-            # ``agent._composed_schema``. The legacy
-            # ``runner.output_schema_path`` only matters when no
-            # composed schema is present — in that case there's nothing
-            # to validate against and ``_validate_output`` returns "off".
-            agent.__dict__["_composed_validation_mode"] = comp.output_validation
-
-        # --- prompt resource binding substitution (Plan 08 Phase 1) ----------
-        prompt_bindings: list[dict] = []
-        try:
-            prompt_bindings = resolve_agent_prompt_bindings(self.store, agent.id)
-            if prompt_bindings:
-                composed_system = agent.__dict__.get("_composed_system")
-                if composed_system is not None:
-                    resolution = resolve_prompt(composed_system, prompt_bindings)
-                    agent.__dict__["_composed_system"] = resolution.rendered_prompt
-                    _resource_snapshot_entries.extend(
-                        prompt_resolution_to_snapshot(resolution)
-                    )
-                    for marker in resolution.unresolved_markers:
-                        logger.warning(
-                            "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
-                            marker,
-                            agent.id,
-                        )
-                else:
-                    # Non-composition path: resolve against inline/file prompt if present
-                    inline_prompt = agent.prompt
-                    if inline_prompt:
-                        resolution = resolve_prompt(inline_prompt, prompt_bindings)
-                        agent = agent.model_copy(
-                            update={"prompt": resolution.rendered_prompt}
-                        )
-                        _resource_snapshot_entries.extend(
-                            prompt_resolution_to_snapshot(resolution)
-                        )
-                        for marker in resolution.unresolved_markers:
-                            logger.warning(
-                                "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
-                                marker,
-                                agent.id,
-                            )
-        except Exception:
-            logger.exception(
-                "executor: prompt resource binding resolution failed for agent %r",
-                agent.id,
-            )
-
-        # Wire new-contract output.json_schema → _composed_schema so the
-        # token backend builds its result_type from the same schema the
-        # executor validates against. Skipped when something earlier
-        # (composition pipeline) already produced one.
-        from agentbox.core.agent.config import resolve_output_config as _resolve_out
-
-        _out_cfg = _resolve_out(self.store, agent)
-        if not isinstance(agent.__dict__.get("_composed_schema"), dict) and isinstance(
-            _out_cfg.json_schema, dict
-        ):
-            agent.__dict__["_composed_schema"] = _out_cfg.json_schema
-
-        # Render the unified output-contract block (schema + validator
-        # descriptions) once, here, so every backend sees the same
-        # bytes. The token backend strips the JSON-Schema portion from
-        # its own injection but keeps the constraint bullets.
-        if _out_cfg.validators or isinstance(_out_cfg.json_schema, dict):
-            from agentbox.core.prompt.output_contract import append as _append_contract
-
-            _composed_system = agent.__dict__.get("_composed_system")
-            if not isinstance(_composed_system, str):
-                # No composition pipeline ran — seed from the inline prompt
-                # so the contract block still reaches the model. Without
-                # this, agents that declare bindings via the
-                # validation-contracts surface (no [composition] block) would
-                # have their schema/constraints only checked post-hoc, never
-                # shown to the model — defeating the "tell the model what
-                # we'll validate" half of the two-gate design.
-                _composed_system = agent.prompt or ""
-            agent.__dict__["_composed_system"] = _append_contract(
-                _composed_system, _out_cfg
-            )
-            _composed_system_base = agent.__dict__.get("_composed_system_base")
-            if isinstance(_composed_system_base, str):
-                # Token backend reads system_base + injects schema via
-                # pydantic-ai. We still append validator-derived constraint
-                # bullets so those reach the model.
-                from agentbox.core.agent.config import OutputConfig as _OC2
-
-                _constraints_only = _OC2(
-                    json_schema=None,
-                    validators=_out_cfg.validators,
-                )
-                agent.__dict__["_composed_system_base"] = _append_contract(
-                    _composed_system_base, _constraints_only
-                )
-
-        # Wire output_schema binding → _composed_schema for runtime validation.
-        # Covers legacy_dir agents that declare output schemas via resource
-        # bindings but have no [composition] block.
-        if prompt_bindings and not isinstance(
-            agent.__dict__.get("_composed_schema"), dict
-        ):
-            for _b in prompt_bindings:
-                if _b.get("slot") != "output_schema":
-                    continue
-                for _blob in _b.get("blobs") or []:
-                    _raw = (_blob.get("content_text") or "").strip()
-                    if not _raw:
-                        continue
-                    try:
-                        _schema = json.loads(_raw)
-                    except (json.JSONDecodeError, TypeError):
-                        logger.warning(
-                            "executor: failed to parse output_schema binding for agent %r",
-                            agent.id,
-                        )
-                        continue
-                    if isinstance(_schema, dict):
-                        agent.__dict__["_composed_schema"] = _schema
-                    break
-                break
-
-        # Fail-fast on internally-inconsistent output schemas before any
-        # backend tries to convert them into a structured-output contract.
-        # An invalid schema (e.g. ``required`` naming properties not in
-        # ``properties``) cannot be satisfied by any model — every backend
-        # would either silently drop fields or burn tokens retrying. Better
-        # to surface the authoring bug with a precise message at the
-        # boundary than wait for an opaque downstream failure.
-        _composed_schema = agent.__dict__.get("_composed_schema")
-        if isinstance(_composed_schema, dict):
-            try:
-                assert_schema_consistent(_composed_schema)
-            except InconsistentSchema as exc:
-                msg = (
-                    f"output schema for agent {agent.id!r} is internally "
-                    f"inconsistent: {exc}"
-                )
-                logger.error("executor: %s", msg)
-                raise ValueError(msg) from exc
+        agent = prepared.agent
+        input_ = prepared.input_
+        _resource_snapshot_entries = prepared.resource_snapshot_entries
+        prompt_bindings = prepared.prompt_bindings  # noqa: F841 — preserved for parity
+        composed_result = prepared.composed_result
+        _workspace_id = prepared.workspace_id
 
         # Resolve effective runner config and select backend adapter
         try:
