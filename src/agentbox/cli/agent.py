@@ -23,7 +23,8 @@ agent_app = typer.Typer(
 @agent_app.command("ls")
 def agent_ls() -> None:
     """List agents registered in the DB."""
-    rows = list_all_agents(store=get_store())
+    store = get_store()
+    rows = list_all_agents(store=store)
     if not rows:
         console.print("[yellow]No agents registered.[/yellow]")
         return
@@ -49,10 +50,14 @@ def agent_ls() -> None:
             if a.workspace == "<ephemeral>"
             else (a.workspace or "[dim]auto[/dim]")
         )
+        # Model is resolved via the bound runner profile — the legacy
+        # ``runner.model`` field is no longer surfaced.
+        profile = store.get_agent_runner_profile(a.id)
+        model_display = (profile.model if profile else None) or "[dim]default[/dim]"
         table.add_row(
             a.id,
             a.runner.kind,
-            a.runner.model or "-",
+            model_display,
             a.session_mode,
             ws_display,
             str(len(a.guardrails)),
@@ -80,7 +85,9 @@ def agent_show(agent_id: str) -> None:
     runner.add_column(style="dim", justify="right")
     runner.add_column()
     runner.add_row("kind", a.runner.kind)
-    runner.add_row("model", a.runner.model or "—")
+    # The model is owned by the bound runner profile. The legacy
+    # ``runner.model`` field is no longer displayed — see the "Runner
+    # profile" panel below for the authoritative model.
     runner.add_row("timeout", f"{a.runner.timeout_seconds}s")
     runner.add_row(
         "allowed_tools",
@@ -88,6 +95,20 @@ def agent_show(agent_id: str) -> None:
     )
     runner.add_row("mcp_config_path", a.runner.mcp_config_path or "—")
     console.print(Panel(runner, title="Runner", border_style="green"))
+
+    profile = get_store().get_agent_runner_profile(a.id)
+    rp = Table.grid(padding=(0, 2))
+    rp.add_column(style="dim", justify="right")
+    rp.add_column()
+    if profile is None:
+        rp.add_row("bound profile", "[dim](none — system default)[/dim]")
+    else:
+        rp.add_row("id", profile.id)
+        rp.add_row("name", profile.name)
+        rp.add_row("backend", profile.backend)
+        rp.add_row("provider", profile.provider or "—")
+        rp.add_row("model", profile.model or "—")
+    console.print(Panel(rp, title="Runner profile", border_style="green"))
 
     ws = Table.grid(padding=(0, 2))
     ws.add_column(style="dim", justify="right")

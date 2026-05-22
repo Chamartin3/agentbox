@@ -47,7 +47,6 @@ from agentbox.core.infra.host_env.capabilities import (
 )
 from agentbox.core.prompt.capture import build_fragments, fragments_to_json
 from agentbox.core.prompt.resolver import resolve_prompt
-from agentbox.core.prompt.versioning.drift import check_drift, startup_sweep
 from agentbox.core.resource.subagent_render import materialize_subagents
 from agentbox.core.resource.workspace_materialize import materialize_workspace
 from agentbox.core.run.backends._schema_to_model import (
@@ -1660,25 +1659,13 @@ class RunExecutor:
 
     def _stamp_run_agent_version(self, run_id: str, agent: AgentDef) -> None:
         try:
-            status = check_drift(agent, self.store)
-            # Run the sweep on drift OR always sync prompt content so
-            # out-of-band prompt edits get versioned even when the agent
-            # definition is unchanged.
-            if status in ("drifted", "new"):
-                startup_sweep(
-                    [agent], self.store, project_root=self.settings.project_root
-                )
-            else:
-                from agentbox.core.prompt.versioning.drift import _sync_prompt
-
-                _sync_prompt(agent, self.store, self.settings.project_root)
-            latest = self.store.latest_version(agent.id)
-            if latest is not None:
+            chosen = self.store.get_active_version(agent.id) or self.store.latest_version(agent.id)
+            if chosen is not None:
                 with self.store.engine.begin() as conn:
                     conn.execute(
                         _runs_table.update()
                         .where(_runs_table.c.id == run_id)
-                        .values(agent_version_id=latest["id"])
+                        .values(agent_version_id=chosen["id"])
                     )
         except Exception:
             logger.exception("failed to stamp agent version for run %s", run_id)

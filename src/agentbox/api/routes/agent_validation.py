@@ -283,7 +283,15 @@ def put_agent_validation(
         except FileNotFoundError:
             prompt_text = ""
     snapshot = _build_snapshot(current)
-    carried_prompt_content = (current.prompt or "").strip() or prompt_text
+    # Prefer the prompt_content already stored on the active version row
+    # (the DB is the source of truth) — falling back to in-memory prompt and
+    # then disk only for legacy/proxy agents where the active row is empty.
+    carried_prompt_content = (
+        active.get("prompt_content")
+        or (current.prompt or "").strip()
+        or prompt_text
+        or None
+    )
 
     try:
         new_version = store.create_version(

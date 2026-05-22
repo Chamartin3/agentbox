@@ -113,7 +113,13 @@ def _sync_prompt(
         root = project_root or (
             agent.source_path.parent if agent.source_path else Path()
         )
-        content = agent.load_prompt(root) if hasattr(agent, "load_prompt") else ""
+        try:
+            content = agent.load_prompt(root) if hasattr(agent, "load_prompt") else ""
+        except FileNotFoundError:
+            # DB-only agent (or stale prompt_path after rename) — no disk
+            # source to sync from. Authoritative content lives in
+            # agent_versions.prompt_content; nothing to do here.
+            return
         if not content:
             return
         result = store.sync_prompt_from_disk(agent.id, content, author="filesystem")

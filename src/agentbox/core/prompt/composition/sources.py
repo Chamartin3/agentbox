@@ -147,67 +147,56 @@ class BindingsBundleSource:
                 }
             )
 
-        # DB-as-source-of-truth: when no slot='system' binding exists,
-        # fall back to ``agent_versions.prompt_content`` (the active
-        # version row). Bindings exist for shared/cross-agent prompts;
-        # simple agents whose prompt lives in their own version row
-        # should not need a binding to run. Disk fallback removed in
-        # Plan 18 — bundles are never read from the filesystem at
-        # runtime.
+        # DB-as-source-of-truth: ``agent_versions.prompt_content`` is the
+        # only runtime source of the system prompt. Legacy
+        # ``slot='system'`` bindings are ignored — they remain in the
+        # table for history but never feed the composer. This guarantees
+        # every ``edit_prompt`` call reaches the runner.
         self._av_prompt: str | None = None
         self._av_config: dict[str, Any] = {}
-        if self._find_slot("system") is None:
+        av = None
+        try:
+            av = self.store.get_active_version(self.agent_id)
+        except Exception:
             av = None
+        if av is None:
             try:
-                av = self.store.get_active_version(self.agent_id)
+                av = self.store.latest_version(self.agent_id)
             except Exception:
                 av = None
-            if av is None:
-                # Last resort — try the latest version row even if no
-                # active pointer is set. Mirrors store.get_agent_def.
-                try:
-                    av = self.store.latest_version(self.agent_id)
-                except Exception:
-                    av = None
-            prompt = (av or {}).get("prompt_content") if isinstance(av, dict) else None
-            if not prompt:
-                raise ValueError(
-                    f"agent {self.agent_id!r} has no prompt source: no "
-                    "slot='system' binding and no agent_versions.prompt_content. "
-                    "Populate one via the UI prompt editor or "
-                    "agentbox-mcp.edit_prompt."
-                )
-            self._av_prompt = prompt
-            cfg = (av or {}).get("config_json") if isinstance(av, dict) else None
-            if isinstance(cfg, str):
-                try:
-                    cfg = json.loads(cfg)
-                except (ValueError, TypeError):
-                    cfg = None
-            if isinstance(cfg, dict):
-                self._av_config = cfg
-
-            # Load version files so schemas declared in agent.toml
-            # ([composition].output_schema = "output_schema.json") can be
-            # resolved from the active agent_version row when no explicit
-            # output_schema binding exists. Production stores these via
-            # POST /agents/{id}/versions/{v}/files.
+        prompt = (av or {}).get("prompt_content") if isinstance(av, dict) else None
+        if not prompt:
+            raise ValueError(
+                f"agent {self.agent_id!r} has no agent_versions.prompt_content. "
+                "Populate it via the UI prompt editor or "
+                "agentbox-mcp.edit_prompt."
+            )
+        self._av_prompt = prompt
+        cfg = (av or {}).get("config_json") if isinstance(av, dict) else None
+        if isinstance(cfg, str):
             try:
-                version_id = av.get("id") if isinstance(av, dict) else None
-                if version_id is not None:
-                    self._av_files = {
-                        row["relative_path"]: row["content"]
-                        for row in self.store.list_version_files(version_id)
-                        if row.get("relative_path")
-                    }
-            except Exception:
-                self._av_files = {}
+                cfg = json.loads(cfg)
+            except (ValueError, TypeError):
+                cfg = None
+        if isinstance(cfg, dict):
+            self._av_config = cfg
+
+        try:
+            version_id = av.get("id") if isinstance(av, dict) else None
+            if version_id is not None:
+                self._av_files = {
+                    row["relative_path"]: row["content"]
+                    for row in self.store.list_version_files(version_id)
+                    if row.get("relative_path")
+                }
+        except Exception:
+            self._av_files = {}
 
         # Synthesize a composition dict so the existing composer
         # branches (which check ``composition['user_template']`` etc.)
         # continue to work without a special case.
         comp: dict[str, Any] = {}
-        if self._find_slot("system") or self._av_prompt is not None:
+        if self._av_prompt is not None:
             comp["system"] = _SYS_PSEUDO
         if self._find_user_template() is not None:
             comp["user_template"] = _USER_PSEUDO
@@ -283,15 +272,13 @@ class BindingsBundleSource:
         return rendered.get("text") or ""
 
     def read_system(self) -> str:
-        b = self._find_slot("system")
-        if b is None:
-            if self._av_prompt is not None:
-                return self._av_prompt
+        # DB-as-source-of-truth: always ``agent_versions.prompt_content``.
+        # Any ``slot='system'`` binding is ignored (history only).
+        if self._av_prompt is None:
             raise FileNotFoundError(
-                f"agent {self.agent_id!r} has no slot='system' binding "
-                "and no agent_versions.prompt_content fallback"
+                f"agent {self.agent_id!r} has no agent_versions.prompt_content"
             )
-        return self._render_blob_text(b)
+        return self._av_prompt
 
     def read_user_template(self) -> str | None:
         b = self._find_user_template()
@@ -375,10 +362,7 @@ class BindingsBundleSource:
 
     def bundle_files(self) -> dict[str, str]:
         files: dict[str, str] = {}
-        sys_b = self._find_slot("system")
-        if sys_b is not None:
-            files[_SYS_PSEUDO] = self._render_blob_text(sys_b)
-        elif self._av_prompt is not None:
+        if self._av_prompt is not None:
             files[_SYS_PSEUDO] = self._av_prompt
         ut_b = self._find_user_template()
         if ut_b is not None:

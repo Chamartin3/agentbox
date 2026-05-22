@@ -130,6 +130,9 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     On-disk files are not written by this endpoint — use
     ``POST /api/agents/{id}/export`` for that.
     """
+    import json as _json
+
+    from agentbox.api.routes.agent_validation import _decode_config_json
     from agentbox.core.prompt.versioning.drift import (
         _build_config_json,
         _build_snapshot,
@@ -166,25 +169,69 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     snapshot = _build_snapshot(updated)
     config_json = _build_config_json(updated)
 
+    # Carry forward prompt_content from the currently-active version so a
+    # config-only PATCH never produces a row with NULL prompt_content (which
+    # would crash the runtime with "agent X has no prompt source").
+    active_row = store.get_active_version(agent_id)
+
+    # Carry forward inline validators (config_json["input|output"]["validators"])
+    # — AgentDef has no field for these, so _build_config_json drops them.
+    # Without this merge, every PATCH silently clobbers the validators
+    # written by PUT /api/agents/{id}/validation.
+    prior_cfg = _decode_config_json((active_row or {}).get("config_json"))
+    new_cfg = _json.loads(config_json)
+    for direction in ("input", "output"):
+        prior_section = prior_cfg.get(direction)
+        if not isinstance(prior_section, dict) or "validators" not in prior_section:
+            continue
+        section = new_cfg.get(direction)
+        if not isinstance(section, dict):
+            section = {}
+        section.setdefault("validators", prior_section["validators"])
+        new_cfg[direction] = section
+    config_json = _json.dumps(new_cfg)
+
+    carried_prompt_content = (
+        (active_row or {}).get("prompt_content") or prompt_text or None
+    )
+    carried_prompt_snapshot = (
+        prompt_text or (active_row or {}).get("prompt_snapshot") or ""
+    )
+
     try:
-        store.create_version(
+        new_version = store.create_version(
             agent_id=updated.id,
             source_path=str(updated.source_path) if updated.source_path else "",
             source_format=(
                 updated.source_format.value if updated.source_format else "unknown"
             ),
             content_snapshot=snapshot,
-            prompt_snapshot=prompt_text,
+            prompt_snapshot=carried_prompt_snapshot,
             content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
             author="api:patch",
             changelog=f"patch: {', '.join(sorted(patch))}",
             files=None,
             config_json=config_json,
+            prompt_content=carried_prompt_content,
         )
     except Exception as exc:
         logger.exception("patch_agent: DB write failed for %r", agent_id)
         raise HTTPException(
             500, {"code": "db_write_failed", "detail": agent_id}
+        ) from exc
+
+    # Activate the new version so subsequent reads (validation push,
+    # runtime resolution, follow-up PATCHes) see this row instead of a
+    # stale prior active. Skipping activation is what caused validation
+    # push to overwrite freshly-PATCHed config (e.g. composition added
+    # by a prior PATCH was clobbered because validation read the older
+    # active row).
+    try:
+        store.activate_version(updated.id, int(new_version["id"]))
+    except Exception as exc:
+        logger.exception("patch_agent: activate_version failed for %r", agent_id)
+        raise HTTPException(
+            500, {"code": "activate_failed", "detail": agent_id}
         ) from exc
 
     store.upsert_agent_sync(

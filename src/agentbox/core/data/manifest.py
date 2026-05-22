@@ -97,7 +97,14 @@ class RunnerSpec(BaseModel):
     # --- claude_code runner ---
 
     model: str | None = None
-    """Model alias passed to the runner (claude only)."""
+    """DEPRECATED — legacy cosmetic field, kept only for backward
+    compatibility with old TOML imports. The runtime model is owned by
+    the agent's bound runner profile (``agent_runner_profiles`` →
+    ``runner_profiles.model``). This field is no longer surfaced by
+    the API, MCP tools, or CLI; new code must not read it. Some
+    backend adapters still consult it as a last-resort fallback when
+    no runner profile is bound — that path is also slated for
+    removal."""
 
     mcp_config_path: str | None = None
     """Path to mcp config json, resolved relative to project_root.

@@ -266,15 +266,12 @@ def render_agent_prompt_preview(
 
     resolved = [_resolve_binding(store, b) for b in raw]
 
-    # System-slot binding overrides the template (matches the REST route's
-    # behaviour and what BindingsBundleSource feeds the runner).
-    system_view = _schema_for_slot(resolved, "system")
-    template_text = (
-        system_view["text"] if system_view and system_view.get("text") else template
-    )
-
+    # DB-as-source-of-truth: ``agent_versions.prompt_content`` (passed in
+    # as ``template``) is the only system-prompt source. Legacy
+    # ``slot='system'`` bindings are ignored at render time — they remain
+    # in the table for history but never shadow live ``edit_prompt`` edits.
     splice_bindings = [b for b in resolved if b.get("marker") and b.get("mode")]
-    result = resolve_prompt(template_text, splice_bindings)
+    result = resolve_prompt(template, splice_bindings)
 
     refs_text, refs_meta, per_ref_chars = _render_references_block(resolved)
     base_prompt = result.rendered_prompt
@@ -345,7 +342,7 @@ def render_agent_prompt_preview(
     return {
         "rendered_prompt": composed,
         "base_prompt": base_prompt,
-        "template": template_text,
+        "template": template,
         "unresolved_markers": result.unresolved_markers,
         "warnings": result.warnings,
         "references": refs_meta,

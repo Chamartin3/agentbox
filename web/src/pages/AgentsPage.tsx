@@ -27,7 +27,7 @@ function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void
         )}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
           <span className="tag">{agent.runner.kind}</span>
-          {agent.runner.model && <span className="tag">{agent.runner.model}</span>}
+          {agent.model && <span className="tag">{agent.model}</span>}
           {agent.workspace && <span className="tag">{agent.workspace}</span>}
         </div>
         <div className="code-block">
@@ -108,7 +108,7 @@ export default function AgentsPage() {
     return (
       a.id.toLowerCase().includes(q) ||
       (a.description || '').toLowerCase().includes(q) ||
-      (a.runner.model || '').toLowerCase().includes(q) ||
+      (a.model || '').toLowerCase().includes(q) ||
       (a.tags || []).some((t) => t.toLowerCase().includes(q))
     );
   });
@@ -118,7 +118,7 @@ export default function AgentsPage() {
     const pick = (x: AgentDef): string | null =>
       sortKey === AgentSortKey.Id ? x.id
       : sortKey === AgentSortKey.Runner ? x.runner.kind
-      : sortKey === AgentSortKey.Model ? (x.runner.model || null)
+      : sortKey === AgentSortKey.Model ? (x.model || null)
       : (x.last_activity_at || x.updated_at || null);
     const av = pick(a);
     const bv = pick(b);

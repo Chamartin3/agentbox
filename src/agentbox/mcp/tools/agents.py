@@ -20,6 +20,49 @@ def _agent_dict(agent: Any) -> dict:
     return dict(agent.__dict__)
 
 
+def _strip_legacy_runner_model(d: dict) -> dict:
+    """Drop the legacy ``runner.model`` field from a serialized agent dict.
+
+    The authoritative model lives on the bound runner profile; the
+    ``runner.model`` column is cosmetic/import-only and has misled
+    operators into thinking it was the runtime value. MCP responses
+    surface the profile-resolved model under a top-level ``model`` key
+    instead (see ``_inject_profile_model``).
+    """
+    runner = d.get("runner")
+    if isinstance(runner, dict) and "model" in runner:
+        runner = {k: v for k, v in runner.items() if k != "model"}
+        d["runner"] = runner
+    return d
+
+
+def _inject_profile_model(d: dict, store: Any) -> dict:
+    """Resolve the agent's effective model via its bound runner profile.
+
+    Adds ``model``, ``model_provider`` and ``runner_profile_id`` at the
+    top level so MCP consumers don't have to make a second call.
+    Profile is the single source of truth; falls back to ``None`` when
+    no profile is bound (executor will use the system default at run
+    time).
+    """
+    agent_id = d.get("id")
+    if not agent_id:
+        return d
+    try:
+        profile = store.get_agent_runner_profile(agent_id)
+    except Exception:
+        profile = None
+    if profile is not None:
+        d["model"] = profile.model
+        d["model_provider"] = profile.provider
+        d["runner_profile_id"] = profile.id
+    else:
+        d.setdefault("model", None)
+        d.setdefault("model_provider", None)
+        d.setdefault("runner_profile_id", None)
+    return d
+
+
 def _paginate(items: list, limit: int, offset: int) -> dict:
     total = len(items)
     page = items[offset : offset + limit]
@@ -46,7 +89,11 @@ def register(mcp: FastMCP) -> None:
         limit = clamp_limit(limit)
         ctx = get_context()
         agents = [
-            _agent_dict(a) for a in list_all_agents(store=ctx.store, loader=ctx.loader)
+            _inject_profile_model(
+                _strip_legacy_runner_model(_agent_dict(a)),
+                ctx.store,
+            )
+            for a in list_all_agents(store=ctx.store, loader=ctx.loader)
         ]
         if tag:
             agents = [a for a in agents if tag in (a.get("tags") or [])]
@@ -76,7 +123,11 @@ def register(mcp: FastMCP) -> None:
                 ]
             ).lower()
             if q in hay:
-                results.append(d)
+                results.append(
+                    _inject_profile_model(
+                        _strip_legacy_runner_model(d), ctx.store
+                    )
+                )
         return _paginate(results, limit, offset)
 
     @mcp.tool
@@ -103,7 +154,10 @@ def register(mcp: FastMCP) -> None:
                 "author": active.get("author"),
                 "created_at": active.get("created_at"),
             }
-        return {"agent": _agent_dict(agent), "prompt": prompt_meta}
+        agent_payload = _inject_profile_model(
+            _strip_legacy_runner_model(_agent_dict(agent)), ctx.store
+        )
+        return {"agent": agent_payload, "prompt": prompt_meta}
 
     @mcp.tool
     def list_agent_tags() -> dict:

@@ -134,7 +134,13 @@ export interface GuardrailRow {
 
 export interface RunnerSpec {
   kind: string;
-  model: string | null;
+  /**
+   * @deprecated The legacy `runner.model` field is no longer surfaced by
+   * the API. Read the top-level `AgentDef.model` instead (resolved via
+   * the bound runner profile). Kept optional for backwards-compat with
+   * old write paths.
+   */
+  model?: string | null;
   mcp_config_path: string | null;
   agents_config_path: string | null;
   settings_path: string | null;
@@ -179,6 +185,10 @@ export interface AgentDef {
   active_version?: number | null;
   run_count?: number | null;
   runner_profile_id?: string | null;
+  /** Effective model resolved via the bound runner profile. */
+  model?: string | null;
+  /** Effective provider resolved via the bound runner profile. */
+  model_provider?: string | null;
 }
 
 export interface PromptFragment {

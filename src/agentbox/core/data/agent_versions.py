@@ -879,13 +879,13 @@ class AgentVersionsMixin:
 
         logger = logging.getLogger(__name__)
 
-        latest = self.latest_version(agent_id)
-        if latest is None:
+        row = self.get_active_version(agent_id) or self.latest_version(agent_id)
+        if row is None:
             return None
         if self.is_agent_deleted(agent_id):
             return None
         try:
-            return AgentDef.from_db_row(latest)
+            return AgentDef.from_db_row(row)
         except ValueError:
             # No config_json or content_snapshot — incomplete row.
             return None
@@ -893,7 +893,7 @@ class AgentVersionsMixin:
             logger.warning(
                 "agent_versions: row for %r v%s failed validation: %s",
                 agent_id,
-                latest.get("version"),
+                row.get("version"),
                 exc,
             )
             return None

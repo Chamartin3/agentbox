@@ -543,7 +543,7 @@ export default function RunDetailPage() {
   const modelName = run.configured_model
     || (runnerSnapshot && !snapshotMissing && runnerSnapshot.model)
     || usage?.model
-    || agent?.runner?.model
+    || agent?.model
     || null;
   const runnerProfileName = (runnerSnapshot && !snapshotMissing && runnerSnapshot.profile_name) || null;
   const cacheTokens = (usage?.cache_read_tokens ?? 0) + (usage?.cache_write_tokens ?? 0);

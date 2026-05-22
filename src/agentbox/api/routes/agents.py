@@ -71,12 +71,25 @@ def list_agents() -> list[dict]:
             workspace_str = ""
         active = store.get_active_version(agent.id)
         latest = store.latest_version(agent.id)
+        dumped = agent.model_dump()
+        # Drop the legacy ``runner.model`` field — it's an import-only
+        # cosmetic column, not the runtime source of truth. Consumers
+        # should read the top-level ``model`` resolved via the bound
+        # runner profile below.
+        if isinstance(dumped.get("runner"), dict):
+            dumped["runner"] = {
+                k: v for k, v in dumped["runner"].items() if k != "model"
+            }
+        profile_id = profile_bindings.get(agent.id)
+        profile = store.get_runner_profile(profile_id) if profile_id else None
         data = {
-            **agent.model_dump(),
+            **dumped,
             "resolved_workspace": workspace_str,
             "run_count": run_counts.get(agent.id, 0),
             "last_run_at": last_run_at.get(agent.id),
-            "runner_profile_id": profile_bindings.get(agent.id),
+            "runner_profile_id": profile_id,
+            "model": profile.model if profile else None,
+            "model_provider": profile.provider if profile else None,
         }
         if latest is not None:
             data["updated_at"] = latest.get("created_at")
@@ -153,11 +166,25 @@ def get_agent(agent_id: str) -> dict:
                 "config_json": v.get("config_json"),
             }
         )
+    # Drop legacy ``runner.model`` from the surfaced agent dict — the
+    # runner profile bound to the agent is the single source of truth
+    # for the runtime model. ``runner_profile_id`` + the resolved
+    # ``model`` / ``model_provider`` fields below are what callers
+    # should consume.
+    agent_dump = agent.model_dump()
+    if isinstance(agent_dump.get("runner"), dict):
+        agent_dump["runner"] = {
+            k: v for k, v in agent_dump["runner"].items() if k != "model"
+        }
+    bound_profile = store.get_agent_runner_profile(agent_id)
     return {
-        "agent": agent.model_dump(),
+        "agent": agent_dump,
         "prompt": prompt,
         "composed_system": composed_system,
         "composed_user": composed_user,
+        "runner_profile_id": bound_profile.id if bound_profile else None,
+        "model": bound_profile.model if bound_profile else None,
+        "model_provider": bound_profile.provider if bound_profile else None,
         "workspace": {
             "path": str(workspace_path),
             "ephemeral": ephemeral,
