@@ -52,6 +52,8 @@ RUN npm install -g @anthropic-ai/claude-code \
 WORKDIR /opt/agentbox
 COPY libs/agentbox/pyproject.toml ./
 COPY libs/agentbox/src ./src
+COPY libs/agentbox/alembic ./alembic
+COPY libs/agentbox/alembic.ini ./alembic.ini
 
 # Drop the SPA into the place FastAPI expects.
 COPY --from=web /web/dist /opt/agentbox/src/agentbox/ui/static/dist
