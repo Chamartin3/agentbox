@@ -6,17 +6,14 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
 
 from agentbox.api.deps import get_loader, get_settings, get_store
-from agentbox.core import workspaces as ws
-from agentbox.core.data.manifest import AgentDef
-from agentbox.core.data.runner_profiles import RunnerProfile
-from agentbox.core.data.schema import agent_runner_profiles
-from agentbox.core.data.schema import runs as runs_table
-from agentbox.core.prompt.composition import compose_from_source
-from agentbox.core.prompt.composition.loader import load_bundle_from_bindings
-from agentbox.core.service.agents import list_all_agents, resolve_agent
+from agentbox.core.data import RunnerProfile
+from agentbox.core.service.agents import (
+    get_agent_detail,
+    list_agents_enriched,
+    resolve_agent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,171 +25,21 @@ def list_agents() -> list[dict]:
     """List agents from the DB (one row per agent_id, latest version).
 
     DB-as-source-of-truth: every agent that has ever been imported into
-    ``agent_versions`` appears here, even when its on-disk bundle is gone
-    or the loader can't see it. Resolution lives in
-    ``core.services.agents.list_all_agents`` so the MCP surface returns
-    the exact same set.
+    ``agent_versions`` appears here. Enrichment (run counts, bound
+    runner profile, resolved workspace) is owned by
+    ``core.service.agents.list_agents_enriched``.
     """
-    store = get_store()
-    loader = get_loader()
-    settings = get_settings()
-
-    # Per-agent run counts and bound runner profiles, in two cheap queries.
-    run_counts: dict[str, int] = {}
-    last_run_at: dict[str, str] = {}
-    profile_bindings: dict[str, str] = {}
-    try:
-        with store.engine.connect() as conn:
-            for agent_id, n, last in conn.execute(
-                select(
-                    runs_table.c.agent_id,
-                    func.count().label("n"),
-                    func.max(runs_table.c.created_at).label("last"),
-                ).group_by(runs_table.c.agent_id)
-            ):
-                if agent_id:
-                    run_counts[agent_id] = int(n)
-                    if last:
-                        last_run_at[agent_id] = str(last)
-            for agent_id, profile_id in conn.execute(
-                select(
-                    agent_runner_profiles.c.agent_id,
-                    agent_runner_profiles.c.runner_profile_id,
-                )
-            ):
-                profile_bindings[agent_id] = profile_id
-    except Exception:
-        logger.exception("agents list: failed to load run counts / profile bindings")
-
-    def _enrich(agent: AgentDef) -> dict:
-        try:
-            workspace_str = str(ws.resolve_path(agent, settings, store)[0])
-        except Exception:
-            workspace_str = ""
-        active = store.get_active_version(agent.id)
-        latest = store.latest_version(agent.id)
-        dumped = agent.model_dump()
-        # Drop the legacy ``runner.model`` field — it's an import-only
-        # cosmetic column, not the runtime source of truth. Consumers
-        # should read the top-level ``model`` resolved via the bound
-        # runner profile below.
-        if isinstance(dumped.get("runner"), dict):
-            dumped["runner"] = {
-                k: v for k, v in dumped["runner"].items() if k != "model"
-            }
-        profile_id = profile_bindings.get(agent.id)
-        profile = store.get_runner_profile(profile_id) if profile_id else None
-        data = {
-            **dumped,
-            "resolved_workspace": workspace_str,
-            "run_count": run_counts.get(agent.id, 0),
-            "last_run_at": last_run_at.get(agent.id),
-            "runner_profile_id": profile_id,
-            "model": profile.model if profile else None,
-            "model_provider": profile.provider if profile else None,
-        }
-        if latest is not None:
-            data["updated_at"] = latest.get("created_at")
-            data["version"] = active["version"] if active else latest.get("version")
-        data["last_activity_at"] = max(
-            (t for t in (data.get("updated_at"), data.get("last_run_at")) if t),
-            default=None,
-        )
-        return data
-
-    return [_enrich(agent) for agent in list_all_agents(store=store, loader=loader)]
+    return list_agents_enriched(store=get_store(), settings=get_settings())
 
 
 @router.get("/{agent_id}")
 def get_agent(agent_id: str) -> dict:
-    loader = get_loader()
-    settings = get_settings()
-    store = get_store()
-    # Shared resolver — DB first, manifest fallback. Same call MCP makes.
-    agent = resolve_agent(agent_id, store=store, loader=loader)
-    if agent is None:
+    detail = get_agent_detail(
+        agent_id, store=get_store(), settings=get_settings()
+    )
+    if detail is None:
         raise HTTPException(404)
-    workspace_path, ephemeral = ws.resolve_path(agent, settings, store)
-
-    # Composed view — render the DB bundle the same way the runner would.
-    # Returns the fully assembled system prompt (with references appended)
-    # and the user template (with the output_schema instruction block).
-    composed_system: str | None = None
-    composed_user: str | None = None
-    latest_row = store.get_active_version(agent_id) or store.latest_version(agent_id)
-    # DB is source of truth — surface the active version's prompt_content;
-    # only fall back to the on-disk prompt_path file when the DB row has no
-    # stored content (legacy / unmigrated agents).
-    prompt = ""
-    db_prompt = (latest_row or {}).get("prompt_content")
-    if isinstance(db_prompt, str) and db_prompt:
-        prompt = db_prompt
-    elif agent.prompt_path:
-        try:
-            prompt = agent.load_prompt(settings.project_root)
-        except FileNotFoundError:
-            prompt = ""
-    try:
-        bundle = load_bundle_from_bindings(
-            agent_id=agent_id,
-            store=store,
-        )
-        result = compose_from_source(bundle.source, variables={}, render=False)
-        composed_system = result.system
-        composed_user = result.user
-    except FileNotFoundError:
-        logger.info(
-            "agents detail: no system slot binding for %r; preview empty",
-            agent_id,
-        )
-    except Exception:
-        logger.exception("agents detail: composition preview failed for %r", agent_id)
-
-    versions = store.list_versions(agent_id)
-    enriched = []
-    for v in versions:
-        comments = store.list_comments(v["id"])
-        rating = store.get_rating(v["id"])
-        enriched.append(
-            {
-                "id": v["id"],
-                "version": v["version"],
-                "author": v["author"],
-                "changelog": v["changelog"],
-                "is_legacy": v["is_legacy"],
-                "created_at": v["created_at"],
-                "has_comments": len(comments) > 0,
-                "rating": rating["rating"] if rating else None,
-                "config_json": v.get("config_json"),
-            }
-        )
-    # Drop legacy ``runner.model`` from the surfaced agent dict — the
-    # runner profile bound to the agent is the single source of truth
-    # for the runtime model. ``runner_profile_id`` + the resolved
-    # ``model`` / ``model_provider`` fields below are what callers
-    # should consume.
-    agent_dump = agent.model_dump()
-    if isinstance(agent_dump.get("runner"), dict):
-        agent_dump["runner"] = {
-            k: v for k, v in agent_dump["runner"].items() if k != "model"
-        }
-    bound_profile = store.get_agent_runner_profile(agent_id)
-    return {
-        "agent": agent_dump,
-        "prompt": prompt,
-        "composed_system": composed_system,
-        "composed_user": composed_user,
-        "runner_profile_id": bound_profile.id if bound_profile else None,
-        "model": bound_profile.model if bound_profile else None,
-        "model_provider": bound_profile.provider if bound_profile else None,
-        "workspace": {
-            "path": str(workspace_path),
-            "ephemeral": ephemeral,
-            "generated_configs": {},
-        },
-        "current_version": latest_row["version"] if latest_row else None,
-        "versions": enriched,
-    }
+    return detail
 
 
 # ---------------------------------------------------------------------------

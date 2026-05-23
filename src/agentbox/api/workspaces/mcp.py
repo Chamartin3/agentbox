@@ -1,4 +1,8 @@
-"""Workspace MCP override routes (Plan 05)."""
+"""Workspace MCP override routes (Plan 05).
+
+Transport-only: parses bodies, calls
+:mod:`agentbox.core.service.workspaces`, maps store ValueErrors to 400.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
-from agentbox.core.data.store import SessionStore
+from agentbox.core.data import SessionStore
+from agentbox.core.service import workspaces as ws_service
 
 router = APIRouter(tags=["workspace-mcp"])
 
@@ -31,25 +36,11 @@ class PolicyBody(BaseModel):
     default_policy: Policy
 
 
-def _manifest_servers(store: SessionStore) -> list[dict]:
-    """Best-effort: return manifest-declared MCP servers as list of dicts.
-
-    Each entry has at minimum ``name`` and ``config``. The resolver does
-    not require any other fields. If the manifest is not loaded, returns
-    an empty list — callers see the "no manifest" case explicitly.
-    """
-    servers = store.get_project_mcp_servers()
-    if not servers:
-        return []
-    return [{"name": s.name, "config": s.model_dump(exclude={"name"})} for s in servers]
-
-
 @router.get("/api/workspaces/{workspace_id}/mcp")
 def get_effective_mcp(
     workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
 ):
-    servers = _manifest_servers(store)
-    return store.resolve_workspace_mcp(workspace_id, servers)
+    return ws_service.resolve_workspace_mcp(workspace_id, store=store)
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp/servers")
@@ -57,8 +48,7 @@ def get_effective_servers(
     workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
 ):
     """Effective per-workspace MCP servers — union of manifest + overrides."""
-    servers = _manifest_servers(store)
-    return store.resolve_workspace_mcp(workspace_id, servers)
+    return ws_service.resolve_workspace_mcp(workspace_id, store=store)
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp/policy")
@@ -125,9 +115,7 @@ def refresh_workspace_mcp_discovery(
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     """Invalidate the MCP tool discovery cache for this workspace's servers.
-    Returns count of cache entries removed."""
-    resolved = store.resolve_workspace_mcp(workspace_id, _manifest_servers(store))
-    removed = 0
-    for s in resolved.get("servers", []):
-        removed += store.invalidate_server_cache(s["name"])
-    return {"invalidated": removed}
+
+    Returns count of cache entries removed.
+    """
+    return ws_service.refresh_workspace_mcp_discovery(workspace_id, store=store)

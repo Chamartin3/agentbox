@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
-from agentbox.core.data.records import SharedResourceRecord
+from agentbox.core.data import SharedResourceRecord
 
 
 def _mark_deprecated(response: Response) -> None:

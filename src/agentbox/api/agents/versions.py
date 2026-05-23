@@ -1,7 +1,8 @@
 """Agent versioning endpoints — read, diff, comment, rate, create, rollback.
 
-Phase 6a: read-only (list, get, diff, comments, ratings).
-Phase 6b: write-back (POST new version, rollback).
+Transport-only: parses bodies, calls store / service, maps domain errors
+to HTTP. The repeated agent-existence guard lives in
+:func:`agentbox.core.service.agents.require_agent_exists`.
 """
 
 from __future__ import annotations
@@ -10,21 +11,30 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from agentbox.api.deps import get_loader, get_store
+from agentbox.core.service import agents as agents_service
+from agentbox.core.service.agents import AgentNotFound
 
 router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
 
 
+def _require_agent(agent_id: str) -> None:
+    try:
+        agents_service.require_agent_exists(
+            agent_id, store=get_store(), loader=get_loader()
+        )
+    except AgentNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 # ---------------------------------------------------------------------------
-# Read — Phase 6a
+# Read
 # ---------------------------------------------------------------------------
 
 
 @router.get("")
 def list_agent_versions(agent_id: str) -> dict:
+    _require_agent(agent_id)
     store = get_store()
-    agent = store.get_agent_def(agent_id) or get_loader().get(agent_id)
-    if agent is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     versions = store.list_versions(agent_id)
     active = store.get_active_version(agent_id)
     latest = store.latest_version(agent_id)
@@ -58,9 +68,8 @@ def list_agent_versions(agent_id: str) -> dict:
 
 @router.get("/{version}")
 def get_agent_version(agent_id: str, version: int) -> dict:
+    _require_agent(agent_id)
     store = get_store()
-    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     v = store.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
@@ -85,17 +94,15 @@ def get_agent_version(agent_id: str, version: int) -> dict:
 
 @router.get("/{a}/diff/{b}")
 def diff_agent_versions(agent_id: str, a: int, b: int) -> dict:
-    store = get_store()
-    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
+    _require_agent(agent_id)
     try:
-        return store.diff_versions(agent_id, a, b)
+        return get_store().diff_versions(agent_id, a, b)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
-# Comments — Phase 6a
+# Comments
 # ---------------------------------------------------------------------------
 
 
@@ -106,9 +113,8 @@ class CommentBody(BaseModel):
 
 @router.post("/{version}/comments")
 def add_comment(agent_id: str, version: int, body: CommentBody) -> dict:
+    _require_agent(agent_id)
     store = get_store()
-    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     v = store.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
@@ -116,7 +122,7 @@ def add_comment(agent_id: str, version: int, body: CommentBody) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Ratings — Phase 6a
+# Ratings
 # ---------------------------------------------------------------------------
 
 
@@ -127,9 +133,8 @@ class RatingBody(BaseModel):
 
 @router.put("/{version}/rating")
 def set_rating(agent_id: str, version: int, body: RatingBody) -> dict:
+    _require_agent(agent_id)
     store = get_store()
-    if store.get_agent_def(agent_id) is None and get_loader().get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
     v = store.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
@@ -140,7 +145,7 @@ def set_rating(agent_id: str, version: int, body: RatingBody) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Write-back — Phase 6b
+# Write-back
 # ---------------------------------------------------------------------------
 
 
@@ -153,17 +158,12 @@ class NewVersionBody(BaseModel):
 
 @router.post("")
 def create_agent_version(agent_id: str, body: NewVersionBody) -> dict:
-    """Create a new version from a full agent definition snapshot.
-
-    Phase 6b: caller is responsible for writing the agent file to disk
-    first (via Plan 04's writer). This endpoint only records the version row.
-    """
+    """Create a new version from a full agent definition snapshot."""
     loader = get_loader()
     agent = loader.get(agent_id)
     if agent is None:
         raise HTTPException(404, f"unknown agent {agent_id!r}")
-    store = get_store()
-    return store.create_version(
+    return get_store().create_version(
         agent_id=agent_id,
         source_path=str(agent.source_path) if agent.source_path else "",
         source_format=(agent.source_format.value if agent.source_format else "unknown"),
@@ -190,12 +190,9 @@ def save_prompt_revision(agent_id: str, body: PromptRevisionBody) -> dict:
     legacy prompt_versions table does not apply. If ``activate`` is true
     (default), the new version is also set as active.
     """
-    store = get_store()
-    loader = get_loader()
-    if store.get_agent_def(agent_id) is None and loader.get(agent_id) is None:
-        raise HTTPException(404, f"unknown agent {agent_id!r}")
+    _require_agent(agent_id)
     try:
-        result = store.save_prompt_revision(
+        return get_store().save_prompt_revision(
             agent_id,
             prompt_content=body.prompt_content,
             author=body.author,
@@ -204,7 +201,6 @@ def save_prompt_revision(agent_id: str, body: PromptRevisionBody) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-    return result
 
 
 # Rollback is handled by the canonical endpoint in agents.py

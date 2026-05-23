@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_settings, get_store
-from agentbox.core.data.manifest import AgentDef
+from agentbox.core.data import AgentDef
 from agentbox.core.service.agents import resolve_agent
 
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     """
     import json as _json
 
-    from agentbox.api.routes.agent_validation import _decode_config_json
+    from agentbox.api.agents.validation import _decode_config_json
     from agentbox.core.prompt.versioning.drift import (
         _build_config_json,
         _build_snapshot,

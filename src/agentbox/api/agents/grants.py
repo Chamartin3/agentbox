@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
-from agentbox.core.data.store import SessionStore
+from agentbox.core.data import SessionStore
 
 router = APIRouter(prefix="/api/agents", tags=["agent-tool-grants"])
 

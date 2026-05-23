@@ -18,37 +18,22 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
-from agentbox.api.routes import (
+from agentbox.api import (
     activity,
-    agent_tool_grants,
-    agent_tools_discovery,
-    agent_validation,
     agents,
-    agents_create,
-    agents_write,
     api_tokens,
     env_doc,
     health,
     host_env,
     mcp,
     project_settings,
-    prompts,
-    providers_alias,
-    repo_resources,
-    resource_bindings,
     resources,
-    runner_backends,
-    runner_profiles,
-    runner_providers,
+    runners,
     runs,
     usage,
-    versions,
-    workspace_mcp,
     workspaces,
 )
-from agentbox.api.routes import (
-    settings as settings_routes,
-)
+from agentbox.api import settings as settings_routes
 from agentbox.core.prompt.versioning.drift import startup_sweep
 from agentbox.core.resource.boot_import import (
     import_composition_references,
@@ -169,8 +154,7 @@ def _on_startup() -> None:
     # Set AGENTBOX_SKIP_DEFAULT_PROFILES=1 to opt out (used by the test suite).
     if not os.environ.get("AGENTBOX_SKIP_DEFAULT_PROFILES"):
         try:
-            from agentbox.core.data.runner_profiles_seed import (
-                seed_default_runner_profiles,
+            from agentbox.core.data import (seed_default_runner_profiles,
             )
 
             created = seed_default_runner_profiles(store)
@@ -337,36 +321,24 @@ def create_app() -> FastAPI:
             },
         )
 
-    # API routers first.
+    # Resource-grouped routers — each subpackage's __init__.py owns the
+    # include order of its children.
     app.include_router(runs.router)
-    # agents_write owns /api/agents/export-all and /import-file — must
-    # come before agents.router which catches /api/agents/{agent_id}.
-    app.include_router(agents_write.router)
-    app.include_router(agents_create.router)
     app.include_router(agents.router)
-    app.include_router(usage.router)
     app.include_router(workspaces.router)
-    app.include_router(prompts.router)
     app.include_router(resources.router)
-    app.include_router(repo_resources.router)
-    app.include_router(resource_bindings.router)
-    app.include_router(agent_validation.router)
-    app.include_router(env_doc.router)
-    app.include_router(workspace_mcp.router)
-    app.include_router(host_env.router)
-    app.include_router(runner_backends.router)
-    app.include_router(runner_profiles.router)
-    app.include_router(runner_providers.router)
-    app.include_router(providers_alias.router)
+    app.include_router(runners.router)
+
+    # Top-level leaf routers (single-resource URL paths).
+    app.include_router(usage.router)
     app.include_router(activity.router)
+    app.include_router(env_doc.router)
+    app.include_router(host_env.router)
     app.include_router(mcp.router)
     app.include_router(health.router)
-    app.include_router(versions.router)
     app.include_router(settings_routes.router)
     app.include_router(project_settings.router)
     app.include_router(api_tokens.router)
-    app.include_router(agent_tool_grants.router)
-    app.include_router(agent_tools_discovery.router)
 
     # SPA assets.
     assets_dir = SPA_DIR / "assets"

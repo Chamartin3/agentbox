@@ -7,7 +7,7 @@ from typing import Any
 
 from agentbox.config import Settings, load_settings
 from agentbox.core.data import SessionStore
-from agentbox.core.data.manifest import ProjectManifest
+from agentbox.core.data import ProjectManifest
 from agentbox.core.run.executor import RunExecutor
 from agentbox.core.workspace.mcp.client import McpRegistry
 
