@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar
 from agentbox.core.run.history.types import ConversationView
 
 if TYPE_CHECKING:
-    from agentbox.core.data.records import RunRecord
+    from agentbox.core.data import RunRecord
 
 
 class ConversationSource(ABC):

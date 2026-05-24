@@ -24,6 +24,11 @@ from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
 from agentbox.api.events import DoneEvent, RunEvent
+from agentbox.core.run.post_render import (
+    inject_agent_tools_mcp,
+    inject_host_env_mcp,
+)
+from agentbox.core.run.prepare.prompts import ComposedState
 from agentbox.core.run.streaming.session import RunStreamSession
 from agentbox.core.run.validation import ValidationResult, validate_output
 
@@ -77,6 +82,25 @@ class McpToolSpec(TypedDict, total=False):
     name: str
     description: str
     inputSchema: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PostRenderContext:
+    """Inputs to :meth:`BackendAdapter.post_render`.
+
+    The executor resolves grants and run paths before the hook runs;
+    backends just do file mutations (or skip). ``host_env_grants`` /
+    ``agent_tool_grants`` are ``None`` when there's nothing to inject —
+    the default :meth:`BackendAdapter.post_render` checks for this.
+    """
+
+    run_dir: Path
+    workdir: Path
+    db_path: Path
+    workspace_id: str | None
+    agent_id: str
+    host_env_grants: dict[str, Any] | None = None
+    agent_tool_grants: set[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -188,6 +212,7 @@ class BackendAdapter(ABC):
         mcp_tools: list[McpToolSpec] | None = None,
         creds: dict[str, str] | None = None,
         runner_config: Any | None = None,
+        composed: ComposedState | None = None,
     ) -> RenderedConfig:
         """Analyse ``agent`` and ``workdir``, return a frozen run config.
 
@@ -262,6 +287,42 @@ class BackendAdapter(ABC):
             session.emit(ev)
         return result
 
+    def post_render(
+        self,
+        rendered: RenderedConfig,
+        ctx: PostRenderContext,
+    ) -> None:
+        """Post-materialization hook — called by the executor after
+        ``render()``'s files have been written into ``ctx.run_dir``.
+
+        Default implementation injects the agentbox MCP servers
+        (host-env, agent-tools) into the generated ``claude_mcp.json``
+        when the executor passes resolved grants. Backends that don't
+        consume ``claude_mcp.json`` (in-process backends like ``token``,
+        or backends with a different MCP config format) override to
+        no-op or to write their own format.
+
+        Must be idempotent: the executor may call it multiple times
+        across re-renders. Must not raise — the executor wraps the call
+        in a try/except and logs.
+        """
+        if ctx.host_env_grants:
+            inject_host_env_mcp(
+                run_dir=ctx.run_dir,
+                grants=ctx.host_env_grants,
+                workspace_id=ctx.workspace_id or "",
+                workdir=ctx.workdir,
+                db_path=ctx.db_path,
+            )
+        if ctx.agent_tool_grants:
+            inject_agent_tools_mcp(
+                run_dir=ctx.run_dir,
+                grants=ctx.agent_tool_grants,
+                agent_id=ctx.agent_id,
+                workdir=ctx.workdir,
+                db_path=ctx.db_path,
+            )
+
     def validate_output(
         self,
         agent: Any,
@@ -270,12 +331,13 @@ class BackendAdapter(ABC):
         *,
         project_root: Path | None = None,
         store: Any | None = None,
+        composed: ComposedState | None = None,
     ) -> ValidationResult:
         """Validate ``output`` against the agent's declared schema.
 
-        Default implementation resolves the schema from
-        ``agent._composed_schema`` (preferred — set by the composition
-        pipeline or by the output_schema prompt-binding) or from
+        Default implementation resolves the schema from ``composed.schema``
+        (preferred — set by the composition pipeline or the
+        ``output_schema`` prompt-binding) or from
         ``runner.output_schema_path`` (legacy disk path), and runs the
         engine declared by ``runner.output_validation_engine``.
 
@@ -291,21 +353,30 @@ class BackendAdapter(ABC):
         contract.
         """
         return validate_output(
-            agent, workdir, output, project_root=project_root, store=store
+            agent,
+            workdir,
+            output,
+            project_root=project_root,
+            store=store,
+            composed=composed,
         )
 
     # ----- protected helpers (shared across backends) ----------------------
 
-    def _collect_system_files(self, agent: Any, workdir: Path) -> dict[Path, bytes]:
+    def _collect_system_files(
+        self,
+        agent: Any,
+        workdir: Path,
+        composed: ComposedState | None = None,
+    ) -> dict[Path, bytes]:
         """Collect the CLAUDE.md system-context file for materialisation.
 
-        Prefers the in-memory ``_composed_system`` attached to the agent
-        (set by the prompt composer when fragments are merged) over the
-        on-disk ``CLAUDE.md`` in the workdir. Returns an empty dict when
-        neither exists.
+        Prefers ``composed.system`` (set by the prompt composer when
+        fragments are merged) over the on-disk ``CLAUDE.md`` in the
+        workdir. Returns an empty dict when neither exists.
         """
         files: dict[Path, bytes] = {}
-        composed_system = getattr(agent, "_composed_system", None)
+        composed_system = composed.system if composed is not None else None
         if composed_system is not None:
             files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
         else:
@@ -314,14 +385,19 @@ class BackendAdapter(ABC):
                 files[Path("CLAUDE.md")] = claude_md.read_bytes()
         return files
 
-    def _resolve_prompt(self, agent: Any, workdir: Path) -> str:
+    def _resolve_prompt(
+        self,
+        agent: Any,
+        workdir: Path,
+        composed: ComposedState | None = None,
+    ) -> str:
         """Resolve the system prompt for in-process backends.
 
-        Prefers ``agent._composed_system`` (set by the prompt composer)
-        and falls back to ``agent.load_prompt(workdir.parent)`` when
+        Prefers ``composed.system`` (set by the prompt composer) and
+        falls back to ``agent.load_prompt(workdir.parent)`` when
         available. Returns ``""`` when neither resolves.
         """
-        composed_system = getattr(agent, "_composed_system", None)
+        composed_system = composed.system if composed is not None else None
         if composed_system is not None:
             return composed_system
         prompt_text = getattr(agent, "load_prompt", None)

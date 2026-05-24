@@ -14,14 +14,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 import os
 import shutil
 import tempfile
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 from agentbox.api.events import (
     DoneEvent,
@@ -39,19 +38,24 @@ from agentbox.core.agent.profiles import (
 )
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import SessionStore
-from agentbox.core.data.manifest import AgentDef
-from agentbox.core.data.schema import runs as _runs_table
+from agentbox.core.data import AgentDef
+from agentbox.core.data import runs as _runs_table
+from agentbox.core.data import McpSnapshot, RunnerSnapshot
 from agentbox.core.infra.host_env.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
 from agentbox.core.prompt.capture import build_fragments, fragments_to_json
-from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.run.backends.base import PostRenderContext, RenderedConfig
+from agentbox.core.run.post_render import (
+    inject_agent_tools_mcp as _inject_agent_tools_mcp_helper,
+    inject_host_env_mcp as _inject_host_env_mcp_helper,
+)
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.run.guardrails.base import GuardrailContext
 from agentbox.core.run.prepare import prepare_run_resources
 from agentbox.core.run.render import materialize_rendered_config
+from agentbox.core.run.retry import RetryOrchestrator
 from agentbox.core.run.streaming.session import RunStreamSession
-from agentbox.core.run.validation import extract_json
 from agentbox.core.workspace.manager import resolve_path
 
 if TYPE_CHECKING:
@@ -101,7 +105,7 @@ async def _adapter_run_into_session(
 # of these, the run is classified as ``failed`` rather than ``error``.
 # Mirrors the patterns in ``core/runners/_rate_limit.py`` but operates
 # on the final aggregated error string after the runner has surfaced it.
-_FAILED_ERROR_MARKERS: tuple[str, ...] = (
+_FAILED_ERROR_MARKERS: Final[tuple[str, ...]] = (
     "rate limit",
     "rate-limit",
     "rate_limit",
@@ -333,6 +337,7 @@ class RunExecutor:
 
         agent = prepared.agent
         input_ = prepared.input_
+        composed = prepared.composed
         _resource_snapshot_entries = prepared.resource_snapshot_entries
         prompt_bindings = prepared.prompt_bindings  # noqa: F841 — preserved for parity
         composed_result = prepared.composed_result
@@ -362,17 +367,18 @@ class RunExecutor:
             return self._fail_pre_run(agent, input_, workdir, session_id, error_msg)
 
         adapter, rendered = self._select_backend(
-            agent, workdir, backend, runner_config=effective
+            agent, workdir, backend, runner_config=effective, composed=composed
         )
         rendered, run_dir = self._render_for_run(adapter, agent, workdir, rendered)
 
-        # --- host-env MCP server injection (Plan 08 Phase 3) -----------------
+        # --- resolve MCP grants, then delegate file mutations to the backend.
+        # Executor owns the store / capability checks; the backend's
+        # ``post_render`` hook owns the on-disk MCP config format.
         _host_env_grants: dict | None = None
         if _workspace_id:
             try:
                 resolved_he = self.store.resolve_workspace_host_env(_workspace_id)
                 grants = resolved_he.get("grants") or {}
-                # Only inject if there's more than the default-granted workspace_info cap
                 non_default = {
                     k
                     for k, v in _HOST_ENV_CAPABILITIES.items()
@@ -380,31 +386,39 @@ class RunExecutor:
                 }
                 if grants.keys() & non_default:
                     _host_env_grants = grants
-                    self._inject_host_env_mcp(
-                        run_dir=run_dir,
-                        grants=grants,
-                        workspace_id=_workspace_id,
-                        workdir=workdir,
-                    )
             except Exception:
                 logger.exception(
-                    "executor: host-env MCP injection failed for workspace %r",
+                    "executor: host-env grant resolution failed for workspace %r",
                     _workspace_id,
                 )
 
-        # --- agent-tools MCP server injection (Plan 19) -----------------------
+        _agent_tool_grants: set[str] | None = None
         try:
-            _agent_tool_grants = self.store.list_active_grants(agent.id)
-            if _agent_tool_grants:
-                self._inject_agent_tools_mcp(
-                    run_dir=run_dir,
-                    grants=_agent_tool_grants,
-                    agent_id=agent.id,
-                    workdir=workdir,
-                )
+            grants_set = self.store.list_active_grants(agent.id)
+            if grants_set:
+                _agent_tool_grants = grants_set
         except Exception:
             logger.exception(
-                "executor: agent-tools MCP injection failed for agent %r",
+                "executor: agent-tools grant resolution failed for agent %r",
+                agent.id,
+            )
+
+        try:
+            adapter.post_render(
+                rendered,
+                PostRenderContext(
+                    run_dir=run_dir,
+                    workdir=workdir,
+                    db_path=self.settings.db_path,
+                    workspace_id=_workspace_id,
+                    agent_id=agent.id,
+                    host_env_grants=_host_env_grants,
+                    agent_tool_grants=_agent_tool_grants,
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "executor: post_render failed for agent %r",
                 agent.id,
             )
 
@@ -487,10 +501,8 @@ class RunExecutor:
             # Non-composition path (most agents): persist the final composed
             # system prompt — base + resource bindings + output-contract block —
             # so the run page can display exactly what the model received.
-            _final_system = agent.__dict__.get("_composed_system")
-            if not isinstance(_final_system, str):
-                _final_system = agent.prompt or ""
-            _final_schema = agent.__dict__.get("_composed_schema")
+            _final_system = composed.system if composed.system is not None else (agent.prompt or "")
+            _final_schema = composed.schema
             self.store.save_run_composition(
                 run_id=run_id,
                 composition_snapshot=None,
@@ -505,7 +517,7 @@ class RunExecutor:
             )
 
         # Persist resource + MCP snapshots (Plan 08 Phase 1+3)
-        _mcp_snapshot: dict | None = None
+        _mcp_snapshot: McpSnapshot | None = None
         if _workspace_id:
             try:
                 manifest_servers = [
@@ -559,6 +571,7 @@ class RunExecutor:
                 user_input=input_,
                 project_root=self.settings.project_root,
                 store=self.store,
+                composed=composed,
             )
             self.store.save_run_prompt(run_id, fragments_to_json(frags))
         except Exception:
@@ -575,6 +588,7 @@ class RunExecutor:
                 transcript_path,
                 broadcaster,
                 effective=effective,
+                composed=composed,
             )
         )
         self._tasks.add(task)
@@ -712,6 +726,7 @@ class RunExecutor:
         workdir: Path,
         backend_override: str | None = None,
         runner_config: EffectiveRunnerConfig | None = None,
+        composed: Any | None = None,
     ) -> tuple[BackendAdapter, RenderedConfig]:
         """Pick a backend adapter and render its config.
 
@@ -742,7 +757,9 @@ class RunExecutor:
         for name in candidates:
             adapter = _try_backend(name)
             if adapter is not None:
-                rendered = adapter.render(agent, workdir, runner_config=runner_config)
+                rendered = adapter.render(
+                    agent, workdir, runner_config=runner_config, composed=composed
+                )
                 return adapter, rendered
 
         # Carry the list of attempted names so the HTTP layer can tell the
@@ -760,7 +777,7 @@ class RunExecutor:
         runner_config_param: dict[str, Any] | None,
         timeout_override: int | None,
         agent: AgentDef | None = None,
-    ) -> dict[str, Any]:
+    ) -> RunnerSnapshot:
         """Compose the append-only runner_snapshot dict for a run.
 
         Captures everything the run-detail UI needs to render what
@@ -768,7 +785,7 @@ class RunExecutor:
         the resolution source, and any per-run overrides that were
         applied. Profile name is looked up best-effort.
         """
-        from agentbox.core.data.records import now_iso
+        from agentbox.core.data import now_iso
 
         profile_name: str | None = None
         if effective.profile_id:
@@ -897,41 +914,18 @@ class RunExecutor:
         workspace_id: str,
         workdir: Path,
     ) -> None:
-        """Patch claude_mcp.json in run_dir to include the host-env stdio server.
+        """Back-compat wrapper around the post-render MCP helper.
 
-        Claude Code / OpenCode spawn the server themselves when they see it in
-        the MCP config. We pass the effective grants + run context via env vars
-        so the server process can enforce them and write to the audit log.
+        Production code goes through ``BackendAdapter.post_render``; this
+        method survives because tests instantiate a ``MagicMock(spec=RunExecutor)``
+        and call it as a bound method.
         """
-        import json as _json
-        import sys
-
-        mcp_path = run_dir / "claude_mcp.json"
-        if not mcp_path.exists():
-            mcp_data: dict = {"mcpServers": {}}
-        else:
-            mcp_data = _json.loads(mcp_path.read_text())
-        mcp_data.setdefault("mcpServers", {})
-
-        env_vars: dict[str, str] = {
-            "AGENTBOX_HOST_ENV_GRANTS_JSON": _json.dumps(grants),
-            "AGENTBOX_HOST_ENV_WORKSPACE_ID": workspace_id,
-            "AGENTBOX_HOST_ENV_WORKDIR": str(workdir),
-            "AGENTBOX_DB_PATH": str(self.settings.db_path),
-        }
-        mcp_data["mcpServers"]["agentbox-host-env"] = {
-            "command": sys.executable,
-            "args": ["-m", "agentbox.core.workspace.mcp.servers.host_env"],
-            "env": env_vars,
-        }
-        mcp_path.write_text(
-            _json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        logger.debug(
-            "executor: injected host-env MCP server for workspace %r with caps: %s",
-            workspace_id,
-            list(grants.keys()),
+        _inject_host_env_mcp_helper(
+            run_dir=run_dir,
+            grants=grants,
+            workspace_id=workspace_id,
+            workdir=workdir,
+            db_path=self.settings.db_path,
         )
 
     def _inject_agent_tools_mcp(
@@ -941,37 +935,13 @@ class RunExecutor:
         agent_id: str,
         workdir: Path,
     ) -> None:
-        """Inject the agent_tools stdio MCP server into the run's MCP config."""
-        import json as _json
-        import sys
-
-        mcp_path = run_dir / "claude_mcp.json"
-        if not mcp_path.exists():
-            mcp_data: dict = {"mcpServers": {}}
-        else:
-            mcp_data = _json.loads(mcp_path.read_text())
-        mcp_data.setdefault("mcpServers", {})
-
-        env_vars: dict[str, str] = {
-            "AGENTBOX_AGENT_TOOLS_GRANTS_JSON": _json.dumps(sorted(grants)),
-            "AGENTBOX_AGENT_TOOLS_AGENT_ID": agent_id,
-            "AGENTBOX_AGENT_TOOLS_RUN_ID": "",
-            "AGENTBOX_AGENT_TOOLS_WORKDIR": str(workdir),
-            "AGENTBOX_DB_PATH": str(self.settings.db_path),
-        }
-        mcp_data["mcpServers"]["agentbox-agent-tools"] = {
-            "command": sys.executable,
-            "args": ["-m", "agentbox.core.workspace.mcp.servers.agent_tools"],
-            "env": env_vars,
-        }
-        mcp_path.write_text(
-            _json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        logger.debug(
-            "executor: injected agent-tools MCP server for agent %r with tools: %s",
-            agent_id,
-            sorted(grants),
+        """Back-compat wrapper around the post-render MCP helper."""
+        _inject_agent_tools_mcp_helper(
+            run_dir=run_dir,
+            grants=grants,
+            agent_id=agent_id,
+            workdir=workdir,
+            db_path=self.settings.db_path,
         )
 
     @staticmethod
@@ -994,10 +964,9 @@ class RunExecutor:
         transcript_path: Path,
         broadcaster: RunBroadcaster,
         effective: EffectiveRunnerConfig | None = None,
+        composed: Any | None = None,
     ) -> None:
         from agentbox.core.agent.config import ExecutionConfig, PythonAgentConfig
-
-        current_input = input_
 
         final_ok = False
         final_error: str | None = None
@@ -1055,186 +1024,50 @@ class RunExecutor:
             # need to re-record here. UsageEvents from the runner refine
             # token/cost; model is preserved by COALESCE in record_usage.
             with session:
-                for attempt in range(max_attempts):
-                    session.output_text.clear()
-                    run_error: str | None = None
+                from agentbox.core.agent.config import (
+                    resolve_output_config as _resolve_oc,
+                )
 
-                    # Honour the shared wall-clock deadline computed above.
-                    # If a prior attempt already exhausted the budget, raise
-                    # synthetic TimeoutError immediately rather than waiting
-                    # for ``asyncio.timeout_at`` to fire on a no-op await.
-                    if asyncio.get_event_loop().time() >= deadline:
-                        run_error = (
-                            f"timeout after {timeout}s "
-                            f"(budget exhausted across {attempt} attempt"
-                            f"{'s' if attempt != 1 else ''})"
-                        )
-                        final_error = run_error
-                        final_ok = False
-                        final_status = RunStatus.TIMEOUT.value
-                        session.emit_timeout(timeout_seconds=timeout, error=run_error)
-                        session.emit_log(level="error", message=run_error)
-                        break
+                _oc = _resolve_oc(self.store, agent)
+                has_schema = bool(
+                    python_cfg.output_schema_path
+                    or (composed is not None and isinstance(composed.schema, dict))
+                    or _oc.json_schema is not None
+                    or bool(_oc.validators)
+                )
+                validation_mode = (
+                    composed.validation_mode
+                    if composed is not None and composed.validation_mode is not None
+                    else "strict"
+                )
 
-                    try:
-                        async with asyncio.timeout_at(deadline):
-                            # Backend pushes events through the session
-                            # (which enforces DoneEvent-last ordering) and
-                            # returns the terminal status. The default
-                            # ``run_into_session`` pump intercepts the
-                            # backend's DoneEvent so it doesn't reach WS
-                            # clients before validation runs.
-                            #
-                            # Note: the previous loop also early-broke on
-                            # fatal LogEvents (rate-limit / auth / quota
-                            # markers) to cut off subprocess output sooner.
-                            # We've dropped that here — the backend still
-                            # surfaces the error via its own DoneEvent, and
-                            # ``_classify_terminal_error`` below reclassifies
-                            # the run as ``failed`` based on the error
-                            # string. Responsiveness regression on stuck
-                            # rate-limited subprocesses is the trade-off;
-                            # the per-run timeout still bounds total wall
-                            # time. See ``detect_in_text_line``.
-                            backend_result = await _adapter_run_into_session(
-                                adapter, rendered, current_input, session
-                            )
-                            final_ok = backend_result.ok
-                            final_error = backend_result.error
-                            final_status = backend_result.status
-                    except TimeoutError:
-                        run_error = f"timeout after {timeout}s"
-                        final_error = run_error
-                        final_ok = False
-                        final_status = RunStatus.TIMEOUT.value
-                        if timeout is not None:
-                            session.emit_timeout(
-                                timeout_seconds=timeout, error=run_error
-                            )
-                    except Exception as exc:
-                        import traceback as _tb
-
-                        tb_text = _tb.format_exc()
-                        run_error = (
-                            f"executor error: {type(exc).__name__}: {exc}\n{tb_text}"
-                        )
-                        final_error = run_error
-                        final_ok = False
-                        logging.getLogger("agentbox.executor").exception(
-                            "runner crashed for run %s", run_id
-                        )
-
-                    if run_error:
-                        session.emit_log(level="error", message=run_error)
-
-                    output = "\n".join(session.output_text).strip() or None
-
-                    # When the agent wrote structured output to a file
-                    # instead of returning it inline (e.g. opencode with
-                    # write tools), prefer the file content if the text
-                    # output doesn't parse as JSON. Only kicks in when an
-                    # output schema is configured.
-                    from agentbox.core.agent.config import (
-                        resolve_output_config as _resolve_oc,
-                    )
-
-                    _oc = _resolve_oc(self.store, agent)
-                    has_schema = bool(
-                        python_cfg.output_schema_path
-                        or isinstance(agent.__dict__.get("_composed_schema"), dict)
-                        or _oc.json_schema is not None
-                        or bool(_oc.validators)
-                    )
-                    if has_schema:
-                        output = self._maybe_load_output_file(output, workdir)
-
-                    # --- Error recovery (any failure including timeout) ---
-                    if not final_ok:
-                        if error_retries_left > 0:
-                            error_retries_left -= 1
-                            reason = (
-                                "timeout"
-                                if final_status == RunStatus.TIMEOUT.value
-                                else "run_error"
-                            )
-                            current_input = self._build_error_retry_prompt(
-                                input_, output, final_error
-                            )
-                            session.emit_retry(
-                                attempt=attempt + 1,
-                                reason=reason,
-                                error=final_error,
-                            )
-                            session.emit_log(
-                                level="warn",
-                                message=(
-                                    f"Run failed (attempt {attempt + 1}): "
-                                    f"{final_error} — retrying "
-                                    f"({error_retries_left} left)"
-                                ),
-                            )
-                            continue
-                        # No retries left — final error is already set.
-                        break
-
-                    # --- Validation retry (output schema check) -----------
-                    mode = getattr(agent, "_composed_validation_mode", "strict")
-                    if has_schema and mode != "off":
-                        result = adapter.validate_output(
-                            agent,
-                            workdir,
-                            output,
-                            project_root=self.settings.project_root,
-                            store=self.store,
-                        )
-                        schema_validated_via = result.engine
-                        session.emit_validation(
-                            ok=result.ok,
-                            attempt=attempt + 1,
-                            mode=mode,
-                            engine=result.engine,
-                            error=None if result.ok else result.error,
-                        )
-                        if result.ok:
-                            validation_status = "ok"
-                            validation_errors = None
-                            break
-                        validation_status = "fail"
-                        validation_errors = [result.error]
-                        if validation_retries_left > 0:
-                            validation_retries_left -= 1
-                            current_input = self._build_retry_prompt(
-                                input_, output, result.error
-                            )
-                            session.emit_retry(
-                                attempt=attempt + 1,
-                                reason="validation_failed",
-                                error=result.error,
-                            )
-                            session.emit_log(
-                                level="warn",
-                                message=(
-                                    f"Validation failed (attempt {attempt + 1}): "
-                                    f"{result.error} — retrying "
-                                    f"({validation_retries_left} left)"
-                                ),
-                            )
-                            continue
-                        # Final attempt failed validation
-                        if mode == "strict":
-                            final_ok = False
-                            final_error = f"output validation failed: {result.error}"
-                            # Validation failure is an expected, agent-level
-                            # outcome — classify as ``failed`` so the
-                            # error-status bucket stays reserved for
-                            # unexpected runner crashes.
-                            final_status = RunStatus.FAILED.value
-                        elif mode == "warn":
-                            validation_status = "warn"
-                        break
-
-                    # Success path — no validation configured or passed.
-                    break
+                orchestrator = RetryOrchestrator(
+                    adapter=adapter,
+                    rendered=rendered,
+                    agent=agent,
+                    composed=composed,
+                    workdir=workdir,
+                    store=self.store,
+                    project_root=self.settings.project_root,
+                )
+                outcome = await orchestrator.execute(
+                    initial_input=input_,
+                    max_attempts=max_attempts,
+                    error_retries_left=error_retries_left,
+                    validation_retries_left=validation_retries_left,
+                    timeout_seconds=timeout,
+                    deadline=deadline,
+                    has_schema=has_schema,
+                    validation_mode=validation_mode,
+                    session=session,
+                )
+                final_ok = outcome.final_ok
+                final_error = outcome.final_error
+                final_status = outcome.final_status
+                output = outcome.output
+                validation_status = outcome.validation_status
+                validation_errors = outcome.validation_errors
+                schema_validated_via = outcome.schema_validated_via
 
                 try:
                     await self._run_guardrails(
@@ -1244,7 +1077,11 @@ class RunExecutor:
                     suffix = f"guardrail error: {exc}"
                     final_error = f"{final_error} | {suffix}" if final_error else suffix
                 if schema_validated_via is None:
-                    mode = getattr(agent, "_composed_validation_mode", "strict")
+                    mode = (
+                        composed.validation_mode
+                        if composed is not None and composed.validation_mode is not None
+                        else "strict"
+                    )
                     if mode == "off":
                         schema_validated_via = "off"
                 # Reclassify expected, agent-level failures (rate-limit /
@@ -1301,65 +1138,6 @@ class RunExecutor:
                 self._cleanup_run_dir(run_dir)
             with contextlib.suppress(Exception):
                 self._cleanup_workdir(agent, workdir)
-
-    @staticmethod
-    def _maybe_load_output_file(current: str | None, workdir: Path) -> str | None:
-        """Return ``workdir/output.json`` content when ``current`` isn't JSON.
-
-        Agents occasionally write their structured output to disk instead
-        of inlining it. If the runner's text output doesn't parse as JSON
-        and an ``output.json`` file exists in the workdir, swap it in so
-        validation can engage on the file content. Falls back to
-        ``current`` on any IO/decode failure.
-        """
-        if current:
-            try:
-                json.loads(extract_json(current))
-                return current
-            except (json.JSONDecodeError, ValueError):
-                pass
-        candidate = workdir / "output.json"
-        try:
-            if candidate.is_file():
-                content = candidate.read_text(encoding="utf-8").strip()
-                if content:
-                    return content
-        except OSError:
-            pass
-        return current
-
-    @staticmethod
-    def _build_retry_prompt(
-        original_input: str, previous_output: str, validation_error: str
-    ) -> str:
-        return (
-            f"{original_input}\n\n"
-            f"--- PREVIOUS ATTEMPT FAILED VALIDATION ---\n"
-            f"Your previous output did not pass validation:\n\n"
-            f"{validation_error}\n\n"
-            f"--- YOUR PREVIOUS OUTPUT ---\n"
-            f"{previous_output}\n\n"
-            f"--- FIX IT ---\n"
-            f"Fix the issues above and produce a corrected output that passes validation."
-        )
-
-    @staticmethod
-    def _build_error_retry_prompt(
-        original_input: str, previous_output: str | None, error: str | None
-    ) -> str:
-        parts = [
-            f"{original_input}\n\n",
-            "--- PREVIOUS ATTEMPT FAILED ---\n",
-        ]
-        if error:
-            parts.append(f"The run failed with the following error:\n\n{error}\n\n")
-        if previous_output:
-            parts.append(f"--- YOUR PREVIOUS OUTPUT ---\n{previous_output}\n\n")
-        parts.append(
-            "--- FIX IT ---\n"
-            "Review the error above, correct the issue, and produce a new output."
-        )
-        return "".join(parts)
 
     async def _run_guardrails(
         self,

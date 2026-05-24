@@ -17,7 +17,7 @@ from agentbox.core.run.history.base import ConversationSource
 from agentbox.core.run.history.types import ConversationView, TokenTotals
 
 if TYPE_CHECKING:
-    from agentbox.core.data.records import RunRecord
+    from agentbox.core.data import RunRecord
 
 
 class PiSessionSource(ConversationSource):

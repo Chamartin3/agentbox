@@ -4,7 +4,7 @@ Lifted out of ``executor.py`` so :class:`BackendAdapter` (and any
 custom backend) can validate output without depending on the executor.
 
 ``validate_output()`` is the public entry point. It resolves the agent's
-schema (from ``_composed_schema`` first, then ``runner.output_schema_path``)
+schema (from ``composed.schema`` first, then ``runner.output_schema_path``)
 and runs the engine declared by ``runner.output_validation_engine``.
 
 Backends that produce already-typed outputs (token / pydantic-ai) can
@@ -304,6 +304,7 @@ def resolve_schema(
     agent: Any,
     workdir: Path,
     project_root: Path | None = None,
+    composed_schema: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
     """Locate the agent's output schema.
 
@@ -313,16 +314,14 @@ def resolve_schema(
     ``error_msg`` as a validation failure).
 
     Resolution order:
-      1. ``agent._composed_schema`` (already-rendered binding).
+      1. ``composed_schema`` (already-rendered binding from the prompt
+         composer / output-schema prompt-binding).
       2. ``python.output_schema_path`` (legacy file-based contract).
     """
     from agentbox.core.agent.config import PythonAgentConfig
 
-    composed = (
-        agent.__dict__.get("_composed_schema") if hasattr(agent, "__dict__") else None
-    )
-    if isinstance(composed, dict):
-        return composed, ""
+    if isinstance(composed_schema, dict):
+        return composed_schema, ""
 
     python_cfg = PythonAgentConfig.from_agent(agent)
     schema_rel = python_cfg.output_schema_path
@@ -348,6 +347,7 @@ def validate_output(
     *,
     project_root: Path | None = None,
     store: Any | None = None,
+    composed: Any | None = None,
 ) -> ValidationResult:
     """Validate ``output`` against the agent's declared schema.
 
@@ -423,7 +423,10 @@ def validate_output(
         return ValidationResult(ok=True, engine=engine)
 
     # --- Legacy path: schema file ---
-    schema, schema_err = resolve_schema(agent, workdir, project_root)
+    composed_schema = getattr(composed, "schema", None) if composed is not None else None
+    schema, schema_err = resolve_schema(
+        agent, workdir, project_root, composed_schema=composed_schema
+    )
     if schema is None:
         if schema_err:
             return ValidationResult(ok=False, error=schema_err, engine="none")

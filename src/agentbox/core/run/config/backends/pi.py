@@ -15,7 +15,7 @@ from agentbox.core.run.config.backends.base import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data import AgentDef
     from agentbox.core.run.config.run_configurator import ComposedMetadata
 
 

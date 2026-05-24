@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.constants import RunnerKind
-from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
 
 DEFAULT_RUNNER = RunnerSpec(

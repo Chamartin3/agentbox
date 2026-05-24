@@ -5,10 +5,10 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from agentbox.core.data.records import now_iso
-from agentbox.core.data.runner_profiles import RunnerProfileCreate
-from agentbox.core.data.schema import runs as runs_table
-from agentbox.core.data.schema import usage as usage_table
+from agentbox.core.data import now_iso
+from agentbox.core.data import RunnerProfileCreate
+from agentbox.core.data import runs as runs_table
+from agentbox.core.data import usage as usage_table
 
 
 class TestRunnerProfileStats:

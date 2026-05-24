@@ -11,7 +11,7 @@ import pytest
 
 @pytest.fixture()
 def store(tmp_path: Path):  # type: ignore[no-untyped-def]
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
     return SessionStore(tmp_path / "db.sqlite")
 

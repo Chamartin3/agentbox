@@ -80,7 +80,7 @@ def test_run_with_db_seeded_noop_agent(isolated_data_dir: Path, client: Any) -> 
     import warnings
 
     from agentbox.api.deps import get_store
-    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data import AgentDef
 
     _register_noop_backend()
 

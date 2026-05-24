@@ -220,7 +220,7 @@ def agent_create(
     backing file is created; the agent lives entirely in the DB.
     """
     from agentbox.core.agent.config import build_config_json_payload
-    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data import AgentDef
 
     data = json.loads(config.read_text(encoding="utf-8"))
     try:
@@ -272,7 +272,7 @@ def agent_edit(
     """
     import hashlib
 
-    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data import AgentDef
     from agentbox.core.prompt.versioning.drift import _build_snapshot
 
     if not set_:

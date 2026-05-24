@@ -29,7 +29,7 @@ from agentbox.core.run.history.types import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.data.records import RunRecord
+    from agentbox.core.data import RunRecord
 
 
 class OpencodeSessionSource(ConversationSource):

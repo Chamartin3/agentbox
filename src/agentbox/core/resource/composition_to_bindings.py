@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
 logger = logging.getLogger(__name__)
 

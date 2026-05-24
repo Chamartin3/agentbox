@@ -344,6 +344,7 @@ class TokenBackend(BackendAdapter):
         mcp_tools: list[dict] | None = None,
         creds: dict | None = None,
         runner_config: Any | None = None,
+        composed: Any | None = None,
     ) -> RenderedConfig:
         python_cfg = PythonAgentConfig.from_agent(agent)
         model = getattr(runner_config, "model", None) or self.default_model
@@ -353,7 +354,7 @@ class TokenBackend(BackendAdapter):
         # (DB-only agents have no on-disk bundle to read from); fall back to
         # ``output_schema_path`` for legacy file-based agents.
         output_schema: dict[str, Any] | None = None
-        composed_schema = getattr(agent, "_composed_schema", None)
+        composed_schema = composed.schema if composed is not None else None
         if isinstance(composed_schema, dict):
             output_schema = composed_schema
         elif python_cfg.output_schema_path:
@@ -375,15 +376,15 @@ class TokenBackend(BackendAdapter):
         # (which returns the fully-composed string) keeps legacy callers
         # working — those won't have a schema mismatch since no result_type
         # is being attached either.
-        system_base = getattr(agent, "_composed_system_base", None)
+        system_base = composed.system_base if composed is not None else None
         prompt = (
             system_base
             if isinstance(system_base, str) and system_base
-            else self._resolve_prompt(agent, workdir)
+            else self._resolve_prompt(agent, workdir, composed)
         )
 
-        references = getattr(agent, "_composed_references", ()) or ()
-        input_schema = getattr(agent, "_composed_input_schema", None)
+        references = (composed.references if composed is not None else ()) or ()
+        input_schema = composed.input_schema if composed is not None else None
 
         agent_meta: dict[str, Any] = {
             "agent_module": python_cfg.agent_module,
@@ -428,7 +429,7 @@ class TokenBackend(BackendAdapter):
 
         return RenderedConfig(
             cwd=Path("."),
-            files=self._collect_system_files(agent, workdir),
+            files=self._collect_system_files(agent, workdir, composed),
             agent_meta=agent_meta,
             model=model,
         )

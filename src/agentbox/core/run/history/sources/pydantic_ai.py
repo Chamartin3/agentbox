@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.data.transcripts import read_transcript
+from agentbox.core.data import read_transcript
 from agentbox.core.run.history.base import ConversationSource
 from agentbox.core.run.history.sources.transcript import (
     _events_to_conversation_view,
@@ -18,7 +18,7 @@ from agentbox.core.run.history.sources.transcript import (
 from agentbox.core.run.history.types import ConversationView, TokenTotals
 
 if TYPE_CHECKING:
-    from agentbox.core.data.records import RunRecord
+    from agentbox.core.data import RunRecord
 
 
 class PydanticAiHistorySource(ConversationSource):

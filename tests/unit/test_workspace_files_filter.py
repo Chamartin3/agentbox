@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.api.routes.workspaces import _is_user_file
+from agentbox.core.service.workspaces import is_user_file as _is_user_file
 
 
 def test_user_file_at_root_is_kept() -> None:

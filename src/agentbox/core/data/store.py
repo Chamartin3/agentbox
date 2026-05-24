@@ -36,7 +36,14 @@ from agentbox.core.data.mcp_discovery import McpDiscoveryMixin
 from agentbox.core.data.mcp_overrides import McpOverridesMixin
 from agentbox.core.data.project_config import ProjectConfigMixin
 from agentbox.core.data.prompts import PromptVersionsMixin
-from agentbox.core.data.records import RunRecord, now_iso, row_to_run
+from agentbox.core.data.records import (
+    McpSnapshot,
+    ResourceSnapshotEntry,
+    RunnerSnapshot,
+    RunRecord,
+    now_iso,
+    row_to_run,
+)
 from agentbox.core.data.resource_bindings import ResourceBindingsMixin
 from agentbox.core.data.resources import ResourcesMixin
 from agentbox.core.data.runner_profiles import RunnerProfilesMixin
@@ -61,7 +68,7 @@ logger = logging.getLogger(__name__)
 class _CoreStore:
     """Connection + CRUD for sessions, runs, usage, guardrails, run_prompts."""
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         # check_same_thread=False — FastAPI dispatches sync handlers to a
@@ -719,8 +726,8 @@ class _CoreStore:
         self,
         run_id: str,
         *,
-        resource_snapshot: list[dict] | None = None,
-        mcp_snapshot: dict | None = None,
+        resource_snapshot: list[ResourceSnapshotEntry] | None = None,
+        mcp_snapshot: McpSnapshot | None = None,
     ) -> None:
         import json as _json
 
@@ -736,7 +743,7 @@ class _CoreStore:
     def save_run_runner_snapshot(
         self,
         run_id: str,
-        runner_snapshot: dict,
+        runner_snapshot: RunnerSnapshot,
     ) -> None:
         """Persist the runner config resolved at dispatch time.
 

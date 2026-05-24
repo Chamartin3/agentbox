@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from agentbox.core.constants import ResourceType
 
 if TYPE_CHECKING:
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
 logger = logging.getLogger(__name__)
 

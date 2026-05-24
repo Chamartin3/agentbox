@@ -8,7 +8,7 @@ from rich.table import Table
 
 from agentbox.api.deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.data.mcp_overrides import VALID_POLICIES
+from agentbox.core.data import VALID_POLICIES
 
 mcp_workspace_app = typer.Typer(
     name="mcp-workspace",

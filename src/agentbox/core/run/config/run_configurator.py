@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.data.manifest import AgentDef
+from agentbox.core.data import AgentDef
 from agentbox.core.run.config.backends.base import McpConfig
 
 

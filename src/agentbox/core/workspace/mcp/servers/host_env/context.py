@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
 
 @dataclass
@@ -50,7 +50,7 @@ class HostEnvContext:
         if self.db_path is None:
             return None
         try:
-            from agentbox.core.data.store import SessionStore
+            from agentbox.core.data import SessionStore
 
             self._store = SessionStore(self.db_path)
         except Exception:

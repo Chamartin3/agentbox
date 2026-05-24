@@ -85,7 +85,7 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @pytest.fixture
 def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk SessionStore (sqlite) under ``tmp_path``."""
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
     return SessionStore(tmp_path / "db.sqlite")
 

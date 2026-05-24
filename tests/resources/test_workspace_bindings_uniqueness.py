@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.data.store import SessionStore
+from agentbox.core.data import SessionStore
 
 
 @pytest.fixture

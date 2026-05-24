@@ -17,7 +17,7 @@ from rich.table import Table
 from agentbox.api.deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.agent.providers import list_providers
-from agentbox.core.data.runner_profiles import RunnerProfileCreate
+from agentbox.core.data import RunnerProfileCreate
 
 runner_profile_app = typer.Typer(
     name="runner-profile",

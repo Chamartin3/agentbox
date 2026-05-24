@@ -19,7 +19,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-from agentbox.core.data.schema import metadata
+from agentbox.core.data import metadata
 
 revision: str = "0001_initial"
 down_revision: str | Sequence[str] | None = None

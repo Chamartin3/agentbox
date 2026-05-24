@@ -12,7 +12,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.data.transcripts import read_transcript
+from agentbox.core.data import read_transcript
 from agentbox.core.run.history.base import ConversationSource
 from agentbox.core.run.history.types import (
     ContentPart,
@@ -22,7 +22,7 @@ from agentbox.core.run.history.types import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.data.records import RunRecord
+    from agentbox.core.data import RunRecord
 
 
 def _events_to_conversation_view(

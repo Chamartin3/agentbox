@@ -32,7 +32,7 @@ from agentbox.core.run.run_prep import (
 
 if TYPE_CHECKING:
     from agentbox.config import Settings
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
 logger = logging.getLogger(__name__)
 

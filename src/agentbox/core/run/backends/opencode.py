@@ -62,6 +62,7 @@ class OpenCodeBackend(BackendAdapter):
         mcp_tools: list[dict] | None = None,
         creds: dict | None = None,
         runner_config: Any | None = None,
+        composed: Any | None = None,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
         extra_args = list(
@@ -95,7 +96,7 @@ class OpenCodeBackend(BackendAdapter):
             argv=argv,
             env=env,
             cwd=Path("."),
-            files=self._collect_system_files(agent, workdir),
+            files=self._collect_system_files(agent, workdir, composed),
             agent_meta={"timeout_seconds": timeout_seconds},
             model=model,
         )

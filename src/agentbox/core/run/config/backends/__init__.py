@@ -13,7 +13,7 @@ from .pi import PiConfigGenerator
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data import AgentDef
     from agentbox.core.run.config.run_configurator import ComposedMetadata
 
 

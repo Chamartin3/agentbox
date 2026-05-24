@@ -17,7 +17,7 @@ from agentbox.core.resource.drift import (
 
 @pytest.fixture
 def store(tmp_path: Path):
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
     return SessionStore(tmp_path / "db.sqlite")
 

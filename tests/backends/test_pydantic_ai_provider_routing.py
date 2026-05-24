@@ -14,7 +14,7 @@ import pytest
 from agentbox.api.events import DoneEvent
 from agentbox.core.agent.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunnerKind
-from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.run.backends.token import TokenBackend
 
 DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.TOKEN)

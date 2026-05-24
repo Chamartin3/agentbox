@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.constants import RunnerKind
-from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
 from agentbox.core.run.backends.opencode import OpenCodeBackend
 

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from agentbox.core.data.manifest import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.run.config.backends import get_generator, list_generators
 from agentbox.core.run.config.run_configurator import (
     ComposedMetadata,

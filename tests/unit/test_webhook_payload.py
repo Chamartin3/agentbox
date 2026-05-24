@@ -13,7 +13,7 @@ from agentbox.api.webhooks import (
     _parsed_output_structured,
     webhook_payload,
 )
-from agentbox.core.data.records import RunRecord
+from agentbox.core.data import RunRecord
 
 
 def _make_run(output: str, validation_status: str = "ok") -> RunRecord:

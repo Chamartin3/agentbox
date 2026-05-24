@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.data.manifest import AgentDef, AgentSource, RunnerSpec
+from agentbox.core.data import AgentDef, AgentSource, RunnerSpec
 from agentbox.core.prompt.versioning.drift import (
     AgentDriftStatus,
     check_drift,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.data.runner_profiles import RunnerProfileCreate, RunnerProfilePatch
+from agentbox.core.data import RunnerProfileCreate, RunnerProfilePatch
 
 
 class TestRunnerProfilesCRUD:

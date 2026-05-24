@@ -13,7 +13,7 @@ from agentbox.config import Settings
 from agentbox.core.resource.skills import discover_skills
 
 if TYPE_CHECKING:
-    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data import AgentDef
 
 
 @dataclass(frozen=True)

@@ -18,7 +18,7 @@ from agentbox.core.prompt.rendering import render_for_type
 from agentbox.core.prompt.resolver import resolve_prompt
 
 if TYPE_CHECKING:
-    from agentbox.core.data.store import SessionStore
+    from agentbox.core.data import SessionStore
 
 
 class PreviewError(Exception):

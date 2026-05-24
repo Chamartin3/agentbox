@@ -31,7 +31,7 @@ class AgentToolsContext:
 
     @cached_property
     def store(self):
-        from agentbox.core.data.store import SessionStore
+        from agentbox.core.data import SessionStore
 
         return SessionStore(self.db_path)
 

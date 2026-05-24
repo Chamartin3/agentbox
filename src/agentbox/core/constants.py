@@ -110,24 +110,3 @@ class EventType(StrEnum):
     TIMEOUT = "timeout"
     VALIDATION = "validation"
     DONE = "done"
-
-
-def runtime_default_model(backend_name: str) -> str | None:
-    """Look up an operator-configured default model for a backend.
-
-    Reads the `runtime_defaults` settings section for `default_model_<backend>`.
-    Returns `None` when the store isn't available, the section is missing,
-    or the value is unset. Backends fall back to their hard-coded
-    `default_model` attribute when this returns `None`.
-    """
-    try:
-        from agentbox.api.deps import get_store
-
-        store = get_store()
-        section = store.get_settings_section("runtime_defaults") or {}
-        value = section.get(f"default_model_{backend_name}")
-        if isinstance(value, str) and value.strip():
-            return value
-        return None
-    except Exception:
-        return None

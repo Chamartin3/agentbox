@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.data.manifest import RunnerSpec
+from agentbox.core.data import RunnerSpec
 from pydantic import ValidationError
 
 

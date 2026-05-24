@@ -10,11 +10,8 @@ historically jammed into ``AgentDef.runner`` into three logical buckets:
   (module, deps factory, output schema path).
 
 The values live in ``agent_versions.config_json`` under sub-keys
-``execution`` / ``runtime`` / ``python``. Each ``from_agent()`` factory
-reads those keys first and falls back to the legacy ``agent.runner``
-fields so unmigrated agents keep working transparently. The backfill
-migration (``backfill_agent_config_json``) copies the legacy values
-into the new sub-dicts so the fallback never triggers in steady state.
+``execution`` / ``runtime`` / ``python``. ``config_json`` is the sole
+source of truth — there is no legacy ``agent.runner`` fallback.
 
 Runner-level config (backend, model, timeout, provider, extra_args)
 stays out of here entirely — that's ``EffectiveRunnerConfig`` resolved
@@ -26,14 +23,6 @@ from __future__ import annotations
 import json as _json
 from dataclasses import dataclass
 from typing import Any, Literal
-
-
-def _runner_attr(agent: Any, name: str, default: Any = None) -> Any:
-    runner = getattr(agent, "runner", None)
-    if runner is None:
-        return default
-    val = getattr(runner, name, default)
-    return val if val is not None else default
 
 
 def _config_section(agent: Any, section: str) -> dict[str, Any]:
@@ -62,8 +51,7 @@ def _config_section(agent: Any, section: str) -> dict[str, Any]:
 class ExecutionConfig:
     """Executor-level retry & validation semantics.
 
-    Lives at ``agent_versions.config_json["execution"]``. Falls back to
-    ``agent.runner`` for unmigrated agents.
+    Lives at ``agent_versions.config_json["execution"]``.
     """
 
     max_validation_retries: int = 0
@@ -74,20 +62,9 @@ class ExecutionConfig:
     def from_agent(cls, agent: Any) -> ExecutionConfig:
         sub = _config_section(agent, "execution")
         return cls(
-            max_validation_retries=int(
-                sub.get("max_validation_retries")
-                if sub.get("max_validation_retries") is not None
-                else _runner_attr(agent, "max_validation_retries", 0)
-            ),
-            max_error_retries=int(
-                sub.get("max_error_retries")
-                if sub.get("max_error_retries") is not None
-                else _runner_attr(agent, "max_error_retries", 0)
-            ),
-            output_validation_engine=(
-                sub.get("output_validation_engine")
-                or _runner_attr(agent, "output_validation_engine", "both")
-            ),
+            max_validation_retries=int(sub.get("max_validation_retries") or 0),
+            max_error_retries=int(sub.get("max_error_retries") or 0),
+            output_validation_engine=sub.get("output_validation_engine") or "both",
         )
 
 
@@ -95,8 +72,7 @@ class ExecutionConfig:
 class RuntimeConfig:
     """Runtime tooling/permissions surface.
 
-    Lives at ``agent_versions.config_json["runtime"]``. Falls back to
-    ``agent.runner`` for unmigrated agents.
+    Lives at ``agent_versions.config_json["runtime"]``.
     """
 
     mcp_config_path: str | None = None
@@ -105,16 +81,9 @@ class RuntimeConfig:
     @classmethod
     def from_agent(cls, agent: Any) -> RuntimeConfig:
         sub = _config_section(agent, "runtime")
-        tools = sub.get("allowed_tools")
-        if tools is None:
-            tools = _runner_attr(agent, "allowed_tools", []) or []
         return cls(
-            mcp_config_path=(
-                sub.get("mcp_config_path")
-                if "mcp_config_path" in sub
-                else _runner_attr(agent, "mcp_config_path", None)
-            ),
-            allowed_tools=tuple(tools),
+            mcp_config_path=sub.get("mcp_config_path"),
+            allowed_tools=tuple(sub.get("allowed_tools") or ()),
         )
 
 
@@ -122,8 +91,7 @@ class RuntimeConfig:
 class PythonAgentConfig:
     """Pydantic-ai / token backend dispatch metadata.
 
-    Lives at ``agent_versions.config_json["python"]``. Falls back to
-    ``agent.runner`` for unmigrated agents.
+    Lives at ``agent_versions.config_json["python"]``.
 
     ``output_schema_path`` is included here because it's part of how
     the runtime locates the schema for the executor's validation loop.
@@ -139,21 +107,9 @@ class PythonAgentConfig:
     def from_agent(cls, agent: Any) -> PythonAgentConfig:
         sub = _config_section(agent, "python")
         return cls(
-            agent_module=(
-                sub.get("agent_module")
-                if "agent_module" in sub
-                else _runner_attr(agent, "agent_module", None)
-            ),
-            deps_factory=(
-                sub.get("deps_factory")
-                if "deps_factory" in sub
-                else _runner_attr(agent, "deps_factory", None)
-            ),
-            output_schema_path=(
-                sub.get("output_schema_path")
-                if "output_schema_path" in sub
-                else _runner_attr(agent, "output_schema_path", None)
-            ),
+            agent_module=sub.get("agent_module"),
+            deps_factory=sub.get("deps_factory"),
+            output_schema_path=sub.get("output_schema_path"),
         )
 
 

@@ -28,7 +28,7 @@ from agentbox.api.deps import (
 )
 from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
-from agentbox.core.data.manifest import AgentDef
+from agentbox.core.data import AgentDef
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.workspace.mcp.client import McpRegistry
 

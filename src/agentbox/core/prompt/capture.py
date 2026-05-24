@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.constants import RunnerKind
-from agentbox.core.data.manifest import AgentDef
+from agentbox.core.data import AgentDef
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
@@ -61,6 +61,7 @@ def build_fragments(
     project_root: Path,
     argv: list[str] | None = None,
     store: SessionStore | None = None,
+    composed: object | None = None,
 ) -> list[PromptFragment]:
     frags: list[PromptFragment] = [
         PromptFragment(
@@ -72,7 +73,7 @@ def build_fragments(
     ]
 
     # Composed prompts take precedence over legacy prompt_path.
-    composed_system = getattr(agent, "_composed_system", None)
+    composed_system = getattr(composed, "system", None) if composed is not None else None
     if composed_system is not None:
         frags.append(
             PromptFragment(
@@ -82,7 +83,7 @@ def build_fragments(
                 content=composed_system,
             )
         )
-        composed_schema = getattr(agent, "_composed_schema", None)
+        composed_schema = getattr(composed, "schema", None) if composed is not None else None
         if composed_schema is not None:
             frags.append(
                 PromptFragment(

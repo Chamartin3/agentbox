@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.data.manifest import ProjectManifest, WorkspaceDef, WorkspaceFile
+from agentbox.core.data import ProjectManifest, WorkspaceDef, WorkspaceFile
 
 
 def test_workspace_def_defaults() -> None:

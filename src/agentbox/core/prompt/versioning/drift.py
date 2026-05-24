@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agentbox.core.data.agent_versions import AgentVersionsMixin
-    from agentbox.core.data.manifest import AgentDef
-    from agentbox.core.data.prompts import PromptVersionsMixin
-    from agentbox.core.data.runner_profiles import RunnerProfilesMixin
+    from agentbox.core.data import AgentVersionsMixin
+    from agentbox.core.data import AgentDef
+    from agentbox.core.data import PromptVersionsMixin
+    from agentbox.core.data import RunnerProfilesMixin
 
 logger = logging.getLogger(__name__)
 
@@ -177,8 +177,7 @@ def _ingest_runner_profile(
         return
 
     try:
-        from agentbox.core.data.runner_profiles import (
-            RunnerProfileCreate,
+        from agentbox.core.data import (RunnerProfileCreate,
         )
 
         profile_id = f"legacy:{agent_id}"

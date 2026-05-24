@@ -28,8 +28,7 @@ import sys
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.schema import (
-    agent_version_validation_bindings,
+from agentbox.core.data import (agent_version_validation_bindings,
     agent_versions,
     validation_contracts,
 )

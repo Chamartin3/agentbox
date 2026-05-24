@@ -18,7 +18,7 @@ from agentbox.core.run.config.backends.base import (
 from agentbox.core.run.config.prompt_composer import PromptComposer
 
 if TYPE_CHECKING:
-    from agentbox.core.data.manifest import AgentDef
+    from agentbox.core.data import AgentDef
     from agentbox.core.run.config.run_configurator import ComposedMetadata
 
 
