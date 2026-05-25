@@ -1,0 +1,334 @@
+"""Direct-agent execution path for ``TokenBackend``.
+
+Used when no ``agent_module`` is configured — we construct a
+``pydantic_ai.Agent`` here, optionally with a JSON-Schema-derived
+``result_type`` so the provider enforces structured output. Streaming
+events from ``pydantic_ai.Agent.run_stream_events`` are translated
+into agentbox :class:`RunEvent` deltas inline so the transcript
+captures every token.
+
+Split out of ``_backend.py`` to keep the main module focused on the
+``BackendAdapter`` contract; the streaming-loop body is the bulk of
+the original 993-LOC module.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from collections.abc import AsyncIterator
+from typing import Any
+
+from pydantic import ValidationError
+from pydantic_ai import NativeOutput, PromptedOutput, RunContext
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
+
+from agentbox.api.events import (
+    DoneEvent,
+    LogEvent,
+    RunEvent,
+    TextEvent,
+    ThinkingEvent,
+    UsageEvent,
+)
+from agentbox.core.run.backends._schema_to_model import (
+    UnsupportedSchema,
+    json_schema_to_pydantic_model,
+)
+from agentbox.core.run.backends.token._schema import _json_schema_to_pydantic_model
+from agentbox.core.run.backends.token._stream import (
+    _RefSection,
+    TokenDeps,
+    _emit_message_history,
+    _format_provider_error,
+)
+from agentbox.core.run.backends.token._usage import extract_usage
+
+
+async def run_direct_agent_mode(
+    *,
+    run_id: str,
+    prompt: str,
+    model_str: str,
+    output_schema: dict[str, Any] | None,
+    input_schema: dict[str, Any] | None,
+    output_mode: str,
+    provider: str | None,
+    api_key: str | None,
+    base_url: str | None,
+    output_retries: Any,
+    references: list[dict[str, Any]],
+    input_data: Any,
+) -> AsyncIterator[RunEvent]:
+    """Drive a directly-constructed ``pydantic_ai.Agent`` to completion."""
+    try:
+        from pydantic_ai import Agent
+    except ImportError:
+        yield DoneEvent(
+            run_id=run_id,
+            ok=False,
+            error=(
+                "pydantic-ai is not installed. Install it to use the token backend."
+            ),
+        )
+        return
+
+    # Build result_type from output schema when present. The strict
+    # converter preserves enums, length/pattern, ranges and
+    # ``additionalProperties=false`` so pydantic-ai's own validation
+    # matches the JSON Schema the agent was authored against. If the
+    # schema uses a construct the strict converter can't translate,
+    # fall back to the loose converter (basic types only) and log a
+    # warning rather than failing the run — losing some constraints
+    # is better than aborting.
+    result_type: Any = None
+    if output_schema:
+        try:
+            result_type = json_schema_to_pydantic_model(
+                output_schema,
+                model_name="AgentOutput",
+            )
+        except UnsupportedSchema as exc:
+            yield LogEvent(
+                run_id=run_id,
+                level="warn",
+                message=(
+                    f"strict schema conversion failed ({exc}); "
+                    "falling back to loose conversion — pydantic-ai "
+                    "validation will be looser than the JSON Schema."
+                ),
+            )
+            try:
+                result_type = _json_schema_to_pydantic_model(
+                    output_schema,
+                    model_name="AgentOutput",
+                )
+            except Exception as fallback_exc:
+                yield DoneEvent(
+                    run_id=run_id,
+                    ok=False,
+                    error=f"schema-to-model conversion error: {fallback_exc}",
+                )
+                return
+        except Exception as exc:
+            yield DoneEvent(
+                run_id=run_id,
+                ok=False,
+                error=f"schema-to-model conversion error: {exc}",
+            )
+            return
+
+    # Validate input against input_schema if declared. Mirrors the
+    # full-agent mode contract — the agent's instructions reference
+    # the input shape; sending a payload that doesn't match wastes
+    # tokens and confuses the model.
+    if isinstance(input_schema, dict) and isinstance(input_data, dict):
+        try:
+            input_model = json_schema_to_pydantic_model(
+                input_schema,
+                model_name="AgentInput",
+            )
+            input_model.model_validate(input_data)
+        except UnsupportedSchema as exc:
+            yield LogEvent(
+                run_id=run_id,
+                level="warn",
+                message=f"could not validate input against input_schema: {exc}",
+            )
+        except ValidationError as exc:
+            yield DoneEvent(
+                run_id=run_id,
+                ok=False,
+                error=f"input validation error: {exc}",
+            )
+            return
+
+    # Build user message.
+    user_message = (
+        json.dumps(input_data, indent=2)
+        if isinstance(input_data, dict)
+        else str(input_data)
+    )
+
+    # Instantiate and run pydantic-ai Agent.
+    start = time.monotonic()
+
+    # Wrap result_type per the profile's output_mode. ``auto`` and
+    # ``tool`` map to the pydantic-ai default (forced tool_choice on
+    # an output tool). ``prompted`` injects the schema in the system
+    # prompt and parses JSON from the response — required for
+    # reasoning models (e.g. DeepSeek V4 Pro) that reject forced
+    # tool_choice. ``native`` uses the provider's structured-output
+    # mode where supported.
+    wrapped_output_type: Any = None
+    if result_type is not None:
+        if output_mode == "prompted":
+            wrapped_output_type = PromptedOutput(result_type)
+        elif output_mode == "native":
+            wrapped_output_type = NativeOutput(result_type)
+        else:
+            wrapped_output_type = result_type
+
+    # Build reference deps. References ride through pydantic-ai's
+    # ``RunContext`` instead of being concatenated onto the system
+    # prompt — a dynamic ``@system_prompt`` handler renders them
+    # below. This keeps the static base prompt small and makes the
+    # references inspectable as deps rather than buried in a string.
+    deps = TokenDeps(
+        references=tuple(
+            _RefSection(heading=r["heading"], content=r["content"])
+            for r in references
+            if isinstance(r, dict) and r.get("heading") and r.get("content")
+        )
+    )
+
+    common_kwargs: dict[str, Any] = {
+        "system_prompt": prompt,
+        "deps_type": TokenDeps,
+    }
+    if wrapped_output_type is not None:
+        common_kwargs["output_type"] = wrapped_output_type
+    if isinstance(output_retries, int) and output_retries > 0:
+        common_kwargs["output_retries"] = output_retries
+
+    if base_url:
+        # Strip provider prefix (e.g. "openrouter:google/gemini-2.5-flash-lite"
+        # → "google/gemini-2.5-flash-lite") for OpenAI-compatible endpoints.
+        short_model = model_str.split(":", 1)[1] if ":" in model_str else model_str
+        # Local providers (e.g. Ollama) accept any string as api_key; use a
+        # dummy when none is configured rather than failing OpenAIProvider's
+        # required-key validation.
+        provider_obj = OpenAIProvider(
+            api_key=api_key or "no-key",
+            base_url=base_url,
+        )
+        pai_model = OpenAIModel(short_model, provider=provider_obj)
+        pai_agent = Agent(pai_model, **common_kwargs)
+    else:
+        pai_agent = Agent(model_str, **common_kwargs)
+
+    @pai_agent.system_prompt
+    def _render_refs(ctx: RunContext[TokenDeps]) -> str:
+        sections = ctx.deps.references if ctx.deps else ()
+        if not sections:
+            return ""
+        return "\n\n".join(f"## {s.heading}\n\n{s.content}" for s in sections)
+
+    # We're inside an async generator — pydantic-ai's run_sync() would
+    # try to start its own event loop and fail. Use the async API.
+    yield TextEvent(run_id=run_id, role="system", text=prompt)
+    yield TextEvent(run_id=run_id, role="user", text=user_message)
+    yield LogEvent(
+        run_id=run_id,
+        message=f"sending to model {model_str}...",
+    )
+    # Use run_stream_events() so every token / thinking chunk
+    # is emitted to the transcript in real time, regardless of
+    # whether the final structured-output parse succeeds.
+    thinking_accum: dict[int, str] = {}
+    text_accum: dict[int, str] = {}
+    final_result: Any = None
+    try:
+        async with pai_agent.run_stream_events(user_message, deps=deps) as stream:
+            async for event in stream:
+                et = type(event).__name__
+                if et == "PartStartEvent":
+                    idx: int = getattr(event, "index", 0)
+                    pn = type(event.part).__name__
+                    if "Thinking" in pn:
+                        thinking_accum[idx] = getattr(event.part, "content", "")
+                    elif "Text" in pn:
+                        text_accum[idx] = getattr(event.part, "content", "")
+                elif et == "PartDeltaEvent":
+                    idx = getattr(event, "index", 0)
+                    dn = type(event.delta).__name__
+                    delta_text: str = getattr(event.delta, "content_delta", "")
+                    if "Thinking" in dn and delta_text:
+                        thinking_accum[idx] = (
+                            thinking_accum.get(idx, "") + delta_text
+                        )
+                        yield ThinkingEvent(run_id=run_id, text=delta_text)
+                    elif "Text" in dn and delta_text:
+                        text_accum[idx] = text_accum.get(idx, "") + delta_text
+                        yield TextEvent(
+                            run_id=run_id,
+                            text=delta_text,
+                            delta=True,
+                        )
+                elif et == "PartEndEvent":
+                    idx = getattr(event, "index", 0)
+                    pn = type(event.part).__name__
+                    if "Thinking" in pn:
+                        thinking_accum[idx] = getattr(event.part, "content", "")
+                    elif "Text" in pn:
+                        text_accum[idx] = getattr(event.part, "content", "")
+                elif et == "AgentRunResultEvent":
+                    final_result = getattr(event, "result", None)
+    except Exception as exc:
+        err_text = _format_provider_error(exc, model=model_str, provider=provider)
+        # Emit whatever partial output was captured before the error.
+        for acc in (thinking_accum, text_accum):
+            for text in acc.values():
+                if text:
+                    yield TextEvent(run_id=run_id, text=text)
+        body = getattr(exc, "body", None)
+        if body:
+            yield LogEvent(
+                run_id=run_id,
+                level="info",
+                message=f"model raw response: {body}",
+            )
+        yield LogEvent(run_id=run_id, level="error", message=err_text)
+        yield DoneEvent(run_id=run_id, ok=False, error=err_text, status="error")
+        return
+    _elapsed = time.monotonic() - start
+
+    # Reconstruct result for downstream processing.
+    result = final_result
+
+    all_messages = getattr(result, "all_messages", None)
+    if callable(all_messages):
+        # Deltas already streamed the assistant text in this code path,
+        # so re-emitting the message history's TextEvents would cause a
+        # second non-delta assistant TextEvent to land in
+        # ``session.output_text`` alongside the serialized result below,
+        # producing concatenated duplicate JSON for Ollama (and any
+        # other text-mode provider). Keep tool/thinking events for
+        # provenance; drop text.
+        for ev in _emit_message_history(run_id, all_messages()):
+            if isinstance(ev, TextEvent):
+                continue
+            yield ev
+
+    # Serialize output. pydantic-ai 1.x exposes ``.output``; pre-1.x used ``.data``.
+    try:
+        output_data = getattr(result, "output", None)
+        if output_data is None:
+            output_data = result.data
+        if hasattr(output_data, "model_dump_json"):
+            output_text = output_data.model_dump_json()
+        elif hasattr(output_data, "model_dump"):
+            output_text = json.dumps(output_data.model_dump())
+        else:
+            output_text = json.dumps(output_data, default=str)
+    except Exception as exc:
+        yield DoneEvent(
+            run_id=run_id,
+            ok=False,
+            error=f"output serialization error: {exc}",
+        )
+        return
+
+    yield TextEvent(run_id=run_id, text=output_text)
+
+    input_tokens, output_tokens, model_name = extract_usage(result)
+    yield UsageEvent(
+        run_id=run_id,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=None,
+        model=model_name,
+    )
+
+    yield DoneEvent(run_id=run_id, ok=True)
