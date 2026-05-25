@@ -19,21 +19,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
 from agentbox.api import (
-    activity,
     agents,
-    api_tokens,
-    env_doc,
-    health,
-    host_env,
-    mcp,
-    project_settings,
+    analytics,
     resources,
     runners,
     runs,
-    usage,
+    system,
     workspaces,
 )
-from agentbox.api import settings as settings_routes
 from agentbox.core.prompt.versioning.drift import startup_sweep
 from agentbox.core.resource.boot_import import (
     import_composition_references,
@@ -328,17 +321,8 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(resources.router)
     app.include_router(runners.router)
-
-    # Top-level leaf routers (single-resource URL paths).
-    app.include_router(usage.router)
-    app.include_router(activity.router)
-    app.include_router(env_doc.router)
-    app.include_router(host_env.router)
-    app.include_router(mcp.router)
-    app.include_router(health.router)
-    app.include_router(settings_routes.router)
-    app.include_router(project_settings.router)
-    app.include_router(api_tokens.router)
+    app.include_router(analytics.router)
+    app.include_router(system.router)
 
     # SPA assets.
     assets_dir = SPA_DIR / "assets"

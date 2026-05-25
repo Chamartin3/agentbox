@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,14 +9,8 @@ from pydantic import BaseModel
 
 from agentbox.api.deps import get_settings, get_store
 from agentbox.core.data import SessionStore
-from agentbox.core.workspace.env_doc.renderers import (
-    AgentsMdRenderer,
-    ClaudeMdRenderer,
-    RuntimeContext,
-)
-from agentbox.core.workspace.env_doc.renderers.base import ReferenceEntry
+from agentbox.core.service import env_doc as svc
 from agentbox.core.workspace.env_doc.schema import EnvDocContent
-from agentbox.core.workspace.sync import sync_workspace_by_name
 
 router = APIRouter(tags=["env-doc"])
 
@@ -36,30 +29,6 @@ class PreviewEnvDocBody(BaseModel):
     content: EnvDocContent | None = None
 
 
-def _runtime_context(store: SessionStore, workspace_id: str) -> RuntimeContext:
-    skills: list[ReferenceEntry] = []
-    folders: list[ReferenceEntry] = []
-    for b in store.list_workspace_file_bindings(workspace_id):
-        resource = store.get_repo_resource(b["resource_id"])
-        if not resource:
-            continue
-        entry = ReferenceEntry(
-            label=resource["display_name"], detail=b.get("target_path") or ""
-        )
-        if resource["type"] == "skill":
-            skills.append(entry)
-        elif resource["type"] == "folder":
-            folders.append(entry)
-    return RuntimeContext(skills=skills, folders=folders)
-
-
-def _render_both(content: EnvDocContent, ctx: RuntimeContext) -> dict[str, str]:
-    return {
-        "claude_md": ClaudeMdRenderer().render(content, ctx),
-        "agents_md": AgentsMdRenderer().render(content, ctx),
-    }
-
-
 @router.get("/api/workspaces/{workspace_id}/env-doc")
 def get_env_doc(workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]):
     active = store.get_active_env_doc(workspace_id)
@@ -74,30 +43,18 @@ def save_env_doc(
     body: SaveEnvDocBody,
     store: Annotated[SessionStore, Depends(get_store)],
 ):
-    """Save and publish the workspace env-doc.
-
-    Drafts were removed — every save is live, immediately becomes the
-    active version, and triggers a workspace re-sync to refresh
-    CLAUDE.md / AGENTS.md on disk.
-    """
+    """Save and publish the workspace env-doc, then re-sync on-disk renders."""
     try:
-        result = store.save_env_doc(
+        return svc.save_and_sync_env_doc(
+            store,
+            get_settings(),
             workspace_id,
-            body.content.model_dump(),
-            changelog=body.reason,
-            publish=True,
+            content=body.content.model_dump(),
+            reason=body.reason,
             actor=body.actor,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    try:
-        sync_workspace_by_name(store, get_settings(), workspace_id)
-    except Exception:
-        logging.getLogger(__name__).exception(
-            "env_doc save: sync_workspace_by_name failed for %s", workspace_id
-        )
-    return result
 
 
 @router.post("/api/workspaces/{workspace_id}/env-doc/preview")
@@ -113,5 +70,5 @@ def preview_env_doc(
         if not active:
             raise HTTPException(status_code=404, detail="no env doc for workspace")
         content = EnvDocContent.model_validate(active["content_json"])
-    ctx = _runtime_context(store, workspace_id)
-    return _render_both(content, ctx)
+    ctx = svc.build_env_doc_context(store, workspace_id)
+    return svc.render_env_doc_preview(content, ctx)
