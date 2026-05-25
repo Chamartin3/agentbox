@@ -1,23 +1,7 @@
 // Typed fetch helpers for resources, prompt bindings, workspace resources,
 // env-doc, MCP policy/servers, and host-env endpoints.
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(path, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
-  });
-  if (!resp.ok) {
-    let detail: unknown;
-    try {
-      detail = await resp.clone().json();
-    } catch {
-      detail = await resp.text();
-    }
-    throw new Error(`HTTP ${resp.status}: ${JSON.stringify(detail)}`);
-  }
-  if (resp.status === 204) return undefined as T;
-  return (await resp.json()) as T;
-}
+import { apiRequest as req } from './http';
 
 // ---- types -----------------------------------------------------------------
 

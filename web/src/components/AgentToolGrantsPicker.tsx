@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiRequest } from "../api/http";
 
 interface ToolInfo {
   name: string;
@@ -33,12 +34,10 @@ export function AgentToolGrantsPicker({ agentId }: Props) {
   const refresh = async () => {
     setLoading(true);
     try {
-      const [toolsRes, grantsRes] = await Promise.all([
-        fetch("/api/agent_tools"),
-        fetch(`/api/agents/${agentId}/tool_grants`),
+      const [tools, grants] = await Promise.all([
+        apiRequest<{ items: ToolInfo[] }>("/api/agent_tools"),
+        apiRequest<{ items: Grant[] }>(`/api/agents/${agentId}/tool_grants`),
       ]);
-      const tools = await toolsRes.json();
-      const grants = await grantsRes.json();
       setAvailableTools(tools.items ?? []);
       setActiveGrants(grants.items ?? []);
       setError(null);
@@ -60,12 +59,10 @@ export function AgentToolGrantsPicker({ agentId }: Props) {
     if (!selectedTool || grantReason.trim().length < 3) return;
     setGrantLoading(true);
     try {
-      const res = await fetch(`/api/agents/${agentId}/tool_grants`, {
+      await apiRequest(`/api/agents/${agentId}/tool_grants`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tool_name: selectedTool, changelog: grantReason }),
       });
-      if (!res.ok) throw new Error(await res.text());
       setSelectedTool("");
       setGrantReason("");
       await refresh();
@@ -80,15 +77,13 @@ export function AgentToolGrantsPicker({ agentId }: Props) {
     const reason = revokeReason[toolName]?.trim();
     if (!reason || reason.length < 3) return;
     try {
-      const res = await fetch(
+      await apiRequest(
         `/api/agents/${agentId}/tool_grants/${toolName}`,
         {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ changelog: reason }),
         },
       );
-      if (!res.ok) throw new Error(await res.text());
       setRevokeReason((prev) => ({ ...prev, [toolName]: "" }));
       await refresh();
     } catch (e) {

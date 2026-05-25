@@ -56,18 +56,7 @@ interface PreviewResult {
   total_chars?: number;
 }
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
-  if (init?.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-  const resp = await fetch(path, { ...init, headers });
-  if (!resp.ok) {
-    let detail: unknown;
-    try { detail = await resp.clone().json(); } catch { detail = await resp.text(); }
-    throw new ApiError(resp.status, detail);
-  }
-  if (resp.status === 204) return undefined as T;
-  return (await resp.json()) as T;
-}
+import { apiRequest as req } from '../api/http';
 
 function errMsg(e: unknown, fallback: string): string {
   if (e instanceof ApiError) {

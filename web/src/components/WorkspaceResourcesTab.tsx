@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiRequestOrNull } from '../api/http';
 
 export interface WorkspaceFileBinding {
   path: string;
@@ -26,15 +27,10 @@ export default function WorkspaceResourcesTab({ workspaceId }: Props) {
     if (!workspaceId) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/resources`, {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then(async (resp) => {
-        if (resp.status === 404) return { workspace_id: workspaceId, bindings: [] };
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return (await resp.json()) as WorkspaceResourcesResponse;
-      })
-      .then((data) => setBindings(data.bindings || []))
+    apiRequestOrNull<WorkspaceResourcesResponse>(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/resources`,
+    )
+      .then((data) => setBindings(data?.bindings || []))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [workspaceId]);

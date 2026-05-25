@@ -1,22 +1,7 @@
 // Typed fetch helpers for the central resource repository
 // (Plan 01 endpoints under /api/repo-resources).
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
-  if (init && !(init.body instanceof FormData) && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
-  }
-  const resp = await fetch(path, { ...init, headers });
-  if (!resp.ok) {
-    let detail: unknown;
-    try { detail = await resp.clone().json(); } catch { detail = await resp.text(); }
-    throw new Error(`HTTP ${resp.status}: ${JSON.stringify(detail)}`);
-  }
-  if (resp.status === 204) return undefined as T;
-  const ct = resp.headers.get('Content-Type') || '';
-  if (ct.includes('application/json')) return (await resp.json()) as T;
-  return (await resp.text()) as unknown as T;
-}
+import { apiRequest as req } from './http';
 
 export type RepoType = 'document' | 'folder' | 'skill' | 'schema' | 'script';
 

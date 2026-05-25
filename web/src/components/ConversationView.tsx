@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
+import type { LooseStreamEvent } from '../api/events';
+import { fmtTime, prettyExcerpt } from '../util/format';
 
-export interface StreamEvent {
-  type: string;
-  [k: string]: unknown;
-}
+// Backwards-compatible alias. Prefer RunEvent/LooseStreamEvent from api/events.
+export type StreamEvent = LooseStreamEvent;
 
 interface ConversationMessage {
   id: string;
@@ -15,25 +15,6 @@ interface ConversationMessage {
   // A subsequent non-delta TextEvent for the same role REPLACES it
   // (the backend emits a consolidated/fence-stripped final text).
   fromDelta?: boolean;
-}
-
-function prettyExcerpt(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  if (typeof v === 'object') {
-    try { return JSON.stringify(v, null, 2); } catch { return String(v); }
-  }
-  const s = String(v);
-  const trimmed = s.trim();
-  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-    try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch { /* not valid JSON */ }
-  }
-  return s;
-}
-
-function fmtDt(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function buildConversation(events: StreamEvent[]): ConversationMessage[] {
@@ -353,7 +334,7 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
               <div key={m.id} className="conversation-turn assistant">
                 <div className="conversation-turn-header">
                   <span className="conversation-role">assistant</span>
-                  {m.ts && <span className="conversation-ts">{fmtDt(m.ts)}</span>}
+                  {m.ts && <span className="conversation-ts">{fmtTime(m.ts)}</span>}
                 </div>
                 <div className="conversation-turn-body">
                   <pre className="conversation-text">{typeof m.content === 'string' ? prettyExcerpt(m.content) : m.content}</pre>
@@ -365,7 +346,7 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
               <div key={m.id} className="conversation-turn user">
                 <div className="conversation-turn-header">
                   <span className="conversation-role">user</span>
-                  {m.ts && <span className="conversation-ts">{fmtDt(m.ts)}</span>}
+                  {m.ts && <span className="conversation-ts">{fmtTime(m.ts)}</span>}
                 </div>
                 <div className="conversation-turn-body">
                   <pre className="conversation-text">{String(m.content)}</pre>
@@ -377,7 +358,7 @@ export default function ConversationView({ events }: { events: StreamEvent[] }) 
               <div key={m.id} className="conversation-turn system">
                 <div className="conversation-turn-header">
                   <span className="conversation-role">system</span>
-                  {m.ts && <span className="conversation-ts">{fmtDt(m.ts)}</span>}
+                  {m.ts && <span className="conversation-ts">{fmtTime(m.ts)}</span>}
                 </div>
                 <div className="conversation-turn-body">
                   <pre className="conversation-text">{String(m.content)}</pre>

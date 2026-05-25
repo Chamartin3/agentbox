@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { apiRequest as api } from '../api/http';
 
 interface SkillRow {
   id: string;
@@ -10,18 +11,6 @@ interface SkillRow {
 
 interface Props {
   workspaceId: string;
-}
-
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-  });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`HTTP ${resp.status}: ${text}`);
-  }
-  return resp.json();
 }
 
 export default function WorkspaceSkillsEditor({ workspaceId }: Props) {

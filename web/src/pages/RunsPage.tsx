@@ -35,12 +35,12 @@ function setParam(
 
 const STATUSES = [
   { value: '', label: 'All' },
-  { value: RunStatus.Ok, label: 'OK' },
-  { value: RunStatus.Failed, label: 'Failed' },
-  { value: RunStatus.Error, label: 'Error' },
-  { value: RunStatus.Incomplete, label: 'Incomplete' },
-  { value: RunStatus.Timeout, label: 'Timeout' },
-  { value: RunStatus.Running, label: 'Running' },
+  { value: RunStatus.OK, label: 'OK' },
+  { value: RunStatus.FAILED, label: 'Failed' },
+  { value: RunStatus.ERROR, label: 'Error' },
+  { value: RunStatus.INCOMPLETE, label: 'Incomplete' },
+  { value: RunStatus.TIMEOUT, label: 'Timeout' },
+  { value: RunStatus.RUNNING, label: 'Running' },
 ];
 
 

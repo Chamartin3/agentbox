@@ -8,6 +8,7 @@ import {
 } from '../api/client';
 import Toast from '../components/Toast';
 import RunnerProfileModal from '../components/RunnerProfileModal';
+import { apiTokens as apiTokensClient } from '../api/api_tokens';
 import './RunnerProfilesPage.css';
 
 function errMsg(e: unknown, fallback: string): string {
@@ -37,10 +38,7 @@ export default function RunnerProfilesPage({ embedded = false }: { embedded?: bo
     loadProfiles();
     loadProviders();
     loadBackends();
-    fetch('/api/api-tokens')
-      .then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((d) => setApiTokens(Array.isArray(d) ? d : (d?.items ?? [])))
-      .catch(() => setApiTokens([]));
+    apiTokensClient.listSafe().then(setApiTokens);
   }, []);
 
   useEffect(() => {

@@ -1,21 +1,20 @@
 import { useState } from 'react';
-type RunRating = { rating: number | null };
-const runRatingsApi = {
-  setRating: async (runId: string, value: number): Promise<RunRating> => {
-    const r = await fetch(`/api/runs/${encodeURIComponent(runId)}/rating`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ rating: value }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-  },
-  clearRating: async (runId: string): Promise<void> => {
-    const r = await fetch(`/api/runs/${encodeURIComponent(runId)}/rating`, { method: 'DELETE' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  },
-};
+import { apiRequest } from '../api/http';
 import './RatingStars.css';
+
+type RunRating = { rating: number | null };
+
+const runRatingsApi = {
+  setRating: (runId: string, value: number): Promise<RunRating> =>
+    apiRequest<RunRating>(`/api/runs/${encodeURIComponent(runId)}/rating`, {
+      method: 'PUT',
+      body: JSON.stringify({ rating: value }),
+    }),
+  clearRating: (runId: string): Promise<void> =>
+    apiRequest<void>(`/api/runs/${encodeURIComponent(runId)}/rating`, {
+      method: 'DELETE',
+    }),
+};
 
 interface RunRatingStarsProps {
   runId: string;

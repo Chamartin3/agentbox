@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Toast from '../components/Toast';
+import { apiRequest } from '../api/http';
 
 const SECTIONS = [
   {
@@ -27,18 +28,14 @@ interface SectionPayload {
 export type ToastState = { kind: 'ok' | 'error'; msg: string } | null;
 
 async function fetchSection(section: string): Promise<SectionPayload> {
-  const r = await fetch(`/api/settings/${section}`);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return (await r.json()) as SectionPayload;
+  return apiRequest<SectionPayload>(`/api/settings/${section}`);
 }
 
 async function patchSection(section: string, values: Record<string, unknown>): Promise<void> {
-  const r = await fetch(`/api/settings/${section}`, {
+  await apiRequest(`/api/settings/${section}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ values }),
   });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
 }
 
 function SectionShell({

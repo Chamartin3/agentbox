@@ -72,15 +72,10 @@ export const McpDefaultPolicy = {
 } as const;
 export type McpDefaultPolicy = (typeof McpDefaultPolicy)[keyof typeof McpDefaultPolicy];
 
-export const RunStatus = {
-  Ok: 'ok',
-  Failed: 'failed',
-  Error: 'error',
-  Incomplete: 'incomplete',
-  Timeout: 'timeout',
-  Running: 'running',
-} as const;
-export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
+// Single source of truth lives in theme/statusColors.ts (where the
+// status palette and canonicalStatus mapper also live). Re-exported
+// here so api/enums stays the one-stop import for UI enums.
+export { RunStatus } from '../theme/statusColors';
 
 export const ToastKind = { Ok: 'ok', Error: 'error' } as const;
 export type ToastKind = (typeof ToastKind)[keyof typeof ToastKind];

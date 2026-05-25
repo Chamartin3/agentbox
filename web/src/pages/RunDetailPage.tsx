@@ -4,17 +4,16 @@ import { AgentDef, GuardrailRow, PromptFragment, RunPromptDoc, RunRecord, UsageR
 import EventStream from '../components/EventStream';
 import ConversationView from '../components/ConversationView';
 import RunCommentThread from '../components/RunCommentThread';
+import { StatusPill } from '../components/ui/StatusPill';
 import { fmtCost, fmtDt, fmtMs, fmtNum, fmtRelative } from '../util/format';
+import type { LooseStreamEvent } from '../api/events';
 
 function durationMs(r: RunRecord): number | null {
   if (!r.finished_at) return null;
   return new Date(r.finished_at).getTime() - new Date(r.created_at).getTime();
 }
 
-interface StreamEvent {
-  type: string;
-  [k: string]: unknown;
-}
+type StreamEvent = LooseStreamEvent;
 
 // ────────────────────────────────────────────────────────────── error parsing
 
@@ -64,17 +63,6 @@ function prettyText(s: string): { text: string; isJson: boolean } {
 }
 
 // ──────────────────────────────────────────────────────────────── components
-
-function StatusPill({ status }: { status: string }) {
-  let cls: string;
-  if (status === 'ok') cls = 'ok';
-  else if (status === 'running') cls = 'running';
-  else if (status === 'timeout' || status === 'stopped' || status === 'incomplete')
-    cls = 'eph';
-  else if (status === 'failed') cls = 'failed';
-  else cls = 'error';
-  return <span className={`pill ${cls}`}>{status}</span>;
-}
 
 function Tag({
   label,

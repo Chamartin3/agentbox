@@ -1,17 +1,5 @@
 import { useEffect, useState } from 'react';
-
-interface ApiToken {
-  id: string;
-  environment: string;
-  name: string;
-  last_four: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface CreatedToken extends ApiToken {
-  secret: string;
-}
+import { apiTokens, type ApiToken, type CreatedToken } from '../api/api_tokens';
 
 export default function SettingsApiTokensTab() {
   const [items, setItems] = useState<ApiToken[]>([]);
@@ -22,8 +10,7 @@ export default function SettingsApiTokensTab() {
   const [status, setStatus] = useState<string | null>(null);
 
   async function reload() {
-    const r = await fetch('/api/api-tokens');
-    const data = await r.json();
+    const data = await apiTokens.list();
     setItems(data.items || []);
   }
 
@@ -34,61 +21,48 @@ export default function SettingsApiTokensTab() {
   async function create() {
     setStatus(null);
     setJustCreated(null);
-    const r = await fetch('/api/api-tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ environment: env, name, secret }),
-    });
-    if (!r.ok) {
-      setStatus(`create failed: ${r.status} ${await r.text()}`);
-      return;
+    try {
+      const data = await apiTokens.create({ environment: env, name, secret });
+      setJustCreated(data);
+      setName('');
+      setSecret('');
+      await reload();
+    } catch (e) {
+      setStatus(`create failed: ${(e as Error).message}`);
     }
-    const data = await r.json();
-    setJustCreated(data);
-    setName('');
-    setSecret('');
-    await reload();
   }
 
   async function rotate(id: string) {
     const next = prompt('new secret (min 4 chars):');
     if (!next || next.length < 4) return;
-    const r = await fetch(`/api/api-tokens/${id}/rotate`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ secret: next }),
-    });
-    if (!r.ok) {
-      setStatus(`rotate failed: ${r.status}`);
-      return;
+    try {
+      await apiTokens.rotate(id, next);
+      setStatus('rotated.');
+      await reload();
+    } catch (e) {
+      setStatus(`rotate failed: ${(e as Error).message}`);
     }
-    setStatus('rotated.');
-    await reload();
   }
 
   async function rename(id: string, current: string) {
     const next = prompt('new name:', current);
     if (!next || next === current) return;
-    const r = await fetch(`/api/api-tokens/${id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: next }),
-    });
-    if (!r.ok) {
-      setStatus(`rename failed: ${r.status}`);
-      return;
+    try {
+      await apiTokens.rename(id, next);
+      await reload();
+    } catch (e) {
+      setStatus(`rename failed: ${(e as Error).message}`);
     }
-    await reload();
   }
 
   async function remove(id: string) {
     if (!confirm('delete this token?')) return;
-    const r = await fetch(`/api/api-tokens/${id}`, { method: 'DELETE' });
-    if (!r.ok && r.status !== 204) {
-      setStatus(`delete failed: ${r.status}`);
-      return;
+    try {
+      await apiTokens.remove(id);
+      await reload();
+    } catch (e) {
+      setStatus(`delete failed: ${(e as Error).message}`);
     }
-    await reload();
   }
 
   return (

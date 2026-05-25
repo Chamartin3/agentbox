@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { apiRequestOrNull } from '../api/http';
 import { subagentsApi } from '../api/repo';
 import EnvDocEditor from '../components/EnvDocEditor';
 import WorkspaceResourcesEditor from '../components/WorkspaceResourcesEditor';
@@ -59,8 +60,9 @@ export default function WorkspaceDetailPage() {
         api.getWorkspaceMcpToolsByName(id),
         api.listWorkspaceSkillsByName(id),
         subagentsApi.list(id),
-        fetch(`/api/workspaces/${encodeURIComponent(id)}/resources`)
-          .then((r) => (r.ok ? r.json() : { items: [] })),
+        apiRequestOrNull<{ items: unknown[] }>(
+          `/api/workspaces/${encodeURIComponent(id)}/resources`,
+        ).then((d) => d ?? { items: [] }),
       ]);
       setData(ws);
       setPermissions((perms as any).permissions || {});

@@ -1,6 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { RunStatus, canonicalStatus } from '../theme/statusColors';
 import { fmtCost, fmtMs, fmtNum, fmtRelative } from '../util/format';
+import { StatusPill } from './ui/StatusPill';
+
+// Re-export so existing imports (`import { StatusPill } from '../components/RunsTable'`)
+// keep working. New code should import from './ui/StatusPill' directly.
+export { StatusPill };
 
 // Normalized row shape used by the shared runs table. Both the runs API
 // (RunRecord) and the activity API (AgentRun) map onto this — fields not
@@ -49,20 +53,6 @@ const DEFAULT_COLUMNS: RunsColumn[] = [
   'started',
   'finished',
 ];
-
-function statusClass(s: string): string {
-  return canonicalStatus(s);
-}
-
-function statusLabel(s: string): string {
-  return canonicalStatus(s) === RunStatus.OK && s !== RunStatus.OK ? RunStatus.OK : s;
-}
-
-export function StatusPill({ status }: { status: string }) {
-  return <span className={`pill ${statusClass(status)}`}>{statusLabel(status)}</span>;
-}
-
-
 
 const COLUMN_HEADER: Record<RunsColumn, string> = {
   run: 'Run',

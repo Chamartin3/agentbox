@@ -1,79 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  getEventMeta,
+  summarizeEvent,
+  type LooseStreamEvent,
+} from '../api/events';
+import { fmtDt, fmtRelativeShort, fmtTimeMs } from '../util/format';
 
-export interface StreamEvent {
-  type: string;
-  [k: string]: unknown;
-}
-
-function fmtDt(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
-}
-
-function fmtDtFull(iso: string | null | undefined): string {
-  return iso ? new Date(iso).toLocaleString() : '';
-}
-
-function fmtRelativeShort(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
-
-const EVENT_META: Record<string, { label: string; color: string; bg: string }> = {
-  text:       { label: 'text',       color: '#c9d1d9', bg: 'rgba(201,209,217,0.08)' },
-  log:        { label: 'log',        color: '#8b949e', bg: 'rgba(139,148,158,0.08)' },
-  tool_call:  { label: 'call',       color: '#79c0ff', bg: 'rgba(121,192,255,0.10)' },
-  tool_result:{ label: 'result',     color: '#3fb950', bg: 'rgba(63,185,80,0.10)' },
-  usage:      { label: 'usage',      color: '#d29922', bg: 'rgba(210,153,34,0.10)' },
-  guardrail:  { label: 'guardrail',  color: '#d2a8ff', bg: 'rgba(210,168,255,0.10)' },
-  done:       { label: 'done',       color: '#58a6ff', bg: 'rgba(88,166,255,0.10)' },
-  retry:      { label: 'retry',      color: '#f0883e', bg: 'rgba(240,136,62,0.10)' },
-  thinking:   { label: 'thinking',   color: '#58a6ff', bg: 'rgba(88,166,255,0.10)' },
-  timeout:    { label: 'timeout',    color: '#f0883e', bg: 'rgba(240,136,62,0.15)' },
-  validation: { label: 'validation', color: '#d2a8ff', bg: 'rgba(210,168,255,0.10)' },
-};
-
-function getMeta(type: string) {
-  return EVENT_META[type] ?? { label: type, color: 'var(--fg-muted)', bg: 'rgba(139,148,158,0.06)' };
-}
-
-function summarizeEvent(ev: StreamEvent): string {
-  const t = String(ev.type || '');
-  switch (t) {
-    case 'text':
-      return String(ev.text ?? '').slice(0, 180);
-    case 'log':
-      return `[${ev.level ?? ''}] ${String(ev.message ?? '').slice(0, 180)}`;
-    case 'tool_call':
-      return `${ev.tool ?? ''} ${JSON.stringify(ev.arguments ?? {}).slice(0, 140)}`;
-    case 'tool_result':
-      return `${ev.tool ?? ''} ok=${ev.ok}`;
-    case 'usage':
-      return `in=${ev.input_tokens ?? 0} out=${ev.output_tokens ?? 0} cost=$${ev.cost_usd ?? 0}`;
-    case 'guardrail':
-      return `${ev.name ?? ''} ok=${ev.ok}`;
-    case 'done':
-      return `status=${ev.status ?? ''}`;
-    case 'retry':
-      return `attempt=${ev.attempt ?? ''} reason=${ev.reason ?? ''}`;
-    case 'thinking':
-      return String(ev.text ?? '').slice(0, 180);
-    case 'timeout':
-      return `timeout after ${ev.timeout_seconds ?? '?'}s`;
-    case 'validation':
-      return `ok=${ev.ok} engine=${ev.engine ?? ''} mode=${ev.mode ?? ''} attempt=${ev.attempt ?? ''}${ev.error ? ` — ${String(ev.error).slice(0, 120)}` : ''}`;
-    default:
-      return JSON.stringify(ev).slice(0, 180);
-  }
-}
+// Backwards-compatible alias for existing callers (RunDetailPage etc.).
+// New code should import RunEvent / UiRunEvent from ../api/events instead.
+export type StreamEvent = LooseStreamEvent;
 
 function eventKey(ev: StreamEvent, idx: number): string {
   return `${idx}-${ev.type}-${ev.ts ?? ''}`;
@@ -190,7 +125,7 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
       <div className="event-stream-toolbar">
         <div className="event-stream-chips">
           {allTypes.map((type) => {
-            const meta = getMeta(type);
+            const meta = getEventMeta(type);
             const active = visibleTypes.has(type);
             return (
               <button
@@ -240,7 +175,7 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
         ) : (
           filtered.map(({ ev, idx }) => {
             const type = String(ev.type || '');
-            const meta = getMeta(type);
+            const meta = getEventMeta(type);
             const key = eventKey(ev, idx);
             const isOpen = expanded.has(key);
             const ts = typeof ev.ts === 'string' ? ev.ts : undefined;
@@ -258,8 +193,8 @@ export default function EventStream({ events, isLive = false }: EventStreamProps
                   <span className="event-type-pill" style={{ color: meta.color, borderColor: meta.color }}>
                     {meta.label}
                   </span>
-                  <span className="event-ts" title={fmtDtFull(ts)}>
-                    {ts ? fmtDt(ts) : ''}
+                  <span className="event-ts" title={ts ? fmtDt(ts) : ''}>
+                    {ts ? fmtTimeMs(ts) : ''}
                   </span>
                   <span className="event-relative">{ts ? fmtRelativeShort(ts) : ''}</span>
                   <span className="event-summary">{summary}</span>

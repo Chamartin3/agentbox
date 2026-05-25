@@ -1,28 +1,9 @@
-// Typed API client. Throws on non-2xx.
+// Typed API client. Throws ApiError on non-2xx.
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(path, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-  });
-  if (!resp.ok) {
-    let detail: unknown;
-    try {
-      detail = await resp.clone().json();
-    } catch {
-      detail = await resp.text();
-    }
-    throw new ApiError(resp.status, detail);
-  }
-  if (resp.status === 204) return undefined as T;
-  return (await resp.json()) as T;
-}
+import { RunStatus } from '../theme/statusColors';
+import { apiRequest as req, ApiError } from './http';
 
-export class ApiError extends Error {
-  constructor(public status: number, public detail: unknown) {
-    super(`HTTP ${status}`);
-  }
-}
+export { ApiError };
 
 // ---- types --------------------------------------------------------------
 
@@ -40,13 +21,7 @@ export interface RunRecord {
   id: string;
   agent_id: string;
   session_id: string | null;
-  status:
-    | 'running'
-    | 'ok'
-    | 'error'
-    | 'failed'
-    | 'timeout'
-    | 'incomplete';
+  status: RunStatus;
   input: string;
   output: string | null;
   error: string | null;
@@ -538,7 +513,7 @@ export const api = {
       return {
         agents,
         executors: [],
-        statuses: ['ok', 'error', 'failed', 'incomplete', 'timeout', 'running'],
+        statuses: Object.values(RunStatus),
       };
     }
   },

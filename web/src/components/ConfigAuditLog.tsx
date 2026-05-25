@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiRequestOrNull } from '../api/http';
 
 interface ConfigEvent {
   id: number;
@@ -20,9 +21,10 @@ export default function ConfigAuditLog({ agentId }: ConfigAuditLogProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/agents/${agentId}/config-events?limit=50`)
-      .then((r) => r.json())
-      .then((d) => setEvents(d.events ?? []))
+    apiRequestOrNull<{ events: ConfigEvent[] }>(
+      `/api/agents/${agentId}/config-events?limit=50`,
+    )
+      .then((d) => setEvents(d?.events ?? []))
       .catch(() => setEvents([]))
       .finally(() => setIsLoading(false));
   }, [agentId]);

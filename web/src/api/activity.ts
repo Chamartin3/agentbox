@@ -72,11 +72,7 @@ export interface ActivitySummary {
   by_reported_model: ActivityByReportedModel[];
 }
 
-async function get<T>(path: string): Promise<T> {
-  const resp = await fetch(path);
-  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-  return (await resp.json()) as T;
-}
+import { apiRequest as get } from './http';
 
 export const activityApi = {
   summary(params: { range: ActivityRange; action?: string; executor?: string }) {

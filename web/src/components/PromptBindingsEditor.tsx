@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiRequestOrNull } from '../api/http';
 
 export interface PromptBinding {
   marker: string;
@@ -26,15 +27,10 @@ export default function PromptBindingsEditor({ agentId }: Props) {
     if (!agentId) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/agents/${encodeURIComponent(agentId)}/prompt-bindings`, {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then(async (resp) => {
-        if (resp.status === 404) return { agent_id: agentId, bindings: [] };
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return (await resp.json()) as PromptBindingsResponse;
-      })
-      .then((data) => setBindings(data.bindings || []))
+    apiRequestOrNull<PromptBindingsResponse>(
+      `/api/agents/${encodeURIComponent(agentId)}/prompt-bindings`,
+    )
+      .then((data) => setBindings(data?.bindings || []))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [agentId]);

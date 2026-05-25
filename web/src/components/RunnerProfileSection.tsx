@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError, type RunnerBackend, type RunnerProfile, type RunnerProvider } from '../api/client';
+import { apiTokens as apiTokensClient } from '../api/api_tokens';
 import RunnerProfileModal from './RunnerProfileModal';
 
 export function RunnerProfileSection({ agentId }: { agentId: string }) {
@@ -23,10 +24,7 @@ export function RunnerProfileSection({ agentId }: { agentId: string }) {
         api.listRunnerProfiles(),
         api.listRunnerProviders().catch(() => []),
         api.listRunnerBackends().catch(() => []),
-        fetch('/api/api-tokens')
-          .then((r) => (r.ok ? r.json() : { items: [] }))
-          .then((d) => (Array.isArray(d) ? d : (d?.items ?? [])))
-          .catch(() => []),
+        apiTokensClient.listSafe(),
       ]);
       setBound(b);
       setProfiles(list);

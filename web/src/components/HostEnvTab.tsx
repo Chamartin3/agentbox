@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiRequestOrNull } from '../api/http';
 
 interface HostEnvGrant {
   name: string;
@@ -25,14 +26,9 @@ export default function HostEnvTab({ workspaceId }: Props) {
     if (!workspaceId) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/host-env`, {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then(async (resp) => {
-        if (resp.status === 404) return null;
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return (await resp.json()) as HostEnvResponse;
-      })
+    apiRequestOrNull<HostEnvResponse>(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/host-env`,
+    )
       .then((data) => setGrants(data?.grants ?? []))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));

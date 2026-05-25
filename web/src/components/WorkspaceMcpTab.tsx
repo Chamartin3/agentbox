@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiRequestOrNull } from '../api/http';
 
 interface McpServerOverride {
   name: string;
@@ -39,21 +40,13 @@ export default function WorkspaceMcpTab({ workspaceId }: Props) {
     setLoading(true);
     setError(null);
 
-    const policyReq = fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/policy`, {
-      headers: { 'Content-Type': 'application/json' },
-    }).then(async (resp) => {
-      if (resp.status === 404) return null;
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      return (await resp.json()) as McpPolicyResponse;
-    });
-
-    const serversReq = fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/servers`, {
-      headers: { 'Content-Type': 'application/json' },
-    }).then(async (resp) => {
-      if (resp.status === 404) return null;
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      return (await resp.json()) as McpServersResponse;
-    });
+    const wid = encodeURIComponent(workspaceId);
+    const policyReq = apiRequestOrNull<McpPolicyResponse>(
+      `/api/workspaces/${wid}/mcp/policy`,
+    );
+    const serversReq = apiRequestOrNull<McpServersResponse>(
+      `/api/workspaces/${wid}/mcp/servers`,
+    );
 
     Promise.all([policyReq, serversReq])
       .then(([policyData, serversData]) => {

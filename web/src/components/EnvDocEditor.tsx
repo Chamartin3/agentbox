@@ -31,17 +31,7 @@ interface Props {
   workspaceId: string;
 }
 
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-  });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`HTTP ${resp.status}: ${text}`);
-  }
-  return resp.json();
-}
+import { apiRequest as api } from '../api/http';
 
 export default function EnvDocEditor({ workspaceId }: Props) {
   const [content, setContent] = useState<EnvDocContent | null>(null);

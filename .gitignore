@@ -29,6 +29,7 @@ src/agentbox/ui/static/dist-old/
 *.sqlite3
 /workspaces/
 /workdir/
+/web/workdir/
 
 # Planning docs (local only)
 docs/
