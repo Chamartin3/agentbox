@@ -30,11 +30,37 @@ class StoreContext(Protocol):
     # ----- _CoreStore connection state ------------------------------------
     engine: Engine
 
-    # ----- cross-mixin helpers --------------------------------------------
+    # ----- cross-mixin / intra-mixin helpers ------------------------------
+    # Methods declared here so that mixin code typed as ``self: StoreContext``
+    # can still call sibling-mixin helpers AND its own helper methods. The
+    # set is intentionally minimal — extend only when a new call site
+    # appears.
+
     def get_repo_resource(self, resource_id: str) -> dict | None:
         """Defined on ``ResourcesMixin``; used by ``ResourceBindingsMixin``."""
         ...
 
     def list_workspace_file_bindings(self, workspace_id: str) -> list[dict]:
         """Defined on ``ResourceBindingsMixin``; used internally for re-reads."""
+        ...
+
+    def replace_workspace_file_bindings(
+        self,
+        workspace_id: str,
+        bindings: object,
+        *,
+        reason: str,
+        actor: str | None = None,
+    ) -> list[dict]:
+        """Defined on ``ResourceBindingsMixin``; invoked by skill replace."""
+        ...
+
+    def _get_grant_row(self, agent_id: str, tool_name: str) -> dict:
+        """Internal helper on ``AgentToolGrantsMixin``."""
+        ...
+
+    def list_agent_tool_grants(
+        self, agent_id: str, include_revoked: bool = False
+    ) -> list[dict]:
+        """Defined on ``AgentToolGrantsMixin``; called by ``list_active_grants``."""
         ...

@@ -22,6 +22,7 @@ from collections.abc import Iterable
 
 from sqlalchemy.engine import Engine
 
+from agentbox.core.data._protocol import StoreContext
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import (
     agent_prompt_resource_bindings,
@@ -158,7 +159,7 @@ class ResourceBindingsMixin:
             return {r._mapping["workspace_id"]: int(r._mapping["n"]) for r in rows}
 
     def replace_workspace_file_bindings(
-        self,
+        self: StoreContext,
         workspace_id: str,
         bindings: Iterable[dict],
         *,
@@ -196,7 +197,7 @@ class ResourceBindingsMixin:
             # target_path. Look up the resource type to know which kind
             # of binding this is.
             if target_path:
-                resource = self.get_repo_resource(b["resource_id"])  # type: ignore[attr-defined]
+                resource = self.get_repo_resource(b["resource_id"])
                 rtype = (resource or {}).get("type")
                 if rtype == "folder":
                     normalized = target_path.strip("/")
@@ -234,7 +235,7 @@ class ResourceBindingsMixin:
         return self.list_workspace_file_bindings(workspace_id)
 
     def replace_workspace_skill_bindings(
-        self,
+        self: StoreContext,
         workspace_id: str,
         skill_resource_ids: Iterable[str],
         *,
@@ -249,11 +250,11 @@ class ResourceBindingsMixin:
         → ``.claude/skills/<name>``), ``materialize_mode=copy``,
         ``on_conflict=skip``.
         """
-        current = self.list_workspace_file_bindings(workspace_id)  # type: ignore[attr-defined]
+        current = self.list_workspace_file_bindings(workspace_id)
         merged: list[dict] = []
         order = 0
         for b in current:
-            resource = self.get_repo_resource(b["resource_id"])  # type: ignore[attr-defined]
+            resource = self.get_repo_resource(b["resource_id"])
             if resource and resource.get("type") == "skill":
                 # Drop existing skill bindings — they will be replaced.
                 continue

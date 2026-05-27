@@ -71,7 +71,7 @@ class AgentToolGrantsMixin:
         return self._get_grant_row(agent_id, tool_name)
 
     def revoke_agent_tool(
-        self,
+        self: StoreContext,
         agent_id: str,
         tool_name: str,
         changelog: str,
@@ -82,7 +82,7 @@ class AgentToolGrantsMixin:
             raise ValueError("changelog must be at least 3 characters")
 
         now = now_iso()
-        with self.engine.begin() as conn:  # type: ignore[attr-defined]
+        with self.engine.begin() as conn:
             result = conn.execute(
                 update(agent_tool_grants)
                 .where(
@@ -102,12 +102,12 @@ class AgentToolGrantsMixin:
                 )
 
     def list_agent_tool_grants(
-        self,
+        self: StoreContext,
         agent_id: str,
         include_revoked: bool = False,
     ) -> list[dict]:
         """Return grant rows for an agent, newest-first."""
-        with self.engine.connect() as conn:  # type: ignore[attr-defined]
+        with self.engine.connect() as conn:
             q = select(agent_tool_grants).where(
                 agent_tool_grants.c.agent_id == agent_id
             )
@@ -117,13 +117,13 @@ class AgentToolGrantsMixin:
             rows = conn.execute(q).mappings().all()
             return [dict(r) for r in rows]
 
-    def list_active_grants(self, agent_id: str) -> set[str]:
+    def list_active_grants(self: StoreContext, agent_id: str) -> set[str]:
         """Return set of active tool_names for an agent. Used by executor at run-start."""
         rows = self.list_agent_tool_grants(agent_id, include_revoked=False)
         return {r["tool_name"] for r in rows}
 
-    def _get_grant_row(self, agent_id: str, tool_name: str) -> dict:
-        with self.engine.connect() as conn:  # type: ignore[attr-defined]
+    def _get_grant_row(self: StoreContext, agent_id: str, tool_name: str) -> dict:
+        with self.engine.connect() as conn:
             row = (
                 conn.execute(
                     select(agent_tool_grants).where(
