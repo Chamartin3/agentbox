@@ -29,13 +29,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from agentbox.api.events import DoneEvent
 from agentbox.core.data import RunStatus
+from agentbox.core.run.backends.base import BackendRunResult
 from agentbox.core.run.validation import extract_json
 
 if TYPE_CHECKING:
     from agentbox.core.run.backends.base import (
         BackendAdapter,
-        BackendRunResult,
         RenderedConfig,
     )
     from agentbox.core.run.streaming.session import RunStreamSession
@@ -128,9 +129,6 @@ async def _adapter_run_into_session(
     session: RunStreamSession,
 ) -> BackendRunResult:
     """Invoke ``adapter.run_into_session`` or bridge a legacy iterator backend."""
-    from agentbox.api.events import DoneEvent
-    from agentbox.core.run.backends.base import BackendRunResult
-
     if hasattr(adapter, "run_into_session"):
         return await adapter.run_into_session(rendered, input_, session)
 

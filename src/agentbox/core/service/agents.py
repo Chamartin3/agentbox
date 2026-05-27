@@ -17,14 +17,22 @@ the ``/api/agents`` routes (and re-usable by MCP / CLI):
 
 from __future__ import annotations
 
+import hashlib
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import func, select
 
+from agentbox.core import workspaces as ws
+from agentbox.core.agent.config import build_config_json_payload
+from agentbox.core.constants import SessionMode
+from agentbox.core.data import AgentDef, agent_runner_profiles
+from agentbox.core.data import runs as runs_table
+from agentbox.core.prompt.composition import compose_from_source
+from agentbox.core.prompt.composition.loader import load_bundle_from_bindings
+
 if TYPE_CHECKING:
     from agentbox.config import Settings
-    from agentbox.core.data import AgentDef
     from agentbox.core.data import SessionStore
 
 logger = logging.getLogger(__name__)
@@ -58,8 +66,6 @@ def list_all_agents(
     for backward compatibility and ignored.
     """
     del loader  # deprecated, ignored
-    from agentbox.core.data import AgentDef
-
     out: list[AgentDef] = []
     for row in store.list_agents_with_latest():
         try:
@@ -90,9 +96,6 @@ def _aggregate_run_metadata(
     Wrapped in a broad try so a single bad row in either table never
     blanks the agents list — the caller falls back to empty dicts.
     """
-    from agentbox.core.data import agent_runner_profiles
-    from agentbox.core.data import runs as runs_table
-
     run_counts: dict[str, int] = {}
     last_run_at: dict[str, str] = {}
     profile_bindings: dict[str, str] = {}
@@ -145,8 +148,6 @@ def _enrich_agent(
     last_run_at: dict[str, str],
     profile_bindings: dict[str, str],
 ) -> dict:
-    from agentbox.core import workspaces as ws
-
     try:
         workspace_str = str(ws.resolve_path(agent, settings, store)[0])
     except Exception:
@@ -212,10 +213,6 @@ def get_agent_detail(
     includes the active prompt body, a composed system+user preview,
     bound runner profile, workspace info, and the full version list.
     """
-    from agentbox.core import workspaces as ws
-    from agentbox.core.prompt.composition import compose_from_source
-    from agentbox.core.prompt.composition.loader import load_bundle_from_bindings
-
     agent = resolve_agent(agent_id, store=store)
     if agent is None:
         return None
@@ -336,12 +333,6 @@ def create_agent_record(
 
     Raises :class:`AgentAlreadyExists` when the agent_id is already taken.
     """
-    from typing import cast
-
-    from agentbox.core.agent.config import build_config_json_payload
-    from agentbox.core.constants import SessionMode
-    from agentbox.core.data import AgentDef
-
     agent_def = AgentDef(
         id=agent_id,
         description=description,
@@ -390,8 +381,6 @@ def upload_version_file(
     Raises :class:`VersionNotFound`, :class:`VersionNotDraft`, or
     :class:`DuplicateVersionFile`.
     """
-    import hashlib
-
     version_record = store.get_version(agent_id, version)
     if version_record is None:
         raise VersionNotFound(f"version {version} not found")

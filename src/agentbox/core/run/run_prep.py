@@ -15,6 +15,11 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agentbox.core.workspace.env_doc.renderers.agents_md import AgentsMdRenderer
+from agentbox.core.workspace.env_doc.renderers.base import RuntimeContext
+from agentbox.core.workspace.env_doc.renderers.claude_md import ClaudeMdRenderer
+from agentbox.core.workspace.env_doc.schema import EnvDocContent
+
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
 
@@ -233,11 +238,6 @@ def render_env_doc(
                 "run_prep: env doc version %s has invalid content_json", doc.get("id")
             )
             return []
-
-    from agentbox.core.workspace.env_doc.renderers.agents_md import AgentsMdRenderer
-    from agentbox.core.workspace.env_doc.renderers.base import RuntimeContext
-    from agentbox.core.workspace.env_doc.renderers.claude_md import ClaudeMdRenderer
-    from agentbox.core.workspace.env_doc.schema import EnvDocContent
 
     try:
         content = EnvDocContent.model_validate(content_json)

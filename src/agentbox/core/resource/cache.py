@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -69,8 +70,6 @@ def prune_cache(cache_root: Path, *, older_than_days: float = 30.0) -> int:
 
     Returns the number of entries deleted.
     """
-    import time
-
     if not cache_root.exists():
         return 0
 

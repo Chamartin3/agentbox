@@ -26,6 +26,8 @@ import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from jsonschema import Draft202012Validator
+
 from agentbox.core.constants import ResourceType
 from agentbox.core.prompt.rendering import render_for_type
 from agentbox.core.resource.importers.base import ImporterContext
@@ -35,6 +37,7 @@ from agentbox.core.resource.importers.script import ScriptImporter
 from agentbox.core.resource.importers.skill import SkillImporter
 from agentbox.core.resource.importers.upload import UploadImporter
 from agentbox.core.resource.importers.zip_upload import ZipUploadImporter
+from agentbox.core.resource.pydantic_export import schema_to_pydantic
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
@@ -478,8 +481,6 @@ def export_pydantic(
     blob = store.read_repo_blob(vid, "")
     if not blob:
         raise ResourceNotFound("schema blob")
-    from agentbox.core.resource.pydantic_export import schema_to_pydantic
-
     schema_text = blob.get("content_text") or blob["content"].decode("utf-8")
     try:
         return schema_to_pydantic(schema_text, class_name=class_name)
@@ -516,8 +517,6 @@ def validate_script_sample(
     schema_blob = store.read_repo_blob(schema_active["id"], "")
     if not schema_blob:
         raise InvalidResource("schema blob missing")
-
-    from jsonschema import Draft202012Validator
 
     schema_doc = json.loads(schema_blob.get("content_text") or schema_blob["content"])
     validator = Draft202012Validator(schema_doc)

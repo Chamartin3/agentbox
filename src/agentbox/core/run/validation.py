@@ -14,13 +14,24 @@ either call this directly or short-circuit with their own
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 import jsonschema as _jsonschema
+
+from agentbox.core.agent.config import (
+    ExecutionConfig,
+    PythonAgentConfig,
+    resolve_output_config,
+)
+from agentbox.core.prompt.composition.pydantic_validate import validate_with_pydantic
 
 # Engine label for the validator that produced the verdict. ``off`` means
 # no schema is configured and validation was skipped; ``none`` means a
@@ -158,10 +169,6 @@ def validate_pydantic(output: str, schema: dict[str, Any]) -> ValidationResult:
     invariants to actually run, configure the agent's two-gate output
     contract (``config_json["output"]``) with an HTTP validator callback.
     """
-    from agentbox.core.prompt.composition.pydantic_validate import (
-        validate_with_pydantic,
-    )
-
     ok, err = validate_with_pydantic(output, schema)
     return ValidationResult(ok=ok, error=err, engine="pydantic")
 
@@ -178,13 +185,6 @@ def call_http_validator(validator_cfg: Any, output: str) -> ValidationResult:
     Failure to reach the endpoint surfaces as a hard failure — we never
     silently skip validation when the callback is configured.
     """
-    import hashlib
-    import hmac
-    import json
-    import os
-
-    import httpx
-
     body = json.dumps({"output": output}).encode("utf-8")
 
     secret = os.environ.get("AGENTBOX_WEBHOOK_SECRET", "")
@@ -318,8 +318,6 @@ def resolve_schema(
          composer / output-schema prompt-binding).
       2. ``python.output_schema_path`` (legacy file-based contract).
     """
-    from agentbox.core.agent.config import PythonAgentConfig
-
     if isinstance(composed_schema, dict):
         return composed_schema, ""
 
@@ -367,8 +365,6 @@ def validate_output(
       - ``ok=True, engine="off"`` when no schema is configured.
       - ``ok=False, engine="none"`` for empty output when a schema exists.
     """
-    from agentbox.core.agent.config import ExecutionConfig, resolve_output_config
-
     # --- Validation: schema (implicit) + contract validators (explicit) ---
     output_cfg = resolve_output_config(store, agent)
     if output_cfg.json_schema is not None or output_cfg.validators:

@@ -4,6 +4,15 @@ import logging
 import time
 from typing import Any
 
+from agentbox.core.agent.providers import (
+    anthropic,
+    cli,
+    google,
+    ollama,
+    openai,
+    openrouter,
+    xai,
+)
 from agentbox.core.agent.providers.base import ProviderAdapter, ProviderDescriptor
 
 logger = logging.getLogger(__name__)
@@ -60,16 +69,6 @@ _PROVIDERS: dict[str, ProviderAdapter] = {}
 
 def _initialize_providers() -> None:
     """Populate the provider registry by importing provider modules."""
-    from agentbox.core.agent.providers import (
-        anthropic,
-        cli,
-        google,
-        ollama,
-        openai,
-        openrouter,
-        xai,
-    )
-
     _PROVIDERS["openai"] = openai.OpenAIAdapter()
     _PROVIDERS["anthropic"] = anthropic.AnthropicAdapter()
     _PROVIDERS["google"] = google.GoogleAdapter()
@@ -86,8 +85,6 @@ def refresh_opencode_providers() -> list[str]:
     opencode backend. The set grows as credentials become available
     inside the container (env vars or ``opencode providers login``).
     """
-    from agentbox.core.agent.providers import cli
-
     discovered = cli.discover_opencode_providers()
 
     # Drop any existing opencode-backed adapters that came from a previous

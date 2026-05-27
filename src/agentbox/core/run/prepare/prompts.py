@@ -35,8 +35,13 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.agent.config import ExecutionConfig
+from agentbox.core.agent.config import (
+    ExecutionConfig,
+    OutputConfig as _OC,
+    resolve_output_config as _resolve_out,
+)
 from agentbox.core.data import AgentDef
+from agentbox.core.prompt.output_contract import append as _append_contract
 from agentbox.core.prompt.resolver import resolve_prompt
 from agentbox.core.run.backends._schema_to_model import (
     InconsistentSchema,
@@ -239,16 +244,11 @@ def resolve_run_prompt(
         )
 
     # ----- Stage 3: output-contract assembly ----------------------------
-    from agentbox.core.agent.config import resolve_output_config as _resolve_out
-
     out_cfg = _resolve_out(store, agent)
     if composed_schema is None and isinstance(out_cfg.json_schema, dict):
         composed_schema = out_cfg.json_schema
 
     if out_cfg.validators or isinstance(out_cfg.json_schema, dict):
-        from agentbox.core.agent.config import OutputConfig as _OC
-        from agentbox.core.prompt.output_contract import append as _append_contract
-
         base_for_contract = system_text if system_text is not None else (agent.prompt or "")
         system_text = _append_contract(base_for_contract, out_cfg)
 

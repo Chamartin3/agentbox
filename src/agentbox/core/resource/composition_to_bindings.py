@@ -31,6 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from sqlalchemy import text
+
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
 
@@ -151,8 +153,6 @@ def _backfill_slot_active_flag(store: SessionStore) -> None:
     new BindingsBundleSource gates rendering on it. Backfill makes the
     cutover safe.
     """
-    from sqlalchemy import text
-
     with store.engine.begin() as conn:
         conn.execute(
             text(

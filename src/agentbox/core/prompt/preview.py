@@ -12,6 +12,11 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from agentbox.core.agent.config import (
+    HttpValidatorConfig,
+    OutputConfig,
+    ScriptValidatorConfig,
+)
 from agentbox.core.prompt.composition import _append_input_schema, _append_schema
 from agentbox.core.prompt.output_contract import render as _render_output_contract
 from agentbox.core.prompt.rendering import render_for_type
@@ -131,21 +136,13 @@ def _validation_block_for_preview(
     Returns ``(rendered_text, view_dict)`` where view_dict is the
     structured payload returned to the UI under ``validation``.
     """
-    import json as _json
-
-    from agentbox.core.agent.config import (
-        HttpValidatorConfig,
-        OutputConfig,
-        ScriptValidatorConfig,
-    )
-
     active = store.get_active_version(agent_id)
     if not active or active.get("id") is None:
         return "", None
     raw_cfg = active.get("config_json")
     if isinstance(raw_cfg, str):
         try:
-            cfg = _json.loads(raw_cfg)
+            cfg = json.loads(raw_cfg)
         except (ValueError, TypeError):
             cfg = {}
     elif isinstance(raw_cfg, dict):

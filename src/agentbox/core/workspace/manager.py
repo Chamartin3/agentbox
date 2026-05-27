@@ -112,6 +112,7 @@ def reset(agent: AgentDef, settings: Settings, store: object | None = None) -> P
 
 def list_all(store: object, settings: Settings) -> list[WorkspaceInfo]:
     """List a WorkspaceInfo for every agent known to the DB."""
+    # lazy: cycle workspace.manager ↔ service.agents (service.agents imports this module)
     from agentbox.core.service.agents import list_all_agents
 
     return [info(a, settings, store) for a in list_all_agents(store=store)]
