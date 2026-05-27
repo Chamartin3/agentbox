@@ -146,6 +146,23 @@ from agentbox.core.data.runner_profiles_seed import (
 )
 from agentbox.core.data.transcripts import read_transcript
 
+# Re-bind schema table names that collide with submodule names. The mixin
+# imports above register submodules as attributes of this package, which
+# shadows the Table objects imported from ``schema``. Re-import last so the
+# facade exports the Tables, not the submodules.
+from agentbox.core.data.schema import (  # noqa: E402,F811
+    agent_config_events,
+    agent_sync,
+    agent_tool_grants,
+    agent_versions,
+    api_tokens,
+    prompt_versions,
+    resources,
+    runner_profiles,
+    settings,
+    workspaces,
+)
+
 __all__ = [
     "RunStatus",
     # records
