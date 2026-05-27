@@ -1,40 +1,31 @@
-"""agentbox CLI — restructured into per-group modules.
+"""agentbox CLI — restructured into per-group subpackages.
+
+Top-level command groups mirror the API layout under
+``src/agentbox/api/``: ``agents``, ``runs``, ``runners``,
+``workspaces``, ``resources``, ``analytics``, ``system``, ``ops``.
 
 Entry point: ``agentbox.cli:app`` (wired in pyproject.toml).
 """
 
-from agentbox.cli.agent import agent_app
-from agentbox.cli.cfg import cfg_app
-from agentbox.cli.env_doc import env_doc_app
-from agentbox.cli.host_env import host_env_app
-from agentbox.cli.launch import launch_cmd
-from agentbox.cli.mcp import mcp_app
-from agentbox.cli.mcp_workspace import mcp_workspace_app
-from agentbox.cli.migrate import migrate_app
-from agentbox.cli.prompt_bindings import prompt_bindings_app
-from agentbox.cli.resource import resource_app
-from agentbox.cli.root import app, register_backward_compat
-from agentbox.cli.runner_profiles import runner_profile_app, runner_provider_app
-from agentbox.cli.runs import runs_app
-from agentbox.cli.workspace_resources import workspace_resources_app
-from agentbox.cli.ws import ws_app
+from __future__ import annotations
 
-app.add_typer(agent_app, name="agent")
-app.add_typer(ws_app, name="ws")
+from agentbox.cli.agents import app as agents_app
+from agentbox.cli.analytics import app as analytics_app
+from agentbox.cli.ops import app as ops_app
+from agentbox.cli.resources import app as resources_app
+from agentbox.cli.root import app
+from agentbox.cli.runners import app as runners_app
+from agentbox.cli.runs import app as runs_app
+from agentbox.cli.system import app as system_app
+from agentbox.cli.workspaces import app as workspaces_app
+
+app.add_typer(agents_app, name="agents")
 app.add_typer(runs_app, name="runs")
-app.add_typer(cfg_app, name="cfg")
-app.add_typer(mcp_app, name="mcp")
-app.add_typer(migrate_app, name="migrate")
-app.add_typer(runner_profile_app, name="runner-profile")
-app.add_typer(runner_provider_app, name="runner-provider")
-app.add_typer(resource_app, name="resource")
-app.add_typer(prompt_bindings_app, name="prompt-bindings")
-app.add_typer(workspace_resources_app, name="workspace-resources")
-app.add_typer(env_doc_app, name="env-doc")
-app.add_typer(mcp_workspace_app, name="mcp-workspace")
-app.add_typer(host_env_app, name="host-env")
-app.command(name="launch")(launch_cmd)
-
-register_backward_compat()
+app.add_typer(runners_app, name="runners")
+app.add_typer(workspaces_app, name="workspaces")
+app.add_typer(resources_app, name="resources")
+app.add_typer(analytics_app, name="analytics")
+app.add_typer(system_app, name="system")
+app.add_typer(ops_app, name="ops")
 
 __all__ = ["app"]

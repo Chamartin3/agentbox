@@ -9,33 +9,34 @@ runner = CliRunner()
 def test_root_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "agent" in result.output
-    assert "ws" in result.output
-    assert "runs" in result.output
-    assert "cfg" in result.output
-    assert "mcp" in result.output
-    assert "migrate" in result.output
-    assert "serve" in result.output
-    assert "exec" in result.output
-    assert "doctor" in result.output
+    for grp in (
+        "agents",
+        "runs",
+        "runners",
+        "workspaces",
+        "resources",
+        "analytics",
+        "system",
+        "ops",
+        "serve",
+        "exec",
+        "doctor",
+    ):
+        assert grp in result.output
 
 
-def test_agent_help() -> None:
-    result = runner.invoke(app, ["agent", "--help"])
+def test_agents_help() -> None:
+    result = runner.invoke(app, ["agents", "--help"])
     assert result.exit_code == 0
     assert "ls" in result.output
     assert "show" in result.output
-    assert "prompt" in result.output
 
 
-def test_ws_help() -> None:
-    result = runner.invoke(app, ["ws", "--help"])
+def test_workspaces_help() -> None:
+    result = runner.invoke(app, ["workspaces", "--help"])
     assert result.exit_code == 0
     assert "ls" in result.output
     assert "path" in result.output
-    assert "new" in result.output
-    assert "reset" in result.output
-    assert "edit" in result.output
 
 
 def test_runs_help() -> None:
@@ -43,24 +44,41 @@ def test_runs_help() -> None:
     assert result.exit_code == 0
     assert "ls" in result.output
     assert "show" in result.output
-    assert "tail" in result.output
 
 
-def test_cfg_help() -> None:
-    result = runner.invoke(app, ["cfg", "--help"])
+def test_ops_help() -> None:
+    result = runner.invoke(app, ["ops", "--help"])
     assert result.exit_code == 0
-    assert "show" in result.output
-    assert "paths" in result.output
-    assert "gen" in result.output
+    assert "cfg" in result.output
+    assert "migrate" in result.output
+    assert "launch" in result.output
 
 
-def test_mcp_help() -> None:
-    result = runner.invoke(app, ["mcp", "--help"])
+def test_system_help() -> None:
+    result = runner.invoke(app, ["system", "--help"])
     assert result.exit_code == 0
-    assert "ls" in result.output
+    assert "env" in result.output
+    assert "host" in result.output
+    assert "mcp" in result.output
 
 
-def test_migrate_help() -> None:
-    result = runner.invoke(app, ["migrate", "--help"])
+def test_runners_help() -> None:
+    result = runner.invoke(app, ["runners", "--help"])
     assert result.exit_code == 0
-    assert "ws-perms" in result.output
+    assert "profiles" in result.output
+    assert "providers" in result.output
+    assert "backends" in result.output
+
+
+def test_analytics_help() -> None:
+    result = runner.invoke(app, ["analytics", "--help"])
+    assert result.exit_code == 0
+    assert "activity" in result.output
+    assert "usage" in result.output
+
+
+def test_resources_help() -> None:
+    result = runner.invoke(app, ["resources", "--help"])
+    assert result.exit_code == 0
+    assert "repo" in result.output
+    assert "bindings" in result.output
