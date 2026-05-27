@@ -1,6 +1,6 @@
 import pytest
-from agentbox.agent_tools.decorator import agent_tool
-from agentbox.agent_tools.registry import SharedToolRegistry
+from agentbox.core.tools.decorator import agent_tool
+from agentbox.core.tools.registry import SharedToolRegistry
 from pydantic import BaseModel
 
 
@@ -56,10 +56,10 @@ def test_duplicate_name_raises():
 
 def test_discover_tools_is_idempotent(monkeypatch):
     # With no installed entry points this should be a no-op
-    from agentbox.agent_tools import discovery
+    from agentbox.core.tools import discovery
 
     discovery._DISCOVERED = False
-    from agentbox.agent_tools import discover_tools
+    from agentbox.core.tools import discover_tools
 
     discover_tools()
     discover_tools()  # second call must not raise or duplicate

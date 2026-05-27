@@ -82,7 +82,7 @@ def _on_startup() -> None:
     # Populate the shared agent_tools registry from installed entry points so
     # /api/agent_tools and the control-plane MCP can list discovered tools.
     try:
-        from agentbox.agent_tools.discovery import discover_tools
+        from agentbox.core.tools.discovery import discover_tools
 
         discover_tools()
     except Exception:

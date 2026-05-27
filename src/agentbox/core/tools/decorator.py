@@ -4,7 +4,7 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-from agentbox.agent_tools.registry import SharedToolRegistry, ToolSpec
+from agentbox.core.tools.registry import SharedToolRegistry, ToolSpec
 
 
 def agent_tool(
