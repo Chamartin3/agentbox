@@ -14,7 +14,7 @@ from agentbox.core.workspace.env_doc.renderers import (
 )
 from agentbox.core.workspace.env_doc.renderers.base import ReferenceEntry
 from agentbox.core.workspace.env_doc.schema import EnvDocContent
-from agentbox.core.workspace.sync import sync_workspace_by_name
+from agentbox.core.workspace.build import build_workspace_by_name
 
 _log = logging.getLogger(__name__)
 
@@ -67,9 +67,9 @@ def save_and_sync_env_doc(
         actor=actor,
     )
     try:
-        sync_workspace_by_name(store, settings, workspace_id)
+        build_workspace_by_name(store, settings, workspace_id)
     except Exception:
         _log.exception(
-            "env_doc save: sync_workspace_by_name failed for %s", workspace_id
+            "env_doc save: build_workspace_by_name failed for %s", workspace_id
         )
     return result

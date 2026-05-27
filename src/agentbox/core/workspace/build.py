@@ -77,11 +77,11 @@ def _remove_orphan(workdir: Path, rel_path: str) -> bool:
             shutil.rmtree(target)
         return True
     except Exception:
-        logger.exception("workspace_sync: failed to remove orphan %s", target)
+        logger.exception("workspace_build: failed to remove orphan %s", target)
         return False
 
 
-def sync_workspace(
+def build_workspace(
     store: SessionStore,
     settings: Settings,
     workspace_id: str,
@@ -137,7 +137,7 @@ def sync_workspace(
             workspace_outcomes_to_snapshot(outcomes)
     except Exception as e:
         logger.exception(
-            "workspace_sync: resource materialization failed for %r", workspace_id
+            "workspace_build: resource materialization failed for %r", workspace_id
         )
         result.errors.append(f"resources: {e}")
 
@@ -146,7 +146,7 @@ def sync_workspace(
         result.env_doc_files = [e["file"] for e in env_entries]
     except Exception as e:
         logger.exception(
-            "workspace_sync: env doc rendering failed for %r", workspace_id
+            "workspace_build: env doc rendering failed for %r", workspace_id
         )
         result.errors.append(f"env_doc: {e}")
 
@@ -157,7 +157,7 @@ def sync_workspace(
             result.subagents_written = [o.alias for o in sub_outcomes]
     except Exception as e:
         logger.exception(
-            "workspace_sync: subagent materialization failed for %r", workspace_id
+            "workspace_build: subagent materialization failed for %r", workspace_id
         )
         result.errors.append(f"subagents: {e}")
 
@@ -193,7 +193,7 @@ def resolve_workspace_workdir(
     return candidate if candidate.exists() else None
 
 
-def sync_workspace_by_name(
+def build_workspace_by_name(
     store: SessionStore, settings: Settings, workspace_id: str
 ) -> WorkspaceSyncResult | None:
     """Convenience wrapper: resolve workdir from name, then sync.
@@ -204,7 +204,7 @@ def sync_workspace_by_name(
     workdir = resolve_workspace_workdir(store, settings, workspace_id)
     if workdir is None:
         return None
-    return sync_workspace(store, settings, workspace_id, workdir)
+    return build_workspace(store, settings, workspace_id, workdir)
 
 
 def _write_provenance(workdir: Path, result: WorkspaceSyncResult) -> None:

@@ -1,4 +1,4 @@
-"""Phase 1: sync_workspace orchestrator — env-doc + subagents + provenance."""
+"""Phase 1: build_workspace orchestrator — env-doc + subagents + provenance."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from agentbox.core.data import SessionStore
-from agentbox.core.workspace.sync import sync_workspace, sync_workspace_by_name
+from agentbox.core.workspace.build import build_workspace, build_workspace_by_name
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def test_sync_writes_env_doc_files_and_provenance(
     _save_env_doc(store, "default")
     workdir = tmp_path / "workdir" / "default"
 
-    result = sync_workspace(store, fake_settings, "default", workdir)
+    result = build_workspace(store, fake_settings, "default", workdir)
 
     assert (workdir / "CLAUDE.md").exists()
     assert (workdir / "AGENTS.md").exists()
@@ -61,7 +61,7 @@ def test_sync_skips_ephemeral(
     store: SessionStore, fake_settings, tmp_path: Path
 ) -> None:
     workdir = tmp_path / "tmpws"
-    result = sync_workspace(store, fake_settings, "<ephemeral>", workdir)
+    result = build_workspace(store, fake_settings, "<ephemeral>", workdir)
     assert result.env_doc_files == []
     assert not (workdir / "CLAUDE.md").exists()
 
@@ -73,31 +73,31 @@ def test_sync_no_env_doc_still_writes_provenance(
     _seed_workspace(store, "barebones")
     workdir = tmp_path / "workdir" / "barebones"
 
-    result = sync_workspace(store, fake_settings, "barebones", workdir)
+    result = build_workspace(store, fake_settings, "barebones", workdir)
 
     assert result.env_doc_files == []
     assert not (workdir / "CLAUDE.md").exists()
     assert (workdir / ".agentbox" / "meta.json").exists()
 
 
-def test_sync_workspace_by_name_resolves_path(
+def test_build_workspace_by_name_resolves_path(
     store: SessionStore, fake_settings, tmp_path: Path
 ) -> None:
     """The convenience wrapper resolves workspace_id → workdir from the DB."""
     _seed_workspace(store, "named")
     _save_env_doc(store, "named")
 
-    result = sync_workspace_by_name(store, fake_settings, "named")
+    result = build_workspace_by_name(store, fake_settings, "named")
 
     assert result is not None
     assert result.workdir == (tmp_path / "workdir" / "named").resolve()
     assert (tmp_path / "workdir" / "named" / "CLAUDE.md").exists()
 
 
-def test_sync_workspace_by_name_unknown_returns_none(
+def test_build_workspace_by_name_unknown_returns_none(
     store: SessionStore, fake_settings
 ) -> None:
-    assert sync_workspace_by_name(store, fake_settings, "ghost") is None
+    assert build_workspace_by_name(store, fake_settings, "ghost") is None
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ def test_sync_removes_orphans_recorded_in_previous_meta(
         )
     )
 
-    result = sync_workspace(store, fake_settings, "ws", workdir)
+    result = build_workspace(store, fake_settings, "ws", workdir)
 
     assert set(result.orphans_removed) == {"old-folder", "old-doc.md"}
     assert not (workdir / "old-folder").exists()
@@ -143,7 +143,7 @@ def test_sync_does_not_remove_files_outside_previous_meta(
     (workdir / "user-handwritten.md").write_text("mine")
     # No prior meta.json → no orphans should be removed.
 
-    result = sync_workspace(store, fake_settings, "ws2", workdir)
+    result = build_workspace(store, fake_settings, "ws2", workdir)
 
     assert result.orphans_removed == []
     assert (workdir / "user-handwritten.md").exists()

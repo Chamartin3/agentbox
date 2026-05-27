@@ -155,13 +155,13 @@ def _launch_session(
 
     # Phase 1: sync env-doc, subagents, and resource bindings into the
     # workspace before the runner starts. Skipped for ephemeral/unnamed
-    # workspaces (sync_workspace also no-ops on those).
+    # workspaces (build_workspace also no-ops on those).
     if workspace_name and not is_ephemeral:
         from agentbox.api.deps import get_store
-        from agentbox.core.workspace.sync import sync_workspace
+        from agentbox.core.workspace.build import build_workspace
 
         try:
-            sync_result = sync_workspace(
+            sync_result = build_workspace(
                 store=get_store(),
                 settings=settings,
                 workspace_id=workspace_name,
@@ -266,7 +266,7 @@ def _resolve_workspace(
             creds = getattr(ws_def, "creds", None)
             return path, False, creds, ws_name
         # Manifest miss — try the DB registry (db-only workspaces created
-        # via the API/UI). Returning the name lets sync_workspace
+        # via the API/UI). Returning the name lets build_workspace
         # materialize env-doc + resource bindings.
         from agentbox.api.deps import get_store
 

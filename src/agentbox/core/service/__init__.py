@@ -71,4 +71,4 @@ from agentbox.core.workspace.manager import (
     resolve_path,
 )
 from agentbox.core.workspace.mcp.client import McpRegistry
-from agentbox.core.workspace.sync import sync_workspace, sync_workspace_by_name
+from agentbox.core.workspace.build import build_workspace, build_workspace_by_name

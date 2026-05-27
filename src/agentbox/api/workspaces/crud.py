@@ -42,10 +42,10 @@ def _raise_agent_not_found(agent_id: str) -> NoReturn:
     raise HTTPException(404, f"unknown agent {agent_id!r}")
 
 
-def _sync_workspace_cb(store, settings, name: str) -> None:
-    from agentbox.core.workspace.sync import sync_workspace_by_name
+def _build_workspace_cb(store, settings, name: str) -> None:
+    from agentbox.core.workspace.build import build_workspace_by_name
 
-    sync_workspace_by_name(store, settings, name)
+    build_workspace_by_name(store, settings, name)
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
             settings=get_settings(),
             loader=get_loader(),
             mcp_manifest=_try_get_mcp_manifest(),
-            sync_cb=_sync_workspace_cb,
+            sync_cb=_build_workspace_cb,
         )
     except WorkspaceNotFound:
         _raise_not_found(name)

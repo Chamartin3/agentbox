@@ -2,7 +2,7 @@
 
 Thin HTTP layer: parses requests, delegates to
 ``core.service.bindings``, maps domain errors. Workspace mutations
-inject ``sync_workspace_by_name`` as the sync callback so the
+inject ``build_workspace_by_name`` as the sync callback so the
 service stays transport-agnostic.
 """
 
@@ -22,7 +22,7 @@ from agentbox.core.service.bindings import (
     PreviewError,
 )
 from agentbox.core.service.resources import ResourceNotFound
-from agentbox.core.workspace.sync import sync_workspace_by_name
+from agentbox.core.workspace.build import build_workspace_by_name
 
 router = APIRouter(tags=["resource-bindings"])
 
@@ -165,7 +165,7 @@ def replace_workspace_resources(
             reason=body.reason,
             actor=body.actor,
             settings=get_settings(),
-            sync_cb=sync_workspace_by_name,
+            sync_cb=build_workspace_by_name,
         )
     except BindingError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -214,7 +214,7 @@ def replace_workspace_subagents(
             store=store,
             actor=body.actor,
             settings=get_settings(),
-            sync_cb=sync_workspace_by_name,
+            sync_cb=build_workspace_by_name,
         )
     except BindingError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -245,7 +245,7 @@ def replace_workspace_skill_bindings(
             reason=body.reason,
             actor=body.actor,
             settings=get_settings(),
-            sync_cb=sync_workspace_by_name,
+            sync_cb=build_workspace_by_name,
         )
     except BindingError as exc:
         raise HTTPException(400, str(exc)) from exc

@@ -556,7 +556,7 @@ def register(mcp: FastMCP) -> None:
         """
         from agentbox.api.deps import get_settings
         from agentbox.core.workspace.env_doc.schema import EnvDocContent
-        from agentbox.core.workspace.sync import sync_workspace_by_name
+        from agentbox.core.workspace.build import build_workspace_by_name
 
         try:
             validated = EnvDocContent.model_validate(content).model_dump()
@@ -568,7 +568,7 @@ def register(mcp: FastMCP) -> None:
             workspace_id, validated, changelog=reason or "edit"
         )
         try:
-            sync_workspace_by_name(ctx.store, get_settings(), workspace_id)
+            build_workspace_by_name(ctx.store, get_settings(), workspace_id)
         except Exception:
             import logging
 

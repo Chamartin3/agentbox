@@ -6,6 +6,7 @@ import uuid
 
 from sqlalchemy import select, update
 
+from agentbox.core.data._protocol import StoreContext
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import agent_tool_grants
 
@@ -14,7 +15,7 @@ class AgentToolGrantsMixin:
     """CRUD for agent_tool_grants rows. Mixed into SessionStore."""
 
     def grant_agent_tool(
-        self,
+        self: StoreContext,
         agent_id: str,
         tool_name: str,
         changelog: str,
@@ -25,7 +26,7 @@ class AgentToolGrantsMixin:
             raise ValueError("changelog must be at least 3 characters")
 
         now = now_iso()
-        with self.engine.begin() as conn:  # type: ignore[attr-defined]
+        with self.engine.begin() as conn:
             existing = (
                 conn.execute(
                     select(agent_tool_grants).where(
