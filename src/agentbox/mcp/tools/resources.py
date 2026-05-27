@@ -10,7 +10,7 @@ import zipfile
 from fastmcp import FastMCP
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.prompt.preview import (
+from agentbox.core.agent.prompt.preview import (
     PreviewError,
     render_agent_prompt_preview,
 )

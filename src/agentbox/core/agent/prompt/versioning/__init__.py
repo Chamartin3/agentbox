@@ -1,6 +1,6 @@
 """Agent drift detection and startup sweep."""
 
-from agentbox.core.prompt.versioning.drift import (
+from agentbox.core.agent.prompt.versioning.drift import (
     AgentDriftStatus,
     check_drift,
     startup_sweep,

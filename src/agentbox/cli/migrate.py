@@ -7,7 +7,7 @@ from rich.text import Text
 from agentbox.api.deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.migrations import migrate_capabilities_to_manifest
-from agentbox.core.prompt.versioning.drift import _build_config_json
+from agentbox.core.agent.prompt.versioning.drift import _build_config_json
 
 migrate_app = typer.Typer(
     name="migrate",

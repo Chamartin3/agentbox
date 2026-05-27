@@ -44,7 +44,7 @@ from agentbox.core.data import McpSnapshot, RunnerSnapshot
 from agentbox.core.workspace.host_env.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
-from agentbox.core.prompt.capture import build_fragments, fragments_to_json
+from agentbox.core.agent.prompt.capture import build_fragments, fragments_to_json
 from agentbox.core.run.backends.base import PostRenderContext, RenderedConfig
 from agentbox.core.run.post_render import (
     inject_agent_tools_mcp as _inject_agent_tools_mcp_helper,

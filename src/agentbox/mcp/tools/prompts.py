@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from agentbox.core.prompt.composition import preview as preview_composition
+from agentbox.core.agent.prompt.composition import preview as preview_composition
 from agentbox.core.service.agents import resolve_agent
 from agentbox.mcp.deps import get_context
 from agentbox.mcp.schemas import clamp_limit

@@ -27,7 +27,7 @@ from agentbox.api import (
     system,
     workspaces,
 )
-from agentbox.core.prompt.versioning.drift import startup_sweep
+from agentbox.core.agent.prompt.versioning.drift import startup_sweep
 from agentbox.core.resource.boot_import import (
     import_composition_references,
     import_repo_resources,

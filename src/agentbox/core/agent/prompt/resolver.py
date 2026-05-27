@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from agentbox.core.prompt.rendering import render_for_type
+from agentbox.core.agent.prompt.rendering import render_for_type
 
 _MARKER_RE = re.compile(r"\{\{resource:([a-zA-Z0-9_\-]+)\}\}")
 

@@ -23,14 +23,14 @@ from agentbox.core.data import SessionStore
 from agentbox.core.workspace.host_env import CAPABILITIES
 
 # ── Prompt / composition ──────────────────────────────────────────────
-from agentbox.core.prompt.composition import compose_from_source
-from agentbox.core.prompt.composition import preview as composition_preview
-from agentbox.core.prompt.preview import (
+from agentbox.core.agent.prompt.composition import compose_from_source
+from agentbox.core.agent.prompt.composition import preview as composition_preview
+from agentbox.core.agent.prompt.preview import (
     PreviewError,
     render_agent_prompt_preview,
 )
-from agentbox.core.prompt.rendering import render_for_type
-from agentbox.core.prompt.resolver import resolve_prompt
+from agentbox.core.agent.prompt.rendering import render_for_type
+from agentbox.core.agent.prompt.resolver import resolve_prompt
 from agentbox.core.resource.importers.host_path import HostPathImporter
 from agentbox.core.resource.importers.schema import SchemaImporter
 from agentbox.core.resource.importers.script import ScriptImporter

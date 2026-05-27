@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.data import CompositionConfig
-from agentbox.core.prompt.composition import (
+from agentbox.core.agent.prompt.composition import (
     ComposeResult,
     compose_from_source,
 )
-from agentbox.core.prompt.composition.sources import (
+from agentbox.core.agent.prompt.composition.sources import (
     BindingsBundleSource,
     BundleSource,
 )

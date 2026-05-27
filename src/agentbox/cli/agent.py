@@ -273,7 +273,7 @@ def agent_edit(
     import hashlib
 
     from agentbox.core.data import AgentDef
-    from agentbox.core.prompt.versioning.drift import _build_snapshot
+    from agentbox.core.agent.prompt.versioning.drift import _build_snapshot
 
     if not set_:
         console.print("[red]nothing to set; pass --set k=v[/red]")

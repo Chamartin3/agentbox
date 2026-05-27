@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.prompt.composition import _append_validation_engine_hint
+from agentbox.core.agent.prompt.composition import _append_validation_engine_hint
 
 
 class TestAppendValidationEngineHint:

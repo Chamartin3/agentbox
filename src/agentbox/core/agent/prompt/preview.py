@@ -17,10 +17,10 @@ from agentbox.core.agent.config import (
     OutputConfig,
     ScriptValidatorConfig,
 )
-from agentbox.core.prompt.composition import _append_input_schema, _append_schema
-from agentbox.core.prompt.output_contract import render as _render_output_contract
-from agentbox.core.prompt.rendering import render_for_type
-from agentbox.core.prompt.resolver import resolve_prompt
+from agentbox.core.agent.prompt.composition import _append_input_schema, _append_schema
+from agentbox.core.agent.prompt.output_contract import render as _render_output_contract
+from agentbox.core.agent.prompt.rendering import render_for_type
+from agentbox.core.agent.prompt.resolver import resolve_prompt
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
