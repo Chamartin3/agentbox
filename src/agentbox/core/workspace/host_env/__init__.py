@@ -6,8 +6,8 @@ scope for the foundation drop — the data model + permission resolver
 land here so the API can edit grants and runs can check them.
 """
 
-from agentbox.core.infra.host_env.capabilities import CAPABILITIES, Capability
-from agentbox.core.infra.host_env.permissions import (
+from agentbox.core.workspace.host_env.capabilities import CAPABILITIES, Capability
+from agentbox.core.workspace.host_env.permissions import (
     GrantViolation,
     check_capability,
     resolve_grants,

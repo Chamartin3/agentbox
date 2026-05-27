@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
 from agentbox.core.data import SessionStore
-from agentbox.core.infra.host_env import CAPABILITIES
+from agentbox.core.workspace.host_env import CAPABILITIES
 
 router = APIRouter(tags=["host-env"])
 

@@ -20,7 +20,7 @@ from agentbox.core.data import RunnerProfile, RunnerProfileCreate
 from agentbox.core.data import SessionStore
 
 # ── Infra ─────────────────────────────────────────────────────────────
-from agentbox.core.infra.host_env import CAPABILITIES
+from agentbox.core.workspace.host_env import CAPABILITIES
 
 # ── Prompt / composition ──────────────────────────────────────────────
 from agentbox.core.prompt.composition import compose_from_source

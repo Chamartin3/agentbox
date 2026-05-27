@@ -41,7 +41,7 @@ from agentbox.core.data import SessionStore
 from agentbox.core.data import AgentDef
 from agentbox.core.data import runs as _runs_table
 from agentbox.core.data import McpSnapshot, RunnerSnapshot
-from agentbox.core.infra.host_env.capabilities import (
+from agentbox.core.workspace.host_env.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
 from agentbox.core.prompt.capture import build_fragments, fragments_to_json

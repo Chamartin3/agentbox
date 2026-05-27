@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
-from agentbox.core.infra.host_env.permissions import GrantViolation, check_capability
+from agentbox.core.workspace.host_env.permissions import GrantViolation, check_capability
 from fastmcp import FastMCP
 
 

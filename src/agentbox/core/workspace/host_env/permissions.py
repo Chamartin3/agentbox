@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from agentbox.core.infra.host_env.capabilities import CAPABILITIES
+from agentbox.core.workspace.host_env.capabilities import CAPABILITIES
 
 
 class GrantViolation(Exception):
