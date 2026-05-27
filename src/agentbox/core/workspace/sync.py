@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -62,8 +63,6 @@ def _read_previous_meta(workdir: Path) -> dict:
 
 def _remove_orphan(workdir: Path, rel_path: str) -> bool:
     """Best-effort remove an on-disk path. Returns True if anything was removed."""
-    import shutil
-
     if not rel_path:
         return False
     target = (workdir / rel_path).resolve()

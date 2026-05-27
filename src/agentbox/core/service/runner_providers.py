@@ -26,6 +26,7 @@ from agentbox.core.agent.profiles import EffectiveRunnerConfig
 from agentbox.core.agent.providers import get_provider, list_providers
 from agentbox.core.agent.providers.base import ProviderDescriptor, ProviderModel
 from agentbox.core.agent.providers.registry import (
+    _MODEL_CACHE,
     list_models as registry_list_models,
 )
 from agentbox.core.agent.providers.registry import (
@@ -79,8 +80,6 @@ def list_runner_providers(
 
 def refresh_providers() -> dict[str, Any]:
     """Re-run dynamic provider discovery and invalidate model caches."""
-    from agentbox.core.agent.providers.registry import _MODEL_CACHE
-
     discovered = refresh_opencode_providers()
     _MODEL_CACHE.clear()
     return {

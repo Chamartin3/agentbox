@@ -14,6 +14,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agentbox.core.agent.config import build_config_json_payload
+
 if TYPE_CHECKING:
     from agentbox.core.data import AgentVersionsMixin
     from agentbox.core.data import AgentDef
@@ -67,8 +69,6 @@ def _build_config_json(agent: AgentDef) -> str:
     runner field — defaults included — to prevent silent revert to the
     pydantic default at read time.
     """
-    from agentbox.core.agent.config import build_config_json_payload
-
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         data = agent.model_dump(mode="json", exclude_none=False)

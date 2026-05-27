@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import time
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
@@ -97,7 +98,6 @@ async def stream_jsonl_subprocess(
     stdout_chunks: list[str] = []
     captured_session_id: str | None = None
     streamed_any_text = False
-    import time
 
     silent_since = time.time()
 

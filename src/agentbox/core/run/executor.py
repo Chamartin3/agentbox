@@ -52,6 +52,7 @@ from agentbox.core.run.post_render import (
 )
 from agentbox.core.run.config import ConfigGenerator
 from agentbox.core.run.guardrails.base import GuardrailContext
+from agentbox.core.run.backends.base import BackendRunResult
 from agentbox.core.run.prepare import prepare_run_resources
 from agentbox.core.run.render import materialize_rendered_config
 from agentbox.core.run.retry import RetryOrchestrator
@@ -59,7 +60,7 @@ from agentbox.core.run.streaming.session import RunStreamSession
 from agentbox.core.workspace.manager import resolve_path
 
 if TYPE_CHECKING:
-    from agentbox.core.run.backends.base import BackendAdapter, BackendRunResult
+    from agentbox.core.run.backends.base import BackendAdapter
     from agentbox.core.workspace.mcp.client.registry import McpRegistry
 
 logger = logging.getLogger(__name__)
@@ -80,8 +81,6 @@ async def _adapter_run_into_session(
     this helper pumps them into the session manually so the executor's
     single entry point keeps working.
     """
-    from agentbox.core.run.backends.base import BackendRunResult
-
     if hasattr(adapter, "run_into_session"):
         return await adapter.run_into_session(rendered, input_, session)
 
