@@ -28,7 +28,7 @@ class RevokeBody(BaseModel):
 def list_grants(
     agent_id: str,
     include_revoked: bool = False,
-    store: Annotated[SessionStore, Depends(get_store)] = ...,
+    store: Annotated[SessionStore, Depends(get_store)] = ...,  # pyright: ignore[reportArgumentType]
 ):
     return {
         "items": store.list_agent_tool_grants(agent_id, include_revoked=include_revoked)
@@ -39,7 +39,7 @@ def list_grants(
 def grant_tool(
     agent_id: str,
     body: GrantBody,
-    store: Annotated[SessionStore, Depends(get_store)] = ...,
+    store: Annotated[SessionStore, Depends(get_store)] = ...,  # pyright: ignore[reportArgumentType]
 ):
     try:
         return store.grant_agent_tool(
@@ -57,7 +57,7 @@ def revoke_tool(
     agent_id: str,
     tool_name: str,
     body: RevokeBody,
-    store: Annotated[SessionStore, Depends(get_store)] = ...,
+    store: Annotated[SessionStore, Depends(get_store)] = ...,  # pyright: ignore[reportArgumentType]
 ):
     try:
         store.revoke_agent_tool(

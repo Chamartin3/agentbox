@@ -9,8 +9,17 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
+from agentbox.core.service import (
+    list_repo_resources,
+    get_repo_resource_by_slug,
+    list_repo_versions,
+    create_repo_resource,
+    import_repo_version,
+    publish_repo_version,
+    rollback_repo_resource,
+)
 
 resource_app = typer.Typer(
     name="resource",
@@ -29,7 +38,7 @@ def resource_list(
 ) -> None:
     """List resources in the repository."""
     store = get_store()
-    rows = store.list_repo_resources(type=type, limit=limit)
+    rows = list_repo_resources(store, type=type, limit=limit)
     if tag:
         rows = [r for r in rows if tag in (r.get("tags") or "")]
     if not rows:
@@ -63,7 +72,7 @@ def resource_list(
 def resource_show(slug: str) -> None:
     """Show a resource and its version history."""
     store = get_store()
-    resource = store.get_repo_resource_by_slug(slug)
+    resource = get_repo_resource_by_slug(store, slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
@@ -81,7 +90,7 @@ def resource_show(slug: str) -> None:
     meta.add_row("active_version_id", resource.get("active_version_id") or "—")
     console.print(Panel(meta, title=f"Resource: {slug}", border_style="cyan"))
 
-    versions = store.list_repo_versions(resource["id"])
+    versions = list_repo_versions(store, resource["id"])
     if not versions:
         console.print("[dim]No versions.[/dim]")
         return
@@ -134,14 +143,15 @@ def resource_upload(
         content_text = content.decode("utf-8")
 
     store = get_store()
-    resource = store.get_repo_resource_by_slug(slug)
+    resource = get_repo_resource_by_slug(store, slug)
     if not resource:
         console.print(
             f"[yellow]Resource {slug!r} not found — creating it as 'document'.[/yellow]"
         )
-        resource = store.create_repo_resource(slug, "document", slug)
+        resource = create_repo_resource(store, slug, "document", slug)
 
-    version = store.import_repo_version(
+    version = import_repo_version(
+        store,
         resource["id"],
         [("", content, None, content_text)],
         import_source="upload",
@@ -166,12 +176,12 @@ def resource_publish(
         raise typer.Exit(1)
 
     store = get_store()
-    resource = store.get_repo_resource_by_slug(slug)
+    resource = get_repo_resource_by_slug(store, slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
 
-    version = store.publish_repo_version(version_id, reason=changelog)
+    version = publish_repo_version(store, version_id, reason=changelog)
     console.print(
         f"[green]✓[/green] published version [bold]{version['version_number']}[/bold] "
         f"for resource [bold]{slug}[/bold]"
@@ -192,13 +202,13 @@ def resource_rollback(
         raise typer.Exit(1)
 
     store = get_store()
-    resource = store.get_repo_resource_by_slug(slug)
+    resource = get_repo_resource_by_slug(store, slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
 
-    version = store.rollback_repo_resource(
-        resource["id"], version_number, reason=changelog
+    version = rollback_repo_resource(
+        store, resource["id"], version_number, reason=changelog
     )
     console.print(
         f"[green]✓[/green] rolled back to version {version_number} — "
@@ -226,7 +236,7 @@ def resource_migrate_composition(
             "running for real.[/yellow]"
         )
 
-    from agentbox.api.deps import get_settings
+    from agentbox.cli._deps import get_settings
 
     store = get_store()
     settings = get_settings()
@@ -253,3 +263,110 @@ def resource_migrate_composition(
         for agent_id, err in report.failed:
             console.print(f"  [red]{agent_id}[/red]: {err}")
         raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# Version management
+# ---------------------------------------------------------------------------
+
+
+@resource_app.command("versions")
+def resource_versions(
+    slug: str = typer.Argument(..., help="Resource slug"),
+    upload: bool = typer.Option(
+        False, "--upload", help="Upload a new version from a file"
+    ),
+    file_path: str = typer.Option(
+        "", "--file", help="File path for --upload"
+    ),
+    changelog: str = typer.Option(
+        "cli upload", "--changelog", help="Changelog for uploaded version"
+    ),
+) -> None:
+    """List or upload resource versions.
+
+    Examples:
+        resources repo versions my-resource
+        resources repo versions my-resource --upload --file ./data.csv
+    """
+    store = get_store()
+    resource = get_repo_resource_by_slug(store, slug)
+    if not resource:
+        console.print(f"[red]Resource not found:[/red] {slug!r}")
+        raise typer.Exit(2)
+
+    if upload:
+        if not file_path:
+            console.print("[red]--file required for --upload[/red]")
+            raise typer.Exit(2)
+        path = Path(file_path)
+        if not path.exists():
+            console.print(f"[red]File not found:[/red] {file_path}")
+            raise typer.Exit(2)
+        content = path.read_bytes()
+        content_text = None
+        with contextlib.suppress(UnicodeDecodeError):
+            content_text = content.decode("utf-8")
+        version = import_repo_version(
+            store,
+            resource["id"],
+            [("", content, None, content_text)],
+            import_source="upload",
+            changelog=changelog,
+            activate=True,
+        )
+        console.print(
+            f"[green]uploaded[/green] version {version['version_number']} "
+            f"(id={version['id']})"
+        )
+        return
+
+    versions = list_repo_versions(store, resource["id"])
+    if not versions:
+        console.print("[dim]No versions.[/dim]")
+        return
+
+    vtable = Table(header_style="bold green", padding=(0, 1))
+    vtable.add_column("#", style="dim")
+    vtable.add_column("ID", style="dim")
+    vtable.add_column("Draft", justify="center")
+    vtable.add_column("Source")
+    vtable.add_column("Changelog")
+    vtable.add_column("Created at", style="dim")
+    for v in versions:
+        draft = (
+            "[yellow]draft[/yellow]"
+            if v.get("is_draft")
+            else "[green]published[/green]"
+        )
+        vtable.add_row(
+            str(v["version_number"]),
+            v["id"],
+            draft,
+            v.get("import_source") or "",
+            v.get("changelog") or "",
+            v.get("created_at") or "",
+        )
+    console.print(vtable)
+
+
+@resource_app.command("preview-modes")
+def resource_preview_modes(
+    resource_id: str = typer.Argument(..., help="Resource ID"),
+) -> None:
+    """List available preview modes for a resource."""
+    from agentbox.core.service.bindings import preview_modes
+
+    store = get_store()
+    try:
+        result = preview_modes(resource_id, store=store)
+    except Exception:
+        console.print(f"[red]resource {resource_id!r} not found[/red]")
+        raise typer.Exit(1)
+    modes = result.get("modes", [])
+    if not modes:
+        console.print(f"[dim]No preview modes for resource {resource_id!r}[/dim]")
+        return
+    for m in modes:
+        desc = m.get("text", "")[:80] if m.get("text") else m.get("description", "")
+        console.print(f"[bold]{m.get('mode', '?')}[/bold]: {desc}")

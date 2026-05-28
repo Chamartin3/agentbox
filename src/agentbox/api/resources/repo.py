@@ -8,7 +8,7 @@ HTTP-streaming boundary.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Never
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import Response
@@ -27,7 +27,7 @@ from agentbox.core.service.resources import (
 router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])
 
 
-def _raise_not_found(detail: str = "resource not found"):
+def _raise_not_found(detail: str = "resource not found") -> Never:
     raise HTTPException(status_code=404, detail=detail)
 
 

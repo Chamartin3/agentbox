@@ -11,10 +11,10 @@ from .opencode import OpenCodeConfigGenerator
 from .pi import PiConfigGenerator
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from pathlib import Path  # noqa: F401
 
-    from agentbox.core.data import AgentDef
-    from agentbox.core.run.config.run_configurator import ComposedMetadata
+    from agentbox.core.data import AgentDef  # noqa: F401
+    from agentbox.core.run.config.run_configurator import ComposedMetadata  # noqa: F401
 
 
 _GENERATORS: dict[str, BackendConfigGenerator] = {
