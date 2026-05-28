@@ -15,7 +15,6 @@ from sqlalchemy import (
     Index,
     Integer,
     LargeBinary,
-    MetaData,
     String,
     Table,
     UniqueConstraint,
@@ -23,8 +22,7 @@ from sqlalchemy import (
 )
 
 from agentbox.core.constants import ResourceType
-
-metadata = MetaData()
+from agentbox.core.data._metadata import metadata
 
 _RESOURCE_TYPES_SQL = ", ".join(f"'{t.value}'" for t in ResourceType)
 

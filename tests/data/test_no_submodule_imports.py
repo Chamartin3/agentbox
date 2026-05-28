@@ -31,6 +31,7 @@ ALLOWED = {
     REPO_ROOT / "src" / "agentbox" / "core" / "data",
     # Tests that verify the façade itself by comparing against submodule.
     REPO_ROOT / "tests" / "data" / "test_facade_exports.py",
+    REPO_ROOT / "tests" / "data" / "test_metadata_tables.py",
     # This guard.
     REPO_ROOT / "tests" / "data" / "test_no_submodule_imports.py",
 }
