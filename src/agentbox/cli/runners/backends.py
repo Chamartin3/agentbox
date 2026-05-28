@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json as _json
+
 import typer
 from rich.table import Table
 
@@ -25,12 +27,29 @@ _LABELS: dict[str, str] = {
 
 
 @app.command("ls")
-def backend_ls() -> None:
+def backend_ls(
+    json_output: bool = typer.Option(
+        False, "--json", help="Output as JSON instead of a table"
+    ),
+) -> None:
     """List every registered backend along with compatible providers."""
     providers = list_providers()
     rows = sorted(registered_backends().items())
     if not rows:
         console.print("[yellow]No backends registered.[/yellow]")
+        return
+
+    if json_output:
+        result = []
+        for name, cls in rows:
+            compatible = [p.id for p in providers if name in (p.compatible_backends or [])]
+            result.append({
+                "id": name,
+                "label": _LABELS.get(name, name),
+                "default_model": getattr(cls, "default_model", None),
+                "compatible_providers": compatible,
+            })
+        console.print(_json.dumps(result, indent=2))
         return
 
     table = Table(

@@ -23,7 +23,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.api.deps import (
+from agentbox.cli._deps import (
     get_loader as _get_loader,  # _NoopLoader stub
 )
 from agentbox.cli._common import console
@@ -140,7 +140,7 @@ def _launch_session(
 
     agent_def: AgentDef | None = None
     if agent:
-        from agentbox.api.deps import get_store as _gs
+        from agentbox.cli._deps import get_store as _gs
 
         agent_def = _gs().get_agent_def(agent)
         if agent_def is None:
@@ -157,7 +157,7 @@ def _launch_session(
     # workspace before the runner starts. Skipped for ephemeral/unnamed
     # workspaces (build_workspace also no-ops on those).
     if workspace_name and not is_ephemeral:
-        from agentbox.api.deps import get_store
+        from agentbox.cli._deps import get_store
         from agentbox.core.workspace.build import build_workspace
 
         try:
@@ -268,7 +268,7 @@ def _resolve_workspace(
         # Manifest miss — try the DB registry (db-only workspaces created
         # via the API/UI). Returning the name lets build_workspace
         # materialize env-doc + resource bindings.
-        from agentbox.api.deps import get_store
+        from agentbox.cli._deps import get_store
 
         db_row = get_store().get_workspace(ws_name)
         if db_row is not None:
@@ -334,7 +334,7 @@ def _make_generator(
     manifest: object,
     workspace_id: str | None = None,
 ) -> ConfigGenerator:
-    from agentbox.api.deps import get_store
+    from agentbox.cli._deps import get_store
 
     mcp_server_name = "mcp"
     mcp_command: list[str] = ["mcp_serve.sh"]

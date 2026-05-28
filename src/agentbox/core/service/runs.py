@@ -259,19 +259,27 @@ def list_runs(
     limit: int = 50,
     offset: int = 0,
     paginated: bool = False,
+    with_usage: bool = False,
 ) -> list[dict] | dict:
     """Backward-compatible run listing.
 
     Returns the raw list when called without filters; otherwise returns
     the envelope ``{items, total, offset, limit, has_more}``.
+
+    When ``with_usage`` is True, each run dict is enriched with a
+    ``usage`` key containing the corresponding usage record (or ``None``).
     """
     if not paginated and not any(
         [status, executor, q, since, until, offset, agent_version]
     ):
-        return [
+        result: list[dict] = [
             _enrich_with_version(store, r.__dict__)
             for r in store.list_runs(limit=limit, agent_id=agent)
         ]
+        if with_usage:
+            for d in result:
+                d["usage"] = store.get_usage(d["id"])
+        return result
     items, total = store.list_runs_paged(
         agent_id=agent,
         status=status,
@@ -283,8 +291,12 @@ def list_runs(
         limit=limit,
         offset=offset,
     )
+    enriched = [_enrich_with_version(store, r) for r in items]
+    if with_usage:
+        for d in enriched:
+            d["usage"] = store.get_usage(d["id"])
     return {
-        "items": [_enrich_with_version(store, r) for r in items],
+        "items": enriched,
         "total": total,
         "offset": offset,
         "limit": limit,
@@ -454,7 +466,6 @@ def get_run_detail(run_id: str, *, store: SessionStore) -> dict:
     if rec is None:
         raise RunNotFound(run_id)
     usage = store.get_usage(run_id)
-    guardrails = store.list_guardrails(run_id)
     run_dict = dict(rec.__dict__)
     if rec.agent_version_id is not None:
         ver = store.get_version_by_id(rec.agent_version_id)
@@ -477,7 +488,7 @@ def get_run_detail(run_id: str, *, store: SessionStore) -> dict:
         snap.get("model") if isinstance(snap, dict) else None
     )
     run_dict["reported_model"] = usage.get("model") if usage else None
-    return {"run": run_dict, "usage": usage, "guardrails": guardrails}
+    return {"run": run_dict, "usage": usage}
 
 
 def get_run_prompt(run_id: str, *, store: SessionStore) -> dict:

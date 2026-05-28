@@ -57,14 +57,6 @@ class UsageEvent(_EventBase):
     model: str | None = None
 
 
-class GuardrailEvent(_EventBase):
-    type: Literal[EventType.GUARDRAIL] = EventType.GUARDRAIL
-    name: str
-    ok: bool
-    message: str | None = None
-    attempt: int = 0
-
-
 class LogEvent(_EventBase):
     type: Literal[EventType.LOG] = EventType.LOG
     level: Literal["debug", "info", "warn", "error"] = "info"
@@ -119,7 +111,6 @@ RunEvent = Annotated[
     | ToolResultEvent
     | TextEvent
     | UsageEvent
-    | GuardrailEvent
     | LogEvent
     | RetryEvent
     | ThinkingEvent

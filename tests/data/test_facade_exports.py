@@ -29,7 +29,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "AgentManifest",
         "AgentSource",
         "CompositionConfig",
-        "GuardrailRef",
         "McpServerSpec",
         "McpTransport",
         "ProjectManifest",

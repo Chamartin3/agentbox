@@ -8,9 +8,18 @@ import typer
 from rich.json import JSON
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.data import RunnerProfileCreate
+from agentbox.core.service import (
+    list_runner_profiles,
+    get_runner_profile,
+    create_runner_profile,
+    bind_runner_profile,
+    runner_profile_stats,
+    list_runner_profile_stats,
+    delete_runner_profile,
+    RunnerProfileCreate,
+)
 
 app = typer.Typer(
     name="profiles",
@@ -28,12 +37,21 @@ def profile_ls(
         None, help="Filter by provider (e.g. 'openai', 'openrouter')"
     ),
     enabled: bool | None = typer.Option(None, help="Filter by enabled status"),
+    json_output: bool = typer.Option(
+        False, "--json", help="Output as JSON instead of a table"
+    ),
 ) -> None:
     """List runner profiles with optional filters."""
     store = get_store()
-    profiles = store.list_runner_profiles(
-        backend=backend, provider=provider, enabled=enabled
+    profiles = list_runner_profiles(
+        store, backend=backend, provider=provider, enabled=enabled
     )
+
+    if json_output:
+        console.print(
+            _json.dumps([p.model_dump() for p in profiles], indent=2)
+        )
+        return
 
     if not profiles:
         console.print("[yellow]No runner profiles found.[/yellow]")
@@ -74,7 +92,7 @@ def profile_ls(
 def profile_get(profile_id: str) -> None:
     """Show runner profile details as JSON."""
     store = get_store()
-    profile = store.get_runner_profile(profile_id)
+    profile = get_runner_profile(store, profile_id)
 
     if not profile:
         console.print(f"[red]Profile not found:[/red] {profile_id}")
@@ -101,7 +119,8 @@ def profile_create(
 ) -> None:
     """Create a new runner profile."""
     store = get_store()
-    profile = store.create_runner_profile(
+    profile = create_runner_profile(
+        store,
         RunnerProfileCreate(
             id=id,
             name=name,
@@ -125,10 +144,10 @@ def profile_set_agent(
 ) -> None:
     """Bind a runner profile to an agent."""
     store = get_store()
-    if not store.get_runner_profile(profile_id):
+    if not get_runner_profile(store, profile_id):
         console.print(f"[red]Profile not found:[/red] {profile_id}")
         raise typer.Exit(1)
-    store.set_agent_runner_profile(agent_id, profile_id)
+    bind_runner_profile(store, agent_id, profile_id)
     console.print(
         f"[green]Bound agent[/green] [bold]{agent_id}[/bold] "
         f"[green]to profile[/green] [bold]{profile_id}[/bold]"
@@ -156,7 +175,7 @@ def profile_stats(
     store = get_store()
 
     if profile_id:
-        stats = store.runner_profile_stats(profile_id)
+        stats = runner_profile_stats(store, profile_id)
         table = Table(
             title=f"Stats for profile {profile_id}",
             title_style="bold",
@@ -181,7 +200,7 @@ def profile_stats(
         console.print(table)
         return
 
-    all_stats = store.list_runner_profile_stats()
+    all_stats = list_runner_profile_stats(store)
     if not all_stats:
         console.print("[yellow]No profile statistics found.[/yellow]")
         return
@@ -219,7 +238,7 @@ def profile_delete(
 ) -> None:
     """Delete a runner profile."""
     store = get_store()
-    if not store.get_runner_profile(profile_id):
+    if not get_runner_profile(store, profile_id):
         console.print(f"[red]Profile not found:[/red] {profile_id}")
         raise typer.Exit(1)
     if not yes:
@@ -230,5 +249,5 @@ def profile_delete(
         if not typer.confirm("Continue?", default=False):
             console.print("[dim]Aborted.[/dim]")
             raise typer.Exit(0)
-    store.delete_runner_profile(profile_id)
+    delete_runner_profile(store, profile_id)
     console.print(f"[green]Deleted runner profile[/green] [bold]{profile_id}[/bold]")

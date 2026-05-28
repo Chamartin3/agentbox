@@ -5,9 +5,14 @@ from __future__ import annotations
 import typer
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.run.run_prep import resolve_workspace_resources
+from agentbox.core.service import (
+    get_repo_resource_by_slug,
+    list_workspace_file_bindings,
+    replace_workspace_file_bindings,
+)
 
 workspace_resources_app = typer.Typer(
     name="workspace-resources",
@@ -20,7 +25,7 @@ workspace_resources_app = typer.Typer(
 def wr_list(workspace_id: str) -> None:
     """List all file bindings for a workspace."""
     store = get_store()
-    rows = store.list_workspace_file_bindings(workspace_id)
+    rows = list_workspace_file_bindings(store, workspace_id)
     if not rows:
         console.print(
             f"[yellow]No file bindings for workspace {workspace_id!r}.[/yellow]"
@@ -72,12 +77,12 @@ def wr_set(
         raise typer.Exit(1)
 
     store = get_store()
-    resource = store.get_repo_resource_by_slug(resource_slug)
+    resource = get_repo_resource_by_slug(store, resource_slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {resource_slug!r}")
         raise typer.Exit(2)
 
-    existing = store.list_workspace_file_bindings(workspace_id)
+    existing = list_workspace_file_bindings(store, workspace_id)
     kept = [b for b in existing if b.get("target_path") != dest_path]
     new_binding = {
         "resource_id": resource["id"],
@@ -88,7 +93,7 @@ def wr_set(
     }
     kept.append(new_binding)
 
-    store.replace_workspace_file_bindings(workspace_id, kept, reason=reason)
+    replace_workspace_file_bindings(store, workspace_id, kept, reason=reason)
     console.print(
         f"[green]✓[/green] binding set: workspace=[bold]{workspace_id}[/bold] "
         f"path=[bold]{dest_path}[/bold] → {resource_slug} (mode={mode})"

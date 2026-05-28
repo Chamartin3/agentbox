@@ -104,7 +104,6 @@ class EventType(StrEnum):
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
     USAGE = "usage"
-    GUARDRAIL = "guardrail"
     RETRY = "retry"
     THINKING = "thinking"
     TIMEOUT = "timeout"

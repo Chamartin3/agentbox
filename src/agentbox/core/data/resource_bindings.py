@@ -22,7 +22,6 @@ from collections.abc import Iterable
 
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data._protocol import StoreContext
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import (
     agent_prompt_resource_bindings,
@@ -159,7 +158,7 @@ class ResourceBindingsMixin:
             return {r._mapping["workspace_id"]: int(r._mapping["n"]) for r in rows}
 
     def replace_workspace_file_bindings(
-        self: StoreContext,
+        self,
         workspace_id: str,
         bindings: Iterable[dict],
         *,
@@ -235,7 +234,7 @@ class ResourceBindingsMixin:
         return self.list_workspace_file_bindings(workspace_id)
 
     def replace_workspace_skill_bindings(
-        self: StoreContext,
+        self,
         workspace_id: str,
         skill_resource_ids: Iterable[str],
         *,

@@ -6,8 +6,14 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
+from agentbox.core.service import (
+    get_workspace_host_env,
+    list_host_env_calls_for_run,
+    list_host_env_profiles,
+    resolve_workspace_host_env,
+)
 
 host_env_app = typer.Typer(
     name="host-env",
@@ -20,7 +26,7 @@ host_env_app = typer.Typer(
 def he_profiles() -> None:
     """List all host-env profiles."""
     store = get_store()
-    rows = store.list_host_env_profiles()
+    rows = list_host_env_profiles(store)
     if not rows:
         console.print("[yellow]No host-env profiles defined.[/yellow]")
         return
@@ -49,7 +55,7 @@ def he_profiles() -> None:
 def he_grants(workspace_id: str) -> None:
     """Show the resolved host-env grants for a workspace."""
     store = get_store()
-    row = store.get_workspace_host_env(workspace_id)
+    row = get_workspace_host_env(store, workspace_id)
     if not row:
         console.print(
             f"[yellow]No host-env grant for workspace {workspace_id!r}.[/yellow]"
@@ -67,7 +73,7 @@ def he_grants(workspace_id: str) -> None:
         Panel(meta, title=f"Host-env grant — {workspace_id}", border_style="cyan")
     )
 
-    resolved = store.resolve_workspace_host_env(workspace_id)
+    resolved = resolve_workspace_host_env(store, workspace_id)
     grants = resolved.get("grants") or {}
 
     if grants:
@@ -85,7 +91,7 @@ def he_grants(workspace_id: str) -> None:
 def he_audit(run_id: str) -> None:
     """Show the host-env call audit log for a run."""
     store = get_store()
-    rows = store.list_host_env_calls_for_run(run_id)
+    rows = list_host_env_calls_for_run(store, run_id)
     if not rows:
         console.print(
             f"[yellow]No host-env calls recorded for run {run_id!r}.[/yellow]"

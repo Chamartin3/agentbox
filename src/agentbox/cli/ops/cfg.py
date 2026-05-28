@@ -11,7 +11,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.tree import Tree
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.config import load_settings
 from agentbox.core.run.config import ConfigGenerator

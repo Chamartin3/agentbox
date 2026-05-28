@@ -61,6 +61,9 @@ class McpRegistry:
     def server_health(self, name: str) -> ServerHealth | None:
         return self._health.get(name)
 
+    def reset_health(self) -> None:
+        self._health.clear()
+
     def health_report(self) -> McpHealthReport:
         overall = self._compute_overall_status()
         return McpHealthReport(overall=overall, servers=dict(self._health))

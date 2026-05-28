@@ -48,11 +48,6 @@ class _CompositionPatch(BaseModel):
     references: list[dict | str] | None = None
 
 
-class _GuardrailPatch(BaseModel):
-    name: str
-    options: dict = Field(default_factory=dict)
-
-
 class AgentPatch(BaseModel):
     """Editable subset of an AgentDef. All fields optional."""
 
@@ -63,7 +58,6 @@ class AgentPatch(BaseModel):
     tools: list[str] | None = None
     webhook_url: str | None = None
     headless: bool | None = None
-    guardrails: list[_GuardrailPatch] | None = None
     runner: _RunnerPatch | None = None
     composition: _CompositionPatch | None = None
 

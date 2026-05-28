@@ -8,7 +8,7 @@ collaborator under :mod:`agentbox.core.run.execute`:
 * :class:`~agentbox.core.run.execute.snapshots.SnapshotWriter` —
   runner/MCP/resource snapshots persisted to the run row.
 * :class:`~agentbox.core.run.execute.steploop.RunStepLoop` — drives
-  the backend stream + guardrails into a terminal :class:`StepResult`.
+  the backend stream into a terminal :class:`StepResult`.
 * :class:`~agentbox.core.run.execute.finalizer.RunFinalizer` — terminal
   persist + webhook + cleanup (the ``finally`` block of the run task).
 * :class:`~agentbox.core.run.execute.webhooks.WebhookDispatcher` —

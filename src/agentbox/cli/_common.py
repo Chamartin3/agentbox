@@ -4,7 +4,7 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.core.constants import EventType
 
 console = Console()
@@ -15,7 +15,6 @@ EVENT_STYLES: dict[str, str] = {
     EventType.TOOL_CALL: "cyan",
     EventType.TOOL_RESULT: "green",
     EventType.USAGE: "yellow",
-    EventType.GUARDRAIL: "magenta",
     EventType.RETRY: "bright_yellow",
     EventType.THINKING: "bright_blue",
     EventType.TIMEOUT: "bright_red",

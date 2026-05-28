@@ -13,11 +13,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.api.deps import get_loader as _DefinitionLoaderShim
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_loader as _DefinitionLoaderShim
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
 from agentbox.config import load_settings
 from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.service import get_project_mcp_servers
 from agentbox.core.workspace.mcp.client import McpRegistry
 
 app = typer.Typer(
@@ -132,7 +133,7 @@ def doctor() -> None:
 
     # 3. All workspaces resolvable
     try:
-        from agentbox.api.deps import get_store as _gs
+        from agentbox.cli._deps import get_store as _gs
         from agentbox.core import workspaces as ws
 
         rows = ws.list_all(_gs(), settings)
@@ -158,11 +159,10 @@ def doctor() -> None:
     try:
         from agentbox.core import plugins
 
-        guard_count = len(plugins.guardrails())
         backend_count = len(plugins.backends())
         _ok(
             "Plugins",
-            f"{backend_count} backend(s), {guard_count} guardrail(s)",
+            f"{backend_count} backend(s)",
         )
     except Exception as exc:
         _fail("Plugins", str(exc))
@@ -172,7 +172,7 @@ def doctor() -> None:
         mcp_registry = McpRegistry(settings.mcp_cache_dir)
         mcp_server_name = "mcp"
         mcp_command = ["mcp_serve.sh"]
-        servers = store.get_project_mcp_servers()
+        servers = get_project_mcp_servers(store)
         if servers:
             srv = servers[0]
             mcp_server_name = srv.name

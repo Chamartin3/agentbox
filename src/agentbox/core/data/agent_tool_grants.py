@@ -6,7 +6,6 @@ import uuid
 
 from sqlalchemy import select, update
 
-from agentbox.core.data._protocol import StoreContext
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import agent_tool_grants
 
@@ -15,7 +14,7 @@ class AgentToolGrantsMixin:
     """CRUD for agent_tool_grants rows. Mixed into SessionStore."""
 
     def grant_agent_tool(
-        self: StoreContext,
+        self,
         agent_id: str,
         tool_name: str,
         changelog: str,
@@ -71,7 +70,7 @@ class AgentToolGrantsMixin:
         return self._get_grant_row(agent_id, tool_name)
 
     def revoke_agent_tool(
-        self: StoreContext,
+        self,
         agent_id: str,
         tool_name: str,
         changelog: str,
@@ -102,7 +101,7 @@ class AgentToolGrantsMixin:
                 )
 
     def list_agent_tool_grants(
-        self: StoreContext,
+        self,
         agent_id: str,
         include_revoked: bool = False,
     ) -> list[dict]:
@@ -117,12 +116,12 @@ class AgentToolGrantsMixin:
             rows = conn.execute(q).mappings().all()
             return [dict(r) for r in rows]
 
-    def list_active_grants(self: StoreContext, agent_id: str) -> set[str]:
+    def list_active_grants(self, agent_id: str) -> set[str]:
         """Return set of active tool_names for an agent. Used by executor at run-start."""
         rows = self.list_agent_tool_grants(agent_id, include_revoked=False)
         return {r["tool_name"] for r in rows}
 
-    def _get_grant_row(self: StoreContext, agent_id: str, tool_name: str) -> dict:
+    def _get_grant_row(self, agent_id: str, tool_name: str) -> dict:
         with self.engine.connect() as conn:
             row = (
                 conn.execute(

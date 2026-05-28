@@ -4,10 +4,20 @@ import typer
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.api.deps import get_settings, get_store
+from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.migrations import migrate_capabilities_to_manifest
 from agentbox.core.agent.prompt.versioning.drift import _build_config_json
+from agentbox.core.service import (
+    get_active_agent_version,
+    get_agent_def,
+    get_settings_section,
+    replace_version_config,
+    set_project_mcp_server,
+    set_project_shared_asset,
+    set_setting,
+    update_agent_meta,
+)
 
 migrate_app = typer.Typer(
     name="migrate",
@@ -70,14 +80,14 @@ def migrate_to_db_only(agent_id: str) -> None:
     store = get_store()
 
     # Get active version
-    active = store.get_active_version(agent_id)
+    active = get_active_agent_version(store, agent_id)
     if active is None:
         console.print(f"[red]error:[/red] agent {agent_id!r} has no active version")
         raise typer.Exit(1)
 
     # If config_json is empty, load the agent and populate it
     if not active.get("config_json"):
-        agent = store.get_agent_def(agent_id)
+        agent = get_agent_def(store, agent_id)
         if agent is None:
             console.print(
                 f"[red]error:[/red] could not load agent {agent_id!r} from DB"
@@ -86,13 +96,13 @@ def migrate_to_db_only(agent_id: str) -> None:
 
         # Rebuild the active version with config_json populated
         config_json_str = _build_config_json(agent)
-        store.replace_version_config(active["id"], config_json_str)
+        replace_version_config(store, active["id"], config_json_str)
         console.print(
             f"[cyan]info:[/cyan] populated config_json for v{active['version']}"
         )
 
     # Update agent_meta: sync_mode="off", export_to_disk=True
-    result = store.update_agent_meta(agent_id, sync_mode="off", export_to_disk=True)
+    result = update_agent_meta(store, agent_id, sync_mode="off", export_to_disk=True)
     if result is None:
         console.print(f"[red]error:[/red] agent_meta row not found for {agent_id!r}")
         raise typer.Exit(1)
@@ -152,9 +162,9 @@ def import_manifest(
         data = tomllib.load(f)
     manifest = ProjectManifest.model_validate(data)
 
-    existing_servers = store.get_settings_section(PROJECT_MCP_SERVERS)
-    existing_assets = store.get_settings_section(PROJECT_SHARED_ASSETS)
-    existing_runtime = store.get_settings_section(PROJECT_RUNTIME)
+    existing_servers = get_settings_section(store, PROJECT_MCP_SERVERS)
+    existing_assets = get_settings_section(store, PROJECT_SHARED_ASSETS)
+    existing_runtime = get_settings_section(store, PROJECT_RUNTIME)
 
     table = Table(
         title=f"Importing {manifest_path}",
@@ -173,14 +183,14 @@ def import_manifest(
         if not force and spec.name in existing_servers:
             _row(PROJECT_MCP_SERVERS, spec.name, "skip", "dim")
             continue
-        store.set_project_mcp_server(spec, author="migrate:import-manifest")
+        set_project_mcp_server(store, spec, author="migrate:import-manifest")
         _row(PROJECT_MCP_SERVERS, spec.name, "write", "green")
 
     for name, path in (manifest.shared_assets or {}).items():
         if not force and name in existing_assets:
             _row(PROJECT_SHARED_ASSETS, name, "skip", "dim")
             continue
-        store.set_project_shared_asset(name, path, author="migrate:import-manifest")
+        set_project_shared_asset(store, name, path, author="migrate:import-manifest")
         _row(PROJECT_SHARED_ASSETS, name, "write", "green")
 
     runtime_writes: list[tuple[str, object]] = []
@@ -195,7 +205,7 @@ def import_manifest(
         if not force and key in existing_runtime:
             _row(PROJECT_RUNTIME, key, "skip", "dim")
             continue
-        store.set_setting(PROJECT_RUNTIME, key, value, author="migrate:import-manifest")
+        set_setting(store, PROJECT_RUNTIME, key, value, author="migrate:import-manifest")
         _row(PROJECT_RUNTIME, key, "write", "green")
 
     console.print(table)

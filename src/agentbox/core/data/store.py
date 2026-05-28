@@ -6,7 +6,7 @@ dicts / dataclasses, and the analytics queries are conditional aggregates
 that read more clearly as SQL expressions than as ORM relationships.
 
 ``SessionStore`` is composed from:
-- ``_CoreStore``  — connection mgmt + sessions/runs/usage/guardrails CRUD
+- ``_CoreStore``  — connection mgmt + sessions/runs/usage CRUD
 - ``AgentToolGrantsMixin`` — agent-scoped tool grant/revoke CRUD
 - ``AnalyticsMixin``       — read-only rollups and time-series
 - ``PromptVersionsMixin``  — draft/publish/rollback for prompt history
@@ -49,7 +49,6 @@ from agentbox.core.data.resources import ResourcesMixin
 from agentbox.core.data.runner_profiles import RunnerProfilesMixin
 from agentbox.core.data.runtime_permissions import RuntimePermissionsMixin
 from agentbox.core.data.schema import (
-    guardrail_results,
     metadata,
     run_comments,
     run_prompts,
@@ -66,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 
 class _CoreStore:
-    """Connection + CRUD for sessions, runs, usage, guardrails, run_prompts."""
+    """Connection + CRUD for sessions, runs, usage, run_prompts."""
 
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
@@ -559,7 +558,7 @@ class _CoreStore:
             )
             return [dict(r._mapping) for r in rows]
 
-    # ----- usage / guardrails ----------------------------------------------
+    # ----- usage --------------------------------------------------------
 
     def record_usage(self, run_id: str, payload: dict) -> None:
         values = {
@@ -593,30 +592,6 @@ class _CoreStore:
         with self.engine.connect() as conn:
             row = conn.execute(usage.select().where(usage.c.run_id == run_id)).first()
             return dict(row._mapping) if row else None
-
-    def record_guardrail(
-        self, run_id: str, name: str, ok: bool, message: str | None, attempt: int
-    ) -> None:
-        with self.engine.begin() as conn:
-            conn.execute(
-                guardrail_results.insert().values(
-                    run_id=run_id,
-                    name=name,
-                    ok=int(ok),
-                    message=message,
-                    attempt=attempt,
-                    created_at=now_iso(),
-                )
-            )
-
-    def list_guardrails(self, run_id: str) -> list[dict]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                guardrail_results.select()
-                .where(guardrail_results.c.run_id == run_id)
-                .order_by(guardrail_results.c.id)
-            )
-            return [dict(r._mapping) for r in rows]
 
     # ----- webhook deliveries ------------------------------------------------
 

@@ -18,12 +18,13 @@ from pathlib import Path
 
 import typer
 
-from agentbox.api.deps import get_loader as _get_loader
+from agentbox.cli._deps import get_loader as _get_loader
 from agentbox.cli._common import console
-from agentbox.cli.launch import _apply_creds, _make_generator, _resolve_workspace
+from agentbox.cli.ops.launch import _apply_creds, _make_generator, _resolve_workspace
 from agentbox.config import load_settings
 from agentbox.core.data import SessionStore
 from agentbox.core.run.run_prep import render_env_doc
+from agentbox.core.service import get_agent_def, get_workspace
 
 
 def shell_cmd(
@@ -47,14 +48,14 @@ def shell_cmd(
     """
     settings = load_settings()
     loader = _get_loader()
-    from agentbox.api.deps import get_store as _gs
+    store = SessionStore(settings.db_path)
 
-    agent_def = _gs().get_agent_def(agent)
+    agent_def = get_agent_def(store, agent)
     if agent_def is None:
         console.print(f"[red]Unknown agent:[/red] {agent!r}")
         raise typer.Exit(1)
 
-    workspace_path, is_ephemeral, creds = _resolve_workspace(
+    workspace_path, is_ephemeral, creds, _ = _resolve_workspace(
         agent_def, workspace, ephemeral, settings, loader
     )
 
@@ -98,7 +99,7 @@ def _render_env_doc(
         return False
     try:
         store = SessionStore(settings.db_path)
-        ws = store.get_workspace(ws_name)
+        ws = get_workspace(store, ws_name)
         if not ws:
             return False
         entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 
 import typer
 import websockets
@@ -10,9 +9,13 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
-from agentbox.core.data import read_transcript
+from agentbox.core.service import runs as runs_service
+from agentbox.core.service.runs import (
+    RunNotFound,
+)
+from agentbox.core.service import aggregate_usage
 
 runs_app = typer.Typer(
     name="runs",
@@ -25,10 +28,20 @@ runs_app = typer.Typer(
 def runs_list(
     agent: str | None = typer.Option(None, "--agent", help="Filter by agent id"),
     limit: int = typer.Option(20, "--limit", help="Max rows"),
+    json_output: bool = typer.Option(
+        False, "--json", help="Output as JSON instead of a table"
+    ),
 ) -> None:
     """Show recent runs with status, tokens, and cost."""
-    store = get_store()
-    rows = store.list_runs(limit=limit, agent_id=agent)
+    rows = runs_service.list_runs(
+        store=get_store(), agent=agent, limit=limit, with_usage=True
+    )
+    assert isinstance(rows, list)
+
+    if json_output:
+        console.print(json.dumps(rows, indent=2, default=str))
+        return
+
     if not rows:
         console.print("[yellow]No runs yet.[/yellow]")
         return
@@ -49,27 +62,28 @@ def runs_list(
     table.add_column("Finished", style="dim")
 
     for r in rows:
-        usage = store.get_usage(r.id) or {}
+        usage = r.get("usage") or {}
         status_style = {
             "ok": "green",
             "running": "blue",
             "error": "red",
-        }.get(r.status, "white")
-        status = Text(r.status, style=f"bold {status_style}")
+        }.get(r.get("status", ""), "white")
+        status = Text(r.get("status", ""), style=f"bold {status_style}")
         cost = usage.get("cost_usd")
         table.add_row(
-            r.id[:12],
-            r.agent_id,
+            (r.get("id") or "")[:12],
+            r.get("agent_id", ""),
             status,
             str(usage.get("input_tokens") or "·"),
             str(usage.get("output_tokens") or "·"),
             f"{cost:.4f}" if cost else "[dim]·[/dim]",
-            r.created_at,
-            r.finished_at or "[dim]…[/dim]",
+            r.get("created_at", ""),
+            r.get("finished_at") or "[dim]…[/dim]",
         )
     console.print(table)
 
-    agg = store.aggregate_usage()
+    store = get_store()
+    agg = aggregate_usage(store)
     console.print(
         f"[dim]totals:[/dim] "
         f"[cyan]{agg['input_tokens']}[/cyan] in · "
@@ -80,26 +94,36 @@ def runs_list(
 
 
 @runs_app.command("show")
-def runs_show(run_id: str) -> None:
-    """Show metadata, usage, and guardrail results for a single run."""
-    store = get_store()
-    rec = store.get_run(run_id)
-    if rec is None:
+def runs_show(
+    run_id: str,
+    json_output: bool = typer.Option(
+        False, "--json", help="Output as JSON instead of formatted panels"
+    ),
+) -> None:
+    """Show metadata and usage for a single run."""
+    try:
+        detail = runs_service.get_run_detail(run_id, store=get_store())
+    except RunNotFound:
         console.print(f"[red]no such run[/red] {run_id!r}")
         raise typer.Exit(2)
-    usage = store.get_usage(rec.id) or {}
-    guards = store.list_guardrails(rec.id)
+
+    if json_output:
+        console.print(json.dumps(detail, indent=2, default=str))
+        return
+
+    run_dict = detail["run"]
+    usage = detail.get("usage") or {}
 
     meta = Table.grid(padding=(0, 2))
     meta.add_column(style="dim", justify="right")
     meta.add_column()
-    meta.add_row("run id", rec.id)
-    meta.add_row("agent", rec.agent_id)
-    meta.add_row("status", rec.status)
-    meta.add_row("started", rec.created_at)
-    meta.add_row("finished", rec.finished_at or "—")
-    if rec.error:
-        meta.add_row("error", f"[red]{rec.error}[/red]")
+    meta.add_row("run id", run_dict.get("id"))
+    meta.add_row("agent", run_dict.get("agent_id"))
+    meta.add_row("status", run_dict.get("status"))
+    meta.add_row("started", run_dict.get("created_at"))
+    meta.add_row("finished", run_dict.get("finished_at") or "—")
+    if run_dict.get("error"):
+        meta.add_row("error", f"[red]{run_dict['error']}[/red]")
     console.print(Panel(meta, title="run", border_style="cyan"))
 
     if usage:
@@ -115,18 +139,6 @@ def runs_show(run_id: str) -> None:
         u.add_row("cost", f"${cost:.4f}" if cost else "—")
         console.print(Panel(u, title="usage", border_style="yellow"))
 
-    if guards:
-        gt = Table(header_style="bold magenta", padding=(0, 1))
-        gt.add_column("#", style="dim", justify="right")
-        gt.add_column("Guardrail")
-        gt.add_column("Result", justify="center")
-        gt.add_column("Message")
-        for g in guards:
-            ok = bool(g["ok"])
-            result = Text("✓ ok", style="green") if ok else Text("✗ fail", style="red")
-            gt.add_row(str(g["attempt"]), g["name"], result, (g["message"] or "")[:80])
-        console.print(Panel(gt, title="guardrails", border_style="magenta"))
-
 
 @runs_app.command("tail")
 def runs_tail(
@@ -141,17 +153,12 @@ def runs_tail(
         return
 
     store = get_store()
-    rec = store.get_run(run_id)
-    if rec is None:
+    try:
+        events = runs_service.get_transcript(run_id, store=store)
+    except RunNotFound:
         console.print(f"[red]no such run[/red] {run_id!r}")
         raise typer.Exit(2)
 
-    if not rec.transcript_path:
-        console.print("[yellow]no transcript for this run[/yellow]")
-        return
-
-    path = Path(rec.transcript_path)
-    events = read_transcript(path)
     if not events:
         console.print("[yellow]transcript is empty[/yellow]")
         return
@@ -177,3 +184,161 @@ def _tail_follow(run_id: str) -> None:
                 )
 
     asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# Stats and facets
+# ---------------------------------------------------------------------------
+
+
+@runs_app.command("stats")
+def runs_stats(
+    agent: str | None = typer.Option(None, "--agent", help="Filter by agent id"),
+    status: str | None = typer.Option(None, "--status", help="Filter by status"),
+    since: str | None = typer.Option(None, "--since", help="ISO start date"),
+    until: str | None = typer.Option(None, "--until", help="ISO end date"),
+) -> None:
+    """Aggregated run statistics."""
+    result = runs_service.run_stats(
+        store=get_store(),
+        agent=agent,
+        status=status,
+        since=since,
+        until=until,
+    )
+    console.print(json.dumps(result, indent=2, default=str))
+
+
+@runs_app.command("facets")
+def runs_facets() -> None:
+    """Distinct values for filter dropdowns (agents, executors, statuses)."""
+    result = runs_service.run_facets(store=get_store())
+    console.print(json.dumps(result, indent=2, default=str))
+
+
+# ---------------------------------------------------------------------------
+# Comments
+# ---------------------------------------------------------------------------
+
+
+@runs_app.command("comments")
+def runs_comments(
+    run_id: str = typer.Argument(..., help="Run ID"),
+    add: str | None = typer.Option(None, "--add", help="Add a comment (body text)"),
+    author: str = typer.Option("cli", "--author", help="Comment author"),
+) -> None:
+    """List or add comments for a run."""
+    if add:
+        try:
+            runs_service.add_comment(
+                run_id, store=get_store(), author=author, body=add
+            )
+        except RunNotFound:
+            console.print(f"[red]run {run_id!r} not found[/red]")
+            raise typer.Exit(1)
+        console.print("[green]comment added[/green]")
+    else:
+        try:
+            result = runs_service.list_comments(run_id, store=get_store())
+        except RunNotFound:
+            console.print(f"[red]run {run_id!r} not found[/red]")
+            raise typer.Exit(1)
+        items = result.get("items", [])
+        if not items:
+            console.print("[dim]no comments[/dim]")
+            return
+        for c in items:
+            console.print(
+                f"[bold]{c.get('author', '')}[/bold] "
+                f"[dim]{c.get('created_at', '')}[/dim]\n"
+                f"  {c.get('body', '')}\n"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Prompt and transcript
+# ---------------------------------------------------------------------------
+
+
+@runs_app.command("prompt")
+def runs_prompt(
+    run_id: str = typer.Argument(..., help="Run ID"),
+) -> None:
+    """Show the rendered prompt for a completed run."""
+    try:
+        result = runs_service.get_run_prompt(run_id, store=get_store())
+    except RunNotFound:
+        console.print(f"[red]run {run_id!r} not found[/red]")
+        raise typer.Exit(1)
+    console.print(json.dumps(result, indent=2, default=str))
+
+
+@runs_app.command("transcript")
+def runs_transcript(
+    run_id: str = typer.Argument(..., help="Run ID"),
+) -> None:
+    """Show the transcript for a run."""
+    try:
+        events = runs_service.get_transcript(run_id, store=get_store())
+    except RunNotFound:
+        console.print(f"[red]run {run_id!r} not found[/red]")
+        raise typer.Exit(1)
+    if not events:
+        console.print("[dim]empty transcript[/dim]")
+        return
+    for ev in events:
+        t = ev.get("type", "?")
+        style = event_color(t)
+        console.print(f"[{style}][{t}][/{style}] {json.dumps(ev, default=str)[:400]}")
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle actions
+# ---------------------------------------------------------------------------
+
+
+@runs_app.command("post-outcome")
+def runs_post_outcome(
+    run_id: str = typer.Argument(..., help="Run ID"),
+    status: str = typer.Argument(..., help="Outcome status"),
+    error_kind: str | None = typer.Option(
+        None, "--error-kind", help="Error kind if applicable"
+    ),
+) -> None:
+    """Record downstream post-processing outcome for a completed run."""
+    try:
+        runs_service.post_outcome(
+            run_id,
+            store=get_store(),
+            status=status,
+            error_kind=error_kind,
+        )
+    except RunNotFound:
+        console.print(f"[red]run {run_id!r} not found[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]outcome recorded[/green]: {status}")
+
+
+@runs_app.command("cancel")
+def runs_cancel(
+    run_id: str = typer.Argument(..., help="Run ID"),
+) -> None:
+    """Cancel an in-progress run. Idempotent.
+
+    Note: effective cancellation requires the executor to be running
+    (i.e., the server is active). In CLI-only mode this sets the
+    cancelled flag.
+    """
+    async def _cancel() -> None:
+        from agentbox.cli._deps import get_executor
+
+        try:
+            await runs_service.cancel_run(
+                run_id, store=get_store(), executor=get_executor()
+            )
+        except RunNotFound:
+            console.print(f"[red]run {run_id!r} not found[/red]")
+            raise typer.Exit(1)
+
+    asyncio.run(_cancel())
+    console.print(f"[yellow]cancelled[/yellow] {run_id!r}")

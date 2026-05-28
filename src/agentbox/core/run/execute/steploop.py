@@ -7,8 +7,7 @@ It does *not* persist the terminal state — that's the finalizer's job.
 The actual per-event work (transcript append, WS broadcast, usage
 record, schema validation, retry-on-validation-failure) is handled by
 :class:`agentbox.core.run.retry.RetryOrchestrator` and
-:class:`agentbox.core.run.streaming.session.RunStreamSession`; the step
-loop just wires those together and runs guardrails post-stream.
+:class:`agentbox.core.run.streaming.session.RunStreamSession`.
 """
 
 from __future__ import annotations
@@ -19,14 +18,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
-from agentbox.api.events import GuardrailEvent, UsageEvent
+from agentbox.api.events import UsageEvent
 from agentbox.config import Settings
-from agentbox.core.agent.plugins import get_guardrail
 from agentbox.core.agent.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.run.backends.base import RenderedConfig
-from agentbox.core.run.guardrails.base import GuardrailContext
 from agentbox.core.run.retry import RetryOrchestrator
 from agentbox.core.run.streaming.session import RunStreamSession
 
@@ -211,14 +208,6 @@ class RunStepLoop:
             validation_errors = outcome.validation_errors
             schema_validated_via = outcome.schema_validated_via
 
-            try:
-                await self._run_guardrails(
-                    run_id, agent, input_, output or "", session
-                )
-            except Exception as exc:
-                suffix = f"guardrail error: {exc}"
-                final_error = f"{final_error} | {suffix}" if final_error else suffix
-
             if schema_validated_via is None:
                 mode = (
                     composed.validation_mode
@@ -252,48 +241,6 @@ class RunStepLoop:
             schema_validated_via=schema_validated_via,
             session=session,
         )
-
-    async def _run_guardrails(
-        self,
-        run_id: str,
-        agent: AgentDef,
-        input_: str,
-        output: str,
-        session: RunStreamSession,
-    ) -> None:
-        for idx, ref in enumerate(agent.guardrails):
-            try:
-                cls = get_guardrail(ref.name)
-            except KeyError as exc:
-                session.emit(
-                    GuardrailEvent(
-                        run_id=run_id, name=ref.name, ok=False, message=str(exc)
-                    )
-                )
-                continue
-            instance = cls()
-            ctx = GuardrailContext(
-                run_id=run_id,
-                agent_id=agent.id,
-                input=input_,
-                output=output,
-                transcript_path=str(session.transcript_path),
-                attempt=idx,
-                options=ref.options,
-            )
-            result = instance.evaluate(ctx)
-            self.store.record_guardrail(
-                run_id, ref.name, result.ok, result.message, attempt=idx
-            )
-            session.emit(
-                GuardrailEvent(
-                    run_id=run_id,
-                    name=ref.name,
-                    ok=result.ok,
-                    message=result.message,
-                    attempt=idx,
-                )
-            )
 
 
 __all__ = ["RunStepLoop", "StepResult", "classify_terminal_error"]

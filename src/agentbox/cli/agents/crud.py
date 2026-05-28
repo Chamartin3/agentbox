@@ -8,9 +8,24 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.api.deps import get_settings, get_store
+from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console, resolve_agent
 from agentbox.core import prompts
+from agentbox.core.service import (
+    branch_agent_draft,
+    clear_agent_runner_profile,
+    create_agent,
+    create_agent_version,
+    get_agent_def,
+    get_agent_runner_profile,
+    get_prompt_version,
+    get_runner_profile,
+    latest_agent_version,
+    publish_agent_version,
+    rollback_agent_to,
+    set_agent_runner_profile,
+    soft_delete_agent,
+)
 from agentbox.core.service.agents import list_all_agents
 
 agent_app = typer.Typer(
@@ -21,10 +36,23 @@ agent_app = typer.Typer(
 
 
 @agent_app.command("ls")
-def agent_ls() -> None:
+def agent_ls(
+    json_output: bool = typer.Option(
+        False, "--json", help="Output as JSON instead of a table"
+    ),
+) -> None:
     """List agents registered in the DB."""
     store = get_store()
     rows = list_all_agents(store=store)
+
+    if json_output:
+        console.print(
+            json.dumps(
+                [a.model_dump(mode="json") for a in rows], indent=2
+            )
+        )
+        return
+
     if not rows:
         console.print("[yellow]No agents registered.[/yellow]")
         return
@@ -52,7 +80,7 @@ def agent_ls() -> None:
         )
         # Model is resolved via the bound runner profile — the legacy
         # ``runner.model`` field is no longer surfaced.
-        profile = store.get_agent_runner_profile(a.id)
+        profile = get_agent_runner_profile(store, a.id)
         model_display = (profile.model if profile else None) or "[dim]default[/dim]"
         table.add_row(
             a.id,
@@ -60,7 +88,6 @@ def agent_ls() -> None:
             model_display,
             a.session_mode,
             ws_display,
-            str(len(a.guardrails)),
             a.description or "",
         )
     console.print(table)
@@ -96,7 +123,7 @@ def agent_show(agent_id: str) -> None:
     runner.add_row("mcp_config_path", a.runner.mcp_config_path or "—")
     console.print(Panel(runner, title="Runner", border_style="green"))
 
-    profile = get_store().get_agent_runner_profile(a.id)
+    profile = get_agent_runner_profile(get_store(), a.id)
     rp = Table.grid(padding=(0, 2))
     rp.add_column(style="dim", justify="right")
     rp.add_column()
@@ -118,19 +145,6 @@ def agent_show(agent_id: str) -> None:
     ws.add_row("headless", str(a.headless))
     ws.add_row("claude_agent", str(a.claude_agent))
     console.print(Panel(ws, title="Workspace", border_style="blue"))
-
-    if a.guardrails:
-        gt = Table(header_style="bold magenta", padding=(0, 1))
-        gt.add_column("Name")
-        gt.add_column("Options")
-        for g in a.guardrails:
-            opts = (
-                ", ".join(f"{k}={v}" for k, v in g.options.items())
-                if g.options
-                else "—"
-            )
-            gt.add_row(g.name, opts)
-        console.print(Panel(gt, title="Guardrails", border_style="magenta"))
 
     servers = get_store().get_project_mcp_servers()
     if servers:
@@ -155,7 +169,7 @@ def agent_prompt(
     store = get_store()
 
     if version is not None:
-        committed = store.get_prompt_version(agent_id, version)
+        committed = get_prompt_version(store, agent_id, version)
         if committed is None:
             console.print(
                 f"[red]version {version} not found for agent {agent_id!r}[/red]"
@@ -230,11 +244,12 @@ def agent_create(
         raise typer.Exit(2) from exc
 
     store = get_store()
-    if store.latest_version(agent_def.id) is not None:
+    if latest_agent_version(store, agent_def.id) is not None:
         console.print(f"[red]agent {agent_def.id!r} already exists[/red]")
         raise typer.Exit(1)
 
-    rec = store.create_agent(
+    rec = create_agent(
+        store,
         agent_id=agent_def.id,
         config_json={
             **agent_def.model_dump(mode="json", exclude_none=True),
@@ -281,7 +296,7 @@ def agent_edit(
 
     store = get_store()
     settings = get_settings()
-    current = store.get_agent_def(agent_id)
+    current = get_agent_def(store, agent_id)
     if current is None:
         console.print(f"[red]agent {agent_id!r} not found[/red]")
         raise typer.Exit(1)
@@ -310,7 +325,8 @@ def agent_edit(
         except FileNotFoundError:
             prompt_text = ""
 
-    rec = store.create_version(
+    rec = create_agent_version(
+        store,
         agent_id=updated.id,
         source_path=str(updated.source_path) if updated.source_path else "",
         source_format=(
@@ -340,8 +356,221 @@ def agent_delete(
         if not confirm:
             raise typer.Exit(0)
     store = get_store()
-    result = store.soft_delete_agent(agent_id)
+    result = soft_delete_agent(store, agent_id)
     if result is None:
         console.print(f"[red]agent {agent_id!r} not found[/red]")
         raise typer.Exit(1)
     console.print(f"[green]deleted[/green] {agent_id!r}")
+
+
+# ---------------------------------------------------------------------------
+# Agent lifecycle — draft, publish, rollback
+# ---------------------------------------------------------------------------
+
+
+@agent_app.command("draft")
+def agent_draft(
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    author: str = typer.Option("cli", "--author", help="Author identifier"),
+) -> None:
+    """Create a new draft version by cloning the active version."""
+    resolve_agent(agent_id)
+    store = get_store()
+    try:
+        result = branch_agent_draft(store, agent_id, author=author)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(
+        f"[green]draft created[/green] v{result.get('version')} "
+        f"(id={result.get('id')}, draft={result.get('is_draft', True)})"
+    )
+
+
+@agent_app.command("publish")
+def agent_publish(
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    version: int = typer.Argument(..., help="Version number to publish"),
+    reason: str = typer.Option("cli publish", "--reason", help="Publish reason"),
+) -> None:
+    """Publish a draft version (set as active)."""
+    resolve_agent(agent_id)
+    store = get_store()
+    try:
+        result = publish_agent_version(store, agent_id, version, reason)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(
+        f"[green]published[/green] v{result.get('version')} "
+        f"(id={result.get('id')})"
+    )
+
+
+@agent_app.command("rollback")
+def agent_rollback(
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    version: int = typer.Argument(..., help="Target version to roll back to"),
+    reason: str = typer.Option(..., "--reason", help="Rollback reason (min 3 chars)"),
+    author: str = typer.Option("cli", "--author", help="Author identifier"),
+) -> None:
+    """Roll back to a previous agent version (creates a new version)."""
+    resolve_agent(agent_id)
+    store = get_store()
+    try:
+        result = rollback_agent_to(store, agent_id, version, reason, author=author)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(
+        f"[green]rolled back[/green] to v{version} (new v{result.get('version')})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Runner profile binding
+# ---------------------------------------------------------------------------
+
+
+@agent_app.command("runner-profile")
+def agent_runner_profile(
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    get: bool = typer.Option(False, "--get", help="Show the bound runner profile"),
+    set_: str | None = typer.Option(
+        None, "--set", help="Runner profile ID to bind"
+    ),
+    clear: bool = typer.Option(
+        False, "--clear", help="Remove the runner profile binding"
+    ),
+) -> None:
+    """Get, set, or clear the runner profile bound to an agent.
+
+    Examples:
+        agents runner-profile my-agent --get
+        agents runner-profile my-agent --set <profile_id>
+        agents runner-profile my-agent --clear
+    """
+    if sum([get, set_ is not None, clear]) != 1:
+        console.print(
+            "[red]exactly one of --get, --set, or --clear must be specified[/red]"
+        )
+        raise typer.Exit(2)
+
+    resolve_agent(agent_id)
+    store = get_store()
+
+    if get:
+        profile = get_agent_runner_profile(store, agent_id)
+        if profile is None:
+            console.print("[dim]no runner profile bound[/dim]")
+        else:
+            console.print(
+                f"[bold]{profile.id}[/bold] — {profile.name} "
+                f"([cyan]{profile.backend}[/cyan] / {profile.provider or 'default'})"
+            )
+    elif set_:
+        profile = get_runner_profile(store, set_)
+        if profile is None:
+            console.print(f"[red]runner profile {set_!r} not found[/red]")
+            raise typer.Exit(1)
+        set_agent_runner_profile(store, agent_id, set_)
+        console.print(f"[green]bound[/green] profile {set_!r} to {agent_id!r}")
+    elif clear:
+        clear_agent_runner_profile(store, agent_id)
+        console.print(f"[yellow]cleared[/yellow] profile binding for {agent_id!r}")
+
+
+# ---------------------------------------------------------------------------
+# Version files
+# ---------------------------------------------------------------------------
+
+
+@agent_app.command("files")
+def agent_files(
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    version: int = typer.Argument(..., help="Version number"),
+    add: bool = typer.Option(False, "--add", help="Add a file to the version"),
+    rm: int | None = typer.Option(
+        None, "--rm", help="File ID to remove from the version"
+    ),
+    kind: str | None = typer.Option(
+        None, "--kind", help="File kind (output_schema, input_schema, etc.)"
+    ),
+    name: str | None = typer.Option(
+        None, "--name", help="File name for --add"
+    ),
+    content: str | None = typer.Option(
+        None, "--content", help="File content for --add"
+    ),
+) -> None:
+    """Add or remove version bundle files.
+
+    Examples:
+        agents files my-agent 1 --add --kind output_schema --name schema.json --content '{"...""}'
+        agents files my-agent 1 --rm 42
+    """
+    from agentbox.core.service.agents import (
+        delete_version_file,
+        upload_version_file,
+    )
+    from agentbox.core.service.agents import (
+        VersionFileNotFound,
+        VersionNotDraft,
+        VersionNotFound,
+    )
+
+    if add and rm is not None:
+        console.print("[red]use --add or --rm, not both[/red]")
+        raise typer.Exit(2)
+    if not add and rm is None:
+        console.print("[red]use --add or --rm[/red]")
+        raise typer.Exit(2)
+
+    store = get_store()
+
+    if add:
+        if not kind or not name or not content:
+            console.print(
+                "[red]--kind, --name, and --content required for --add[/red]"
+            )
+            raise typer.Exit(2)
+        try:
+            result = upload_version_file(
+                store=store,
+                agent_id=agent_id,
+                version=version,
+                kind=kind,
+                name=name,
+                content=content,
+            )
+        except VersionNotFound:
+            console.print(f"[red]version {version} not found[/red]")
+            raise typer.Exit(1)
+        except VersionNotDraft as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
+        except Exception as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
+        console.print(
+            f"[green]added[/green] {name!r} (file_id={result['file']['id']}, "
+            f"sha256={result['sha256'][:8]})"
+        )
+    elif rm is not None:
+        try:
+            delete_version_file(
+                store=store,
+                agent_id=agent_id,
+                version=version,
+                file_id=rm,
+            )
+        except VersionNotFound:
+            console.print(f"[red]version {version} not found[/red]")
+            raise typer.Exit(1)
+        except VersionNotDraft:
+            console.print("[red]version is not a draft[/red]")
+            raise typer.Exit(1)
+        except VersionFileNotFound:
+            console.print(f"[red]file {rm} not found[/red]")
+            raise typer.Exit(1)
+        console.print(f"[yellow]removed[/yellow] file {rm} from v{version}")

@@ -9,7 +9,7 @@ import typer
 from rich.json import JSON
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.service import analytics as svc
 
@@ -37,7 +37,7 @@ def activity_runs(
     range_: _Range = typer.Option("30d", "--range", help="Time range."),
     agent: str | None = typer.Option(None, help="Filter by agent id."),
     executor: str | None = typer.Option(None, help="Filter by executor."),
-    state: str | None = typer.Option(
+    state: Literal["running", "ok", "error"] | None = typer.Option(
         None, help="Filter by state: running|ok|error."
     ),
     limit: int = typer.Option(50, help="Max rows to return."),
@@ -48,7 +48,7 @@ def activity_runs(
         range_=range_,
         agent=agent,
         executor=executor,
-        state=state,  # type: ignore[arg-type]
+        state=state,
         limit=limit,
     )
     runs = data.get("runs", [])

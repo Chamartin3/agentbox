@@ -38,6 +38,14 @@ __all__ = [
     "update_profile",
     "delete_profile",
     "get_profile_stats",
+    "list_runner_profiles",
+    "get_runner_profile",
+    "create_runner_profile",
+    "delete_runner_profile",
+    "set_agent_runner_profile",
+    "get_agent_runner_profile",
+    "runner_profile_stats",
+    "list_runner_profile_stats",
 ]
 
 
@@ -222,3 +230,63 @@ def get_profile_stats(
     if store.get_runner_profile(profile_id) is None:
         raise ProfileNotFound(profile_id)
     return store.runner_profile_stats(profile_id, since=since, until=until)
+
+
+# ---------------------------------------------------------------------------
+# Pass-through wrappers for CLI consumers
+# ---------------------------------------------------------------------------
+
+
+def list_runner_profiles(
+    store: SessionStore,
+    *,
+    backend: str | None = None,
+    provider: str | None = None,
+    enabled: bool | None = None,
+) -> list[RunnerProfile]:
+    return store.list_runner_profiles(backend=backend, provider=provider, enabled=enabled)
+
+
+def get_runner_profile(store: SessionStore, profile_id: str) -> RunnerProfile | None:
+    return store.get_runner_profile(profile_id)
+
+
+def create_runner_profile(
+    store: SessionStore, profile: RunnerProfileCreate
+) -> RunnerProfile:
+    return store.create_runner_profile(profile)
+
+
+def delete_runner_profile(store: SessionStore, profile_id: str) -> None:
+    store.delete_runner_profile(profile_id)
+
+
+def set_agent_runner_profile(
+    store: SessionStore, agent_id: str, profile_id: str
+) -> RunnerProfile:
+    return store.set_agent_runner_profile(agent_id, profile_id)
+
+
+def get_agent_runner_profile(
+    store: SessionStore, agent_id: str
+) -> RunnerProfile | None:
+    return store.get_agent_runner_profile(agent_id)
+
+
+def runner_profile_stats(
+    store: SessionStore,
+    profile_id: str,
+    *,
+    since: str | None = None,
+    until: str | None = None,
+) -> RunnerProfileStats:
+    return store.runner_profile_stats(profile_id, since=since, until=until)
+
+
+def list_runner_profile_stats(
+    store: SessionStore,
+    *,
+    since: str | None = None,
+    until: str | None = None,
+) -> list[RunnerProfileStats]:
+    return store.list_runner_profile_stats(since=since, until=until)

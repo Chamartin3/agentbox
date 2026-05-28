@@ -7,9 +7,15 @@ from pathlib import Path
 import typer
 from rich.text import Text
 
-from agentbox.api.deps import get_settings, get_store
+from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import checkmark, console, resolve_agent
 from agentbox.core import workspaces as ws
+from agentbox.core.service import get_workspace as service_get_workspace
+from agentbox.core.service import workspaces as workspaces_service
+from agentbox.core.service.workspaces import (
+    WorkspaceExists,
+    WorkspaceNotFound,
+)
 
 ws_app = typer.Typer(
     name="ws",
@@ -119,6 +125,174 @@ def ws_edit(
 
 
 # ---------------------------------------------------------------------------
+# Registry CRUD — create / delete named workspaces (DB-backed)
+# ---------------------------------------------------------------------------
+
+
+@ws_app.command("create")
+def ws_create(
+    name: str = typer.Argument(..., help="Workspace name"),
+    description: str | None = typer.Option(
+        None, "--description", help="Optional description"
+    ),
+    path: str | None = typer.Option(
+        None, "--path", help="Optional workspace path relative to project root"
+    ),
+) -> None:
+    """Create a named workspace in the DB registry."""
+    store = get_store()
+    try:
+        result = workspaces_service.create_workspace_registry(
+            name,
+            store=store,
+            description=description,
+            path=path,
+        )
+    except WorkspaceExists as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]created[/green] workspace {result['name']!r}")
+
+
+@ws_app.command("delete")
+def ws_delete(
+    name: str = typer.Argument(..., help="Workspace name"),
+    purge_disk: bool = typer.Option(
+        False, "--purge-disk", help="Also delete the workspace directory on disk"
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+) -> None:
+    """Delete a named workspace from the DB registry."""
+    if not yes:
+        confirm = typer.confirm(f"Delete workspace {name!r}?")
+        if not confirm:
+            raise typer.Exit(0)
+    store = get_store()
+    try:
+        result = workspaces_service.delete_workspace_registry(
+            name,
+            store=store,
+            settings=get_settings(),
+            purge_disk=purge_disk,
+        )
+    except WorkspaceNotFound:
+        console.print(f"[red]workspace {name!r} not found[/red]")
+        raise typer.Exit(1)
+    console.print(f"[yellow]deleted[/yellow] workspace {result['name']!r}")
+
+
+# ---------------------------------------------------------------------------
+# Config generation and skills
+# ---------------------------------------------------------------------------
+
+
+@ws_app.command("generate-configs")
+def ws_generate_configs(
+    name: str = typer.Argument(..., help="Workspace name or agent ID"),
+) -> None:
+    """Generate runner configs into a workspace."""
+    try:
+        result = workspaces_service.generate_configs_by_name(
+            name,
+            store=get_store(),
+            settings=get_settings(),
+        )
+    except WorkspaceNotFound:
+        console.print(f"[red]workspace {name!r} not found[/red]")
+        raise typer.Exit(1)
+    console.print(
+        f"[green]configs generated[/green] → {result.get('target_dir', '?')} "
+        f"({result.get('files_written', 0)} files)"
+    )
+
+
+@ws_app.command("generate-skills")
+def ws_generate_skills(
+    name: str = typer.Argument(..., help="Workspace name or agent ID"),
+) -> None:
+    """Generate skill shell scripts into a workspace."""
+    try:
+        result = workspaces_service.generate_skills_by_name(
+            name,
+            store=get_store(),
+            settings=get_settings(),
+        )
+    except WorkspaceNotFound:
+        console.print(f"[red]workspace {name!r} not found[/red]")
+        raise typer.Exit(1)
+    console.print(
+        f"[green]skills generated[/green] → {result.get('target_dir', '?')} "
+        f"({result.get('skills_written', 0)} skills)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# File read / write
+# ---------------------------------------------------------------------------
+
+
+@ws_app.command("file")
+def ws_file(
+    name: str = typer.Argument(..., help="Workspace name or agent ID"),
+    read: bool = typer.Option(False, "--read", help="Read file content"),
+    write: str | None = typer.Option(
+        None, "--write", help="Write content (pass '-' to read from stdin)"
+    ),
+    file_path: str = typer.Option(
+        "CLAUDE.md", "--path", help="File path within workspace"
+    ),
+) -> None:
+    """Read or write a file in a workspace.
+
+    Examples:
+        workspaces file my-ws --read --path CLAUDE.md
+        workspaces file my-ws --write "new content" --path AGENTS.md
+    """
+    if read and write is not None:
+        console.print("[red]use --read or --write, not both[/red]")
+        raise typer.Exit(2)
+    if not read and write is None:
+        console.print("[red]use --read or --write[/red]")
+        raise typer.Exit(2)
+
+    store = get_store()
+
+    if read:
+        try:
+            result = workspaces_service.read_file_by_name(
+                name, file_path, store=store, settings=get_settings()
+            )
+        except WorkspaceNotFound:
+            console.print(f"[red]workspace {name!r} not found[/red]")
+            raise typer.Exit(1)
+        except Exception as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
+        console.print(result.get("content", "") if result else "")
+    elif write is not None:
+        content = write
+        if write == "-":
+            import sys
+
+            content = sys.stdin.read()
+        try:
+            result = workspaces_service.write_file_by_name(
+                name,
+                file_path,
+                content,
+                store=store,
+                settings=get_settings(),
+            )
+        except WorkspaceNotFound:
+            console.print(f"[red]workspace {name!r} not found[/red]")
+            raise typer.Exit(1)
+        except Exception as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
+        console.print(f"[green]written[/green] {file_path!r} ({result.get('bytes', 0)} bytes)")
+
+
+# ---------------------------------------------------------------------------
 # shell / explore
 # ---------------------------------------------------------------------------
 
@@ -134,7 +308,7 @@ def _resolve_workspace(
     settings = get_settings()
     store = get_store()
 
-    row = store.get_workspace(name) if hasattr(store, "get_workspace") else None
+    row = service_get_workspace(store, name) if hasattr(store, "get_workspace") else None
     if row and row.get("path"):
         path = settings.project_root / row["path"]
         path.mkdir(parents=True, exist_ok=True)
@@ -152,13 +326,13 @@ def _delegate_shell(name: str | None, generate: bool) -> int:
     workspace first; if that doesn't match, treat ``name`` as an agent ID
     and let the launch resolver use the agent's declared workspace.
     """
-    from agentbox.cli.launch import _launch_session
+    from agentbox.cli.ops.launch import _launch_session
 
     store = get_store()
     workspace_arg: str | None = None
     agent_arg: str | None = None
     if name and name != "default":
-        row = store.get_workspace(name) if hasattr(store, "get_workspace") else None
+        row = service_get_workspace(store, name) if hasattr(store, "get_workspace") else None
         if row:
             workspace_arg = name
         else:

@@ -1,9 +1,9 @@
 """Per-run retry + validation orchestrator.
 
 Owns the loop body that used to live inline at ``executor._run`` between
-``with session:`` and the guardrails call (~240 lines). The executor
+``with session:`` and the terminal bookkeeping (~240 lines). The executor
 remains responsible for everything around the loop: session
-construction, observers, deadline computation, guardrails, terminal
+construction, observers, deadline computation, terminal
 status reclassification, ``finish_run``.
 
 The loop's responsibility:
@@ -17,7 +17,7 @@ The loop's responsibility:
 6. Success path → return.
 
 Single value returned: :class:`RetryOutcome`. The executor unpacks it
-and continues with guardrails + bookkeeping.
+and continues with bookkeeping.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 class RetryOutcome:
     """Terminal state of the retry loop.
 
-    The executor reads these fields and continues with guardrails +
+    The executor reads these fields and continues with
     ``finish_run``. ``final_status`` may still be ``None`` for the
     success path — the executor reclassifies expected-failure error
     strings after the fact.

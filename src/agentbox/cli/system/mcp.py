@@ -5,7 +5,7 @@ import json
 import typer
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.config import load_settings
 
@@ -41,11 +41,14 @@ def mcp_ls() -> None:
 
     for s in servers:
         if s.url:
-            transport = s.transport
+            transport = s.transport or "http"
             endpoint = s.url
         elif s.command:
             transport = "stdio"
             endpoint = " ".join(s.command[:2]) + ("…" if len(s.command) > 2 else "")
+        else:
+            transport = "unknown"
+            endpoint = "—"
 
         # Try to read cache for health info
         cache_path = settings.mcp_cache_dir / f"{s.name}.json"

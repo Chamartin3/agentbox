@@ -7,7 +7,7 @@ import json as _json
 import typer
 from rich.json import JSON
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 
 app = typer.Typer(

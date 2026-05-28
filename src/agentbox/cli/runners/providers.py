@@ -7,9 +7,10 @@ import asyncio
 import typer
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.agent.providers import list_providers
+from agentbox.core.service import get_runner_profile
 
 app = typer.Typer(
     name="providers",
@@ -73,7 +74,7 @@ def provider_models(
 
     config = _Config()
     if profile_id:
-        profile = store.get_runner_profile(profile_id)
+        profile = get_runner_profile(store, profile_id)
         if not profile:
             console.print(f"[red]Profile not found:[/red] {profile_id}")
             raise typer.Exit(1)

@@ -11,8 +11,15 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
+from agentbox.core.service import (
+    get_active_env_doc,
+    list_env_doc_versions,
+    publish_env_doc,
+    rollback_env_doc,
+    save_env_doc,
+)
 
 env_doc_app = typer.Typer(
     name="env-doc",
@@ -36,7 +43,7 @@ def _load_content(content_or_file: str) -> dict:
 def env_doc_show(workspace_id: str) -> None:
     """Show the active env doc for a workspace."""
     store = get_store()
-    doc = store.get_active_env_doc(workspace_id)
+    doc = get_active_env_doc(store, workspace_id)
     if not doc:
         console.print(
             f"[yellow]No active env doc for workspace {workspace_id!r}.[/yellow]"
@@ -73,7 +80,7 @@ def env_doc_show(workspace_id: str) -> None:
 def env_doc_versions(workspace_id: str) -> None:
     """List all env doc versions for a workspace."""
     store = get_store()
-    rows = store.list_env_doc_versions(workspace_id)
+    rows = list_env_doc_versions(store, workspace_id)
     if not rows:
         console.print(
             f"[yellow]No env doc versions for workspace {workspace_id!r}.[/yellow]"
@@ -122,7 +129,7 @@ def env_doc_edit(
 
     content = _load_content(content_or_file)
     store = get_store()
-    doc = store.save_env_doc(workspace_id, content, changelog=changelog, publish=True)
+    doc = save_env_doc(store, workspace_id, content, changelog=changelog, publish=True)
     console.print(
         f"[green]✓[/green] env doc version [bold]{doc['version_number']}[/bold] saved "
         f"for workspace [bold]{workspace_id}[/bold]"
@@ -133,7 +140,7 @@ def env_doc_edit(
 def env_doc_publish(workspace_id: str, version_id: str) -> None:
     """Publish (activate) a specific env doc version."""
     store = get_store()
-    doc = store.publish_env_doc(workspace_id, version_id)
+    doc = publish_env_doc(store, workspace_id, version_id)
     console.print(
         f"[green]✓[/green] env doc version [bold]{doc['version_number']}[/bold] published "
         f"for workspace [bold]{workspace_id}[/bold]"
@@ -154,8 +161,39 @@ def env_doc_rollback(
         raise typer.Exit(1)
 
     store = get_store()
-    doc = store.rollback_env_doc(workspace_id, version_id, changelog=changelog)
+    doc = rollback_env_doc(store, workspace_id, version_id, changelog=changelog)
     console.print(
         f"[green]✓[/green] rolled back — new env doc version [bold]{doc['version_number']}[/bold] "
         f"for workspace [bold]{workspace_id}[/bold]"
     )
+
+
+@env_doc_app.command("preview")
+def env_doc_preview(
+    workspace_id: str = typer.Argument(..., help="Workspace ID"),
+) -> None:
+    """Preview env doc rendering for a workspace.
+
+    Renders the active env doc for this workspace.
+    """
+    store = get_store()
+    doc = get_active_env_doc(store, workspace_id)
+    if not doc:
+        console.print(
+            f"[yellow]No active env doc for workspace {workspace_id!r}.[/yellow]"
+        )
+        return
+
+    from agentbox.core.run.run_prep import render_env_doc
+
+    try:
+        entries = render_env_doc(
+            store=get_store(),
+            workspace_id=workspace_id,
+            workdir=Path("."),
+        )
+    except Exception as exc:
+        console.print(f"[red]preview failed: {exc}[/red]")
+        raise typer.Exit(1)
+
+    console.print(json.dumps(entries, indent=2, default=str))

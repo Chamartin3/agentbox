@@ -160,13 +160,6 @@ class RunnerSpec(BaseModel):
     configuration)."""
 
 
-class GuardrailRef(BaseModel):
-    """Entrypoint name registered under `agentbox.guardrails`."""
-
-    name: str
-    options: dict = Field(default_factory=dict)
-
-
 class SharedRef(BaseModel):
     """Reference to a shared resource (versioned, stored in DB).
 
@@ -309,7 +302,6 @@ class AgentDef(BaseModel):
 
     runner: RunnerSpec = Field(default_factory=lambda: RunnerSpec())
     session_mode: SessionMode = "headless"
-    guardrails: list[GuardrailRef] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
     unsupported_backends: list[str] = Field(default_factory=list)

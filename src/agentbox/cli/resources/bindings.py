@@ -7,10 +7,16 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.api.deps import get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.agent.prompt.resolver import resolve_prompt
 from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
+from agentbox.core.service import (
+    list_prompt_bindings,
+    get_repo_resource_by_slug,
+    replace_prompt_bindings,
+    get_active_agent_version,
+)
 
 prompt_bindings_app = typer.Typer(
     name="prompt-bindings",
@@ -23,7 +29,7 @@ prompt_bindings_app = typer.Typer(
 def pb_list(agent_id: str) -> None:
     """List all prompt bindings for an agent."""
     store = get_store()
-    rows = store.list_prompt_bindings(agent_id)
+    rows = list_prompt_bindings(store, agent_id)
     if not rows:
         console.print(f"[yellow]No prompt bindings for agent {agent_id!r}.[/yellow]")
         return
@@ -75,12 +81,12 @@ def pb_set(
         raise typer.Exit(1)
 
     store = get_store()
-    resource = store.get_repo_resource_by_slug(resource_slug)
+    resource = get_repo_resource_by_slug(store, resource_slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {resource_slug!r}")
         raise typer.Exit(2)
 
-    existing = store.list_prompt_bindings(agent_id)
+    existing = list_prompt_bindings(store, agent_id)
     # Upsert: remove any existing binding for this marker, append new one.
     kept = [b for b in existing if b["marker"] != marker]
     new_binding = {
@@ -92,7 +98,7 @@ def pb_set(
     }
     kept.append(new_binding)
 
-    store.replace_prompt_bindings(agent_id, kept, reason=reason)
+    replace_prompt_bindings(store, agent_id, kept, reason=reason)
     console.print(
         f"[green]✓[/green] binding set: agent=[bold]{agent_id}[/bold] "
         f"marker=[bold]{marker}[/bold] → {resource_slug} (mode={mode})"
@@ -103,7 +109,7 @@ def pb_set(
 def pb_preview(agent_id: str) -> None:
     """Preview the resolved prompt for an agent with all bindings applied."""
     store = get_store()
-    active = store.get_active_version(agent_id)
+    active = get_active_agent_version(store, agent_id)
     if not active:
         console.print(f"[red]No active version for agent {agent_id!r}[/red]")
         raise typer.Exit(2)
