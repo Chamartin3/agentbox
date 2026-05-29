@@ -97,16 +97,6 @@ export interface RunsStats {
   }>;
 }
 
-export interface GuardrailRow {
-  id: number;
-  run_id: string;
-  name: string;
-  ok: number;
-  message: string | null;
-  attempt: number;
-  created_at: string;
-}
-
 export interface RunnerSpec {
   kind: string;
   /**
@@ -130,11 +120,6 @@ export interface RunnerSpec {
   max_error_retries: number;
 }
 
-export interface GuardrailRef {
-  name: string;
-  options: Record<string, unknown>;
-}
-
 export interface AgentDef {
   id: string;
   description: string;
@@ -143,7 +128,6 @@ export interface AgentDef {
   workspace: string | null;
   runner: RunnerSpec;
   session_mode: 'headless' | 'persistent';
-  guardrails: GuardrailRef[];
   tags: string[];
   tools: string[];
   webhook_url: string | null;
@@ -518,7 +502,7 @@ export const api = {
     }
   },
   getRun: (id: string) =>
-    req<{ run: RunRecord; usage: UsageRecord | null; guardrails: GuardrailRow[] }>(
+    req<{ run: RunRecord; usage: UsageRecord | null }>(
       `/api/runs/${id}`,
     ),
   getTranscript: (id: string) =>

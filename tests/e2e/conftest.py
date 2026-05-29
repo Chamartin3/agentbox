@@ -1,13 +1,11 @@
-"""Shared fixtures for the agentbox test suite.
+"""End-to-end test fixtures.
 
-Conventions:
+Tests under ``tests/e2e/`` exercise the full stack with real backends,
+live network connections, and persistent infrastructure. They are
+conditionally skipped when the required environment is not available.
 
-- ``tests/unit/`` — auto-tagged ``unit``. Must not touch the database,
-  network, or subprocess runners. Uses mocks exclusively.
-- ``tests/integration/`` — auto-tagged ``integration``. Gets a real
-  SQLite SessionStore and full FastAPI TestClient.
-- ``tests/e2e/`` — auto-tagged ``e2e``. Full-stack tests with real
-  backends and infrastructure. Conditionally skipped when infra is absent.
+Set ``AGENTBOX_E2E=1`` to opt in to the e2e suite. Individual tests
+may impose additional requirements (e.g. ``OLLAMA_HOST``).
 """
 
 from __future__ import annotations
@@ -21,25 +19,35 @@ import pytest
 
 
 # --------------------------------------------------------------------------- #
-# Marker auto-tagging by directory
+# Conditional skip — entire e2e suite
 # --------------------------------------------------------------------------- #
 
 
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item],
 ) -> None:
-    for item in items:
-        path = str(item.fspath)
-        if "/tests/unit/" in path:
-            item.add_marker(pytest.mark.unit)
-        elif "/tests/integration/" in path:
-            item.add_marker(pytest.mark.integration)
-        elif "/tests/e2e/" in path:
-            item.add_marker(pytest.mark.e2e)
+    if not os.environ.get("AGENTBOX_E2E"):
+        skip_e2e = pytest.mark.skip(reason="AGENTBOX_E2E not set")
+        for item in items:
+            item.add_marker(skip_e2e)
 
 
 # --------------------------------------------------------------------------- #
-# Data-dir isolation
+# Infra checks
+# --------------------------------------------------------------------------- #
+
+
+def _check_ollama() -> bool:
+    return bool(os.environ.get("OLLAMA_HOST"))
+
+
+def _check_backend_binary(name: str) -> bool:
+    import shutil
+    return shutil.which(name) is not None
+
+
+# --------------------------------------------------------------------------- #
+# Data-dir isolation (same as integration, kept here for standalone e2e runs)
 # --------------------------------------------------------------------------- #
 
 
@@ -67,11 +75,6 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     except (ImportError, AttributeError):
         pass
     return tmp_path
-
-
-# --------------------------------------------------------------------------- #
-# Store + API client
-# --------------------------------------------------------------------------- #
 
 
 @pytest.fixture
@@ -112,13 +115,18 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
 
 
 # --------------------------------------------------------------------------- #
-# Belt-and-braces: never inherit a stray AGENTBOX_DATA_DIR from the shell
+# Live-backend skip helpers (use in individual test decorators)
 # --------------------------------------------------------------------------- #
 
 
-@pytest.fixture(autouse=True)
-def _scrub_agentbox_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for key in list(os.environ):
-        if key.startswith("AGENTBOX_") and key != "AGENTBOX_DEBUG":
-            monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("AGENTBOX_IMPORT_ON_START", "1")
+ollama_required = pytest.mark.skipif(
+    not _check_ollama(),
+    reason="OLLAMA_HOST not set",
+)
+
+
+def backend_required(name: str) -> pytest.MarkDecorator:
+    return pytest.mark.skipif(
+        not _check_backend_binary(name),
+        reason=f"{name} not on PATH",
+    )

@@ -241,21 +241,6 @@ function buildConversation(events: StreamEvent[]): ConversationMessage[] {
         });
         break;
       }
-      case 'guardrail': {
-        msgs.push({
-          id: `${msgs.length}-guardrail`,
-          role: 'meta',
-          ts,
-          content: (
-            <div className="conversation-guardrail">
-              <span className="dim">guardrail</span>
-              <code>{String(ev.name || '')}</code>
-              {ev.ok ? <span className="pill ok">ok</span> : <span className="pill error">fail</span>}
-            </div>
-          ),
-        });
-        break;
-      }
       case 'done': {
         msgs.push({
           id: `${msgs.length}-done`,

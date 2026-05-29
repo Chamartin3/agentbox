@@ -793,11 +793,6 @@ h2 { font-size: 15px; color: var(--fg-muted); border-bottom: 1px solid var(--bor
   align-items: center;
   gap: 10px;
 }
-.conversation-guardrail {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 .conversation-done {
   display: flex;
   align-items: center;

@@ -69,7 +69,6 @@ def agent_ls(
     table.add_column("Model", style="dim")
     table.add_column("Session", style="dim")
     table.add_column("Workspace", style="dim")
-    table.add_column("Guardrails", justify="right", style="magenta")
     table.add_column("Description")
 
     for a in rows:

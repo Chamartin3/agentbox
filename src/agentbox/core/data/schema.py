@@ -87,18 +87,6 @@ usage = Table(
     Column("cost_usd", Float),
 )
 
-guardrail_results = Table(
-    "guardrail_results",
-    metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("run_id", String, ForeignKey("runs.id"), nullable=False),
-    Column("name", String, nullable=False),
-    Column("ok", Integer, nullable=False),
-    Column("message", String),
-    Column("attempt", Integer, nullable=False, server_default="0"),
-    Column("created_at", String, nullable=False),
-    CheckConstraint("ok IN (0, 1)", name="guardrail_ok_bool"),
-)
 
 run_prompts = Table(
     "run_prompts",

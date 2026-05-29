@@ -1,41 +1,16 @@
-"""Shared fixtures for the agentbox test suite.
+"""Integration-test fixtures.
 
-Conventions:
-
-- ``tests/unit/`` — auto-tagged ``unit``. Must not touch the database,
-  network, or subprocess runners. Uses mocks exclusively.
-- ``tests/integration/`` — auto-tagged ``integration``. Gets a real
-  SQLite SessionStore and full FastAPI TestClient.
-- ``tests/e2e/`` — auto-tagged ``e2e``. Full-stack tests with real
-  backends and infrastructure. Conditionally skipped when infra is absent.
+All tests under ``tests/integration/`` get a real SQLite SessionStore
+and a full FastAPI TestClient with an isolated data directory per test.
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
-
-
-# --------------------------------------------------------------------------- #
-# Marker auto-tagging by directory
-# --------------------------------------------------------------------------- #
-
-
-def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item],
-) -> None:
-    for item in items:
-        path = str(item.fspath)
-        if "/tests/unit/" in path:
-            item.add_marker(pytest.mark.unit)
-        elif "/tests/integration/" in path:
-            item.add_marker(pytest.mark.integration)
-        elif "/tests/e2e/" in path:
-            item.add_marker(pytest.mark.e2e)
 
 
 # --------------------------------------------------------------------------- #
@@ -45,7 +20,11 @@ def pytest_collection_modifyitems(
 
 @pytest.fixture
 def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point ``AGENTBOX_DATA_DIR`` at a per-test tmp dir."""
+    """Point ``AGENTBOX_DATA_DIR`` at a per-test tmp dir.
+
+    Creates a minimal ``manifest.toml`` and clears DI caches so
+    ``create_app()`` uses the fresh data directory.
+    """
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
@@ -84,7 +63,11 @@ def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
 
 @pytest.fixture
 def client(isolated_data_dir: Path) -> Iterator[Any]:
-    """FastAPI TestClient with an isolated data dir."""
+    """FastAPI TestClient with an isolated data dir.
+
+    Clears DI caches before and after each test so every ``client``
+    sees the per-test ``AGENTBOX_DATA_DIR``.
+    """
     import agentbox.api.deps as deps
     from agentbox.api.app import create_app
     from fastapi.testclient import TestClient
@@ -109,16 +92,3 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
         deps.get_mcp_registry,
     ):
         fn.cache_clear()
-
-
-# --------------------------------------------------------------------------- #
-# Belt-and-braces: never inherit a stray AGENTBOX_DATA_DIR from the shell
-# --------------------------------------------------------------------------- #
-
-
-@pytest.fixture(autouse=True)
-def _scrub_agentbox_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for key in list(os.environ):
-        if key.startswith("AGENTBOX_") and key != "AGENTBOX_DEBUG":
-            monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("AGENTBOX_IMPORT_ON_START", "1")

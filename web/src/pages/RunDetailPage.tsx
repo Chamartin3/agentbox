@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AgentDef, GuardrailRow, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
+import { AgentDef, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
 import EventStream from '../components/EventStream';
 import ConversationView from '../components/ConversationView';
 import RunCommentThread from '../components/RunCommentThread';
@@ -363,7 +363,6 @@ export default function RunDetailPage() {
   const [cancelling, setCancelling] = useState(false);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [usage, setUsage] = useState<UsageRecord | null>(null);
-  const [guards, setGuards] = useState<GuardrailRow[]>([]);
   const [agent, setAgent] = useState<AgentDef | null>(null);
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -381,7 +380,6 @@ export default function RunDetailPage() {
       const r = await api.getRun(id);
       setRun(r.run);
       setUsage(r.usage);
-      setGuards(r.guardrails);
       // Fetch agent metadata for context tags.
       api.listAgents()
         .then((list) => setAgent(list.find((a) => a.id === r.run.agent_id) ?? null))
@@ -671,7 +669,6 @@ export default function RunDetailPage() {
               </span>
             ) : '—'}
           </span>
-          <span className="sub">{guards.length} guardrails</span>
         </div>
       </div>
 
@@ -729,7 +726,7 @@ export default function RunDetailPage() {
         </button>
         <button className={tab === 'checks' ? 'active' : ''} onClick={() => setTab('checks')}>
           Checks<span className="count">
-            {(run.validation_status ? 1 : 0) + guards.length || '—'}
+            {run.validation_status ? 1 : '—'}
           </span>
         </button>
         <button className={tab === 'snapshot' ? 'active' : ''} onClick={() => setTab('snapshot')}>
@@ -947,38 +944,6 @@ export default function RunDetailPage() {
                 {' '}<code>runner.output_schema_path</code> in the agent config
                 to enable jsonschema/pydantic validation with retries.
               </p>
-            )}
-          </section>
-
-          <section className="section">
-            <h2 style={{ borderBottom: 'none' }}>
-              Guardrails {guards.length > 0 && <span className="dim">({guards.length})</span>}
-            </h2>
-            {guards.length === 0 ? (
-              <p className="dim" style={{ margin: 0, fontSize: 12 }}>
-                no guardrails ran for this agent — add a <code>guardrails</code> entry
-                in the agent config to record post-run observational checks here
-                (e.g. cost-bound, schema-shape, custom python).
-              </p>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th><th>Name</th><th>Result</th><th>Message</th><th>At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {guards.map((g) => (
-                    <tr key={g.id}>
-                      <td className="dim">{g.attempt}</td>
-                      <td><code>{g.name}</code></td>
-                      <td>{g.ok ? <span className="pill ok">ok</span> : <span className="pill error">fail</span>}</td>
-                      <td style={{ whiteSpace: 'pre-wrap' }}>{g.message ?? ''}</td>
-                      <td className="dim" title={g.created_at}>{fmtRelative(g.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             )}
           </section>
         </>
