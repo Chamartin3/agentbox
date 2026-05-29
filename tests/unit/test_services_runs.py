@@ -247,7 +247,7 @@ def test_get_run_detail_shape(store: SessionStore) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     detail = runs_service.get_run_detail(run_id, store=store)
-    assert set(detail) == {"run", "usage", "guardrails"}
+    assert set(detail) == {"run", "usage"}
     assert detail["run"]["id"] == run_id
     assert detail["run"]["backend"] is None
 

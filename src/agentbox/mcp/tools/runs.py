@@ -247,7 +247,7 @@ def register(mcp: FastMCP) -> None:
         Returns lightweight ``{ts, level, message}`` rows so a caller can
         page through stderr without pulling tool calls or full text
         events into context. For everything (text, tool calls, usage,
-        guardrail, done) use ``get_run_transcript``.
+        done) use ``get_run_transcript``.
         """
         limit = clamp_limit(limit)
         store = get_context().store

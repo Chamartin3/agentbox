@@ -7,7 +7,6 @@ export const EVENT_TYPES = [
   'tool_call',
   'tool_result',
   'usage',
-  'guardrail',
   'retry',
   'thinking',
   'timeout',
@@ -60,14 +59,6 @@ export interface UsageEvent extends EventBase {
   model?: string | null;
 }
 
-export interface GuardrailEvent extends EventBase {
-  type: 'guardrail';
-  name: string;
-  ok: boolean;
-  message?: string | null;
-  attempt?: number;
-}
-
 export interface RetryEvent extends EventBase {
   type: 'retry';
   attempt?: number;
@@ -109,7 +100,6 @@ export type RunEvent =
   | ToolCallEvent
   | ToolResultEvent
   | UsageEvent
-  | GuardrailEvent
   | RetryEvent
   | ThinkingEvent
   | TimeoutEvent
@@ -146,7 +136,6 @@ export const EVENT_META: Record<EventType, EventMeta> = {
   tool_call:   { label: 'call',       color: '#79c0ff', bg: 'rgba(121,192,255,0.10)' },
   tool_result: { label: 'result',     color: '#3fb950', bg: 'rgba(63,185,80,0.10)' },
   usage:       { label: 'usage',      color: '#d29922', bg: 'rgba(210,153,34,0.10)' },
-  guardrail:   { label: 'guardrail',  color: '#d2a8ff', bg: 'rgba(210,168,255,0.10)' },
   retry:       { label: 'retry',      color: '#f0883e', bg: 'rgba(240,136,62,0.10)' },
   thinking:    { label: 'thinking',   color: '#58a6ff', bg: 'rgba(88,166,255,0.10)' },
   timeout:     { label: 'timeout',    color: '#f0883e', bg: 'rgba(240,136,62,0.15)' },
@@ -177,8 +166,6 @@ export function summarizeEvent(ev: LooseStreamEvent): string {
       return `${ev.tool ?? ''} ok=${ev.ok}`;
     case 'usage':
       return `in=${ev.input_tokens ?? 0} out=${ev.output_tokens ?? 0} cost=$${ev.cost_usd ?? 0}`;
-    case 'guardrail':
-      return `${ev.name ?? ''} ok=${ev.ok}`;
     case 'done':
       return `status=${ev.status ?? ''}`;
     case 'retry':
