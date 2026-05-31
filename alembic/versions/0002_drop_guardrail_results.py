@@ -21,7 +21,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.drop_table("guardrail_results")
+    op.execute("DROP TABLE IF EXISTS guardrail_results")
 
 
 def downgrade() -> None:

@@ -1,151 +1,146 @@
-"""Workspace permissions inlined into agentbox.toml (Plan 05).
-
-Tests that WorkspaceDef correctly parses and applies permission fields
-from the manifest, and that defaults are applied when fields are omitted.
-"""
+"""Tests for host-env grant resolution and permission checks."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import pytest
 
-from agentbox.core.data import ProjectManifest, WorkspaceDef, WorkspaceFile
-
-
-def test_workspace_def_defaults() -> None:
-    """WorkspaceDef applies sensible defaults for permission fields."""
-    ws = WorkspaceDef(
-        name="test",
-        path="workdir/test",
-    )
-    assert ws.allowed_tools == []
-    assert ws.allowed_builtin_tools == []
-    assert ws.files == []
-    assert ws.max_tokens is None
-    assert ws.allow_file_write is True
-    assert ws.allow_network is True
+from agentbox.core.workspace.host_env.permissions import (
+    GrantViolation,
+    _deep_merge,
+    _path_within_allowlist,
+    check_capability,
+    resolve_grants,
+)
 
 
-def test_workspace_def_with_permissions() -> None:
-    """WorkspaceDef parses permission fields from manifest."""
-    ws = WorkspaceDef(
-        name="restricted",
-        path="workdir/restricted",
-        allowed_tools=["Read", "Write"],
-        allowed_builtin_tools=["bash", "python"],
-        max_tokens=16000,
-        allow_file_write=False,
-        allow_network=False,
-    )
-    assert ws.allowed_tools == ["Read", "Write"]
-    assert ws.allowed_builtin_tools == ["bash", "python"]
-    assert ws.max_tokens == 16000
-    assert ws.allow_file_write is False
-    assert ws.allow_network is False
+class TestDeepMerge:
+    def test_simple_override(self) -> None:
+        assert _deep_merge({"a": 1}, {"a": 2}) == {"a": 2}
+
+    def test_adds_new_keys(self) -> None:
+        assert _deep_merge({"a": 1}, {"b": 2}) == {"a": 1, "b": 2}
+
+    def test_none_base(self) -> None:
+        assert _deep_merge(None, {"a": 1}) == {"a": 1}
+
+    def test_none_overrides(self) -> None:
+        assert _deep_merge({"a": 1}, None) == {"a": 1}
+
+    def test_nested_merge(self) -> None:
+        base = {"fs": {"read": {"max_bytes": 100}}}
+        overrides = {"fs": {"read": {"allowed_paths": ["/tmp"]}}}
+        result = _deep_merge(base, overrides)
+        assert result["fs"]["read"]["max_bytes"] == 100
+        assert result["fs"]["read"]["allowed_paths"] == ["/tmp"]
+
+    def test_list_replaces_not_merges(self) -> None:
+        base = {"allowlist": ["a", "b"]}
+        overrides = {"allowlist": ["c"]}
+        assert _deep_merge(base, overrides) == {"allowlist": ["c"]}
 
 
-def test_workspace_file_model() -> None:
-    """WorkspaceFile parses src/dst mappings."""
-    f = WorkspaceFile(src="docs/readme.txt", dst="README.txt")
-    assert f.src == "docs/readme.txt"
-    assert f.dst == "README.txt"
+class TestPathWithinAllowlist:
+    def test_exact_match(self) -> None:
+        assert _path_within_allowlist("/tmp/file.txt", ["/tmp"]) is True
+
+    def test_subdirectory(self) -> None:
+        assert _path_within_allowlist("/tmp/sub/file.txt", ["/tmp"]) is True
+
+    def test_not_within(self) -> None:
+        assert _path_within_allowlist("/etc/passwd", ["/tmp"]) is False
+
+    def test_multiple_roots(self) -> None:
+        assert _path_within_allowlist("/var/log/app.log", ["/tmp", "/var"]) is True
 
 
-def test_workspace_def_with_files() -> None:
-    """WorkspaceDef parses files array."""
-    ws = WorkspaceDef(
-        name="with_files",
-        path="workdir/with_files",
-        files=[
-            WorkspaceFile(src="data/config.json", dst="config.json"),
-            WorkspaceFile(src="docs/guide.md", dst="guide.md"),
-        ],
-    )
-    assert len(ws.files) == 2
-    assert ws.files[0].src == "data/config.json"
-    assert ws.files[0].dst == "config.json"
+class TestResolveGrants:
+    def test_adds_default_granted_capabilities(self) -> None:
+        grants = resolve_grants({}, {})
+        assert "http.fetch" in grants
+
+    def test_merges_profile_and_overrides(self) -> None:
+        grants = resolve_grants(
+            {"env.get": {"allowlist": ["HOME"]}},
+            {"env.get": {"allowlist": ["PATH"]}},
+        )
+        assert grants["env.get"]["allowlist"] == ["PATH"]
+
+    def test_keeps_profile_grants_without_overrides(self) -> None:
+        grants = resolve_grants({"env.get": {"allowlist": ["HOME"]}}, None)
+        assert grants["env.get"]["allowlist"] == ["HOME"]
 
 
-def test_manifest_parses_workspace_permissions(tmp_path: Path) -> None:
-    """ProjectManifest parses inlined workspace permissions."""
-    manifest_text = """
-[[workspaces]]
-name = "default"
-path = "workdir/default"
-allowed_tools = ["Read", "Write", "Bash"]
-allowed_builtin_tools = ["python"]
-max_tokens = 32000
-allow_file_write = true
-allow_network = true
-files = [
-  { src = "data/config.json", dst = "config.json" }
-]
+class TestCheckCapability:
+    def test_unknown_capability_raises(self) -> None:
+        with pytest.raises(GrantViolation, match="unknown capability"):
+            check_capability({}, "no.such.capability")
 
-[[workspaces]]
-name = "restricted"
-path = "workdir/restricted"
-allowed_tools = []
-allowed_builtin_tools = []
-max_tokens = 8000
-allow_file_write = false
-allow_network = false
-"""
-    manifest_path = tmp_path / "agentbox.toml"
-    manifest_path.write_text(manifest_text)
+    def test_not_granted_raises(self) -> None:
+        with pytest.raises(GrantViolation, match="not granted"):
+            check_capability({}, "env.get")
 
-    import tomlkit
+    def test_env_get_valid(self) -> None:
+        grants = {"env.get": {"allowlist": ["HOME"]}}
+        check_capability(grants, "env.get", {"name": "HOME"})
 
-    data = tomlkit.parse(manifest_text)
-    manifest = ProjectManifest.model_validate(data)
+    def test_env_get_not_allowlisted(self) -> None:
+        grants = {"env.get": {"allowlist": ["HOME"]}}
+        with pytest.raises(GrantViolation, match="not allowlisted"):
+            check_capability(grants, "env.get", {"name": "SECRET"})
 
-    assert len(manifest.workspaces) == 2
+    def test_env_get_missing_name(self) -> None:
+        grants = {"env.get": {"allowlist": ["HOME"]}}
+        with pytest.raises(GrantViolation, match="missing .* name"):
+            check_capability(grants, "env.get", {})
 
-    default_ws = manifest.workspaces[0]
-    assert default_ws.name == "default"
-    assert default_ws.allowed_tools == ["Read", "Write", "Bash"]
-    assert default_ws.allowed_builtin_tools == ["python"]
-    assert default_ws.max_tokens == 32000
-    assert default_ws.allow_file_write is True
-    assert default_ws.allow_network is True
-    assert len(default_ws.files) == 1
-    assert default_ws.files[0].src == "data/config.json"
-    assert default_ws.files[0].dst == "config.json"
+    def test_fs_read_valid_path(self) -> None:
+        grants = {"fs.read": {"allowed_paths": ["/tmp"]}}
+        check_capability(grants, "fs.read", {"path": "/tmp/file.txt"})
 
-    restricted_ws = manifest.workspaces[1]
-    assert restricted_ws.name == "restricted"
-    assert restricted_ws.allowed_tools == []
-    assert restricted_ws.allowed_builtin_tools == []
-    assert restricted_ws.max_tokens == 8000
-    assert restricted_ws.allow_file_write is False
-    assert restricted_ws.allow_network is False
+    def test_fs_read_not_in_paths(self) -> None:
+        grants = {"fs.read": {"allowed_paths": ["/tmp"]}}
+        with pytest.raises(GrantViolation, match="not within"):
+            check_capability(grants, "fs.read", {"path": "/etc/passwd"})
 
-    # Files are optional
-    assert len(restricted_ws.files) == 0
+    def test_fs_read_no_allowed_paths(self) -> None:
+        grants = {"fs.read": {}}
+        with pytest.raises(GrantViolation, match="no allowed_paths"):
+            check_capability(grants, "fs.read", {"path": "/tmp/x"})
 
+    def test_fs_read_size_exceeds_max(self) -> None:
+        grants = {"fs.read": {"allowed_paths": ["/tmp"], "max_bytes": 100}}
+        with pytest.raises(GrantViolation, match="exceeds max_bytes"):
+            check_capability(grants, "fs.read", {"path": "/tmp/x", "size_hint": 200})
 
-def test_workspace_permissions_to_dict() -> None:
-    """WorkspaceDef permissions can be converted to dict for config generation."""
-    ws = WorkspaceDef(
-        name="test",
-        path="workdir/test",
-        allowed_tools=["Read"],
-        allowed_builtin_tools=["bash"],
-        max_tokens=16000,
-        allow_file_write=False,
-        files=[WorkspaceFile(src="data.json", dst="data.json")],
-    )
+    def test_shell_exec_valid(self) -> None:
+        grants = {"shell.exec": {"command_allowlist": ["echo .*"]}}
+        check_capability(grants, "shell.exec", {"cmd": "echo hello"})
 
-    perms_dict = {
-        "allowed_tools": ws.allowed_tools,
-        "allowed_builtin_tools": ws.allowed_builtin_tools,
-        "files": [f.model_dump() for f in ws.files],
-        "max_tokens": ws.max_tokens,
-        "allow_file_write": ws.allow_file_write,
-        "allow_network": ws.allow_network,
-    }
+    def test_shell_exec_not_allowed(self) -> None:
+        grants = {"shell.exec": {"command_allowlist": ["echo .*"]}}
+        with pytest.raises(GrantViolation, match="not on allowlist"):
+            check_capability(grants, "shell.exec", {"cmd": "rm -rf /"})
 
-    assert perms_dict["allowed_tools"] == ["Read"]
-    assert perms_dict["allowed_builtin_tools"] == ["bash"]
-    assert perms_dict["max_tokens"] == 16000
-    assert perms_dict["allow_file_write"] is False
-    assert len(perms_dict["files"]) == 1
-    assert perms_dict["files"][0]["src"] == "data.json"
+    def test_shell_exec_no_allowlist(self) -> None:
+        grants = {"shell.exec": {}}
+        with pytest.raises(GrantViolation, match="no command_allowlist"):
+            check_capability(grants, "shell.exec", {"cmd": "ls"})
+
+    def test_http_fetch_valid(self) -> None:
+        grants = {"http.fetch": {"host_allowlist": ["api.example.com"]}}
+        check_capability(grants, "http.fetch", {"url": "https://api.example.com/data"})
+
+    def test_http_fetch_host_not_allowed(self) -> None:
+        grants = {"http.fetch": {"host_allowlist": ["api.example.com"]}}
+        with pytest.raises(GrantViolation, match="not allowlisted"):
+            check_capability(grants, "http.fetch", {"url": "https://evil.com"})
+
+    def test_http_fetch_method_not_allowed(self) -> None:
+        grants = {
+            "http.fetch": {
+                "host_allowlist": ["example.com"],
+                "methods": ["GET"],
+            }
+        }
+        with pytest.raises(GrantViolation, match="method"):
+            check_capability(grants, "http.fetch", {"url": "https://example.com", "method": "POST"})

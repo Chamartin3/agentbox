@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from agentbox.api.deps import get_settings, get_store
 from agentbox.core.service.agents import AgentServiceError, patch_agent_config

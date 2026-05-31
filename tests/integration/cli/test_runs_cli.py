@@ -101,7 +101,7 @@ def test_runs_stats_empty(store_fixture) -> None:
     result = runner.invoke(app, ["runs", "stats"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
-    assert "total_runs" in parsed
+    assert "totals" in parsed
 
 
 def test_runs_facets_empty(store_fixture) -> None:

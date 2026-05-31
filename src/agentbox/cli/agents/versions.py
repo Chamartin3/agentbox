@@ -10,7 +10,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli._deps import get_loader, get_store
-from agentbox.cli._common import console
+from agentbox.cli._common import console, handle_cli_errors
 from agentbox.core.service import (
     add_version_comment,
     create_agent_version,
@@ -159,11 +159,8 @@ def versions_diff(
         raise typer.Exit(1)
 
     store = get_store()
-    try:
+    with handle_cli_errors():
         result = diff_agent_versions(store, agent_id, a, b)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1)
 
     console.print(
         Syntax(
@@ -222,11 +219,8 @@ def versions_rate(
         console.print(f"[red]version {version} not found[/red]")
         raise typer.Exit(1)
 
-    try:
+    with handle_cli_errors():
         set_version_rating(store, v["id"], rating, rater)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1)
     console.print(f"[green]rated[/green] v{version} → {rating}/5")
 
 
@@ -280,7 +274,7 @@ def versions_prompt_revision(
         raise typer.Exit(1)
 
     store = get_store()
-    try:
+    with handle_cli_errors():
         result = save_prompt_revision(
             store,
             agent_id,
@@ -289,9 +283,6 @@ def versions_prompt_revision(
             changelog=changelog,
             activate=not no_activate,
         )
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1)
     console.print(
         f"[green]prompt revision[/green] v{result['version']} "
         f"(id={result['id']}, active={not no_activate})"

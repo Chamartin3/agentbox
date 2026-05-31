@@ -9,7 +9,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli._deps import get_settings, get_store
-from agentbox.cli._common import console, resolve_agent
+from agentbox.cli._common import console, handle_cli_errors, resolve_agent
 from agentbox.core import prompts
 from agentbox.core.service import (
     branch_agent_draft,
@@ -375,11 +375,8 @@ def agent_draft(
     """Create a new draft version by cloning the active version."""
     resolve_agent(agent_id)
     store = get_store()
-    try:
+    with handle_cli_errors():
         result = branch_agent_draft(store, agent_id, author=author)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1) from exc
     console.print(
         f"[green]draft created[/green] v{result.get('version')} "
         f"(id={result.get('id')}, draft={result.get('is_draft', True)})"
@@ -395,11 +392,8 @@ def agent_publish(
     """Publish a draft version (set as active)."""
     resolve_agent(agent_id)
     store = get_store()
-    try:
+    with handle_cli_errors():
         result = publish_agent_version(store, agent_id, version, reason)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1) from exc
     console.print(
         f"[green]published[/green] v{result.get('version')} "
         f"(id={result.get('id')})"
@@ -416,11 +410,8 @@ def agent_rollback(
     """Roll back to a previous agent version (creates a new version)."""
     resolve_agent(agent_id)
     store = get_store()
-    try:
+    with handle_cli_errors():
         result = rollback_agent_to(store, agent_id, version, reason, author=author)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1) from exc
     console.print(
         f"[green]rolled back[/green] to v{version} (new v{result.get('version')})"
     )

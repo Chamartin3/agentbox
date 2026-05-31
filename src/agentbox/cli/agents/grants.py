@@ -6,7 +6,7 @@ import typer
 from rich.table import Table
 
 from agentbox.cli._deps import get_store
-from agentbox.cli._common import console, resolve_agent
+from agentbox.cli._common import console, handle_cli_errors, resolve_agent
 from agentbox.core.service import (
     grant_agent_tool,
     list_agent_tool_grants,
@@ -63,7 +63,7 @@ def grants_add(
     """Grant a tool to an agent."""
     resolve_agent(agent_id)
     store = get_store()
-    try:
+    with handle_cli_errors():
         grant_agent_tool(
             store,
             agent_id=agent_id,
@@ -71,9 +71,6 @@ def grants_add(
             changelog=changelog,
             actor=actor,
         )
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1) from exc
     console.print(f"[green]granted[/green] {tool_name!r} to {agent_id!r}")
 
 
@@ -87,7 +84,7 @@ def grants_rm(
     """Revoke a tool grant from an agent."""
     resolve_agent(agent_id)
     store = get_store()
-    try:
+    with handle_cli_errors():
         revoke_agent_tool(
             store,
             agent_id=agent_id,
@@ -95,7 +92,4 @@ def grants_rm(
             changelog=changelog,
             actor=actor,
         )
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(1) from exc
     console.print(f"[yellow]revoked[/yellow] {tool_name!r} from {agent_id!r}")
