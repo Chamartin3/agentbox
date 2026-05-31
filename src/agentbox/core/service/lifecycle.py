@@ -15,11 +15,10 @@ from dataclasses import dataclass, field, replace
 from typing import Final
 
 from agentbox.config import Settings
-from agentbox.core.agent.manifest import McpServerSpec
 from agentbox.core.agent.prompt.versioning.drift import startup_sweep
 from agentbox.core.data import ProjectManifest, SessionStore
-from agentbox.core.data.seeds.runner_profiles import seed_default_runner_profiles
-from agentbox.core.deps import get_mcp_registry
+from agentbox.core.data.manifest import McpServerSpec
+from agentbox.core.data.runners.seeds import seed_default_runner_profiles
 from agentbox.core.resource.boot_import import (
     import_composition_references,
     import_repo_resources,
@@ -31,9 +30,10 @@ from agentbox.core.resource.composition_to_bindings import (
 from agentbox.core.resource.legacy_migration import (
     migrate_shared_resources_to_repo,
 )
-from agentbox.core.run.webhooks import schedule_webhook
+from agentbox.core.run.execute.webhooks import schedule_webhook
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.tools.discovery import discover_tools
+from agentbox.core.workspace.mcp.client import McpRegistry
 from agentbox.core.workspace.mcp.client.registry import McpServerConfig
 
 _log = logging.getLogger(__name__)
@@ -80,7 +80,9 @@ def discover_agent_tools() -> StartupReport:
     return StartupReport(tools_discovered=True)
 
 
-def sync_project_mcp_servers(store: SessionStore) -> StartupReport:
+def sync_project_mcp_servers(
+    store: SessionStore, settings: Settings
+) -> StartupReport:
     """Schedule async sync of any project-level MCP server specs."""
     try:
         specs_models = store.get_project_mcp_servers()
@@ -90,7 +92,7 @@ def sync_project_mcp_servers(store: SessionStore) -> StartupReport:
     if not specs_models:
         return StartupReport()
     try:
-        registry = get_mcp_registry()
+        registry = McpRegistry(settings.mcp_cache_dir)
         specs: list[McpServerConfig] = [_to_mcp_config(s) for s in specs_models]
         task = asyncio.ensure_future(registry.sync_servers(specs))
         task.add_done_callback(_swallow_task_exception)
@@ -243,7 +245,7 @@ def run_startup_tasks(
     settings.check_runtime_sources(store)
     report = StartupReport()
     report = _merge(report, discover_agent_tools())
-    report = _merge(report, sync_project_mcp_servers(store))
+    report = _merge(report, sync_project_mcp_servers(store, settings))
     report = _merge(report, import_on_start_sweep(manifest, store, settings))
     report = _merge(report, seed_runner_profiles(store))
     report = _merge(report, boot_import_resources(store, settings, manifest))

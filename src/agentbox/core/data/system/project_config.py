@@ -15,19 +15,24 @@ accessors here instead of touching ``SettingsMixin`` directly.
 
 from __future__ import annotations
 
+from sqlalchemy.engine import Engine
+
 from agentbox.core.data.manifest import McpServerSpec
+from agentbox.core.data.system.settings import SettingsMixin
 
 PROJECT_MCP_SERVERS = "project_mcp_servers"
 PROJECT_SHARED_ASSETS = "project_shared_assets"
 PROJECT_RUNTIME = "project_runtime"
 
 
-class ProjectConfigMixin:
+class ProjectConfigMixin(SettingsMixin):
     """Typed wrappers over ``SettingsMixin`` for project-level config.
 
     Requires ``SettingsMixin`` (``get_setting``, ``set_setting``,
     ``get_settings_section``, ``update_settings_section``) in the MRO.
     """
+
+    engine: Engine
 
     # ----- MCP servers --------------------------------------------------
 

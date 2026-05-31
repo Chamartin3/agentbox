@@ -12,11 +12,17 @@ import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
-from sqlalchemy import Integer, func, select
-from sqlalchemy.engine import Engine, Row
+from sqlalchemy import select
+from sqlalchemy.engine import Engine
 
-from agentbox.core.data.analytics import _duration_ms_expr
 from agentbox.core.data.records import now_iso
+from agentbox.core.data.runners._models import RunnerProfileStats, _row_to_profile
+from agentbox.core.data.runners.stats import RunnerStatsMixin
+
+# Re-export so callers can ``from agentbox.core.data.runners.profiles import
+# RunnerProfileStats`` — the canonical model lives in ``_models`` but the
+# package contract advertises it here.
+__all__ = ["RunnerProfileStats"]
 
 
 class RunnerProfile(BaseModel):
@@ -80,20 +86,6 @@ class RunnerProfilePatch(BaseModel):
     is_system_default: bool | None = None
 
 
-class RunnerProfileStats(BaseModel):
-    """Statistics for a runner profile."""
-
-    profile_id: str
-    runs: int
-    succeeded: int
-    failed: int
-    input_tokens: int
-    output_tokens: int
-    cost_usd: float | None = None
-    avg_duration_ms: float | None = None
-    last_run_at: str | None = None
-
-
 def _slugify_id(name: str) -> str:
     """Derive a URL-safe profile id from a display name."""
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
@@ -114,31 +106,7 @@ def _derive_profile_id(name: str, existing_ids: set[str]) -> str:
     return f"{base}-{uuid.uuid4().hex[:8]}"
 
 
-def _row_to_profile(row: Row) -> RunnerProfile:
-    """Convert a database row to a RunnerProfile model."""
-    m = row._mapping
-    return RunnerProfile(
-        id=m["id"],
-        name=m["name"],
-        description=m.get("description"),
-        backend=m["backend"],
-        provider=m.get("provider"),
-        model=m.get("model"),
-        base_url=m.get("base_url"),
-        api_key_env=m.get("api_key_env"),
-        api_token_id=m.get("api_token_id"),
-        output_mode=m.get("output_mode") or "auto",
-        params=_json.loads(m.get("params_json") or "{}"),
-        headers=_json.loads(m.get("headers_json") or "{}"),
-        extra_args=_json.loads(m.get("extra_args_json") or "[]"),
-        is_enabled=bool(m.get("is_enabled", 1)),
-        is_system_default=bool(m.get("is_system_default", 0)),
-        created_at=m["created_at"],
-        updated_at=m["updated_at"],
-    )
-
-
-class RunnerProfilesMixin:
+class RunnerProfilesMixin(RunnerStatsMixin):
     """Runner profile CRUD and stats queries. Requires ``self.engine: Engine``."""
 
     engine: Engine
@@ -393,148 +361,3 @@ class RunnerProfilesMixin:
                     agent_runner_profiles.c.agent_id == agent_id
                 )
             )
-
-    def get_system_default_runner_profile(self) -> RunnerProfile | None:
-        """Get the system-wide default runner profile."""
-        from agentbox.core.data.schema import runner_profiles
-
-        with self.engine.connect() as conn:
-            row = conn.execute(
-                select(runner_profiles).where(runner_profiles.c.is_system_default == 1)
-            ).first()
-            return _row_to_profile(row) if row else None
-
-    def runner_profile_stats(
-        self,
-        profile_id: str,
-        since: str | None = None,
-        until: str | None = None,
-    ) -> RunnerProfileStats:
-        """Get aggregated statistics for a specific runner profile."""
-        from agentbox.core.data.schema import runs, usage
-
-        base_filters = [runs.c.runner_profile_id == profile_id]
-        if since:
-            base_filters.append(runs.c.created_at >= since)
-        if until:
-            base_filters.append(runs.c.created_at <= until)
-
-        duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
-
-        stmt = (
-            select(
-                func.count().label("runs"),
-                func.sum(func.cast((runs.c.status == "ok"), type_=Integer)).label(
-                    "succeeded"
-                ),
-                func.sum(
-                    func.cast(
-                        (
-                            runs.c.status.in_(
-                                ("error", "failed", "timeout", "incomplete")
-                            )
-                        ),
-                        type_=Integer,
-                    )
-                ).label("failed"),
-                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
-                func.coalesce(func.sum(usage.c.output_tokens), 0).label(
-                    "output_tokens"
-                ),
-                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
-                func.avg(duration_ms).label("avg_duration_ms"),
-                func.max(runs.c.created_at).label("last_run_at"),
-            )
-            .select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
-            .where(*base_filters)
-        )
-
-        with self.engine.connect() as conn:
-            row = conn.execute(stmt).first()
-
-        m = row._mapping if row else {}
-        return RunnerProfileStats(
-            profile_id=profile_id,
-            runs=int(m.get("runs") or 0),
-            succeeded=int(m.get("succeeded") or 0),
-            failed=int(m.get("failed") or 0),
-            input_tokens=int(m.get("input_tokens") or 0),
-            output_tokens=int(m.get("output_tokens") or 0),
-            cost_usd=float(m.get("cost_usd") or 0.0) or None,
-            avg_duration_ms=float(m.get("avg_duration_ms") or 0.0)
-            if m.get("avg_duration_ms")
-            else None,
-            last_run_at=m.get("last_run_at"),
-        )
-
-    def list_runner_profile_stats(
-        self,
-        since: str | None = None,
-        until: str | None = None,
-    ) -> list[RunnerProfileStats]:
-        """Get aggregated statistics for all runner profiles."""
-        from agentbox.core.data.schema import runs, usage
-
-        base_filters = []
-        if since:
-            base_filters.append(runs.c.created_at >= since)
-        if until:
-            base_filters.append(runs.c.created_at <= until)
-
-        duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
-
-        stmt = (
-            select(
-                runs.c.runner_profile_id.label("profile_id"),
-                func.count().label("runs"),
-                func.sum(func.cast((runs.c.status == "ok"), type_=Integer)).label(
-                    "succeeded"
-                ),
-                func.sum(
-                    func.cast(
-                        (
-                            runs.c.status.in_(
-                                ("error", "failed", "timeout", "incomplete")
-                            )
-                        ),
-                        type_=Integer,
-                    )
-                ).label("failed"),
-                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
-                func.coalesce(func.sum(usage.c.output_tokens), 0).label(
-                    "output_tokens"
-                ),
-                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
-                func.avg(duration_ms).label("avg_duration_ms"),
-                func.max(runs.c.created_at).label("last_run_at"),
-            )
-            .select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
-            .where(*base_filters)
-            .where(runs.c.runner_profile_id.isnot(None))
-            .group_by(runs.c.runner_profile_id)
-            .order_by(runs.c.runner_profile_id)
-        )
-
-        with self.engine.connect() as conn:
-            rows = conn.execute(stmt)
-
-        stats = []
-        for row in rows:
-            m = row._mapping
-            stats.append(
-                RunnerProfileStats(
-                    profile_id=m.get("profile_id") or "unknown",
-                    runs=int(m.get("runs") or 0),
-                    succeeded=int(m.get("succeeded") or 0),
-                    failed=int(m.get("failed") or 0),
-                    input_tokens=int(m.get("input_tokens") or 0),
-                    output_tokens=int(m.get("output_tokens") or 0),
-                    cost_usd=float(m.get("cost_usd") or 0.0) or None,
-                    avg_duration_ms=float(m.get("avg_duration_ms") or 0.0)
-                    if m.get("avg_duration_ms")
-                    else None,
-                    last_run_at=m.get("last_run_at"),
-                )
-            )
-
-        return stats

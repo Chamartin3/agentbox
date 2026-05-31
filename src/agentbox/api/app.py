@@ -25,7 +25,7 @@ from agentbox.api import (
     system,
     workspaces,
 )
-from agentbox.core import deps as _deps
+from agentbox.api import deps as _deps
 from agentbox.core.service.lifecycle import run_startup_tasks
 
 SPA_DIR = Path(__file__).parent.parent / "ui" / "static" / "dist"

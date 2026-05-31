@@ -100,25 +100,25 @@ from agentbox.core.data.schema import (
 # ---------------------------------------------------------------------------
 # Mixins (composed into SessionStore — exposed for type hints & tests)
 # ---------------------------------------------------------------------------
-from agentbox.core.data.agent_config_events import AgentConfigEventsMixin
-from agentbox.core.data.agent_sync import AgentSyncMixin
-from agentbox.core.data.agent_tool_grants import AgentToolGrantsMixin
-from agentbox.core.data.agent_versions import AgentVersionsMixin
-from agentbox.core.data.analytics import AnalyticsMixin
-from agentbox.core.data.api_tokens import ApiTokensMixin
-from agentbox.core.data.env_docs import EnvDocsMixin
-from agentbox.core.data.host_env import HostEnvMixin
-from agentbox.core.data.mcp_discovery import McpDiscoveryMixin
-from agentbox.core.data.mcp_overrides import McpOverridesMixin
-from agentbox.core.data.project_config import ProjectConfigMixin
-from agentbox.core.data.prompts import PromptVersionsMixin
-from agentbox.core.data.resource_bindings import ResourceBindingsMixin
-from agentbox.core.data.resources import ResourcesMixin
-from agentbox.core.data.runner_profiles import RunnerProfilesMixin
-from agentbox.core.data.runtime_permissions import RuntimePermissionsMixin
-from agentbox.core.data.settings import SettingsMixin
-from agentbox.core.data.shared_resources import SharedResourcesMixin
-from agentbox.core.data.workspaces import WorkspacesMixin
+from agentbox.core.data.agents.config_events import AgentConfigEventsMixin
+from agentbox.core.data.agents.sync import AgentSyncMixin
+from agentbox.core.data.agents.tool_grants import AgentToolGrantsMixin
+from agentbox.core.data.agents.versions import AgentVersionsMixin
+from agentbox.core.data.agents.prompts import PromptVersionsMixin
+from agentbox.core.data.runs.analytics import AnalyticsMixin
+from agentbox.core.data.resources.crud import ResourcesMixin
+from agentbox.core.data.resources.shared import SharedResourcesMixin
+from agentbox.core.data.resources.bindings import ResourceBindingsMixin
+from agentbox.core.data.runners.profiles import RunnerProfilesMixin
+from agentbox.core.data.system.api_tokens import ApiTokensMixin
+from agentbox.core.data.system.settings import SettingsMixin
+from agentbox.core.data.system.project_config import ProjectConfigMixin
+from agentbox.core.data.workspaces.crud import WorkspacesMixin
+from agentbox.core.data.workspaces.env_docs import EnvDocsMixin
+from agentbox.core.data.workspaces.host_env import HostEnvMixin
+from agentbox.core.data.workspaces.mcp_discovery import McpDiscoveryMixin
+from agentbox.core.data.workspaces.mcp_overrides import McpOverridesMixin
+from agentbox.core.data.workspaces.runtime_permissions import RuntimePermissionsMixin
 
 # ---------------------------------------------------------------------------
 # Store façade
@@ -128,21 +128,55 @@ from agentbox.core.data.store import SessionStore
 # ---------------------------------------------------------------------------
 # Domain-specific helpers / constants
 # ---------------------------------------------------------------------------
-from agentbox.core.data.analytics import _duration_ms_expr  # noqa: F401
-from agentbox.core.data.claude_session import find_session_log, parse_session_log
-from agentbox.core.data.mcp_overrides import VALID_POLICIES
-from agentbox.core.data.resources import _hash_blobs  # noqa: F401
-from agentbox.core.data.runner_profiles import (
+from agentbox.core.data.runs.analytics import _duration_ms_expr  # noqa: F401
+from agentbox.core.data.runs.claude_session import find_session_log, parse_session_log
+from agentbox.core.data.constants import VALID_POLICIES
+from agentbox.core.data.resources.crud import _hash_blobs as hash_blobs  # noqa: F401
+from agentbox.core.data.runners.profiles import (
     RunnerProfile,
     RunnerProfileCreate,
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.data.runner_profiles_seed import (
+from agentbox.core.data.runners.seeds import (
     DEFAULT_PROFILES,
     seed_default_runner_profiles,
 )
 from agentbox.core.data.transcripts import read_transcript
+
+# ---------------------------------------------------------------------------
+# Event types
+# ---------------------------------------------------------------------------
+from agentbox.core.data.events import (
+    DoneEvent,
+    LogEvent,
+    RetryEvent,
+    RunEvent,
+    TextEvent,
+    ThinkingEvent,
+    TimeoutEvent,
+    ToolCallEvent,
+    ToolResultEvent,
+    UsageEvent,
+    ValidationEvent,
+)
+
+# ---------------------------------------------------------------------------
+# Protocols (typed store surfaces)
+# ---------------------------------------------------------------------------
+from agentbox.core.data.protocols import RunStore, StartupStore, WorkspaceBuildStore
+
+# ---------------------------------------------------------------------------
+# Row types (TypedDict query result shapes)
+# ---------------------------------------------------------------------------
+from agentbox.core.data.row_types import (
+    EnvDocRow,
+    PromptVersionRow,
+    RepoResourceRow,
+    ResourceStatus,
+    WorkspaceRow,
+    WorkspaceSource,
+)
 
 # Re-bind schema table names that collide with submodule names. The mixin
 # imports above register submodules as attributes of this package, which
@@ -153,10 +187,12 @@ from agentbox.core.data.schema import (  # noqa: E402,F811
     agent_sync,
     agent_tool_grants,
     agent_versions,
+    agents,
     api_tokens,
     prompt_versions,
     resources,
     runner_profiles,
+    runs,
     settings,
     workspaces,
 )
@@ -261,4 +297,28 @@ __all__ = [
     "parse_session_log",
     "read_transcript",
     "seed_default_runner_profiles",
+    "hash_blobs",
+    # events
+    "DoneEvent",
+    "LogEvent",
+    "RetryEvent",
+    "RunEvent",
+    "TextEvent",
+    "ThinkingEvent",
+    "TimeoutEvent",
+    "ToolCallEvent",
+    "ToolResultEvent",
+    "UsageEvent",
+    "ValidationEvent",
+    # protocols
+    "RunStore",
+    "StartupStore",
+    "WorkspaceBuildStore",
+    # row types
+    "EnvDocRow",
+    "PromptVersionRow",
+    "RepoResourceRow",
+    "ResourceStatus",
+    "WorkspaceRow",
+    "WorkspaceSource",
 ]

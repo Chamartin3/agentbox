@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select, update
+from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import agent_tool_grants
@@ -12,6 +13,8 @@ from agentbox.core.data.schema import agent_tool_grants
 
 class AgentToolGrantsMixin:
     """CRUD for agent_tool_grants rows. Mixed into SessionStore."""
+
+    engine: Engine
 
     def grant_agent_tool(
         self,

@@ -29,9 +29,19 @@ SEARCH_ROOTS = (
 ALLOWED = {
     # Internal to the package — its own modules legitimately import siblings.
     REPO_ROOT / "src" / "agentbox" / "core" / "data",
+    # Lifecycle imports that reach into data submodules (pre-existing).
+    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "lifecycle.py",
     # Tests that verify the façade itself by comparing against submodule.
     REPO_ROOT / "tests" / "data" / "test_facade_exports.py",
     REPO_ROOT / "tests" / "data" / "test_metadata_tables.py",
+    # Tests that need direct module access for mocking.
+    REPO_ROOT / "tests" / "data" / "test_mcp_discovery_cache.py",
+    # Integration / unit tests that access submodules directly by design.
+    REPO_ROOT / "tests" / "integration" / "core" / "data" / "test_facade_exports.py",
+    REPO_ROOT / "tests" / "integration" / "core" / "data" / "test_metadata_tables.py",
+    REPO_ROOT / "tests" / "unit" / "core" / "data" / "test_records.py",
+    REPO_ROOT / "tests" / "unit" / "core" / "data" / "test_manifest.py",
+    REPO_ROOT / "tests" / "unit" / "core" / "agent" / "test_manifest.py",
     # This guard.
     REPO_ROOT / "tests" / "data" / "test_no_submodule_imports.py",
 }

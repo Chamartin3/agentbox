@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.data import _hash_blobs
+from agentbox.core.data.resources.crud import _hash_blobs
 from agentbox.core.resource.importers.base import ImporterContext
 from agentbox.core.resource.importers.host_path import HostPathImporter
 from agentbox.core.resource.importers.schema import SchemaImporter

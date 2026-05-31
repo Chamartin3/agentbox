@@ -112,6 +112,31 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "parse_session_log",
         "read_transcript",
         "seed_default_runner_profiles",
+        # event types
+        "DoneEvent",
+        "LogEvent",
+        "RetryEvent",
+        "RunEvent",
+        "TextEvent",
+        "ThinkingEvent",
+        "TimeoutEvent",
+        "ToolCallEvent",
+        "ToolResultEvent",
+        "UsageEvent",
+        "ValidationEvent",
+        # consumer Protocols (Plan 08)
+        "RunStore",
+        "StartupStore",
+        "WorkspaceBuildStore",
+        # row TypedDicts (Plan 06)
+        "EnvDocRow",
+        "PromptVersionRow",
+        "RepoResourceRow",
+        "WorkspaceRow",
+        "ResourceStatus",
+        "WorkspaceSource",
+        # misc
+        "hash_blobs",
     }
 )
 

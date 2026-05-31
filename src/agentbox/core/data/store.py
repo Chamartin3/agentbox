@@ -24,18 +24,18 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from agentbox.core.constants import RunStatus
-from agentbox.core.data.agent_config_events import AgentConfigEventsMixin
-from agentbox.core.data.agent_sync import AgentSyncMixin
-from agentbox.core.data.agent_tool_grants import AgentToolGrantsMixin
-from agentbox.core.data.agent_versions import AgentVersionsMixin
-from agentbox.core.data.analytics import AnalyticsMixin
-from agentbox.core.data.api_tokens import ApiTokensMixin
-from agentbox.core.data.env_docs import EnvDocsMixin
-from agentbox.core.data.host_env import HostEnvMixin
-from agentbox.core.data.mcp_discovery import McpDiscoveryMixin
-from agentbox.core.data.mcp_overrides import McpOverridesMixin
-from agentbox.core.data.project_config import ProjectConfigMixin
-from agentbox.core.data.prompts import PromptVersionsMixin
+from agentbox.core.data.agents.config_events import AgentConfigEventsMixin
+from agentbox.core.data.agents.sync import AgentSyncMixin
+from agentbox.core.data.agents.tool_grants import AgentToolGrantsMixin
+from agentbox.core.data.agents.versions import AgentVersionsMixin
+from agentbox.core.data.agents.prompts import PromptVersionsMixin
+from agentbox.core.data.runs.analytics import AnalyticsMixin
+from agentbox.core.data.resources.crud import ResourcesMixin
+from agentbox.core.data.resources.shared import SharedResourcesMixin
+from agentbox.core.data.resources.bindings import ResourceBindingsMixin
+from agentbox.core.data.runners.profiles import RunnerProfilesMixin
+from agentbox.core.data.system.api_tokens import ApiTokensMixin
+from agentbox.core.data.system.project_config import ProjectConfigMixin
 from agentbox.core.data.records import (
     McpSnapshot,
     ResourceSnapshotEntry,
@@ -44,10 +44,6 @@ from agentbox.core.data.records import (
     now_iso,
     row_to_run,
 )
-from agentbox.core.data.resource_bindings import ResourceBindingsMixin
-from agentbox.core.data.resources import ResourcesMixin
-from agentbox.core.data.runner_profiles import RunnerProfilesMixin
-from agentbox.core.data.runtime_permissions import RuntimePermissionsMixin
 from agentbox.core.data.schema import (
     metadata,
     run_comments,
@@ -57,9 +53,12 @@ from agentbox.core.data.schema import (
     usage,
     webhook_deliveries,
 )
-from agentbox.core.data.settings import SettingsMixin
-from agentbox.core.data.shared_resources import SharedResourcesMixin
-from agentbox.core.data.workspaces import WorkspacesMixin
+from agentbox.core.data.workspaces.crud import WorkspacesMixin
+from agentbox.core.data.workspaces.env_docs import EnvDocsMixin
+from agentbox.core.data.workspaces.host_env import HostEnvMixin
+from agentbox.core.data.workspaces.mcp_discovery import McpDiscoveryMixin
+from agentbox.core.data.workspaces.mcp_overrides import McpOverridesMixin
+from agentbox.core.data.workspaces.runtime_permissions import RuntimePermissionsMixin
 
 logger = logging.getLogger(__name__)
 
@@ -756,7 +755,8 @@ class SessionStore(
     McpDiscoveryMixin,
     HostEnvMixin,
     RunnerProfilesMixin,
-    SettingsMixin,
+    # SettingsMixin is inherited transitively through ProjectConfigMixin;
+    # listing it directly here causes an MRO conflict.
     ProjectConfigMixin,
     ApiTokensMixin,
     AnalyticsMixin,

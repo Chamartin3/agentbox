@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import settings as settings_table
@@ -17,6 +18,8 @@ from agentbox.core.data.schema import settings as settings_table
 
 class SettingsMixin:
     """CRUD for the `settings` table."""
+
+    engine: Engine
 
     def get_settings_section(self, section: str) -> dict:
         """Return all `{key: value}` pairs in a section (empty dict if none)."""

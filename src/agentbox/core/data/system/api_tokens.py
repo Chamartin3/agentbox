@@ -19,6 +19,7 @@ import os
 import uuid
 
 from cryptography.fernet import Fernet, InvalidToken
+from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import api_tokens
@@ -48,6 +49,8 @@ def _key_from_env_or_db(store) -> bytes:
 
 class ApiTokensMixin:
     """CRUD for the ``api_tokens`` table."""
+
+    engine: Engine
 
     def _fernet(self) -> Fernet:
         return Fernet(_key_from_env_or_db(self))

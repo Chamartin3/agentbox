@@ -7,6 +7,8 @@ from typing import Any
 
 from sqlalchemy.engine import Engine
 
+from agentbox.core.data.agents.versions.read import _AgentVersionsReadMixin
+
 
 def _text_diff(a: str, b: str) -> str:
     if a == b:
@@ -38,7 +40,7 @@ def _json_diff(a: str, b: str) -> dict:
     return {"added": added, "removed": removed, "changed": changed}
 
 
-class _AgentVersionsDiffMixin:
+class _AgentVersionsDiffMixin(_AgentVersionsReadMixin):
     """Diff queries over agent_versions rows."""
 
     engine: Engine

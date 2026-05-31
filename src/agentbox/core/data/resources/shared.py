@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from typing import Any, Mapping
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.engine import Engine
@@ -86,7 +87,7 @@ class SharedResourcesMixin:
                     created_at=now_iso(),
                 )
             )
-        return self.get_resource(id, 1) or self._row_to_record(
+        result = self.get_resource(id, 1) or self._row_to_record(
             {
                 "id": id,
                 "version": 1,
@@ -103,6 +104,8 @@ class SharedResourcesMixin:
                 "created_at": now_iso(),
             }
         )
+        assert result is not None
+        return result
 
     def create_resource_version(
         self,
@@ -138,7 +141,7 @@ class SharedResourcesMixin:
             raise ValueError(f"Resource {id!r} not found and no fields provided")
 
         # Compute new version number
-        next_ver = self._next_version(id)
+        next_ver = self._next_shared_version(id)
 
         # Merge field updates with latest values
         kind = fields_to_update.get("kind") or (latest.kind if latest else "")
@@ -183,7 +186,7 @@ class SharedResourcesMixin:
                 )
             )
 
-        return self.get_resource(id, next_ver) or self._row_to_record(
+        result = self.get_resource(id, next_ver) or self._row_to_record(
             {
                 "id": id,
                 "version": next_ver,
@@ -200,6 +203,8 @@ class SharedResourcesMixin:
                 "created_at": now_iso(),
             }
         )
+        assert result is not None
+        return result
 
     def get_resource(self, id: str, version: int) -> SharedResourceRecord | None:
         """Fetch a specific resource version by id and version number."""
@@ -271,7 +276,8 @@ class SharedResourcesMixin:
             query = query.limit(limit).offset(offset)
 
             rows = conn.execute(query)
-            return [self._row_to_record(r._mapping) for r in rows]
+            records = [self._row_to_record(r._mapping) for r in rows]
+            return [r for r in records if r is not None]
 
     def count_active_resources(
         self, *, kind: str | None = None, q: str | None = None
@@ -317,7 +323,8 @@ class SharedResourcesMixin:
                 .limit(limit)
                 .offset(offset)
             )
-            return [self._row_to_record(r._mapping) for r in rows]
+            records = [self._row_to_record(r._mapping) for r in rows]
+            return [r for r in records if r is not None]
 
     def activate_resource(self, id: str, version: int) -> SharedResourceRecord:
         """Atomically activate a specific version and deactivate others.
@@ -361,7 +368,7 @@ class SharedResourcesMixin:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _next_version(self, id: str) -> int:
+    def _next_shared_version(self, id: str) -> int:
         """Compute next version number for a resource."""
         with self.engine.connect() as conn:
             row = conn.execute(
@@ -372,7 +379,9 @@ class SharedResourcesMixin:
             return int(row[0]) + 1 if row else 1
 
     @staticmethod
-    def _row_to_record(row: dict | None) -> SharedResourceRecord | None:
+    def _row_to_record(
+        row: Mapping[str, Any] | None,
+    ) -> SharedResourceRecord | None:
         """Convert a row dict to SharedResourceRecord."""
         if not row:
             return None

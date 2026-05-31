@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
+from agentbox.core.data.row_types import PromptVersionRow
 from agentbox.core.data.schema import prompt_versions
 
 
@@ -33,7 +34,9 @@ class PromptVersionsMixin:
             )
             return [dict(r._mapping) for r in rows]
 
-    def get_prompt_version(self, agent_id: str, version: int) -> dict | None:
+    def get_prompt_version(
+        self, agent_id: str, version: int
+    ) -> PromptVersionRow | None:
         with self.engine.connect() as conn:
             row = conn.execute(
                 prompt_versions.select().where(
@@ -41,7 +44,7 @@ class PromptVersionsMixin:
                     prompt_versions.c.version == version,
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return PromptVersionRow(**dict(row._mapping)) if row else None
 
     def get_latest_committed_prompt(self, agent_id: str) -> dict | None:
         with self.engine.connect() as conn:

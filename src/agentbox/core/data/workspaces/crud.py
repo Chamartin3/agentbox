@@ -17,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
+from agentbox.core.data.row_types import WorkspaceRow
 from agentbox.core.data.schema import workspaces
 
 # Satellite tables whose rows belong to a workspace. Listed here so
@@ -44,12 +45,12 @@ class WorkspacesMixin:
             rows = conn.execute(workspaces.select().order_by(workspaces.c.name))
             return [dict(r._mapping) for r in rows]
 
-    def get_workspace(self, name: str) -> dict | None:
+    def get_workspace(self, name: str) -> WorkspaceRow | None:
         with self.engine.connect() as conn:
             row = conn.execute(
                 workspaces.select().where(workspaces.c.name == name)
             ).first()
-            return dict(row._mapping) if row else None
+            return WorkspaceRow(**dict(row._mapping)) if row else None
 
     def create_workspace(
         self,

@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
+from agentbox.core.data.row_types import EnvDocRow  # noqa: F401
 from agentbox.core.data.schema import workspace_env_doc_versions, workspace_env_docs
 
 
@@ -27,7 +28,7 @@ class EnvDocsMixin:
 
     engine: Engine
 
-    def get_active_env_doc(self, workspace_id: str) -> dict | None:
+    def get_active_env_doc(self, workspace_id: str) -> EnvDocRow | None:
         with self.engine.connect() as conn:
             ptr = conn.execute(
                 workspace_env_docs.select().where(
@@ -41,7 +42,7 @@ class EnvDocsMixin:
                     workspace_env_doc_versions.c.id == ptr.active_version_id
                 )
             ).first()
-            return dict(ver._mapping) if ver else None
+            return EnvDocRow(**dict(ver._mapping)) if ver else None
 
     def list_env_doc_versions(self, workspace_id: str) -> list[dict]:
         with self.engine.connect() as conn:

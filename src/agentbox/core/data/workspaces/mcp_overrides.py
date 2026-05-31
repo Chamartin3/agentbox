@@ -18,6 +18,7 @@ from typing import Literal
 
 from sqlalchemy.engine import Engine
 
+from agentbox.core.data.constants import VALID_POLICIES
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.schema import (
     workspace_mcp_overrides,
@@ -25,7 +26,6 @@ from agentbox.core.data.schema import (
     workspace_mcp_tool_overrides,
 )
 
-VALID_POLICIES = ("allow_all_unless_disabled", "deny_all_unless_enabled")
 Policy = Literal["allow_all_unless_disabled", "deny_all_unless_enabled"]
 
 

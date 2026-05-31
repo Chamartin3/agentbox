@@ -22,6 +22,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
+from agentbox.core.data.row_types import RepoResourceRow
 from agentbox.core.data.schema import (
     active_resource_versions,
     resource_blobs,
@@ -203,12 +204,12 @@ class ResourcesMixin:
             )
         return self.get_repo_resource(resource_id)
 
-    def get_repo_resource(self, resource_id: str) -> dict | None:
+    def get_repo_resource(self, resource_id: str) -> RepoResourceRow | None:
         with self.engine.connect() as conn:
             row = conn.execute(
                 resources_table.select().where(resources_table.c.id == resource_id)
             ).first()
-            return dict(row._mapping) if row else None
+            return RepoResourceRow(**dict(row._mapping)) if row else None
 
     def get_repo_resource_by_slug(self, slug: str) -> dict | None:
         with self.engine.connect() as conn:
