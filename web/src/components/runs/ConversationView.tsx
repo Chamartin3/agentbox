@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { LooseStreamEvent } from '../api/events';
-import { fmtTime, prettyExcerpt } from '../util/format';
+import type { LooseStreamEvent } from '../../api/events';
+import { fmtTime, prettyExcerpt } from '../../util/format';
 
 // Backwards-compatible alias. Prefer RunEvent/LooseStreamEvent from api/events.
 export type StreamEvent = LooseStreamEvent;

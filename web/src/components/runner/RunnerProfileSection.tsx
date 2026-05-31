@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, ApiError, type RunnerBackend, type RunnerProfile, type RunnerProvider } from '../api/client';
-import { apiTokens as apiTokensClient } from '../api/api_tokens';
+import { api, ApiError, type RunnerBackend, type RunnerProfile, type RunnerProvider } from '../../api/client';
+import { apiTokens as apiTokensClient } from '../../api/api_tokens';
 import RunnerProfileModal from './RunnerProfileModal';
 
 export function RunnerProfileSection({ agentId }: { agentId: string }) {

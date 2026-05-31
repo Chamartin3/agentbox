@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { hostEnvApi, HostEnvCapability, HostEnvGrants } from '../api/repo';
+import { hostEnvApi, HostEnvCapability, HostEnvGrants } from '../../api/repo';
 
 interface Props {
   workspaceId: string;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import EnvDocEditor from '../src/components/EnvDocEditor';
+import EnvDocEditor from '../src/components/workspace/EnvDocEditor';
 
 global.fetch = vi.fn();
 

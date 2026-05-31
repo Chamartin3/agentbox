@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import MarkdownEditor from './MarkdownEditor';
+import MarkdownEditor from '../MarkdownEditor';
 
 interface EnvDocContent {
   project_name: string;
@@ -31,7 +31,7 @@ interface Props {
   workspaceId: string;
 }
 
-import { apiRequest as api } from '../api/http';
+import { apiRequest as api } from '../../api/http';
 
 export default function EnvDocEditor({ workspaceId }: Props) {
   const [content, setContent] = useState<EnvDocContent | null>(null);

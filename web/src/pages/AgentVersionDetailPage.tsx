@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { versionsApi, VersionDetail, Comment } from '../api/versions';
 import AgentVersionDiff from './AgentVersionDiff';
-import RunRatingStars from '../components/RunRatingStars';
+import RunRatingStars from '../components/runs/RunRatingStars';
 
 interface RunRecord {
   id: string;

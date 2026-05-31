@@ -5,11 +5,11 @@ import { versionsApi, VersionSummary } from '../api/versions';
 import AgentVersions from './AgentVersions';
 import ManifestEditor from '../components/ManifestEditor';
 import MarkdownEditor from '../components/MarkdownEditor';
-import RunsTable, { RunRow } from '../components/RunsTable';
+import RunsTable, { RunRow } from '../components/runs/RunsTable';
 import RunsDashboard from '../components/runs/RunsDashboard';
-import AgentResourcesEditor from '../components/AgentResourcesEditor';
-import AgentValidationEditor from '../components/AgentValidationEditor';
-import LiveComposedPromptPreview, { type PreviewResult } from '../components/LiveComposedPromptPreview';
+import AgentResourcesEditor from '../components/agent/AgentResourcesEditor';
+import AgentValidationEditor from '../components/agent/AgentValidationEditor';
+import LiveComposedPromptPreview, { type PreviewResult } from '../components/agent/LiveComposedPromptPreview';
 import Toast from '../components/Toast';
 import './AgentDetailPage.css';
 

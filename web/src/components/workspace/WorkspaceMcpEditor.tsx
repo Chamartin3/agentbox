@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { workspaceMcpApi, EffectiveMcp, McpPolicy, McpServerView } from '../api/repo';
+import { workspaceMcpApi, EffectiveMcp, McpPolicy, McpServerView } from '../../api/repo';
 
 interface Props {
   workspaceId: string;

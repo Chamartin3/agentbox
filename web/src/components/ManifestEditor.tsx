@@ -1,8 +1,8 @@
 import { useEffect, useState, KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError } from '../api/client';
-import { RunnerProfileSection } from './RunnerProfileSection';
-import { AgentToolGrantsPicker } from './AgentToolGrantsPicker';
+import { RunnerProfileSection } from './runner/RunnerProfileSection';
+import { AgentToolGrantsPicker } from './agent/AgentToolGrantsPicker';
 
 interface Props {
   agent: AgentDef;

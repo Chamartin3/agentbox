@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError } from '../api/client';
-import { repoApi, type RepoResource, type RepoVersion } from '../api/repo';
-import { ConflictPolicy, MaterializeMode, RepoType as RepoTypeEnum } from '../api/enums';
-import ResourcePicker from './ResourcePicker';
-import Toast from './Toast';
+import { ApiError } from '../../api/client';
+import { repoApi, type RepoResource, type RepoVersion } from '../../api/repo';
+import { ConflictPolicy, MaterializeMode, RepoType as RepoTypeEnum } from '../../api/enums';
+import ResourcePicker from '../ResourcePicker';
+import Toast from '../Toast';
 
 type OnConflict = ConflictPolicy;
 
@@ -43,7 +43,7 @@ interface DryRunResult {
   conflicts: DryRunConflict[];
 }
 
-import { apiRequest as req } from '../api/http';
+import { apiRequest as req } from '../../api/http';
 
 function errMsg(e: unknown, fallback: string): string {
   if (e instanceof ApiError) {

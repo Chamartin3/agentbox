@@ -18,8 +18,8 @@ import {
   AgentRunState,
   activityApi,
 } from '../api/activity';
-import RunsTable, { RunRow } from '../components/RunsTable';
-import RunDetailDrawer from '../components/RunDetailDrawer';
+import RunsTable, { RunRow } from '../components/runs/RunsTable';
+import RunDetailDrawer from '../components/runs/RunDetailDrawer';
 import { fmtCost, fmtMs, fmtNum } from '../util/format';
 
 const RANGES: ActivityRange[] = ['7d', '30d', '90d'];

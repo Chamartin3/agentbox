@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiRequest as api } from '../api/http';
+import { apiRequest as api } from '../../api/http';
 
 interface SkillRow {
   id: string;

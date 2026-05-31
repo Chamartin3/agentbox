@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AgentDef, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
-import EventStream from '../components/EventStream';
-import ConversationView from '../components/ConversationView';
-import RunCommentThread from '../components/RunCommentThread';
+import EventStream from '../components/runs/EventStream';
+import ConversationView from '../components/runs/ConversationView';
+import RunCommentThread from '../components/runs/RunCommentThread';
 import { StatusPill } from '../components/ui/StatusPill';
 import { fmtCost, fmtDt, fmtMs, fmtNum, fmtRelative } from '../util/format';
 import type { LooseStreamEvent } from '../api/events';

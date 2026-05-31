@@ -4,7 +4,7 @@ import {
   api,
   type AgentValidationView,
   type Validator,
-} from '../api/client';
+} from '../../api/client';
 
 type Direction = 'input' | 'output';
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, AgentDef } from '../api/client';
-import { subagentsApi, WorkspaceSubagent } from '../api/repo';
+import { api, AgentDef } from '../../api/client';
+import { subagentsApi, WorkspaceSubagent } from '../../api/repo';
 
 interface Row {
   agent_id: string;

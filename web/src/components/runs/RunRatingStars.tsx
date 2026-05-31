@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { apiRequest } from '../api/http';
-import './RatingStars.css';
+import { apiRequest } from '../../api/http';
+import './RunRatingStars.css';
 
 type RunRating = { rating: number | null };
 

@@ -7,8 +7,8 @@ import {
   type RunnerProfileCreate,
   type RunnerProfilePatch,
   type RunnerProvider,
-} from '../api/client';
-import { BackendId } from '../api/enums';
+} from '../../api/client';
+import { BackendId } from '../../api/enums';
 
 function stripProviderPrefix(model: string | null | undefined, provider: string | null | undefined): string {
   if (!model) return '';

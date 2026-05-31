@@ -3,8 +3,8 @@ import {
   getEventMeta,
   summarizeEvent,
   type LooseStreamEvent,
-} from '../api/events';
-import { fmtDt, fmtRelativeShort, fmtTimeMs } from '../util/format';
+} from '../../api/events';
+import { fmtDt, fmtRelativeShort, fmtTimeMs } from '../../util/format';
 
 // Backwards-compatible alias for existing callers (RunDetailPage etc.).
 // New code should import RunEvent / UiRunEvent from ../api/events instead.

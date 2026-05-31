@@ -1,9 +1,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError } from '../api/client';
-import { repoApi, type RepoResource, type RepoType, type RepoVersion } from '../api/repo';
-import ResourcePicker from './ResourcePicker';
-import Toast from './Toast';
+import { ApiError } from '../../api/client';
+import { repoApi, type RepoResource, type RepoType, type RepoVersion } from '../../api/repo';
+import ResourcePicker from '../ResourcePicker';
+import Toast from '../Toast';
 import LiveComposedPromptPreview from './LiveComposedPromptPreview';
 
 type PromptMode = 'inline' | 'skill_primer' | 'name_only' | 'manifest';
@@ -56,7 +56,7 @@ interface PreviewResult {
   total_chars?: number;
 }
 
-import { apiRequest as req } from '../api/http';
+import { apiRequest as req } from '../../api/http';
 
 function errMsg(e: unknown, fallback: string): string {
   if (e instanceof ApiError) {

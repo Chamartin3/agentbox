@@ -7,7 +7,7 @@ import {
   api,
 } from '../api/client';
 import { RunsFilterKey, RunStatus } from '../api/enums';
-import RunsTable, { RunRow } from '../components/RunsTable';
+import RunsTable, { RunRow } from '../components/runs/RunsTable';
 import RunsDashboard from '../components/runs/RunsDashboard';
 import RunnerProfilesPage from './RunnerProfilesPage';
 import { RuntimeDefaultsForm, type ToastState } from './SettingsBaseTab';

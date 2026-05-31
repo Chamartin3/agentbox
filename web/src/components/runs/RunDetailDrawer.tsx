@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { AgentRun } from '../api/activity';
-import { fmtCost, fmtDt, fmtMs, fmtNum } from '../util/format';
+import { AgentRun } from '../../api/activity';
+import { fmtCost, fmtDt, fmtMs, fmtNum } from '../../util/format';
 
 interface Props {
   run: AgentRun | null;
