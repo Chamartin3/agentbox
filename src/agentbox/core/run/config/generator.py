@@ -35,6 +35,14 @@ if TYPE_CHECKING:
 Permission = Literal["allow", "ask"]
 
 
+def _dump_json(path: Path, data: object) -> Path:
+    """Write ``data`` to ``path`` as pretty-printed JSON. Returns ``path``."""
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return path
+
+
 def _is_read_tool_claude(tool: str, prefix: str = CLAUDE_MCP_PREFIX) -> bool:
     if not tool.startswith(prefix):
         return False
@@ -372,134 +380,30 @@ class ConfigGenerator:
         files: list[dict] | None = None,
         project_root: Path | None = None,
     ) -> dict[str, Path]:
-        """Generate all configs into workspace_path/.agentbox/generated/.
+        """Generate all configs into ``workspace_path/.agentbox/generated/``.
 
-        Parameters
-        ----------
-        workspace_path:
-            Path to the workspace directory.
-        allowed_tools:
-            Optional set of tool names (with ``mcp__`` prefix) to restrict
-            each agent to. When provided, only tools in this set are included
-            in the generated configs. Both Claude Code and OpenCode configs
-            are generated from the same filtered specification.
+        ``allowed_tools`` (set of mcp-prefixed tool names) restricts each
+        agent's tool list before generation. ``allowed_builtin_tools`` is
+        forwarded into the Claude settings builder unchanged. Both Claude
+        and OpenCode configs are generated from the same filtered shape.
 
-        Returns
-        -------
-        Dict mapping config type to generated file path.
+        Also mirrors the Claude settings document to
+        ``<workspace>/.claude/settings.json`` so Claude Code's CWD auto-load
+        picks up the same deny/allow when an interactive launcher does not
+        pass ``--settings`` explicitly. Declared workspace ``files`` are
+        copied into the workspace cwd (not the generated subdir).
         """
-        agents = self.discovery.discover_mcp_agents()
-
-        # Filter agent tools against workspace permissions
-        if allowed_tools is not None:
-            filtered: list[DiscoveredAgent] = []
-            for agent in agents:
-                filtered_tools = [t for t in agent["mcp_tools"] if t in allowed_tools]
-                if filtered_tools:
-                    filtered_agent = dict(agent)
-                    filtered_agent["mcp_tools"] = filtered_tools
-                    filtered.append(filtered_agent)  # type: ignore[arg-type]
-            agents = filtered
-            if self.verbose:
-                total = sum(len(a["mcp_tools"]) for a in agents)
-                print(f"  Filtered to {len(agents)} agents with {total} allowed tools")
-
-        generated_dir = workspace_path / ".agentbox" / "generated"
-        generated_dir.mkdir(parents=True, exist_ok=True)
-
-        # Claude Code agents.json
-        claude_agents = build_claude_agents(agents)
-        claude_agents_path = generated_dir / "claude_agents.json"
-        claude_agents_path.write_text(
-            json.dumps(claude_agents, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
+        agents = self._filter_by_allowed(
+            self.discovery.discover_mcp_agents(), allowed_tools
         )
-        if self.verbose:
-            print(f"  Wrote {len(claude_agents)} agents to {claude_agents_path}")
-
-        # Claude Code settings.json
-        claude_settings = build_claude_settings(
-            agents, allowed_builtin_tools, self.discovery.claude_mcp_prefix
+        target_dir = workspace_path / ".agentbox" / "generated"
+        paths = self._write_configs(
+            target_dir, agents, allowed_builtin_tools, verbose=self.verbose,
         )
-        claude_settings_path = generated_dir / "claude_settings.json"
-        claude_settings_path.write_text(
-            json.dumps(claude_settings, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        if self.verbose:
-            allow_count = len(claude_settings["permissions"]["allow"])  # type: ignore[union-attr]
-            print(f"  Wrote {allow_count} permissions to {claude_settings_path}")
-
-        # Mirror to <workspace>/.claude/settings.json so Claude Code's cwd
-        # auto-load picks up the same deny/allow when an interactive
-        # launcher does not pass --settings explicitly.
-        mirror_dir = workspace_path / ".claude"
-        mirror_dir.mkdir(parents=True, exist_ok=True)
-        mirror_path = mirror_dir / "settings.json"
-        existing: dict = {}
-        if mirror_path.is_file():
-            try:
-                existing = json.loads(mirror_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                existing = {}
-        existing["permissions"] = claude_settings["permissions"]
-        existing.setdefault("theme", "dark")
-        mirror_path.write_text(
-            json.dumps(existing, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-
-        # Materialize declarative file copies into the workspace cwd so
-        # agents can read reference docs as plain files.
         if files and project_root is not None:
             _materialize_workspace_files(workspace_path, files, project_root)
-
-        # Claude MCP config — multi-server when ``self.servers`` is set,
-        # else a single legacy entry built from the constructor kwargs.
-        claude_mcp_config = build_claude_mcp_config(
-            servers=self.servers,
-            mcp_server_name=self.mcp_server_name,
-            mcp_url=self.mcp_url,
-            mcp_transport=self.mcp_transport,
-            mcp_command=self.mcp_command,
-        )
-        claude_mcp_config_path = generated_dir / "claude_mcp.json"
-        claude_mcp_config_path.write_text(
-            json.dumps(claude_mcp_config, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        if self.verbose:
-            kind = "remote" if self.mcp_url else "stdio"
-            print(f"  Wrote {kind} Claude MCP config to {claude_mcp_config_path}")
-
-        # OpenCode config
-        opencode_config = build_opencode_config(
-            agents,
-            mcp_server_name=self.mcp_server_name,
-            mcp_command=self.mcp_command,
-            mcp_url=self.mcp_url,
-            mcp_transport=self.mcp_transport,
-            servers=self.servers,
-        )
-        opencode_path = generated_dir / "opencode.json"
-        opencode_path.write_text(
-            json.dumps(opencode_config, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        if self.verbose:
-            agent_names = [
-                k
-                for k, v in opencode_config["agent"].items()  # type: ignore[union-attr]
-                if not v.get("disable")  # type: ignore[union-attr]
-            ]
-            print(f"  Wrote {len(agent_names)} opencode agents to {opencode_path}")
-
-        return {
-            "claude_agents": claude_agents_path,
-            "claude_settings": claude_settings_path,
-            "claude_mcp": claude_mcp_config_path,
-            "opencode": opencode_path,
-        }
+        self._mirror_claude_settings(workspace_path, paths["claude_settings"])
+        return paths
 
     def generate_configs_into(
         self,
@@ -510,29 +414,78 @@ class ConfigGenerator:
     ) -> dict[str, Path]:
         """Generate all configs as flat files into ``target_dir``.
 
-        Unlike ``generate_for_workspace`` this writes directly to an
-        arbitrary directory without a ``.agentbox/generated/`` subdirectory.
-        Used by the executor to populate per-run tmpfs directories.
+        Unlike :meth:`generate_for_workspace` this writes directly to an
+        arbitrary directory without a ``.agentbox/generated/`` subdirectory
+        and emits no verbose progress lines. Declared workspace ``files``
+        are copied into ``target_dir`` (flat). Used by the executor to
+        populate per-run tmpfs directories.
         """
         agents = self.discovery.discover_mcp_agents()
+        paths = self._write_configs(
+            target_dir, agents, allowed_builtin_tools, verbose=False,
+        )
+        if files and project_root is not None:
+            _materialize_workspace_files(target_dir, files, project_root)
+        return paths
 
+    # ------------------------------------------------------------------ #
+    # Internals
+    # ------------------------------------------------------------------ #
+
+    def _filter_by_allowed(
+        self,
+        agents: list[DiscoveredAgent],
+        allowed_tools: set[str] | None,
+    ) -> list[DiscoveredAgent]:
+        """Keep only tools in ``allowed_tools``; drop agents left empty.
+
+        ``None`` means "no filter" and returns the input unchanged.
+        """
+        if allowed_tools is None:
+            return agents
+        filtered: list[DiscoveredAgent] = []
+        for agent in agents:
+            kept = [t for t in agent["mcp_tools"] if t in allowed_tools]
+            if not kept:
+                continue
+            narrowed = dict(agent)
+            narrowed["mcp_tools"] = kept
+            filtered.append(narrowed)  # type: ignore[arg-type]
+        if self.verbose:
+            total = sum(len(a["mcp_tools"]) for a in filtered)
+            print(f"  Filtered to {len(filtered)} agents with {total} allowed tools")
+        return filtered
+
+    def _write_configs(
+        self,
+        target_dir: Path,
+        agents: list[DiscoveredAgent],
+        allowed_builtin: list[str] | None,
+        *,
+        verbose: bool,
+    ) -> dict[str, Path]:
+        """Write the four generated configs into ``target_dir``.
+
+        Returns the path map both public methods exposed before the
+        collapse — same keys, same files, byte-identical content. File
+        materialization and the ``.claude/settings.json`` mirror are
+        callers' responsibilities because they target different paths in
+        the workspace and executor forms.
+        """
         target_dir.mkdir(parents=True, exist_ok=True)
 
         claude_agents_data = build_claude_agents(agents)
-        ca_path = target_dir / "claude_agents.json"
-        ca_path.write_text(
-            json.dumps(claude_agents_data, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        ca_path = _dump_json(target_dir / "claude_agents.json", claude_agents_data)
+        if verbose:
+            print(f"  Wrote {len(claude_agents_data)} agents to {ca_path}")
 
         claude_settings_data = build_claude_settings(
-            agents, allowed_builtin_tools, self.discovery.claude_mcp_prefix
+            agents, allowed_builtin, self.discovery.claude_mcp_prefix
         )
-        cs_path = target_dir / "claude_settings.json"
-        cs_path.write_text(
-            json.dumps(claude_settings_data, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        cs_path = _dump_json(target_dir / "claude_settings.json", claude_settings_data)
+        if verbose:
+            allow_count = len(claude_settings_data["permissions"]["allow"])  # type: ignore[union-attr]
+            print(f"  Wrote {allow_count} permissions to {cs_path}")
 
         claude_mcp_data = build_claude_mcp_config(
             servers=self.servers,
@@ -541,11 +494,10 @@ class ConfigGenerator:
             mcp_transport=self.mcp_transport,
             mcp_command=self.mcp_command,
         )
-        cm_path = target_dir / "claude_mcp.json"
-        cm_path.write_text(
-            json.dumps(claude_mcp_data, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        cm_path = _dump_json(target_dir / "claude_mcp.json", claude_mcp_data)
+        if verbose:
+            kind = "remote" if self.mcp_url else "stdio"
+            print(f"  Wrote {kind} Claude MCP config to {cm_path}")
 
         opencode_data = build_opencode_config(
             agents,
@@ -555,14 +507,14 @@ class ConfigGenerator:
             mcp_transport=self.mcp_transport,
             servers=self.servers,
         )
-        oc_path = target_dir / "opencode.json"
-        oc_path.write_text(
-            json.dumps(opencode_data, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-
-        if files and project_root is not None:
-            _materialize_workspace_files(target_dir, files, project_root)
+        oc_path = _dump_json(target_dir / "opencode.json", opencode_data)
+        if verbose:
+            agent_names = [
+                k
+                for k, v in opencode_data["agent"].items()  # type: ignore[union-attr]
+                if not v.get("disable")  # type: ignore[union-attr]
+            ]
+            print(f"  Wrote {len(agent_names)} opencode agents to {oc_path}")
 
         return {
             "claude_agents": ca_path,
@@ -570,6 +522,31 @@ class ConfigGenerator:
             "claude_mcp": cm_path,
             "opencode": oc_path,
         }
+
+    def _mirror_claude_settings(
+        self, workspace_path: Path, claude_settings_path: Path
+    ) -> None:
+        """Mirror the generated Claude settings into ``<workspace>/.claude/settings.json``.
+
+        The mirror preserves any non-``permissions`` keys an operator may
+        have set in the workspace's checked-in settings file.
+        """
+        mirror_dir = workspace_path / ".claude"
+        mirror_dir.mkdir(parents=True, exist_ok=True)
+        mirror_path = mirror_dir / "settings.json"
+        existing: dict = {}
+        if mirror_path.is_file():
+            try:
+                existing = json.loads(mirror_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                existing = {}
+        generated = json.loads(claude_settings_path.read_text(encoding="utf-8"))
+        existing["permissions"] = generated["permissions"]
+        existing.setdefault("theme", "dark")
+        mirror_path.write_text(
+            json.dumps(existing, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
 
     def get_generated_paths(self, workspace_path: Path) -> dict[str, Path]:
         """Return expected paths without generating."""
