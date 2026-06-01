@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -328,6 +329,16 @@ def build_opencode_config(
     return result
 
 
+# Writers import the builder functions defined above, so this import
+# must come after they exist. (Top-of-file import would race the
+# circular path agentbox.core.run.config.generator → writers → generator.)
+from agentbox.core.run.config.writers import (  # noqa: E402
+    DEFAULT_WRITERS,
+    ConfigWriter,
+    WriteContext,
+)
+
+
 class ConfigGenerator:
     """Generates runner configuration files for a workspace.
 
@@ -357,6 +368,7 @@ class ConfigGenerator:
         mcp_transport: str = "http",
         servers: list[dict] | None = None,
         verbose: bool = True,
+        writers: Sequence[ConfigWriter] | None = None,
     ) -> None:
         self.discovery = AgentDiscovery(
             agentbox_toml=agentbox_toml,
@@ -371,6 +383,11 @@ class ConfigGenerator:
         self.mcp_transport = mcp_transport
         self.servers = servers
         self.verbose = verbose
+        # The writer list IS the backend set. Adding a third backend
+        # (e.g. Codex) is a new ConfigWriter class plus passing it here.
+        self.writers: tuple[ConfigWriter, ...] = (
+            tuple(writers) if writers is not None else DEFAULT_WRITERS
+        )
 
     def generate_for_workspace(
         self,
@@ -464,64 +481,31 @@ class ConfigGenerator:
         *,
         verbose: bool,
     ) -> dict[str, Path]:
-        """Write the four generated configs into ``target_dir``.
+        """Drive every registered :class:`ConfigWriter` against ``target_dir``.
 
         Returns the path map both public methods exposed before the
-        collapse — same keys, same files, byte-identical content. File
-        materialization and the ``.claude/settings.json`` mirror are
-        callers' responsibilities because they target different paths in
-        the workspace and executor forms.
+        Protocol introduction — same keys, same files, byte-identical
+        content. File materialization and the ``.claude/settings.json``
+        mirror are callers' responsibilities because they target
+        different paths in the workspace and executor forms.
         """
         target_dir.mkdir(parents=True, exist_ok=True)
-
-        claude_agents_data = build_claude_agents(agents)
-        ca_path = _dump_json(target_dir / "claude_agents.json", claude_agents_data)
-        if verbose:
-            print(f"  Wrote {len(claude_agents_data)} agents to {ca_path}")
-
-        claude_settings_data = build_claude_settings(
-            agents, allowed_builtin, self.discovery.claude_mcp_prefix
-        )
-        cs_path = _dump_json(target_dir / "claude_settings.json", claude_settings_data)
-        if verbose:
-            allow_count = len(claude_settings_data["permissions"]["allow"])  # type: ignore[union-attr]
-            print(f"  Wrote {allow_count} permissions to {cs_path}")
-
-        claude_mcp_data = build_claude_mcp_config(
-            servers=self.servers,
-            mcp_server_name=self.mcp_server_name,
-            mcp_url=self.mcp_url,
-            mcp_transport=self.mcp_transport,
-            mcp_command=self.mcp_command,
-        )
-        cm_path = _dump_json(target_dir / "claude_mcp.json", claude_mcp_data)
-        if verbose:
-            kind = "remote" if self.mcp_url else "stdio"
-            print(f"  Wrote {kind} Claude MCP config to {cm_path}")
-
-        opencode_data = build_opencode_config(
-            agents,
+        ctx = WriteContext(
+            allowed_builtin=allowed_builtin,
             mcp_server_name=self.mcp_server_name,
             mcp_command=self.mcp_command,
             mcp_url=self.mcp_url,
             mcp_transport=self.mcp_transport,
             servers=self.servers,
+            claude_mcp_prefix=self.discovery.claude_mcp_prefix,
         )
-        oc_path = _dump_json(target_dir / "opencode.json", opencode_data)
-        if verbose:
-            agent_names = [
-                k
-                for k, v in opencode_data["agent"].items()  # type: ignore[union-attr]
-                if not v.get("disable")  # type: ignore[union-attr]
-            ]
-            print(f"  Wrote {len(agent_names)} opencode agents to {oc_path}")
-
-        return {
-            "claude_agents": ca_path,
-            "claude_settings": cs_path,
-            "claude_mcp": cm_path,
-            "opencode": oc_path,
-        }
+        paths: dict[str, Path] = {}
+        for writer in self.writers:
+            result = writer.write(target_dir, agents, ctx)
+            paths[result.key] = result.path
+            if verbose and result.summary:
+                print(result.summary)
+        return paths
 
     def _mirror_claude_settings(
         self, workspace_path: Path, claude_settings_path: Path
