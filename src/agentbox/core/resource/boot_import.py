@@ -130,7 +130,7 @@ def _import_one(
     importer,
     tags: Iterable[str] = (),
     metadata_extra: dict | None = None,
-) -> tuple[str, bool]:
+) -> tuple[str, str]:
     """Idempotently create-or-update a single resource. Returns (action, slug).
 
     action ∈ {"created", "updated", "skipped"}.

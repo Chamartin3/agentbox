@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import typer
 from rich.table import Table
@@ -66,23 +67,26 @@ def provider_models(
 ) -> None:
     """List available models for a provider."""
     from agentbox.core.agent.providers import get_provider
+    from agentbox.core.agent.providers.registry import list_models as registry_list_models
 
     store = get_store()
 
-    class _Config:
-        pass
-
-    config = _Config()
     if profile_id:
         profile = get_runner_profile(store, profile_id)
         if not profile:
             console.print(f"[red]Profile not found:[/red] {profile_id}")
             raise typer.Exit(1)
-        config.base_url = profile.base_url or base_url
-        config.api_key_env = profile.api_key_env or api_key_env
+        config = SimpleNamespace(
+            base_url=profile.base_url or base_url,
+            api_key_env=profile.api_key_env or api_key_env,
+            backend=None,
+        )
     else:
-        config.base_url = base_url
-        config.api_key_env = api_key_env
+        config = SimpleNamespace(
+            base_url=base_url,
+            api_key_env=api_key_env,
+            backend=None,
+        )
 
     provider = get_provider(provider_id)
     if not provider:
@@ -96,7 +100,9 @@ def provider_models(
         raise typer.Exit(1)
 
     try:
-        models = asyncio.run(provider.list_models(config, refresh=refresh))
+        models = asyncio.run(
+            registry_list_models(provider_id, config, refresh=refresh)
+        )
     except Exception as e:
         console.print(f"[red]Error fetching models:[/red] {e}")
         raise typer.Exit(1)  # noqa: B904

@@ -132,11 +132,11 @@ from agentbox.core.data.runs.analytics import _duration_ms_expr  # noqa: F401
 from agentbox.core.data.runs.claude_session import find_session_log, parse_session_log
 from agentbox.core.data.constants import VALID_POLICIES
 from agentbox.core.data.resources.crud import _hash_blobs as hash_blobs  # noqa: F401
+from agentbox.core.data.runners._models import RunnerProfileStats
 from agentbox.core.data.runners.profiles import (
     RunnerProfile,
     RunnerProfileCreate,
     RunnerProfilePatch,
-    RunnerProfileStats,
 )
 from agentbox.core.data.runners.seeds import (
     DEFAULT_PROFILES,

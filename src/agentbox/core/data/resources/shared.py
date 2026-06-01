@@ -380,7 +380,7 @@ class SharedResourcesMixin:
 
     @staticmethod
     def _row_to_record(
-        row: Mapping[str, Any] | None,
+        row: Mapping[str, Any] | Any | None,
     ) -> SharedResourceRecord | None:
         """Convert a row dict to SharedResourceRecord."""
         if not row:

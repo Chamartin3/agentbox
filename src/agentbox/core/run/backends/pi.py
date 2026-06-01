@@ -9,7 +9,7 @@ import os
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from agentbox.api.events import (
     DoneEvent,
@@ -75,8 +75,10 @@ def parse_pi_event(
         events.append(ThinkingEvent(run_id=run_id, text=text))
 
     if etype in ("usage", "turn.completed", "completion"):
-        usage = evt.get("usage") if isinstance(evt.get("usage"), dict) else evt
-        model = evt.get("model") if isinstance(evt.get("model"), str) else None
+        usage_raw = evt.get("usage")
+        usage: dict[str, Any] = usage_raw if isinstance(usage_raw, dict) else evt
+        model_raw = evt.get("model")
+        model = model_raw if isinstance(model_raw, str) else None
         events.append(
             UsageEvent(
                 run_id=run_id,
@@ -91,15 +93,17 @@ def parse_pi_event(
 
 
 def _int_or_zero(v: object) -> int:
-    try:
-        return int(v)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return 0
+    if isinstance(v, (int, float, str)):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return 0
+    return 0
 
 
 class PiBackend(BackendAdapter):
     name = _NAME
-    conversation_format: str | None = "pi-session"
+    conversation_format: ClassVar[str | None] = "pi-session"
     default_model = _DEFAULT_PI_MODEL
 
     def __init__(self) -> None:
@@ -116,7 +120,7 @@ class PiBackend(BackendAdapter):
         self,
         agent: Any,
         workdir: Path,
-        mcp_tools: list[dict] | None = None,
+        mcp_tools: Any = None,
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
@@ -129,7 +133,7 @@ class PiBackend(BackendAdapter):
 
         env = dict(os.environ)
 
-        timeout_seconds = agent_runner.timeout_seconds
+        timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
         return RenderedConfig(
             argv=argv,

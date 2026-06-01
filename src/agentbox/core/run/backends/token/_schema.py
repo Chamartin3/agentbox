@@ -109,6 +109,7 @@ def _json_schema_to_pydantic_model(
             fields[prop_name] = (py_type, default)
         if not fields:
             return create_model(name)
-        return create_model(name, **fields)
+        create_model_any: Any = create_model
+        return create_model_any(name, **fields)
 
     return _build_model_from_schema(schema, name=model_name)

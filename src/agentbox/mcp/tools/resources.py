@@ -21,7 +21,11 @@ from agentbox.core.run.run_prep import (
     resolve_workspace_resources,
 )
 from agentbox.core.service.agents import resolve_agent
-from agentbox.core.workspace.env_doc.renderers import AgentsMdRenderer, ClaudeMdRenderer
+from agentbox.core.service.env_doc import (
+    build_env_doc_context,
+    render_env_doc_preview,
+)
+from agentbox.core.workspace.env_doc.schema import EnvDocContent
 from agentbox.mcp.deps import get_context
 from agentbox.mcp.schemas import clamp_limit
 
@@ -141,7 +145,9 @@ def register(mcp: FastMCP) -> None:
             fname = filename or f"{slug.replace('/', '_')}.md"
             importer = UploadImporter(filename=fname, content=raw, mime_type=mime_type)
         try:
-            imported = importer.run(ImporterContext(actor=None, changelog=changelog))
+            imported = importer.run(
+                ImporterContext(actor=None, changelog=changelog or "")
+            )
             version = ctx.store.import_repo_version(
                 resource["id"],
                 imported.blobs,
@@ -254,7 +260,9 @@ def register(mcp: FastMCP) -> None:
             as_skill=(type == "skill"),
         )
         try:
-            imported = importer.run(ImporterContext(actor=None, changelog=changelog))
+            imported = importer.run(
+                ImporterContext(actor=None, changelog=changelog or "")
+            )
             version = ctx.store.import_repo_version(
                 resource["id"],
                 imported.blobs,
@@ -591,13 +599,14 @@ def register(mcp: FastMCP) -> None:
         if doc is None:
             return {"workspace_id": workspace_id, "claude_md": None, "agents_md": None}
 
-        content = doc.get("content", "")
+        content = EnvDocContent.model_validate(doc.get("content_json") or {})
+        rctx = build_env_doc_context(ctx.store, workspace_id)
+        rendered = render_env_doc_preview(content, rctx)
         result: dict = {"workspace_id": workspace_id}
-
         if audience != "agents_only":
-            result["claude_md"] = ClaudeMdRenderer().render(content)
+            result["claude_md"] = rendered["claude_md"]
         if audience != "claude_only":
-            result["agents_md"] = AgentsMdRenderer().render(content)
+            result["agents_md"] = rendered["agents_md"]
         return result
 
     @mcp.tool
@@ -648,7 +657,7 @@ def register(mcp: FastMCP) -> None:
             return err
         ctx = get_context()
         row = ctx.store.set_workspace_mcp_tool_override(
-            workspace_id, server_name, tool_name, enabled=enabled, changelog=reason
+            workspace_id, server_name, tool_name, enabled=enabled
         )
         return row
 
@@ -668,7 +677,7 @@ def register(mcp: FastMCP) -> None:
             return err
         ctx = get_context()
         row = ctx.store.set_workspace_host_env(
-            workspace_id, overrides=grants, changelog=reason
+            workspace_id, profile_id=None, overrides=grants, changelog=reason
         )
         return row
 

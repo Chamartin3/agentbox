@@ -235,15 +235,17 @@ async def run_direct_agent_mode(
                 et = type(event).__name__
                 if et == "PartStartEvent":
                     idx: int = getattr(event, "index", 0)
-                    pn = type(event.part).__name__
+                    part = getattr(event, "part", None)
+                    pn = type(part).__name__
                     if "Thinking" in pn:
-                        thinking_accum[idx] = getattr(event.part, "content", "")
+                        thinking_accum[idx] = getattr(part, "content", "")
                     elif "Text" in pn:
-                        text_accum[idx] = getattr(event.part, "content", "")
+                        text_accum[idx] = getattr(part, "content", "")
                 elif et == "PartDeltaEvent":
                     idx = getattr(event, "index", 0)
-                    dn = type(event.delta).__name__
-                    delta_text: str = getattr(event.delta, "content_delta", "")
+                    delta = getattr(event, "delta", None)
+                    dn = type(delta).__name__
+                    delta_text: str = getattr(delta, "content_delta", "")
                     if "Thinking" in dn and delta_text:
                         thinking_accum[idx] = (
                             thinking_accum.get(idx, "") + delta_text
@@ -258,11 +260,12 @@ async def run_direct_agent_mode(
                         )
                 elif et == "PartEndEvent":
                     idx = getattr(event, "index", 0)
-                    pn = type(event.part).__name__
+                    part = getattr(event, "part", None)
+                    pn = type(part).__name__
                     if "Thinking" in pn:
-                        thinking_accum[idx] = getattr(event.part, "content", "")
+                        thinking_accum[idx] = getattr(part, "content", "")
                     elif "Text" in pn:
-                        text_accum[idx] = getattr(event.part, "content", "")
+                        text_accum[idx] = getattr(part, "content", "")
                 elif et == "AgentRunResultEvent":
                     final_result = getattr(event, "result", None)
     except Exception as exc:

@@ -153,11 +153,12 @@ def _claude_code_fragments(
     spec = agent.runner
     out: list[PromptFragment] = []
 
-    if spec.agents_config_path:
+    agents_config_path = getattr(spec, "agents_config_path", None)
+    if agents_config_path:
         out.append(
             _read_file_fragment(
                 name="agents_config",
-                path=project_root / spec.agents_config_path,
+                path=project_root / agents_config_path,
                 source="project",
                 injected_by="claude_cli",
             )
@@ -171,11 +172,12 @@ def _claude_code_fragments(
                 injected_by="claude_cli",
             )
         )
-    if spec.settings_path:
+    settings_path = getattr(spec, "settings_path", None)
+    if settings_path:
         out.append(
             _read_file_fragment(
                 name="settings",
-                path=project_root / spec.settings_path,
+                path=project_root / settings_path,
                 source="project",
                 injected_by="claude_cli",
             )

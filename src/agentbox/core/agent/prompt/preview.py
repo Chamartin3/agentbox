@@ -51,6 +51,10 @@ def _resolve_binding(store: SessionStore, b: dict) -> dict:
             )
         version_id = active["id"]
     version = store.get_repo_version(version_id)
+    if not version:
+        raise PreviewError(
+            "no_version", f"version {version_id!r} not found"
+        )
     blobs = list(store.iter_repo_blobs(version_id))
     return {
         "binding_id": b.get("id") or b.get("binding_id") or "live",
@@ -300,7 +304,7 @@ def render_agent_prompt_preview(
     parts: list[dict] = [
         {"label": "prompt template", "chars": len(base_prompt)},
     ]
-    if input_schema_block:
+    if input_schema_block and input_schema is not None:
         parts.append(
             {
                 "label": "input_schema block",
@@ -316,7 +320,7 @@ def render_agent_prompt_preview(
     # visually grouped in the composer breakdown chart — schema (implicit
     # validator), rules, and the validation hint all originate from the
     # validation contract surface.
-    if output_schema_block:
+    if output_schema_block and output_schema is not None:
         parts.append(
             {
                 "label": "validator: output schema (json-schema gate)",

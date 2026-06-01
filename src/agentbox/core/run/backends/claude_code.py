@@ -15,7 +15,7 @@ import shutil
 import signal
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from agentbox.api.events import (
     DoneEvent,
@@ -40,7 +40,7 @@ _HEARTBEAT_INTERVAL_SECONDS = 30.0
 
 class ClaudeCodeBackend(BackendAdapter):
     name = _NAME
-    conversation_format: str | None = "claude-cli-jsonl"
+    conversation_format: ClassVar[str | None] = "claude-cli-jsonl"
 
     def conversation_uri(
         self,
@@ -53,7 +53,7 @@ class ClaudeCodeBackend(BackendAdapter):
         self,
         agent: Any,
         workdir: Path,
-        mcp_tools: list[dict] | None = None,
+        mcp_tools: Any = None,
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
@@ -97,7 +97,7 @@ class ClaudeCodeBackend(BackendAdapter):
         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             env.pop(k, None)
 
-        timeout_seconds = agent_runner.timeout_seconds
+        timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
         return RenderedConfig(
             argv=argv,

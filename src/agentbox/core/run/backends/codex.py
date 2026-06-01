@@ -11,7 +11,7 @@ import os
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
@@ -100,7 +100,7 @@ def _int_or_zero(v: object) -> int:
 
 class CodexBackend(BackendAdapter):
     name = _NAME
-    conversation_format: str | None = "codex-session"
+    conversation_format: ClassVar[str | None] = "codex-session"
     default_model = _DEFAULT_CODEX_MODEL
 
     def __init__(self) -> None:
@@ -117,7 +117,7 @@ class CodexBackend(BackendAdapter):
         self,
         agent: Any,
         workdir: Path,
-        mcp_tools: list[dict] | None = None,
+        mcp_tools: Any = None,
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
@@ -130,7 +130,7 @@ class CodexBackend(BackendAdapter):
 
         env = dict(os.environ)
 
-        timeout_seconds = agent_runner.timeout_seconds
+        timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
         return RenderedConfig(
             argv=argv,

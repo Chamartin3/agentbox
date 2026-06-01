@@ -143,7 +143,7 @@ class ResourcesMixin:
         description: str | None = None,
         tags: Iterable[str] | None = None,
         created_by: str | None = None,
-    ) -> dict:
+    ) -> RepoResourceRow | dict:
         if type not in RESOURCE_TYPES:
             raise ValueError(
                 f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}"
@@ -178,7 +178,7 @@ class ResourcesMixin:
         display_name: str | None = None,
         description: str | None = None,
         tags: Iterable[str] | None = None,
-    ) -> dict | None:
+    ) -> RepoResourceRow | None:
         """Update mutable resource fields. Pass only the fields you want to change."""
         values: dict = {}
         if type is not None:

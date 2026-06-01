@@ -13,7 +13,7 @@ from agentbox.config import Settings
 from agentbox.core.resource.skills import discover_skills
 
 if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef
+    from agentbox.core.data import AgentDef, SessionStore
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ class WorkspaceInfo:
 def resolve_path(
     agent: AgentDef,
     settings: Settings,
-    store: object | None = None,
+    store: SessionStore | None = None,
 ) -> tuple[Path, bool]:
     """Return (workspace_path, is_ephemeral) for an agent.
 
@@ -46,18 +46,16 @@ def resolve_path(
 
     if agent.workspace:
         if store is not None:
-            get_ws = getattr(store, "get_workspace", None)
-            if callable(get_ws):
-                row = get_ws(agent.workspace)
-                if row and row.get("path"):
-                    return settings.project_root / row["path"], False
+            row = store.get_workspace(agent.workspace)
+            if row and row.get("path"):
+                return settings.project_root / row["path"], False
         return settings.project_root / agent.workspace, False
 
     return settings.workspaces_root / agent.id, False
 
 
 def info(
-    agent: AgentDef, settings: Settings, store: object | None = None
+    agent: AgentDef, settings: Settings, store: SessionStore | None = None
 ) -> WorkspaceInfo:
     path, ephemeral = resolve_path(agent, settings, store)
     has_claude_md = (path / "CLAUDE.md").exists() if path.exists() else False
@@ -89,7 +87,7 @@ Edit freely — changes take effect on the next run.
 def ensure(
     agent: AgentDef,
     settings: Settings,
-    store: object | None = None,
+    store: SessionStore | None = None,
     scaffold: bool = True,
 ) -> Path:
     """Create the workspace if missing. Optionally scaffold a starter CLAUDE.md."""
@@ -102,7 +100,7 @@ def ensure(
     return path
 
 
-def reset(agent: AgentDef, settings: Settings, store: object | None = None) -> Path:
+def reset(agent: AgentDef, settings: Settings, store: SessionStore | None = None) -> Path:
     """Delete and recreate the workspace (drops everything inside)."""
     path, _ = resolve_path(agent, settings, store)
     if path.exists():
@@ -110,7 +108,7 @@ def reset(agent: AgentDef, settings: Settings, store: object | None = None) -> P
     return ensure(agent, settings, store, scaffold=True)
 
 
-def list_all(store: object, settings: Settings) -> list[WorkspaceInfo]:
+def list_all(store: SessionStore, settings: Settings) -> list[WorkspaceInfo]:
     """List a WorkspaceInfo for every agent known to the DB."""
     # lazy: cycle workspace.manager ↔ service.agents (service.agents imports this module)
     from agentbox.core.service.agents import list_all_agents

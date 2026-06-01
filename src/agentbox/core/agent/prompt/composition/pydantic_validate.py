@@ -102,7 +102,8 @@ def _build_model_from_schema(
         fields[prop_name] = (py_type, default)
     if not fields:
         return _empty_model(name)
-    return create_model(name, **fields)
+    create_model_any: Any = create_model
+    return create_model_any(name, **fields)
 
 
 def validate_with_pydantic(

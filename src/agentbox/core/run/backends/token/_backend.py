@@ -23,7 +23,7 @@ import json
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
@@ -44,7 +44,7 @@ class TokenBackend(BackendAdapter):
     """Unified in-process LLM backend using pydantic-ai."""
 
     name = _NAME
-    conversation_format: str | None = "pydantic-ai-history"
+    conversation_format: ClassVar[str | None] = "pydantic-ai-history"
 
     def conversation_uri(
         self,
@@ -59,7 +59,7 @@ class TokenBackend(BackendAdapter):
         self,
         agent: Any,
         workdir: Path,
-        mcp_tools: list[dict] | None = None,
+        mcp_tools: Any = None,
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
@@ -263,7 +263,8 @@ class TokenBackend(BackendAdapter):
         from pydantic import Field
 
         try:
-            from pydantic_agents import BaseAgent
+            pydantic_agents = __import__("pydantic_agents")
+            BaseAgent = pydantic_agents.BaseAgent
         except ImportError as exc:
             raise ImportError(
                 "pydantic_agents is required for auto-generated agents. "

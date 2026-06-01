@@ -119,8 +119,10 @@ class OpencodeSessionSource(ConversationSource):
 
         totals = TokenTotals()
         if isinstance(info, dict):
-            tokens = info.get("tokens") if isinstance(info.get("tokens"), dict) else {}
-            cache = tokens.get("cache") if isinstance(tokens.get("cache"), dict) else {}
+            tokens_raw = info.get("tokens")
+            tokens = tokens_raw if isinstance(tokens_raw, dict) else {}
+            cache_raw = tokens.get("cache")
+            cache = cache_raw if isinstance(cache_raw, dict) else {}
             totals.input_tokens = int(tokens.get("input") or 0)
             totals.output_tokens = int(tokens.get("output") or 0)
             totals.cache_read_tokens = int(cache.get("read") or 0)

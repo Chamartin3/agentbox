@@ -13,7 +13,7 @@ import os
 import re
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from agentbox.api.events import (
     DoneEvent,
@@ -40,7 +40,7 @@ _HEARTBEAT_INTERVAL_SECONDS = 30.0
 
 class OpenCodeBackend(BackendAdapter):
     name = _NAME
-    conversation_format: str | None = "opencode-session"
+    conversation_format: ClassVar[str | None] = "opencode-session"
     default_model = _DEFAULT_OPENCODE_MODEL
 
     def __init__(self) -> None:
@@ -59,7 +59,7 @@ class OpenCodeBackend(BackendAdapter):
         self,
         agent: Any,
         workdir: Path,
-        mcp_tools: list[dict] | None = None,
+        mcp_tools: Any = None,
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
@@ -90,7 +90,7 @@ class OpenCodeBackend(BackendAdapter):
         env = dict(os.environ)
         env["PWD"] = str(workdir)
 
-        timeout_seconds = agent_runner.timeout_seconds
+        timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
         return RenderedConfig(
             argv=argv,

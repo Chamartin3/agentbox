@@ -137,7 +137,8 @@ def import_manifest(
     from pathlib import Path
 
     from agentbox.core.data import ProjectManifest
-    from agentbox.core.data import (PROJECT_MCP_SERVERS,
+    from agentbox.core.data.system.project_config import (
+        PROJECT_MCP_SERVERS,
         PROJECT_RUNTIME,
         PROJECT_SHARED_ASSETS,
     )
@@ -218,7 +219,7 @@ def migrate_prompt_versions() -> None:
 
     See ``agentbox.core.data.backfill_prompt_versions``.
     """
-    from agentbox.core.data import backfill
+    from agentbox.core.data.system.seeds import backfill
 
     store = get_store()
     n = backfill(store)

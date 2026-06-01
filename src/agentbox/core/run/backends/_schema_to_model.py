@@ -313,10 +313,11 @@ def json_schema_to_pydantic_model(
             if additional_properties is False
             else ConfigDict()
         )
+        create_model_any: Any = create_model
         if fields:
-            model = create_model(name, __config__=config, **fields)
+            model = create_model_any(name, __config__=config, **fields)
         else:
-            model = create_model(name, __config__=config)
+            model = create_model_any(name, __config__=config)
 
         cache[name] = model
         return model

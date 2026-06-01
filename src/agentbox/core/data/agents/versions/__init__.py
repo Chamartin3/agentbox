@@ -18,27 +18,15 @@ from agentbox.core.data.agents.versions.models import (
     _VALID_FILE_KINDS,
 )
 from agentbox.core.data.agents.versions.read import _AgentVersionsReadMixin  # noqa: F401
-from agentbox.core.data.agents.versions.write_agent import _AgentVersionsAgentMixin
-from agentbox.core.data.agents.versions.write_files import _AgentVersionsFilesMixin
-from agentbox.core.data.agents.versions.write_meta import _AgentVersionsMetaMixin
-from agentbox.core.data.agents.versions.write_revisions import (
-    _AgentVersionsRevisionsMixin,
-)
+from agentbox.core.data.agents.versions.write import AgentWriteMixin
 
 
 class AgentVersionsMixin(
-    _AgentVersionsAgentMixin,
-    _AgentVersionsRevisionsMixin,
-    _AgentVersionsFilesMixin,
-    _AgentVersionsMetaMixin,
+    AgentWriteMixin,
     _AgentVersionsDiffMixin,
 ):
-    """Versioned agent persistence. Requires ``self.engine: Engine``.
+    """Versioned agent persistence. Requires ``self.engine: Engine``."""
 
-    ``_AgentVersionsReadMixin`` is inherited transitively through
-    ``_AgentVersionsMetaMixin``; listing it again in the direct bases
-    causes an MRO conflict.
-    """
 
 
 __all__ = [

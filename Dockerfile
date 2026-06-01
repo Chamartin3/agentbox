@@ -2,9 +2,9 @@
 
 FROM node:20-alpine AS web
 WORKDIR /web
-COPY libs/agentbox/web/package.json ./
+COPY web/package.json ./
 RUN npm install --no-audit --no-fund
-COPY libs/agentbox/web/ ./
+COPY web/ ./
 # Vite builds into /opt/agentbox/src/agentbox/ui/static/dist via vite.config.ts;
 # we redirect the output here instead.
 RUN npx vite build --outDir /web/dist
@@ -50,10 +50,10 @@ RUN npm install -g @anthropic-ai/claude-code \
  && chown -R appuser:appuser /opt/npm-global
 
 WORKDIR /opt/agentbox
-COPY libs/agentbox/pyproject.toml ./
-COPY libs/agentbox/src ./src
-COPY libs/agentbox/alembic ./alembic
-COPY libs/agentbox/alembic.ini ./alembic.ini
+COPY pyproject.toml ./
+COPY src ./src
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 
 # Drop the SPA into the place FastAPI expects.
 COPY --from=web /web/dist /opt/agentbox/src/agentbox/ui/static/dist
@@ -62,11 +62,8 @@ RUN pip install --no-cache-dir -e . websockets
 
 # Legacy consumer plugins (entry-point plugins resolved at runtime via
 # the `agentbox.guardrails` group).
-COPY libs/cvman_agentbox /opt/cvman_agentbox
-RUN pip install --no-cache-dir -e /opt/cvman_agentbox --config-settings editable_mode=compat
-
 RUN mkdir -p /data /project /home/appuser/.claude /home/appuser/.local/share/opencode \
- && chown -R appuser:appuser /data /opt/agentbox /opt/cvman_agentbox /home/appuser/.claude /home/appuser/.local
+ && chown -R appuser:appuser /data /opt/agentbox /home/appuser/.claude /home/appuser/.local
 
 COPY <<'EOF' /usr/local/bin/agentbox-entrypoint
 #!/usr/bin/env bash
