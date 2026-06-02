@@ -153,7 +153,7 @@ def test_backend_adapter_default_validate_output(tmp_path: Path) -> None:
     """``BackendAdapter`` default impl delegates to validation.validate_output."""
     from collections.abc import AsyncIterator
 
-    from agentbox.api.events import RunEvent
+    from agentbox.core.data import RunEvent
     from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
 
     class _Stub(BackendAdapter):

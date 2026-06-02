@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from agentbox.api.events import DoneEvent
+from agentbox.core.data import DoneEvent
 from agentbox.core.data import RunStatus
 from agentbox.core.run.backends.base import BackendRunResult
 from agentbox.core.run.validation import extract_json

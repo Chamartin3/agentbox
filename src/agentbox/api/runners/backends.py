@@ -13,8 +13,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from agentbox.core.agent.resolve import list_engines as registered_backends
-from agentbox.core.agent.providers import list_providers
+from agentbox.core.agents.resolve import list_engines as registered_backends
+from agentbox.core.agents.providers import list_providers
 
 router = APIRouter(prefix="/api/runner-backends", tags=["runner-backends"])
 

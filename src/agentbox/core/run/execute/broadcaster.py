@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 
-from agentbox.api.events import RunEvent
+from agentbox.core.data import RunEvent
 
 
 class RunBroadcaster:

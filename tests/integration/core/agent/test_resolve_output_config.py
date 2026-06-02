@@ -8,7 +8,7 @@ import json
 from typing import Any
 
 import pytest
-from agentbox.core.agent.config import (
+from agentbox.core.agents.config import (
     HttpValidatorConfig,
     ScriptValidatorConfig,
     resolve_output_config,

@@ -15,7 +15,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from agentbox.api.events import (
+from agentbox.core.data import (
     DoneEvent,
     LogEvent,
     TextEvent,
@@ -238,7 +238,7 @@ async def _fake_jsonl_stream(events: list[Any]) -> Any:
 
 
 async def test_codex_scenario_1_text_only() -> None:
-    from agentbox.api.events import UsageEvent
+    from agentbox.core.data import UsageEvent
     from agentbox.core.run.backends import codex as codex_mod
 
     rendered = RenderedConfig(
@@ -271,7 +271,7 @@ async def test_codex_scenario_1_text_only() -> None:
 
 
 async def test_pi_scenario_1_text_only() -> None:
-    from agentbox.api.events import UsageEvent
+    from agentbox.core.data import UsageEvent
     from agentbox.core.run.backends import pi as pi_mod
 
     rendered = RenderedConfig(

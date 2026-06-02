@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
-from agentbox.api.events import DoneEvent, RunEvent
+from agentbox.core.data import DoneEvent, RunEvent
 from agentbox.core.run.post_render import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,

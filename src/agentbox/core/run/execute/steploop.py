@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
-from agentbox.api.events import UsageEvent
+from agentbox.core.data import UsageEvent
 from agentbox.config import Settings
-from agentbox.core.agent.profiles import EffectiveRunnerConfig
+from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.run.backends.base import RenderedConfig
@@ -125,8 +125,8 @@ class RunStepLoop:
         effective: EffectiveRunnerConfig | None,
         composed: Any | None,
     ) -> StepResult:
-        from agentbox.core.agent.config import ExecutionConfig, PythonAgentConfig
-        from agentbox.core.agent.config import resolve_output_config as _resolve_oc
+        from agentbox.core.agents.config import ExecutionConfig, PythonAgentConfig
+        from agentbox.core.agents.config import resolve_output_config as _resolve_oc
 
         exec_cfg = ExecutionConfig.from_agent(agent)
         python_cfg = PythonAgentConfig.from_agent(agent)

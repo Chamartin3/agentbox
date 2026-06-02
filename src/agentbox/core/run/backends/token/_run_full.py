@@ -23,7 +23,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from agentbox.api.events import (
+from agentbox.core.data import (
     DoneEvent,
     LogEvent,
     RunEvent,

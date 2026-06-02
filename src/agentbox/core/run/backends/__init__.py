@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from agentbox.core.agent.resolve import list_engines as backends
-from agentbox.core.agent.resolve import resolve_engine_by_name as _resolve_backend
+from agentbox.core.agents.resolve import list_engines as backends
+from agentbox.core.agents.resolve import resolve_engine_by_name as _resolve_backend
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
 
 

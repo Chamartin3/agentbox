@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 import httpx
 import pytest
-from agentbox.core.agent.providers.base import ProviderDescriptor
+from agentbox.core.agents.providers.base import ProviderDescriptor
 from agentbox.core.data import SessionStore
 from agentbox.core.service.runner_providers import (
     InvalidProviderRequest,

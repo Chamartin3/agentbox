@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.agent.plugins import backends
+from agentbox.core.agents.plugins import backends
 from agentbox.core.run.backends import get_backend, list_backends
 
 
@@ -52,7 +52,7 @@ def test_fake_adapter_can_be_registered(monkeypatch) -> None:
         async def run(self, rendered, input, run_id):
             yield None  # type: ignore[return-value]
 
-    import agentbox.core.agent.plugins as plugins
+    import agentbox.core.agents.plugins as plugins
 
     plugins._BACKEND_CLASSES = None  # type: ignore[attr-defined]
     with monkeypatch.context() as m:

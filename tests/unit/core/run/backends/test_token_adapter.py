@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from agentbox.api.events import TextEvent
+from agentbox.core.data import TextEvent
 from agentbox.core.run.backends.base import RenderedConfig
 from agentbox.core.run.backends.token import TokenBackend
 from pydantic import BaseModel, ValidationError

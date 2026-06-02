@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from agentbox.api.events import TextEvent
+from agentbox.core.data import TextEvent
 from agentbox.core.run.execute.broadcaster import RunBroadcaster
 
 

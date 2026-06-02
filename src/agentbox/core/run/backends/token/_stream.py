@@ -21,7 +21,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from agentbox.api.events import (
+from agentbox.core.data import (
     LogEvent,
     RunEvent,
     TextEvent,

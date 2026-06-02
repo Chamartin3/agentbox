@@ -41,7 +41,7 @@ ALLOWED = {
     REPO_ROOT / "tests" / "integration" / "core" / "data" / "test_metadata_tables.py",
     REPO_ROOT / "tests" / "unit" / "core" / "data" / "test_records.py",
     REPO_ROOT / "tests" / "unit" / "core" / "data" / "test_manifest.py",
-    REPO_ROOT / "tests" / "unit" / "core" / "agent" / "test_manifest.py",
+    REPO_ROOT / "tests" / "unit" / "core" / "agents" / "test_manifest.py",
     # This guard.
     REPO_ROOT / "tests" / "data" / "test_no_submodule_imports.py",
 }

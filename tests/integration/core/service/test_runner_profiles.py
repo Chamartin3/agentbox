@@ -43,7 +43,7 @@ class _FakeBackend:
 
 class _FakeProvider:
     def __init__(self, compatible_backends: list[str] | None = None) -> None:
-        from agentbox.core.agent.providers.base import ProviderDescriptor as PD
+        from agentbox.core.agents.providers.base import ProviderDescriptor as PD
 
         self.descriptor = PD(
             id="mock",

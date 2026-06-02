@@ -20,7 +20,7 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
-from agentbox.api.events import (
+from agentbox.core.data import (
     DoneEvent,
     LogEvent,
     RunEvent,

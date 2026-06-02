@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from agentbox.api.events import LogEvent, RunEvent
+from agentbox.core.data import LogEvent, RunEvent
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, RunRecord, SessionStore
 from agentbox.core.run.validation import extract_json

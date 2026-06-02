@@ -17,7 +17,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.api.events import (
+from agentbox.core.data import (
     DoneEvent,
     LogEvent,
     RunEvent,
@@ -25,7 +25,7 @@ from agentbox.api.events import (
     TimeoutEvent,
     UsageEvent,
 )
-from agentbox.core.agent.config import RuntimeConfig
+from agentbox.core.agents.config import RuntimeConfig
 from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.run.streaming.rate_limit import detect_in_text_line
 from agentbox.core.workspace.manager import load_capabilities

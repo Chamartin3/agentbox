@@ -147,7 +147,7 @@ from agentbox.core.data.transcripts import read_transcript
 # ---------------------------------------------------------------------------
 # Event types
 # ---------------------------------------------------------------------------
-from agentbox.core.data.events import (
+from agentbox.core.data.runs.events import (
     DoneEvent,
     LogEvent,
     RetryEvent,

@@ -235,7 +235,7 @@ class CompositionConfig(BaseModel):
     """Prompt-composition recipe for an agent bundle.
 
     When present, agentbox owns prompt rendering via
-    ``agentbox.core.agent.prompt.composition.compose()``.
+    ``agentbox.core.agents.prompt.composition.compose()``.
 
     Supports both filesystem paths and shared resource references:
     - File paths: ``"prompts/system.md"`` or ``"shared://root/path.md"``

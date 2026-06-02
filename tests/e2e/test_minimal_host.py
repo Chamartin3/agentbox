@@ -13,7 +13,7 @@ from typing import Any
 
 def _register_noop_backend() -> None:
     """Inject a noop BackendAdapter into the plugins registry under 'claude_code'."""
-    from agentbox.api.events import DoneEvent, RunEvent
+    from agentbox.core.data import DoneEvent, RunEvent
     from agentbox.core.run.backends.base import RenderedConfig
 
     class _NoopBackend:
@@ -34,7 +34,7 @@ def _register_noop_backend() -> None:
         ) -> AsyncIterator[RunEvent]:
             yield DoneEvent(run_id=run_id, ok=True, output="noop done")
 
-    import agentbox.core.agent.plugins as _plugins
+    import agentbox.core.agents.plugins as _plugins
 
     _plugins.backends()
     _plugins._BACKEND_CLASSES["claude_code"] = _NoopBackend  # type: ignore[index]

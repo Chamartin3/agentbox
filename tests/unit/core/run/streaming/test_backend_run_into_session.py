@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest
-from agentbox.api.events import DoneEvent, LogEvent, RunEvent, TextEvent
+from agentbox.core.data import DoneEvent, LogEvent, RunEvent, TextEvent
 from agentbox.core.run.backends.base import (
     BackendAdapter,
     BackendRunResult,

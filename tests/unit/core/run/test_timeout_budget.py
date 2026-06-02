@@ -18,7 +18,7 @@ import asyncio
 from collections.abc import AsyncIterator
 
 import pytest
-from agentbox.api.events import DoneEvent, RunEvent, TextEvent
+from agentbox.core.data import DoneEvent, RunEvent, TextEvent
 from agentbox.core.run.backends.base import (
     BackendAdapter,
     RenderedConfig,

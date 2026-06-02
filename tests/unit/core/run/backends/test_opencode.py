@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.agent.profiles import EffectiveRunnerConfig
+from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.run.backends.opencode import OpenCodeBackend

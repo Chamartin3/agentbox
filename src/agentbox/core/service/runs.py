@@ -25,7 +25,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.agent.resolve import (
+from agentbox.core.agents.resolve import (
     engine_load_failure as backend_load_failure,
     list_engines as backends,
 )

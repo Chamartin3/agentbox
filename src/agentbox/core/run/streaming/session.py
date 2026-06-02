@@ -32,7 +32,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, TextIO
 
-from agentbox.api.events import (
+from agentbox.core.data import (
     DoneEvent,
     LogEvent,
     RetryEvent,

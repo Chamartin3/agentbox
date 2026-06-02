@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agentbox.core.agent.prompt.composition import _append_validation_engine_hint
+from agentbox.core.agents.prompt.composition import _append_validation_engine_hint
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.run.validation import validate_output
 

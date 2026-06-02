@@ -6,13 +6,13 @@ deep core internals. This keeps the internal organization private.
 
 # ── Data / persistence ────────────────────────────────────────────────
 # ── Agent config / profiles / plugins ─────────────────────────────────
-from agentbox.core.agent.config import build_config_json_payload as build_config_json_payload
-from agentbox.core.agent.resolve import engine_load_failure as backend_load_failure  # noqa: F401
-from agentbox.core.agent.resolve import list_engines as backends  # noqa: F401
-from agentbox.core.agent.resolve import resolve_engine_by_name as get_backend  # noqa: F401
-from agentbox.core.agent.profiles import EffectiveRunnerConfig as EffectiveRunnerConfig
-from agentbox.core.agent.providers import get_provider as get_provider
-from agentbox.core.agent.providers import list_providers as list_providers
+from agentbox.core.agents.config import build_config_json_payload as build_config_json_payload
+from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure  # noqa: F401
+from agentbox.core.agents.resolve import list_engines as backends  # noqa: F401
+from agentbox.core.agents.resolve import resolve_engine_by_name as get_backend  # noqa: F401
+from agentbox.core.agents.profiles import EffectiveRunnerConfig as EffectiveRunnerConfig
+from agentbox.core.agents.providers import get_provider as get_provider
+from agentbox.core.agents.providers import list_providers as list_providers
 
 # ── Constants ─────────────────────────────────────────────────────────
 from agentbox.core.constants import EventType as EventType
@@ -33,12 +33,12 @@ from agentbox.core.data import WorkspaceDef as WorkspaceDef
 from agentbox.core.tools import CAPABILITIES as CAPABILITIES  # noqa: F401
 
 # ── Prompt / composition ──────────────────────────────────────────────
-from agentbox.core.agent.prompt.composition import compose_from_source as compose_from_source
-from agentbox.core.agent.prompt.composition import preview as composition_preview  # noqa: F401
-from agentbox.core.agent.prompt.preview import PreviewError as PreviewError
-from agentbox.core.agent.prompt.preview import render_agent_prompt_preview as render_agent_prompt_preview
-from agentbox.core.agent.prompt.rendering import render_for_type as render_for_type
-from agentbox.core.agent.prompt.resolver import resolve_prompt as resolve_prompt
+from agentbox.core.agents.prompt.composition import compose_from_source as compose_from_source
+from agentbox.core.agents.prompt.composition import preview as composition_preview  # noqa: F401
+from agentbox.core.agents.prompt.preview import PreviewError as PreviewError
+from agentbox.core.agents.prompt.preview import render_agent_prompt_preview as render_agent_prompt_preview
+from agentbox.core.agents.prompt.rendering import render_for_type as render_for_type
+from agentbox.core.agents.prompt.resolver import resolve_prompt as resolve_prompt
 from agentbox.core.resource.importers.host_path import HostPathImporter as HostPathImporter
 from agentbox.core.resource.importers.schema import SchemaImporter as SchemaImporter
 from agentbox.core.resource.importers.script import ScriptImporter as ScriptImporter

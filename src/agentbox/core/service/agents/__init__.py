@@ -24,13 +24,13 @@ from typing import TYPE_CHECKING, Any, cast
 from sqlalchemy import func, select
 
 from agentbox.core import workspaces as ws
-from agentbox.core.agent.config import build_config_json_payload
+from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.constants import SessionMode
 from agentbox.core.data import AgentDef, agent_runner_profiles
 from agentbox.core.data import runs as runs_table
-from agentbox.core.agent.prompt.composition import compose_from_source
-from agentbox.core.agent.prompt.composition.loader import load_bundle_from_bindings
-from agentbox.core.agent.prompt.versioning.drift import (
+from agentbox.core.agents.prompt.composition import compose_from_source
+from agentbox.core.agents.prompt.composition.loader import load_bundle_from_bindings
+from agentbox.core.agents.prompt.versioning.drift import (
     _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
 )
 
@@ -520,8 +520,8 @@ def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
 
 
 def _validate_runner_against_registry(agent: AgentDef) -> None:
-    from agentbox.core.agent.resolve import engine_load_failure as backend_load_failure
-    from agentbox.core.agent.resolve import list_engines
+    from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure
+    from agentbox.core.agents.resolve import list_engines
 
     kind = agent.runner.kind
     name = kind.value if hasattr(kind, "value") else str(kind)
@@ -565,7 +565,7 @@ def patch_agent_config(
     import json as _json
 
     from agentbox.core.data import AgentDef as _AgentDef
-    from agentbox.core.agent.prompt.versioning.drift import (
+    from agentbox.core.agents.prompt.versioning.drift import (
         _build_config_json,
         _build_snapshot,
     )
@@ -787,7 +787,7 @@ def put_agent_validation(
     import hashlib
     import json as _json
 
-    from agentbox.core.agent.prompt.versioning.drift import _build_snapshot
+    from agentbox.core.agents.prompt.versioning.drift import _build_snapshot
 
     current = resolve_agent(agent_id, store=store)
     if current is None:

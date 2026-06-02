@@ -31,13 +31,13 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from agentbox.api.events import DoneEvent, LogEvent
+from agentbox.core.data import DoneEvent, LogEvent
 from agentbox.config import Settings
-from agentbox.core.agent.profiles import RunnerProfileResolver
+from agentbox.core.agents.profiles import RunnerProfileResolver
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.data import runs as _runs_table
-from agentbox.core.agent.prompt.capture import build_fragments, fragments_to_json
+from agentbox.core.agents.prompt.capture import build_fragments, fragments_to_json
 
 # Re-exports — preserve the historical public surface of this module so
 # downstream imports (tests, services, host_env) keep working.
