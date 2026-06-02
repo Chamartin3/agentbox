@@ -16,7 +16,11 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from agentbox.core.agent.plugins import backend_load_failure, backends, get_backend
+from agentbox.core.agent.resolve import (
+    engine_load_failure as backend_load_failure,
+    list_engines as backends,
+    resolve_engine_by_name as get_backend,
+)
 from agentbox.core.agent.providers import get_provider, list_providers
 
 if TYPE_CHECKING:

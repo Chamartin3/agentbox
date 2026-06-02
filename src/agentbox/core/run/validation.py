@@ -31,7 +31,7 @@ from agentbox.core.agent.config import (
     PythonAgentConfig,
     resolve_output_config,
 )
-from agentbox.core.agent.prompt.composition.pydantic_validate import validate_with_pydantic
+from agentbox.core.run.pydantic_validate import validate_with_pydantic
 
 # Engine label for the validator that produced the verdict. ``off`` means
 # no schema is configured and validation was skipped; ``none`` means a

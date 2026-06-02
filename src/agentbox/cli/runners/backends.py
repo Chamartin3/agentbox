@@ -8,7 +8,7 @@ import typer
 from rich.table import Table
 
 from agentbox.cli._common import console
-from agentbox.core.agent.plugins import backends as registered_backends
+from agentbox.core.agent.resolve import list_engines as registered_backends
 from agentbox.core.agent.providers import list_providers
 
 app = typer.Typer(

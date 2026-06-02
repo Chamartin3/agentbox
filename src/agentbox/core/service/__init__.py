@@ -60,6 +60,7 @@ from agentbox.core.run.run_prep import resolve_agent_prompt_bindings as resolve_
 from agentbox.core.run.run_prep import resolve_workspace_resources as resolve_workspace_resources
 
 # ── Cross-cutting agents service ──────────────────────────────────────
+from agentbox.core.service.agents import build_agent_snapshot as build_agent_snapshot
 from agentbox.core.service.agents import list_all_agents as list_all_agents
 from agentbox.core.service.agents import resolve_agent as resolve_agent
 from agentbox.core.service.agent_lifecycle import add_comment as add_version_comment  # noqa: F401

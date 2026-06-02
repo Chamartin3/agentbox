@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_settings, get_store
-from agentbox.core.data import SessionStore
+from agentbox.core.service import SessionStore
 from agentbox.core.service import agents as svc
 
 logger = logging.getLogger(__name__)

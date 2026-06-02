@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.api.events import DoneEvent, LogEvent
 from agentbox.config import Settings
-from agentbox.core.agent.plugins import get_backend
+from agentbox.core.agent.resolve import resolve_engine_by_name as get_backend
 from agentbox.core.agent.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.run.backends.base import PostRenderContext, RenderedConfig

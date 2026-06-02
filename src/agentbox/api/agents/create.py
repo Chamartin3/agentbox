@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
-from agentbox.core.data import CompositionConfig, RunnerSpec, WorkspaceDef
+from agentbox.core.service import CompositionConfig, RunnerSpec, WorkspaceDef
 from agentbox.core.service import agents as agents_service
 from agentbox.core.service.agents import (
     AgentAlreadyExists,

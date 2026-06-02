@@ -12,7 +12,10 @@ from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console, handle_cli_errors, resolve_agent
 from agentbox.core import prompts
 from agentbox.core.service import (
+    AgentDef,
     branch_agent_draft,
+    build_agent_snapshot,
+    build_config_json_payload,
     clear_agent_runner_profile,
     create_agent,
     create_agent_version,
@@ -232,9 +235,6 @@ def agent_create(
     The config file must be a JSON object matching ``AgentDef``. No on-disk
     backing file is created; the agent lives entirely in the DB.
     """
-    from agentbox.core.agent.config import build_config_json_payload
-    from agentbox.core.data import AgentDef
-
     data = json.loads(config.read_text(encoding="utf-8"))
     try:
         agent_def = AgentDef.model_validate(data)
@@ -286,9 +286,6 @@ def agent_edit(
     """
     import hashlib
 
-    from agentbox.core.data import AgentDef
-    from agentbox.core.agent.prompt.versioning.drift import _build_snapshot
-
     if not set_:
         console.print("[red]nothing to set; pass --set k=v[/red]")
         raise typer.Exit(2)
@@ -316,7 +313,7 @@ def agent_edit(
 
     updated.source_path = current.source_path
     updated.source_format = current.source_format
-    snapshot = _build_snapshot(updated)
+    snapshot = build_agent_snapshot(updated)
     prompt_text = ""
     if updated.prompt_path:
         try:

@@ -63,10 +63,11 @@ include = ["alembic/**/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-ra --strict-markers --strict-config"
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 markers = [
   "unit: fast, isolated tests for a single module",
   "integration: cross-module / executor / API / store tests",
+  "e2e: end-to-end tests covering full user flows",
   "slow: tests that take noticeable wall-time",
   "live_ollama: requires a running Ollama instance (set OLLAMA_HOST)",
   "live_callback: requires a consumer Django service reachable at CVMAN_BASE_URL",

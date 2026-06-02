@@ -28,7 +28,7 @@ KNOWN_SECTIONS = (
 
 
 # Default seed values surfaced when a section has nothing in the DB yet.
-# Backends read these via `agentbox.core.agent.defaults.runtime_default_model`
+# Backends read these via `agentbox.core.engines.defaults.runtime_default_model`
 # at runtime — editing them in the UI takes effect on the next run.
 SECTION_DEFAULTS: dict[str, dict] = {
     "runtime_defaults": {

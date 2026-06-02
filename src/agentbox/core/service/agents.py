@@ -30,6 +30,9 @@ from agentbox.core.data import AgentDef, agent_runner_profiles
 from agentbox.core.data import runs as runs_table
 from agentbox.core.agent.prompt.composition import compose_from_source
 from agentbox.core.agent.prompt.composition.loader import load_bundle_from_bindings
+from agentbox.core.agent.prompt.versioning.drift import (
+    _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
+)
 
 if TYPE_CHECKING:
     from agentbox.config import Settings
@@ -517,11 +520,12 @@ def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
 
 
 def _validate_runner_against_registry(agent: AgentDef) -> None:
-    from agentbox.core.agent.plugins import backend_load_failure, backends
+    from agentbox.core.agent.resolve import engine_load_failure as backend_load_failure
+    from agentbox.core.agent.resolve import list_engines
 
     kind = agent.runner.kind
     name = kind.value if hasattr(kind, "value") else str(kind)
-    loaded = backends()
+    loaded = list_engines()
     if name in loaded:
         return
     failure = backend_load_failure(name)
