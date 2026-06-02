@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from agentbox.core.data.records import (
-    RunRecord,
     SharedResourceRecord,
     now_iso,
 )
+from agentbox.core.data.runs.records import RunRecord
 
 
 class TestNowIso:

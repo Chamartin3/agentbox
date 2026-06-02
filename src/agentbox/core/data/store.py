@@ -40,10 +40,9 @@ from agentbox.core.data.records import (
     McpSnapshot,
     ResourceSnapshotEntry,
     RunnerSnapshot,
-    RunRecord,
     now_iso,
-    row_to_run,
 )
+from agentbox.core.data.runs.records import RunRecord, row_to_run
 from agentbox.core.data.schema import (
     metadata,
     run_comments,

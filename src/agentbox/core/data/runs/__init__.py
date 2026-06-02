@@ -1,6 +1,41 @@
-"""Run-scoped data layer.
+"""Run-scoped data layer — records, transcripts, events, analytics.
 
-Submodules:
-- analytics/: AnalyticsMixin — activity rollups, time-series queries
-- claude_session: find_session_log, parse_session_log — Claude CLI session parsing
+**Import from this package, not its submodules.**
 """
+
+from agentbox.core.data.runs.events import (
+    DoneEvent,
+    LogEvent,
+    RetryEvent,
+    RunEvent,
+    TextEvent,
+    ThinkingEvent,
+    TimeoutEvent,
+    ToolCallEvent,
+    ToolResultEvent,
+    UsageEvent,
+    ValidationEvent,
+)
+from agentbox.core.data.runs.records import RunRecord, row_to_run
+from agentbox.core.data.runs.transcripts import read_transcript, resolve_transcript_path
+
+__all__ = [
+    # events
+    "DoneEvent",
+    "LogEvent",
+    "RetryEvent",
+    "RunEvent",
+    "TextEvent",
+    "ThinkingEvent",
+    "TimeoutEvent",
+    "ToolCallEvent",
+    "ToolResultEvent",
+    "UsageEvent",
+    "ValidationEvent",
+    # records
+    "RunRecord",
+    "row_to_run",
+    # transcripts
+    "read_transcript",
+    "resolve_transcript_path",
+]
