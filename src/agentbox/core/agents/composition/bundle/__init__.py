@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.constants import BundleFile
-from agentbox.core.agents.prompt.composition.sources import (
+from agentbox.core.agents.composition.bundle.sources import (
     BindingsBundleSource,
     BundleSource,
 )

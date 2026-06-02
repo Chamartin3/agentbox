@@ -17,7 +17,7 @@ from agentbox.cli._deps import get_loader as _DefinitionLoaderShim
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
 from agentbox.config import load_settings
-from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.engines.render import ConfigGenerator
 from agentbox.core.service import get_project_mcp_servers
 from agentbox.core.workspace.mcp.client import McpRegistry
 

@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.data import AgentDef
-from agentbox.core.run.config.backends.base import McpConfig
+from agentbox.core.engines.render.backends.base import McpConfig
 
 
 @dataclass(frozen=True)
@@ -175,7 +175,7 @@ class RunConfigurator:
 
         # 3. Skills (copy filtered skills into backend-native dirs)
         from agentbox.core.resource.skills import discover_skills
-        from agentbox.core.run.config.skills.filter import (
+        from agentbox.core.engines.render.skills.filter import (
             filter_skills_for_backend,
         )
 
@@ -221,7 +221,7 @@ class RunConfigurator:
 
     def _write_prompts(self, prompt_dir: Path, composed: ComposedMetadata) -> None:
         """Write the canonical prompt files via PromptComposer."""
-        from agentbox.core.run.config.prompt_composer import PromptComposer
+        from agentbox.core.engines.render.prompt_composer import PromptComposer
 
         PromptComposer.write_prompts(prompt_dir, composed)
 
@@ -247,7 +247,7 @@ class RunConfigurator:
         mcp: McpConfig | None = None,
     ) -> None:
         """Dispatch to per-backend generators."""
-        from agentbox.core.run.config.backends import get_generator
+        from agentbox.core.engines.render.backends import get_generator
 
         generator = get_generator(backend)
         if generator is not None:

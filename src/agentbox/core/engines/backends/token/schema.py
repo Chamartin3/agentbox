@@ -1,14 +1,14 @@
 """Loose JSON-Schema → pydantic ``BaseModel`` converter.
 
 This is the lenient fallback used by :class:`TokenBackend` when the
-strict converter in :mod:`agentbox.core.run.backends._schema_to_model`
+strict converter in :mod:`agentbox.core.engines.backends.schema_to_model`
 raises :class:`UnsupportedSchema`. It only honors basic shapes
 (``type``, ``$ref``, ``oneOf``/``anyOf``, ``required``, ``default``)
 and intentionally drops enums, length/pattern constraints, and the like
 — losing some constraint coverage is preferred to aborting a run.
 
 Exposed at the package top-level as
-``agentbox.core.run.backends.token._json_schema_to_pydantic_model`` for
+``agentbox.core.engines.backends.token._json_schema_to_pydantic_model`` for
 backward compatibility with callers and tests that imported it from the
 old single-module ``token.py``.
 """

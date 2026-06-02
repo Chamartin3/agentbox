@@ -11,7 +11,7 @@ from agentbox.core.agents.plugins import (
     backends as _backends,
     get_backend as _get_backend,
 )
-from agentbox.core.run.backends.base import BackendAdapter
+from agentbox.core.engines.backends.base import BackendAdapter
 
 
 def resolve_engine_by_name(name: str) -> type[BackendAdapter]:

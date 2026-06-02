@@ -28,9 +28,9 @@ from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.constants import SessionMode
 from agentbox.core.data import AgentDef, agent_runner_profiles
 from agentbox.core.data import runs as runs_table
-from agentbox.core.agents.prompt.composition import compose_from_source
-from agentbox.core.agents.prompt.composition.loader import load_bundle_from_bindings
-from agentbox.core.agents.prompt.versioning.drift import (
+from agentbox.core.agents.composition.bundle import compose_from_source
+from agentbox.core.agents.composition.bundle.loader import load_bundle_from_bindings
+from agentbox.core.agents.composition.versioning.drift import (
     _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
 )
 
@@ -565,7 +565,7 @@ def patch_agent_config(
     import json as _json
 
     from agentbox.core.data import AgentDef as _AgentDef
-    from agentbox.core.agents.prompt.versioning.drift import (
+    from agentbox.core.agents.composition.versioning.drift import (
         _build_config_json,
         _build_snapshot,
     )
@@ -787,7 +787,7 @@ def put_agent_validation(
     import hashlib
     import json as _json
 
-    from agentbox.core.agents.prompt.versioning.drift import _build_snapshot
+    from agentbox.core.agents.composition.versioning.drift import _build_snapshot
 
     current = resolve_agent(agent_id, store=store)
     if current is None:

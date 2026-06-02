@@ -7,7 +7,7 @@ from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
-    from agentbox.core.run.backends.base import BackendAdapter
+    from agentbox.core.engines.backends.base import BackendAdapter
 
 T = TypeVar("T")
 

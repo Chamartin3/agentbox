@@ -23,14 +23,14 @@ from agentbox.config import Settings
 from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
-from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.engines.backends.base import RenderedConfig
 from agentbox.core.run.retry import RetryOrchestrator
 from agentbox.core.run.streaming.session import RunStreamSession
 
 from agentbox.core.run.execute.broadcaster import RunBroadcaster
 
 if TYPE_CHECKING:
-    from agentbox.core.run.backends.base import BackendAdapter
+    from agentbox.core.engines.backends.base import BackendAdapter
 
 logger = logging.getLogger(__name__)
 

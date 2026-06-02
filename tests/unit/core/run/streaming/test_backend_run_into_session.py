@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 from agentbox.core.data import DoneEvent, LogEvent, RunEvent, TextEvent
-from agentbox.core.run.backends.base import (
+from agentbox.core.engines.backends.base import (
     BackendAdapter,
     BackendRunResult,
     RenderedConfig,

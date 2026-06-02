@@ -326,7 +326,7 @@ class TestSnapshotHelpers:
         assert e["skipped"] is False
 
     def test_prompt_resolution_to_snapshot(self):
-        from agentbox.core.agents.prompt.resolver import PromptResolution, ResolvedBinding
+        from agentbox.core.agents.composition.resolver import PromptResolution, ResolvedBinding
         from agentbox.core.run.run_prep import prompt_resolution_to_snapshot
 
         rb = ResolvedBinding(

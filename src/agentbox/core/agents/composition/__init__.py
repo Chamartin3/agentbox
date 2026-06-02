@@ -5,12 +5,12 @@ import from one place. Names match what exists today; renames per the
 modularization plan land in Phase 6.
 """
 
-from agentbox.core.agents.prompt.capture import (
+from agentbox.core.agents.composition.capture import (
     PromptFragment as PromptFragment,
     build_fragments as build_fragments,
     fragments_to_json as fragments_to_json,
 )
-from agentbox.core.agents.prompt.composition import (
+from agentbox.core.agents.composition.bundle import (
     ComposeResult as ComposeResult,
     ComposedReference as ComposedReference,
     CompositionPreview as CompositionPreview,
@@ -19,15 +19,15 @@ from agentbox.core.agents.prompt.composition import (
     compose_from_source as compose_from_source,
     preview as preview,
 )
-from agentbox.core.agents.prompt.output_contract import (
+from agentbox.core.agents.composition.output_contract import (
     append as append_output_contract,
     render as render_output_contract,
 )
-from agentbox.core.agents.prompt.preview import (
+from agentbox.core.agents.composition.preview import (
     PreviewError as PreviewError,
     render_agent_prompt_preview as render_agent_prompt_preview,
 )
-from agentbox.core.agents.prompt.rendering import (
+from agentbox.core.agents.composition.rendering import (
     render_document as render_document,
     render_folder_manifest as render_folder_manifest,
     render_for_type as render_for_type,
@@ -35,7 +35,7 @@ from agentbox.core.agents.prompt.rendering import (
     render_script as render_script,
     render_skill_primer as render_skill_primer,
 )
-from agentbox.core.agents.prompt.resolver import (
+from agentbox.core.agents.composition.resolver import (
     PromptResolution as PromptResolution,
     ResolvedBinding as ResolvedBinding,
     resolve_prompt as resolve_prompt,

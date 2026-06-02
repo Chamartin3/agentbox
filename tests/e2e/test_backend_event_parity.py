@@ -22,8 +22,8 @@ from agentbox.core.data import (
     ToolCallEvent,
     ToolResultEvent,
 )
-from agentbox.core.run.backends.base import RenderedConfig
-from agentbox.core.run.backends.token import TokenBackend
+from agentbox.core.engines.backends.base import RenderedConfig
+from agentbox.core.engines.backends.token import TokenBackend
 from pydantic import BaseModel, ValidationError
 
 pytestmark = pytest.mark.asyncio
@@ -239,7 +239,7 @@ async def _fake_jsonl_stream(events: list[Any]) -> Any:
 
 async def test_codex_scenario_1_text_only() -> None:
     from agentbox.core.data import UsageEvent
-    from agentbox.core.run.backends import codex as codex_mod
+    from agentbox.core.engines.backends import codex as codex_mod
 
     rendered = RenderedConfig(
         argv=["codex", "exec", "--json"],
@@ -272,7 +272,7 @@ async def test_codex_scenario_1_text_only() -> None:
 
 async def test_pi_scenario_1_text_only() -> None:
     from agentbox.core.data import UsageEvent
-    from agentbox.core.run.backends import pi as pi_mod
+    from agentbox.core.engines.backends import pi as pi_mod
 
     rendered = RenderedConfig(
         argv=["pi", "-p", "--mode", "json"],

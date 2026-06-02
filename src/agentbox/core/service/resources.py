@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from jsonschema import Draft202012Validator
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.agents.prompt.rendering import render_for_type
+from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.resource.importers.base import ImporterContext
 from agentbox.core.resource.importers.host_path import HostPathImporter
 from agentbox.core.resource.importers.schema import SchemaImporter

@@ -33,12 +33,12 @@ from agentbox.core.data import WorkspaceDef as WorkspaceDef
 from agentbox.core.tools import CAPABILITIES as CAPABILITIES  # noqa: F401
 
 # ── Prompt / composition ──────────────────────────────────────────────
-from agentbox.core.agents.prompt.composition import compose_from_source as compose_from_source
-from agentbox.core.agents.prompt.composition import preview as composition_preview  # noqa: F401
-from agentbox.core.agents.prompt.preview import PreviewError as PreviewError
-from agentbox.core.agents.prompt.preview import render_agent_prompt_preview as render_agent_prompt_preview
-from agentbox.core.agents.prompt.rendering import render_for_type as render_for_type
-from agentbox.core.agents.prompt.resolver import resolve_prompt as resolve_prompt
+from agentbox.core.agents.composition.bundle import compose_from_source as compose_from_source
+from agentbox.core.agents.composition.bundle import preview as composition_preview  # noqa: F401
+from agentbox.core.agents.composition.preview import PreviewError as PreviewError
+from agentbox.core.agents.composition.preview import render_agent_prompt_preview as render_agent_prompt_preview
+from agentbox.core.agents.composition.rendering import render_for_type as render_for_type
+from agentbox.core.agents.composition.resolver import resolve_prompt as resolve_prompt
 from agentbox.core.resource.importers.host_path import HostPathImporter as HostPathImporter
 from agentbox.core.resource.importers.schema import SchemaImporter as SchemaImporter
 from agentbox.core.resource.importers.script import ScriptImporter as ScriptImporter
@@ -49,7 +49,7 @@ from agentbox.core.resource.importers.zip_upload import ZipUploadImporter as Zip
 # ── Resources ─────────────────────────────────────────────────────────
 from agentbox.core.resource.skills import discover_skills as discover_skills
 from agentbox.core.resource.skills import find_skill as find_skill
-from agentbox.core.run.config import ConfigGenerator as ConfigGenerator
+from agentbox.core.engines.render import ConfigGenerator as ConfigGenerator
 
 # ── Run execution ─────────────────────────────────────────────────────
 from agentbox.core.run.executor import NoBackendAvailable as NoBackendAvailable

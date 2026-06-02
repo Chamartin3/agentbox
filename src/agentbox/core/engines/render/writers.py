@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Final, Protocol
 
-from agentbox.core.run.config.discovery import DiscoveredAgent
-from agentbox.core.run.config.generator import (
+from agentbox.core.engines.render.discovery import DiscoveredAgent
+from agentbox.core.engines.render.generator import (
     _dump_json,
     build_claude_agents,
     build_claude_mcp_config,

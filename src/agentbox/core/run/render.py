@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.run.backends.base import RenderedConfig
+from agentbox.core.engines.backends.base import RenderedConfig
 
 
 class RunDirExists(RuntimeError):

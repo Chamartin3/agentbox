@@ -24,11 +24,11 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING, Any, Literal
 
-from agentbox.core.agents.prompt.preview import (
+from agentbox.core.agents.composition.preview import (
     PreviewError,
     render_agent_prompt_preview,
 )
-from agentbox.core.agents.prompt.rendering import render_for_type
+from agentbox.core.agents.composition.rendering import render_for_type
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore

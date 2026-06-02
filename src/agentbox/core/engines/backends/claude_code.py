@@ -26,7 +26,7 @@ from agentbox.core.data import (
     UsageEvent,
 )
 from agentbox.core.agents.config import RuntimeConfig
-from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.run.streaming.rate_limit import detect_in_text_line
 from agentbox.core.workspace.manager import load_capabilities
 

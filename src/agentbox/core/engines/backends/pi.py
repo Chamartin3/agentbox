@@ -1,6 +1,6 @@
 """Backend adapter for the pi.dev CLI (``pi -p ... --mode json``).
 
-Plan 16 Phase 2 — first cut. Mirrors :mod:`agentbox.core.run.backends.codex`.
+Plan 16 Phase 2 — first cut. Mirrors :mod:`agentbox.core.engines.backends.codex`.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from agentbox.core.data import (
     ThinkingEvent,
     UsageEvent,
 )
-from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.run.streaming.jsonl import stream_jsonl_subprocess
 
 _NAME = "pi"

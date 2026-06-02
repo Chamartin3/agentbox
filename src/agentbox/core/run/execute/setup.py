@@ -25,15 +25,15 @@ from agentbox.config import Settings
 from agentbox.core.agents.resolve import resolve_engine
 from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, SessionStore
-from agentbox.core.run.backends.base import PostRenderContext, RenderedConfig
-from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.engines.backends.base import PostRenderContext, RenderedConfig
+from agentbox.core.engines.render import ConfigGenerator
 from agentbox.core.run.render import materialize_rendered_config
 from agentbox.core.workspace.manager import resolve_path
 
 from agentbox.core.run.execute.broadcaster import RunBroadcaster
 
 if TYPE_CHECKING:
-    from agentbox.core.run.backends.base import BackendAdapter
+    from agentbox.core.engines.backends.base import BackendAdapter
     from agentbox.core.workspace.mcp.client.registry import McpRegistry
 
 logger = logging.getLogger(__name__)

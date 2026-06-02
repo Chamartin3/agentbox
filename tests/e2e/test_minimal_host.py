@@ -14,7 +14,7 @@ from typing import Any
 def _register_noop_backend() -> None:
     """Inject a noop BackendAdapter into the plugins registry under 'claude_code'."""
     from agentbox.core.data import DoneEvent, RunEvent
-    from agentbox.core.run.backends.base import RenderedConfig
+    from agentbox.core.engines.backends.base import RenderedConfig
 
     class _NoopBackend:
         name = "claude_code"

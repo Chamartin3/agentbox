@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agentbox.core.data import AgentDef
-    from agentbox.core.run.config.run_configurator import ComposedMetadata
+    from agentbox.core.engines.render.run_configurator import ComposedMetadata
 
 
 @dataclass(frozen=True)

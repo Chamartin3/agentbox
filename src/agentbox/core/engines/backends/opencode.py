@@ -23,7 +23,7 @@ from agentbox.core.data import (
     ThinkingEvent,
     TimeoutEvent,
 )
-from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 
 _NAME = "opencode"
 _DEFAULT_OPENCODE_MODEL = "opencode/deepseek-v4-flash-free"

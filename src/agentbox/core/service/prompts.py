@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.agents.prompt import prompts as _prompts
-from agentbox.core.agents.prompt.prompts import PromptDoc, PromptError
+from agentbox.core.agents.composition import prompts as _prompts
+from agentbox.core.agents.composition.prompts import PromptDoc, PromptError
 
 if TYPE_CHECKING:
     from pathlib import Path

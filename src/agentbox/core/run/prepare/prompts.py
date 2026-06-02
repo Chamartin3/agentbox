@@ -41,9 +41,9 @@ from agentbox.core.agents.config import (
     resolve_output_config as _resolve_out,
 )
 from agentbox.core.data import AgentDef
-from agentbox.core.agents.prompt.output_contract import append as _append_contract
-from agentbox.core.agents.prompt.resolver import resolve_prompt
-from agentbox.core.run.backends._schema_to_model import (
+from agentbox.core.agents.composition.output_contract import append as _append_contract
+from agentbox.core.agents.composition.resolver import resolve_prompt
+from agentbox.core.engines.backends.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
 )
@@ -167,10 +167,10 @@ def resolve_run_prompt(
     composed_bundle_sha: str | None = None
 
     if agent.composition is not None and variables is not None:
-        from agentbox.core.agents.prompt.composition import (
+        from agentbox.core.agents.composition.bundle import (
             _append_validation_engine_hint,
         )
-        from agentbox.core.agents.prompt.composition.loader import (
+        from agentbox.core.agents.composition.bundle.loader import (
             load_bundle_from_bindings,
         )
 

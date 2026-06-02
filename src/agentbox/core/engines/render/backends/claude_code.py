@@ -14,15 +14,15 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.run.config.backends.base import (
+from agentbox.core.engines.render.backends.base import (
     BackendConfigGenerator,
     McpConfig,
 )
-from agentbox.core.run.config.prompt_composer import PromptComposer
+from agentbox.core.engines.render.prompt_composer import PromptComposer
 
 if TYPE_CHECKING:
     from agentbox.core.data import AgentDef
-    from agentbox.core.run.config.run_configurator import ComposedMetadata
+    from agentbox.core.engines.render.run_configurator import ComposedMetadata
 
 
 class ClaudeCodeConfigGenerator(BackendConfigGenerator):

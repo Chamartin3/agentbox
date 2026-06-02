@@ -8,7 +8,7 @@ from agentbox.core.data import TextEvent, ThinkingEvent, UsageEvent
 from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
-from agentbox.core.run.backends.pi import (
+from agentbox.core.engines.backends.pi import (
     PiBackend,
     build_pi_argv,
     parse_pi_event,

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path  # noqa: F401
 
     from agentbox.core.data import AgentDef  # noqa: F401
-    from agentbox.core.run.config.run_configurator import ComposedMetadata  # noqa: F401
+    from agentbox.core.engines.render.run_configurator import ComposedMetadata  # noqa: F401
 
 
 _GENERATORS: dict[str, BackendConfigGenerator] = {

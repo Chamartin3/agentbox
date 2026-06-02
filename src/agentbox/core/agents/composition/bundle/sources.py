@@ -266,7 +266,7 @@ class BindingsBundleSource:
 
     def _render_blob_text(self, b: dict) -> str:
         # Local import avoids a circular at module import time.
-        from agentbox.core.agents.prompt.rendering import render_for_type
+        from agentbox.core.agents.composition.rendering import render_for_type
 
         rendered = render_for_type(b["type"], b.get("blobs") or [])
         return rendered.get("text") or ""

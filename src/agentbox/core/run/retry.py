@@ -31,11 +31,11 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.core.data import DoneEvent
 from agentbox.core.data import RunStatus
-from agentbox.core.run.backends.base import BackendRunResult
+from agentbox.core.engines.backends.base import BackendRunResult
 from agentbox.core.run.validation import extract_json
 
 if TYPE_CHECKING:
-    from agentbox.core.run.backends.base import (
+    from agentbox.core.engines.backends.base import (
         BackendAdapter,
         RenderedConfig,
     )

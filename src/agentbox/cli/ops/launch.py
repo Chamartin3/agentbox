@@ -29,7 +29,7 @@ from agentbox.cli._deps import (
 from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
 from agentbox.core.data import AgentDef
-from agentbox.core.run.config import ConfigGenerator
+from agentbox.core.engines.render import ConfigGenerator
 from agentbox.core.workspace.mcp.client import McpRegistry
 
 SUPPORTED_RUNNERS = ("claude", "opencode", "codex", "pi", "shell")

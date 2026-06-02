@@ -10,7 +10,7 @@ def _materialize_files(
     files: list[dict],
     project_root: Path,
 ) -> None:
-    from agentbox.core.run.config.generator import _materialize_workspace_files
+    from agentbox.core.engines.render.generator import _materialize_workspace_files
 
     _materialize_workspace_files(target_dir, files, project_root)
 

@@ -37,7 +37,7 @@ from agentbox.core.agents.profiles import RunnerProfileResolver
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.data import runs as _runs_table
-from agentbox.core.agents.prompt.capture import build_fragments, fragments_to_json
+from agentbox.core.agents.composition.capture import build_fragments, fragments_to_json
 
 # Re-exports — preserve the historical public surface of this module so
 # downstream imports (tests, services, host_env) keep working.
@@ -48,7 +48,7 @@ from agentbox.core.run.execute.setup import (
     RunSetup,
     fail_pre_run as _fail_pre_run_helper,
 )
-from agentbox.core.run.post_render import (
+from agentbox.core.engines.render.postrender import (
     inject_agent_tools_mcp as _inject_agent_tools_mcp_helper,
     inject_host_env_mcp as _inject_host_env_mcp_helper,
 )

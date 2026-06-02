@@ -22,8 +22,8 @@ from pathlib import Path
 import pytest
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
-from agentbox.core.run.backends.claude_code import ClaudeCodeBackend
-from agentbox.core.run.backends.opencode import OpenCodeBackend
+from agentbox.core.engines.backends.claude_code import ClaudeCodeBackend
+from agentbox.core.engines.backends.opencode import OpenCodeBackend
 
 _DEFAULT_AGENT_TIMEOUT = 1200
 

@@ -14,7 +14,7 @@ gating stay in the executor (which owns the store).
 
 from __future__ import annotations
 
-from agentbox.core.run.post_render.mcp_inject import (
+from agentbox.core.engines.render.postrender.mcp_inject import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )

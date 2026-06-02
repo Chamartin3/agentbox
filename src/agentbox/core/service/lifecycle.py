@@ -15,7 +15,7 @@ from dataclasses import dataclass, field, replace
 from typing import Final
 
 from agentbox.config import Settings
-from agentbox.core.agents.prompt.versioning.drift import startup_sweep
+from agentbox.core.agents.composition.versioning.drift import startup_sweep
 from agentbox.core.data import ProjectManifest, SessionStore
 from agentbox.core.data.manifest import McpServerSpec
 from agentbox.core.data.runners.seeds import seed_default_runner_profiles

@@ -1,7 +1,7 @@
 """``TokenBackend`` — unified in-process pydantic-ai backend adapter.
 
 The public class lives here; the package ``__init__`` re-exports it so
-the entry point ``token = agentbox.core.run.backends.token:TokenBackend``
+the entry point ``token = agentbox.core.engines.backends.token:TokenBackend``
 keeps working after the split from the legacy single-module layout.
 
 The two execution modes are factored into sibling modules:
@@ -29,9 +29,9 @@ from pydantic import BaseModel
 
 from agentbox.core.data import DoneEvent, LogEvent, RunEvent
 from agentbox.core.agents.config import PythonAgentConfig
-from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
-from agentbox.core.run.backends.token._run_direct import run_direct_agent_mode
-from agentbox.core.run.backends.token._run_full import (
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.token.run_direct import run_direct_agent_mode
+from agentbox.core.engines.backends.token.run_full import (
     import_agent,
     resolve_request_model,
     run_full_agent_mode,

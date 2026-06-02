@@ -331,8 +331,8 @@ def build_opencode_config(
 
 # Writers import the builder functions defined above, so this import
 # must come after they exist. (Top-of-file import would race the
-# circular path agentbox.core.run.config.generator → writers → generator.)
-from agentbox.core.run.config.writers import (  # noqa: E402
+# circular path agentbox.core.engines.render.generator → writers → generator.)
+from agentbox.core.engines.render.writers import (  # noqa: E402
     DEFAULT_WRITERS,
     ConfigWriter,
     WriteContext,

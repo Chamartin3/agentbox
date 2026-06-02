@@ -3,12 +3,12 @@
 This package was extracted from a single 993-LOC ``token.py`` module
 during the Phase-5 backend refactor. The public surface is unchanged:
 
-* The entry-point ``token = agentbox.core.run.backends.token:TokenBackend``
+* The entry-point ``token = agentbox.core.engines.backends.token:TokenBackend``
   in :file:`pyproject.toml` continues to resolve here.
 * Helpers and module-level names imported by callers / tests
   (``_json_schema_to_pydantic_model``, ``importlib``, ``TokenDeps``,
   ``_RefSection``, etc.) are re-exported below so existing
-  ``from agentbox.core.run.backends.token import X`` statements keep
+  ``from agentbox.core.engines.backends.token import X`` statements keep
   working.
 
 The submodule layout:
@@ -29,9 +29,9 @@ from __future__ import annotations
 
 import importlib
 
-from agentbox.core.run.backends.token._backend import TokenBackend
-from agentbox.core.run.backends.token._schema import _json_schema_to_pydantic_model
-from agentbox.core.run.backends.token._stream import (
+from agentbox.core.engines.backends.token.backend import TokenBackend
+from agentbox.core.engines.backends.token.schema import _json_schema_to_pydantic_model
+from agentbox.core.engines.backends.token.stream import (
     _RefSection,
     TokenDeps,
     _emit_message_history,
@@ -40,7 +40,7 @@ from agentbox.core.run.backends.token._stream import (
     _part_kind,
     _stringify_excerpt,
 )
-from agentbox.core.run.backends.token._usage import extract_usage
+from agentbox.core.engines.backends.token.usage import extract_usage
 
 __all__ = [
     "TokenBackend",

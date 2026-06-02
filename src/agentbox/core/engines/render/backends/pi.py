@@ -9,14 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.run.config.backends.base import (
+from agentbox.core.engines.render.backends.base import (
     BackendConfigGenerator,
     McpConfig,
 )
 
 if TYPE_CHECKING:
     from agentbox.core.data import AgentDef
-    from agentbox.core.run.config.run_configurator import ComposedMetadata
+    from agentbox.core.engines.render.run_configurator import ComposedMetadata
 
 
 class PiConfigGenerator(BackendConfigGenerator):

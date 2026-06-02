@@ -1,9 +1,9 @@
-"""Unit tests for agentbox.core.agents.prompt.composition.compose()."""
+"""Unit tests for agentbox.core.agents.composition.bundle.compose()."""
 
 from pathlib import Path
 
 import pytest
-from agentbox.core.agents.prompt.composition import ComposeResult, compose
+from agentbox.core.agents.composition.bundle import ComposeResult, compose
 
 
 def _write_bundle(tmp_path: Path, agent_toml: str, files: dict[str, str]) -> Path:

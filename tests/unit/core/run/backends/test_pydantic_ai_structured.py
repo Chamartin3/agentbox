@@ -11,7 +11,7 @@ import pytest
 
 class TestJsonSchemaToPydanticModel:
     def _make_model(self):
-        from agentbox.core.run.backends.token import _json_schema_to_pydantic_model
+        from agentbox.core.engines.backends.token import _json_schema_to_pydantic_model
 
         return _json_schema_to_pydantic_model
 
@@ -114,7 +114,7 @@ class TestJsonSchemaToPydanticModel:
 class TestTokenBackendRender:
     def test_render_builds_agent_meta(self, tmp_path: Path) -> None:
         from agentbox.core.data import AgentDef, RunnerSpec
-        from agentbox.core.run.backends.token import TokenBackend
+        from agentbox.core.engines.backends.token import TokenBackend
 
         schema = {"type": "object", "properties": {"name": {"type": "string"}}}
         (tmp_path / "output_schema.json").write_text(json.dumps(schema))
@@ -144,7 +144,7 @@ class TestTokenBackendRender:
 
     def test_render_handles_missing_schema(self, tmp_path: Path) -> None:
         from agentbox.core.data import AgentDef, RunnerSpec
-        from agentbox.core.run.backends.token import TokenBackend
+        from agentbox.core.engines.backends.token import TokenBackend
 
         agent = AgentDef(
             id="test",

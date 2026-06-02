@@ -15,7 +15,7 @@ from agentbox.core.data import DoneEvent
 from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
-from agentbox.core.run.backends.token import TokenBackend
+from agentbox.core.engines.backends.token import TokenBackend
 
 DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.TOKEN)
 
@@ -203,7 +203,7 @@ class TestTokenProviderRouting:
 
         # Mock importlib to capture the kwargs passed to it
         with patch(
-            "agentbox.core.run.backends.token.importlib.import_module"
+            "agentbox.core.engines.backends.token.importlib.import_module"
         ) as mock_import:
             # Create a mock module with a mock Agent class
             mock_module = MagicMock()
@@ -239,7 +239,7 @@ class TestTokenProviderRouting:
         rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=None)
 
         # Mock importlib
-        with patch("agentbox.core.run.backends.token.importlib.import_module"):
+        with patch("agentbox.core.engines.backends.token.importlib.import_module"):
             events = []
             async for event in adapter.run(rendered, "test input", "run-123"):
                 events.append(event)

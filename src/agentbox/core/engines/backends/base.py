@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
 from agentbox.core.data import DoneEvent, RunEvent
-from agentbox.core.run.post_render import (
+from agentbox.core.engines.render.postrender import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )

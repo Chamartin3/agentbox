@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from agentbox.core.agents.prompt.composition.pydantic_validate import validate_with_pydantic
+from agentbox.core.agents.composition.bundle.pydantic_validate import validate_with_pydantic
 
 
 def _schema(name: str = "TestOutput") -> dict:

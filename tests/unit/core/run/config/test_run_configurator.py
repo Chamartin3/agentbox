@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data import AgentDef, RunnerSpec
-from agentbox.core.run.config.backends import get_generator, list_generators
-from agentbox.core.run.config.run_configurator import (
+from agentbox.core.engines.render.backends import get_generator, list_generators
+from agentbox.core.engines.render.run_configurator import (
     ComposedMetadata,
     RunConfigurator,
 )
-from agentbox.core.run.config.skills.filter import filter_skills_for_backend
+from agentbox.core.engines.render.skills.filter import filter_skills_for_backend
 
 
 def _make_agent(**overrides: object) -> AgentDef:
@@ -354,7 +354,7 @@ class TestGeneratorRegistry:
         assert set(list_generators()) == {"opencode", "claude_code", "codex", "pi"}
 
     def test_get_generator_returns_instance(self) -> None:
-        from agentbox.core.run.config.backends.opencode import (
+        from agentbox.core.engines.render.backends.opencode import (
             OpenCodeConfigGenerator,
         )
 
@@ -369,7 +369,7 @@ class TestMcpConfig:
     def test_opencode_generates_mcp_config(
         self, tmp_runs_dir: Path, composed: ComposedMetadata
     ) -> None:
-        from agentbox.core.run.config.backends.base import McpConfig
+        from agentbox.core.engines.render.backends.base import McpConfig
 
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
@@ -394,7 +394,7 @@ class TestMcpConfig:
     def test_claude_generates_mcp_config(
         self, tmp_runs_dir: Path, composed: ComposedMetadata
     ) -> None:
-        from agentbox.core.run.config.backends.base import McpConfig
+        from agentbox.core.engines.render.backends.base import McpConfig
 
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)
@@ -437,7 +437,7 @@ class TestMcpConfig:
     def test_opencode_mcp_local_mode(
         self, tmp_runs_dir: Path, composed: ComposedMetadata
     ) -> None:
-        from agentbox.core.run.config.backends.base import McpConfig
+        from agentbox.core.engines.render.backends.base import McpConfig
 
         agent = _make_agent()
         cfg = RunConfigurator(Path("/tmp"), runs_tmpfs_dir=tmp_runs_dir)

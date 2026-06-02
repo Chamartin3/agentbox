@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from agentbox.core.data import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
-from agentbox.core.run.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.run.streaming.jsonl import stream_jsonl_subprocess
 
 _NAME = "codex"

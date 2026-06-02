@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agentbox.core.agents.prompt.rendering import (
+from agentbox.core.agents.composition.rendering import (
     _blob_text,
     render_document,
     render_folder_manifest,
