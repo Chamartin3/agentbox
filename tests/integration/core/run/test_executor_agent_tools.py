@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from agentbox.core.tools.decorator import agent_tool
+from agentbox.core.tools.registry import agent_tool
 from agentbox.core.tools.registry import SharedToolRegistry
 from pydantic import BaseModel
 

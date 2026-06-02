@@ -1,9 +1,8 @@
-"""Curated host-env capability registry.
+"""Curated capability registry — canonical taxonomy for all host-env tools.
 
 Each entry declares a capability the host-env MCP server exposes plus the
-JSON-schema-ish shape of its grant params. The actual MCP tool
-implementations land later; this module is the single source of truth
-the API and grant resolver agree on.
+JSON-schema-ish shape of its grant params. This module is the single source
+of truth the API, grant resolver, and MCP implementations agree on.
 """
 
 from __future__ import annotations

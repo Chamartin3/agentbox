@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.tools.builtin.registry import (
+from agentbox.core.tools.builtin import (
     BUILTIN_TOOLS,
     BuiltinToolSpec,
     backend_tool_name,
@@ -30,7 +30,7 @@ class TestRegistry:
 
     def test_capability_alignment(self):
         """Tools with a capability must have the same name as the capability key."""
-        from agentbox.core.workspace.host_env.capabilities import CAPABILITIES
+        from agentbox.core.tools import CAPABILITIES
 
         for tool in BUILTIN_TOOLS:
             if tool.capability is not None:

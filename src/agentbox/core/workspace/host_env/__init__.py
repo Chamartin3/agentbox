@@ -1,13 +1,13 @@
 """Host-environment MCP server primitives (Plan 06).
 
-This package houses the capability registry, permission/grant resolver,
-and a stub for the FastMCP server. The server process itself is out of
-scope for the foundation drop — the data model + permission resolver
-land here so the API can edit grants and runs can check them.
+Re-exports from canonical locations. Prefer importing directly from
+:mod:`agentbox.core.tools` (Capability, CAPABILITIES) and
+:mod:`agentbox.core.workspace.permissions` (GrantViolation, check_capability,
+resolve_grants).
 """
 
-from agentbox.core.workspace.host_env.capabilities import CAPABILITIES, Capability
-from agentbox.core.workspace.host_env.permissions import (
+from agentbox.core.tools.capabilities import CAPABILITIES, Capability
+from agentbox.core.workspace.permissions import (
     GrantViolation,
     check_capability,
     resolve_grants,

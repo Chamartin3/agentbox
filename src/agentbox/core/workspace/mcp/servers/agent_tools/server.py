@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agentbox.core.tools.registry import SharedToolRegistry
+from agentbox.core.tools import SharedToolRegistry
 from agentbox.core.workspace.mcp.servers.agent_tools.context import AgentToolsContext
 from fastmcp import FastMCP
 

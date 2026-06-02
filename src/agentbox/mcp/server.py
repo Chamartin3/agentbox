@@ -21,7 +21,7 @@ def build_server() -> FastMCP:
     # Populate the shared agent_tools registry so list_agent_tools sees
     # consumer-registered entry points.
     try:
-        from agentbox.core.tools.discovery import discover_tools
+        from agentbox.core.tools import discover_tools
 
         discover_tools()
     except Exception:

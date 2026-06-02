@@ -19,6 +19,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from agentbox.core.workspace.permissions import (  # noqa: E402
+    GrantViolation,
+    check_capability,
+    resolve_grants,
+)
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -77,10 +83,6 @@ def _make_fs_fns(ctx_factory):
     """Return (fs_read, fs_list, fs_write) functions with ctx wired in."""
     from pathlib import Path as _Path
 
-    from agentbox.core.workspace.host_env.permissions import (
-        GrantViolation,
-        check_capability,
-    )
 
     def fs_read(path: str) -> str:
         ctx = ctx_factory()
@@ -140,7 +142,7 @@ class TestFsCapability:
         assert result == "hello world"
 
     def test_read_blocked_outside_allowlist(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import GrantViolation
+
 
         other = tmp_path / "other"
         other.mkdir()
@@ -154,7 +156,7 @@ class TestFsCapability:
             fs_read(str(target))
 
     def test_read_without_grant(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import GrantViolation
+
 
         grants = _make_grants()
         ctx = _make_ctx(grants, tmp_path)
@@ -185,7 +187,7 @@ class TestFsCapability:
         assert (tmp_path / "new.txt").read_text() == "written"
 
     def test_path_traversal_blocked(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import GrantViolation
+
 
         sub = tmp_path / "safe"
         sub.mkdir()
@@ -208,10 +210,6 @@ class TestFsCapability:
 def _make_shell_fn(ctx_factory):
     import subprocess
 
-    from agentbox.core.workspace.host_env.permissions import (
-        GrantViolation,
-        check_capability,
-    )
 
     def shell_exec(cmd: str, cwd: str | None = None, timeout: int = 30) -> dict:
         ctx = ctx_factory()
@@ -252,7 +250,7 @@ class TestShellCapability:
         assert "hello" in result["stdout"]
 
     def test_blocked_command_raises(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import GrantViolation
+
 
         grants = _make_grants(**{"shell.exec": {"command_allowlist": ["^ls$"]}})
         ctx = _make_ctx(grants, tmp_path)
@@ -262,7 +260,7 @@ class TestShellCapability:
             fn("rm -rf /")
 
     def test_no_shell_grant_raises(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import GrantViolation
+
 
         grants = _make_grants()
         ctx = _make_ctx(grants, tmp_path)
@@ -279,11 +277,6 @@ class TestShellCapability:
 
 class TestHttpCapability:
     def test_blocked_host_raises(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import (
-            GrantViolation,
-            check_capability,
-        )
-
         grants = _make_grants(
             **{"http.fetch": {"host_allowlist": ["allowed.example.com"]}}
         )
@@ -296,10 +289,7 @@ class TestHttpCapability:
             )
 
     def test_blocked_method_raises(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import (
-            GrantViolation,
-            check_capability,
-        )
+
 
         grants = _make_grants(
             **{"http.fetch": {"host_allowlist": ["safe.com"], "methods": ["GET"]}}
@@ -322,7 +312,7 @@ class TestEnvCapability:
     def test_allowed_var(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         import os
 
-        from agentbox.core.workspace.host_env.permissions import check_capability
+
 
         monkeypatch.setenv("MY_VAR", "secret_value")
         grants = _make_grants(**{"env.get": {"allowlist": ["MY_VAR"]}})
@@ -330,10 +320,7 @@ class TestEnvCapability:
         assert os.environ.get("MY_VAR") == "secret_value"
 
     def test_blocked_var_raises(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import (
-            GrantViolation,
-            check_capability,
-        )
+
 
         grants = _make_grants(**{"env.get": {"allowlist": ["SAFE_VAR"]}})
         with pytest.raises(GrantViolation, match="not allowlisted"):
@@ -347,13 +334,13 @@ class TestEnvCapability:
 
 class TestWorkspaceInfo:
     def test_returns_metadata(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import check_capability
+
 
         grants = _make_grants()
         check_capability(grants, "agentbox.workspace_info", {})  # should not raise
 
     def test_not_in_grants_but_default_granted(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import resolve_grants
+
 
         effective = resolve_grants(None, None)
         assert "agentbox.workspace_info" in effective
@@ -382,7 +369,7 @@ class TestAuditLog:
         assert kwargs["run_id"] == "run1"
 
     def test_audit_recorded_on_denial(self, tmp_path: Path):
-        from agentbox.core.workspace.host_env.permissions import GrantViolation
+
 
         store = MagicMock()
         grants = _make_grants()  # no fs.read grant

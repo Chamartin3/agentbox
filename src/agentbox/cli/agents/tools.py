@@ -8,7 +8,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli._common import console
-from agentbox.core.tools.registry import SharedToolRegistry
+from agentbox.core.tools import SharedToolRegistry
 
 tools_app = typer.Typer(
     name="tools",

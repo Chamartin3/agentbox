@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from agentbox.core.tools.registry import SharedToolRegistry
+from agentbox.core.tools import SharedToolRegistry
 
 router = APIRouter(prefix="/api/agent_tools", tags=["agent-tools-discovery"])
 

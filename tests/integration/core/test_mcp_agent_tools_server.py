@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from agentbox.core.tools.decorator import agent_tool
+from agentbox.core.tools.registry import agent_tool
 from agentbox.core.tools.registry import SharedToolRegistry
 from agentbox.core.workspace.mcp.servers.agent_tools.context import AgentToolsContext
 from agentbox.core.workspace.mcp.servers.agent_tools.server import build_server

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agentbox.core.workspace.host_env.permissions import (
+from agentbox.core.workspace.permissions import (
     GrantViolation,
     _deep_merge,
     _path_within_allowlist,
@@ -56,7 +56,7 @@ class TestPathWithinAllowlist:
 class TestResolveGrants:
     def test_adds_default_granted_capabilities(self) -> None:
         grants = resolve_grants({}, {})
-        assert "http.fetch" in grants
+        assert "agentbox.workspace_info" in grants
 
     def test_merges_profile_and_overrides(self) -> None:
         grants = resolve_grants(
@@ -90,7 +90,7 @@ class TestCheckCapability:
 
     def test_env_get_missing_name(self) -> None:
         grants = {"env.get": {"allowlist": ["HOME"]}}
-        with pytest.raises(GrantViolation, match="missing .* name"):
+        with pytest.raises(GrantViolation, match="missing.*name"):
             check_capability(grants, "env.get", {})
 
     def test_fs_read_valid_path(self) -> None:

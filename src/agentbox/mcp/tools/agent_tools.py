@@ -13,7 +13,7 @@ def register(mcp: FastMCP) -> None:
         description="List all consumer-registered shared agent tools discovered at startup.",
     )
     def list_agent_tools(tags: list[str] | None = None) -> dict:
-        from agentbox.core.tools.registry import SharedToolRegistry
+        from agentbox.core.tools import SharedToolRegistry
 
         specs = SharedToolRegistry.all()
         if tags:

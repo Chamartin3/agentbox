@@ -1,5 +1,30 @@
-from agentbox.core.tools.decorator import agent_tool
-from agentbox.core.tools.discovery import discover_tools
-from agentbox.core.tools.registry import SharedToolRegistry, ToolSpec
+from agentbox.core.tools.builtin import (
+    BUILTIN_TOOLS,
+    BuiltinToolSpec,
+    UnknownToolError,
+    from_native,
+    native_tool_names,
+    to_native,
+)
+from agentbox.core.tools.capabilities import CAPABILITIES, Capability
+from agentbox.core.tools.registry import (
+    SharedToolRegistry,
+    ToolSpec,
+    agent_tool,
+    discover_tools,
+)
 
-__all__ = ["SharedToolRegistry", "ToolSpec", "agent_tool", "discover_tools"]
+__all__ = [
+    "BUILTIN_TOOLS",
+    "BuiltinToolSpec",
+    "CAPABILITIES",
+    "Capability",
+    "SharedToolRegistry",
+    "ToolSpec",
+    "UnknownToolError",
+    "agent_tool",
+    "discover_tools",
+    "from_native",
+    "native_tool_names",
+    "to_native",
+]

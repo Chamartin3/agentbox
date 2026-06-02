@@ -7,9 +7,9 @@ deep core internals. This keeps the internal organization private.
 # ── Data / persistence ────────────────────────────────────────────────
 # ── Agent config / profiles / plugins ─────────────────────────────────
 from agentbox.core.agent.config import build_config_json_payload as build_config_json_payload
-from agentbox.core.agent.plugins import backend_load_failure as backend_load_failure
-from agentbox.core.agent.plugins import backends as backends
-from agentbox.core.agent.plugins import get_backend as get_backend
+from agentbox.core.agent.resolve import engine_load_failure as backend_load_failure  # noqa: F401
+from agentbox.core.agent.resolve import list_engines as backends  # noqa: F401
+from agentbox.core.agent.resolve import resolve_engine_by_name as get_backend  # noqa: F401
 from agentbox.core.agent.profiles import EffectiveRunnerConfig as EffectiveRunnerConfig
 from agentbox.core.agent.providers import get_provider as get_provider
 from agentbox.core.agent.providers import list_providers as list_providers
@@ -21,13 +21,16 @@ from agentbox.core.constants import RunStatus as RunStatus
 from agentbox.core.data import read_transcript as read_transcript
 from agentbox.core.data import AgentDef as AgentDef
 from agentbox.core.data import AgentSource as AgentSource
+from agentbox.core.data import CompositionConfig as CompositionConfig
+from agentbox.core.data import RunnerSpec as RunnerSpec
 from agentbox.core.data import VALID_POLICIES as VALID_POLICIES
 from agentbox.core.data import RunnerProfile as RunnerProfile
 from agentbox.core.data import RunnerProfileCreate as RunnerProfileCreate
 from agentbox.core.data import SessionStore as SessionStore
+from agentbox.core.data import WorkspaceDef as WorkspaceDef
 
 # ── Infra ─────────────────────────────────────────────────────────────
-from agentbox.core.workspace.host_env import CAPABILITIES as CAPABILITIES
+from agentbox.core.tools import CAPABILITIES as CAPABILITIES  # noqa: F401
 
 # ── Prompt / composition ──────────────────────────────────────────────
 from agentbox.core.agent.prompt.composition import compose_from_source as compose_from_source

@@ -22,7 +22,7 @@ from typing import Any
 
 from agentbox.core.agent.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, McpSnapshot, RunnerSnapshot, SessionStore
-from agentbox.core.workspace.host_env.capabilities import (
+from agentbox.core.tools.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
 

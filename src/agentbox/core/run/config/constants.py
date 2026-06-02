@@ -1,10 +1,12 @@
 """Configuration generation constants.
 
-Ported from bin/constants.py — these are the constants used by the
-Claude Code and OpenCode config generators.
+Per-backend native tool names and translations are derived from the
+canonical ``BUILTIN_TOOLS`` taxonomy in :mod:`agentbox.core.tools`.
 """
 
 from __future__ import annotations
+
+from agentbox.core.tools import BUILTIN_TOOLS, native_tool_names
 
 # Read-only tool action prefixes — tools matching these are auto-allowed
 READ_PREFIXES: frozenset[str] = frozenset(
@@ -20,24 +22,17 @@ CLAUDE_MCP_PREFIX = f"mcp__{MCP_SERVER_NAME}__"
 # Prefix for OpenCode MCP tool references (<server>_<tool>)
 OPENCODE_MCP_PREFIX = f"{MCP_SERVER_NAME}_"
 
-# Built-in code tools to deny in the MCP-only environment.
-DENIED_BUILTIN_TOOLS: tuple[str, ...] = (
-    "Bash",
-    "Read",
-    "Write",
-    "Edit",
-    "MultiEdit",
-    "Glob",
-    "Grep",
-    "NotebookEdit",
-)
+# Built-in tools denied by default in the Claude Code MCP-only environment.
+# Derived from BUILTIN_TOOLS — every Claude Code native name is denied unless
+# the workspace explicitly allowlists it.
+DENIED_BUILTIN_TOOLS: tuple[str, ...] = tuple(sorted(native_tool_names("claude_code")))
 
-# Claude Code ↔ OpenCode tool name mapping
+# Claude Code → OpenCode tool name mapping.
+# Computed from BUILTIN_TOOLS entries that have both backend names.
 CLAUDE_TO_OPENCODE_TOOLS: dict[str, str] = {
-    "AskUserQuestion": "question",
-    "Task": "task",
-    "WebFetch": "webfetch",
-    "WebSearch": "websearch",
+    spec.backend_names["claude_code"]: spec.backend_names["opencode"]
+    for spec in BUILTIN_TOOLS
+    if "claude_code" in spec.backend_names and "opencode" in spec.backend_names
 }
 
 # OpenCode built-in agents to disable (we use MCP-only, not their agents)

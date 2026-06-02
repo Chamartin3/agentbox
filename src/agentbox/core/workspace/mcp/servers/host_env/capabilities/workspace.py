@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.workspace.host_env.permissions import GrantViolation, check_capability
+from agentbox.core.workspace.permissions import GrantViolation, check_capability
 from fastmcp import FastMCP
 
 
