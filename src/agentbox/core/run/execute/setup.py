@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.core.data import DoneEvent, LogEvent
 from agentbox.config import Settings
-from agentbox.core.agents.resolve import resolve_engine_by_name as get_backend
+from agentbox.core.agents.resolve import resolve_engine
 from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.run.backends.base import PostRenderContext, RenderedConfig
@@ -174,11 +174,9 @@ class RunSetup:
 
         def _try_backend(name: str) -> BackendAdapter | None:
             try:
-                cls = get_backend(name)
-                inst = cls()
+                return resolve_engine(name)
             except KeyError:
                 return None
-            return inst  # type: ignore[return-value]
 
         candidates: list[str] = []
         if backend_override:
