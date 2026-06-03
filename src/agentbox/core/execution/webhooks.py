@@ -1,9 +1,8 @@
 """Completion webhook delivery.
 
-Thin wrapper over :func:`agentbox.api.webhooks.schedule_webhook` that
-isolates the executor from the (re)fetching dance: the run row is
-re-read from the store so the delivered payload reflects the persisted
-terminal state — not the in-flight values the executor was carrying.
+Thin dispatcher that isolates the executor from the delivery mechanics.
+The actual ``schedule_webhook`` implementation lives in ``api.webhooks``
+and is imported lazily to avoid a core→api dependency at module level.
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from agentbox.api.webhooks import schedule_webhook
 from agentbox.core.data import AgentDef, SessionStore
 
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
@@ -42,6 +40,8 @@ class WebhookDispatcher:
             refreshed = self._store.get_run(run_id)
             if refreshed is None:
                 return
+            from agentbox.api.webhooks import schedule_webhook
+
             schedule_webhook(
                 agent,
                 refreshed,
@@ -82,6 +82,8 @@ class WebhookDispatcher:
                 if refreshed.transcript_path
                 else None
             )
+            from agentbox.api.webhooks import schedule_webhook
+
             schedule_webhook(
                 agent,
                 refreshed,

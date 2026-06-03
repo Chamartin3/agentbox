@@ -104,7 +104,7 @@ from agentbox.core.data.agents.sync import AgentSyncMixin
 from agentbox.core.data.agents.grants import AgentToolGrantsMixin
 from agentbox.core.data.agents.versions import AgentVersionsMixin
 from agentbox.core.data.agents.prompts import PromptVersionsMixin
-from agentbox.core.data.execution.analytics import ExecutionAnalyticsMixin as AnalyticsMixin
+from agentbox.core.data.execution.analytics import ExecutionAnalyticsMixin
 from agentbox.core.data.resources.crud import ResourcesMixin
 from agentbox.core.data.resources.shared import SharedResourcesMixin
 from agentbox.core.data.resources.bindings import ResourceBindingsMixin
@@ -268,7 +268,7 @@ __all__ = [
     "AgentSyncMixin",
     "AgentToolGrantsMixin",
     "AgentVersionsMixin",
-    "AnalyticsMixin",
+    "ExecutionAnalyticsMixin",
     "ApiTokensMixin",
     "EnvDocsMixin",
     "HostEnvMixin",
