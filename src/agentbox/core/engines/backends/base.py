@@ -110,6 +110,11 @@ class RenderedConfig:
     ``render()`` on a backend adapter produces one of these. The executor
     materialises ``files`` to disk, then passes the same object to
     ``run()`` so the adapter never needs to re-inspect the workspace.
+
+    Cross-domain values that backends previously fetched via direct
+    imports from ``core.agents.*``, ``core.workspace.*``, or
+    ``core.resource.*`` are populated here by the executor during setup.
+    Backends read them from this object — never from other domains.
     """
 
     files: Mapping[Path, bytes] = field(default_factory=dict)
@@ -143,6 +148,20 @@ class RenderedConfig:
     Computed automatically by ``compute_digest()``. Stable across identical
     inputs; changes when any tool, arg, or env var is added/removed.
     """
+
+    # -- Cross-domain values populated by the executor ------------------------
+    # These carry data from agents/workspaces/resources domains so backends
+    # never import those domains directly.  The executor populates them in
+    # `core.execution.orchestrate.setup` before calling `adapter.render()`.
+
+    mcp_tools: list[McpToolSpec] = field(default_factory=list)
+    """MCP tool manifests resolved at run time."""
+
+    host_env_server_cmd: list[str] = field(default_factory=list)
+    """CLI args for the agentbox host-env MCP server."""
+
+    agent_tools_server_cmd: list[str] = field(default_factory=list)
+    """CLI args for the agentbox agent-tools MCP server."""
 
     def __post_init__(self) -> None:
         if not self.digest:
