@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.agents.plugins import get_backend
+from agentbox.core.agents.resolve import resolve_engine_by_name
 from agentbox.core.agents.providers import get_provider
 
 SourceType = Literal[
@@ -256,6 +256,6 @@ class RunnerProfileResolver:
             ValueError: If backend is not registered.
         """
         try:
-            get_backend(backend)
+            resolve_engine_by_name(backend)
         except KeyError as exc:
             raise ValueError(f"unknown backend {backend!r}: {exc}") from exc

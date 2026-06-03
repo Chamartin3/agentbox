@@ -12,7 +12,7 @@ import logging
 
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.agents.tool_grants import AgentToolGrantsMixin
+from agentbox.core.data.agents.grants import AgentToolGrantsMixin
 from agentbox.core.data.agents.versions.models import _copy_version_files, _prepare_files
 from agentbox.core.data.agents.versions.read import _AgentVersionsReadMixin
 from agentbox.core.data.records import now_iso

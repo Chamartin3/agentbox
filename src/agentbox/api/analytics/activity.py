@@ -7,7 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Query
 
 from agentbox.api.deps import get_store
-from agentbox.core.service import analytics as svc
+from agentbox.core.execution.evaluate import activity as svc
 
 router = APIRouter(prefix="/api/activity", tags=["activity"])
 

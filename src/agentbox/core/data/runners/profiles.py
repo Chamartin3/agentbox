@@ -17,7 +17,7 @@ from sqlalchemy.engine import Engine
 
 from agentbox.core.data.records import now_iso
 from agentbox.core.data.runners._models import RunnerProfileStats, _row_to_profile
-from agentbox.core.data.runners.stats import RunnerStatsMixin
+from agentbox.core.data.execution.analytics.profile_stats import RunnerStatsMixin
 
 # Re-export so callers can ``from agentbox.core.data.runners.profiles import
 # RunnerProfileStats`` — the canonical model lives in ``_models`` but the

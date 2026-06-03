@@ -84,7 +84,7 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "AgentSyncMixin",
         "AgentToolGrantsMixin",
         "AgentVersionsMixin",
-        "AnalyticsMixin",
+        "ExecutionAnalyticsMixin",
         "ApiTokensMixin",
         "EnvDocsMixin",
         "HostEnvMixin",

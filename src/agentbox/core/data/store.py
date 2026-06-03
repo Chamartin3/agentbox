@@ -8,7 +8,7 @@ that read more clearly as SQL expressions than as ORM relationships.
 ``SessionStore`` is composed from:
 - ``_CoreStore``  — connection mgmt + sessions/runs/usage CRUD
 - ``AgentToolGrantsMixin`` — agent-scoped tool grant/revoke CRUD
-- ``AnalyticsMixin``       — read-only rollups and time-series
+- ``ExecutionAnalyticsMixin``       — read-only rollups and time-series
 - ``PromptVersionsMixin``  — draft/publish/rollback for prompt history
 """
 
@@ -24,12 +24,12 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from agentbox.core.constants import RunStatus
-from agentbox.core.data.agents.config_events import AgentConfigEventsMixin
+from agentbox.core.data.agents.events import AgentConfigEventsMixin
 from agentbox.core.data.agents.sync import AgentSyncMixin
-from agentbox.core.data.agents.tool_grants import AgentToolGrantsMixin
+from agentbox.core.data.agents.grants import AgentToolGrantsMixin
 from agentbox.core.data.agents.versions import AgentVersionsMixin
 from agentbox.core.data.agents.prompts import PromptVersionsMixin
-from agentbox.core.data.execution.analytics import AnalyticsMixin
+from agentbox.core.data.execution.analytics import ExecutionAnalyticsMixin
 from agentbox.core.data.resources.crud import ResourcesMixin
 from agentbox.core.data.resources.shared import SharedResourcesMixin
 from agentbox.core.data.resources.bindings import ResourceBindingsMixin
@@ -758,7 +758,7 @@ class SessionStore(
     # listing it directly here causes an MRO conflict.
     ProjectConfigMixin,
     ApiTokensMixin,
-    AnalyticsMixin,
+    ExecutionAnalyticsMixin,
     _CoreStore,
 ):
     """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + shared resources + runner profiles + sync."""

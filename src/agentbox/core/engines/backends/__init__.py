@@ -1,4 +1,11 @@
-"""Backend adapter registry — discover and select agent backends."""
+"""Backend adapter registry — discover and select agent backends.
+
+.. note::
+
+   The direct ``agents.plugins`` import is a known back-edge deferred to
+   Step 5 (RenderedConfig inversion).  Fixing it now creates a circular
+   import (``resolve.py`` needs ``BackendAdapter`` from this package).
+"""
 
 from __future__ import annotations
 

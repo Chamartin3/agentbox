@@ -13,13 +13,13 @@ plan 27 modularization:
 
 from __future__ import annotations
 
-from agentbox.core.data.execution.analytics._helpers import _duration_ms_expr  # noqa: F401
+from agentbox.core.data.execution.analytics.helpers import _duration_ms_expr  # noqa: F401
 from agentbox.core.data.execution.analytics.activity import ActivityAnalyticsMixin
 from agentbox.core.data.execution.analytics.aggregates import AggregateAnalyticsMixin
 from agentbox.core.data.execution.analytics.listing import ListingAnalyticsMixin
 
 
-class AnalyticsMixin(
+class ExecutionAnalyticsMixin(
     ActivityAnalyticsMixin,
     AggregateAnalyticsMixin,
     ListingAnalyticsMixin,

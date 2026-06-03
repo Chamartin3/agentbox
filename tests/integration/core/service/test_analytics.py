@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data import SessionStore
-from agentbox.core.service.analytics import (
+from agentbox.core.execution.evaluate.activity import (
     enrich_recent_runs,
     since_iso,
     summary,

@@ -11,7 +11,7 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.service import analytics as svc
+from agentbox.core.execution.evaluate import activity as svc
 
 app = typer.Typer(
     name="activity",
