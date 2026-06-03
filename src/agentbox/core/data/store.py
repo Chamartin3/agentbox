@@ -29,7 +29,7 @@ from agentbox.core.data.agents.sync import AgentSyncMixin
 from agentbox.core.data.agents.tool_grants import AgentToolGrantsMixin
 from agentbox.core.data.agents.versions import AgentVersionsMixin
 from agentbox.core.data.agents.prompts import PromptVersionsMixin
-from agentbox.core.data.runs.analytics import AnalyticsMixin
+from agentbox.core.data.execution.analytics import AnalyticsMixin
 from agentbox.core.data.resources.crud import ResourcesMixin
 from agentbox.core.data.resources.shared import SharedResourcesMixin
 from agentbox.core.data.resources.bindings import ResourceBindingsMixin
@@ -42,7 +42,7 @@ from agentbox.core.data.records import (
     RunnerSnapshot,
     now_iso,
 )
-from agentbox.core.data.runs.records import RunRecord, row_to_run
+from agentbox.core.data.execution.records import RunRecord, row_to_run
 from agentbox.core.data.schema import (
     metadata,
     run_comments,

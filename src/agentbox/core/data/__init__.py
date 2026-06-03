@@ -29,7 +29,7 @@ from agentbox.core.data.records import (
     SharedResourceRecord,
     now_iso,
 )
-from agentbox.core.data.runs.records import RunRecord, row_to_run
+from agentbox.core.data.execution.records import RunRecord, row_to_run
 
 # ---------------------------------------------------------------------------
 # Manifest / declarative models (pydantic)
@@ -104,7 +104,7 @@ from agentbox.core.data.agents.sync import AgentSyncMixin
 from agentbox.core.data.agents.tool_grants import AgentToolGrantsMixin
 from agentbox.core.data.agents.versions import AgentVersionsMixin
 from agentbox.core.data.agents.prompts import PromptVersionsMixin
-from agentbox.core.data.runs.analytics import AnalyticsMixin
+from agentbox.core.data.execution.analytics import AnalyticsMixin
 from agentbox.core.data.resources.crud import ResourcesMixin
 from agentbox.core.data.resources.shared import SharedResourcesMixin
 from agentbox.core.data.resources.bindings import ResourceBindingsMixin
@@ -127,8 +127,8 @@ from agentbox.core.data.store import SessionStore
 # ---------------------------------------------------------------------------
 # Domain-specific helpers / constants
 # ---------------------------------------------------------------------------
-from agentbox.core.data.runs.analytics import _duration_ms_expr  # noqa: F401
-from agentbox.core.data.runs.claude_session import find_session_log, parse_session_log
+from agentbox.core.data.execution.analytics import _duration_ms_expr  # noqa: F401
+from agentbox.core.data.execution.claude_session import find_session_log, parse_session_log
 from agentbox.core.data.constants import VALID_POLICIES
 from agentbox.core.data.resources.crud import _hash_blobs as hash_blobs  # noqa: F401
 from agentbox.core.data.runners._models import RunnerProfileStats
@@ -141,12 +141,12 @@ from agentbox.core.data.runners.seeds import (
     DEFAULT_PROFILES,
     seed_default_runner_profiles,
 )
-from agentbox.core.data.runs.transcripts import read_transcript
+from agentbox.core.data.execution.transcripts import read_transcript
 
 # ---------------------------------------------------------------------------
 # Event types
 # ---------------------------------------------------------------------------
-from agentbox.core.data.runs.events import (
+from agentbox.core.data.execution.events import (
     DoneEvent,
     LogEvent,
     RetryEvent,

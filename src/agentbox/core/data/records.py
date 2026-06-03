@@ -1,6 +1,6 @@
 """DB return-shape dataclasses and TypedDicts for snapshots and non-run records.
 
-RunRecord and its row mapper live in ``core.data.runs.records``.
+RunRecord and its row mapper live in ``core.data.execution.records``.
 """
 
 from __future__ import annotations

@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.runs.analytics._helpers import _duration_ms_expr
+from agentbox.core.data.execution.analytics._helpers import _duration_ms_expr
 from agentbox.core.data.schema import agent_versions, runs, usage
 
 
