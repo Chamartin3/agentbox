@@ -10,7 +10,7 @@ from rich.table import Table
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.agents.composition.resolver import resolve_prompt
-from agentbox.core.run.run_prep import resolve_agent_prompt_bindings
+from agentbox.core.execution.prepare.envdoc import resolve_agent_prompt_bindings
 from agentbox.core.service import (
     list_prompt_bindings,
     get_repo_resource_by_slug,

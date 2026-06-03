@@ -47,7 +47,7 @@ from agentbox.core.engines.backends.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
 )
-from agentbox.core.run.run_prep import (
+from agentbox.core.execution.prepare.envdoc import (
     prompt_resolution_to_snapshot,
     resolve_agent_prompt_bindings,
 )

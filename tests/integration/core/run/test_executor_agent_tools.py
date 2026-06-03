@@ -35,7 +35,7 @@ def test_agent_tools_mcp_injected_when_grants_exist(tmp_path: Path):
     run_dir = tmp_path / "run"
     run_dir.mkdir()
 
-    from agentbox.core.run.executor import RunExecutor
+    from agentbox.core.execution.orchestrate.executor import RunExecutor
 
     executor = MagicMock(spec=RunExecutor)
     executor.settings = MagicMock()

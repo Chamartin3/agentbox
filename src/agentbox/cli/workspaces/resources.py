@@ -7,7 +7,7 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.run.run_prep import resolve_workspace_resources
+from agentbox.core.execution.prepare.envdoc import resolve_workspace_resources
 from agentbox.core.service import (
     get_repo_resource_by_slug,
     list_workspace_file_bindings,

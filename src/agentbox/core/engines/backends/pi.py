@@ -20,7 +20,7 @@ from agentbox.core.data import (
     UsageEvent,
 )
 from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
-from agentbox.core.run.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.execution.streaming.jsonl import stream_jsonl_subprocess
 
 _NAME = "pi"
 _DEFAULT_PI_MODEL: str | None = None

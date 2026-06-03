@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.data import find_session_log, parse_session_log
-from agentbox.core.run.history.base import ConversationSource
-from agentbox.core.run.history.types import (
+from agentbox.core.execution.history.base import ConversationSource
+from agentbox.core.execution.history.types import (
     ContentPart,
     ConversationView,
     TokenTotals,

@@ -13,7 +13,7 @@ Contract:
   executor's job (it persists ``PreparedResources.resource_snapshot_entries``
   after the run row is created).
 - Composed prompt/schema state is returned as a typed
-  :class:`~agentbox.core.run.prepare.prompts.ComposedState` on
+  :class:`~agentbox.core.execution.prepare.prompts.ComposedState` on
   :attr:`PreparedResources.composed`. The executor threads it through
   ``render`` / ``validate_output`` / capture explicitly — there is no
   hidden ``agent.__dict__`` side-channel anymore.
@@ -29,8 +29,8 @@ from typing import TYPE_CHECKING, Any
 from agentbox.core.data import AgentDef
 from agentbox.core.resource.subagent_render import materialize_subagents
 from agentbox.core.resource.workspace_materialize import materialize_workspace
-from agentbox.core.run.prepare.prompts import ComposedState, resolve_run_prompt
-from agentbox.core.run.run_prep import (
+from agentbox.core.execution.prepare.prompts import ComposedState, resolve_run_prompt
+from agentbox.core.execution.prepare.envdoc import (
     render_env_doc,
     resolve_workspace_resources,
     resolve_workspace_subagents,
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 class PreparedResources:
     """Result of :func:`prepare_run_resources`.
 
-    See :class:`agentbox.core.run.prepare.prompts.ResolvedPrompt` for
+    See :class:`agentbox.core.execution.prepare.prompts.ResolvedPrompt` for
     the prompt-assembly outputs that are surfaced through ``agent``.
     """
 

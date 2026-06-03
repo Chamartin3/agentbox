@@ -9,15 +9,15 @@ the agentbox transcript" hint and fall back to ``TranscriptSource``.
 Once codex exposes a deterministic session export (or a documented
 on-disk layout under ``~/.codex/sessions/``), grow this source to parse
 the messages into ``Turn`` objects analogous to
-:class:`~agentbox.core.run.history.sources.opencode.OpencodeSessionSource`.
+:class:`~agentbox.core.execution.history.sources.opencode.OpencodeSessionSource`.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from agentbox.core.run.history.base import ConversationSource
-from agentbox.core.run.history.types import ConversationView, TokenTotals
+from agentbox.core.execution.history.base import ConversationSource
+from agentbox.core.execution.history.types import ConversationView, TokenTotals
 
 if TYPE_CHECKING:
     from agentbox.core.data import RunRecord

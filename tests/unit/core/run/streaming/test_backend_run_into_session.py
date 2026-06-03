@@ -19,7 +19,7 @@ from agentbox.core.engines.backends.base import (
     BackendRunResult,
     RenderedConfig,
 )
-from agentbox.core.run.streaming.session import CaptureSession
+from agentbox.core.execution.streaming.session import CaptureSession
 
 
 class _IteratorBackend(BackendAdapter):

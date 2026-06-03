@@ -25,7 +25,7 @@ import httpx
 from agentbox.core.data import LogEvent, RunEvent
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, RunRecord, SessionStore
-from agentbox.core.run.validation import extract_json
+from agentbox.core.execution.validate import extract_json
 
 logger = logging.getLogger(__name__)
 

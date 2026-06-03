@@ -52,12 +52,12 @@ from agentbox.core.resource.skills import find_skill as find_skill
 from agentbox.core.engines.render import ConfigGenerator as ConfigGenerator
 
 # ── Run execution ─────────────────────────────────────────────────────
-from agentbox.core.run.executor import NoBackendAvailable as NoBackendAvailable
-from agentbox.core.run.executor import RunExecutor as RunExecutor
-from agentbox.core.run.history import get as get_conversation  # noqa: F401
-from agentbox.core.run.run_prep import render_env_doc as render_env_doc
-from agentbox.core.run.run_prep import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
-from agentbox.core.run.run_prep import resolve_workspace_resources as resolve_workspace_resources
+from agentbox.core.execution.orchestrate.executor import NoBackendAvailable as NoBackendAvailable
+from agentbox.core.execution.orchestrate.executor import RunExecutor as RunExecutor
+from agentbox.core.execution.history import get as get_conversation  # noqa: F401
+from agentbox.core.execution.prepare.envdoc import render_env_doc as render_env_doc
+from agentbox.core.execution.prepare.envdoc import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
+from agentbox.core.execution.prepare.envdoc import resolve_workspace_resources as resolve_workspace_resources
 
 # ── Cross-cutting agents service ──────────────────────────────────────
 from agentbox.core.service.agents import build_agent_snapshot as build_agent_snapshot

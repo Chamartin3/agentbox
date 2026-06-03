@@ -1,19 +1,19 @@
 """RunExecutor — orchestrates a single agent run end-to-end.
 
 Thin orchestrator that delegates each lifecycle phase to a dedicated
-collaborator under :mod:`agentbox.core.run.execute`:
+collaborator under :mod:`agentbox.core.execution.execute`:
 
-* :class:`~agentbox.core.run.execute.setup.RunSetup` — workdir,
+* :class:`~agentbox.core.execution.orchestrate.setup.RunSetup` — workdir,
   backend selection, render, post-render MCP injection.
-* :class:`~agentbox.core.run.execute.snapshots.SnapshotWriter` —
+* :class:`~agentbox.core.execution.orchestrate.snapshots.SnapshotWriter` —
   runner/MCP/resource snapshots persisted to the run row.
-* :class:`~agentbox.core.run.execute.steploop.RunStepLoop` — drives
+* :class:`~agentbox.core.execution.orchestrate.steploop.RunStepLoop` — drives
   the backend stream into a terminal :class:`StepResult`.
-* :class:`~agentbox.core.run.execute.finalizer.RunFinalizer` — terminal
+* :class:`~agentbox.core.execution.orchestrate.finalizer.RunFinalizer` — terminal
   persist + webhook + cleanup (the ``finally`` block of the run task).
-* :class:`~agentbox.core.run.execute.webhooks.WebhookDispatcher` —
+* :class:`~agentbox.core.execution.webhooks.WebhookDispatcher` —
   completion webhook delivery.
-* :class:`~agentbox.core.run.execute.broadcaster.RunBroadcaster` —
+* :class:`~agentbox.core.execution.orchestrate.broadcaster.RunBroadcaster` —
   in-memory pub/sub for WS subscribers.
 
 The public surface (``RunExecutor.execute``, ``cancel_run``,
@@ -41,9 +41,9 @@ from agentbox.core.agents.composition.capture import build_fragments, fragments_
 
 # Re-exports — preserve the historical public surface of this module so
 # downstream imports (tests, services, host_env) keep working.
-from agentbox.core.run.execute.broadcaster import RunBroadcaster
-from agentbox.core.run.execute.finalizer import RunFinalizer
-from agentbox.core.run.execute.setup import (
+from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
+from agentbox.core.execution.orchestrate.finalizer import RunFinalizer
+from agentbox.core.execution.orchestrate.setup import (
     NoBackendAvailable,
     RunSetup,
     fail_pre_run as _fail_pre_run_helper,
@@ -52,16 +52,16 @@ from agentbox.core.engines.render.postrender import (
     inject_agent_tools_mcp as _inject_agent_tools_mcp_helper,
     inject_host_env_mcp as _inject_host_env_mcp_helper,
 )
-from agentbox.core.run.execute.snapshots import (
+from agentbox.core.execution.orchestrate.snapshots import (
     SnapshotWriter,
     build_runner_snapshot,
 )
-from agentbox.core.run.execute.steploop import RunStepLoop
-from agentbox.core.run.execute.webhooks import WebhookDispatcher
-from agentbox.core.run.prepare import prepare_run_resources
+from agentbox.core.execution.orchestrate.steploop import RunStepLoop
+from agentbox.core.execution.webhooks import WebhookDispatcher
+from agentbox.core.execution.prepare import prepare_run_resources
 # ``_adapter_run_into_session`` is re-imported below for back-compat with
 # tests that depend on it being importable from this module.
-from agentbox.core.run.retry import _adapter_run_into_session  # noqa: F401
+from agentbox.core.execution.retry import _adapter_run_into_session  # noqa: F401
 
 if TYPE_CHECKING:
     from agentbox.core.workspace.mcp.client.registry import McpRegistry

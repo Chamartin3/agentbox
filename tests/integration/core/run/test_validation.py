@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.run.validation import (
+from agentbox.core.execution.validate import (
     ValidationResult,
     extract_json,
     validate_jsonschema,

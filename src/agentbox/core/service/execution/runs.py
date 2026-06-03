@@ -30,13 +30,13 @@ from agentbox.core.agents.resolve import (
     list_engines as backends,
 )
 from agentbox.core.data import read_transcript
-from agentbox.core.run.executor import NoBackendAvailable
+from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.prompts import AgentNotFound
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
-    from agentbox.core.run.executor import RunExecutor
+    from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)
 

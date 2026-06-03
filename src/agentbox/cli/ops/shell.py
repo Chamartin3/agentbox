@@ -23,7 +23,7 @@ from agentbox.cli._common import console
 from agentbox.cli.ops.launch import _apply_creds, _make_generator, _resolve_workspace
 from agentbox.config import load_settings
 from agentbox.core.data import SessionStore
-from agentbox.core.run.run_prep import render_env_doc
+from agentbox.core.execution.prepare.envdoc import render_env_doc
 from agentbox.core.service import get_agent_def, get_workspace
 
 

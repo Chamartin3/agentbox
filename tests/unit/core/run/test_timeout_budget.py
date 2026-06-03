@@ -23,8 +23,8 @@ from agentbox.core.engines.backends.base import (
     BackendAdapter,
     RenderedConfig,
 )
-from agentbox.core.run.executor import _adapter_run_into_session
-from agentbox.core.run.streaming.session import CaptureSession
+from agentbox.core.execution.orchestrate.executor import _adapter_run_into_session
+from agentbox.core.execution.streaming.session import CaptureSession
 
 
 class _SlowBackend(BackendAdapter):

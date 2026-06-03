@@ -30,7 +30,7 @@ from agentbox.core.resource.composition_to_bindings import (
 from agentbox.core.resource.legacy_migration import (
     migrate_shared_resources_to_repo,
 )
-from agentbox.core.run.execute.webhooks import schedule_webhook
+from agentbox.core.execution.webhooks import schedule_webhook
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.tools import discover_tools
 from agentbox.core.workspace.mcp.client import McpRegistry

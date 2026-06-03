@@ -6,9 +6,9 @@ load and parse the runner's native conversation log into a uniform
 ``ConversationView``.
 """
 
-from agentbox.core.run.history.base import ConversationSource
-from agentbox.core.run.history.registry import available_formats, get
-from agentbox.core.run.history.types import (
+from agentbox.core.execution.history.base import ConversationSource
+from agentbox.core.execution.history.registry import available_formats, get
+from agentbox.core.execution.history.types import (
     ContentPart,
     ConversationView,
     TokenTotals,

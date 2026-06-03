@@ -17,8 +17,8 @@ from pydantic import BaseModel
 from agentbox.api.deps import get_executor, get_loader, get_store
 from agentbox.api.webhooks import schedule_webhook
 from agentbox.core.data import read_transcript
-from agentbox.core.service import runs as runs_service
-from agentbox.core.service.runs import (
+from agentbox.core.service.execution import runs as runs_service
+from agentbox.core.service.execution.runs import (
     AgentNotFound,
     InvalidRunInput,
     NoBackendAvailable,

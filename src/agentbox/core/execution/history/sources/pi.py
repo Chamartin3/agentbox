@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from agentbox.core.run.history.base import ConversationSource
-from agentbox.core.run.history.types import ConversationView, TokenTotals
+from agentbox.core.execution.history.base import ConversationSource
+from agentbox.core.execution.history.types import ConversationView, TokenTotals
 
 if TYPE_CHECKING:
     from agentbox.core.data import RunRecord

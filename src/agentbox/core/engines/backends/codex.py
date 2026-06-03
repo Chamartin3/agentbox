@@ -1,7 +1,7 @@
 """Backend adapter for the OpenAI Codex CLI (``codex exec --json``).
 
 Self-contained adapter introduced in Plan 16 Phase 2. Streaming uses
-the shared :func:`agentbox.core.run.streaming.jsonl.stream_jsonl_subprocess`
+the shared :func:`agentbox.core.execution.streaming.jsonl.stream_jsonl_subprocess`
 helper.
 """
 
@@ -15,7 +15,7 @@ from typing import Any, ClassVar
 
 from agentbox.core.data import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
-from agentbox.core.run.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.execution.streaming.jsonl import stream_jsonl_subprocess
 
 _NAME = "codex"
 _DEFAULT_CODEX_MODEL: str | None = None  # let codex pick its own default

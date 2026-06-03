@@ -142,7 +142,7 @@ class OpenCodeBackend(BackendAdapter):
         import asyncio
         import json
 
-        from agentbox.core.run.streaming.rate_limit import (
+        from agentbox.core.execution.streaming.rate_limit import (
             detect_in_opencode_event,
             detect_in_text_line,
         )

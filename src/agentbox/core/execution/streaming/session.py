@@ -43,7 +43,7 @@ from agentbox.core.data import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.run.executor import RunBroadcaster
+    from agentbox.core.execution.orchestrate.executor import RunBroadcaster
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +231,7 @@ class CaptureSession(RunStreamSession):
     """
 
     def __init__(self, run_id: str = "test-run") -> None:
-        from agentbox.core.run.executor import RunBroadcaster
+        from agentbox.core.execution.orchestrate.executor import RunBroadcaster
 
         super().__init__(
             run_id=run_id,

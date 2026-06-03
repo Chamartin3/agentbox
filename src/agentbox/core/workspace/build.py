@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 
 from agentbox.core.resource.subagent_render import materialize_subagents
 from agentbox.core.resource.workspace_materialize import materialize_workspace
-from agentbox.core.run.run_prep import (
+from agentbox.core.execution.prepare.envdoc import (
     render_env_doc,
     resolve_workspace_resources,
     resolve_workspace_subagents,

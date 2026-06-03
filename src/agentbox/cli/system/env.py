@@ -184,7 +184,7 @@ def env_doc_preview(
         )
         return
 
-    from agentbox.core.run.run_prep import render_env_doc
+    from agentbox.core.execution.prepare.envdoc import render_env_doc
 
     try:
         entries = render_env_doc(

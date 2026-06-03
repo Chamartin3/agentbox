@@ -11,8 +11,8 @@ from rich.text import Text
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
-from agentbox.core.service import runs as runs_service
-from agentbox.core.service.runs import (
+from agentbox.core.service.execution import runs as runs_service
+from agentbox.core.service.execution.runs import (
     RunNotFound,
 )
 from agentbox.core.service import aggregate_usage

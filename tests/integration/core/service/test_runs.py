@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 
 from agentbox.core.data import SessionStore
-from agentbox.core.run.executor import NoBackendAvailable
-from agentbox.core.service import runs as runs_service
-from agentbox.core.service.runs import (
+from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
+from agentbox.core.service.execution import runs as runs_service
+from agentbox.core.service.execution.runs import (
     AgentNotFound,
     InvalidRunInput,
     RunNotFound,

@@ -6,8 +6,8 @@ It does *not* persist the terminal state — that's the finalizer's job.
 
 The actual per-event work (transcript append, WS broadcast, usage
 record, schema validation, retry-on-validation-failure) is handled by
-:class:`agentbox.core.run.retry.RetryOrchestrator` and
-:class:`agentbox.core.run.streaming.session.RunStreamSession`.
+:class:`agentbox.core.execution.retry.RetryOrchestrator` and
+:class:`agentbox.core.execution.streaming.session.RunStreamSession`.
 """
 
 from __future__ import annotations
@@ -24,10 +24,10 @@ from agentbox.core.agents.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.engines.backends.base import RenderedConfig
-from agentbox.core.run.retry import RetryOrchestrator
-from agentbox.core.run.streaming.session import RunStreamSession
+from agentbox.core.execution.retry import RetryOrchestrator
+from agentbox.core.execution.streaming.session import RunStreamSession
 
-from agentbox.core.run.execute.broadcaster import RunBroadcaster
+from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 
 if TYPE_CHECKING:
     from agentbox.core.engines.backends.base import BackendAdapter

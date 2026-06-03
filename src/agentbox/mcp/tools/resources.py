@@ -17,7 +17,7 @@ from agentbox.core.agents.composition.preview import (
 from agentbox.core.resource.importers.base import ImporterContext
 from agentbox.core.resource.importers.upload import UploadImporter
 from agentbox.core.resource.importers.zip_upload import ZipUploadImporter
-from agentbox.core.run.run_prep import (
+from agentbox.core.execution.prepare.envdoc import (
     resolve_workspace_resources,
 )
 from agentbox.core.service.agents import resolve_agent

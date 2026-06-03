@@ -392,7 +392,7 @@ class TestAuditLog:
 
 class TestExecutorInjection:
     def test_injects_host_env_into_mcp_config(self, tmp_path: Path):
-        from agentbox.core.run.executor import RunExecutor
+        from agentbox.core.execution.orchestrate.executor import RunExecutor
 
         executor = object.__new__(RunExecutor)
         executor.settings = MagicMock()
@@ -421,7 +421,7 @@ class TestExecutorInjection:
         assert "existing-server" in updated["mcpServers"]
 
     def test_creates_mcp_config_when_missing(self, tmp_path: Path):
-        from agentbox.core.run.executor import RunExecutor
+        from agentbox.core.execution.orchestrate.executor import RunExecutor
 
         executor = object.__new__(RunExecutor)
         executor.settings = MagicMock()

@@ -7,12 +7,12 @@ should import from this package; nothing here is backend-specific.
 
 from __future__ import annotations
 
-from agentbox.core.run.streaming.jsonl import stream_jsonl_subprocess
-from agentbox.core.run.streaming.rate_limit import (
+from agentbox.core.execution.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.execution.streaming.rate_limit import (
     detect_in_opencode_event,
     detect_in_text_line,
 )
-from agentbox.core.run.streaming.session import (
+from agentbox.core.execution.streaming.session import (
     CaptureSession,
     DoneAlreadyEmittedError,
     RunStreamSession,

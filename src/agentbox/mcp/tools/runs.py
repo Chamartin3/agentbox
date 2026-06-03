@@ -8,8 +8,8 @@ from typing import Any
 from fastmcp import FastMCP
 
 from agentbox.core.service import read_transcript
-from agentbox.core.run.history import get as get_conversation_source
-from agentbox.core.run.history.sources.transcript import TranscriptSource
+from agentbox.core.execution.history import get as get_conversation_source
+from agentbox.core.execution.history.sources.transcript import TranscriptSource
 from agentbox.mcp.deps import get_context
 from agentbox.mcp.schemas import clamp_limit
 

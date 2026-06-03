@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar
 
-from agentbox.core.run.history.types import ConversationView
+from agentbox.core.execution.history.types import ConversationView
 
 if TYPE_CHECKING:
     from agentbox.core.data import RunRecord
