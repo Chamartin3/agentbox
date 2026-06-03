@@ -96,3 +96,10 @@ class WebhookDispatcher:
 
 
 __all__ = ["WebhookDispatcher"]
+
+
+def schedule_webhook(*args, **kwargs):
+    """Lazy re-export of api.webhooks.schedule_webhook."""
+    from agentbox.api.webhooks import schedule_webhook as _impl
+
+    return _impl(*args, **kwargs)
