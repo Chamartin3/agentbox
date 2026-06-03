@@ -124,6 +124,7 @@ class PiBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
+        **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
         model = getattr(runner_config, "model", None) or self.default_model

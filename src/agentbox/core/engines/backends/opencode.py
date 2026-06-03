@@ -63,6 +63,7 @@ class OpenCodeBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
+        **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
         extra_args = list(

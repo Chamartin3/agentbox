@@ -63,6 +63,7 @@ class TokenBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
+        **kwargs: Any,
     ) -> RenderedConfig:
         python_cfg = PythonAgentConfig.from_agent(agent)
         model = getattr(runner_config, "model", None) or self.default_model

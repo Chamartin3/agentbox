@@ -17,13 +17,13 @@ from pydantic import BaseModel
 from agentbox.api.deps import get_executor, get_loader, get_store
 from agentbox.api.webhooks import schedule_webhook
 from agentbox.core.data import read_transcript
-from agentbox.core.service.execution import runs as runs_service
+from agentbox.core.service.execution import runs
 from agentbox.core.service.execution.runs import (
     AgentNotFound,
     InvalidRunInput,
-    NoBackendAvailable,
     RunNotFound,
 )
+from agentbox.core.execution.orchestrate.setup import NoBackendAvailable
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -74,7 +74,7 @@ class CreateRunBody(BaseModel):
 @router.post("")
 async def create_run(body: CreateRunBody) -> dict:
     try:
-        return await runs_service.create_run(
+        return await runs.create_run(
             body.agent,
             store=get_store(),
             executor=get_executor(),
@@ -96,7 +96,7 @@ async def create_run(body: CreateRunBody) -> dict:
     except InvalidRunInput as exc:
         raise HTTPException(422, str(exc)) from exc
     except NoBackendAvailable as exc:
-        raise HTTPException(503, runs_service.no_backend_detail(exc)) from exc
+        raise HTTPException(503, runs.no_backend_detail(exc)) from exc
 
 
 @router.get("")
@@ -113,7 +113,7 @@ def list_runs(
     paginated: bool = False,
 ) -> list[dict] | dict:
     """List runs. See ``core.service.runs.list_runs`` for the shape."""
-    return runs_service.list_runs(
+    return runs.list_runs(
         store=get_store(),
         agent=agent,
         status=status,
@@ -139,7 +139,7 @@ def runs_stats(
     until: str | None = None,
 ) -> dict:
     """Aggregated stats for the run dashboard."""
-    return runs_service.run_stats(
+    return runs.run_stats(
         store=get_store(),
         agent=agent,
         status=status,
@@ -163,7 +163,7 @@ class CompleteRunBody(BaseModel):
 @router.post("/{run_id}/complete")
 async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
     try:
-        return runs_service.complete_run(
+        return runs.complete_run(
             run_id,
             store=get_store(),
             ok=body.ok,
@@ -191,7 +191,7 @@ class SnapshotBody(BaseModel):
 @router.post("/{run_id}/snapshot")
 async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
     try:
-        return runs_service.snapshot_run(
+        return runs.snapshot_run(
             run_id,
             store=get_store(),
             rendered_prompt=body.rendered_prompt,
@@ -217,7 +217,7 @@ class PostOutcomeBody(BaseModel):
 def post_outcome(run_id: str, body: PostOutcomeBody) -> dict:
     """Record downstream post-processing outcome for a completed run."""
     try:
-        return runs_service.post_outcome(
+        return runs.post_outcome(
             run_id,
             store=get_store(),
             status=body.status,
@@ -232,7 +232,7 @@ def post_outcome(run_id: str, body: PostOutcomeBody) -> dict:
 async def rerun(run_id: str) -> dict:
     """Re-execute a finished run with the same agent + input/variables."""
     try:
-        return await runs_service.rerun(
+        return await runs.rerun(
             run_id,
             store=get_store(),
             executor=get_executor(),
@@ -254,7 +254,7 @@ class RunCommentBody(BaseModel):
 @router.get("/{run_id}/comments")
 def list_comments(run_id: str) -> dict:
     try:
-        return runs_service.list_comments(run_id, store=get_store())
+        return runs.list_comments(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
 
@@ -262,7 +262,7 @@ def list_comments(run_id: str) -> dict:
 @router.post("/{run_id}/comments")
 def add_comment(run_id: str, body: RunCommentBody) -> dict:
     try:
-        return runs_service.add_comment(
+        return runs.add_comment(
             run_id, store=get_store(), author=body.author, body=body.body
         )
     except RunNotFound as exc:
@@ -273,7 +273,7 @@ def add_comment(run_id: str, body: RunCommentBody) -> dict:
 async def cancel_run(run_id: str) -> dict:
     """Cancel an in-progress run. Idempotent."""
     try:
-        return await runs_service.cancel_run(
+        return await runs.cancel_run(
             run_id, store=get_store(), executor=get_executor()
         )
     except RunNotFound as exc:
@@ -283,13 +283,13 @@ async def cancel_run(run_id: str) -> dict:
 @router.get("/_facets")
 def run_facets() -> dict:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""
-    return runs_service.run_facets(store=get_store())
+    return runs.run_facets(store=get_store())
 
 
 @router.get("/{run_id}")
 def get_run(run_id: str) -> dict:
     try:
-        return runs_service.get_run_detail(run_id, store=get_store())
+        return runs.get_run_detail(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404) from exc
 
@@ -297,7 +297,7 @@ def get_run(run_id: str) -> dict:
 @router.get("/{run_id}/prompt")
 def get_run_prompt(run_id: str) -> dict:
     try:
-        return runs_service.get_run_prompt(run_id, store=get_store())
+        return runs.get_run_prompt(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404) from exc
 
@@ -305,7 +305,7 @@ def get_run_prompt(run_id: str) -> dict:
 @router.get("/{run_id}/transcript")
 def get_transcript(run_id: str) -> list[dict]:
     try:
-        return runs_service.get_transcript(run_id, store=get_store())
+        return runs.get_transcript(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404) from exc
 

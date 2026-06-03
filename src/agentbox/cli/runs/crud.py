@@ -11,7 +11,7 @@ from rich.text import Text
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
-from agentbox.core.service.execution import runs as runs_service
+from agentbox.core.service.execution import runs
 from agentbox.core.service.execution.runs import (
     RunNotFound,
 )
@@ -33,7 +33,7 @@ def runs_list(
     ),
 ) -> None:
     """Show recent runs with status, tokens, and cost."""
-    rows = runs_service.list_runs(
+    rows = runs.list_runs(
         store=get_store(), agent=agent, limit=limit, with_usage=True
     )
     assert isinstance(rows, list)
@@ -102,7 +102,7 @@ def runs_show(
 ) -> None:
     """Show metadata and usage for a single run."""
     try:
-        detail = runs_service.get_run_detail(run_id, store=get_store())
+        detail = runs.get_run_detail(run_id, store=get_store())
     except RunNotFound:
         console.print(f"[red]no such run[/red] {run_id!r}")
         raise typer.Exit(2)
@@ -154,7 +154,7 @@ def runs_tail(
 
     store = get_store()
     try:
-        events = runs_service.get_transcript(run_id, store=store)
+        events = runs.get_transcript(run_id, store=store)
     except RunNotFound:
         console.print(f"[red]no such run[/red] {run_id!r}")
         raise typer.Exit(2)
@@ -199,7 +199,7 @@ def runs_stats(
     until: str | None = typer.Option(None, "--until", help="ISO end date"),
 ) -> None:
     """Aggregated run statistics."""
-    result = runs_service.run_stats(
+    result = runs.run_stats(
         store=get_store(),
         agent=agent,
         status=status,
@@ -212,7 +212,7 @@ def runs_stats(
 @runs_app.command("facets")
 def runs_facets() -> None:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""
-    result = runs_service.run_facets(store=get_store())
+    result = runs.run_facets(store=get_store())
     console.print(json.dumps(result, indent=2, default=str))
 
 
@@ -230,7 +230,7 @@ def runs_comments(
     """List or add comments for a run."""
     if add:
         try:
-            runs_service.add_comment(
+            runs.add_comment(
                 run_id, store=get_store(), author=author, body=add
             )
         except RunNotFound:
@@ -239,7 +239,7 @@ def runs_comments(
         console.print("[green]comment added[/green]")
     else:
         try:
-            result = runs_service.list_comments(run_id, store=get_store())
+            result = runs.list_comments(run_id, store=get_store())
         except RunNotFound:
             console.print(f"[red]run {run_id!r} not found[/red]")
             raise typer.Exit(1)
@@ -266,7 +266,7 @@ def runs_prompt(
 ) -> None:
     """Show the rendered prompt for a completed run."""
     try:
-        result = runs_service.get_run_prompt(run_id, store=get_store())
+        result = runs.get_run_prompt(run_id, store=get_store())
     except RunNotFound:
         console.print(f"[red]run {run_id!r} not found[/red]")
         raise typer.Exit(1)
@@ -279,7 +279,7 @@ def runs_transcript(
 ) -> None:
     """Show the transcript for a run."""
     try:
-        events = runs_service.get_transcript(run_id, store=get_store())
+        events = runs.get_transcript(run_id, store=get_store())
     except RunNotFound:
         console.print(f"[red]run {run_id!r} not found[/red]")
         raise typer.Exit(1)
@@ -307,7 +307,7 @@ def runs_post_outcome(
 ) -> None:
     """Record downstream post-processing outcome for a completed run."""
     try:
-        runs_service.post_outcome(
+        runs.post_outcome(
             run_id,
             store=get_store(),
             status=status,
@@ -333,7 +333,7 @@ def runs_cancel(
         from agentbox.cli._deps import get_executor
 
         try:
-            await runs_service.cancel_run(
+            await runs.cancel_run(
                 run_id, store=get_store(), executor=get_executor()
             )
         except RunNotFound:

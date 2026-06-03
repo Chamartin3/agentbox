@@ -25,10 +25,8 @@ from agentbox.core.data import (
     TimeoutEvent,
     UsageEvent,
 )
-from agentbox.core.agents.config import RuntimeConfig
 from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.execution.streaming.rate_limit import detect_in_text_line
-from agentbox.core.workspace.manager import load_capabilities
 
 _NAME = "claude_code"
 
@@ -57,8 +55,22 @@ class ClaudeCodeBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
+        *,
+        runtime_config: Any = None,
+        host_capabilities: dict | None = None,
+        **kwargs: Any,
     ) -> RenderedConfig:
-        runtime_cfg = RuntimeConfig.from_agent(agent)
+        """Render the Claude Code backend configuration.
+
+        ``runtime_config`` and ``host_capabilities`` are pre-computed by
+        the executor and passed in so this method never imports from
+        ``core.agents.*`` or ``core.workspace.*`` directly.
+        """
+        if runtime_config is None:
+            from agentbox.core.agents.config import RuntimeConfig
+
+            runtime_config = RuntimeConfig.from_agent(agent)
+
         agent_runner = getattr(agent, "runner", None)
         extra_args = list(
             getattr(runner_config, "extra_args", None)
@@ -83,9 +95,9 @@ class ClaudeCodeBackend(BackendAdapter):
             "claude_settings.json",
         ]
 
-        capabilities = load_capabilities(workdir)
+        capabilities = host_capabilities or {}
         effective_tools = _intersect_allowed_tools(
-            list(runtime_cfg.allowed_tools), capabilities.get("allowed_tools")
+            list(runtime_config.allowed_tools), capabilities.get("allowed_tools")
         )
         if effective_tools:
             argv += ["--allowedTools", *effective_tools]

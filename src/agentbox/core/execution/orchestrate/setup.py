@@ -20,6 +20,7 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from agentbox.core.agents.config import RuntimeConfig
 from agentbox.core.data import DoneEvent, LogEvent
 from agentbox.config import Settings
 from agentbox.core.agents.resolve import resolve_engine
@@ -28,7 +29,8 @@ from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.engines.backends.base import PostRenderContext, RenderedConfig
 from agentbox.core.engines.render import ConfigGenerator
 from agentbox.core.execution.render import materialize_rendered_config
-from agentbox.core.workspace.manager import resolve_path
+from agentbox.core.resource.skills import discover_skills
+from agentbox.core.workspace.manager import load_capabilities, resolve_path
 
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 
@@ -170,7 +172,16 @@ class RunSetup:
 
         Static ``agent.runner`` is intentionally ignored; dispatch has a
         single runtime source of truth: ``EffectiveRunnerConfig``.
+
+        Cross-domain values (runtime config, host capabilities) are
+        resolved here so backends never import ``core.agents.*`` or
+        ``core.workspace.*`` directly.
         """
+
+        # Resolve cross-domain values before render so backends don't
+        # import from agents / workspaces / resources domains directly.
+        runtime_config = RuntimeConfig.from_agent(agent)
+        host_capabilities = load_capabilities(workdir)
 
         def _try_backend(name: str) -> BackendAdapter | None:
             try:
@@ -188,7 +199,12 @@ class RunSetup:
             adapter = _try_backend(name)
             if adapter is not None:
                 rendered = adapter.render(
-                    agent, workdir, runner_config=runner_config, composed=composed
+                    agent,
+                    workdir,
+                    runner_config=runner_config,
+                    composed=composed,
+                    runtime_config=runtime_config,
+                    host_capabilities=host_capabilities,
                 )
                 return adapter, rendered
 

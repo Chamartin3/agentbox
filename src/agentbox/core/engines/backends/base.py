@@ -27,12 +27,14 @@ if TYPE_CHECKING:
     from agentbox.core.execution.prepare.prompts import ComposedState
     from agentbox.core.execution.streaming.session import RunStreamSession
 
+from agentbox.core.agents.config import RuntimeConfig
 from agentbox.core.data import DoneEvent, RunEvent
 from agentbox.core.engines.render.postrender import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )
 from agentbox.core.execution.validate import ValidationResult, validate_output
+from agentbox.core.resource.skills import SkillPack
 
 
 @dataclass(frozen=True)
@@ -165,6 +167,24 @@ class RenderedConfig:
     agent_tools_server_cmd: list[str] = field(default_factory=list)
     """CLI args for the agentbox agent-tools MCP server."""
 
+    runtime_config: RuntimeConfig | None = None
+    """Resolved runtime tooling config from the agent definition.
+
+    Populated by the executor before ``render()`` so backends never
+    import ``core.agents.config`` directly."""
+
+    host_capabilities: dict[str, Any] = field(default_factory=dict)
+    """Workspace host capabilities dict (allowed_tools, mcp_config_path, …).
+
+    Populated by the executor before ``render()`` so backends never
+    import ``core.workspace.manager`` directly."""
+
+    skill_packs: list[SkillPack] = field(default_factory=list)
+    """Filtered skill packs for the workspace.
+
+    Populated by the executor before ``render()`` so the render pipeline
+    never imports ``core.resource.skills`` directly."""
+
     def __post_init__(self) -> None:
         if not self.digest:
             object.__setattr__(self, "digest", self.compute_digest())
@@ -234,6 +254,10 @@ class BackendAdapter(ABC):
         creds: dict[str, str] | None = None,
         runner_config: Any | None = None,
         composed: ComposedState | None = None,
+        *,
+        runtime_config: RuntimeConfig | None = None,
+        host_capabilities: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> RenderedConfig:
         """Analyse ``agent`` and ``workdir``, return a frozen run config.
 
@@ -244,6 +268,10 @@ class BackendAdapter(ABC):
         ``runner_config`` is the authoritative runtime dispatch config;
         adapters must not read ``agent.runner`` for backend/model/timeout/
         extra_args fallback.
+
+        ``runtime_config`` and ``host_capabilities`` are pre-computed by
+        the executor so backends never import ``core.agents.*`` or
+        ``core.workspace.*`` directly.
         """
 
     @abstractmethod
