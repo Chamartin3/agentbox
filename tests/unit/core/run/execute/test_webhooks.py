@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from agentbox.api.webhooks import (
+from agentbox.core.execution.webhooks import (
     _parsed_output,
     _parsed_output_structured,
     webhook_payload,
