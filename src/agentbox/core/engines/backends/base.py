@@ -21,7 +21,11 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+
+if TYPE_CHECKING:
+    from agentbox.core.execution.prepare.prompts import ComposedState
+    from agentbox.core.execution.streaming.session import RunStreamSession
 
 from agentbox.core.data import DoneEvent, RunEvent
 from agentbox.core.engines.render.postrender import (
