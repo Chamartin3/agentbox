@@ -1,10 +1,12 @@
 [importlinter]
 root_package = agentbox
 
-# Agents domain facade — external callers may only touch the facade modules
-# (core.agents and core.service.agents). Reaching past them into composition,
-# resolve internals, or per-version write modules locks callers to the
-# current layout and silently couples interfaces to private structure.
+
+# ─── Agents domain facade ────────────────────────────────────────────────
+# External callers may only touch the facade modules (core.agents and
+# core.service.agents). Reaching past them into composition, resolve
+# internals, or per-version write modules locks callers to the current
+# layout and silently couples interfaces to private structure.
 [importlinter:contract:agents-facade]
 name = Agents domain facade
 type = forbidden
@@ -18,3 +20,176 @@ forbidden_modules =
     agentbox.core.agents.composition.versioning
     agentbox.core.agents.config
 allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # execution.validate reads agent config to assert schema consistency
+    agentbox.core.execution.validate -> agentbox.core.agents.config
+    # execution.prepare.prompts drives composition; expected coupling
+    agentbox.core.execution.prepare.prompts -> agentbox.core.agents.composition.bundle
+    agentbox.core.execution.prepare.prompts -> agentbox.core.agents.composition.bundle.loader
+    agentbox.core.execution.prepare.prompts -> agentbox.core.agents.config
+
+
+# ─── Interface boundary ──────────────────────────────────────────────────
+# api/cli/mcp call business logic via core.service only. core.data
+# (records, enums, store) and core.constants are also allowed since they
+# are leaf-data layers shared across the whole codebase. Direct imports of
+# any other core.* submodule are forbidden so the facade stays the only
+# place that ever moves when internals are refactored.
+#
+# The ignore_imports block below is the known-debt registry: every line is
+# a direct import the facade hasn't yet absorbed. Pay it down by adding a
+# core.service re-export and rerouting the caller.
+[importlinter:contract:interface-facade]
+name = Interface layers go through core.service
+type = forbidden
+source_modules =
+    agentbox.api
+    agentbox.cli
+    agentbox.mcp
+forbidden_modules =
+    agentbox.core.agents
+    agentbox.core.engines
+    agentbox.core.execution
+    agentbox.core.feedback
+    agentbox.core.resources
+    agentbox.core.run
+    agentbox.core.workspace
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # api → core.agents
+    agentbox.api.runners.backends -> agentbox.core.agents.resolve
+    # api → core.engines
+    agentbox.api.runners.backends -> agentbox.core.engines.providers
+    agentbox.api.runners.providers -> agentbox.core.engines.providers.base
+    # api → core.execution
+    agentbox.api.analytics.activity -> agentbox.core.execution.evaluate.activity
+    agentbox.api.webhooks -> agentbox.core.execution.webhooks
+    # api → core.workspace
+    agentbox.api.resources.bindings -> agentbox.core.workspace.build
+    agentbox.api.system.env -> agentbox.core.workspace.env_doc.schema
+    agentbox.api.workspaces.crud -> agentbox.core.workspace.build
+    # cli → core.agents
+    agentbox.cli.resources.bindings -> agentbox.core.agents.composition.resolver
+    agentbox.cli.runners.backends -> agentbox.core.agents.resolve
+    # cli → core.engines
+    agentbox.cli.ops.cfg -> agentbox.core.engines.render
+    agentbox.cli.ops.creds -> agentbox.core.engines.credentials
+    agentbox.cli.ops.launch -> agentbox.core.engines.render
+    agentbox.cli.root -> agentbox.core.engines.render
+    agentbox.cli.root -> agentbox.core.engines.backends.registry
+    agentbox.cli.runners.backends -> agentbox.core.engines.providers
+    agentbox.cli.runners.providers -> agentbox.core.engines.providers
+    agentbox.cli.runners.providers -> agentbox.core.engines.providers.registry
+    # cli → core.execution
+    agentbox.cli.analytics.activity -> agentbox.core.execution.evaluate.activity
+    agentbox.cli.ops.shell -> agentbox.core.execution.prepare.envdoc
+    agentbox.cli.resources.bindings -> agentbox.core.execution.prepare.envdoc
+    agentbox.cli.system.env -> agentbox.core.execution.prepare.envdoc
+    agentbox.cli.workspaces.resources -> agentbox.core.execution.prepare.envdoc
+    # cli → core.resources
+    agentbox.cli.resources.repo -> agentbox.core.resources.composition_to_bindings
+    # cli → core.workspace
+    agentbox.cli.ops.launch -> agentbox.core.workspace.build
+    # mcp → core.agents
+    agentbox.mcp.tools.resources -> agentbox.core.agents.composition.preview
+    # mcp → core.execution
+    agentbox.mcp.tools.resources -> agentbox.core.execution.prepare.envdoc
+    agentbox.mcp.tools.runs -> agentbox.core.execution.history
+    agentbox.mcp.tools.runs -> agentbox.core.execution.history.sources.transcript
+    # mcp → core.resources
+    agentbox.mcp.tools.resources -> agentbox.core.resources.importers.base
+    agentbox.mcp.tools.resources -> agentbox.core.resources.importers.upload
+    agentbox.mcp.tools.resources -> agentbox.core.resources.importers.zip_upload
+    # mcp → core.workspace
+    agentbox.mcp.tools.resources -> agentbox.core.workspace.build
+    agentbox.mcp.tools.resources -> agentbox.core.workspace.env_doc.schema
+
+
+# ─── Resources is the foundation ─────────────────────────────────────────
+# Per APP_DOMAINS, resources sits at the bottom of the tree: agents and
+# workspace depend on it; it depends on nothing else. Any direct import
+# from resources into a peer domain is a layering inversion.
+[importlinter:contract:resources-foundation]
+name = Resources is the foundation
+type = forbidden
+source_modules =
+    agentbox.core.resources
+forbidden_modules =
+    agentbox.core.agents
+    agentbox.core.engines
+    agentbox.core.execution
+    agentbox.core.feedback
+    agentbox.core.workspace
+allow_indirect_imports = True
+
+
+# ─── Engines: only Tools + leaves ────────────────────────────────────────
+# Engines is the catalog of backends/providers/credentials. Per
+# APP_DOMAINS it sits below agents and above resources; it must never
+# reach up into agents, workspace, or execution.
+#
+# Known debt below: backends share streaming + validate helpers with the
+# executor, and embed agents.config types. Real fix: move shared types to
+# core.data and lift streaming primitives into a neutral runtime layer.
+[importlinter:contract:engines-position]
+name = Engines must not import higher domains
+type = forbidden
+source_modules =
+    agentbox.core.engines
+forbidden_modules =
+    agentbox.core.agents
+    agentbox.core.execution
+    agentbox.core.feedback
+    agentbox.core.workspace
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # engines → agents (backends embed AgentDef types; profiles reaches resolve)
+    agentbox.core.engines.backends.claude_code -> agentbox.core.agents.config
+    agentbox.core.engines.backends.token.backend -> agentbox.core.agents.config
+    agentbox.core.engines.profiles -> agentbox.core.agents.resolve
+    # engines → execution (shared streaming + validation helpers)
+    agentbox.core.engines.backends.base -> agentbox.core.execution.streaming.session
+    agentbox.core.engines.backends.base -> agentbox.core.execution.validate
+    agentbox.core.engines.backends.base -> agentbox.core.execution.prepare.prompts
+    agentbox.core.engines.backends.pi -> agentbox.core.execution.streaming.jsonl
+    agentbox.core.engines.backends.codex -> agentbox.core.execution.streaming.jsonl
+    agentbox.core.engines.backends.claude_code -> agentbox.core.execution.streaming.rate_limit
+    agentbox.core.engines.backends.opencode -> agentbox.core.execution.streaming.rate_limit
+
+
+# ─── Agents ⟂ Workspace (peer rule) ──────────────────────────────────────
+# Per APP_DOMAINS, agents and workspace are siblings under execution.
+# Neither may import the other; cross-domain operations go through
+# core.service.
+[importlinter:contract:agents-peer]
+name = Agents and workspace are independent peers
+type = forbidden
+source_modules =
+    agentbox.core.agents
+forbidden_modules =
+    agentbox.core.workspace
+    agentbox.core.execution
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # agents.composition.bundle re-exports moved pydantic_validate
+    agentbox.core.agents.composition.bundle.pydantic_validate -> agentbox.core.execution.pydantic_validate
+
+
+[importlinter:contract:workspace-peer]
+name = Workspace cannot import agents or execution
+type = forbidden
+source_modules =
+    agentbox.core.workspace
+forbidden_modules =
+    agentbox.core.agents
+    agentbox.core.execution
+    agentbox.core.feedback
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # workspace.build pulls env-doc renderer from execution.prepare.envdoc
+    agentbox.core.workspace.build -> agentbox.core.execution.prepare.envdoc
