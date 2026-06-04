@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from agentbox.core.data import DoneEvent
-from agentbox.core.agents.profiles import EffectiveRunnerConfig
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.token import TokenBackend

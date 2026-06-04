@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from agentbox.core.agents.providers.base import (
+from agentbox.core.engines.providers.base import (
     Provider,
     ProviderDescriptor,
     ProviderModel,

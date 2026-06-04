@@ -12,7 +12,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agentbox.cli._common import console
-from agentbox.core.credentials import (
+from agentbox.core.engines.credentials import (
     CredentialMethod,
     CredentialState,
     Method,
@@ -20,7 +20,7 @@ from agentbox.core.credentials import (
     list_all as creds_list_all,
 )
 
-from agentbox.core.credentials import _registration  # noqa: F401
+from agentbox.core.engines.credentials import _registration  # noqa: F401
 
 creds_app = typer.Typer(
     name="creds",

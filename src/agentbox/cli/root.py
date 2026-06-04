@@ -157,7 +157,7 @@ def doctor() -> None:
 
     # 5. Plugins loadable
     try:
-        from agentbox.core import plugins
+        from agentbox.core.engines.backends.registry import backends as plugins
 
         backend_count = len(plugins.backends())
         _ok(

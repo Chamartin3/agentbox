@@ -10,7 +10,7 @@ from urllib.parse import urlparse, urlunparse
 
 import httpx
 
-from agentbox.core.agents.providers.base import (
+from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
     ProviderDescriptor,

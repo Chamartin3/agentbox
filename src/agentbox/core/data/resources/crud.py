@@ -31,7 +31,7 @@ from agentbox.core.data.schema import (
 from agentbox.core.data.schema import (
     resources as resources_table,
 )
-from agentbox.core.resource.models import (
+from agentbox.core.data.resources.models import (
     IMPORT_SOURCES,
     RESOURCE_TYPES,
     Resource,

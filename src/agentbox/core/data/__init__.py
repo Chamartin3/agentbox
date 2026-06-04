@@ -108,7 +108,7 @@ from agentbox.core.data.execution.analytics import ExecutionAnalyticsMixin
 from agentbox.core.data.resources.crud import ResourcesMixin
 from agentbox.core.data.resources.shared import SharedResourcesMixin
 from agentbox.core.data.resources.bindings import ResourceBindingsMixin
-from agentbox.core.data.runners.profiles import RunnerProfilesMixin
+from agentbox.core.data.engines.profiles import RunnerProfilesMixin
 from agentbox.core.data.system.api_tokens import ApiTokensMixin
 from agentbox.core.data.system.settings import SettingsMixin
 from agentbox.core.data.system.project_config import ProjectConfigMixin
@@ -132,13 +132,13 @@ from agentbox.core.data.execution.analytics import _duration_ms_expr  # noqa: F4
 from agentbox.core.data.execution.claude_session import find_session_log, parse_session_log
 from agentbox.core.data.constants import VALID_POLICIES
 from agentbox.core.data.resources.crud import _hash_blobs as hash_blobs  # noqa: F401
-from agentbox.core.data.runners._models import RunnerProfileStats
-from agentbox.core.data.runners.profiles import (
+from agentbox.core.data.engines.models import RunnerProfileStats
+from agentbox.core.data.engines.profiles import (
     RunnerProfile,
     RunnerProfileCreate,
     RunnerProfilePatch,
 )
-from agentbox.core.data.runners.seeds import (
+from agentbox.core.data.engines.seeds import (
     DEFAULT_PROFILES,
     seed_default_runner_profiles,
 )

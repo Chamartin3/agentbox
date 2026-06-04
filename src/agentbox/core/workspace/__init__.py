@@ -4,11 +4,11 @@ Re-exports the names execution/ callers need so they never import from
 ``core.workspace.*`` or ``core.resource.*`` submodules directly.
 """
 
-from agentbox.core.resource.skills import discover_skills as discover_skills
-from agentbox.core.resource.subagent_render import (
+from agentbox.core.resources.skills import discover_skills as discover_skills
+from agentbox.core.resources.subagent_render import (
     materialize_subagents as materialize_subagents,
 )
-from agentbox.core.resource.workspace_materialize import (
+from agentbox.core.resources.workspace_materialize import (
     materialize_workspace as materialize_workspace,
 )
 from agentbox.core.workspace.env_doc.renderers.agents_md import (

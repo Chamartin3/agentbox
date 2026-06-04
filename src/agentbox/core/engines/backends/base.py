@@ -27,14 +27,13 @@ if TYPE_CHECKING:
     from agentbox.core.execution.prepare.prompts import ComposedState
     from agentbox.core.execution.streaming.session import RunStreamSession
 
-from agentbox.core.agents.config import RuntimeConfig
 from agentbox.core.data import DoneEvent, RunEvent
 from agentbox.core.engines.render.postrender import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )
 from agentbox.core.execution.validate import ValidationResult, validate_output
-from agentbox.core.resource.skills import SkillPack
+from agentbox.core.resources.skills import SkillPack
 
 
 @dataclass(frozen=True)

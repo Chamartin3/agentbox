@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from agentbox.core.credentials import (
+from agentbox.core.engines.credentials import (
     CredentialMethod,
     CredentialState,
     Method,
@@ -17,8 +17,8 @@ from agentbox.core.credentials import (
     list_all,
     register,
 )
-from agentbox.core.credentials.methods import _upsert_env_line
-from agentbox.core.credentials.registry import _detect_env_var, _detect_oauth, detect_file
+from agentbox.core.engines.credentials.methods import _upsert_env_line
+from agentbox.core.engines.credentials.registry import _detect_env_var, _detect_oauth, detect_file
 
 
 @pytest.fixture(autouse=True)

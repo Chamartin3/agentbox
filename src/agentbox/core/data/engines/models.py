@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from agentbox.core.data.runners.profiles import RunnerProfile
+    from agentbox.core.data.engines.profiles import RunnerProfile
 
 
 class RunnerProfileStats(BaseModel):
@@ -27,7 +27,7 @@ class RunnerProfileStats(BaseModel):
 
 def _row_to_profile(row) -> RunnerProfile:
     """Convert a database row to a RunnerProfile model."""
-    from agentbox.core.data.runners.profiles import RunnerProfile
+    from agentbox.core.data.engines.profiles import RunnerProfile
 
     m = row._mapping
     return RunnerProfile(

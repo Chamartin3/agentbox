@@ -9,7 +9,7 @@ from typing import Any
 from agentbox.config import Settings
 from agentbox.core import workspaces as ws
 from agentbox.core.data import SessionStore
-from agentbox.core.resource.skills import discover_skills, find_skill
+from agentbox.core.resources.skills import discover_skills, find_skill
 
 from ._files import _resolve_agent_or_raise, resolve_workspace_path
 

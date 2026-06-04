@@ -5,14 +5,14 @@ providers (OpenAI, OpenRouter, xAI, Ollama, etc.). It does not execute
 agents — that responsibility remains with the token backend.
 """
 
-from agentbox.core.agents.providers.base import (
+from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
     ProviderAdapter,
     ProviderDescriptor,
     ProviderModel,
 )
-from agentbox.core.agents.providers.registry import get_provider, list_providers
+from agentbox.core.engines.providers.registry import get_provider, list_providers
 
 __all__ = [
     "HTTPProviderAdapter",

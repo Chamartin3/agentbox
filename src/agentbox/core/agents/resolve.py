@@ -6,7 +6,7 @@ adapter for an agent. Wraps the plugin loader so nothing else imports
 directly.
 """
 
-from agentbox.core.agents.plugins import (
+from agentbox.core.engines.backends.registry import (
     backend_load_failure as _backend_load_failure,
     backends as _backends,
     get_backend as _get_backend,

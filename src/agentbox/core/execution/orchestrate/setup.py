@@ -20,7 +20,9 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.agents import EffectiveRunnerConfig, resolve_engine, RuntimeConfig
+from agentbox.core.agents.resolve import resolve_engine
+from agentbox.core.agents.config import RuntimeConfig
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data import DoneEvent, LogEvent
 from agentbox.config import Settings
 from agentbox.core.data import AgentDef, SessionStore

@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.agents.plugins import backends as _backends, get_backend as _get_backend_class
+from agentbox.core.engines.backends.registry import backends as _backends, get_backend as _get_backend_class
 from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 
 

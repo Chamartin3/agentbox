@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.data import TextEvent, UsageEvent
-from agentbox.core.agents.profiles import EffectiveRunnerConfig
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.codex import (

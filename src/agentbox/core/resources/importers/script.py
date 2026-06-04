@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.resource.importers.base import (
+from agentbox.core.resources.importers.base import (
     ImporterContext,
     ImporterResult,
     ResourceImporter,

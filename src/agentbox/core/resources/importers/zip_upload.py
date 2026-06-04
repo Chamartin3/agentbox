@@ -14,13 +14,13 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from agentbox.core.resource.importers.base import (
+from agentbox.core.resources.importers.base import (
     ImporterContext,
     ImporterResult,
     ResourceImporter,
 )
-from agentbox.core.resource.importers.host_path import HostPathImporter
-from agentbox.core.resource.importers.skill import SkillImporter
+from agentbox.core.resources.importers.host_path import HostPathImporter
+from agentbox.core.resources.importers.skill import SkillImporter
 
 
 def _safe_extract(zf: zipfile.ZipFile, dest: Path) -> None:

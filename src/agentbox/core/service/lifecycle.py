@@ -18,16 +18,16 @@ from agentbox.config import Settings
 from agentbox.core.agents.composition.versioning.drift import startup_sweep
 from agentbox.core.data import ProjectManifest, SessionStore
 from agentbox.core.data.manifest import McpServerSpec
-from agentbox.core.data.runners.seeds import seed_default_runner_profiles
-from agentbox.core.resource.boot_import import (
+from agentbox.core.data.engines.seeds import seed_default_runner_profiles
+from agentbox.core.resources.boot_import import (
     import_composition_references,
     import_repo_resources,
     sweep_workspace_skill_bindings,
 )
-from agentbox.core.resource.composition_to_bindings import (
+from agentbox.core.resources.composition_to_bindings import (
     migrate_composition_to_bindings,
 )
-from agentbox.core.resource.legacy_migration import (
+from agentbox.core.resources.legacy_migration import (
     migrate_shared_resources_to_repo,
 )
 from agentbox.core.execution.webhooks import schedule_webhook

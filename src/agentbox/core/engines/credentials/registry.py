@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from agentbox.core.credentials.methods import Method
-from agentbox.core.credentials.state import CredentialState
+from agentbox.core.engines.credentials.methods import Method
+from agentbox.core.engines.credentials.state import CredentialState
 
 
 @dataclass

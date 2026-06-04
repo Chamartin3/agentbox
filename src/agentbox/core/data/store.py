@@ -33,7 +33,7 @@ from agentbox.core.data.execution.analytics import ExecutionAnalyticsMixin
 from agentbox.core.data.resources.crud import ResourcesMixin
 from agentbox.core.data.resources.shared import SharedResourcesMixin
 from agentbox.core.data.resources.bindings import ResourceBindingsMixin
-from agentbox.core.data.runners.profiles import RunnerProfilesMixin
+from agentbox.core.data.engines.profiles import RunnerProfilesMixin
 from agentbox.core.data.system.api_tokens import ApiTokensMixin
 from agentbox.core.data.system.project_config import ProjectConfigMixin
 from agentbox.core.data.records import (

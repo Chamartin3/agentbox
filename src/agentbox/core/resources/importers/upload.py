@@ -11,12 +11,12 @@ import mimetypes
 from dataclasses import dataclass
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.resource.importers.base import (
+from agentbox.core.resources.importers.base import (
     ImporterContext,
     ImporterResult,
     ResourceImporter,
 )
-from agentbox.core.resource.importers.host_path import _is_text_mime
+from agentbox.core.resources.importers.host_path import _is_text_mime
 
 
 @dataclass(frozen=True)

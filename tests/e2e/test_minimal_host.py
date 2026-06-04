@@ -34,7 +34,7 @@ def _register_noop_backend() -> None:
         ) -> AsyncIterator[RunEvent]:
             yield DoneEvent(run_id=run_id, ok=True, output="noop done")
 
-    import agentbox.core.agents.plugins as _plugins
+    import agentbox.core.engines.backends.registry as _plugins
 
     _plugins.backends()
     _plugins._BACKEND_CLASSES["claude_code"] = _NoopBackend  # type: ignore[index]

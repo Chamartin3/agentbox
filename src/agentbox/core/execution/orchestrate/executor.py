@@ -33,7 +33,8 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.core.data import DoneEvent, LogEvent
 from agentbox.config import Settings
-from agentbox.core.agents import RunnerProfileResolver, build_fragments, fragments_to_json
+from agentbox.core.agents.composition.capture import build_fragments, fragments_to_json
+from agentbox.core.engines.profiles import RunnerProfileResolver
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.data import runs as _runs_table

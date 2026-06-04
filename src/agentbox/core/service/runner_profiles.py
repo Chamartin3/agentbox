@@ -21,7 +21,7 @@ from agentbox.core.agents.resolve import (
     list_engines as backends,
     resolve_engine_by_name as get_backend,
 )
-from agentbox.core.agents.providers import get_provider, list_providers
+from agentbox.core.engines.providers import get_provider, list_providers
 
 if TYPE_CHECKING:
     from agentbox.core.data import (RunnerProfile,

@@ -26,7 +26,7 @@ from typing import Any, Literal
 import httpx
 import jsonschema as _jsonschema
 
-from agentbox.core.agents import (
+from agentbox.core.agents.config import (
     ExecutionConfig,
     PythonAgentConfig,
     resolve_output_config,

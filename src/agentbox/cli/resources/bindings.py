@@ -9,13 +9,13 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.agents.composition.resolver import resolve_prompt
-from agentbox.core.execution.prepare.envdoc import resolve_agent_prompt_bindings
 from agentbox.core.service import (
-    list_prompt_bindings,
-    get_repo_resource_by_slug,
-    replace_prompt_bindings,
     get_active_agent_version,
+    get_repo_resource_by_slug,
+    list_prompt_bindings,
+    replace_prompt_bindings,
+    resolve_agent_prompt_bindings,
+    resolve_prompt,
 )
 
 prompt_bindings_app = typer.Typer(

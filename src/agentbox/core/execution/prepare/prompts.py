@@ -35,14 +35,25 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.agents import (
+from agentbox.core.agents.composition.bundle import (
+    _append_validation_engine_hint,
+)
+from agentbox.core.agents.composition.bundle.loader import (
+    load_bundle_from_bindings,
+)
+from agentbox.core.agents.composition.capture import (
+    build_fragments,
+)
+from agentbox.core.agents.composition.output_contract import (
+    append as _append_output_contract,
+)
+from agentbox.core.agents.composition.resolver import (
+    resolve_prompt,
+)
+from agentbox.core.agents.config import (
     ExecutionConfig,
     OutputConfig as _OC,
-    _append_output_contract,
-    _append_validation_engine_hint,
-    load_bundle_from_bindings,
     resolve_output_config as _resolve_out,
-    resolve_prompt,
 )
 from agentbox.core.data import AgentDef
 from agentbox.core.engines.backends.schema_to_model import (

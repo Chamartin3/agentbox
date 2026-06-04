@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.data.runners.profiles import RunnerProfileCreate
+from agentbox.core.data.engines.profiles import RunnerProfileCreate
 
 _log = logging.getLogger(__name__)
 

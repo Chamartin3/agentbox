@@ -11,9 +11,9 @@ from agentbox.core.agents.composition.versioning.drift import _build_config_json
 from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure  # noqa: F401
 from agentbox.core.agents.resolve import list_engines as backends  # noqa: F401
 from agentbox.core.agents.resolve import resolve_engine_by_name as get_backend  # noqa: F401
-from agentbox.core.agents.profiles import EffectiveRunnerConfig as EffectiveRunnerConfig
-from agentbox.core.agents.providers import get_provider as get_provider
-from agentbox.core.agents.providers import list_providers as list_providers
+from agentbox.core.engines.profiles import EffectiveRunnerConfig as EffectiveRunnerConfig
+from agentbox.core.engines.providers import get_provider as get_provider
+from agentbox.core.engines.providers import list_providers as list_providers
 
 # ── Constants ─────────────────────────────────────────────────────────
 from agentbox.core.constants import EventType as EventType
@@ -28,6 +28,7 @@ from agentbox.core.data import VALID_POLICIES as VALID_POLICIES
 from agentbox.core.data import RunnerProfile as RunnerProfile
 from agentbox.core.data import RunnerProfileCreate as RunnerProfileCreate
 from agentbox.core.data import SessionStore as SessionStore
+from agentbox.core.data import SharedResourceRecord as SharedResourceRecord
 from agentbox.core.data import WorkspaceDef as WorkspaceDef
 
 # ── Infra ─────────────────────────────────────────────────────────────
@@ -40,16 +41,17 @@ from agentbox.core.agents.composition.preview import PreviewError as PreviewErro
 from agentbox.core.agents.composition.preview import render_agent_prompt_preview as render_agent_prompt_preview
 from agentbox.core.agents.composition.rendering import render_for_type as render_for_type
 from agentbox.core.agents.composition.resolver import resolve_prompt as resolve_prompt
-from agentbox.core.resource.importers.host_path import HostPathImporter as HostPathImporter
-from agentbox.core.resource.importers.schema import SchemaImporter as SchemaImporter
-from agentbox.core.resource.importers.script import ScriptImporter as ScriptImporter
-from agentbox.core.resource.importers.skill import SkillImporter as SkillImporter
-from agentbox.core.resource.importers.upload import UploadImporter as UploadImporter
-from agentbox.core.resource.importers.zip_upload import ZipUploadImporter as ZipUploadImporter
+from agentbox.core.resources.importers.base import ImporterContext as ImporterContext
+from agentbox.core.resources.importers.host_path import HostPathImporter as HostPathImporter
+from agentbox.core.resources.importers.schema import SchemaImporter as SchemaImporter
+from agentbox.core.resources.importers.script import ScriptImporter as ScriptImporter
+from agentbox.core.resources.importers.skill import SkillImporter as SkillImporter
+from agentbox.core.resources.importers.upload import UploadImporter as UploadImporter
+from agentbox.core.resources.importers.zip_upload import ZipUploadImporter as ZipUploadImporter
 
 # ── Resources ─────────────────────────────────────────────────────────
-from agentbox.core.resource.skills import discover_skills as discover_skills
-from agentbox.core.resource.skills import find_skill as find_skill
+from agentbox.core.resources.skills import discover_skills as discover_skills
+from agentbox.core.resources.skills import find_skill as find_skill
 from agentbox.core.engines.render import ConfigGenerator as ConfigGenerator
 
 # ── Run execution ─────────────────────────────────────────────────────
@@ -99,15 +101,15 @@ from agentbox.core.service.runner_profiles import runner_profile_stats as runner
 from agentbox.core.service.runner_profiles import set_agent_runner_profile as bind_runner_profile  # noqa: F401
 
 # ── Repo resources service ─────────────────────────────────────────────
-from agentbox.core.service.repo_resources import create_repo_resource as create_repo_resource
-from agentbox.core.service.repo_resources import get_repo_resource_by_slug as get_repo_resource_by_slug
-from agentbox.core.service.repo_resources import import_repo_version as import_repo_version
-from agentbox.core.service.repo_resources import list_prompt_bindings as list_prompt_bindings
-from agentbox.core.service.repo_resources import list_repo_resources as list_repo_resources
-from agentbox.core.service.repo_resources import list_repo_versions as list_repo_versions
-from agentbox.core.service.repo_resources import publish_repo_version as publish_repo_version
-from agentbox.core.service.repo_resources import replace_prompt_bindings as replace_prompt_bindings
-from agentbox.core.service.repo_resources import rollback_repo_resource as rollback_repo_resource
+from agentbox.core.service.resources.repo import create_repo_resource as create_repo_resource
+from agentbox.core.service.resources.repo import get_repo_resource_by_slug as get_repo_resource_by_slug
+from agentbox.core.service.resources.repo import import_repo_version as import_repo_version
+from agentbox.core.service.resources.repo import list_prompt_bindings as list_prompt_bindings
+from agentbox.core.service.resources.repo import list_repo_resources as list_repo_resources
+from agentbox.core.service.resources.repo import list_repo_versions as list_repo_versions
+from agentbox.core.service.resources.repo import publish_repo_version as publish_repo_version
+from agentbox.core.service.resources.repo import replace_prompt_bindings as replace_prompt_bindings
+from agentbox.core.service.resources.repo import rollback_repo_resource as rollback_repo_resource
 
 # ── System admin service ───────────────────────────────────────────────
 from agentbox.core.service.system_admin import create_api_token as create_api_token

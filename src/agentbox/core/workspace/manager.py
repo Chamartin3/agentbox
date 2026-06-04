@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.config import Settings
-from agentbox.core.resource.skills import discover_skills
+from agentbox.core.resources.skills import discover_skills
 
 if TYPE_CHECKING:
     from agentbox.core.data import AgentDef, SessionStore

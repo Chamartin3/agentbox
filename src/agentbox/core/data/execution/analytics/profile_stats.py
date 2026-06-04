@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import Integer, func, select
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.runners._models import RunnerProfileStats, _row_to_profile
+from agentbox.core.data.engines.models import RunnerProfileStats, _row_to_profile
 from agentbox.core.data.execution.analytics.helpers import _duration_ms_expr
 
 

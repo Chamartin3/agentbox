@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
 from agentbox.core.constants import ResourceType
-from agentbox.core.data import SessionStore
+from agentbox.core.service import SessionStore
 from agentbox.core.service import resources as resources_service
 from agentbox.core.service.resources import (
     InvalidResource,

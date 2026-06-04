@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentbox.core.agents.providers.base import (
+from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
     ProviderDescriptor,

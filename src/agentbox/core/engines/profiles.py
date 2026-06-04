@@ -14,7 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from agentbox.core.agents.resolve import resolve_engine_by_name
-from agentbox.core.agents.providers import get_provider
+from agentbox.core.engines.providers import get_provider
 
 SourceType = Literal[
     "run_override",

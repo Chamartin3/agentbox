@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agentbox.core.resource.skills import SkillPack
+    from agentbox.core.resources.skills import SkillPack
 
 
 @dataclass(frozen=True)

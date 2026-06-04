@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from agentbox.cli import app
-from agentbox.core.credentials import clear as creds_clear
+from agentbox.core.engines.credentials import clear as creds_clear
 
 runner = CliRunner()
 
@@ -19,7 +19,7 @@ def _clear_creds_registry() -> None:
     import importlib
 
     creds_clear()
-    import agentbox.core.credentials._registration as reg
+    import agentbox.core.engines.credentials.builtin as reg
 
     importlib.reload(reg)
     yield

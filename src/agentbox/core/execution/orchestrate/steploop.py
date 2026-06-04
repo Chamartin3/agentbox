@@ -20,12 +20,12 @@ from typing import TYPE_CHECKING, Any, Final
 
 from agentbox.core.data import UsageEvent
 from agentbox.config import Settings
-from agentbox.core.agents import (
-    EffectiveRunnerConfig,
+from agentbox.core.agents.config import (
     ExecutionConfig,
     PythonAgentConfig,
     resolve_output_config as _resolve_oc,
 )
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.engines.backends.base import RenderedConfig

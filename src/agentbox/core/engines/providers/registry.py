@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Any
 
-from agentbox.core.agents.providers import (
+from agentbox.core.engines.providers import (
     anthropic,
     cli,
     google,
@@ -13,7 +13,7 @@ from agentbox.core.agents.providers import (
     openrouter,
     xai,
 )
-from agentbox.core.agents.providers.base import ProviderAdapter, ProviderDescriptor
+from agentbox.core.engines.providers.base import ProviderAdapter, ProviderDescriptor
 
 logger = logging.getLogger(__name__)
 

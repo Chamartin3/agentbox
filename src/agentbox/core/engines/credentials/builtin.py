@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from agentbox.core.credentials.methods import Method
-from agentbox.core.credentials.registry import (
+from agentbox.core.engines.credentials.methods import Method
+from agentbox.core.engines.credentials.registry import (
     CredentialMethod,
     CredentialState,
     _detect_env_var,

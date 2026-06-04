@@ -10,22 +10,20 @@ import zipfile
 from fastmcp import FastMCP
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.agents.composition.preview import (
+from agentbox.core.service import (
+    EnvDocContent,
+    ImporterContext,
     PreviewError,
+    UploadImporter,
+    ZipUploadImporter,
     render_agent_prompt_preview,
-)
-from agentbox.core.resource.importers.base import ImporterContext
-from agentbox.core.resource.importers.upload import UploadImporter
-from agentbox.core.resource.importers.zip_upload import ZipUploadImporter
-from agentbox.core.execution.prepare.envdoc import (
+    resolve_agent,
     resolve_workspace_resources,
 )
-from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.env_doc import (
     build_env_doc_context,
     render_env_doc_preview,
 )
-from agentbox.core.workspace.env_doc.schema import EnvDocContent
 from agentbox.mcp.deps import get_context
 from agentbox.mcp.schemas import clamp_limit
 
@@ -563,8 +561,7 @@ def register(mcp: FastMCP) -> None:
         reflect the new content right away.
         """
         from agentbox.api.deps import get_settings
-        from agentbox.core.workspace.env_doc.schema import EnvDocContent
-        from agentbox.core.workspace.build import build_workspace_by_name
+        from agentbox.core.service import build_workspace_by_name
 
         try:
             validated = EnvDocContent.model_validate(content).model_dump()

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_settings, get_store
-from agentbox.core.data import SessionStore
+from agentbox.core.service import SessionStore
 from agentbox.core.service import bindings as bindings_service
 from agentbox.core.service.bindings import (
     AgentVersionMissing,
@@ -22,7 +22,7 @@ from agentbox.core.service.bindings import (
     PreviewError,
 )
 from agentbox.core.service.resources import ResourceNotFound
-from agentbox.core.workspace.build import build_workspace_by_name
+from agentbox.core.service import build_workspace_by_name
 
 router = APIRouter(tags=["resource-bindings"])
 

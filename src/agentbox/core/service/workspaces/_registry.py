@@ -7,7 +7,7 @@ from typing import Any
 
 from agentbox.config import Settings
 from agentbox.core.data import SessionStore
-from agentbox.core.resource.skills import discover_skills
+from agentbox.core.resources.skills import discover_skills
 
 from ._errors import WorkspaceExists, WorkspaceNotFound
 from ._files import is_user_file, resolve_workspace_path

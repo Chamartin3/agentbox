@@ -22,14 +22,14 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from agentbox.core.agents.profiles import EffectiveRunnerConfig
-from agentbox.core.agents.providers import get_provider, list_providers
-from agentbox.core.agents.providers.base import ProviderDescriptor, ProviderModel
-from agentbox.core.agents.providers.registry import (
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
+from agentbox.core.engines.providers import get_provider, list_providers
+from agentbox.core.engines.providers.base import ProviderDescriptor, ProviderModel
+from agentbox.core.engines.providers.registry import (
     _MODEL_CACHE,
     list_models as registry_list_models,
 )
-from agentbox.core.agents.providers.registry import (
+from agentbox.core.engines.providers.registry import (
     refresh_opencode_providers,
 )
 
