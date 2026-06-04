@@ -28,7 +28,6 @@ from agentbox.core.engines.backends.base import PostRenderContext, RenderedConfi
 from agentbox.core.engines.render import ConfigGenerator
 from agentbox.core.execution.render import materialize_rendered_config
 from agentbox.core.workspace import (
-    discover_skills,
     load_capabilities,
     resolve_path,
 )
@@ -37,7 +36,7 @@ from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 
 if TYPE_CHECKING:
     from agentbox.core.engines.backends.base import BackendAdapter
-    from agentbox.core.workspace.mcp.client.registry import McpRegistry
+    from agentbox.core.workspace import McpRegistry
 
 logger = logging.getLogger(__name__)
 

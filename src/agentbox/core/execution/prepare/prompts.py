@@ -169,13 +169,6 @@ def resolve_run_prompt(
     composed_bundle_sha: str | None = None
 
     if agent.composition is not None and variables is not None:
-        from agentbox.core.agents.composition.bundle import (
-            _append_validation_engine_hint,
-        )
-        from agentbox.core.agents.composition.bundle.loader import (
-            load_bundle_from_bindings,
-        )
-
         shared_roots = {
             k: settings.project_root / v
             for k, v in store.get_project_shared_assets().items()

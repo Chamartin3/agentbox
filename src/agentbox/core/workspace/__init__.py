@@ -27,11 +27,15 @@ from agentbox.core.workspace.manager import (
     load_capabilities as load_capabilities,
     resolve_path as resolve_path,
 )
+from agentbox.core.workspace.mcp.client.registry import (
+    McpRegistry as McpRegistry,
+)
 
 __all__ = [
     "AgentsMdRenderer",
     "ClaudeMdRenderer",
     "EnvDocContent",
+    "McpRegistry",
     "RuntimeContext",
     "discover_skills",
     "load_capabilities",
