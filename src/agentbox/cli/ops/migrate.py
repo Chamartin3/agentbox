@@ -7,8 +7,8 @@ from rich.text import Text
 from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.migrations import migrate_capabilities_to_manifest
-from agentbox.core.agents.composition.versioning.drift import _build_config_json
 from agentbox.core.service import (
+    build_config_json_str,
     get_active_agent_version,
     get_agent_def,
     get_settings_section,
@@ -95,7 +95,7 @@ def migrate_to_db_only(agent_id: str) -> None:
             raise typer.Exit(1)
 
         # Rebuild the active version with config_json populated
-        config_json_str = _build_config_json(agent)
+        config_json_str = build_config_json_str(agent)
         replace_version_config(store, active["id"], config_json_str)
         console.print(
             f"[cyan]info:[/cyan] populated config_json for v{active['version']}"

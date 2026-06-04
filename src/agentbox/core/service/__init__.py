@@ -7,6 +7,7 @@ deep core internals. This keeps the internal organization private.
 # ── Data / persistence ────────────────────────────────────────────────
 # ── Agent config / profiles / plugins ─────────────────────────────────
 from agentbox.core.agents.config import build_config_json_payload as build_config_json_payload
+from agentbox.core.agents.composition.versioning.drift import _build_config_json as build_config_json_str  # noqa: F401
 from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure  # noqa: F401
 from agentbox.core.agents.resolve import list_engines as backends  # noqa: F401
 from agentbox.core.agents.resolve import resolve_engine_by_name as get_backend  # noqa: F401
