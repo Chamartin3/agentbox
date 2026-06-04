@@ -115,6 +115,7 @@ from agentbox.core.data.system.project_config import ProjectConfigMixin
 from agentbox.core.data.workspaces.crud import WorkspacesMixin
 from agentbox.core.data.workspaces.env_docs import EnvDocsMixin
 from agentbox.core.data.workspaces.host_env import HostEnvMixin
+from agentbox.core.data.system.host_env_calls import HostEnvCallLogMixin
 from agentbox.core.data.workspaces.mcp_discovery import McpDiscoveryMixin
 from agentbox.core.data.workspaces.mcp_overrides import McpOverridesMixin
 from agentbox.core.data.workspaces.runtime_permissions import RuntimePermissionsMixin
@@ -271,6 +272,7 @@ __all__ = [
     "ExecutionAnalyticsMixin",
     "ApiTokensMixin",
     "EnvDocsMixin",
+    "HostEnvCallLogMixin",
     "HostEnvMixin",
     "McpDiscoveryMixin",
     "McpOverridesMixin",
