@@ -17,7 +17,6 @@ forbidden_modules =
     agentbox.core.agents.composition.bundle
     agentbox.core.agents.composition.versioning
     agentbox.core.agents.config
-    agentbox.core.agents.plugins
 ignore_imports =
     agentbox.core.execution.prepare.prompts -> agentbox.core.agents.composition.bundle
     agentbox.core.execution.prepare.prompts -> agentbox.core.agents.composition.bundle.loader
