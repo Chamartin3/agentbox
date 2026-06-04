@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from agentbox.api.deps import get_executor, get_loader, get_store
 from agentbox.api.webhooks import schedule_webhook
-from agentbox.core.data import read_transcript
+from agentbox.core.service import read_transcript
 from agentbox.core.service.execution import runs
 from agentbox.core.service.execution.runs import (
     AgentNotFound,

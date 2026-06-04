@@ -15,10 +15,12 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.workspace.env_doc.renderers.agents_md import AgentsMdRenderer
-from agentbox.core.workspace.env_doc.renderers.base import RuntimeContext
-from agentbox.core.workspace.env_doc.renderers.claude_md import ClaudeMdRenderer
-from agentbox.core.workspace.env_doc.schema import EnvDocContent
+from agentbox.core.workspace import (
+    AgentsMdRenderer,
+    ClaudeMdRenderer,
+    EnvDocContent,
+    RuntimeContext,
+)
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore

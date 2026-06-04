@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agentbox.core.agents.profiles import EffectiveRunnerConfig
+from agentbox.core.agents import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, McpSnapshot, RunnerSnapshot, SessionStore
 from agentbox.core.tools.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,

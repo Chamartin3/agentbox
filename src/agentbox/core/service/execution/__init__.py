@@ -5,7 +5,13 @@ submodules are private organisation.
 """
 
 from agentbox.core.service.execution.create import create_run, rerun
-from agentbox.core.service.execution.evaluate import add_comment, list_comments
+from agentbox.core.service.execution.evaluate import (
+    activity_summary,
+    add_comment,
+    aggregate_usage,
+    distinct_executors,
+    list_comments,
+)
 from agentbox.core.service.execution.lifecycle import (
     cancel_run,
     complete_run,
@@ -24,11 +30,14 @@ from agentbox.core.service.execution.types import InvalidRunInput, RunNotFound, 
 from agentbox.core.service.prompts import AgentNotFound
 
 __all__ = [
+    "activity_summary",
     "add_comment",
+    "aggregate_usage",
     "AgentNotFound",
     "cancel_run",
     "complete_run",
     "create_run",
+    "distinct_executors",
     "get_run_detail",
     "get_run_prompt",
     "get_transcript",

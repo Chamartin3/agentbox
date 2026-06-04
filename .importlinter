@@ -1,0 +1,23 @@
+[importlinter]
+root_package = agentbox
+
+# Agents domain facade — external callers may only touch the facade modules
+# (core.agents and core.service.agents). Reaching past them into composition,
+# resolve internals, or per-version write modules locks callers to the
+# current layout and silently couples interfaces to private structure.
+[importlinter:contract:agents-facade]
+name = Agents domain facade
+type = forbidden
+source_modules =
+    agentbox.api
+    agentbox.cli
+    agentbox.mcp
+    agentbox.core.execution
+forbidden_modules =
+    agentbox.core.agents.composition.bundle
+    agentbox.core.agents.composition.versioning
+    agentbox.core.agents.config
+    agentbox.core.agents.plugins
+ignore_imports =
+    agentbox.core.execution.prepare.prompts -> agentbox.core.agents.composition.bundle
+    agentbox.core.execution.prepare.prompts -> agentbox.core.agents.composition.bundle.loader

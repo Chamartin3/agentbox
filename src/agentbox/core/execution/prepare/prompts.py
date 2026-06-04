@@ -35,14 +35,16 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.agents.config import (
+from agentbox.core.agents import (
     ExecutionConfig,
     OutputConfig as _OC,
+    _append_output_contract,
+    _append_validation_engine_hint,
+    load_bundle_from_bindings,
     resolve_output_config as _resolve_out,
+    resolve_prompt,
 )
 from agentbox.core.data import AgentDef
-from agentbox.core.agents.composition.output_contract import append as _append_contract
-from agentbox.core.agents.composition.resolver import resolve_prompt
 from agentbox.core.engines.backends.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
@@ -250,11 +252,11 @@ def resolve_run_prompt(
 
     if out_cfg.validators or isinstance(out_cfg.json_schema, dict):
         base_for_contract = system_text if system_text is not None else (agent.prompt or "")
-        system_text = _append_contract(base_for_contract, out_cfg)
+        system_text = _append_output_contract(base_for_contract, out_cfg)
 
         if system_base is not None:
             constraints_only = _OC(json_schema=None, validators=out_cfg.validators)
-            system_base = _append_contract(system_base, constraints_only)
+            system_base = _append_output_contract(system_base, constraints_only)
 
     # ----- Stage 4: output_schema binding fallback (legacy_dir) ---------
     if prompt_bindings and composed_schema is None:

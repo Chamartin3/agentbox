@@ -27,8 +27,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.data import AgentDef
-from agentbox.core.resource.subagent_render import materialize_subagents
-from agentbox.core.resource.workspace_materialize import materialize_workspace
+from agentbox.core.workspace import materialize_subagents, materialize_workspace
 from agentbox.core.execution.prepare.prompts import ComposedState, resolve_run_prompt
 from agentbox.core.execution.prepare.envdoc import (
     render_env_doc,

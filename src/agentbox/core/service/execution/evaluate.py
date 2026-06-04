@@ -1,4 +1,4 @@
-"""Run evaluation — comments."""
+"""Run evaluation — comments, usage, and activity stats."""
 
 from __future__ import annotations
 
@@ -22,3 +22,18 @@ def add_comment(
     if store.get_run(run_id) is None:
         raise RunNotFound(run_id)
     return store.add_run_comment(run_id, author, body)
+
+
+def aggregate_usage(*, store: SessionStore) -> dict:
+    """Total tokens + cost across all runs."""
+    return store.aggregate_usage()
+
+
+def activity_summary(*, store: SessionStore, since: str, agent_id: str | None = None) -> dict:
+    """Roll up runs since ``since`` (ISO-8601) into totals + breakdowns."""
+    return store.activity_summary(since, agent=agent_id)
+
+
+def distinct_executors(*, store: SessionStore) -> list[str]:
+    """Distinct executor/model names across all recorded runs."""
+    return store.distinct_executors()

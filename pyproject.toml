@@ -50,6 +50,7 @@ dev = [
   "pytest-cov>=5",
   "anyio>=4",
   "pyright>=1.1.409",
+  "import-linter>=2.0",
 ]
 
 [build-system]
