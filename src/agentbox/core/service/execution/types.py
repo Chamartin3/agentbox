@@ -25,6 +25,24 @@ class InvalidRunInput(ValueError):
     """Raised when the run dispatch payload is missing required fields."""
 
 
+class AgentDisabled(RuntimeError):
+    """Raised by the run dispatcher when the target agent is disabled.
+
+    ``disabled_at`` is the canonical timestamp from ``agent_meta``. The
+    string form is the single, transport-agnostic message — REST, MCP
+    and the web UI all surface it verbatim.
+    """
+
+    def __init__(self, agent_id: str, disabled_at: str | None) -> None:
+        self.agent_id = agent_id
+        self.disabled_at = disabled_at
+        when = f" (disabled at {disabled_at})" if disabled_at else ""
+        super().__init__(
+            f"agent {agent_id!r} is disabled{when}; "
+            "re-enable it to dispatch runs."
+        )
+
+
 def no_backend_detail(exc: NoBackendAvailable) -> str:
     """Compose an honest 'why is no backend available' message."""
     loaded = set(backends().keys())

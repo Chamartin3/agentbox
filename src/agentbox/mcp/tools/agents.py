@@ -82,18 +82,35 @@ def register(mcp: FastMCP) -> None:
         runner: str | None = None,
         limit: int = 20,
         offset: int = 0,
+        include_disabled: bool = False,
     ) -> dict:
         """Paginated list of agents (DB first, manifest fallback).
 
-        Same source as the REST ``GET /api/agents`` endpoint."""
+        Same source as the REST ``GET /api/agents`` endpoint. Pass
+        ``include_disabled=True`` to surface disabled agents (each
+        carries a ``disabled_at`` timestamp; invoking one would fail
+        with ``agent_disabled``)."""
         limit = clamp_limit(limit)
         ctx = get_context()
+
+        def _attach_disabled(d: dict) -> dict:
+            agent_id = d.get("id")
+            meta = ctx.store.get_agent_meta(agent_id) if agent_id else None
+            d["disabled_at"] = (meta or {}).get("disabled_at")
+            return d
+
         agents = [
-            _inject_profile_model(
-                _strip_legacy_runner_model(_agent_dict(a)),
-                ctx.store,
+            _attach_disabled(
+                _inject_profile_model(
+                    _strip_legacy_runner_model(_agent_dict(a)),
+                    ctx.store,
+                )
             )
-            for a in list_all_agents(store=ctx.store, loader=ctx.loader)
+            for a in list_all_agents(
+                store=ctx.store,
+                loader=ctx.loader,
+                include_disabled=include_disabled,
+            )
         ]
         if tag:
             agents = [a for a in agents if tag in (a.get("tags") or [])]
@@ -149,7 +166,6 @@ def register(mcp: FastMCP) -> None:
             prompt_meta = {
                 "version": active["version"],
                 "version_id": active["id"],
-                "is_draft": bool(active.get("is_draft", False)),
                 "changelog": active.get("changelog"),
                 "author": active.get("author"),
                 "created_at": active.get("created_at"),
@@ -157,6 +173,8 @@ def register(mcp: FastMCP) -> None:
         agent_payload = _inject_profile_model(
             _strip_legacy_runner_model(_agent_dict(agent)), ctx.store
         )
+        meta = ctx.store.get_agent_meta(agent_id) or {}
+        agent_payload["disabled_at"] = meta.get("disabled_at")
         return {"agent": agent_payload, "prompt": prompt_meta}
 
     @mcp.tool
@@ -177,15 +195,16 @@ def register(mcp: FastMCP) -> None:
     ) -> dict:
         """Paginated history of agent_versions rows for an agent.
 
-        Shows version number, draft flag, author, changelog, and whether
-        each row is the current active version. Use this to find the
-        version number to pass to ``promote_version``.
+        Shows version number, author, changelog, and whether each row is
+        the current active version. Use this to find the version number to
+        pass to ``promote_version``.
         """
         limit = clamp_limit(limit)
         ctx = get_context()
         rows = ctx.store.list_versions(agent_id)
-        if not include_drafts:
-            rows = [r for r in rows if not r.get("is_draft")]
+        # ``include_drafts`` is retained for API compatibility but ignored —
+        # the draft concept was removed from agent_versions.
+        del include_drafts
         active = ctx.store.get_active_version(agent_id)
         active_id = active["id"] if active else None
         total = len(rows)
@@ -194,7 +213,6 @@ def register(mcp: FastMCP) -> None:
             {
                 "version": r["version"],
                 "id": r["id"],
-                "is_draft": bool(r.get("is_draft")),
                 "is_active": r["id"] == active_id,
                 "author": r.get("author"),
                 "changelog": r.get("changelog"),
@@ -246,7 +264,6 @@ def register(mcp: FastMCP) -> None:
             "agent_id": agent_id,
             "activated_version": version,
             "version_id": v["id"],
-            "is_draft": bool(v.get("is_draft")),
             "previous_active_version": previous["version"] if previous else None,
             "reason": reason.strip(),
         }

@@ -20,7 +20,6 @@ def test_create_agent_happy_path(client: Any) -> None:
     data = resp.json()
     assert data["agent_id"] == "test_agent"
     assert data["version"] == 1
-    assert data["is_draft"] is True
     assert isinstance(data["version_id"], int)
 
 

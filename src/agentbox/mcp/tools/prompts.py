@@ -29,7 +29,6 @@ def _version_meta(version: dict) -> dict:
     return {
         "version": version.get("version"),
         "version_id": version.get("id"),
-        "is_draft": bool(version.get("is_draft", False)),
         "author": version.get("author"),
         "changelog": version.get("changelog"),
         "created_at": version.get("created_at"),
@@ -86,8 +85,9 @@ def register(mcp: FastMCP) -> None:
         limit = clamp_limit(limit)
         store = get_context().store
         rows = store.list_versions(agent_id)
-        if not include_drafts:
-            rows = [r for r in rows if not r.get("is_draft")]
+        # ``include_drafts`` is retained for API compatibility but ignored —
+        # the draft concept was removed from agent_versions.
+        del include_drafts
         active = store.get_active_version(agent_id)
         active_id = active["id"] if active else None
         total = len(rows)

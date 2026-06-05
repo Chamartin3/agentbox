@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { api, AgentDef, ApiError, RunsPage as RunsPageData, RunsStats } from '../api/client';
+import { api, AgentDef, ApiError } from '../api/client';
+import { useAgentActions } from '../hooks/useAgents';
+import { useRunsPage, useRunStats } from '../hooks/useRuns';
 import { versionsApi, VersionSummary } from '../api/versions';
 import AgentVersions from './AgentVersions';
-import ManifestEditor from '../components/ManifestEditor';
-import MarkdownEditor from '../components/MarkdownEditor';
+import AgentConfigEditor from '../components/agent/AgentConfigEditor';
+import MarkdownEditor from '../components/common/MarkdownEditor';
 import RunsTable, { RunRow } from '../components/runs/RunsTable';
 import RunsDashboard from '../components/runs/RunsDashboard';
 import AgentResourcesEditor from '../components/agent/AgentResourcesEditor';
 import AgentValidationEditor from '../components/agent/AgentValidationEditor';
 import LiveComposedPromptPreview, { type PreviewResult } from '../components/agent/LiveComposedPromptPreview';
-import Toast from '../components/Toast';
+import Toast from '../components/common/Toast';
+import { useToast } from '../hooks/useToast';
 import './AgentDetailPage.css';
 
 type TabType = 'configuration' | 'composition' | 'versions' | 'runs';
@@ -33,10 +36,6 @@ function AgentRunsTab({
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [versionFilter, setVersionFilter] = useState<number | ''>('');
-  const [data, setData] = useState<RunsPageData | null>(null);
-  const [stats, setStats] = useState<RunsStats | null>(null);
-  const [loading, setLoading] = useState(false);
-  const lastQuery = useRef('');
 
   const isLiveView = page === 1 && !statusFilter && versionFilter === '';
 
@@ -49,36 +48,26 @@ function AgentRunsTab({
     [agentId, statusFilter, versionFilter],
   );
 
+  const pagedQuery = useMemo(
+    () => ({ ...filterQuery, limit: AGENT_PAGE_SIZE, offset: (page - 1) * AGENT_PAGE_SIZE }),
+    [filterQuery, page],
+  );
+  const runsQ = useRunsPage(pagedQuery);
+  const statsQ = useRunStats(filterQuery);
+  const data = runsQ.data;
+  const stats = statsQ.data;
+  const loading = runsQ.loading || statsQ.loading;
+
   useEffect(() => {
-    const qk = JSON.stringify({ agentId, statusFilter, versionFilter, page });
-    lastQuery.current = qk;
-    const tick = async () => {
-      if (lastQuery.current !== qk) return;
-      setLoading(true);
-      try {
-        const [d, s] = await Promise.all([
-          api.listRunsPaged({
-            ...filterQuery,
-            limit: AGENT_PAGE_SIZE,
-            offset: (page - 1) * AGENT_PAGE_SIZE,
-          }),
-          api.runStats(filterQuery),
-        ]);
-        if (lastQuery.current === qk) {
-          setData(d);
-          setStats(s);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    tick();
     if (!isLiveView) return;
-    const h = window.setInterval(tick, 4000);
+    const h = window.setInterval(() => {
+      runsQ.refresh();
+      statsQ.refresh();
+    }, 4000);
     return () => window.clearInterval(h);
-  }, [agentId, statusFilter, page, isLiveView, filterQuery]);
+    // ponytail: refresh fns are stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLiveView]);
 
   const items = data?.items ?? [];
   const totalPages = data ? Math.max(1, Math.ceil(data.total / Math.max(1, data.limit))) : 1;
@@ -147,7 +136,6 @@ function AgentRunsTab({
             {versions.map((v) => (
               <option key={v.version} value={v.version}>
                 v{v.version}
-                {v.is_draft ? ' (draft)' : ''}
               </option>
             ))}
           </select>
@@ -196,14 +184,14 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<AgentDef | null>(null);
   const [agentLoaded, setAgentLoaded] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<number | null>(null);
-  const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
+  const { toast, flash } = useToast();
+  const agentActions = useAgentActions();
 
   const [prompt, setPrompt] = useState<string>('');
   const [promptDirty, setPromptDirty] = useState(false);
   const [loadingPrompt, setLoadingPrompt] = useState(false);
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [activeVersion, setActiveVersion] = useState<number | null>(null);
-  const [draftVersion, setDraftVersion] = useState<number | null>(null);
   const [changelog, setChangelog] = useState('');
   const [composedPreview, setComposedPreview] = useState<PreviewResult | null>(null);
 
@@ -235,8 +223,6 @@ export default function AgentDetailPage() {
       const data = await versionsApi.listVersions(id);
       setVersions(data.versions);
       setActiveVersion(data.active_version ?? data.latest_version);
-      const draft = data.versions.find((v) => v.is_draft);
-      setDraftVersion(draft ? draft.version : null);
     } catch (e) {
       console.error(e);
     }
@@ -293,11 +279,6 @@ export default function AgentDetailPage() {
     }
   };
 
-  const flash = (kind: 'ok' | 'error', msg: string) => {
-    setToast({ kind, msg });
-    setTimeout(() => setToast(null), 3500);
-  };
-
   if (!agent) {
     if (!agentLoaded) return <p>Loading…</p>;
     return (
@@ -322,6 +303,31 @@ export default function AgentDetailPage() {
           {currentVersion != null && (
             <span className="tag">v{currentVersion}</span>
           )}
+          {agent.disabled_at && (
+            <span
+              className="tag"
+              title={`disabled at ${agent.disabled_at}`}
+              style={{ background: '#c0392b', color: '#fff' }}
+            >
+              disabled
+            </span>
+          )}
+          <button
+            onClick={async () => {
+              try {
+                const r = agent.disabled_at
+                  ? await agentActions.enable(agent.id)
+                  : await agentActions.disable(agent.id);
+                setAgent({ ...agent, disabled_at: r.disabled_at });
+                flash('ok', r.disabled_at ? 'agent disabled' : 'agent enabled');
+              } catch (e) {
+                flash('error', `toggle failed: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }}
+            style={{ fontSize: 12 }}
+          >
+            {agent.disabled_at ? 'Enable' : 'Disable'}
+          </button>
         </div>
       </header>
 
@@ -355,7 +361,7 @@ export default function AgentDetailPage() {
       <div className="tab-content">
         {activeTab === 'configuration' && (
           <div className="tab-pane stack">
-            <ManifestEditor
+            <AgentConfigEditor
               agent={agent}
               onSaved={(updated) => {
                 setAgent(updated);
@@ -376,9 +382,6 @@ export default function AgentDetailPage() {
                   {activeVersion != null && (
                     <span>
                       active v{activeVersion}
-                      {draftVersion != null && (
-                        <span className="dirty"> · draft v{draftVersion}</span>
-                      )}
                     </span>
                   )}
                   <button
@@ -432,7 +435,7 @@ export default function AgentDetailPage() {
               outputValidation={agent.composition?.output_validation || 'strict'}
               onChangeOutputValidation={async (next) => {
                 try {
-                  const updated = await api.patchAgent(id, {
+                  const updated = await agentActions.patch(id, {
                     composition: { output_validation: next },
                   } as unknown as Partial<AgentDef>);
                   setAgent(updated.agent);

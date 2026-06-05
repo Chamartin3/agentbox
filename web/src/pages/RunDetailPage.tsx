@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AgentDef, PromptFragment, RunPromptDoc, RunRecord, UsageRecord, api } from '../api/client';
+import { AgentDef, ApiError, PromptFragment, RunRecord } from '../api/client';
+import { useAgents } from '../hooks/useAgents';
+import { useRun, useRunPrompt, useRunActions } from '../hooks/useRuns';
 import EventStream from '../components/runs/EventStream';
 import ConversationView from '../components/runs/ConversationView';
 import RunCommentThread from '../components/runs/RunCommentThread';
-import { StatusPill } from '../components/ui/StatusPill';
+import { StatusPill } from '../components/common/StatusPill';
 import { fmtCost, fmtDt, fmtMs, fmtNum, fmtRelative } from '../util/format';
 import type { LooseStreamEvent } from '../api/events';
 
@@ -361,13 +363,19 @@ export default function RunDetailPage() {
   const navigate = useNavigate();
   const [rerunning, setRerunning] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [run, setRun] = useState<RunRecord | null>(null);
-  const [usage, setUsage] = useState<UsageRecord | null>(null);
-  const [agent, setAgent] = useState<AgentDef | null>(null);
+  const runQ = useRun(id);
+  const promptQ = useRunPrompt(id);
+  const runActions = useRunActions();
+  const run: RunRecord | null = runQ.data?.run ?? null;
+  const usage = runQ.data?.usage ?? null;
+  const promptDoc = promptQ.data ?? null;
+  const agentsQ = useAgents();
+  const agent: AgentDef | null = run
+    ? (agentsQ.data ?? []).find((a) => a.id === run.agent_id) ?? null
+    : null;
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
-  const [promptDoc, setPromptDoc] = useState<RunPromptDoc | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [eventView, setEventView] = useState<'conversation' | 'events'>('conversation');
   const [tab, setTab] = useState<'prompt' | 'conversation' | 'tools' | 'checks' | 'snapshot'>('prompt');
@@ -375,23 +383,7 @@ export default function RunDetailPage() {
   // Re-render every 30s so "5m ago" labels stay fresh.
   const [, setNow] = useState(Date.now());
 
-  const loadMeta = async () => {
-    try {
-      const r = await api.getRun(id);
-      setRun(r.run);
-      setUsage(r.usage);
-      // Fetch agent metadata for context tags.
-      api.listAgents()
-        .then((list) => setAgent(list.find((a) => a.id === r.run.agent_id) ?? null))
-        .catch(() => {});
-      api.getRunPrompt(id).then(setPromptDoc).catch(() => {});
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   useEffect(() => {
-    loadMeta();
     // Always load the transcript on mount so we have events even before
     // the WebSocket connects (or if the run is already finished).
     setEventsLoading(true);
@@ -418,7 +410,7 @@ export default function RunDetailPage() {
       });
       return out;
     };
-    api.getTranscript(id)
+    runActions.fetchTranscript(id)
       .then((evs) => {
         setEvents((curr) => mergeEvents(curr, evs as StreamEvent[]));
         setEventsLoading(false);
@@ -434,12 +426,13 @@ export default function RunDetailPage() {
     };
     ws.onclose = () => {
       setIsLive(false);
-      loadMeta();
+      runQ.refresh();
+      promptQ.refresh();
       // Refresh transcript after WS close in case new events
       // arrived between the initial load and the WS disconnect.
       // Merge (not replace) so any live events still in state survive.
       setTimeout(() => {
-        api.getTranscript(id)
+        runActions.fetchTranscript(id)
           .then((evs) => setEvents((curr) => mergeEvents(curr, evs as StreamEvent[])))
           .catch(() => {});
       }, 100);
@@ -569,9 +562,8 @@ export default function RunDetailPage() {
               if (!confirm('Cancel this run? The agent will be stopped and marked incomplete.')) return;
               setCancelling(true);
               try {
-                await api.cancelRun(id);
-                const r = await api.getRun(id);
-                setRun(r.run);
+                await runActions.cancel(id);
+                runQ.refresh();
               } catch (e) {
                 console.error(e);
                 alert('cancel failed');
@@ -590,11 +582,16 @@ export default function RunDetailPage() {
           onClick={async () => {
             setRerunning(true);
             try {
-              const { run_id } = await api.rerunRun(id);
+              const { run_id } = await runActions.rerun(id);
               navigate(`/runs/${run_id}`);
             } catch (e) {
               console.error(e);
-              alert('rerun failed');
+              if (e instanceof ApiError && e.status === 403) {
+                const d = e.detail as { detail?: { detail?: string } } | undefined;
+                alert(d?.detail?.detail || 'rerun failed: agent is disabled');
+              } else {
+                alert('rerun failed');
+              }
             } finally {
               setRerunning(false);
             }
@@ -898,7 +895,7 @@ export default function RunDetailPage() {
                 style={{ fontSize: 11, padding: '3px 8px' }}
                 onClick={() => {
                   setEventsLoading(true);
-                  api.getTranscript(id)
+                  runActions.fetchTranscript(id)
                     .then((evs) => { setEvents(evs as StreamEvent[]); setEventsLoading(false); })
                     .catch(() => { setEventsError('failed to load transcript'); setEventsLoading(false); });
                 }}

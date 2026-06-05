@@ -196,13 +196,9 @@ export default function AgentVersions({ agentId: propAgentId }: AgentVersionsPro
                   v{v.version}
                 </td>
                 <td style={{ padding: '6px 8px', fontSize: 11 }}>
-                  {isActive && (
+                  {isActive ? (
                     <span style={{ color: 'var(--green, #3fb950)', fontWeight: 600 }}>● active</span>
-                  )}
-                  {!isActive && v.is_draft && (
-                    <span style={{ color: 'var(--yellow, #d29922)' }}>draft</span>
-                  )}
-                  {!isActive && !v.is_draft && (
+                  ) : (
                     <span className="dim">—</span>
                   )}
                 </td>

@@ -16,7 +16,7 @@ from agentbox.core.data import (RunnerProfile,
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.service import runner_profiles as svc
+from agentbox.core.service.engines import profiles as svc
 from agentbox.core.service.engines.profiles import InvalidProfile, ProfileNotFound
 
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])

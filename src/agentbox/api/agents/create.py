@@ -55,7 +55,6 @@ class AgentCreateResponse(BaseModel):
     agent_id: str
     version: int
     version_id: int
-    is_draft: bool
 
 
 class FileUploadResponse(BaseModel):
@@ -90,7 +89,6 @@ def create_agent(req: AgentCreateRequest) -> AgentCreateResponse:
         agent_id=req.id,
         version=version_record["version"],
         version_id=version_record["id"],
-        is_draft=bool(version_record.get("is_draft")),
     )
 
 

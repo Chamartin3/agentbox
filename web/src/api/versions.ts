@@ -11,7 +11,6 @@ export interface VersionSummary {
   author: string;
   changelog: string;
   is_legacy: boolean;
-  is_draft: boolean;
   is_active: boolean;
   created_at: string;
 }

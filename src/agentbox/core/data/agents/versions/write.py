@@ -83,7 +83,6 @@ class _AgentVersionsAgentMixin(_AgentVersionsReadMixin, AgentToolGrantsMixin):
                     config_json=config_str,
                     prompt_content=prompt_content,
                     source=source,
-                    is_draft=1,
                 )
             )
             pk = result.inserted_primary_key
@@ -121,8 +120,92 @@ class _AgentVersionsAgentMixin(_AgentVersionsReadMixin, AgentToolGrantsMixin):
 
         return self.get_version_by_id(version_id) or {}
 
+    def add_agent_version(
+        self,
+        agent_id: str,
+        config_json: dict,
+        *,
+        prompt_content: str | None = None,
+        author: str,
+        changelog: str,
+        source: str = "ui",
+        source_path: str | None = None,
+        source_format: str | None = None,
+        sync_mode: str = "off",
+        export_to_disk: bool = False,
+    ) -> dict:
+        """Append a new draft version on top of existing history.
+
+        Primitive: no existence check, no soft-delete awareness. Inserts at
+        ``max(version)+1`` and refreshes agent_meta (clearing ``deleted_at``).
+        Callers decide when this is the right operation (e.g. the service
+        layer uses it to re-create over a soft-deleted agent).
+        """
+        existing = self.latest_version(agent_id)
+        next_version = (existing.get("version") or 0) + 1 if existing else 1
+
+        content_hash = hashlib.sha256(
+            json.dumps(config_json, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        config_str = json.dumps(config_json, sort_keys=True)
+
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                agent_versions.insert().values(
+                    agent_id=agent_id,
+                    version=next_version,
+                    source_path=source_path or "",
+                    source_format=source_format or "",
+                    content_snapshot="",
+                    prompt_snapshot="",
+                    content_hash=content_hash,
+                    author=author,
+                    changelog=changelog,
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    config_json=config_str,
+                    prompt_content=prompt_content,
+                    source=source,
+                )
+            )
+            pk = result.inserted_primary_key
+            assert pk is not None
+            version_id = int(pk[0])
+
+            now = now_iso()
+            existing_meta = conn.execute(
+                agent_meta.select().where(agent_meta.c.agent_id == agent_id)
+            ).first()
+            if existing_meta:
+                conn.execute(
+                    agent_meta.update()
+                    .where(agent_meta.c.agent_id == agent_id)
+                    .values(
+                        sync_mode=sync_mode,
+                        export_to_disk=int(export_to_disk),
+                        source_path=source_path,
+                        source_format=source_format,
+                        updated_at=now,
+                        deleted_at=None,
+                    )
+                )
+            else:
+                conn.execute(
+                    agent_meta.insert().values(
+                        agent_id=agent_id,
+                        sync_mode=sync_mode,
+                        export_to_disk=int(export_to_disk),
+                        source_path=source_path,
+                        source_format=source_format,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+
+        return self.get_version_by_id(version_id) or {}
+
     def publish_version(self, agent_id: str, version: int, reason: str) -> dict:
-        """Flip is_draft flag and set as active version.
+        """Set the given version as active. Appends ``reason`` to changelog.
 
         Raises:
             ValueError: if reason is empty or < 3 chars, or version not found.
@@ -144,7 +227,7 @@ class _AgentVersionsAgentMixin(_AgentVersionsReadMixin, AgentToolGrantsMixin):
             conn.execute(
                 agent_versions.update()
                 .where(agent_versions.c.id == version_id)
-                .values(is_draft=0, changelog=new_changelog)
+                .values(changelog=new_changelog)
             )
 
             # Snapshot current active grants onto this version row
@@ -215,7 +298,6 @@ class _AgentVersionsAgentMixin(_AgentVersionsReadMixin, AgentToolGrantsMixin):
                     config_json=target_row.get("config_json"),
                     prompt_content=target_row.get("prompt_content"),
                     source=target_row.get("source", "ui"),
-                    is_draft=0,  # Rollbacks are immediately active
                 )
             )
             pk = result.inserted_primary_key
@@ -250,7 +332,7 @@ class _AgentVersionsRevisionsMixin(_AgentVersionsReadMixin):
     engine: Engine
 
     def branch_draft(self, agent_id: str, *, author: str) -> dict:
-        """Clone the active version into a new draft.
+        """Clone the active version into a new (inactive) version.
 
         Raises:
             ValueError: if no active version exists.
@@ -279,7 +361,6 @@ class _AgentVersionsRevisionsMixin(_AgentVersionsReadMixin):
                     config_json=active.get("config_json"),
                     prompt_content=active.get("prompt_content"),
                     source=active.get("source", "ui"),
-                    is_draft=1,
                 )
             )
             pk = result.inserted_primary_key
@@ -313,7 +394,6 @@ class _AgentVersionsRevisionsMixin(_AgentVersionsReadMixin):
 
         next_v = self._next_version(agent_id)
         active_vid = active["id"]
-        is_draft = 0 if activate else 1
 
         cloned_config = active.get("config_json")
         if cloned_config:
@@ -345,7 +425,6 @@ class _AgentVersionsRevisionsMixin(_AgentVersionsReadMixin):
                     config_json=cloned_config,
                     prompt_content=prompt_content,
                     source=active.get("source", "ui"),
-                    is_draft=is_draft,
                 )
             )
             pk = result.inserted_primary_key
@@ -408,7 +487,6 @@ class _AgentVersionsRevisionsMixin(_AgentVersionsReadMixin):
 
         next_v = self._next_version(agent_id)
         active_vid = active["id"]
-        is_draft = 0 if activate else 1
 
         with self.engine.begin() as conn:
             result = conn.execute(
@@ -427,7 +505,6 @@ class _AgentVersionsRevisionsMixin(_AgentVersionsReadMixin):
                     config_json=new_config_str,
                     prompt_content=active.get("prompt_content"),
                     source=active.get("source", "ui"),
-                    is_draft=is_draft,
                 )
             )
             pk = result.inserted_primary_key
@@ -477,7 +554,6 @@ class _AgentVersionsFilesMixin(_AgentVersionsReadMixin):
         config_json: str | None = None,
         prompt_content: str | None = None,
         source: str = "manifest",
-        is_draft: bool = False,
     ) -> dict:
         prepared = _prepare_files(files) if files else []
         version = self._next_version(agent_id)
@@ -498,7 +574,6 @@ class _AgentVersionsFilesMixin(_AgentVersionsReadMixin):
                     config_json=config_json,
                     prompt_content=prompt_content,
                     source=source,
-                    is_draft=int(is_draft),
                 )
             )
             pk = result.inserted_primary_key
@@ -705,6 +780,56 @@ class _AgentVersionsMetaMixin(_AgentVersionsReadMixin):
                 agent_meta.update()
                 .where(agent_meta.c.agent_id == agent_id)
                 .values(deleted_at=None, updated_at=now_iso())
+            )
+        return self.get_agent_meta(agent_id)
+
+    def disable_agent(self, agent_id: str) -> dict | None:
+        """Stamp ``agent_meta.disabled_at``. Visible but un-invokable.
+
+        Idempotent: returns the current meta row whether or not the agent
+        was already disabled. Returns ``None`` if the agent has no version
+        history at all. Does NOT clear the active version pointer — the
+        agent is still "configured", just gated at dispatch.
+        """
+        latest = self.latest_version(agent_id)
+        if latest is None:
+            return None
+        now = now_iso()
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                agent_meta.select().where(agent_meta.c.agent_id == agent_id)
+            ).first()
+            if existing:
+                conn.execute(
+                    agent_meta.update()
+                    .where(agent_meta.c.agent_id == agent_id)
+                    .values(disabled_at=now, updated_at=now)
+                )
+            else:
+                conn.execute(
+                    agent_meta.insert().values(
+                        agent_id=agent_id,
+                        sync_mode="off",
+                        export_to_disk=0,
+                        source_path=None,
+                        source_format=None,
+                        created_at=now,
+                        updated_at=now,
+                        disabled_at=now,
+                    )
+                )
+        return self.get_agent_meta(agent_id)
+
+    def enable_agent(self, agent_id: str) -> dict | None:
+        """Clear ``disabled_at``."""
+        meta = self.get_agent_meta(agent_id)
+        if meta is None:
+            return None
+        with self.engine.begin() as conn:
+            conn.execute(
+                agent_meta.update()
+                .where(agent_meta.c.agent_id == agent_id)
+                .values(disabled_at=None, updated_at=now_iso())
             )
         return self.get_agent_meta(agent_id)
 

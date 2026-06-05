@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from agentbox.api.deps import get_store
 from agentbox.core.engines.providers.base import ProviderDescriptor, ProviderModel
-from agentbox.core.service import runner_providers as svc
+from agentbox.core.service.engines import providers as svc
 from agentbox.core.service.engines.providers import (
     InvalidProviderRequest,
     ProviderAuthFailed,

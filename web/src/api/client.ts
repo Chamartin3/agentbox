@@ -148,6 +148,8 @@ export interface AgentDef {
   model?: string | null;
   /** Effective provider resolved via the bound runner profile. */
   model_provider?: string | null;
+  /** ISO timestamp set when the agent was disabled, null when enabled. */
+  disabled_at?: string | null;
 }
 
 export interface PromptFragment {
@@ -203,7 +205,6 @@ export interface AgentCreateResult {
   agent_id: string;
   version: number;
   version_id: number;
-  is_draft: boolean;
 }
 
 export interface VersionFileUpload {
@@ -536,7 +537,20 @@ export const api = {
       '/api/usage',
     ),
 
-  listAgents: () => req<AgentDef[]>('/api/agents'),
+  listAgents: (opts?: { includeDisabled?: boolean }) =>
+    req<AgentDef[]>(
+      `/api/agents${opts?.includeDisabled ? '?include_disabled=true' : ''}`,
+    ),
+  disableAgent: (id: string) =>
+    req<{ agent_id: string; disabled_at: string | null }>(
+      `/api/agents/${id}/disable`,
+      { method: 'POST' },
+    ),
+  enableAgent: (id: string) =>
+    req<{ agent_id: string; disabled_at: string | null }>(
+      `/api/agents/${id}/enable`,
+      { method: 'POST' },
+    ),
   getAgent: (id: string) =>
     req<{
       agent: AgentDef;
@@ -664,19 +678,19 @@ export const api = {
     }),
 
   publishVersion: (agentId: string, version: number, reason: string) =>
-    req<{ active_version: number; version_id: number; is_draft: boolean }>(
+    req<{ active_version: number; version_id: number }>(
       `/api/agents/${agentId}/versions/${version}/publish`,
       { method: 'POST', body: JSON.stringify({ reason }) },
     ),
 
   branchDraft: (agentId: string, author: string) =>
-    req<{ version: number; version_id: number; is_draft: boolean }>(
+    req<{ version: number; version_id: number }>(
       `/api/agents/${agentId}/draft`,
       { method: 'POST', body: JSON.stringify({ author }) },
     ),
 
   rollbackVersion: (agentId: string, version: number, reason: string, author: string) =>
-    req<{ version: number; version_id: number; is_draft: boolean; active_version: number }>(
+    req<{ version: number; version_id: number; active_version: number }>(
       `/api/agents/${agentId}/versions/${version}/rollback`,
       { method: 'POST', body: JSON.stringify({ reason, author }) },
     ),

@@ -16,14 +16,14 @@ from pydantic import BaseModel
 
 from agentbox.api.deps import get_executor, get_loader, get_store
 from agentbox.api.webhooks import schedule_webhook
-from agentbox.core.service import read_transcript
+from agentbox.core.service import read_transcript, NoBackendAvailable
 from agentbox.core.service.execution import runs
 from agentbox.core.service.execution.runs import (
+    AgentDisabled,
     AgentNotFound,
     InvalidRunInput,
     RunNotFound,
 )
-from agentbox.core.execution.orchestrate.setup import NoBackendAvailable
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -93,6 +93,16 @@ async def create_run(body: CreateRunBody) -> dict:
         )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
+    except AgentDisabled as exc:
+        raise HTTPException(
+            403,
+            {
+                "code": "agent_disabled",
+                "detail": str(exc),
+                "agent_id": exc.agent_id,
+                "disabled_at": exc.disabled_at,
+            },
+        ) from exc
     except InvalidRunInput as exc:
         raise HTTPException(422, str(exc)) from exc
     except NoBackendAvailable as exc:
@@ -243,6 +253,16 @@ async def rerun(run_id: str) -> dict:
     except AgentNotFound as exc:
         raise HTTPException(
             404, f"agent {exc.agent_id!r} no longer exists"
+        ) from exc
+    except AgentDisabled as exc:
+        raise HTTPException(
+            403,
+            {
+                "code": "agent_disabled",
+                "detail": str(exc),
+                "agent_id": exc.agent_id,
+                "disabled_at": exc.disabled_at,
+            },
         ) from exc
 
 

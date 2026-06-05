@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
+from agentbox.core.data.manifest import AgentDef
 from agentbox.core.data.schema import (
     active_agent_versions,
     agent_meta,
@@ -89,7 +90,11 @@ class _AgentVersionsReadMixin:
             )
             return [self._row_dict(r) for r in rows]
 
-    def list_agents_with_latest(self, include_deleted: bool = False) -> list[dict]:
+    def list_agents_with_latest(
+        self,
+        include_deleted: bool = False,
+        include_disabled: bool = False,
+    ) -> list[dict]:
         """Return one row per agent_id — the latest version's snapshot.
 
         DB-as-source-of-truth read path for the agent list. Avoids hitting
@@ -98,7 +103,9 @@ class _AgentVersionsReadMixin:
         bundle).
 
         Soft-deleted agents (``agent_meta.deleted_at IS NOT NULL``) are
-        excluded by default.
+        excluded by default. Disabled agents (``agent_meta.disabled_at IS
+        NOT NULL``) are also excluded by default — opt-in via
+        ``include_disabled=True`` to surface them with their flag.
         """
         with self.engine.connect() as conn:
             inner = (
@@ -119,18 +126,27 @@ class _AgentVersionsReadMixin:
                 .order_by(agent_versions.c.created_at.desc())
             )
             rows = list(conn.execute(q))
-            if include_deleted:
+            if include_deleted and include_disabled:
                 return [self._row_dict(r) for r in rows]
-            deleted_ids = {
-                r._mapping["agent_id"]
-                for r in conn.execute(
-                    agent_meta.select().where(agent_meta.c.deleted_at.isnot(None))
-                )
-            }
+            hidden_ids: set[str] = set()
+            if not include_deleted:
+                hidden_ids |= {
+                    r._mapping["agent_id"]
+                    for r in conn.execute(
+                        agent_meta.select().where(agent_meta.c.deleted_at.isnot(None))
+                    )
+                }
+            if not include_disabled:
+                hidden_ids |= {
+                    r._mapping["agent_id"]
+                    for r in conn.execute(
+                        agent_meta.select().where(agent_meta.c.disabled_at.isnot(None))
+                    )
+                }
             return [
                 self._row_dict(r)
                 for r in rows
-                if self._row_dict(r).get("agent_id") not in deleted_ids
+                if self._row_dict(r).get("agent_id") not in hidden_ids
             ]
 
     def get_agent_def(self, agent_id: str):  # -> AgentDef | None
@@ -140,11 +156,7 @@ class _AgentVersionsReadMixin:
         should prefer this over ``DefinitionLoader.get()`` so runtime
         behavior is driven by the DB, not the filesystem.
         """
-        import logging
-
-        from agentbox.core.data.manifest import AgentDef
-
-        log = logging.getLogger(__name__)
+        log = logger
 
         row = self.get_active_version(agent_id) or self.latest_version(agent_id)
         if row is None:
@@ -192,6 +204,10 @@ class _AgentVersionsReadMixin:
     def is_agent_deleted(self, agent_id: str) -> bool:
         meta = self.get_agent_meta(agent_id)
         return bool(meta and meta.get("deleted_at"))
+
+    def is_agent_disabled(self, agent_id: str) -> bool:
+        meta = self.get_agent_meta(agent_id)
+        return bool(meta and meta.get("disabled_at"))
 
     # ------------------------------------------------------------------
     # Comments (read)

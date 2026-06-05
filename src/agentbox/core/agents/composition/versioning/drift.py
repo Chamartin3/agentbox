@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.agents.config import build_config_json_payload
+from agentbox.core.data import RunnerProfileCreate
 
 if TYPE_CHECKING:
     from agentbox.core.data import AgentVersionsMixin
@@ -135,13 +136,12 @@ def _sync_prompt(
 
 
 def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
-    """If versions exist but no active pointer, promote the latest committed one.
+    """If versions exist but no active pointer, promote the latest one.
 
     Reproduces the 'orphaned versions' state: rows in ``agent_versions``,
     nothing in ``active_agent_versions``. The runtime resolver would then
     silently fall back to the disk loader, hiding the active version from
-    the UI. Heal by activating the highest committed (non-draft) version,
-    or the latest row of any kind if all are drafts.
+    the UI. Heal by activating the latest version.
     """
     try:
         existing = store.get_active_version(agent_id)
@@ -150,9 +150,7 @@ def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
         versions = store.list_versions(agent_id)
         if not versions:
             return
-        # Prefer the highest committed version; fall back to latest of any.
-        committed = [v for v in versions if not v.get("is_draft")]
-        target = committed[0] if committed else versions[0]
+        target = versions[0]
         store.activate_version(agent_id, target["id"])
         logger.info(
             "versioning: healed missing active pointer for %r → v%d",
@@ -177,9 +175,6 @@ def _ingest_runner_profile(
         return
 
     try:
-        from agentbox.core.data import (RunnerProfileCreate,
-        )
-
         profile_id = f"legacy:{agent_id}"
 
         # Check if profile already exists

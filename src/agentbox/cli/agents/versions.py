@@ -63,17 +63,14 @@ def versions_ls(
     table.add_column("#", style="dim", justify="right")
     table.add_column("Author")
     table.add_column("Changelog")
-    table.add_column("Draft", justify="center")
     table.add_column("Active", justify="center")
     table.add_column("Created")
     for v in versions:
-        draft = "[yellow]✓[/yellow]" if v.get("is_draft") else "·"
         active_marker = "[green]✓[/green]" if v["id"] == active_id else "·"
         table.add_row(
             str(v["version"]),
             v.get("author", ""),
             v.get("changelog", "")[:60],
-            draft,
             active_marker,
             v.get("created_at", ""),
         )

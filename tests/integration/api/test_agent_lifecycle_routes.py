@@ -62,7 +62,6 @@ class TestPublishVersion:
         _setup_agent_with_active_version(store)
         # Create a new draft
         draft = store.branch_draft("test-agent", author="test")
-        assert draft["is_draft"] == 1
         # Publish the draft
         resp = client.post(
             f"/api/agents/test-agent/versions/{draft['version']}/publish",
@@ -70,7 +69,6 @@ class TestPublishVersion:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert not data["is_draft"]
         assert data["version"] == draft["version"]
         # Verify it's active
         active = store.get_active_version("test-agent")
@@ -124,7 +122,6 @@ class TestBranchDraft:
         )
         assert resp.status_code == 201
         data = resp.json()
-        assert data["is_draft"]
         assert data["version"] == v1["version"] + 1
         assert data["author"] == "test-user"
 
@@ -178,7 +175,6 @@ class TestRollbackVersion:
         assert resp.status_code == 201
         data = resp.json()
         assert data["version"] == v1["version"] + 2  # v3
-        assert not data["is_draft"]
         assert data["author"] == "admin"
         # Verify it's active
         active = store.get_active_version("test-agent")
@@ -242,7 +238,7 @@ class TestPublishWebhook:
 
         # Mock the webhook dispatcher
         with patch(
-            "agentbox.api.webhooks.schedule_agent_event_webhook"
+            "agentbox.api.agents.crud.schedule_agent_event_webhook"
         ) as mock_schedule:
             resp = client.post(
                 f"/api/agents/test-agent/versions/{draft['version']}/publish",
@@ -293,7 +289,7 @@ class TestPublishWebhook:
 
         # Mock the webhook dispatcher
         with patch(
-            "agentbox.api.webhooks.schedule_agent_event_webhook"
+            "agentbox.api.agents.crud.schedule_agent_event_webhook"
         ) as mock_schedule:
             resp = client.post(
                 f"/api/agents/test-agent/versions/{draft['version']}/publish",
@@ -341,7 +337,7 @@ class TestPublishWebhook:
 
         # Mock the webhook dispatcher to raise
         with patch(
-            "agentbox.api.webhooks.schedule_agent_event_webhook",
+            "agentbox.api.agents.crud.schedule_agent_event_webhook",
             side_effect=RuntimeError("Webhook dispatch failed"),
         ):
             resp = client.post(

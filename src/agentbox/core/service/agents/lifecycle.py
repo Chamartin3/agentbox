@@ -95,7 +95,6 @@ def create_version(
     config_json: str | None = None,
     prompt_content: str | None = None,
     source: str = "cli",
-    is_draft: bool = False,
 ) -> dict:
     """Create a new agent version record."""
     return store.create_version(
@@ -111,7 +110,6 @@ def create_version(
         config_json=config_json,
         prompt_content=prompt_content,
         source=source,
-        is_draft=is_draft,
     )
 
 

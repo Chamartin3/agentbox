@@ -170,7 +170,6 @@ class TestAgentLifecycle:
         )
         assert v["version"] == 1
         assert v["agent_id"] == "my-agent"
-        assert v["is_draft"] == 1
         assert v["author"] == "test-user"
         assert v["config_json"] is not None
         assert v["prompt_content"] == "Be helpful."
@@ -219,16 +218,14 @@ class TestAgentLifecycle:
         assert meta["export_to_disk"] == 1
 
     def test_publish_flips_draft_and_sets_active(self, session_store) -> None:
-        v1 = session_store.create_agent(
+        session_store.create_agent(
             agent_id="pub-agent",
             config_json={"id": "pub-agent"},
             author="user",
             changelog="initial",
         )
-        assert v1["is_draft"] == 1
 
         published = session_store.publish_version("pub-agent", 1, "Ready for use")
-        assert published["is_draft"] == 0
         assert "publish: Ready for use" in published["changelog"]
 
         # Verify active pointer
@@ -314,7 +311,6 @@ class TestAgentLifecycle:
         # Branch into draft v2
         v2 = session_store.branch_draft("branch-agent", author="brancher")
         assert v2["version"] == 2
-        assert v2["is_draft"] == 1
         assert v2["author"] == "brancher"
         assert v2["config_json"] == v1["config_json"]
         assert v2["prompt_content"] == v1["prompt_content"]
@@ -376,7 +372,6 @@ class TestAgentLifecycle:
             changelog="v2 changes",
             config_json='{"id": "rollback-agent", "value": 2}',
             prompt_content="Updated",
-            is_draft=False,
         )
         session_store.activate_version("rollback-agent", v2_dict["id"])
 
@@ -386,7 +381,6 @@ class TestAgentLifecycle:
         )
 
         assert v3["version"] == 3
-        assert v3["is_draft"] == 0
         assert v3["author"] == "operator"
         assert v3["config_json"] == v1["config_json"]
         assert "rollback to v1: Config too risky" in v3["changelog"]
@@ -425,7 +419,6 @@ class TestAgentLifecycle:
             prompt_snapshot="v2",
             content_hash="xyz",
             author="user",
-            is_draft=False,
         )
         session_store.activate_version("rollback-files", v2["id"])
 

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_loader, get_settings, get_store
+from agentbox.api.webhooks import schedule_agent_event_webhook
 from agentbox.core.service import RunnerProfile
 from agentbox.core.service.agents import (
     get_agent_detail,
@@ -21,15 +22,21 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
 @router.get("")
-def list_agents() -> list[dict]:
+def list_agents(include_disabled: bool = False) -> list[dict]:
     """List agents from the DB (one row per agent_id, latest version).
 
     DB-as-source-of-truth: every agent that has ever been imported into
     ``agent_versions`` appears here. Enrichment (run counts, bound
     runner profile, resolved workspace) is owned by
-    ``core.service.agents.list_agents_enriched``.
+    ``core.service.agents.list_agents_enriched``. Pass
+    ``?include_disabled=true`` to surface agents that have been disabled
+    (each carries a ``disabled_at`` timestamp).
     """
-    return list_agents_enriched(store=get_store(), settings=get_settings())
+    return list_agents_enriched(
+        store=get_store(),
+        settings=get_settings(),
+        include_disabled=include_disabled,
+    )
 
 
 @router.get("/{agent_id}")
@@ -85,10 +92,10 @@ class PublishRequest(BaseModel):
 
 @router.post("/{agent_id}/versions/{version}/publish")
 def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
-    """Publish a draft version (flip is_draft, set as active).
+    """Publish a version (set as active).
 
     Returns:
-        {active_version, version_id, is_draft, version, author, changelog}.
+        {active_version, version_id, version, author, changelog}.
     """
     store = get_store()
     loader = get_loader()
@@ -104,8 +111,6 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
     # Schedule webhook if agent has a webhook_url configured
     agent = resolve_agent(agent_id, store=store, loader=loader)
     if agent and agent.webhook_url:
-        from agentbox.api.webhooks import schedule_agent_event_webhook
-
         try:
             schedule_agent_event_webhook(
                 webhook_url=agent.webhook_url,
@@ -123,7 +128,6 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
     return {
         "active_version": version,
         "version_id": result.get("id"),
-        "is_draft": result.get("is_draft", False),
         "version": result.get("version"),
         "author": result.get("author"),
         "changelog": result.get("changelog"),
@@ -136,10 +140,10 @@ class DraftRequest(BaseModel):
 
 @router.post("/{agent_id}/draft", status_code=201)
 def branch_draft(agent_id: str, body: DraftRequest) -> dict:
-    """Create a new draft version by cloning the active version.
+    """Create a new (non-active) version by cloning the active version.
 
     Returns:
-        {version, version_id, is_draft, author, changelog}.
+        {version, version_id, author, changelog}.
     """
     store = get_store()
     try:
@@ -150,7 +154,6 @@ def branch_draft(agent_id: str, body: DraftRequest) -> dict:
     return {
         "version": result.get("version"),
         "version_id": result.get("id"),
-        "is_draft": result.get("is_draft", True),
         "author": result.get("author"),
         "changelog": result.get("changelog"),
     }
@@ -222,12 +225,35 @@ def delete_agent(agent_id: str) -> None:
         raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
 
 
+@router.post("/{agent_id}/disable", status_code=200)
+def disable_agent(agent_id: str) -> dict:
+    """Mark an agent disabled — visible in lists with ``include_disabled``
+    but the run dispatcher refuses to invoke it with HTTP 403.
+    """
+    store = get_store()
+    meta = store.disable_agent(agent_id)
+    if meta is None:
+        raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
+    return {"agent_id": agent_id, "disabled_at": meta.get("disabled_at")}
+
+
+@router.post("/{agent_id}/enable", status_code=200)
+def enable_agent(agent_id: str) -> dict:
+    """Clear the disabled marker. Idempotent — returns 200 even when the
+    agent was already enabled."""
+    store = get_store()
+    meta = store.enable_agent(agent_id)
+    if meta is None:
+        raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
+    return {"agent_id": agent_id, "disabled_at": meta.get("disabled_at")}
+
+
 @router.post("/{agent_id}/versions/{version}/rollback", status_code=201)
 def rollback_version(agent_id: str, version: int, body: RollbackRequest) -> dict:
     """Create a new version rolling back to target_version's config (becomes active).
 
     Returns:
-        {version, version_id, is_draft, active_version, author, changelog}.
+        {version, version_id, active_version, author, changelog}.
     """
     store = get_store()
     try:
@@ -242,7 +268,6 @@ def rollback_version(agent_id: str, version: int, body: RollbackRequest) -> dict
     return {
         "version": result.get("version"),
         "version_id": result.get("id"),
-        "is_draft": result.get("is_draft", False),
         "active_version": result.get("version"),
         "author": result.get("author"),
         "changelog": result.get("changelog"),

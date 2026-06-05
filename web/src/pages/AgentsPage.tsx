@@ -1,19 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, AgentDef, RunnerProfile } from '../api/client';
+import { AgentDef } from '../api/client';
 import { AgentSortKey, SortDir } from '../api/enums';
+import { useAgent, useAgents, useAgentActions } from '../hooks/useAgents';
+import { useRunnerProfiles } from '../hooks/useRunnerProfiles';
 
 function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void }) {
-  const [prompt, setPrompt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    api.getAgent(agent.id)
-      .then((r) => setPrompt(r.prompt || ''))
-      .catch(() => setPrompt(''))
-      .finally(() => setLoading(false));
-  }, [agent.id]);
+  const { data, loading } = useAgent(agent.id);
+  const prompt = data?.prompt ?? '';
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
@@ -64,34 +58,41 @@ function formatUpdated(s?: string | null): string {
 }
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<AgentDef[]>([]);
-  const [profiles, setProfiles] = useState<RunnerProfile[]>([]);
-  const [savingProfile, setSavingProfile] = useState<string | null>(null);
-  const [selected, setSelected] = useState<AgentDef | null>(null);
   const [query, setQuery] = useState('');
   const [runnerFilter, setRunnerFilter] = useState('');
+  const [includeDisabled, setIncludeDisabled] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>(AgentSortKey.UpdatedAt);
   const [sortDir, setSortDir] = useState<SortDir>(SortDir.Desc);
   const [page, setPage] = useState(1);
+  const [savingProfile, setSavingProfile] = useState<string | null>(null);
+  const [togglingDisabled, setTogglingDisabled] = useState<string | null>(null);
+  const [selected, setSelected] = useState<AgentDef | null>(null);
 
-  useEffect(() => {
-    api.listAgents().then(setAgents).catch(console.error);
-    api.listRunnerProfiles().then(setProfiles).catch(console.error);
-  }, []);
+  const agentsQ = useAgents({ includeDisabled });
+  const profilesQ = useRunnerProfiles();
+  const agents = agentsQ.data ?? [];
+  const profiles = profilesQ.data ?? [];
+  const actions = useAgentActions();
+
+  const onToggleDisabled = async (a: AgentDef) => {
+    setTogglingDisabled(a.id);
+    try {
+      if (a.disabled_at) await actions.enable(a.id);
+      else await actions.disable(a.id);
+      await agentsQ.refresh();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTogglingDisabled(null);
+    }
+  };
 
   const onChangeProfile = async (agentId: string, profileId: string) => {
     setSavingProfile(agentId);
     try {
-      if (profileId) {
-        await api.setAgentRunnerProfile(agentId, profileId);
-      } else {
-        await api.clearAgentRunnerProfile(agentId);
-      }
-      setAgents((prev) =>
-        prev.map((a) =>
-          a.id === agentId ? { ...a, runner_profile_id: profileId || null } : a,
-        ),
-      );
+      if (profileId) await actions.setRunnerProfile(agentId, profileId);
+      else await actions.clearRunnerProfile(agentId);
+      await agentsQ.refresh();
     } catch (e) {
       console.error(e);
     } finally {
@@ -159,6 +160,14 @@ export default function AgentsPage() {
           <option value="">all runners</option>
           {runnerKinds.map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
+        <label style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 12 }}>
+          <input
+            type="checkbox"
+            checked={includeDisabled}
+            onChange={(e) => { setIncludeDisabled(e.target.checked); setPage(1); }}
+          />
+          include disabled
+        </label>
         <span className="dim" style={{ fontSize: 12 }}>{sorted.length} of {agents.length}</span>
       </div>
       <table>
@@ -173,6 +182,7 @@ export default function AgentsPage() {
             <th>v</th>
             <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.UpdatedAt)}>Last activity{ind(AgentSortKey.UpdatedAt)}</th>
             <th>Runs</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -184,6 +194,15 @@ export default function AgentsPage() {
             >
               <td onClick={(e) => e.stopPropagation()}>
                 <Link to={`/agents/${a.id}`}><strong>{a.id}</strong></Link>
+                {a.disabled_at && (
+                  <span
+                    className="pill"
+                    title={`disabled at ${a.disabled_at}`}
+                    style={{ marginLeft: 6, background: '#c0392b', color: '#fff', fontSize: 10 }}
+                  >
+                    disabled
+                  </span>
+                )}
               </td>
               <td><span className="tag">{a.runner.kind}</span></td>
               <td onClick={(e) => e.stopPropagation()}>
@@ -222,10 +241,20 @@ export default function AgentsPage() {
                   {a.run_count ?? 0}
                 </Link>
               </td>
+              <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right' }}>
+                <button
+                  onClick={() => void onToggleDisabled(a)}
+                  disabled={togglingDisabled === a.id}
+                  style={{ fontSize: 11 }}
+                  title={a.disabled_at ? 'Re-enable agent' : 'Disable — prevents new runs'}
+                >
+                  {a.disabled_at ? 'Enable' : 'Disable'}
+                </button>
+              </td>
             </tr>
           ))}
           {pageRows.length === 0 && (
-            <tr><td colSpan={9} className="dim" style={{ textAlign: 'center', padding: 24 }}>no agents match</td></tr>
+            <tr><td colSpan={10} className="dim" style={{ textAlign: 'center', padding: 24 }}>no agents match</td></tr>
           )}
         </tbody>
       </table>

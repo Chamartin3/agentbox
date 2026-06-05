@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,8 +9,8 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console, handle_cli_errors, resolve_agent
+from agentbox.cli._deps import get_settings, get_store
 from agentbox.core import prompts
 from agentbox.core.service import (
     AgentDef,
@@ -29,7 +30,14 @@ from agentbox.core.service import (
     set_agent_runner_profile,
     soft_delete_agent,
 )
-from agentbox.core.service.agents import list_all_agents
+from agentbox.core.service.agents import (
+    VersionFileNotFound,
+    VersionNotDraft,
+    VersionNotFound,
+    delete_version_file,
+    list_all_agents,
+    upload_version_file,
+)
 
 agent_app = typer.Typer(
     name="agent",
@@ -284,8 +292,6 @@ def agent_edit(
     Values are parsed as JSON when possible (so ``--set tags='["x","y"]'``
     works), else stored verbatim as a string.
     """
-    import hashlib
-
     if not set_:
         console.print("[red]nothing to set; pass --set k=v[/red]")
         raise typer.Exit(2)
@@ -337,7 +343,7 @@ def agent_edit(
     )
     console.print(
         f"[green]new version[/green] {updated.id!r} v{rec['version']} "
-        f"(draft={rec.get('is_draft', False)}) — publish with `agent publish`"
+        "— publish with `agent publish`"
     )
 
 
@@ -376,7 +382,7 @@ def agent_draft(
         result = branch_agent_draft(store, agent_id, author=author)
     console.print(
         f"[green]draft created[/green] v{result.get('version')} "
-        f"(id={result.get('id')}, draft={result.get('is_draft', True)})"
+        f"(id={result.get('id')})"
     )
 
 
@@ -496,16 +502,6 @@ def agent_files(
         agents files my-agent 1 --add --kind output_schema --name schema.json --content '{"...""}'
         agents files my-agent 1 --rm 42
     """
-    from agentbox.core.service.agents import (
-        delete_version_file,
-        upload_version_file,
-    )
-    from agentbox.core.service.agents import (
-        VersionFileNotFound,
-        VersionNotDraft,
-        VersionNotFound,
-    )
-
     if add and rm is not None:
         console.print("[red]use --add or --rm, not both[/red]")
         raise typer.Exit(2)

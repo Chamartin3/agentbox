@@ -7,8 +7,18 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.service.agents import resolve_agent
-from agentbox.core.service.execution.types import InvalidRunInput, RunNotFound
+from agentbox.core.service.execution.types import (
+    AgentDisabled,
+    InvalidRunInput,
+    RunNotFound,
+)
 from agentbox.core.service.prompts import AgentNotFound
+
+
+def _assert_enabled(store: "SessionStore", agent_id: str) -> None:
+    if store.is_agent_disabled(agent_id):
+        meta = store.get_agent_meta(agent_id) or {}
+        raise AgentDisabled(agent_id, meta.get("disabled_at"))
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
@@ -43,6 +53,7 @@ async def create_run(
     agent = resolve_agent(agent_id, store=store, loader=loader)
     if agent is None:
         raise AgentNotFound(agent_id)
+    _assert_enabled(store, agent.id)
 
     if input_ is not None and variables is None:
         if agent.composition is not None:
@@ -99,6 +110,7 @@ async def rerun(
     agent = resolve_agent(rec.agent_id, store=store, loader=loader)
     if agent is None:
         raise AgentNotFound(rec.agent_id)
+    _assert_enabled(store, agent.id)
 
     variables: dict[str, str] | None = None
     if rec.variables:

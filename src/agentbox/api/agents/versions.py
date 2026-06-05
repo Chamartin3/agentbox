@@ -51,7 +51,6 @@ def list_agent_versions(agent_id: str) -> dict:
             "author": v["author"],
             "changelog": v["changelog"],
             "is_legacy": v.get("is_legacy", False),
-            "is_draft": bool(v.get("is_draft", False)),
             "is_active": v["id"] == active_id,
             "created_at": v["created_at"],
         }

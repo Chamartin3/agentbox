@@ -44,7 +44,6 @@ agent_versions = Table(
     Column("config_json", String, nullable=True),
     Column("prompt_content", String, nullable=True),
     Column("source", String, nullable=False, server_default="manifest"),
-    Column("is_draft", Integer, nullable=False, server_default="0"),
     Column("resolved_tool_grants", JSON, nullable=True),  # list[str], frozen at publish
     Index("idx_agent_versions_agent", "agent_id", "version", unique=True),
 )
@@ -73,6 +72,7 @@ agent_meta = Table(
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),
     Column("deleted_at", String, nullable=True),
+    Column("disabled_at", String, nullable=True),
 )
 
 agent_version_comments = Table(
