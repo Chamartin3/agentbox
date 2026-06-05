@@ -50,13 +50,7 @@ class NoActiveVersion(LookupError):
         self.resource_id = resource_id
 
 
-# ---------------------------------------------------------------------------
-# Resolution helpers
-# ---------------------------------------------------------------------------
-
-
 def resolve_resource_id(store: SessionStore, id_or_slug: str) -> str | None:
-    """Look up a resource by UUID, slug, or legacy dotted-slug."""
     if not id_or_slug:
         return None
     r = store.get_repo_resource(id_or_slug)
@@ -87,11 +81,6 @@ def _active_version_or_raise(store: SessionStore, resource_id: str) -> dict:
     return active
 
 
-# ---------------------------------------------------------------------------
-# CRUD
-# ---------------------------------------------------------------------------
-
-
 def list_resources(
     *,
     store: SessionStore,
@@ -103,15 +92,9 @@ def list_resources(
 ) -> dict:
     return {
         "items": store.list_repo_resources(
-            type=type,
-            query=query,
-            include_deleted=include_deleted,
-            limit=limit,
-            offset=offset,
+            type=type, query=query, include_deleted=include_deleted, limit=limit, offset=offset,
         ),
-        "total": store.count_repo_resources(
-            type=type, query=query, include_deleted=include_deleted
-        ),
+        "total": store.count_repo_resources(type=type, query=query, include_deleted=include_deleted),
         "limit": limit,
         "offset": offset,
     }
@@ -128,11 +111,7 @@ def create_resource(
 ) -> dict:
     try:
         return store.create_repo_resource(
-            slug=slug,
-            type=type,
-            display_name=display_name,
-            description=description,
-            tags=tags or [],
+            slug=slug, type=type, display_name=display_name, description=description, tags=tags or [],
         )
     except ValueError as exc:
         raise InvalidResource(str(exc)) from exc
@@ -141,24 +120,13 @@ def create_resource(
 def get_resource(resource_id: str, *, store: SessionStore) -> dict:
     rid = _resolve_or_raise(store, resource_id)
     r = store.get_repo_resource(rid)
-    active = (
-        store.get_active_repo_version(rid) if r and r.get("active_version_id") else None
-    )
+    active = store.get_active_repo_version(rid) if r and r.get("active_version_id") else None
     return {"resource": r, "active_version": active}
 
 
-def update_resource(
-    resource_id: str,
-    *,
-    store: SessionStore,
-    display_name: str | None = None,
-    description: str | None = None,
-    tags: list[str] | None = None,
-) -> dict:
+def update_resource(resource_id: str, *, store: SessionStore, display_name: str | None = None, description: str | None = None, tags: list[str] | None = None) -> dict:
     rid = _resolve_or_raise(store, resource_id)
-    updated = store.update_repo_resource(
-        rid, display_name=display_name, description=description, tags=tags
-    )
+    updated = store.update_repo_resource(rid, display_name=display_name, description=description, tags=tags)
     if updated is None:
         raise ResourceNotFound(resource_id)
     return updated
@@ -169,57 +137,27 @@ def list_versions(resource_id: str, *, store: SessionStore) -> dict:
     return {"items": store.list_repo_versions(rid)}
 
 
-# ---------------------------------------------------------------------------
-# Publish / rollback
-# ---------------------------------------------------------------------------
-
-
-def publish_version(
-    resource_id: str,
-    version_id: str,
-    *,
-    store: SessionStore,
-    reason: str,
-    actor: str | None = None,
-) -> dict:
+def publish_version(resource_id: str, version_id: str, *, store: SessionStore, reason: str, actor: str | None = None) -> dict:
     v = store.get_repo_version(version_id)
     if not v or v["resource_id"] != resource_id:
         raise ResourceNotFound(version_id)
     try:
-        return store.publish_repo_version(
-            version_id, reason=reason, activated_by=actor
-        )
+        return store.publish_repo_version(version_id, reason=reason, activated_by=actor)
     except ValueError as exc:
         raise InvalidResource(str(exc)) from exc
 
 
-def rollback_resource(
-    resource_id: str,
-    *,
-    store: SessionStore,
-    target_version: int,
-    reason: str,
-    actor: str | None = None,
-) -> dict:
+def rollback_resource(resource_id: str, *, store: SessionStore, target_version: int, reason: str, actor: str | None = None) -> dict:
     _require_resource(store, resource_id)
     try:
-        return store.rollback_repo_resource(
-            resource_id, target_version, reason=reason, activated_by=actor
-        )
+        return store.rollback_repo_resource(resource_id, target_version, reason=reason, activated_by=actor)
     except ValueError as exc:
         raise InvalidResource(str(exc)) from exc
 
 
-def soft_delete_resource(
-    resource_id: str, *, store: SessionStore, reason: str
-) -> None:
+def soft_delete_resource(resource_id: str, *, store: SessionStore, reason: str) -> None:
     _require_resource(store, resource_id)
     store.soft_delete_repo_resource(resource_id, reason=reason)
-
-
-# ---------------------------------------------------------------------------
-# Helpers shared with import.py and materialize.py
-# ---------------------------------------------------------------------------
 
 
 def _require_resource(store: SessionStore, resource_id: str) -> dict:
@@ -229,17 +167,7 @@ def _require_resource(store: SessionStore, resource_id: str) -> dict:
     return resource
 
 
-# ---------------------------------------------------------------------------
-# Thin store passthroughs (merged from repo_resources.py)
-# ---------------------------------------------------------------------------
-
-
-def list_repo_resources(
-    store: SessionStore,
-    *,
-    type: str | None = None,
-    limit: int = 50,
-) -> list[dict]:
+def list_repo_resources(store: SessionStore, *, type: str | None = None, limit: int = 50) -> list[dict]:
     return store.list_repo_resources(type=type, limit=limit)
 
 
@@ -247,93 +175,29 @@ def get_repo_resource_by_slug(store: SessionStore, slug: str) -> dict | None:
     return store.get_repo_resource_by_slug(slug)
 
 
-def create_repo_resource(
-    store: SessionStore,
-    slug: str,
-    type: str,
-    display_name: str,
-    *,
-    description: str | None = None,
-    tags: list[str] | None = None,
-    created_by: str | None = None,
-) -> dict:
-    return store.create_repo_resource(
-        slug,
-        type,
-        display_name,
-        description=description,
-        tags=tags,
-        created_by=created_by,
-    )
+def create_repo_resource(store: SessionStore, slug: str, type: str, display_name: str, *, description: str | None = None, tags: list[str] | None = None, created_by: str | None = None) -> dict:
+    return store.create_repo_resource(slug, type, display_name, description=description, tags=tags, created_by=created_by)
 
 
 def list_repo_versions(store: SessionStore, resource_id: str) -> list[dict]:
     return store.list_repo_versions(resource_id)
 
 
-def import_repo_version(
-    store: SessionStore,
-    resource_id: str,
-    blobs: list[tuple[str, bytes, str | None, str | None]],
-    *,
-    import_source: str,
-    changelog: str,
-    source_metadata: dict | None = None,
-    metadata: dict | None = None,
-    draft: bool = False,
-    created_by: str | None = None,
-    activate: bool = True,
-) -> dict:
-    return store.import_repo_version(
-        resource_id,
-        blobs,
-        import_source=import_source,
-        changelog=changelog,
-        source_metadata=source_metadata,
-        metadata=metadata,
-        draft=draft,
-        created_by=created_by,
-        activate=activate,
-    )
+def import_repo_version(store: SessionStore, resource_id: str, blobs: list[tuple[str, bytes, str | None, str | None]], *, import_source: str, changelog: str, source_metadata: dict | None = None, metadata: dict | None = None, draft: bool = False, created_by: str | None = None, activate: bool = True) -> dict:
+    return store.import_repo_version(resource_id, blobs, import_source=import_source, changelog=changelog, source_metadata=source_metadata, metadata=metadata, draft=draft, created_by=created_by, activate=activate)
 
 
-def publish_repo_version(
-    store: SessionStore,
-    version_id: str,
-    *,
-    reason: str,
-    activated_by: str | None = None,
-) -> dict:
-    return store.publish_repo_version(
-        version_id, reason=reason, activated_by=activated_by
-    )
+def publish_repo_version(store: SessionStore, version_id: str, *, reason: str, activated_by: str | None = None) -> dict:
+    return store.publish_repo_version(version_id, reason=reason, activated_by=activated_by)
 
 
-def rollback_repo_resource(
-    store: SessionStore,
-    resource_id: str,
-    target_version: int,
-    *,
-    reason: str,
-    activated_by: str | None = None,
-) -> dict:
-    return store.rollback_repo_resource(
-        resource_id, target_version, reason=reason, activated_by=activated_by
-    )
+def rollback_repo_resource(store: SessionStore, resource_id: str, target_version: int, *, reason: str, activated_by: str | None = None) -> dict:
+    return store.rollback_repo_resource(resource_id, target_version, reason=reason, activated_by=activated_by)
 
 
 def list_prompt_bindings(store: SessionStore, agent_id: str) -> list[dict]:
     return store.list_prompt_bindings(agent_id)
 
 
-def replace_prompt_bindings(
-    store: SessionStore,
-    agent_id: str,
-    bindings: list[dict],
-    *,
-    reason: str,
-    actor: str | None = None,
-) -> list[dict]:
-    return store.replace_prompt_bindings(
-        agent_id, bindings, reason=reason, actor=actor
-    )
+def replace_prompt_bindings(store: SessionStore, agent_id: str, bindings: list[dict], *, reason: str, actor: str | None = None) -> list[dict]:
+    return store.replace_prompt_bindings(agent_id, bindings, reason=reason, actor=actor)

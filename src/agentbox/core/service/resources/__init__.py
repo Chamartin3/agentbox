@@ -1,12 +1,7 @@
 """Service layer for the central resource repository.
 
 Wraps the repo-resource CRUD, importer dispatch, version publishing,
-blob/render/tree reads, and export helpers that used to live in
-``api/resources/repo.py``.
-
-Dependency injection is explicit (``store``) so this module has no
-import of FastAPI deps. MCP tools and CLI consumers can reuse the
-same use-cases.
+blob/render/tree reads, and export helpers.
 """
 
 from __future__ import annotations

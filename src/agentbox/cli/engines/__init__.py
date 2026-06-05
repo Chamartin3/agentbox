@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.runners.backends import app as _backends_app
-from agentbox.cli.runners.profiles import app as _profiles_app
-from agentbox.cli.runners.providers import app as _providers_app
+from agentbox.cli.engines.backends import app as _backends_app
+from agentbox.cli.engines.profiles import app as _profiles_app
+from agentbox.cli.engines.providers import app as _providers_app
 
 app = typer.Typer(
     name="runners",

@@ -1,7 +1,7 @@
 """/runner-profiles endpoints — CRUD, agent binding, stats.
 
 Transport-only: parses queries, calls
-:mod:`agentbox.core.service.runner_profiles`, maps domain errors to HTTP.
+:mod:`agentbox.core.service.engines.profiles`, maps domain errors to HTTP.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from agentbox.core.data import (RunnerProfile,
     RunnerProfileStats,
 )
 from agentbox.core.service import runner_profiles as svc
-from agentbox.core.service.runner_profiles import InvalidProfile, ProfileNotFound
+from agentbox.core.service.engines.profiles import InvalidProfile, ProfileNotFound
 
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
 

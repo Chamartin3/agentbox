@@ -14,7 +14,7 @@ from agentbox.cli.analytics import app as analytics_app
 from agentbox.cli.ops import app as ops_app
 from agentbox.cli.resources import app as resources_app
 from agentbox.cli.root import app
-from agentbox.cli.runners import app as runners_app
+from agentbox.cli.engines import app as runners_app
 from agentbox.cli.runs import app as runs_app
 from agentbox.cli.system import app as system_app
 from agentbox.cli.workspaces import app as workspaces_app

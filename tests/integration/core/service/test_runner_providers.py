@@ -11,7 +11,7 @@ import httpx
 import pytest
 from agentbox.core.engines.providers.base import ProviderDescriptor
 from agentbox.core.data import SessionStore
-from agentbox.core.service.runner_providers import (
+from agentbox.core.service.engines.providers import (
     InvalidProviderRequest,
     ProviderAuthFailed,
     ProviderNotFound,
@@ -56,10 +56,10 @@ def _patch_providers(
         return None
 
     monkeypatch.setattr(
-        "agentbox.core.service.runner_providers.list_providers", _list_providers
+        "agentbox.core.service.engines.providers.list_providers", _list_providers
     )
     monkeypatch.setattr(
-        "agentbox.core.service.runner_providers.get_provider", _get_provider
+        "agentbox.core.service.engines.providers.get_provider", _get_provider
     )
     return provider
 
@@ -123,7 +123,7 @@ async def test_list_provider_models_auth_failed(
         )
 
     monkeypatch.setattr(
-        "agentbox.core.service.runner_providers.registry_list_models",
+        "agentbox.core.service.engines.providers.registry_list_models",
         _raise_auth,
     )
     with pytest.raises(ProviderAuthFailed) as exc_info:
@@ -144,7 +144,7 @@ async def test_list_provider_models_upstream_error(
         )
 
     monkeypatch.setattr(
-        "agentbox.core.service.runner_providers.registry_list_models",
+        "agentbox.core.service.engines.providers.registry_list_models",
         _raise_500,
     )
     with pytest.raises(ProviderUpstreamError):
@@ -160,7 +160,7 @@ async def test_list_provider_models_request_error(
         raise httpx.RequestError("connection refused")
 
     monkeypatch.setattr(
-        "agentbox.core.service.runner_providers.registry_list_models",
+        "agentbox.core.service.engines.providers.registry_list_models",
         _raise_request_error,
     )
     with pytest.raises(ProviderUpstreamError):
@@ -176,7 +176,7 @@ async def test_list_provider_models_value_error_from_registry(
         raise ValueError("registry rejected config")
 
     monkeypatch.setattr(
-        "agentbox.core.service.runner_providers.registry_list_models",
+        "agentbox.core.service.engines.providers.registry_list_models",
         _raise_value_error,
     )
     with pytest.raises(InvalidProviderRequest):

@@ -15,10 +15,14 @@ that read more clearly as SQL expressions than as ORM relationships.
 from __future__ import annotations
 
 import contextlib
+import json as _json
 import logging
 import uuid
 from pathlib import Path
 
+import agentbox
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
@@ -87,21 +91,12 @@ class _CoreStore:
 
     def _run_alembic_migrations(self) -> None:
         """Run pending Alembic migrations on startup."""
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         try:
-            from alembic import command
-            from alembic.config import Config
-
             alembic_cfg = Config()
             alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
             # Find the migrations directory — check a few candidate paths so
             # both editable installs and built wheels work.
-            import agentbox
-
             candidates = [
                 Path(agentbox.__file__).parent.parent / "alembic",
                 Path(agentbox.__file__).parent.parent.parent / "alembic",
@@ -400,8 +395,6 @@ class _CoreStore:
         call becomes a no-op so we don't overwrite a real output/error
         with the wrapper's empty result.
         """
-        import json as _json
-
         values: dict = {
             "status": status
             if status
@@ -456,8 +449,6 @@ class _CoreStore:
         Does not modify the run's primary ``status`` — that is the executor's
         own result. The ``post_status`` column is the consumer's verdict.
         """
-        import json as _json
-
         values: dict = {"post_status": "ok" if ok else "fail"}
         if errors is not None:
             values["post_errors"] = _json.dumps(
@@ -605,8 +596,6 @@ class _CoreStore:
         latency_ms: int | None = None,
         error: str | None = None,
     ) -> None:
-        import json as _json
-
         with self.engine.begin() as conn:
             conn.execute(
                 webhook_deliveries.insert().values(
@@ -662,8 +651,6 @@ class _CoreStore:
         validation_errors: list[str],
         composition_snapshot: dict | None = None,
     ) -> None:
-        import json as _json
-
         values: dict = {
             "rendered_prompt": _json.dumps(rendered_prompt),
             "variables": _json.dumps(variables),
@@ -682,8 +669,6 @@ class _CoreStore:
         rendered_prompt: dict | None,
         variables: dict | None,
     ) -> None:
-        import json as _json
-
         values: dict = {}
         if composition_snapshot is not None:
             values["composition_snapshot"] = _json.dumps(composition_snapshot)
@@ -703,8 +688,6 @@ class _CoreStore:
         resource_snapshot: list[ResourceSnapshotEntry] | None = None,
         mcp_snapshot: McpSnapshot | None = None,
     ) -> None:
-        import json as _json
-
         values: dict = {}
         if resource_snapshot is not None:
             values["resource_snapshot"] = _json.dumps(resource_snapshot)
@@ -726,8 +709,6 @@ class _CoreStore:
         Mutating the bound profile or rebinding the agent must not affect
         a previously persisted snapshot.
         """
-        import json as _json
-
         with self.engine.begin() as conn:
             conn.execute(
                 runs.update()

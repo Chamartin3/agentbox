@@ -12,8 +12,8 @@ import re
 from dataclasses import dataclass
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.resources.importers.base import ImporterContext, ImporterResult
-from agentbox.core.resources.importers.host_path import HostPathImporter
+from agentbox.core.resource.importers.base import ImporterContext, ImporterResult
+from agentbox.core.resource.importers.host_path import HostPathImporter
 
 ENTRY_FILE = "SKILL.md"
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)

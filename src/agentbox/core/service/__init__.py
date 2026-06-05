@@ -42,12 +42,12 @@ from agentbox.core.agents.composition.preview import render_agent_prompt_preview
 from agentbox.core.agents.composition.rendering import render_for_type as render_for_type
 from agentbox.core.agents.composition.resolver import resolve_prompt as resolve_prompt
 from agentbox.core.resources.importers.base import ImporterContext as ImporterContext
-from agentbox.core.resources.importers.host_path import HostPathImporter as HostPathImporter
+from agentbox.core.resources.importers.host import HostPathImporter as HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter as SchemaImporter
 from agentbox.core.resources.importers.script import ScriptImporter as ScriptImporter
 from agentbox.core.resources.importers.skill import SkillImporter as SkillImporter
 from agentbox.core.resources.importers.upload import UploadImporter as UploadImporter
-from agentbox.core.resources.importers.zip_upload import ZipUploadImporter as ZipUploadImporter
+from agentbox.core.resources.importers.zip import ZipUploadImporter as ZipUploadImporter
 
 # ── Resources ─────────────────────────────────────────────────────────
 from agentbox.core.resources.skills import discover_skills as discover_skills
@@ -92,13 +92,13 @@ from agentbox.core.service.agents.lifecycle import set_rating as set_version_rat
 from agentbox.core.service.agents.lifecycle import soft_delete_agent as soft_delete_agent
 
 # ── Runner profiles service ────────────────────────────────────────────
-from agentbox.core.service.runner_profiles import create_runner_profile as create_runner_profile
-from agentbox.core.service.runner_profiles import delete_runner_profile as delete_runner_profile
-from agentbox.core.service.runner_profiles import get_runner_profile as get_runner_profile
-from agentbox.core.service.runner_profiles import list_runner_profile_stats as list_runner_profile_stats
-from agentbox.core.service.runner_profiles import list_runner_profiles as list_runner_profiles
-from agentbox.core.service.runner_profiles import runner_profile_stats as runner_profile_stats
-from agentbox.core.service.runner_profiles import set_agent_runner_profile as bind_runner_profile  # noqa: F401
+from agentbox.core.service.engines.profiles import create_runner_profile as create_runner_profile
+from agentbox.core.service.engines.profiles import delete_runner_profile as delete_runner_profile
+from agentbox.core.service.engines.profiles import get_runner_profile as get_runner_profile
+from agentbox.core.service.engines.profiles import list_runner_profile_stats as list_runner_profile_stats
+from agentbox.core.service.engines.profiles import list_runner_profiles as list_runner_profiles
+from agentbox.core.service.engines.profiles import runner_profile_stats as runner_profile_stats
+from agentbox.core.service.engines.profiles import set_agent_runner_profile as bind_runner_profile  # noqa: F401
 
 # ── Repo resources service ─────────────────────────────────────────────
 from agentbox.core.service.resources.repo import create_repo_resource as create_repo_resource

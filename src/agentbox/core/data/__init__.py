@@ -131,7 +131,7 @@ from agentbox.core.data.store import SessionStore
 from agentbox.core.data.execution.analytics import _duration_ms_expr  # noqa: F401
 from agentbox.core.data.execution.claude_session import find_session_log, parse_session_log
 from agentbox.core.data.constants import VALID_POLICIES
-from agentbox.core.data.resources.crud import _hash_blobs as hash_blobs  # noqa: F401
+from agentbox.core.data.resources._rows import hash_blobs as hash_blobs  # noqa: F401
 from agentbox.core.data.engines.models import RunnerProfileStats
 from agentbox.core.data.engines.profiles import (
     RunnerProfile,

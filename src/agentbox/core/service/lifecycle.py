@@ -27,7 +27,7 @@ from agentbox.core.resources.boot_import import (
 from agentbox.core.resources.composition_to_bindings import (
     migrate_composition_to_bindings,
 )
-from agentbox.core.resources.legacy_migration import (
+from agentbox.core.resources.migration import (
     migrate_shared_resources_to_repo,
 )
 from agentbox.core.execution.webhooks import schedule_webhook

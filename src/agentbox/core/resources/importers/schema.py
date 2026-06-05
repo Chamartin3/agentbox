@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.resources.importers.base import (
+from agentbox.core.resource.importers.base import (
     ImporterContext,
     ImporterResult,
     ResourceImporter,

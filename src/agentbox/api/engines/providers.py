@@ -1,7 +1,7 @@
 """Runner provider API — list providers and discover available models.
 
 Transport-only: parses query params, calls
-:mod:`agentbox.core.service.runner_providers`, maps domain errors to HTTP.
+:mod:`agentbox.core.service.engines.providers`, maps domain errors to HTTP.
 
 Endpoints:
   GET /api/runner-providers                    — list provider descriptors
@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Query
 from agentbox.api.deps import get_store
 from agentbox.core.engines.providers.base import ProviderDescriptor, ProviderModel
 from agentbox.core.service import runner_providers as svc
-from agentbox.core.service.runner_providers import (
+from agentbox.core.service.engines.providers import (
     InvalidProviderRequest,
     ProviderAuthFailed,
     ProviderNotFound,

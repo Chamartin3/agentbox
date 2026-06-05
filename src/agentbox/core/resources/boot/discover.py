@@ -16,7 +16,6 @@ _SKILL_ROOT_SKIP_SUFFIXES = ("workdir/worktrees",)
 
 
 def _is_skipped_skill_root(p: Path) -> bool:
-    """Return True if ``p`` lives under a vendor/transient location."""
     parts = p.parts
     if any(part in _SKILL_ROOT_SKIP_PARTS for part in parts):
         return True
@@ -25,13 +24,6 @@ def _is_skipped_skill_root(p: Path) -> bool:
 
 
 def resolve_skill_roots(root: Path) -> list[Path]:
-    """Return the ordered list of existing skill roots to scan.
-
-    Combines :data:`DEFAULT_SKILLS_SOURCES` with paths from the
-    ``AGENTBOX_EXTRA_SKILL_ROOTS`` env var (``:``-separated). Each extra
-    root may be absolute or relative to ``root``. Vendor/transient paths
-    (.venv, node_modules, .git, workdir/worktrees) are filtered out.
-    """
     candidates: list[Path] = [root / rel for rel in DEFAULT_SKILLS_SOURCES]
     extra = os.environ.get("AGENTBOX_EXTRA_SKILL_ROOTS", "")
     for token in extra.split(":"):

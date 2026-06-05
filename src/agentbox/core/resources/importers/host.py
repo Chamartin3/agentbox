@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.resource.importers.base import (
+from agentbox.core.resources.importers.base import (
     ImportedBlob,
     ImporterContext,
     ImporterResult,
