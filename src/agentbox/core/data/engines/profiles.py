@@ -122,8 +122,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
         If is_system_default=True, atomically clears is_system_default on
         all other profiles in the same transaction.
         """
-        from sqlalchemy import insert
-
         if data.id:
             profile_id = data.id
         else:
@@ -135,15 +133,11 @@ class RunnerProfilesMixin(RunnerStatsMixin):
         with self.engine.begin() as conn:
             # If setting as system default, clear other defaults
             if data.is_system_default:
-                from agentbox.core.data.schema import runner_profiles
-
                 conn.execute(
                     runner_profiles.update()
                     .where(runner_profiles.c.is_system_default == 1)
                     .values(is_system_default=0)
                 )
-
-            from agentbox.core.data.schema import runner_profiles
 
             conn.execute(
                 insert(runner_profiles).values(
@@ -193,8 +187,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
         enabled: bool | None = None,
     ) -> list[RunnerProfile]:
         """List runner profiles with optional filters."""
-        from agentbox.core.data.schema import runner_profiles
-
         stmt = select(runner_profiles)
         conds = []
         if backend is not None:
@@ -214,8 +206,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
 
     def get_runner_profile(self, profile_id: str) -> RunnerProfile | None:
         """Get a runner profile by ID."""
-        from agentbox.core.data.schema import runner_profiles
-
         with self.engine.connect() as conn:
             row = conn.execute(
                 select(runner_profiles).where(runner_profiles.c.id == profile_id)
@@ -230,8 +220,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
         If is_system_default is being set True, atomically clears
         is_system_default on all other profiles.
         """
-        from agentbox.core.data.schema import runner_profiles
-
         values: dict[str, Any] = {}
         if patch.name is not None:
             values["name"] = patch.name
@@ -299,8 +287,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
 
     def delete_runner_profile(self, profile_id: str) -> None:
         """Delete a runner profile by ID."""
-        from agentbox.core.data.schema import runner_profiles
-
         with self.engine.begin() as conn:
             conn.execute(
                 runner_profiles.delete().where(runner_profiles.c.id == profile_id)
@@ -308,10 +294,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
 
     def set_agent_runner_profile(self, agent_id: str, profile_id: str) -> RunnerProfile:
         """Bind a runner profile to an agent."""
-        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-
-        from agentbox.core.data.schema import agent_runner_profiles
-
         now = now_iso()
         stmt = sqlite_insert(agent_runner_profiles).values(
             agent_id=agent_id,
@@ -340,8 +322,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
 
     def get_agent_runner_profile(self, agent_id: str) -> RunnerProfile | None:
         """Get the runner profile bound to an agent."""
-        from agentbox.core.data.schema import agent_runner_profiles, runner_profiles
-
         with self.engine.connect() as conn:
             row = conn.execute(
                 select(runner_profiles)
@@ -355,8 +335,6 @@ class RunnerProfilesMixin(RunnerStatsMixin):
 
     def clear_agent_runner_profile(self, agent_id: str) -> None:
         """Remove the runner profile binding from an agent."""
-        from agentbox.core.data.schema import agent_runner_profiles
-
         with self.engine.begin() as conn:
             conn.execute(
                 agent_runner_profiles.delete().where(

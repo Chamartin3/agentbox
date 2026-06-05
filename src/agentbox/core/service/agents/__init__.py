@@ -18,21 +18,28 @@ the ``/api/agents`` routes (and re-usable by MCP / CLI):
 from __future__ import annotations
 
 import hashlib
+import json as _json
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import func, select
 
 from agentbox.core import workspaces as ws
-from agentbox.core.agents.config import build_config_json_payload
-from agentbox.core.constants import SessionMode
-from agentbox.core.data import AgentDef, agent_runner_profiles
-from agentbox.core.data import runs as runs_table
 from agentbox.core.agents.composition.bundle import compose_from_source
 from agentbox.core.agents.composition.bundle.loader import load_bundle_from_bindings
 from agentbox.core.agents.composition.versioning.drift import (
+    _build_config_json,
+    _build_snapshot,
+)
+from agentbox.core.agents.composition.versioning.drift import (
     _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
 )
+from agentbox.core.agents.config import build_config_json_payload
+from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure
+from agentbox.core.agents.resolve import list_engines
+from agentbox.core.constants import SessionMode
+from agentbox.core.data import AgentDef, agent_runner_profiles
+from agentbox.core.data import runs as runs_table
 
 if TYPE_CHECKING:
     from agentbox.config import Settings
@@ -486,8 +493,6 @@ _FORBIDDEN_PATCH_KEYS = {"id"}
 
 def decode_config_json(raw: Any) -> dict:
     """Best-effort decode of ``agent_versions.config_json`` to a dict."""
-    import json as _json
-
     if raw is None:
         return {}
     if isinstance(raw, dict):
@@ -520,9 +525,6 @@ def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
 
 
 def _validate_runner_against_registry(agent: AgentDef) -> None:
-    from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure
-    from agentbox.core.agents.resolve import list_engines
-
     kind = agent.runner.kind
     name = kind.value if hasattr(kind, "value") else str(kind)
     loaded = list_engines()
@@ -561,15 +563,6 @@ def patch_agent_config(
     on any user-visible failure; lower layers (route, MCP tool) map to the
     appropriate transport error.
     """
-    import hashlib
-    import json as _json
-
-    from agentbox.core.data import AgentDef as _AgentDef
-    from agentbox.core.agents.composition.versioning.drift import (
-        _build_config_json,
-        _build_snapshot,
-    )
-
     if not patch:
         raise AgentServiceError(400, "empty_patch", "empty patch")
 
@@ -579,7 +572,7 @@ def patch_agent_config(
 
     merged = _apply_patch_to_agent(current.model_dump(mode="python"), patch)
     try:
-        updated = _AgentDef.model_validate(merged)
+        updated = AgentDef.model_validate(merged)
     except Exception as exc:
         raise AgentServiceError(400, "validation_failed", str(exc)) from exc
     _validate_runner_against_registry(updated)
@@ -784,11 +777,6 @@ def put_agent_validation(
     direction unchanged. An empty list clears it. Returns the post-write
     validation view (same shape as :func:`get_agent_validation`).
     """
-    import hashlib
-    import json as _json
-
-    from agentbox.core.agents.composition.versioning.drift import _build_snapshot
-
     current = resolve_agent(agent_id, store=store)
     if current is None:
         raise AgentServiceError(404, "unknown_agent", agent_id)

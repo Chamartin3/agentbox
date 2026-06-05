@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentbox.core.resource.materializer import materialize_blobs
+from agentbox.core.resources.materializer import materialize_blobs
 
 DEFAULT_SKILLS_ROOT = ".claude/skills"
 

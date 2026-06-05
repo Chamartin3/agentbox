@@ -20,12 +20,17 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from agentbox.core.data import AgentDef
+from agentbox.core.engines.render.backends import get_generator
 from agentbox.core.engines.render.backends.base import McpConfig
+from agentbox.core.engines.render.prompt_composer import PromptComposer
+from agentbox.core.engines.render.skills.filter import filter_skills_for_backend
+from agentbox.core.resources.skills import discover_skills
 
 
 @dataclass(frozen=True)
