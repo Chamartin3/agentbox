@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
-import DataTable, { ColumnDef } from '../components/DataTable';
+import DataTable, { ColumnDef } from '../components/common/DataTable';
 
 interface WorkspaceItem {
   name: string;

@@ -11,7 +11,7 @@ import RunsTable, { RunRow } from '../components/runs/RunsTable';
 import RunsDashboard from '../components/runs/RunsDashboard';
 import RunnerProfilesPage from './RunnerProfilesPage';
 import { RuntimeDefaultsForm, type ToastState } from './SettingsBaseTab';
-import Toast from '../components/Toast';
+import Toast from '../components/common/Toast';
 
 const PAGE_SIZE = 25;
 

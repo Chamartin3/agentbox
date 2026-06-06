@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import MarkdownEditor from '../MarkdownEditor';
+import MarkdownEditor from '../common/MarkdownEditor';
 
 interface EnvDocContent {
   project_name: string;

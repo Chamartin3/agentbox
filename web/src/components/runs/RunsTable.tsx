@@ -1,9 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { fmtCost, fmtMs, fmtNum, fmtRelative } from '../../util/format';
-import { StatusPill } from '../ui/StatusPill';
+import { StatusPill } from '../common/StatusPill';
 
 // Re-export so existing imports (`import { StatusPill } from '../components/RunsTable'`)
-// keep working. New code should import from '../ui/StatusPill' directly.
+// keep working. New code should import from '../common/StatusPill' directly.
 export { StatusPill };
 
 // Normalized row shape used by the shared runs table. Both the runs API

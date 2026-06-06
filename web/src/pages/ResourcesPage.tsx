@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { repoApi, RepoResource, RepoType } from '../api/repo';
-import DataTable, { ColumnDef } from '../components/DataTable';
+import DataTable, { ColumnDef } from '../components/common/DataTable';
 
 // Canonical resource types. Mirrors backend `ResourceType` StrEnum
 // (core/constants.py). Single source of truth across UI + API.

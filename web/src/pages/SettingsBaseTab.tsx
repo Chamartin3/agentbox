@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import Toast from '../components/Toast';
+import Toast from '../components/common/Toast';
 import { apiRequest } from '../api/http';
 
 const SECTIONS = [

@@ -6,7 +6,7 @@ import {
   type RunnerProfile,
   type RunnerProvider,
 } from '../api/client';
-import Toast from '../components/Toast';
+import Toast from '../components/common/Toast';
 import RunnerProfileModal from '../components/runner/RunnerProfileModal';
 import { apiTokens as apiTokensClient } from '../api/api_tokens';
 import './RunnerProfilesPage.css';

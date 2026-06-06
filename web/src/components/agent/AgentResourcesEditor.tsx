@@ -2,8 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../../api/client';
 import { repoApi, type RepoResource, type RepoType, type RepoVersion } from '../../api/repo';
-import ResourcePicker from '../ResourcePicker';
-import Toast from '../Toast';
+import ResourcePicker from '../resources/ResourcePicker';
+import Toast from '../common/Toast';
 import LiveComposedPromptPreview from './LiveComposedPromptPreview';
 
 type PromptMode = 'inline' | 'skill_primer' | 'name_only' | 'manifest';

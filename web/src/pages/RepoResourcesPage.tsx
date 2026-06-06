@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { repoApi, RepoResource, RepoType } from '../api/repo';
-import DataTable, { ColumnDef } from '../components/DataTable';
-import ResourcePicker from '../components/ResourcePicker';
+import DataTable, { ColumnDef } from '../components/common/DataTable';
+import ResourcePicker from '../components/resources/ResourcePicker';
 
 const TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: 'all types' },
