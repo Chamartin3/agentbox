@@ -57,7 +57,7 @@ def test_agent_tools_mcp_injected_when_grants_exist(tmp_path: Path):
     assert env["AGENTBOX_AGENT_TOOLS_AGENT_ID"] == "agent-1"
     assert entry["args"] == [
         "-m",
-        "agentbox.core.workspace.mcp.servers.agent_tools",
+        "agentbox.core.workspaces.mcp.servers.agent_tools",
     ]
 
 

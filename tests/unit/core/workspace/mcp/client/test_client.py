@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.workspace.mcp.client.client import McpClient, McpError
+from agentbox.core.workspaces.mcp.client.client import McpClient, McpError
 
 
 @pytest.mark.asyncio

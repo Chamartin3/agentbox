@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from agentbox.core.workspace.env_doc.renderers.agents_md import AgentsMdRenderer
-from agentbox.core.workspace.env_doc.renderers.base import (
+from agentbox.core.workspaces.envdoc.renderers.agents_md import AgentsMdRenderer
+from agentbox.core.workspaces.envdoc.renderers.base import (
     ReferenceEntry,
     RuntimeContext,
     _render_body,
     _visible_for,
 )
-from agentbox.core.workspace.env_doc.renderers.claude_md import ClaudeMdRenderer
-from agentbox.core.workspace.env_doc.schema import (
+from agentbox.core.workspaces.envdoc.renderers.claude_md import ClaudeMdRenderer
+from agentbox.core.workspaces.envdoc.schema import (
     Command,
     EnvDocContent,
     References,
@@ -27,17 +27,17 @@ def _minimal_content() -> EnvDocContent:
 
 class TestVisibility:
     def test_hidden_always_false(self) -> None:
-        section = Section(title="Hidden", body_markdown="x", visibility="hidden")
+        section = Section(id="hidden", title="Hidden", body_markdown="x", visibility="hidden")
         assert _visible_for(section, "claude_only") is False
         assert _visible_for(section, "agents_only") is False
 
     def test_both_always_true(self) -> None:
-        section = Section(title="Shared", body_markdown="x", visibility="both")
+        section = Section(id="shared", title="Shared", body_markdown="x", visibility="both")
         assert _visible_for(section, "claude_only") is True
         assert _visible_for(section, "agents_only") is True
 
     def test_audience_match(self) -> None:
-        section = Section(title="Claude", body_markdown="x", visibility="claude_only")
+        section = Section(id="claude", title="Claude", body_markdown="x", visibility="claude_only")
         assert _visible_for(section, "claude_only") is True
         assert _visible_for(section, "agents_only") is False
 
@@ -75,8 +75,8 @@ class TestRenderBody:
             project_name="P",
             overview="O",
             sections=[
-                Section(title="Claude Only", body_markdown="claude", visibility="claude_only"),
-                Section(title="Agents Only", body_markdown="agents", visibility="agents_only"),
+                Section(id="claude_only", title="Claude Only", body_markdown="claude", visibility="claude_only"),
+                Section(id="agents_only", title="Agents Only", body_markdown="agents", visibility="agents_only"),
             ],
         )
         claude_result = _render_body(content, RuntimeContext(), "claude_only")
@@ -124,7 +124,7 @@ class TestClaudeMdRenderer:
         content = EnvDocContent(
             project_name="C",
             overview="claude project",
-            sections=[Section(title="Secret", body_markdown="claude only", visibility="claude_only")],
+            sections=[Section(id="secret", title="Secret", body_markdown="claude only", visibility="claude_only")],
         )
         result = renderer.render(content, RuntimeContext())
         assert "claude project" in result
@@ -137,7 +137,7 @@ class TestAgentsMdRenderer:
         content = EnvDocContent(
             project_name="A",
             overview="agents project",
-            sections=[Section(title="Secret", body_markdown="agents only", visibility="agents_only")],
+            sections=[Section(id="secret", title="Secret", body_markdown="agents only", visibility="agents_only")],
         )
         result = renderer.render(content, RuntimeContext())
         assert "agents project" in result

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from agentbox.core.workspace.env_doc.schema import (
+from agentbox.core.workspaces.envdoc.schema import (
     Command,
     CustomLink,
     EnvDocContent,

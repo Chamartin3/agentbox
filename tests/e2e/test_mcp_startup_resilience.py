@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agentbox.core.workspace.mcp.client.health import McpHealthReport, ServerHealth
-from agentbox.core.workspace.mcp.client.registry import McpRegistry
+from agentbox.core.workspaces.mcp.client.health import McpHealthReport, ServerHealth
+from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 
 
 def test_all_servers_ok(tmp_path: Path) -> None:

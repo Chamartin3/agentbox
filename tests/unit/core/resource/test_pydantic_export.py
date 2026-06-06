@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from agentbox.core.resource.pydantic_export import schema_to_pydantic
+from agentbox.core.resources.pydantic_export import schema_to_pydantic
 
 
 def test_simple_schema_renders_pydantic_class():

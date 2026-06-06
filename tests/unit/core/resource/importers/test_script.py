@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.resource.importers.base import ImporterContext
-from agentbox.core.resource.importers.script import ScriptImporter
+from agentbox.core.resources.importers.base import ImporterContext
+from agentbox.core.resources.importers.script import ScriptImporter
 
 
 def test_python_script_detected_by_extension():

@@ -87,6 +87,7 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "ExecutionAnalyticsMixin",
         "ApiTokensMixin",
         "EnvDocsMixin",
+        "HostEnvCallLogMixin",
         "HostEnvMixin",
         "McpDiscoveryMixin",
         "McpOverridesMixin",

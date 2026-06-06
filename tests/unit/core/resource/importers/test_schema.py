@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 
 import pytest
-from agentbox.core.resource.importers.base import ImporterContext
-from agentbox.core.resource.importers.schema import SchemaImporter
+from agentbox.core.resources.importers.base import ImporterContext
+from agentbox.core.resources.importers.schema import SchemaImporter
 
 
 def _run(payload: bytes, filename: str = "s.json"):

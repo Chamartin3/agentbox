@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agentbox.core.workspace.permissions import (  # noqa: E402
+from agentbox.core.workspaces.permissions import (  # noqa: E402
     GrantViolation,
     check_capability,
     resolve_grants,
@@ -37,7 +37,7 @@ def _make_grants(**caps) -> dict:
 
 
 def _make_ctx(grants: dict, tmp_path: Path, store=None):
-    from agentbox.core.workspace.mcp.servers.host_env.context import HostEnvContext
+    from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 
     ctx = HostEnvContext(
         grants=grants,
@@ -413,7 +413,7 @@ class TestExecutorInjection:
         updated = json.loads(mcp_path.read_text())
         assert "agentbox-host-env" in updated["mcpServers"]
         entry = updated["mcpServers"]["agentbox-host-env"]
-        assert entry["args"] == ["-m", "agentbox.core.workspace.mcp.servers.host_env"]
+        assert entry["args"] == ["-m", "agentbox.core.workspaces.mcp.servers.host_env"]
         env = entry["env"]
         assert json.loads(env["AGENTBOX_HOST_ENV_GRANTS_JSON"]) == grants
         assert env["AGENTBOX_HOST_ENV_WORKSPACE_ID"] == "ws1"

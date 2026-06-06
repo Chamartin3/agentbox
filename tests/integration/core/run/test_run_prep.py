@@ -303,7 +303,7 @@ class TestRenderEnvDoc:
 
 class TestSnapshotHelpers:
     def test_workspace_outcomes_to_snapshot(self):
-        from agentbox.core.resource.workspace_materialize import MaterializeOutcome
+        from agentbox.core.resources.workspace_materialize import MaterializeOutcome
         from agentbox.core.execution.prepare.envdoc import workspace_outcomes_to_snapshot
 
         outcomes = [

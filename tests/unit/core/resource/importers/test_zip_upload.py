@@ -6,8 +6,8 @@ import io
 import zipfile
 
 import pytest
-from agentbox.core.resource.importers.base import ImporterContext
-from agentbox.core.resource.importers.zip_upload import ZipUploadImporter
+from agentbox.core.resources.importers.base import ImporterContext
+from agentbox.core.resources.importers.zip import ZipUploadImporter
 
 
 def _make_zip(files: dict[str, bytes]) -> bytes:

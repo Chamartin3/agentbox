@@ -8,7 +8,7 @@ from agentbox.core.data.records import (
     SharedResourceRecord,
     now_iso,
 )
-from agentbox.core.data.execution.records import RunRecord
+from agentbox.core.data.runs.records import RunRecord
 
 
 class TestNowIso:

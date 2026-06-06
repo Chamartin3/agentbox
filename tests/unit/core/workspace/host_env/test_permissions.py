@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agentbox.core.workspace.permissions import (
+from agentbox.core.workspaces.permissions import (
     GrantViolation,
     _deep_merge,
     _path_within_allowlist,

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from agentbox.core.data import CompositionConfig
 from agentbox.core.data import SessionStore
-from agentbox.core.resource.boot_import import import_composition_references
+from agentbox.core.resources.boot_import import import_composition_references
 
 
 @pytest.fixture

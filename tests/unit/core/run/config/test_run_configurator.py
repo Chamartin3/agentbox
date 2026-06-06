@@ -302,7 +302,7 @@ class TestSkills:
 
 class TestSkillFilter:
     def test_no_runners_means_all_backends(self) -> None:
-        from agentbox.core.resource.skills import SkillPack
+        from agentbox.core.resources.skills import SkillPack
 
         skill = SkillPack(
             name="generic",
@@ -313,7 +313,7 @@ class TestSkillFilter:
         assert filter_skills_for_backend([skill], "claude_code") == [skill]
 
     def test_runners_field_filters(self) -> None:
-        from agentbox.core.resource.skills import SkillPack
+        from agentbox.core.resources.skills import SkillPack
 
         opencode_only = SkillPack(
             name="oc",
@@ -333,7 +333,7 @@ class TestSkillFilter:
         ) == [claude_only]
 
     def test_multiple_backends_in_runners(self) -> None:
-        from agentbox.core.resource.skills import SkillPack
+        from agentbox.core.resources.skills import SkillPack
 
         shared = SkillPack(
             name="shared",

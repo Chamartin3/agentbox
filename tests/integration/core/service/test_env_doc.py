@@ -11,8 +11,8 @@ from agentbox.core.service.env_doc import (
     render_env_doc_preview,
     save_and_sync_env_doc,
 )
-from agentbox.core.workspace.env_doc.renderers import RuntimeContext
-from agentbox.core.workspace.env_doc.schema import EnvDocContent
+from agentbox.core.workspaces.envdoc.renderers import RuntimeContext
+from agentbox.core.workspaces.envdoc.schema import EnvDocContent
 
 
 @pytest.fixture

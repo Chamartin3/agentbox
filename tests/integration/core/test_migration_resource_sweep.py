@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.resource.drift import (
+from agentbox.core.resources.drift import (
     detect_resource_hash_mismatches,
     extract_prompt_markers,
     import_manifest_documents,

@@ -74,13 +74,13 @@ def _patch_backends(monkeypatch, *, fail_load: str | None = None) -> None:
         return None
 
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profiles.get_backend", _get_backend
+        "agentbox.core.service.engines._profile_validation.get_backend", _get_backend
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profiles.backends", _backends
+        "agentbox.core.service.engines._profile_validation.backends", _backends
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profiles.backend_load_failure",
+        "agentbox.core.service.engines._profile_validation.backend_load_failure",
         _backend_load_failure,
     )
 
@@ -97,10 +97,10 @@ def _patch_providers(monkeypatch, *, compat: list[str] | None = None) -> None:
         return None
 
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profiles.list_providers", _list_providers_impl
+        "agentbox.core.service.engines._profile_validation.list_providers", _list_providers_impl
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profiles.get_provider", _get_provider
+        "agentbox.core.service.engines._profile_validation.get_provider", _get_provider
     )
 
 

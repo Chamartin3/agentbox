@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from agentbox.core.data import WorkspaceBuildStore
-from agentbox.core.workspace.build import build_workspace
+from agentbox.core.workspaces.build import build_workspace
 
 
 def test_build_workspace_accepts_narrow_protocol(tmp_path):
