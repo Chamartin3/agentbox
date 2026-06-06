@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.resources.importers.base import ImporterContext
-from agentbox.core.resources.importers.host import HostPathImporter
+from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter
 from agentbox.core.resources.importers.script import ScriptImporter
 from agentbox.core.resources.importers.skill import SkillImporter

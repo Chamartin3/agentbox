@@ -1,6 +1,6 @@
 """Materialize workspace file bindings into a run's workdir (Plan 03).
 
-Higher-level wrapper over :mod:`agentbox.core.resource.materializer`
+Higher-level wrapper over :mod:`agentbox.core.resources.materializer`
 that understands the binding metadata: ``target_path`` defaults,
 ``materialize_mode`` (copy / symlink), ``on_conflict`` policy, and
 ``role="workspace_file"`` snapshot entries.

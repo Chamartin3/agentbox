@@ -19,7 +19,7 @@ from agentbox.core.resources.importers.base import (
     ImporterResult,
     ResourceImporter,
 )
-from agentbox.core.resources.importers.host import HostPathImporter
+from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.skill import SkillImporter
 
 

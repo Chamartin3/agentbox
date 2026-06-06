@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from agentbox.core.constants import ResourceType
 from agentbox.core.resources.boot.discover import resolve_skill_roots
 from agentbox.core.resources.boot.import_one import _import_one, import_one_skill
-from agentbox.core.resources.importers.host import HostPathImporter
+from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter
 
 if TYPE_CHECKING:

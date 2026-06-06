@@ -42,7 +42,7 @@ from agentbox.core.agents.composition.preview import render_agent_prompt_preview
 from agentbox.core.agents.composition.rendering import render_for_type as render_for_type
 from agentbox.core.agents.composition.resolver import resolve_prompt as resolve_prompt
 from agentbox.core.resources.importers.base import ImporterContext as ImporterContext
-from agentbox.core.resources.importers.host import HostPathImporter as HostPathImporter
+from agentbox.core.resources.importers.host_path import HostPathImporter as HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter as SchemaImporter
 from agentbox.core.resources.importers.script import ScriptImporter as ScriptImporter
 from agentbox.core.resources.importers.skill import SkillImporter as SkillImporter
