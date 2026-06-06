@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.workspace import (
+from agentbox.core.workspaces import (
     AgentsMdRenderer,
     ClaudeMdRenderer,
     EnvDocContent,

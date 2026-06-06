@@ -10,13 +10,9 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING
-
 from agentbox.config import Settings
+from agentbox.core.data import SessionStore
 from agentbox.core.workspaces.crud import WorkspaceInfo, info, resolve_path
-
-if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
 
 __all__ = [
     "WorkspaceInfo",

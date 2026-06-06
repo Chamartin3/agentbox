@@ -11,7 +11,6 @@ from agentbox.core.data.schema import (
     host_env_profiles,
     workspace_host_env_grants,
 )
-from agentbox.core.workspaces.permissions import resolve_grants
 
 
 def _validate_changelog(s: str) -> str:
@@ -134,6 +133,7 @@ class HostEnvMixin:
         return row
 
     def resolve_workspace_host_env(self, workspace_id: str) -> dict:
+        from agentbox.core.workspaces.permissions import resolve_grants
         row = self.get_workspace_host_env(workspace_id)
         if not row:
             return {"grants": resolve_grants(None, None), "profile_id": None}

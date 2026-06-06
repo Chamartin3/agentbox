@@ -64,7 +64,7 @@ from agentbox.core.execution.prepare import prepare_run_resources
 from agentbox.core.execution.retry import _adapter_run_into_session  # noqa: F401
 
 if TYPE_CHECKING:
-    from agentbox.core.workspace import McpRegistry
+    from agentbox.core.workspaces import McpRegistry
 
 logger = logging.getLogger(__name__)
 
