@@ -15,8 +15,12 @@ from agentbox.core.data import (
     RunnerProfilePatch,
     SessionStore,
 )
-from agentbox.core.service.engines.profiles import (
+from agentbox.core.service.engines.profile_validation import (
     InvalidProfile,
+    validate_create,
+    validate_patch,
+)
+from agentbox.core.service.engines.profiles import (
     ProfileNotFound,
     create_profile,
     delete_profile,
@@ -24,8 +28,6 @@ from agentbox.core.service.engines.profiles import (
     get_profile_stats,
     list_profiles,
     update_profile,
-    validate_create,
-    validate_patch,
 )
 
 
@@ -74,13 +76,14 @@ def _patch_backends(monkeypatch, *, fail_load: str | None = None) -> None:
         return None
 
     monkeypatch.setattr(
-        "agentbox.core.service.engines._profile_validation.get_backend", _get_backend
+        "agentbox.core.service.engines.profile_validation.resolve_engine_by_name",
+        _get_backend,
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines._profile_validation.backends", _backends
+        "agentbox.core.service.engines.profile_validation.list_engines", _backends
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines._profile_validation.backend_load_failure",
+        "agentbox.core.service.engines.profile_validation.engine_load_failure",
         _backend_load_failure,
     )
 
@@ -97,10 +100,10 @@ def _patch_providers(monkeypatch, *, compat: list[str] | None = None) -> None:
         return None
 
     monkeypatch.setattr(
-        "agentbox.core.service.engines._profile_validation.list_providers", _list_providers_impl
+        "agentbox.core.service.engines.profile_validation.list_providers", _list_providers_impl
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines._profile_validation.get_provider", _get_provider
+        "agentbox.core.service.engines.profile_validation.get_provider", _get_provider
     )
 
 
