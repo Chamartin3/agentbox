@@ -12,7 +12,7 @@ import tomllib
 from pathlib import Path
 from typing import TypedDict
 
-from agentbox.core.workspace.mcp.client import McpToolManifest
+from agentbox.core.workspaces.mcp.client import McpToolManifest
 
 
 class DiscoveredAgent(TypedDict):

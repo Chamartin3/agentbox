@@ -9,7 +9,7 @@ from agentbox.config import Settings, load_settings
 from agentbox.core.data import SessionStore
 from agentbox.core.data import ProjectManifest
 from agentbox.core.execution.orchestrate.executor import RunExecutor
-from agentbox.core.workspace.mcp.client import McpRegistry
+from agentbox.core.workspaces.mcp.client import McpRegistry
 
 
 class _NoopLoader:

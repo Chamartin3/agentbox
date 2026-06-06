@@ -31,7 +31,7 @@ from .schemas import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.workspace.mcp.client import McpToolManifest
+    from agentbox.core.workspaces.mcp.client import McpToolManifest
 
 Permission = Literal["allow", "ask"]
 

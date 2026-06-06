@@ -7,14 +7,14 @@ from typing import Any
 
 from agentbox.config import Settings
 from agentbox.core.data import SessionStore
-from agentbox.core.workspace.env_doc.renderers import (
+from agentbox.core.workspaces.envdoc.renderers import (
     AgentsMdRenderer,
     ClaudeMdRenderer,
     RuntimeContext,
 )
-from agentbox.core.workspace.env_doc.renderers.base import ReferenceEntry
-from agentbox.core.workspace.env_doc.schema import EnvDocContent
-from agentbox.core.workspace.build import build_workspace_by_name
+from agentbox.core.workspaces.envdoc.renderers.base import ReferenceEntry
+from agentbox.core.workspaces.envdoc.schema import EnvDocContent
+from agentbox.core.workspaces.build import build_workspace_by_name
 
 _log = logging.getLogger(__name__)
 

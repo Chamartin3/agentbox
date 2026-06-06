@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError } from '../api/client';
-import { useAgentActions } from '../hooks/useAgents';
-import { useRunsPage, useRunStats } from '../hooks/useRuns';
+import { useAgentActions } from '../hooks/agents';
+import { useRunsPage, useRunStats } from '../hooks/runs';
 import { versionsApi, VersionSummary } from '../api/versions';
 import AgentVersions from './AgentVersions';
 import AgentConfigEditor from '../components/agent/AgentConfigEditor';
@@ -13,7 +13,7 @@ import AgentResourcesEditor from '../components/agent/AgentResourcesEditor';
 import AgentValidationEditor from '../components/agent/AgentValidationEditor';
 import LiveComposedPromptPreview, { type PreviewResult } from '../components/agent/LiveComposedPromptPreview';
 import Toast from '../components/common/Toast';
-import { useToast } from '../hooks/useToast';
+import { useToast } from '../hooks/toast';
 import './AgentDetailPage.css';
 
 type TabType = 'configuration' | 'composition' | 'versions' | 'runs';

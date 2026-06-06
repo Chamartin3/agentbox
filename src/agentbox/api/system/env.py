@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from agentbox.api.deps import get_settings, get_store
 from agentbox.core.data import SessionStore
 from agentbox.core.service import env_doc as svc
-from agentbox.core.workspace.env_doc.schema import EnvDocContent
+from agentbox.core.workspaces.envdoc.schema import EnvDocContent
 
 router = APIRouter(tags=["env-doc"])
 

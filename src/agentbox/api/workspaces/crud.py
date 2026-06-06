@@ -43,7 +43,7 @@ def _raise_agent_not_found(agent_id: str) -> NoReturn:
 
 
 def _build_workspace_cb(store, settings, name: str) -> None:
-    from agentbox.core.workspace.build import build_workspace_by_name
+    from agentbox.core.workspaces.build import build_workspace_by_name
 
     build_workspace_by_name(store, settings, name)
 

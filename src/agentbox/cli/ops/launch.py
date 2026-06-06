@@ -30,7 +30,7 @@ from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
 from agentbox.core.data import AgentDef
 from agentbox.core.engines.render import ConfigGenerator
-from agentbox.core.workspace.mcp.client import McpRegistry
+from agentbox.core.workspaces.mcp.client import McpRegistry
 
 SUPPORTED_RUNNERS = ("claude", "opencode", "codex", "pi", "shell")
 DEFAULT_WORKSPACE_NAME = "default"
@@ -158,7 +158,7 @@ def _launch_session(
     # workspaces (build_workspace also no-ops on those).
     if workspace_name and not is_ephemeral:
         from agentbox.cli._deps import get_store
-        from agentbox.core.workspace.build import build_workspace
+        from agentbox.core.workspaces.build import build_workspace
 
         try:
             sync_result = build_workspace(

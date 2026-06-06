@@ -11,7 +11,7 @@ from agentbox.core.data.schema import (
     host_env_profiles,
     workspace_host_env_grants,
 )
-from agentbox.core.workspace.permissions import resolve_grants
+from agentbox.core.workspaces.permissions import resolve_grants
 
 
 def _validate_changelog(s: str) -> str:

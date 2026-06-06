@@ -1,2 +1,2 @@
 from agentbox.core.agents.composition import prompts as prompts
-from agentbox.core.workspace import manager as workspaces  # noqa: F401
+from agentbox.core.workspaces import manager as workspaces  # noqa: F401

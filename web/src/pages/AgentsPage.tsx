@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AgentDef } from '../api/client';
 import { AgentSortKey, SortDir } from '../api/enums';
-import { useAgent, useAgents, useAgentActions } from '../hooks/useAgents';
-import { useRunnerProfiles } from '../hooks/useRunnerProfiles';
+import { useAgent, useAgents, useAgentActions } from '../hooks/agents';
+import { useRunnerProfiles } from '../hooks/runnerProfiles';
 
 function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void }) {
   const { data, loading } = useAgent(agent.id);

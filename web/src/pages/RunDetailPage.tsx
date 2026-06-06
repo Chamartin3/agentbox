@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AgentDef, ApiError, PromptFragment, RunRecord } from '../api/client';
-import { useAgents } from '../hooks/useAgents';
-import { useRun, useRunPrompt, useRunActions } from '../hooks/useRuns';
+import { useAgents } from '../hooks/agents';
+import { useRun, useRunPrompt, useRunActions } from '../hooks/runs';
 import EventStream from '../components/runs/EventStream';
 import ConversationView from '../components/runs/ConversationView';
 import RunCommentThread from '../components/runs/RunCommentThread';

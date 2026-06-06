@@ -33,8 +33,8 @@ from agentbox.core.resources.migration import (
 from agentbox.core.execution.webhooks import schedule_webhook
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.tools import discover_tools
-from agentbox.core.workspace.mcp.client import McpRegistry
-from agentbox.core.workspace.mcp.client.registry import McpServerConfig
+from agentbox.core.workspaces.mcp.client import McpRegistry
+from agentbox.core.workspaces.mcp.client.registry import McpServerConfig
 
 _log = logging.getLogger(__name__)
 
