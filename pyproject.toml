@@ -79,6 +79,7 @@ markers = [
 filterwarnings = [
   "error",
   "ignore::DeprecationWarning",
+  "ignore::pydantic_ai._warnings.PydanticAIDeprecationWarning",
   # SQLAlchemy/pydantic-ai occasionally leak sockets and event loops in
   # tests that wrap subprocess + HTTP clients. Pytest's unraisable hook
   # turns those late warnings into PytestUnraisableExceptionWarning,
