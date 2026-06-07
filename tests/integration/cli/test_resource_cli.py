@@ -12,16 +12,19 @@ runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    import agentbox.api.deps as deps
+    import agentbox.api.deps as api_deps
+    import agentbox.cli._deps as cli_deps
 
-    for fn in (
-        deps.get_settings,
-        deps.get_store,
-        deps.get_loader,
-        deps.get_executor,
-        deps.get_mcp_registry,
-    ):
-        fn.cache_clear()
+    for deps in (api_deps, cli_deps):
+        for fn in (
+            deps.get_settings,
+            deps.get_store,
+            deps.get_loader,
+            deps.get_executor,
+            deps.get_mcp_registry,
+        ):
+            if hasattr(fn, "cache_clear"):
+                fn.cache_clear()
 
 
 @pytest.fixture

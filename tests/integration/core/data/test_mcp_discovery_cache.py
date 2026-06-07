@@ -46,7 +46,7 @@ class TestCacheTools:
 class TestTtlExpiry:
     def test_expired_entry_returns_none(self, store) -> None:  # type: ignore[no-untyped-def]
         """Entries older than TTL must return None."""
-        from agentbox.core.data.workspaces import mcp_discovery as _mod
+        from agentbox.core.data import mcp_discovery as _mod
 
         # Freeze "now" to a moment 25 hours in the past when caching
         past = datetime.now(UTC) - timedelta(hours=25)

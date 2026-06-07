@@ -116,7 +116,7 @@ def test_doctor_includes_credentials(
 
 
 def _clear_deps_caches() -> None:
-    import agentbox.core.deps as deps
+    import agentbox.cli._deps as deps
 
     for fn in (
         deps.get_settings,
@@ -124,4 +124,5 @@ def _clear_deps_caches() -> None:
         deps.get_executor,
         deps.get_mcp_registry,
     ):
-        fn.cache_clear()
+        if hasattr(fn, "cache_clear"):
+            fn.cache_clear()
