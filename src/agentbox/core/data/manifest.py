@@ -301,7 +301,7 @@ class AgentDef(BaseModel):
     """
 
     runner: RunnerSpec = Field(default_factory=lambda: RunnerSpec())
-    session_mode: SessionMode = "headless"
+    session_mode: SessionMode = SessionMode.HEADLESS
     tags: list[str] = Field(default_factory=list)
 
     unsupported_backends: list[str] = Field(default_factory=list)
@@ -433,7 +433,7 @@ class AgentManifest(BaseModel):
     """Prompt-composition recipe. When present, takes precedence."""
 
     workspace: str | None = None
-    session_mode: SessionMode = "headless"
+    session_mode: SessionMode = SessionMode.HEADLESS
     webhook_url: str | None = None
     tags: list[str] = Field(default_factory=list)
 
