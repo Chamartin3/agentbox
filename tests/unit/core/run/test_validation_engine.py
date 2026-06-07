@@ -59,6 +59,13 @@ class TestOutputValidationEngine:
 
 def _validate(output: str, agent: AgentDef, workdir: Path) -> tuple[bool, str, str]:
     """Compatibility shim around the new ValidationResult API."""
+    # config_json is the only source of truth; mirror RunnerSpec fields into it.
+    agent.__dict__["_config_json"] = {
+        "execution": {
+            "output_validation_engine": agent.runner.output_validation_engine,
+        },
+        "python": {"output_schema_path": agent.runner.output_schema_path},
+    }
     r = validate_output(agent, workdir, output)
     return r.ok, r.error, r.engine
 

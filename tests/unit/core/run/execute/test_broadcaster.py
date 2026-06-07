@@ -10,7 +10,7 @@ from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 class TestRunBroadcaster:
     def test_subscribe_receives_history(self) -> None:
         b = RunBroadcaster()
-        ev = TextEvent(text="hello")
+        ev = TextEvent(run_id="r1", text="hello")
         b.publish(ev)
 
         q = b.subscribe()
@@ -30,7 +30,7 @@ class TestRunBroadcaster:
         q1 = b.subscribe()
         q2 = b.subscribe()
 
-        ev = TextEvent(text="fanout")
+        ev = TextEvent(run_id="r1", text="fanout")
         b.publish(ev)
 
         assert q1.get_nowait().text == "fanout"
@@ -40,7 +40,7 @@ class TestRunBroadcaster:
         b = RunBroadcaster()
         q1 = b.subscribe()
         q2 = b.subscribe()
-        b.publish(TextEvent(text="before close"))
+        b.publish(TextEvent(run_id="r1", text="before close"))
 
         b.close()
 
@@ -51,18 +51,18 @@ class TestRunBroadcaster:
 
     def test_subscribe_replays_history_then_live(self) -> None:
         b = RunBroadcaster()
-        b.publish(TextEvent(text="past"))
+        b.publish(TextEvent(run_id="r1", text="past"))
         q = b.subscribe()
 
         assert q.get_nowait().text == "past"
 
-        b.publish(TextEvent(text="live"))
+        b.publish(TextEvent(run_id="r1", text="live"))
         assert q.get_nowait().text == "live"
 
     def test_multiple_events_in_history(self) -> None:
         b = RunBroadcaster()
-        b.publish(TextEvent(text="first"))
-        b.publish(TextEvent(text="second"))
+        b.publish(TextEvent(run_id="r1", text="first"))
+        b.publish(TextEvent(run_id="r1", text="second"))
 
         q = b.subscribe()
         assert q.get_nowait().text == "first"

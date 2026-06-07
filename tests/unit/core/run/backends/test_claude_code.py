@@ -22,7 +22,14 @@ def _make_agent(**overrides: object) -> AgentDef:
         "runner": DEFAULT_RUNNER,
     }
     kwargs.update(overrides)
-    return AgentDef(**kwargs)  # type: ignore[arg-type]
+    agent = AgentDef(**kwargs)  # type: ignore[arg-type]
+    agent.__dict__["_config_json"] = {
+        "runtime": {
+            "mcp_config_path": agent.runner.mcp_config_path,
+            "allowed_tools": list(agent.runner.allowed_tools),
+        },
+    }
+    return agent
 
 
 def test_render_produces_expected_argv() -> None:

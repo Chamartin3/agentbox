@@ -167,7 +167,7 @@ class TestSetHostEnvGrants:
             fn = _get_tool_fn(mcp, "set_host_env_grants")
             result = fn("ws1", grants, "grant fs read")
         ctx.store.set_workspace_host_env.assert_called_once_with(
-            "ws1", overrides=grants, changelog="grant fs read"
+            "ws1", profile_id=None, overrides=grants, changelog="grant fs read"
         )
         assert result == {"workspace_id": "ws1"}
 

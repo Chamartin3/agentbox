@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from agentbox.core.constants import RunnerKind
 from agentbox.core.data.manifest import (
     AgentDef,
     CompositionConfig,
@@ -18,7 +19,7 @@ class TestRunnerSpec:
     def test_minimal(self) -> None:
         spec = RunnerSpec(kind="claude_code")
         assert spec.kind == "claude_code"
-        assert spec.timeout_seconds is None
+        assert spec.timeout_seconds == 1200
         assert spec.model is None
 
     def test_with_all_fields(self) -> None:
@@ -46,16 +47,16 @@ class TestAgentDef:
         agent = AgentDef(id="my-agent", description="An agent", runner=RunnerSpec(kind="claude_code"))
         assert agent.id == "my-agent"
         assert agent.description == "An agent"
-        assert agent.tags == ()
+        assert agent.tags == []
         assert agent.session_mode == "headless"
 
-    def test_description_required(self) -> None:
-        with pytest.raises(ValidationError):
-            AgentDef(id="a", runner=RunnerSpec(kind="claude_code"))  # type: ignore[call-arg]
+    def test_description_defaults_empty(self) -> None:
+        agent = AgentDef(id="a", runner=RunnerSpec(kind="claude_code"))
+        assert agent.description == ""
 
-    def test_runner_required(self) -> None:
-        with pytest.raises(ValidationError):
-            AgentDef(id="a", description="d")  # type: ignore[call-arg]
+    def test_runner_defaults(self) -> None:
+        agent = AgentDef(id="a", description="d")
+        assert agent.runner.kind == RunnerKind.TOKEN
 
     def test_with_composition(self) -> None:
         agent = AgentDef(
@@ -63,12 +64,12 @@ class TestAgentDef:
             description="With composition",
             runner=RunnerSpec(kind="claude_code"),
             composition=CompositionConfig(
-                system_prompt="You are helpful.",
+                system="prompts/system.md",
                 user_template="Process {{input}}",
             ),
         )
         assert agent.composition is not None
-        assert agent.composition.system_prompt == "You are helpful."
+        assert agent.composition.system == "prompts/system.md"
 
     def test_webhook_url_optional(self) -> None:
         agent = AgentDef(id="a", description="d", runner=RunnerSpec(kind="claude_code"))
@@ -84,11 +85,10 @@ class TestWorkspaceDef:
         ws = WorkspaceDef(name="my-ws", path="/tmp/ws")
         assert ws.name == "my-ws"
         assert ws.path == "/tmp/ws"
-        assert ws.enabled is True
 
 
 class TestProjectManifest:
     def test_minimal(self) -> None:
-        pm = ProjectManifest(workspaces={})
-        assert pm.workspaces == {}
-        assert pm.agents == {}
+        pm = ProjectManifest(workspaces=[])
+        assert pm.workspaces == []
+        assert pm.agents == []

@@ -17,7 +17,15 @@ def _make_agent(**overrides: object) -> AgentDef:
         "runner": DEFAULT_RUNNER,
     }
     kwargs.update(overrides)
-    return AgentDef(**kwargs)  # type: ignore[arg-type]
+    agent = AgentDef(**kwargs)  # type: ignore[arg-type]
+    agent.__dict__["_config_json"] = {
+        "python": {
+            "agent_module": agent.runner.agent_module,
+            "deps_factory": agent.runner.deps_factory,
+            "output_schema_path": agent.runner.output_schema_path,
+        },
+    }
+    return agent
 
 
 def test_render_returns_minimal_config() -> None:

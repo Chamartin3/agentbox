@@ -128,6 +128,9 @@ class TestTokenBackendRender:
                 timeout_seconds=60,
             ),
         )
+        agent.__dict__["_config_json"] = {
+            "python": {"output_schema_path": "output_schema.json"},
+        }
 
         backend = TokenBackend()
         rendered = backend.render(
