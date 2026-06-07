@@ -51,6 +51,7 @@ dev = [
   "anyio>=4",
   "pyright>=1.1.409",
   "import-linter>=2.0",
+  "pytest-timeout>=2.3.0",
 ]
 
 [build-system]
@@ -67,6 +68,8 @@ extend-select = ["PLC0415"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+timeout = 30
+timeout_method = "thread"
 addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 markers = [
   "unit: fast, isolated tests for a single module",
