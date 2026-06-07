@@ -192,7 +192,17 @@ def doctor() -> None:
     except Exception as exc:
         _warn("Generated configs", str(exc))
 
-    # 7. MCP cache present
+    # 7. Credentials
+    try:
+        from agentbox.core.engines.credentials import list_all as _creds_list
+
+        rows = _creds_list()
+        configured = sum(1 for r in rows if getattr(r, "configured", False))
+        _ok("Credentials", f"{configured}/{len(rows)} backend(s) configured")
+    except Exception as exc:
+        _warn("Credentials", str(exc))
+
+    # 8. MCP cache present
     cache = settings.mcp_cache_dir
     if cache.exists():
         files = list(cache.glob("*.json"))
