@@ -20,7 +20,7 @@ from agentbox.core.engines.credentials import (
     list_all as creds_list_all,
 )
 
-from agentbox.core.engines.credentials import _registration  # noqa: F401
+from agentbox.core.engines.credentials import builtin  # noqa: F401
 
 creds_app = typer.Typer(
     name="creds",
