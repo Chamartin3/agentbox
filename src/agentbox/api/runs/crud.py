@@ -19,11 +19,11 @@ from agentbox.api.webhooks import schedule_webhook
 from agentbox.core.service import read_transcript, NoBackendAvailable
 from agentbox.core.service.execution import runs
 from agentbox.core.service.execution.runs import (
-    AgentDisabled,
     AgentNotFound,
     InvalidRunInput,
     RunNotFound,
 )
+from agentbox.core.service.execution.types import AgentDisabled
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
