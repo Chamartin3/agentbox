@@ -1,7 +1,7 @@
 """SQLAlchemy Core table definitions for the agentbox SQLite store.
 
 Single source of truth for the persistence schema. Tables are created on
-startup via `_metadata.create_all(engine)`; no migration tool is used.
+Alembic is the primary migration tool; metadata.create_all(engine) is the fallback.
 """
 
 from __future__ import annotations

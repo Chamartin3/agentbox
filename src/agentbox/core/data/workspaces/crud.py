@@ -16,7 +16,7 @@ from __future__ import annotations
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.row_types import WorkspaceRow
 from agentbox.core.data.schema import workspaces
 

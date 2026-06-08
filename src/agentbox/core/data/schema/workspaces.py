@@ -1,7 +1,7 @@
 """SQLAlchemy Core table definitions for the agentbox SQLite store.
 
 Single source of truth for the persistence schema. Tables are created on
-startup via `_metadata.create_all(engine)`; no migration tool is used.
+Alembic is the primary migration tool; metadata.create_all(engine) is the fallback.
 """
 
 from __future__ import annotations
@@ -167,4 +167,19 @@ workspaces = Table(
         "source IN ('manifest', 'db')",
         name="workspaces_source_check",
     ),
+)
+
+# Template presets for WorkenvConfig generation. Each row stores a complete
+# WorkenvConfig as JSON, plus the engine (recipe) it targets.
+# Seeds are loaded from core/workspaces/generation/seeds/*.yaml.
+
+workenv_templates = Table(
+    "workenv_templates",
+    metadata,
+    Column("name", String, primary_key=True),
+    Column("description", String, nullable=True),
+    Column("engine", String, nullable=False, server_default="claude"),
+    Column("config_json", JSON, nullable=False),
+    Column("created_at", String, nullable=False),
+    Column("updated_at", String, nullable=False),
 )

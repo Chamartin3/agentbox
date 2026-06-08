@@ -1,12 +1,7 @@
-"""DB return-shape dataclasses and TypedDicts for snapshots and non-run records.
-
-RunRecord and its row mapper live in ``core.data.execution.records``.
-"""
+"""Snapshot TypedDicts captured during run dispatch — execution-domain shapes."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any, NotRequired, TypedDict
 
 
@@ -59,26 +54,3 @@ class HostEnvGrant(TypedDict):
     capability: str
     value: NotRequired[str]
     secret_ref: NotRequired[str]
-
-
-@dataclass(frozen=True)
-class SharedResourceRecord:
-    """Frozen record for a shared resource version."""
-
-    id: str
-    version: int
-    kind: str
-    name: str
-    sha256: str
-    created_at: str
-    description: str | None = None
-    content: str | None = None
-    config_json: str | None = None
-    is_active: bool = False
-    author: str | None = None
-    changelog: str | None = None
-    tags: tuple[str, ...] = ()
-
-
-def now_iso() -> str:
-    return datetime.now(UTC).isoformat(timespec="seconds")

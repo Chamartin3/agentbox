@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.manifest import McpServerSpec
+from agentbox.core.data.workspaces.manifest import McpServerSpec
 from agentbox.core.data.system.settings import SettingsMixin
 
 PROJECT_MCP_SERVERS = "project_mcp_servers"

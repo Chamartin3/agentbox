@@ -6,7 +6,7 @@ import json
 
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import agent_config_events
 
 

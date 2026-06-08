@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.manifest import AgentDef
+from agentbox.core.data.agents.manifest import AgentDef
 from agentbox.core.data.schema import (
     active_agent_versions,
     agent_meta,

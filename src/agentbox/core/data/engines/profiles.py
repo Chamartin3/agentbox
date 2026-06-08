@@ -17,8 +17,8 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.engines.models import RunnerProfileStats, _row_to_profile
-from agentbox.core.data.execution.analytics.profile_stats import RunnerStatsMixin
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.feedback.profile_stats import RunnerStatsMixin
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import agent_runner_profiles, runner_profiles
 
 # Re-export so callers can ``from agentbox.core.data.engines.profiles import

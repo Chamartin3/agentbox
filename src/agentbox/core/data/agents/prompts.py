@@ -11,7 +11,7 @@ import hashlib
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.row_types import PromptVersionRow
 from agentbox.core.data.schema import prompt_versions
 

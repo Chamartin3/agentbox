@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import agent_version_files
 
 _VALID_FILE_KINDS = {

@@ -20,31 +20,32 @@ reorganization.
 # RunStatus lives in core.constants but is re-exported here so callers can
 # get every persistent-data symbol from one façade (per data/__init__.py rule).
 from agentbox.core.constants import RunStatus
-from agentbox.core.data.records import (
+from agentbox.core.data.execution.records import RunRecord, row_to_run
+from agentbox.core.data.execution.snapshots import (
     HostEnvGrant,
     McpServerSnapshot,
     McpSnapshot,
     ResourceSnapshotEntry,
     RunnerSnapshot,
-    SharedResourceRecord,
-    now_iso,
 )
-from agentbox.core.data.execution.records import RunRecord, row_to_run
+from agentbox.core.data.resources.shared import SharedResourceRecord
+from agentbox.core.data.utils import now_iso
 
 # ---------------------------------------------------------------------------
 # Manifest / declarative models (pydantic)
 # ---------------------------------------------------------------------------
-from agentbox.core.data.manifest import (
+from agentbox.core.data.agents.manifest import (
     AgentDef,
     AgentManifest,
     AgentSource,
     CompositionConfig,
+    SharedRef,
+)
+from agentbox.core.data.engines.manifest import RunnerManifest, RunnerSpec
+from agentbox.core.data.system.manifest import ProjectManifest
+from agentbox.core.data.workspaces.manifest import (
     McpServerSpec,
     McpTransport,
-    ProjectManifest,
-    RunnerManifest,
-    RunnerSpec,
-    SharedRef,
     WorkspaceDef,
     WorkspaceFile,
 )
@@ -104,7 +105,7 @@ from agentbox.core.data.agents.sync import AgentSyncMixin
 from agentbox.core.data.agents.grants import AgentToolGrantsMixin
 from agentbox.core.data.agents.versions import AgentVersionsMixin
 from agentbox.core.data.agents.prompts import PromptVersionsMixin
-from agentbox.core.data.execution.analytics import ExecutionAnalyticsMixin
+from agentbox.core.data.feedback import ExecutionAnalyticsMixin
 from agentbox.core.data.resources.crud import ResourcesMixin
 from agentbox.core.data.resources.shared import SharedResourcesMixin
 from agentbox.core.data.resources.bindings import ResourceBindingsMixin
@@ -119,6 +120,7 @@ from agentbox.core.data.system.host_env_calls import HostEnvCallLogMixin
 from agentbox.core.data.workspaces.mcp_discovery import McpDiscoveryMixin
 from agentbox.core.data.workspaces.mcp_overrides import McpOverridesMixin
 from agentbox.core.data.workspaces.runtime_permissions import RuntimePermissionsMixin
+from agentbox.core.data.workspaces.templates import WorkenvTemplatesMixin
 
 # ---------------------------------------------------------------------------
 # Store façade
@@ -128,7 +130,6 @@ from agentbox.core.data.store import SessionStore
 # ---------------------------------------------------------------------------
 # Domain-specific helpers / constants
 # ---------------------------------------------------------------------------
-from agentbox.core.data.execution.analytics import _duration_ms_expr  # noqa: F401
 from agentbox.core.data.execution.claude_session import find_session_log, parse_session_log
 from agentbox.core.data.constants import VALID_POLICIES
 from agentbox.core.data.resources._rows import hash_blobs as hash_blobs  # noqa: F401
@@ -164,7 +165,14 @@ from agentbox.core.data.execution.events import (
 # ---------------------------------------------------------------------------
 # Protocols (typed store surfaces)
 # ---------------------------------------------------------------------------
-from agentbox.core.data.protocols import RunStore, StartupStore, WorkspaceBuildStore
+from agentbox.core.data.protocols import (
+    RunSetupStore,
+    RunStore,
+    SnapshotStore,
+    StartupStore,
+    UsageStore,
+    WorkspaceBuildStore,
+)
 
 # ---------------------------------------------------------------------------
 # Row types (TypedDict query result shapes)
@@ -194,6 +202,7 @@ from agentbox.core.data.schema import (  # noqa: E402,F811
     runner_profiles,
     runs,
     settings,
+    workenv_templates,
     workspaces,
 )
 
@@ -264,6 +273,7 @@ __all__ = [
     "workspace_runtime_permissions",
     "workspace_subagents",
     "workspaces",
+    "workenv_templates",
     # mixins
     "AgentConfigEventsMixin",
     "AgentSyncMixin",
@@ -284,6 +294,7 @@ __all__ = [
     "RuntimePermissionsMixin",
     "SettingsMixin",
     "SharedResourcesMixin",
+    "WorkenvTemplatesMixin",
     "WorkspacesMixin",
     # store
     "SessionStore",
@@ -312,8 +323,11 @@ __all__ = [
     "UsageEvent",
     "ValidationEvent",
     # protocols
+    "RunSetupStore",
     "RunStore",
+    "SnapshotStore",
     "StartupStore",
+    "UsageStore",
     "WorkspaceBuildStore",
     # row types
     "EnvDocRow",

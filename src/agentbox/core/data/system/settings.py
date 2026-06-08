@@ -12,7 +12,7 @@ import json
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import settings as settings_table
 
 

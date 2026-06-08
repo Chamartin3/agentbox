@@ -21,7 +21,7 @@ import uuid
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import api_tokens
 
 

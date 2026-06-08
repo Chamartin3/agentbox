@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import (
     host_env_profiles,
     workspace_host_env_grants,

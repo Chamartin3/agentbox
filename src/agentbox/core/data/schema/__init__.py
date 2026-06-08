@@ -32,11 +32,11 @@ from agentbox.core.data.schema.resources import (
     workspace_file_resource_bindings,
 )
 
-from agentbox.core.data.schema.runners import (
+from agentbox.core.data.schema.engines import (
     runner_profiles,
 )
 
-from agentbox.core.data.schema.runs import (
+from agentbox.core.data.schema.execution import (
     run_comments,
     run_prompts,
     runs,
@@ -54,6 +54,7 @@ from agentbox.core.data.schema.system import (
 )
 
 from agentbox.core.data.schema.workspaces import (
+    workenv_templates,
     workspace_env_doc_versions,
     workspace_env_docs,
     workspace_host_env_grants,
@@ -88,9 +89,9 @@ __all__ = [
     "resources",
     "shared_resources",
     "workspace_file_resource_bindings",
-    # runners
+    # engines
     "runner_profiles",
-    # runs
+    # execution
     "run_comments",
     "run_prompts",
     "runs",
@@ -104,6 +105,7 @@ __all__ = [
     "mcp_tool_discovery_cache",
     "settings",
     # workspaces
+    "workenv_templates",
     "workspace_env_doc_versions",
     "workspace_env_docs",
     "workspace_host_env_grants",

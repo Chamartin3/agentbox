@@ -19,7 +19,7 @@ from typing import Literal
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.constants import VALID_POLICIES
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import (
     workspace_mcp_overrides,
     workspace_mcp_policies,
