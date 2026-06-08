@@ -2,7 +2,7 @@
 
 Deprecated — use the subpackages directly:
 - ``agentbox.core.service.resources.bindings`` — prompt + workspace file bindings
-- ``agentbox.core.service.workspaces._bindings`` — subagents + skill bindings
+- ``agentbox.core.service.workspaces.bindings`` — subagents + skill bindings
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from agentbox.core.service.resources.bindings import (
     replace_prompt_resources,
     replace_workspace_resources,
 )
-from agentbox.core.service.workspaces._bindings import (
+from agentbox.core.service.workspaces.bindings import (
     list_workspace_skill_bindings,
     list_workspace_subagents,
     replace_workspace_skill_bindings,
