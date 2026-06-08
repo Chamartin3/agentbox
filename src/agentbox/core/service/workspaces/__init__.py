@@ -10,8 +10,8 @@ Dependency injection is explicit (``store``, ``settings``, ``loader``,
 lets MCP tools and the CLI consume the same use-cases.
 
 This module is the stable public facade; concrete implementations live
-in the private ``_registry`` / ``_permissions`` / ``_mcp`` / ``_configs``
-/ ``_skills`` / ``_files`` / ``_errors`` submodules.
+in the ``registry`` / ``permissions`` / ``mcp`` / ``configs`` /
+``skills`` / ``files`` / ``errors`` submodules.
 
 Domain errors raised here:
 
@@ -28,9 +28,9 @@ from __future__ import annotations
 
 from agentbox.core.service.prompts import AgentNotFound
 
-from ._configs import generate_configs_by_name, generate_configs_for_agent
-from ._errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
-from ._files import (
+from .configs import generate_configs_by_name, generate_configs_for_agent
+from .errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
+from .files import (
     create_workspace_for_agent,
     get_workspace_for_agent,
     is_user_file,
@@ -41,20 +41,20 @@ from ._files import (
     write_file_by_name,
     write_file_for_agent,
 )
-from ._mcp import refresh_workspace_mcp_discovery, resolve_workspace_mcp
-from ._permissions import (
+from .mcp import refresh_workspace_mcp_discovery, resolve_workspace_mcp
+from .permissions import (
     get_permissions,
     get_workspace_mcp_tools,
     load_effective_permissions,
     set_permissions,
 )
-from ._registry import (
+from .registry import (
     create_workspace_registry,
     delete_workspace_registry,
     get_workspace_by_name,
     list_workspaces_enriched,
 )
-from ._skills import (
+from .skills import (
     generate_skills_by_name,
     get_skill_content_by_name,
     list_skills_by_name,
