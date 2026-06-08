@@ -12,7 +12,7 @@ from agentbox.cli._common import checkmark, console, resolve_agent
 from agentbox.core import workspaces as ws
 from agentbox.core.service import get_workspace as service_get_workspace
 from agentbox.core.service import workspaces as workspaces_service
-from agentbox.core.service.workspaces import (
+from agentbox.core.service.workspaces.errors import (
     WorkspaceExists,
     WorkspaceNotFound,
 )

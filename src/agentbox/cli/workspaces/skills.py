@@ -8,7 +8,7 @@ from rich.syntax import Syntax
 from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.service import workspaces as workspaces_service
-from agentbox.core.service.workspaces import WorkspaceNotFound
+from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 skills_app = typer.Typer(
     name="skills",

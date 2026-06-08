@@ -174,7 +174,7 @@ def mcp_refresh(workspace_id: str) -> None:
 def mcp_tools(workspace_id: str) -> None:
     """List MCP tools available to a workspace."""
     from agentbox.cli._deps import get_settings
-    from agentbox.core.service.workspaces import get_workspace_mcp_tools
+    from agentbox.core.service.workspaces.permissions import get_workspace_mcp_tools
 
     store = get_store()
     result = get_workspace_mcp_tools(workspace_id, store=store, settings=get_settings())
