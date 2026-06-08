@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+from agentbox.core.data import RunEvent
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 from agentbox.core.execution.validate import (
     ValidationResult,
     extract_json,
@@ -19,36 +23,15 @@ from agentbox.core.execution.validate import (
 class _FakeAgent:
     def __init__(
         self,
-        composed_schema: dict | None = None,
         output_schema_path: str | None = None,
         engine: str = "jsonschema",
     ) -> None:
-        self._composed_schema = composed_schema
-        # Mirror the shape AgentDef exposes via PythonAgentConfig.from_agent.
-        self.runner = _FakeRunner(output_schema_path)
-        self._engine = engine
-        # ExecutionConfig.from_agent reads .runner.output_validation_engine
-        self.runner.output_validation_engine = engine
         self.composition = None
-
-    @property
-    def __dict__(self) -> dict[str, Any]:  # type: ignore[override]
-        return {"_composed_schema": self._composed_schema}
-
-
-class _FakeRunner:
-    def __init__(
-        self,
-        output_schema_path: str | None,
-    ) -> None:
-        self.output_schema_path = output_schema_path
-        self.output_validation_engine = "jsonschema"
-        # PythonAgentConfig.from_agent inspects these too:
-        self.kind = "token"
-        self.agent_module = None
-        self.deps_factory = None
-        self.max_validation_retries = 0
-        self.max_error_retries = 0
+        # config_json is the sole source of truth — mirror runner fields here.
+        self.__dict__["_config_json"] = {
+            "execution": {"output_validation_engine": engine},
+            "python": {"output_schema_path": output_schema_path},
+        }
 
 
 _SCHEMA = {
@@ -92,15 +75,16 @@ def test_validate_jsonschema_handles_bad_json() -> None:
 
 def test_validate_output_off_when_no_schema(tmp_path: Path) -> None:
     """No composed schema, no path → no validation, ok=True."""
-    agent = _FakeAgent(composed_schema=None, output_schema_path=None)
+    agent = _FakeAgent(output_schema_path=None)
     result = validate_output(agent, tmp_path, '{"anything": 1}')
     assert result == ValidationResult(ok=True, engine="off")
 
 
 def test_validate_output_empty_when_schema_required(tmp_path: Path) -> None:
     """A schema is configured but output is empty → reportable failure."""
-    agent = _FakeAgent(composed_schema=_SCHEMA)
-    result = validate_output(agent, tmp_path, "")
+    agent = _FakeAgent()
+    composed = SimpleNamespace(schema=_SCHEMA)
+    result = validate_output(agent, tmp_path, "", composed=composed)
     assert not result.ok
     assert result.engine == "none"
     assert "empty" in result.error
@@ -108,25 +92,24 @@ def test_validate_output_empty_when_schema_required(tmp_path: Path) -> None:
 
 def test_validate_output_uses_composed_schema(tmp_path: Path) -> None:
     """Composed schema beats reading from disk — works for DB-only agents."""
-    agent = _FakeAgent(composed_schema=_SCHEMA, engine="jsonschema")
-    result = validate_output(agent, tmp_path, '{"name": "x"}')
+    agent = _FakeAgent(engine="jsonschema")
+    composed = SimpleNamespace(schema=_SCHEMA)
+    result = validate_output(agent, tmp_path, '{"name": "x"}', composed=composed)
     assert result.ok
     assert result.engine == "jsonschema"
 
 
 def test_validate_output_falls_back_to_disk_schema(tmp_path: Path) -> None:
-    """When _composed_schema isn't set, load from runner.output_schema_path."""
+    """When composed schema isn't set, load from runner.output_schema_path."""
     schema_file = tmp_path / "schema.json"
     schema_file.write_text(json.dumps(_SCHEMA))
-    agent = _FakeAgent(
-        composed_schema=None, output_schema_path="schema.json", engine="jsonschema"
-    )
+    agent = _FakeAgent(output_schema_path="schema.json", engine="jsonschema")
     result = validate_output(agent, tmp_path, '{"name": "x"}')
     assert result.ok
 
 
 def test_validate_output_missing_schema_file(tmp_path: Path) -> None:
-    agent = _FakeAgent(composed_schema=None, output_schema_path="nope.json")
+    agent = _FakeAgent(output_schema_path="nope.json")
     result = validate_output(agent, tmp_path, '{"name": "x"}')
     assert not result.ok
     assert result.engine == "none"
@@ -136,8 +119,9 @@ def test_validate_output_missing_schema_file(tmp_path: Path) -> None:
 def test_validate_output_both_engines(tmp_path: Path) -> None:
     """``both`` runs jsonschema first then pydantic — failure attribution
     matters for the retry prompt."""
-    agent = _FakeAgent(composed_schema=_SCHEMA, engine="both")
-    result = validate_output(agent, tmp_path, '{"name": "x"}')
+    agent = _FakeAgent(engine="both")
+    composed = SimpleNamespace(schema=_SCHEMA)
+    result = validate_output(agent, tmp_path, '{"name": "x"}', composed=composed)
     assert result.ok
     assert result.engine == "both"
 
@@ -151,10 +135,6 @@ def test_validate_pydantic_smoke() -> None:
 
 def test_backend_adapter_default_validate_output(tmp_path: Path) -> None:
     """``BackendAdapter`` default impl delegates to validation.validate_output."""
-    from collections.abc import AsyncIterator
-
-    from agentbox.core.data import RunEvent
-    from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
 
     class _Stub(BackendAdapter):
         name = "stub"
@@ -169,7 +149,10 @@ def test_backend_adapter_default_validate_output(tmp_path: Path) -> None:
                 yield  # pragma: no cover
 
     adapter = _Stub()
-    agent = _FakeAgent(composed_schema=_SCHEMA)
-    result = adapter.validate_output(agent, tmp_path, '{"name": "x"}')
+    agent = _FakeAgent()
+    composed = SimpleNamespace(schema=_SCHEMA)
+    result = adapter.validate_output(
+        agent, tmp_path, '{"name": "x"}', composed=composed
+    )
     assert result.ok
     assert result.engine == "jsonschema"
