@@ -60,6 +60,18 @@ class _FakeProvider:
 
 
 def _patch_backends(monkeypatch, *, fail_load: str | None = None) -> None:
+    import agentbox.core.service.engines.profile_validation as pv
+
+    assert hasattr(pv, "resolve_engine_by_name"), (
+        "profile_validation contract changed — update _patch_backends"
+    )
+    assert hasattr(pv, "list_engines"), (
+        "profile_validation contract changed — update _patch_backends"
+    )
+    assert hasattr(pv, "engine_load_failure"), (
+        "profile_validation contract changed — update _patch_backends"
+    )
+
     def _get_backend(name: str) -> _FakeBackend:
         if name == "mock":
             return _FakeBackend()

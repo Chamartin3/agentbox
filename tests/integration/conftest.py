@@ -14,6 +14,39 @@ import pytest
 
 
 # --------------------------------------------------------------------------- #
+# Cache isolation
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture(autouse=True)
+def _reset_agentbox_deps_caches() -> Iterator[None]:
+    """Clear every lru_cache in agentbox.api.deps and agentbox.cli._deps
+    before AND after each integration test so cached singletons don't leak."""
+    import agentbox.api.deps as api_deps
+    import agentbox.cli._deps as cli_deps
+
+    for deps in (api_deps, cli_deps):
+        for fn in (
+            deps.get_settings,
+            deps.get_store,
+            deps.get_loader,
+            deps.get_executor,
+            deps.get_mcp_registry,
+        ):
+            fn.cache_clear()
+    yield
+    for deps in (api_deps, cli_deps):
+        for fn in (
+            deps.get_settings,
+            deps.get_store,
+            deps.get_loader,
+            deps.get_executor,
+            deps.get_mcp_registry,
+        ):
+            fn.cache_clear()
+
+
+# --------------------------------------------------------------------------- #
 # Data-dir isolation
 # --------------------------------------------------------------------------- #
 

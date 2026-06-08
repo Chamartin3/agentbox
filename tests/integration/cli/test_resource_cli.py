@@ -11,37 +11,23 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 
-def _clear_deps_caches() -> None:
-    import agentbox.api.deps as api_deps
-    import agentbox.cli._deps as cli_deps
-
-    for deps in (api_deps, cli_deps):
-        for fn in (
-            deps.get_settings,
-            deps.get_store,
-            deps.get_loader,
-            deps.get_executor,
-            deps.get_mcp_registry,
-        ):
-            if hasattr(fn, "cache_clear"):
-                fn.cache_clear()
-
-
 @pytest.fixture
 def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Isolated store pointing at tmp_path."""
+    """Isolated store pointing at tmp_path.
+
+    Relies on the autouse ``_reset_agentbox_deps_caches`` fixture in
+    ``tests/integration/conftest.py`` to clear caches between tests.
+    """
     manifest = tmp_path / "agentbox.toml"
     manifest.write_text("# test manifest\n")
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
-    _clear_deps_caches()
     from agentbox.api.deps import get_store as _get_store
 
     store = _get_store()
     yield store
-    _clear_deps_caches()
 
 
 # ---------------------------------------------------------------------------
