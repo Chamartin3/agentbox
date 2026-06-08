@@ -12,6 +12,7 @@ export default defineConfig({
     outDir: path.resolve(__dirname, '../src/agentbox/ui/static/dist'),
     emptyOutDir: true,
     sourcemap: false,
+    chunkSizeWarningLimit: 700,
   },
   server: {
     host: '0.0.0.0',

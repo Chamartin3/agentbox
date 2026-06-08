@@ -1,16 +1,18 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
-import ActivityPage from './pages/ActivityPage';
-import RunsPage from './pages/RunsPage';
-import RunDetailPage from './pages/RunDetailPage';
-import AgentsPage from './pages/AgentsPage';
-import AgentDetailPage from './pages/AgentDetailPage';
-import AgentVersionDiff from './pages/AgentVersionDiff';
-import AgentVersionDetailPage from './pages/AgentVersionDetailPage';
-import AgentNew from './pages/AgentNew';
-import WorkspacesSection from './pages/WorkspacesSection';
-import WorkspaceDetailPage from './pages/WorkspaceDetailPage';
-import ResourceDetailPage from './pages/ResourceDetailPage';
-import SettingsPage from './pages/SettingsPage';
+
+const ActivityPage = lazy(() => import('./pages/ActivityPage'));
+const RunsPage = lazy(() => import('./pages/RunsPage'));
+const RunDetailPage = lazy(() => import('./pages/RunDetailPage'));
+const AgentsPage = lazy(() => import('./pages/AgentsPage'));
+const AgentDetailPage = lazy(() => import('./pages/AgentDetailPage'));
+const AgentVersionDiff = lazy(() => import('./pages/AgentVersionDiff'));
+const AgentVersionDetailPage = lazy(() => import('./pages/AgentVersionDetailPage'));
+const AgentNew = lazy(() => import('./pages/AgentNew'));
+const WorkspacesSection = lazy(() => import('./pages/WorkspacesSection'));
+const WorkspaceDetailPage = lazy(() => import('./pages/WorkspaceDetailPage'));
+const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 export default function App() {
   return (
@@ -26,6 +28,7 @@ export default function App() {
         </nav>
       </header>
       <main>
+        <Suspense fallback={<p className="dim" style={{ padding: 16 }}>loading…</p>}>
         <Routes>
           <Route path="/" element={<ActivityPage />} />
           <Route path="/runs" element={<RunsPage />} />
@@ -56,6 +59,7 @@ export default function App() {
           <Route path="/resources" element={<Navigate to="/workspaces/resources" replace />} />
           <Route path="/resources/:id" element={<LegacyResourceRedirect />} />
         </Routes>
+        </Suspense>
       </main>
     </>
   );
