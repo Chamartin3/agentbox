@@ -20,14 +20,10 @@ from typing import TYPE_CHECKING, Any, Final
 
 from agentbox.core.data import UsageEvent
 from agentbox.config import Settings
-from agentbox.core.agents.config import (
-    ExecutionConfig,
-    PythonAgentConfig,
-    resolve_output_config as _resolve_oc,
-)
+from agentbox.core.agents import AgentRuntimeView
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
-from agentbox.core.data import AgentDef, SessionStore
+from agentbox.core.data import AgentDef, UsageStore
 from agentbox.core.engines.backends.base import RenderedConfig
 from agentbox.core.execution.retry import RetryOrchestrator
 from agentbox.core.execution.streaming.session import RunStreamSession
@@ -112,7 +108,7 @@ class RunStepLoop:
     :class:`StepResult` ready for the finalizer.
     """
 
-    def __init__(self, store: SessionStore, settings: Settings) -> None:
+    def __init__(self, store: UsageStore, settings: Settings) -> None:
         self.store = store
         self.settings = settings
 
@@ -130,11 +126,10 @@ class RunStepLoop:
         effective: EffectiveRunnerConfig | None,
         composed: Any | None,
     ) -> StepResult:
-        exec_cfg = ExecutionConfig.from_agent(agent)
-        python_cfg = PythonAgentConfig.from_agent(agent)
+        view = AgentRuntimeView.from_agent(agent, store=self.store)
 
-        error_retries_left = exec_cfg.max_error_retries or 0
-        validation_retries_left = exec_cfg.max_validation_retries or 0
+        error_retries_left = view.max_error_retries or 0
+        validation_retries_left = view.max_validation_retries or 0
         max_attempts = 1 + error_retries_left + validation_retries_left
 
         timeout = (
@@ -169,12 +164,11 @@ class RunStepLoop:
         schema_validated_via: str | None = None
 
         with session:
-            _oc = _resolve_oc(self.store, agent)
             has_schema = bool(
-                python_cfg.output_schema_path
+                view.output_schema_path
                 or (composed is not None and isinstance(composed.schema, dict))
-                or _oc.json_schema is not None
-                or bool(_oc.validators)
+                or view.json_schema is not None
+                or bool(view.validators)
             )
             validation_mode = (
                 composed.validation_mode

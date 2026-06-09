@@ -38,7 +38,7 @@ from agentbox.core.execution.prepare.envdoc import (
 
 if TYPE_CHECKING:
     from agentbox.config import Settings
-    from agentbox.core.data import SessionStore
+    from agentbox.core.data import RunStore
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class PreparedResources:
 
 def prepare_run_resources(
     *,
-    store: SessionStore,
+    store: RunStore,
     settings: Settings,
     agent: AgentDef,
     input_: str,

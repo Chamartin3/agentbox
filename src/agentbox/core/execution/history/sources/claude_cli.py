@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Final, Literal, cast
 
-from agentbox.core.data import find_session_log, parse_session_log
+from agentbox.core.data import RunRecord, find_session_log, parse_session_log
 from agentbox.core.execution.history.base import ConversationSource
 from agentbox.core.execution.history.types import (
     ContentPart,
@@ -20,6 +20,15 @@ from agentbox.core.execution.history.types import (
     TokenTotals,
     Turn,
 )
+
+
+ContentType = Literal["text", "thinking", "tool_use", "tool_result"]
+Role = Literal["user", "assistant", "system", "tool"]
+
+_VALID_CONTENT_TYPES: Final = frozenset(
+    {"text", "thinking", "tool_use", "tool_result"}
+)
+_VALID_ROLES: Final = frozenset({"user", "assistant", "system", "tool"})
 
 
 class ClaudeCliJsonlSource(ConversationSource):
@@ -38,7 +47,7 @@ class ClaudeCliJsonlSource(ConversationSource):
         self._transcript_path = transcript_path
 
     @classmethod
-    def for_run(cls, run: Any) -> ConversationSource | None:
+    def for_run(cls, run: RunRecord) -> ConversationSource | None:
         tp = Path(run.transcript_path) if run and run.transcript_path else None
         return cls(transcript_path=tp)
 
@@ -98,19 +107,25 @@ class ClaudeCliJsonlSource(ConversationSource):
         for t in raw.turns:
             parts = []
             for p in t.content:
+                ct = p.type
+                if ct not in _VALID_CONTENT_TYPES:
+                    ct = "text"
                 parts.append(
                     ContentPart(
-                        type=p.type,  # type: ignore[arg-type]
+                        type=cast(ContentType, ct),
                         byte_len=p.length,
                         body=p.body,
                         tool_name=getattr(p, "tool_name", None),
                         tool_use_id=getattr(p, "tool_use_id", None),
                     )
                 )
+            role = t.role
+            if role not in _VALID_ROLES:
+                role = "user"
             turns.append(
                 Turn(
                     index=t.index,
-                    role=t.role,  # type: ignore[arg-type]
+                    role=cast(Role, role),
                     ts=t.ts,
                     stop_reason=t.stop_reason,
                     usage=t.usage,

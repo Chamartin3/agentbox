@@ -1,16 +1,4 @@
-"""Pre-run setup: workdir, backend selection, render, MCP injection.
-
-This module owns the synchronous, pre-stream phase of a run:
-
-* :class:`NoBackendAvailable` — raised when no adapter resolves.
-* :func:`load_workspace_permissions` — DB overlay → permissions dict.
-* :class:`RunSetup` — workdir resolution, backend pick, render-config
-  materialization, generator config write, and per-backend MCP
-  post-render hooks.
-* :func:`fail_pre_run` — short-circuit terminal "couldn't even start"
-  failure that creates the run row in error state and broadcasts a
-  ``DoneEvent`` so any subscribed UI tears down cleanly.
-"""
+"""Pre-run setup: workdir, backend selection, render, MCP injection."""
 
 from __future__ import annotations
 
@@ -21,20 +9,25 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.agents.resolve import resolve_engine
-from agentbox.core.agents.config import RuntimeConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.data import DoneEvent, LogEvent
+from agentbox.core.data import AgentDef, RunSetupStore
 from agentbox.config import Settings
-from agentbox.core.data import AgentDef, SessionStore
-from agentbox.core.engines.backends.base import PostRenderContext, RenderedConfig
-from agentbox.core.engines.render import ConfigGenerator
-from agentbox.core.execution.render import materialize_rendered_config
+from agentbox.core.engines.backends.base import (
+    PostRenderContext,
+    PythonAgentConfigView,
+    RenderedConfig,
+    RuntimeConfigView,
+)
+from agentbox.core.execution.orchestrate.generator import (
+    _read_agent_config_json,
+    make_generator,
+)
+from agentbox.core.execution.orchestrate.materialize import materialize_rendered_config
+from agentbox.core.execution.orchestrate.permissions import load_workspace_permissions
 from agentbox.core.workspaces import (
     load_capabilities,
     resolve_path,
 )
-
-from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 
 if TYPE_CHECKING:
     from agentbox.core.engines.backends.base import BackendAdapter
@@ -44,12 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 class NoBackendAvailable(RuntimeError):
-    """Raised when ``RunSetup.select_backend`` cannot pick any adapter.
-
-    Carries the attempted names so the HTTP layer can tell the client
-    *which* backend was requested and let the loader's failure-reason
-    map explain why it's unavailable.
-    """
+    """Raised when ``select_backend`` cannot pick any adapter."""
 
     def __init__(self, *, agent_id: str, attempted: list[str]) -> None:
         self.agent_id = agent_id
@@ -59,54 +47,12 @@ class NoBackendAvailable(RuntimeError):
         )
 
 
-def load_workspace_permissions(
-    workdir: Path,
-    agent: AgentDef,
-    settings: Settings,
-    store: SessionStore | None = None,
-) -> dict:
-    """Resolve effective workspace permissions from the DB overlay.
-
-    ``workspace_runtime_permissions`` is the single source of truth for
-    built-in tools, file scopes, max_tokens, and network/write flags.
-    Workspaces with no overlay row receive an empty permissions dict —
-    callers downstream treat that as "no constraints declared".
-    """
-    if not agent.workspace or agent.workspace == "<ephemeral>":
-        return {}
-    if store is None:
-        return {}
-    try:
-        overlay = store.get_workspace_runtime_permissions(agent.workspace)
-    except Exception:
-        return {}
-    if not overlay:
-        return {}
-    perms: dict = {}
-    if overlay.get("allowed_builtin_tools") is not None:
-        perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
-    if overlay.get("files") is not None:
-        perms["files"] = overlay["files"]
-    if overlay.get("max_tokens") is not None:
-        perms["max_tokens"] = overlay["max_tokens"]
-    if overlay.get("allow_file_write") is not None:
-        perms["allow_file_write"] = bool(overlay["allow_file_write"])
-    if overlay.get("allow_network") is not None:
-        perms["allow_network"] = bool(overlay["allow_network"])
-    return perms
-
-
 class RunSetup:
-    """Pre-stream setup collaborator for ``RunExecutor``.
-
-    Owns workdir allocation, backend selection, render materialization,
-    and the post-render MCP injection step. Pure helpers — no async,
-    no state beyond the injected store/settings.
-    """
+    """Pre-stream setup: workdir allocation, backend selection, render materialization."""
 
     def __init__(
         self,
-        store: SessionStore,
+        store: RunSetupStore,
         settings: Settings,
         mcp_registry: McpRegistry | None,
     ) -> None:
@@ -125,14 +71,14 @@ class RunSetup:
             original = agent.workspace
             agent.workspace = workspace_override
             try:
-                path, ephemeral = resolve_path(agent, self.settings, self.store)
+                path, ephemeral = resolve_path(agent, self.settings, self.store)  # type: ignore[arg-type]
             finally:
                 agent.workspace = original
             if not ephemeral:
                 path.mkdir(parents=True, exist_ok=True)
                 return path, session_id
 
-        path, ephemeral = resolve_path(agent, self.settings, self.store)
+        path, ephemeral = resolve_path(agent, self.settings, self.store)  # type: ignore[arg-type]
         if not ephemeral:
             path.mkdir(parents=True, exist_ok=True)
             return path, session_id
@@ -165,24 +111,19 @@ class RunSetup:
         runner_config: EffectiveRunnerConfig | None = None,
         composed: Any | None = None,
     ) -> tuple[BackendAdapter, RenderedConfig]:
-        """Pick a backend adapter and render its config.
-
-        Algorithm:
-        1. Explicit ``backend`` from the request (highest priority).
-        2. Resolved ``EffectiveRunnerConfig.backend``.
-        3. ``NoBackendAvailable`` error.
-
-        Static ``agent.runner`` is intentionally ignored; dispatch has a
-        single runtime source of truth: ``EffectiveRunnerConfig``.
-
-        Cross-domain values (runtime config, host capabilities) are
-        resolved here so backends never import ``core.agents.*`` or
-        ``core.workspace.*`` directly.
-        """
-
         # Resolve cross-domain values before render so backends don't
         # import from agents / workspaces / resources domains directly.
-        runtime_config = RuntimeConfig.from_agent(agent)
+        agent_config_json = _read_agent_config_json(agent)
+        runtime_config_view = RuntimeConfigView(
+            allowed_tools=tuple(
+                agent_config_json.get("runtime", {}).get("allowed_tools") or ()
+            ),
+        )
+        python_config_raw = agent_config_json.get("python", {}) or {}
+        python_agent_config_view = PythonAgentConfigView(
+            agent_module=python_config_raw.get("agent_module"),
+            output_schema_path=python_config_raw.get("output_schema_path"),
+        )
         host_capabilities = load_capabilities(workdir)
 
         def _try_backend(name: str) -> BackendAdapter | None:
@@ -205,7 +146,8 @@ class RunSetup:
                     workdir,
                     runner_config=runner_config,
                     composed=composed,
-                    runtime_config=runtime_config,
+                    runtime_config=runtime_config_view,
+                    python_agent_config=python_agent_config_view,
                     host_capabilities=host_capabilities,
                 )
                 return adapter, rendered
@@ -221,14 +163,14 @@ class RunSetup:
         rendered: RenderedConfig,
     ) -> tuple[RenderedConfig, Path]:
         run_dir = self.settings.runs_tmpfs_dir / uuid.uuid4().hex
-
-        # materialize_rendered_config owns the exclusive mkdir (mode 0o700).
         materialize_rendered_config(rendered, run_dir)
 
         permissions = load_workspace_permissions(
             workdir, agent, self.settings, self.store
         )
-        generator = self._make_generator()
+        generator = make_generator(
+            settings=self.settings, store=self.store, mcp_registry=self._mcp_registry
+        )
         generator.generate_configs_into(
             run_dir,
             allowed_builtin_tools=permissions.get("allowed_builtin_tools") or [],
@@ -296,82 +238,9 @@ class RunSetup:
                 agent_id,
             )
 
-    # ------------------------------------------------------------------ generator
-    def _make_generator(self) -> ConfigGenerator:
-        project_root = self.settings.project_root
-        agentbox_toml = project_root / "agentbox.toml"
-        mcp_manifest = self._try_get_mcp_manifest()
-        servers = self.store.get_project_mcp_servers()
-        mcp_spec = servers[0] if servers else None
-        mcp_server_name = mcp_spec.name if mcp_spec else "mcp"
-        mcp_url = mcp_spec.url if mcp_spec else None
-        mcp_transport = str(mcp_spec.transport) if mcp_spec else "http"
-        mcp_command = (
-            mcp_spec.command if mcp_spec and mcp_spec.command else ["mcp_serve.sh"]
-        )
-        static_manifest_path: Path | None = None
-        tool_manifest_path = self.store.get_tool_manifest_path()
-        if tool_manifest_path:
-            candidate = project_root / tool_manifest_path
-            if candidate.exists():
-                static_manifest_path = candidate
-        return ConfigGenerator(
-            agentbox_toml=agentbox_toml,
-            manifest_path=static_manifest_path,
-            mcp_manifest=mcp_manifest,
-            mcp_server_name=mcp_server_name,
-            mcp_url=mcp_url,
-            mcp_transport=mcp_transport,
-            mcp_command=mcp_command,
-            verbose=False,
-        )
 
-    def _try_get_mcp_manifest(self):
-        if self._mcp_registry is None:
-            return None
-        try:
-            return self._mcp_registry.manifest
-        except Exception:
-            return None
-
-
-def fail_pre_run(
-    store: SessionStore,
-    settings: Settings,
-    broadcasters: dict[str, RunBroadcaster],
-    *,
-    agent: AgentDef,
-    input_: str,
-    workdir: Path,
-    session_id: str | None,
-    error_msg: str,
-) -> str:
-    """Create an error run record and broadcast failure before execution starts.
-
-    Used when something during setup (workdir, profile resolution, missing
-    backend) makes it impossible to launch the run task. We still create a
-    row so the operator can see the failure in the UI / API.
-    """
-    transcripts_dir = settings.data_dir / "transcripts"
-    transcripts_dir.mkdir(parents=True, exist_ok=True)
-    transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
-    run_id = store.create_run(
-        agent_id=agent.id,
-        input_=input_,
-        workdir=str(workdir),
-        transcript_path=str(transcript_path),
-        session_id=session_id,
-    )
-    store.finish_run(run_id, ok=False, error=error_msg)
-    broadcaster = RunBroadcaster()
-    broadcasters[run_id] = broadcaster
-    broadcaster.publish(
-        LogEvent(run_id=run_id, level="error", message=f"Error: {error_msg}")
-    )
-    broadcaster.publish(DoneEvent(run_id=run_id, ok=False, error=error_msg))
-    broadcaster.close()
-    return run_id
-
+# fail_pre_run re-exported from pre_run.py for backward compatibility.
+from agentbox.core.execution.orchestrate.pre_run import fail_pre_run  # noqa: F401, E402
 
 __all__ = [
     "NoBackendAvailable",

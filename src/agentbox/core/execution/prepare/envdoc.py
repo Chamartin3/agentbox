@@ -23,7 +23,7 @@ from agentbox.core.workspaces import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.data import RunStore
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def resolve_workspace_resources(store: SessionStore, workspace_id: str) -> list[dict]:
+def resolve_workspace_resources(store: RunStore, workspace_id: str) -> list[dict]:
     """Hydrate all active workspace file bindings into materializer-ready dicts.
 
     Returns the same shape as ``_resolve_binding_for_prompt`` in the API
@@ -106,7 +106,7 @@ def resolve_workspace_resources(store: SessionStore, workspace_id: str) -> list[
 # ---------------------------------------------------------------------------
 
 
-def resolve_workspace_subagents(store: SessionStore, workspace_id: str) -> list[dict]:
+def resolve_workspace_subagents(store: RunStore, workspace_id: str) -> list[dict]:
     """Hydrate workspace subagent rows into renderer-ready dicts.
 
     Each entry includes: workspace_id, agent_id, alias, description,
@@ -157,7 +157,7 @@ def resolve_workspace_subagents(store: SessionStore, workspace_id: str) -> list[
 # ---------------------------------------------------------------------------
 
 
-def resolve_agent_prompt_bindings(store: SessionStore, agent_id: str) -> list[dict]:
+def resolve_agent_prompt_bindings(store: RunStore, agent_id: str) -> list[dict]:
     """Hydrate all active prompt bindings for an agent into resolver-ready dicts.
 
     Returns the same shape as ``_resolve_binding_for_prompt`` in the API
@@ -215,7 +215,7 @@ def resolve_agent_prompt_bindings(store: SessionStore, agent_id: str) -> list[di
 
 
 def render_env_doc(
-    store: SessionStore,
+    store: RunStore,
     workspace_id: str,
     workdir: Path,
 ) -> list[dict]:

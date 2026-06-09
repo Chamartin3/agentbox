@@ -30,44 +30,16 @@ which the executor threads explicitly through ``render``,
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.agents.composition.bundle import (
-    _append_validation_engine_hint,
-)
-from agentbox.core.agents.composition.bundle.loader import (
-    load_bundle_from_bindings,
-)
-from agentbox.core.agents.composition.capture import (
-    build_fragments,
-)
-from agentbox.core.agents.composition.output_contract import (
-    append as _append_output_contract,
-)
-from agentbox.core.agents.composition.resolver import (
-    resolve_prompt,
-)
-from agentbox.core.agents.config import (
-    ExecutionConfig,
-    OutputConfig as _OC,
-    resolve_output_config as _resolve_out,
-)
+from agentbox.core.agents import compose_prompt
 from agentbox.core.data import AgentDef
-from agentbox.core.engines.backends.schema_to_model import (
-    InconsistentSchema,
-    assert_schema_consistent,
-)
-from agentbox.core.execution.prepare.envdoc import (
-    prompt_resolution_to_snapshot,
-    resolve_agent_prompt_bindings,
-)
 
 if TYPE_CHECKING:
     from agentbox.config import Settings
-    from agentbox.core.data import SessionStore
+    from agentbox.core.data import RunStore
 
 logger = logging.getLogger(__name__)
 
@@ -153,171 +125,37 @@ class ResolvedPrompt:
 
 def resolve_run_prompt(
     *,
-    store: SessionStore,
+    store: RunStore,
     settings: Settings,
     agent: AgentDef,
     input_: str,
     variables: dict[str, Any] | None,
 ) -> ResolvedPrompt:
-    """Run the unified prompt-resolution pipeline.
+    """Run the unified prompt-resolution pipeline via the Agents facade.
 
-    The four stages (composition → binding substitution → output
-    contract → schema fallback) and the fail-fast schema consistency
-    check happen here. Behavior is preserved bit-for-bit from the
-    legacy inline version in ``prepare_run_resources``.
+    Delegates to :func:`agentbox.core.agents.compose_prompt` so that
+    the execution layer never imports from ``core.agents.composition.*``
+    or ``core.agents.config`` internals.
     """
-    snapshot_entries: list[dict] = []
-    agent_copied = False
-
-    # ----- Stage 1: composition ----------------------------------------
-    composition_result = None
-    system_text: str | None = None
-    system_base: str | None = None
-    composed_schema: dict | None = None
-    composed_input_schema: dict | None = None
-    composed_user: str | None = None
-    composed_references: Any = None
-    composed_bundle_sha: str | None = None
-
-    if agent.composition is not None and variables is not None:
-        shared_roots = {
-            k: settings.project_root / v
-            for k, v in store.get_project_shared_assets().items()
-        }
-
-        bundle = load_bundle_from_bindings(agent_id=agent.id, store=store)
-        composition_result = bundle.compose(variables, shared_roots)
-
-        system_text = composition_result.system
-        if composition_result.schema is not None:
-            engine = ExecutionConfig.from_agent(agent).output_validation_engine
-            system_text = _append_validation_engine_hint(system_text, engine)
-
-        system_base = composition_result.system_base
-        composed_schema = composition_result.schema
-        composed_input_schema = composition_result.input_schema
-        composed_user = composition_result.user
-        composed_references = composition_result.references
-        composed_bundle_sha = composition_result.bundle_sha
-
-        agent = agent.model_copy(deep=True)
-        agent_copied = True
-        input_ = composition_result.user
-
-    # ----- Stage 1b: validation-mode from agent.composition -------------
-    validation_mode: str | None = None
-    if agent.composition is not None:
-        validation_mode = agent.composition.output_validation
-
-    # ----- Stage 2: prompt-resource binding substitution ----------------
-    prompt_bindings: list[dict] = []
-    try:
-        prompt_bindings = resolve_agent_prompt_bindings(store, agent.id)
-        if prompt_bindings:
-            if system_text is not None:
-                resolution = resolve_prompt(system_text, prompt_bindings)
-                system_text = resolution.rendered_prompt
-                snapshot_entries.extend(
-                    prompt_resolution_to_snapshot(resolution)
-                )
-                for marker in resolution.unresolved_markers:
-                    logger.warning(
-                        "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
-                        marker,
-                        agent.id,
-                    )
-            else:
-                inline_prompt = agent.prompt
-                if inline_prompt:
-                    resolution = resolve_prompt(inline_prompt, prompt_bindings)
-                    agent = agent.model_copy(
-                        update={"prompt": resolution.rendered_prompt}
-                    )
-                    agent_copied = True
-                    snapshot_entries.extend(
-                        prompt_resolution_to_snapshot(resolution)
-                    )
-                    for marker in resolution.unresolved_markers:
-                        logger.warning(
-                            "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
-                            marker,
-                            agent.id,
-                        )
-    except Exception:
-        logger.exception(
-            "executor: prompt resource binding resolution failed for agent %r",
-            agent.id,
-        )
-
-    # ----- Stage 3: output-contract assembly ----------------------------
-    out_cfg = _resolve_out(store, agent)
-    if composed_schema is None and isinstance(out_cfg.json_schema, dict):
-        composed_schema = out_cfg.json_schema
-
-    if out_cfg.validators or isinstance(out_cfg.json_schema, dict):
-        base_for_contract = system_text if system_text is not None else (agent.prompt or "")
-        system_text = _append_output_contract(base_for_contract, out_cfg)
-
-        if system_base is not None:
-            constraints_only = _OC(json_schema=None, validators=out_cfg.validators)
-            system_base = _append_output_contract(system_base, constraints_only)
-
-    # ----- Stage 4: output_schema binding fallback (legacy_dir) ---------
-    if prompt_bindings and composed_schema is None:
-        for _b in prompt_bindings:
-            if _b.get("slot") != "output_schema":
-                continue
-            for _blob in _b.get("blobs") or []:
-                _raw = (_blob.get("content_text") or "").strip()
-                if not _raw:
-                    continue
-                try:
-                    _schema = json.loads(_raw)
-                except (json.JSONDecodeError, TypeError):
-                    logger.warning(
-                        "executor: failed to parse output_schema binding for agent %r",
-                        agent.id,
-                    )
-                    continue
-                if isinstance(_schema, dict):
-                    composed_schema = _schema
-                break
-            break
-
-    # ----- Stage 5: fail-fast schema consistency check ------------------
-    if isinstance(composed_schema, dict):
-        try:
-            assert_schema_consistent(composed_schema)
-        except InconsistentSchema as exc:
-            msg = (
-                f"output schema for agent {agent.id!r} is internally "
-                f"inconsistent: {exc}"
-            )
-            logger.error("executor: %s", msg)
-            raise ValueError(msg) from exc
-
-    # Ensure the returned agent is a fresh copy whenever composed state
-    # is non-trivial, to insulate callers from input aliasing.
-    if not agent_copied and (
-        system_text is not None
-        or system_base is not None
-        or composed_schema is not None
-        or validation_mode is not None
-    ):
-        agent = agent.model_copy(deep=True)
-
-    return ResolvedPrompt(
+    composed = compose_prompt(
+        store=store,
+        settings=settings,
         agent=agent,
         input_=input_,
-        system_text=system_text,
-        system_base=system_base,
-        composed_schema=composed_schema,
-        composed_input_schema=composed_input_schema,
-        composed_user=composed_user,
-        composed_references=composed_references,
-        composed_bundle_sha=composed_bundle_sha,
-        validation_mode=validation_mode,
-        composition_result=composition_result,
-        prompt_bindings=prompt_bindings,
-        snapshot_entries=snapshot_entries,
+        variables=variables,
+    )
+    return ResolvedPrompt(
+        agent=composed.agent,
+        input_=composed.input_,
+        system_text=composed.system_text,
+        system_base=composed.system_base,
+        composed_schema=composed.composed_schema,
+        composed_input_schema=composed.composed_input_schema,
+        composed_user=composed.composed_user,
+        composed_references=composed.composed_references,
+        composed_bundle_sha=composed.composed_bundle_sha,
+        validation_mode=composed.validation_mode,
+        composition_result=composed.composition_result,
+        prompt_bindings=composed.prompt_bindings,
+        snapshot_entries=composed.snapshot_entries,
     )

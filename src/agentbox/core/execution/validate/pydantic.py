@@ -1,10 +1,4 @@
-"""Pydantic-backed output validation from JSON Schema.
-
-Builds a dynamic pydantic ``BaseModel`` from the JSON Schema dict, then
-validates the parsed output through it.  This catches issues that
-``jsonschema`` may miss — type coercion, string constraints, and
-required-field enforcement with pydantic-style error messages.
-"""
+"""Pydantic-model helpers for dynamic validation from JSON Schema."""
 
 from __future__ import annotations
 
@@ -13,18 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, create_model
 
-
-def _extract_json(text: str) -> str:
-    """Strip markdown code fences if present."""
-    stripped = text.strip()
-    if stripped.startswith("```"):
-        lines = stripped.splitlines()
-        if lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        return "\n".join(lines).strip()
-    return stripped
+from agentbox.core.execution.validate.errors import extract_json
 
 
 def _json_type_to_python(
@@ -116,7 +99,7 @@ def validate_with_pydantic(
     failure.  The error message is a concise pydantic-style string.
     """
     try:
-        instance = json.loads(_extract_json(output_text))
+        instance = json.loads(extract_json(output_text))
     except json.JSONDecodeError as exc:
         return False, f"output is not valid JSON: {exc}"
 
@@ -130,3 +113,6 @@ def validate_with_pydantic(
         return True, ""
     except Exception as exc:
         return False, str(exc)
+
+
+__all__ = ["validate_with_pydantic"]

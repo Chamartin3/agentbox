@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 from agentbox.core.data import DoneEvent
 from agentbox.core.data import RunStatus
 from agentbox.core.engines.backends.base import BackendRunResult
-from agentbox.core.execution.validate import extract_json
+from agentbox.core.execution.output_validate import extract_json
 
 if TYPE_CHECKING:
     from agentbox.core.engines.backends.base import (

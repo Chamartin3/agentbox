@@ -18,7 +18,7 @@ import json
 import shutil
 import subprocess
 from contextlib import suppress
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final, Literal, cast
 
 from agentbox.core.execution.history.base import ConversationSource
 from agentbox.core.execution.history.types import (
@@ -30,6 +30,10 @@ from agentbox.core.execution.history.types import (
 
 if TYPE_CHECKING:
     from agentbox.core.data import RunRecord
+
+
+_VALID_ROLES_OC: Final = frozenset({"user", "assistant", "system", "tool"})
+_Role = Literal["user", "assistant", "system", "tool"]
 
 
 class OpencodeSessionSource(ConversationSource):
@@ -135,7 +139,7 @@ class OpencodeSessionSource(ConversationSource):
         for i, msg in enumerate(messages):
             if not isinstance(msg, dict):
                 continue
-            role = msg.get("role", "user")
+            role_str = msg.get("role", "user")
             parts: list[ContentPart] = []
             content = msg.get("content")
             if isinstance(content, str):
@@ -197,7 +201,8 @@ class OpencodeSessionSource(ConversationSource):
                                 tool_use_id=c.get("tool_use_id"),
                             )
                         )
-            turns.append(Turn(index=i, role=role, content=parts))  # type: ignore[arg-type]
+            role = role_str if role_str in _VALID_ROLES_OC else "user"
+            turns.append(Turn(index=i, role=cast(_Role, role), content=parts))
 
         page = turns[offset : offset + limit]
         return ConversationView(

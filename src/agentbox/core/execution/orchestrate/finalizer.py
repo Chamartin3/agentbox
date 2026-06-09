@@ -24,7 +24,7 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.data import AgentDef, SessionStore
+from agentbox.core.data import AgentDef, RunStore
 
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 from agentbox.core.execution.webhooks import WebhookDispatcher
@@ -57,7 +57,7 @@ def cleanup_workdir(agent: AgentDef, workdir: Path) -> None:
 class RunFinalizer:
     """Persists terminal state, fires the webhook, and cleans up."""
 
-    def __init__(self, store: SessionStore, webhooks: WebhookDispatcher) -> None:
+    def __init__(self, store: RunStore, webhooks: WebhookDispatcher) -> None:
         self.store = store
         self.webhooks = webhooks
 

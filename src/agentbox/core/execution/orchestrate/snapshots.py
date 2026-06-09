@@ -21,7 +21,7 @@ import logging
 from typing import Any
 
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.data import AgentDef, McpSnapshot, RunnerSnapshot, SessionStore
+from agentbox.core.data import AgentDef, McpSnapshot, RunnerSnapshot, SnapshotStore
 from agentbox.core.tools.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_runner_snapshot(
-    store: SessionStore,
+    store: SnapshotStore,
     *,
     effective: EffectiveRunnerConfig,
     rendered_model: str | None,
@@ -98,7 +98,7 @@ class SnapshotWriter:
     run-detail page but is never a reason to fail the run itself.
     """
 
-    def __init__(self, store: SessionStore) -> None:
+    def __init__(self, store: SnapshotStore) -> None:
         self._store = store
 
     def save_runner(self, run_id: str, snapshot: RunnerSnapshot) -> None:

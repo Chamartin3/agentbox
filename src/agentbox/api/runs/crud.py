@@ -9,13 +9,18 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
 
 from agentbox.api.deps import get_executor, get_loader, get_store
-from agentbox.api.webhooks import schedule_webhook
+from agentbox.api.runs.schemas import (
+    CompleteRunBody,
+    CreateRunBody,
+    PostOutcomeBody,
+    RunCommentBody,
+    SnapshotBody,
+)
+from agentbox.api.runs.webhooks import schedule_webhook
 from agentbox.core.service import read_transcript, NoBackendAvailable
 from agentbox.core.service.execution import runs
 from agentbox.core.service.execution.runs import (
@@ -26,49 +31,6 @@ from agentbox.core.service.execution.runs import (
 from agentbox.core.service.execution.types import AgentDisabled
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
-
-
-class CreateRunBody(BaseModel):
-    agent: str
-    input: str | None = None
-    """Legacy free-text input. Mutually exclusive with ``variables``."""
-
-    variables: dict[str, str] | None = None
-    """Variable map for prompt composition. Required when the agent
-    declares a ``[composition]`` block."""
-
-    session_id: str | None = None
-    workspace: str | None = None
-    """Optional workspace override (named workspace or explicit path)."""
-
-    timeout_seconds: int | None = None
-    """Per-run timeout override. Overrides the agent's ``runner.timeout_seconds``
-    for this invocation only."""
-
-    webhook_url: str | None = None
-    """Per-run webhook URL override. Overrides the agent's ``webhook_url``
-    for this invocation only. Set to empty string to suppress the webhook."""
-
-    runner: str | None = None
-    """Per-run runner kind override (deprecated — use ``backend``).
-    Overrides the agent's ``runner.kind`` for this invocation only."""
-
-    backend: str | None = None
-    """Per-run backend override. Overrides the agent's backend selection
-    for this invocation only. E.g. ``"claude_code"``, ``"opencode"``,
-    ``"token"``."""
-
-    runner_profile: str | None = None
-    """Per-run runner profile ID. Selects a named profile to resolve the
-    effective runner configuration. Takes precedence over agent defaults."""
-
-    runner_config: dict[str, Any] | None = None
-    """Per-run runner configuration dict. Inline config overrides; merged
-    with or superseeds profile-based settings."""
-
-    runner_embedded: bool = False
-    """When ``True``, the caller will run the agent itself (e.g. pydantic-ai
-    in-process) and POST a snapshot back via ``/runs/{run_id}/snapshot``."""
 
 
 @router.post("")
@@ -161,14 +123,6 @@ def runs_stats(
     )
 
 
-class CompleteRunBody(BaseModel):
-    """Payload posted by an external worker that ran the agent."""
-
-    ok: bool
-    output: str | None = None
-    error: str | None = None
-    usage: dict | None = None
-
 
 @router.post("/{run_id}/complete")
 async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
@@ -186,16 +140,6 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
 
-
-class SnapshotBody(BaseModel):
-    """Payload posted by a caller after running an embedded agent."""
-
-    rendered_prompt: dict
-    variables: dict
-    response_raw: str
-    validation_status: str = "ok"
-    validation_errors: list[str] = []
-    composition_snapshot: dict | None = None
 
 
 @router.post("/{run_id}/snapshot")
@@ -216,11 +160,6 @@ async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
 
-
-class PostOutcomeBody(BaseModel):
-    status: str
-    error_kind: str | None = None
-    errors: list[dict] | None = None
 
 
 @router.post("/{run_id}/post_outcome")
@@ -265,10 +204,6 @@ async def rerun(run_id: str) -> dict:
             },
         ) from exc
 
-
-class RunCommentBody(BaseModel):
-    author: str = "api"
-    body: str
 
 
 @router.get("/{run_id}/comments")
