@@ -1,4 +1,4 @@
-"""BackendAdapter abstract base + RenderedConfig dataclass.
+"""BackendAdapter abstract base class.
 
 All backend adapters inherit from :class:`BackendAdapter`. The ABC owns
 the cross-backend plumbing that used to be copy-pasted into each
@@ -15,13 +15,10 @@ a ``UsageEvent`` (e.g. on timeout).
 
 from __future__ import annotations
 
-import hashlib
-import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Mapping
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
 if TYPE_CHECKING:
     from agentbox.core.execution.prepare.prompts import ComposedState
@@ -32,175 +29,23 @@ from agentbox.core.engines.render.postrender import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )
-from agentbox.core.execution.validate import ValidationResult, validate_output
-from agentbox.core.resources.skills import SkillPack
+from agentbox.core.execution.output_validate import ValidationResult, validate_output
+
+from ._mcp_types import McpToolSpec
+from .rendered import RenderedConfig
+from .requests import BackendRunResult, PostRenderContext, RunRequest
+from .views import PythonAgentConfigView, RuntimeConfigView
 
 
-@dataclass(frozen=True)
-class BackendRunResult:
-    """Terminal status reported by a backend after a run completes.
+class HasAgentConfig(Protocol):
+    """An object carrying a ``_config_json`` attribute (e.g. AgentDef).
 
-    Backends report their *runner-level* outcome here — did the
-    subprocess exit cleanly, was there a runtime error, what was the
-    exit code. Validation outcome is the executor's concern: it runs
-    schema checks AFTER ``run_into_session`` returns and adjusts the
-    final state accordingly before emitting the terminal ``DoneEvent``.
-
-    Why a return value instead of a streamed ``DoneEvent``: the executor
-    must enforce "DoneEvent is the last event emitted" so WS clients
-    see validation results before they treat the run as terminal.
-    Returning the status keeps the backend out of the ordering decision.
+    AgentDef sets this via ``__dict__`` in ``from_db_row()`` so it isn't a
+    declared pydantic field; the Protocol lets callers consume it without
+    importing the full Agents domain.
     """
 
-    ok: bool
-    exit_code: int | None = None
-    error: str | None = None
-    status: str | None = None  # "ok" | "error" | "timeout" | None
-
-
-@dataclass
-class RunRequest:
-    """Per-run inputs handed to a backend's ``run()`` (legacy shape, kept
-    for direct in-process callers).
-
-    Most code paths use :class:`RenderedConfig` instead — the executor
-    renders once and then calls ``run(rendered, input, run_id)``. This
-    dataclass survives for tests and the few helpers that still want a
-    single object holding everything about a run.
-    """
-
-    run_id: str
-    agent: Any  # AgentDef — avoids a circular import; runtime type is AgentDef.
-    input: str
-    workdir: Path
-    project_root: Path
-    session_id: str | None = None
-    runner_profile: str | None = None
-    runner_config: dict[str, Any] | None = None
-
-
-class McpToolSpec(TypedDict, total=False):
-    """Minimal MCP tool descriptor consumed by ``render()``."""
-
-    name: str
-    description: str
-    inputSchema: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class PostRenderContext:
-    """Inputs to :meth:`BackendAdapter.post_render`.
-
-    The executor resolves grants and run paths before the hook runs;
-    backends just do file mutations (or skip). ``host_env_grants`` /
-    ``agent_tool_grants`` are ``None`` when there's nothing to inject —
-    the default :meth:`BackendAdapter.post_render` checks for this.
-    """
-
-    run_dir: Path
-    workdir: Path
-    db_path: Path
-    workspace_id: str | None
-    agent_id: str
-    host_env_grants: dict[str, Any] | None = None
-    agent_tool_grants: set[str] | None = None
-
-
-@dataclass(frozen=True)
-class RenderedConfig:
-    """Immutable description of an agent run's runtime configuration.
-
-    ``render()`` on a backend adapter produces one of these. The executor
-    materialises ``files`` to disk, then passes the same object to
-    ``run()`` so the adapter never needs to re-inspect the workspace.
-
-    Cross-domain values that backends previously fetched via direct
-    imports from ``core.agents.*``, ``core.workspace.*``, or
-    ``core.resource.*`` are populated here by the executor during setup.
-    Backends read them from this object — never from other domains.
-    """
-
-    files: Mapping[Path, bytes] = field(default_factory=dict)
-    """Files to materialise inside the run workdir (relative paths)."""
-
-    argv: list[str] = field(default_factory=list)
-    """Command + arguments to execute."""
-
-    env: Mapping[str, str] = field(default_factory=dict)
-    """Environment variable overrides for the subprocess."""
-
-    cwd: Path = Path(".")
-    """Working directory relative to the run workdir root."""
-
-    agent_meta: dict[str, Any] = field(default_factory=dict)
-    """Backend-specific agent metadata (e.g. agent_module, prompt for pydantic_ai
-    in-process agents). Included in the digest computation."""
-
-    model: str | None = None
-    """Effective model name that will actually be used to run the agent.
-
-    Set by the adapter during ``render()`` from EffectiveRunnerConfig or
-    the backend's own default. Persisted by the executor so even runs
-    that never emit a ``UsageEvent`` (timeouts, early crashes) keep a
-    model name in the runs table.
-    """
-
-    digest: str = ""
-    """sha256 over a sorted JSON serialisation of (files, argv, env, cwd, agent_meta).
-
-    Computed automatically by ``compute_digest()``. Stable across identical
-    inputs; changes when any tool, arg, or env var is added/removed.
-    """
-
-    # -- Cross-domain values populated by the executor ------------------------
-    # These carry data from agents/workspaces/resources domains so backends
-    # never import those domains directly.  The executor populates them in
-    # `core.execution.orchestrate.setup` before calling `adapter.render()`.
-
-    mcp_tools: list[McpToolSpec] = field(default_factory=list)
-    """MCP tool manifests resolved at run time."""
-
-    host_env_server_cmd: list[str] = field(default_factory=list)
-    """CLI args for the agentbox host-env MCP server."""
-
-    agent_tools_server_cmd: list[str] = field(default_factory=list)
-    """CLI args for the agentbox agent-tools MCP server."""
-
-    runtime_config: RuntimeConfig | None = None
-    """Resolved runtime tooling config from the agent definition.
-
-    Populated by the executor before ``render()`` so backends never
-    import ``core.agents.config`` directly."""
-
-    host_capabilities: dict[str, Any] = field(default_factory=dict)
-    """Workspace host capabilities dict (allowed_tools, mcp_config_path, …).
-
-    Populated by the executor before ``render()`` so backends never
-    import ``core.workspace.manager`` directly."""
-
-    skill_packs: list[SkillPack] = field(default_factory=list)
-    """Filtered skill packs for the workspace.
-
-    Populated by the executor before ``render()`` so the render pipeline
-    never imports ``core.resource.skills`` directly."""
-
-    def __post_init__(self) -> None:
-        if not self.digest:
-            object.__setattr__(self, "digest", self.compute_digest())
-
-    def compute_digest(self) -> str:
-        canonical = json.dumps(
-            {
-                "files": {str(p): h.hex() for p, h in sorted(self.files.items())},
-                "argv": list(self.argv),
-                "env": dict(self.env),
-                "cwd": str(self.cwd),
-                "agent_meta": dict(self.agent_meta),
-            },
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        return hashlib.sha256(canonical.encode()).hexdigest()
+    _config_json: dict[str, object] | str | None
 
 
 class BackendAdapter(ABC):
@@ -252,9 +97,9 @@ class BackendAdapter(ABC):
         mcp_tools: list[McpToolSpec] | None = None,
         creds: dict[str, str] | None = None,
         runner_config: Any | None = None,
-        composed: ComposedState | None = None,
+        composed: "ComposedState | None" = None,
         *,
-        runtime_config: RuntimeConfig | None = None,
+        runtime_config: RuntimeConfigView | None = None,
         host_capabilities: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
@@ -300,7 +145,7 @@ class BackendAdapter(ABC):
         self,
         rendered: RenderedConfig,
         input: str,
-        session: RunStreamSession,
+        session: "RunStreamSession",
     ) -> BackendRunResult:
         """Execute the agent, pushing events through ``session``.
 
@@ -379,7 +224,7 @@ class BackendAdapter(ABC):
         *,
         project_root: Path | None = None,
         store: Any | None = None,
-        composed: ComposedState | None = None,
+        composed: "ComposedState | None" = None,
     ) -> ValidationResult:
         """Validate ``output`` against the agent's declared schema.
 
@@ -415,7 +260,7 @@ class BackendAdapter(ABC):
         self,
         agent: Any,
         workdir: Path,
-        composed: ComposedState | None = None,
+        composed: "ComposedState | None" = None,
     ) -> dict[Path, bytes]:
         """Collect the CLAUDE.md system-context file for materialisation.
 
@@ -437,7 +282,7 @@ class BackendAdapter(ABC):
         self,
         agent: Any,
         workdir: Path,
-        composed: ComposedState | None = None,
+        composed: "ComposedState | None" = None,
     ) -> str:
         """Resolve the system prompt for in-process backends.
 

@@ -1,15 +1,9 @@
-"""Backend adapter for the Claude Code CLI.
-
-Self-contained after Plan 16 Phase 4: previously delegated to
-``agentbox.core.runners.claude_code._run_claude``; that subprocess loop
-and its helpers now live inline below.
-"""
+"""Backend adapter for the Claude Code CLI."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import os
 import shutil
 import signal
@@ -23,9 +17,16 @@ from agentbox.core.data import (
     RunEvent,
     TextEvent,
     TimeoutEvent,
-    UsageEvent,
 )
 from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.claude_code.render import (
+    _intersect_allowed_tools,
+    _runtime_config_view_from_agent,
+)
+from agentbox.core.engines.backends.claude_code.views import (
+    _build_usage_event,
+    _parse_envelope,
+)
 from agentbox.core.execution.streaming.rate_limit import detect_in_text_line
 
 _NAME = "claude_code"
@@ -60,16 +61,8 @@ class ClaudeCodeBackend(BackendAdapter):
         host_capabilities: dict | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
-        """Render the Claude Code backend configuration.
-
-        ``runtime_config`` and ``host_capabilities`` are pre-computed by
-        the executor and passed in so this method never imports from
-        ``core.agents.*`` or ``core.workspace.*`` directly.
-        """
         if runtime_config is None:
-            from agentbox.core.agents.config import RuntimeConfig
-
-            runtime_config = RuntimeConfig.from_agent(agent)
+            runtime_config = _runtime_config_view_from_agent(agent)
 
         agent_runner = getattr(agent, "runner", None)
         extra_args = list(
@@ -144,29 +137,6 @@ class ClaudeCodeBackend(BackendAdapter):
             stdin_data=input.encode("utf-8"),
         ):
             yield ev
-
-
-# ---------------------------------------------------------------------------
-# Inlined subprocess loop (formerly runners/claude_code.py:_run_claude)
-# ---------------------------------------------------------------------------
-
-
-def _intersect_allowed_tools(
-    agent_tools: list[str], workspace_tools: list[str] | None
-) -> list[str]:
-    """Effective allow list = agent ∩ workspace.
-
-    If either side is empty/None, treat it as "no restriction" so the
-    other side governs alone.
-    """
-    if not agent_tools and not workspace_tools:
-        return []
-    if not agent_tools:
-        return list(workspace_tools or [])
-    if not workspace_tools:
-        return list(agent_tools)
-    ws_set = set(workspace_tools)
-    return [t for t in agent_tools if t in ws_set]
 
 
 def _kill_group(pid: int, sig: int) -> None:
@@ -337,46 +307,4 @@ async def _run_claude(
     )
 
 
-def _parse_envelope(raw: str) -> dict[str, Any] | None:
-    """Pull the first JSON object out of claude's stdout."""
-    raw = raw.strip()
-    if raw.startswith("{"):
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-    start = raw.find("{")
-    if start < 0:
-        return None
-    try:
-        return json.loads(raw[start:])
-    except json.JSONDecodeError:
-        return None
-
-
-def _build_usage_event(run_id: str, envelope: dict[str, Any]) -> UsageEvent | None:
-    usage = envelope.get("usage")
-    if not isinstance(usage, dict):
-        return None
-    model_usage = envelope.get("modelUsage")
-    model_name: str | None = None
-    if isinstance(model_usage, dict) and model_usage:
-        model_name = next(iter(model_usage.keys()), None)
-    return UsageEvent(
-        run_id=run_id,
-        input_tokens=int(usage.get("input_tokens") or 0),
-        output_tokens=int(usage.get("output_tokens") or 0),
-        cache_read_tokens=int(usage.get("cache_read_input_tokens") or 0),
-        cache_write_tokens=int(usage.get("cache_creation_input_tokens") or 0),
-        cost_usd=_safe_float(envelope.get("total_cost_usd")),
-        model=model_name,
-    )
-
-
-def _safe_float(v: Any) -> float | None:
-    if v is None:
-        return None
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
+__all__ = ["ClaudeCodeBackend", "_run_claude"]

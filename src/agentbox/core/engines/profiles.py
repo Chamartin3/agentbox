@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.agents.resolve import resolve_engine_by_name
+from agentbox.core.engines.backends.registry import get_backend as resolve_engine_by_name
 from agentbox.core.engines.providers import get_provider
 
 SourceType = Literal[

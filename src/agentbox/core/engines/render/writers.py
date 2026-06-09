@@ -17,14 +17,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Final, Protocol
 
+from agentbox.core.engines.render._common import _dump_json
+from agentbox.core.engines.render.claude_agents import build_claude_agents
+from agentbox.core.engines.render.claude_mcp import build_claude_mcp_config
+from agentbox.core.engines.render.claude_settings import build_claude_settings
 from agentbox.core.engines.render.discovery import DiscoveredAgent
-from agentbox.core.engines.render.generator import (
-    _dump_json,
-    build_claude_agents,
-    build_claude_mcp_config,
-    build_claude_settings,
-    build_opencode_config,
-)
+from agentbox.core.engines.render.opencode_config import build_opencode_config
+from agentbox.core.engines.render.schemas.claude import ClaudeSettingsConfig
+from agentbox.core.engines.render.schemas.opencode import OpenCodeConfig
 
 
 @dataclass(frozen=True)
@@ -113,7 +113,8 @@ class ClaudeSettingsWriter:
             agents, ctx.allowed_builtin, ctx.claude_mcp_prefix
         )
         path = _dump_json(target_dir / self.filename, data)
-        allow_count = len(data["permissions"]["allow"])  # type: ignore[union-attr]
+        cfg = ClaudeSettingsConfig.model_validate(data)
+        allow_count = len(cfg.permissions.allow)
         return WriteResult(
             key=self.key,
             path=path,
@@ -170,12 +171,8 @@ class OpenCodeWriter:
             servers=ctx.servers,
         )
         path = _dump_json(target_dir / self.filename, data)
-        agent_block = data["agent"]  # type: ignore[index]
-        enabled = [
-            k
-            for k, v in agent_block.items()  # type: ignore[union-attr]
-            if not v.get("disable")  # type: ignore[union-attr]
-        ]
+        cfg = OpenCodeConfig.model_validate(data)
+        enabled = [k for k, v in cfg.agent.items() if not v.disable]
         return WriteResult(
             key=self.key,
             path=path,

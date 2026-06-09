@@ -243,7 +243,6 @@ class RunConfigurator:
         mcp: McpConfig | None = None,
     ) -> None:
         """Dispatch to per-backend generators."""
-        from agentbox.core.engines.render.backends import get_generator
 
         generator = get_generator(backend)
         if generator is not None:

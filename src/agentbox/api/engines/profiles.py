@@ -10,11 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from agentbox.api._pagination import paginate_list
 from agentbox.api.deps import get_store
-from agentbox.core.data import SessionStore
-from agentbox.core.data import (RunnerProfile,
+from agentbox.core.service import (
+    RunnerProfile,
     RunnerProfileCreate,
     RunnerProfilePatch,
     RunnerProfileStats,
+    SessionStore,
 )
 from agentbox.core.service.engines import profiles as svc
 from agentbox.core.service.engines.profile_validation import InvalidProfile
