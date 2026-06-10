@@ -30,10 +30,14 @@ __all__ = [
 
 
 def list_all(store: SessionStore, settings: Settings) -> list[WorkspaceInfo]:
-    """Deprecated: moved to ``core.service.workspaces``."""
-    from agentbox.core.service.agents import list_all_agents
-
-    return [info(a, settings, store) for a in list_all_agents(store=store)]
+    """Deprecated: moved to ``core.service.workspaces.registry.list_all_workspaces``."""
+    warnings.warn(
+        "manager.list_all is deprecated; use list_all_workspaces from "
+        "core.service.workspaces.registry",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return [info(a, settings, store) for a in store.list_agents_with_latest()]
 
 
 # Re-export crud operations for backward compatibility

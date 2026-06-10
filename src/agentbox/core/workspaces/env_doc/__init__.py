@@ -4,7 +4,7 @@ Single structured source-of-truth that renders into both `CLAUDE.md` and
 `AGENTS.md` at run-prepare time.
 """
 
-from agentbox.core.workspaces.envdoc.schema import (
+from agentbox.core.workspaces.env_doc.schema import (
     Command,
     CustomLink,
     EnvDocContent,

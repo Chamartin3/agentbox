@@ -1,0 +1,13 @@
+engine: opencode
+
+layout:
+  context: opencode.json
+  subagent: agents/{name}.md
+
+serialization:
+  context: json
+  subagent: raw
+
+templates:
+  context: templates/opencode.json.tmpl
+  subagent: templates/subagent.md.tmpl

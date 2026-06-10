@@ -8,7 +8,7 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.data import VALID_POLICIES
+from agentbox.core.service import VALID_POLICIES
 from agentbox.core.service import (
     get_project_mcp_servers,
     get_workspace_mcp_policy,

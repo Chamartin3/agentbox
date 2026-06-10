@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from agentbox.core.workspaces.envdoc.renderers.base import (
+from agentbox.core.workspaces.env_doc.renderers.base import (
     EnvDocRenderer,
     RuntimeContext,
     _render_body,
 )
-from agentbox.core.workspaces.envdoc.schema import EnvDocContent
+from agentbox.core.workspaces.env_doc.schema import EnvDocContent
 
 
 class ClaudeMdRenderer(EnvDocRenderer):

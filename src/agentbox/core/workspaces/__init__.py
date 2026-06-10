@@ -11,16 +11,16 @@ from agentbox.core.workspaces.subagent_render import (
 from agentbox.core.resources.workspace_materialize import (
     materialize_workspace as materialize_workspace,
 )
-from agentbox.core.workspaces.envdoc.renderers.agents_md import (
+from agentbox.core.workspaces.env_doc.renderers.agents_md import (
     AgentsMdRenderer as AgentsMdRenderer,
 )
-from agentbox.core.workspaces.envdoc.renderers.base import (
+from agentbox.core.workspaces.env_doc.renderers.base import (
     RuntimeContext as RuntimeContext,
 )
-from agentbox.core.workspaces.envdoc.renderers.claude_md import (
+from agentbox.core.workspaces.env_doc.renderers.claude_md import (
     ClaudeMdRenderer as ClaudeMdRenderer,
 )
-from agentbox.core.workspaces.envdoc.schema import (
+from agentbox.core.workspaces.env_doc.schema import (
     EnvDocContent as EnvDocContent,
 )
 from agentbox.core.workspaces.crud import (

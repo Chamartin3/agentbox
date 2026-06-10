@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from agentbox.core.workspaces.envdoc.schema import EnvDocContent, Section, Visibility
+from agentbox.core.workspaces.env_doc.schema import EnvDocContent, Section, Visibility
 
 
 @dataclass(frozen=True)

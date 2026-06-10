@@ -209,7 +209,7 @@ def set_permissions(
     mcp_manifest: Any | None = None,
     sync_cb: Any = None,
 ) -> dict:
-    ws_path, project_root = resolve_workspace_path(
+    ws_path, _project_root = resolve_workspace_path(
         name, store=store, settings=settings, loader=loader
     )
 
@@ -239,16 +239,15 @@ def set_permissions(
     )
     _write_capabilities_artifact(ws_path, effective)
 
-    allowed_tools = set(effective.get("allowed_tools") or [])
-    from .configs import _make_generator
+    # Lazy import avoids circular dependency: permissions → configs → permissions.
+    from .configs import generate_configs_by_name  # noqa: PLC0415
 
-    generator = _make_generator(project_root, store, mcp_manifest)
-    generated_paths = generator.generate_for_workspace(
-        ws_path,
-        allowed_tools=allowed_tools if allowed_tools else None,
-        allowed_builtin_tools=effective.get("allowed_builtin_tools") or [],
-        files=effective.get("files") or [],
-        project_root=project_root,
+    config_result = generate_configs_by_name(
+        name,
+        store=store,
+        settings=settings,
+        loader=loader,
+        mcp_manifest=mcp_manifest,
     )
 
     if sync_cb is not None:
@@ -261,11 +260,7 @@ def set_permissions(
         "workspace": name,
         "path": str(ws_path / "permissions" / "capabilities.json"),
         "permissions": effective,
-        "regenerated": {
-            "claude_agents": str(generated_paths["claude_agents"]),
-            "claude_settings": str(generated_paths["claude_settings"]),
-            "opencode": str(generated_paths["opencode"]),
-        },
+        "regenerated": config_result.get("generated", {}),
     }
 
 

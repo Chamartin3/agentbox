@@ -14,10 +14,10 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
-from agentbox.core.workspaces.envdoc.renderers.agents_md import AgentsMdRenderer
-from agentbox.core.workspaces.envdoc.renderers.base import RuntimeContext
-from agentbox.core.workspaces.envdoc.renderers.claude_md import ClaudeMdRenderer
-from agentbox.core.workspaces.envdoc.schema import EnvDocContent
+from agentbox.core.workspaces.env_doc.renderers.agents_md import AgentsMdRenderer
+from agentbox.core.workspaces.env_doc.renderers.base import RuntimeContext
+from agentbox.core.workspaces.env_doc.renderers.claude_md import ClaudeMdRenderer
+from agentbox.core.workspaces.env_doc.schema import EnvDocContent
 
 if TYPE_CHECKING:
     from agentbox.core.data import WorkspaceBuildStore

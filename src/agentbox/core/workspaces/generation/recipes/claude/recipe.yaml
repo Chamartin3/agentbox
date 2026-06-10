@@ -1,0 +1,19 @@
+engine: claude
+
+layout:
+  context: CLAUDE.md
+  subagent: .claude/agents/{name}.md
+  skill: .claude/skills/{name}/SKILL.md
+  mcp_config: .mcp.json
+  permissions: .claude/settings.json
+
+serialization:
+  mcp_config: json
+  permissions: json
+  context: raw
+  subagent: raw
+  skill: raw
+
+templates:
+  context: templates/context.md.tmpl
+  subagent: templates/subagent.md.tmpl
