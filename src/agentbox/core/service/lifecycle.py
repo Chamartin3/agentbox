@@ -15,11 +15,11 @@ from dataclasses import dataclass, field, replace
 from typing import Final
 
 from agentbox.config import Settings
-from agentbox.core.agents.composition.versioning.drift import startup_sweep
+from agentbox.core.agents.composition.drift import startup_sweep
 from agentbox.core.data import ProjectManifest, SessionStore
-from agentbox.core.data.manifest import McpServerSpec
+from agentbox.core.data.workspaces.manifest import McpServerSpec
 from agentbox.core.data.engines.seeds import seed_default_runner_profiles
-from agentbox.core.resources.boot_import import (
+from agentbox.core.resources.boot import (
     import_composition_references,
     import_repo_resources,
     sweep_workspace_skill_bindings,

@@ -15,7 +15,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from agentbox.api.deps import get_store
-from agentbox.core.data import McpServerSpec
+from agentbox.core.service import McpServerSpec
 
 router = APIRouter(prefix="/api/project", tags=["project"])
 

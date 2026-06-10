@@ -25,11 +25,13 @@ import typer
 
 from agentbox.cli._deps import (
     get_loader as _get_loader,  # _NoopLoader stub
+    get_store,
 )
 from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
-from agentbox.core.data import AgentDef
+from agentbox.core.service import AgentDef
 from agentbox.core.engines.render import ConfigGenerator
+from agentbox.core.workspaces.build import build_workspace
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
 SUPPORTED_RUNNERS = ("claude", "opencode", "codex", "pi", "shell")
@@ -140,9 +142,7 @@ def _launch_session(
 
     agent_def: AgentDef | None = None
     if agent:
-        from agentbox.cli._deps import get_store as _gs
-
-        agent_def = _gs().get_agent_def(agent)
+        agent_def = get_store().get_agent_def(agent)
         if agent_def is None:
             console.print(f"[red]Unknown agent:[/red] {agent!r}")
             raise typer.Exit(1)
@@ -157,9 +157,6 @@ def _launch_session(
     # workspace before the runner starts. Skipped for ephemeral/unnamed
     # workspaces (build_workspace also no-ops on those).
     if workspace_name and not is_ephemeral:
-        from agentbox.cli._deps import get_store
-        from agentbox.core.workspaces.build import build_workspace
-
         try:
             sync_result = build_workspace(
                 store=get_store(),
@@ -268,7 +265,6 @@ def _resolve_workspace(
         # Manifest miss — try the DB registry (db-only workspaces created
         # via the API/UI). Returning the name lets build_workspace
         # materialize env-doc + resource bindings.
-        from agentbox.cli._deps import get_store
 
         db_row = get_store().get_workspace(ws_name)
         if db_row is not None:
@@ -334,7 +330,6 @@ def _make_generator(
     manifest: object,
     workspace_id: str | None = None,
 ) -> ConfigGenerator:
-    from agentbox.cli._deps import get_store
 
     mcp_server_name = "mcp"
     mcp_command: list[str] = ["mcp_serve.sh"]

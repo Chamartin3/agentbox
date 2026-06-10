@@ -6,37 +6,24 @@ from pathlib import Path
 
 import typer
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.cli._common import console, handle_cli_errors, resolve_agent
+from agentbox.cli._common import console, resolve_agent
 from agentbox.cli._deps import get_settings, get_store
-from agentbox.core import prompts
+from agentbox.cli.agents._common import _coerce, _set_dotted
 from agentbox.core.service import (
     AgentDef,
-    branch_agent_draft,
     build_agent_snapshot,
     build_config_json_payload,
-    clear_agent_runner_profile,
     create_agent,
     create_agent_version,
     get_agent_def,
     get_agent_runner_profile,
-    get_prompt_version,
-    get_runner_profile,
     latest_agent_version,
-    publish_agent_version,
-    rollback_agent_to,
-    set_agent_runner_profile,
     soft_delete_agent,
 )
 from agentbox.core.service.agents import (
-    VersionFileNotFound,
-    VersionNotDraft,
-    VersionNotFound,
-    delete_version_file,
     list_all_agents,
-    upload_version_file,
 )
 
 agent_app = typer.Typer(
@@ -166,89 +153,54 @@ def agent_show(agent_id: str) -> None:
         console.print(Panel(mcp_list, title="MCP Servers", border_style="yellow"))
 
 
-@agent_app.command("prompt")
-def agent_prompt(
-    agent_id: str,
-    version: int | None = typer.Option(
-        None, "--version", help="Prompt version to display"
-    ),
-) -> None:
-    """Print the agent's system prompt."""
-    a = resolve_agent(agent_id)
-    settings = get_settings()
-    store = get_store()
-
-    if version is not None:
-        committed = get_prompt_version(store, agent_id, version)
-        if committed is None:
-            console.print(
-                f"[red]version {version} not found for agent {agent_id!r}[/red]"
-            )
-            raise typer.Exit(2)
-        content = committed["content"]
-    else:
-        doc = prompts.read_versioned(a, settings.project_root, store)
-        content = doc.content
-
-    if not content:
-        console.print("[yellow]No prompt content for this agent.[/yellow]")
-        return
-
-    console.print(Syntax(content, "markdown", theme="ansi_dark"))
-
-
 # ---------------------------------------------------------------------------
 # Plan 18 — DB-only write commands. These talk to the store directly so they
 # work in offline contexts (no HTTP server required).
 # ---------------------------------------------------------------------------
 
 
-def _set_dotted(obj: dict, dotted: str, value: object) -> None:
-    parts = dotted.split(".")
-    cur = obj
-    for p in parts[:-1]:
-        nxt = cur.get(p)
-        if not isinstance(nxt, dict):
-            nxt = {}
-            cur[p] = nxt
-        cur = nxt
-    cur[parts[-1]] = value
-
-
-def _coerce(value: str) -> object:
-    """Try JSON first (so ``[1,2]`` / ``true`` parse), else return the str."""
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError:
-        return value
-
-
 @agent_app.command("create")
 def agent_create(
-    config: Path = typer.Option(
-        ...,
+    name: str = typer.Option(
+        "",
+        "--name",
+        "-n",
+        help="Agent id + display name. Creates a minimal agent with sensible defaults.",
+    ),
+    config: Path | None = typer.Option(
+        None,
         "--config",
         "-c",
         exists=True,
         readable=True,
         help="Path to inline JSON config (full AgentDef shape).",
     ),
-    author: str = typer.Option(..., "--author"),
+    author: str = typer.Option(
+        "cli",
+        "--author",
+        help="Author identifier.",
+    ),
     changelog: str = typer.Option(
         "initial draft", "--changelog", help="Changelog (min 3 chars)."
     ),
 ) -> None:
-    """Create a new DB-only agent from an inline JSON config file.
+    """Create a new DB-only agent.
 
-    The config file must be a JSON object matching ``AgentDef``. No on-disk
-    backing file is created; the agent lives entirely in the DB.
+    Use ``--config`` to load a full AgentDef JSON file, or ``--name`` to
+    create a minimal agent with sensible defaults (no disk file required).
     """
-    data = json.loads(config.read_text(encoding="utf-8"))
-    try:
-        agent_def = AgentDef.model_validate(data)
-    except Exception as exc:
-        console.print(f"[red]invalid AgentDef:[/red] {exc}")
-        raise typer.Exit(2) from exc
+    if config is not None:
+        data = json.loads(config.read_text(encoding="utf-8"))
+        try:
+            agent_def = AgentDef.model_validate(data)
+        except Exception as exc:
+            console.print(f"[red]invalid AgentDef:[/red] {exc}")
+            raise typer.Exit(2) from exc
+    elif name:
+        agent_def = AgentDef(id=name, description=name)
+    else:
+        console.print("[red]either --config or --name is required[/red]")
+        raise typer.Exit(2)
 
     store = get_store()
     if latest_agent_version(store, agent_def.id) is not None:
@@ -363,197 +315,3 @@ def agent_delete(
         console.print(f"[red]agent {agent_id!r} not found[/red]")
         raise typer.Exit(1)
     console.print(f"[green]deleted[/green] {agent_id!r}")
-
-
-# ---------------------------------------------------------------------------
-# Agent lifecycle — draft, publish, rollback
-# ---------------------------------------------------------------------------
-
-
-@agent_app.command("draft")
-def agent_draft(
-    agent_id: str = typer.Argument(..., help="Agent ID"),
-    author: str = typer.Option("cli", "--author", help="Author identifier"),
-) -> None:
-    """Create a new draft version by cloning the active version."""
-    resolve_agent(agent_id)
-    store = get_store()
-    with handle_cli_errors():
-        result = branch_agent_draft(store, agent_id, author=author)
-    console.print(
-        f"[green]draft created[/green] v{result.get('version')} "
-        f"(id={result.get('id')})"
-    )
-
-
-@agent_app.command("publish")
-def agent_publish(
-    agent_id: str = typer.Argument(..., help="Agent ID"),
-    version: int = typer.Argument(..., help="Version number to publish"),
-    reason: str = typer.Option("cli publish", "--reason", help="Publish reason"),
-) -> None:
-    """Publish a draft version (set as active)."""
-    resolve_agent(agent_id)
-    store = get_store()
-    with handle_cli_errors():
-        result = publish_agent_version(store, agent_id, version, reason)
-    console.print(
-        f"[green]published[/green] v{result.get('version')} "
-        f"(id={result.get('id')})"
-    )
-
-
-@agent_app.command("rollback")
-def agent_rollback(
-    agent_id: str = typer.Argument(..., help="Agent ID"),
-    version: int = typer.Argument(..., help="Target version to roll back to"),
-    reason: str = typer.Option(..., "--reason", help="Rollback reason (min 3 chars)"),
-    author: str = typer.Option("cli", "--author", help="Author identifier"),
-) -> None:
-    """Roll back to a previous agent version (creates a new version)."""
-    resolve_agent(agent_id)
-    store = get_store()
-    with handle_cli_errors():
-        result = rollback_agent_to(store, agent_id, version, reason, author=author)
-    console.print(
-        f"[green]rolled back[/green] to v{version} (new v{result.get('version')})"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Runner profile binding
-# ---------------------------------------------------------------------------
-
-
-@agent_app.command("runner-profile")
-def agent_runner_profile(
-    agent_id: str = typer.Argument(..., help="Agent ID"),
-    get: bool = typer.Option(False, "--get", help="Show the bound runner profile"),
-    set_: str | None = typer.Option(
-        None, "--set", help="Runner profile ID to bind"
-    ),
-    clear: bool = typer.Option(
-        False, "--clear", help="Remove the runner profile binding"
-    ),
-) -> None:
-    """Get, set, or clear the runner profile bound to an agent.
-
-    Examples:
-        agents runner-profile my-agent --get
-        agents runner-profile my-agent --set <profile_id>
-        agents runner-profile my-agent --clear
-    """
-    if sum([get, set_ is not None, clear]) != 1:
-        console.print(
-            "[red]exactly one of --get, --set, or --clear must be specified[/red]"
-        )
-        raise typer.Exit(2)
-
-    resolve_agent(agent_id)
-    store = get_store()
-
-    if get:
-        profile = get_agent_runner_profile(store, agent_id)
-        if profile is None:
-            console.print("[dim]no runner profile bound[/dim]")
-        else:
-            console.print(
-                f"[bold]{profile.id}[/bold] — {profile.name} "
-                f"([cyan]{profile.backend}[/cyan] / {profile.provider or 'default'})"
-            )
-    elif set_:
-        profile = get_runner_profile(store, set_)
-        if profile is None:
-            console.print(f"[red]runner profile {set_!r} not found[/red]")
-            raise typer.Exit(1)
-        set_agent_runner_profile(store, agent_id, set_)
-        console.print(f"[green]bound[/green] profile {set_!r} to {agent_id!r}")
-    elif clear:
-        clear_agent_runner_profile(store, agent_id)
-        console.print(f"[yellow]cleared[/yellow] profile binding for {agent_id!r}")
-
-
-# ---------------------------------------------------------------------------
-# Version files
-# ---------------------------------------------------------------------------
-
-
-@agent_app.command("files")
-def agent_files(
-    agent_id: str = typer.Argument(..., help="Agent ID"),
-    version: int = typer.Argument(..., help="Version number"),
-    add: bool = typer.Option(False, "--add", help="Add a file to the version"),
-    rm: int | None = typer.Option(
-        None, "--rm", help="File ID to remove from the version"
-    ),
-    kind: str | None = typer.Option(
-        None, "--kind", help="File kind (output_schema, input_schema, etc.)"
-    ),
-    name: str | None = typer.Option(
-        None, "--name", help="File name for --add"
-    ),
-    content: str | None = typer.Option(
-        None, "--content", help="File content for --add"
-    ),
-) -> None:
-    """Add or remove version bundle files.
-
-    Examples:
-        agents files my-agent 1 --add --kind output_schema --name schema.json --content '{"...""}'
-        agents files my-agent 1 --rm 42
-    """
-    if add and rm is not None:
-        console.print("[red]use --add or --rm, not both[/red]")
-        raise typer.Exit(2)
-    if not add and rm is None:
-        console.print("[red]use --add or --rm[/red]")
-        raise typer.Exit(2)
-
-    store = get_store()
-
-    if add:
-        if not kind or not name or not content:
-            console.print(
-                "[red]--kind, --name, and --content required for --add[/red]"
-            )
-            raise typer.Exit(2)
-        try:
-            result = upload_version_file(
-                store=store,
-                agent_id=agent_id,
-                version=version,
-                kind=kind,
-                name=name,
-                content=content,
-            )
-        except VersionNotFound:
-            console.print(f"[red]version {version} not found[/red]")
-            raise typer.Exit(1)
-        except VersionNotDraft as exc:
-            console.print(f"[red]{exc}[/red]")
-            raise typer.Exit(1)
-        except Exception as exc:
-            console.print(f"[red]{exc}[/red]")
-            raise typer.Exit(1)
-        console.print(
-            f"[green]added[/green] {name!r} (file_id={result['file']['id']}, "
-            f"sha256={result['sha256'][:8]})"
-        )
-    elif rm is not None:
-        try:
-            delete_version_file(
-                store=store,
-                agent_id=agent_id,
-                version=version,
-                file_id=rm,
-            )
-        except VersionNotFound:
-            console.print(f"[red]version {version} not found[/red]")
-            raise typer.Exit(1)
-        except VersionNotDraft:
-            console.print("[red]version is not a draft[/red]")
-            raise typer.Exit(1)
-        except VersionFileNotFound:
-            console.print(f"[red]file {rm} not found[/red]")
-            raise typer.Exit(1)
-        console.print(f"[yellow]removed[/yellow] file {rm} from v{version}")

@@ -30,8 +30,17 @@ from agentbox.core.agents.config import (
     build_config_json_payload as build_config_json_payload,
     resolve_output_config as resolve_output_config,
 )
+from agentbox.core.agents.runtime import (
+    AgentRuntimeView as AgentRuntimeView,
+    ComposedPrompt as ComposedPrompt,
+    capture_fragments as capture_fragments,
+    compose_prompt as compose_prompt,
+    validate_output as validate_output,
+)
 
 __all__ = [
+    "AgentRuntimeView",
+    "ComposedPrompt",
     "ExecutionConfig",
     "HttpValidatorConfig",
     "OutputConfig",
@@ -40,9 +49,12 @@ __all__ = [
     "ScriptValidatorConfig",
     "build_config_json_payload",
     "build_fragments",
+    "capture_fragments",
+    "compose_prompt",
     "fragments_to_json",
     "load_bundle_from_bindings",
     "resolve_output_config",
     "resolve_prompt",
+    "validate_output",
     "_append_output_contract",
 ]

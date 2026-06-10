@@ -6,8 +6,15 @@ from rich.text import Text
 
 from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
+from agentbox.core.data.system.project_config import (
+    PROJECT_MCP_SERVERS,
+    PROJECT_RUNTIME,
+    PROJECT_SHARED_ASSETS,
+)
+from agentbox.core.data.system.seeds import backfill as _backfill_prompt_versions
 from agentbox.core.migrations import migrate_capabilities_to_manifest
 from agentbox.core.service import (
+    ProjectManifest,
     build_config_json_str,
     get_active_agent_version,
     get_agent_def,
@@ -136,13 +143,6 @@ def import_manifest(
     import tomllib
     from pathlib import Path
 
-    from agentbox.core.data import ProjectManifest
-    from agentbox.core.data.system.project_config import (
-        PROJECT_MCP_SERVERS,
-        PROJECT_RUNTIME,
-        PROJECT_SHARED_ASSETS,
-    )
-
     settings = get_settings()
     store = get_store()
 
@@ -219,8 +219,6 @@ def migrate_prompt_versions() -> None:
 
     See ``agentbox.core.data.backfill_prompt_versions``.
     """
-    from agentbox.core.data.system.seeds import backfill
-
     store = get_store()
-    n = backfill(store)
+    n = _backfill_prompt_versions(store)
     console.print(f"[green]✓[/green] backfilled {n} run(s) with prompt_version_id")

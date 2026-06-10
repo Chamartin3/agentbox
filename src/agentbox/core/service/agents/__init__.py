@@ -6,7 +6,7 @@ source of truth. There is no manifest fallback.
 Import from this package — the submodules are internal.
 """
 
-from agentbox.core.agents.composition.versioning.drift import (
+from agentbox.core.agents.composition.drift import (
     _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
 )
 

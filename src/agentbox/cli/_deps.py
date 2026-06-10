@@ -15,7 +15,7 @@ from functools import lru_cache
 from typing import Any
 
 from agentbox.config import Settings, load_settings
-from agentbox.core.data import ProjectManifest, SessionStore
+from agentbox.core.service import ProjectManifest, SessionStore
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.mcp.client import McpRegistry
 

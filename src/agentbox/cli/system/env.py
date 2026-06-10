@@ -17,6 +17,7 @@ from agentbox.core.service import (
     get_active_env_doc,
     list_env_doc_versions,
     publish_env_doc,
+    render_env_doc,
     rollback_env_doc,
     save_env_doc,
 )
@@ -183,8 +184,6 @@ def env_doc_preview(
             f"[yellow]No active env doc for workspace {workspace_id!r}.[/yellow]"
         )
         return
-
-    from agentbox.core.execution.prepare.envdoc import render_env_doc
 
     try:
         entries = render_env_doc(

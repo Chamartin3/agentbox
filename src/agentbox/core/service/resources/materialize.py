@@ -14,7 +14,6 @@ from agentbox.core.resources.pydantic_export import schema_to_pydantic
 
 from agentbox.core.service.resources.repo import (
     InvalidResource,
-    NoActiveVersion,
     ResourceNotFound,
     _active_version_or_raise,
     _require_resource,

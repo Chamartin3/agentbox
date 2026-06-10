@@ -18,7 +18,7 @@ from starlette.requests import Request
 
 from agentbox.api import (
     agents,
-    analytics,
+    feedback,
     resources,
     engines as runners,
     runs,
@@ -97,7 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(resources.router)
     app.include_router(runners.router)
-    app.include_router(analytics.router)
+    app.include_router(feedback.router)
     app.include_router(system.router)
 
     # SPA assets.

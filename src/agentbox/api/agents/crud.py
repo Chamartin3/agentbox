@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_loader, get_settings, get_store
-from agentbox.api.webhooks import schedule_agent_event_webhook
+from agentbox.api.runs.webhooks import schedule_agent_event_webhook
 from agentbox.core.service import RunnerProfile
 from agentbox.core.service.agents import (
     get_agent_detail,

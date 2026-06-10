@@ -17,7 +17,11 @@ from agentbox.cli._deps import get_loader as _DefinitionLoaderShim
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
 from agentbox.config import load_settings
+from agentbox.core import workspaces as ws_workspaces
+from agentbox.core.engines.backends.registry import backends as plugins_backends
 from agentbox.core.engines.render import ConfigGenerator
+from agentbox.core.engines.credentials import list_all as _creds_list
+from agentbox.core.engines.credentials.state import CredentialState
 from agentbox.core.service import get_project_mcp_servers
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
@@ -133,10 +137,7 @@ def doctor() -> None:
 
     # 3. All workspaces resolvable
     try:
-        from agentbox.cli._deps import get_store as _gs
-        from agentbox.core import workspaces as ws
-
-        rows = ws.list_all(_gs(), settings)
+        rows = ws_workspaces.list_all(get_store(), settings)
         resolvable = True
         for w in rows:
             if not w.exists and not w.ephemeral:
@@ -157,9 +158,7 @@ def doctor() -> None:
 
     # 5. Plugins loadable
     try:
-        from agentbox.core.engines.backends.registry import backends as plugins
-
-        backend_count = len(plugins.backends())
+        backend_count = len(plugins_backends.backends())
         _ok(
             "Plugins",
             f"{backend_count} backend(s)",
@@ -194,11 +193,21 @@ def doctor() -> None:
 
     # 7. Credentials
     try:
-        from agentbox.core.engines.credentials import list_all as _creds_list
-
         rows = _creds_list()
-        configured = sum(1 for r in rows if getattr(r, "configured", False))
-        _ok("Credentials", f"{configured}/{len(rows)} backend(s) configured")
+        if not rows:
+            _ok("Credentials", "no backends registered")
+        else:
+            _ok("Credentials", f"{len(rows)} backend(s)")
+            for r in rows:
+                state = r.detect()
+                label = "configured" if state == CredentialState.PRESENT else "missing"
+                if state == CredentialState.PRESENT:
+                    _ok(f"  {r.backend}", label)
+                else:
+                    _warn(
+                        f"  {r.backend}",
+                        f"{label} (run `agentbox ops creds setup {r.backend}`)",
+                    )
     except Exception as exc:
         _warn("Credentials", str(exc))
 
@@ -212,5 +221,3 @@ def doctor() -> None:
 
     console.print(table)
     raise typer.Exit(min(failures, 1))
-
-

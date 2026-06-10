@@ -9,7 +9,7 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.data import McpServerSpec
+from agentbox.core.service import McpServerSpec
 from agentbox.core.service import (
     delete_project_mcp_server,
     get_project_mcp_servers,

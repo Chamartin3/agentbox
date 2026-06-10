@@ -8,9 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from agentbox.api.deps import get_settings, get_store
-from agentbox.core.data import SessionStore
+from agentbox.core.service import SessionStore
 from agentbox.core.service import env_doc as svc
-from agentbox.core.workspaces.envdoc.schema import EnvDocContent
+from agentbox.core.workspaces.env_doc.schema import EnvDocContent
 
 router = APIRouter(tags=["env-doc"])
 

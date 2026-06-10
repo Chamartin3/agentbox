@@ -7,7 +7,7 @@ deep core internals. This keeps the internal organization private.
 # ── Data / persistence ────────────────────────────────────────────────
 # ── Agent config / profiles / plugins ─────────────────────────────────
 from agentbox.core.agents.config import build_config_json_payload as build_config_json_payload
-from agentbox.core.agents.composition.versioning.drift import _build_config_json as build_config_json_str  # noqa: F401
+from agentbox.core.agents.composition.drift import _build_config_json as build_config_json_str  # noqa: F401
 from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure  # noqa: F401
 from agentbox.core.agents.resolve import list_engines as backends  # noqa: F401
 from agentbox.core.agents.resolve import resolve_engine_by_name as get_backend  # noqa: F401
@@ -23,10 +23,15 @@ from agentbox.core.data import read_transcript as read_transcript
 from agentbox.core.data import AgentDef as AgentDef
 from agentbox.core.data import AgentSource as AgentSource
 from agentbox.core.data import CompositionConfig as CompositionConfig
+from agentbox.core.data import McpServerSpec as McpServerSpec
+from agentbox.core.data import ProjectManifest as ProjectManifest
 from agentbox.core.data import RunnerSpec as RunnerSpec
 from agentbox.core.data import VALID_POLICIES as VALID_POLICIES
 from agentbox.core.data import RunnerProfile as RunnerProfile
 from agentbox.core.data import RunnerProfileCreate as RunnerProfileCreate
+from agentbox.core.data import RunnerProfilePatch as RunnerProfilePatch
+from agentbox.core.data import RunnerProfileStats as RunnerProfileStats
+from agentbox.core.data import RunRecord as RunRecord
 from agentbox.core.data import SessionStore as SessionStore
 from agentbox.core.data import SharedResourceRecord as SharedResourceRecord
 from agentbox.core.data import WorkspaceDef as WorkspaceDef
@@ -52,7 +57,6 @@ from agentbox.core.resources.importers.zip import ZipUploadImporter as ZipUpload
 # ── Resources ─────────────────────────────────────────────────────────
 from agentbox.core.resources.skills import discover_skills as discover_skills
 from agentbox.core.resources.skills import find_skill as find_skill
-from agentbox.core.engines.render import ConfigGenerator as ConfigGenerator
 
 # ── Run execution ─────────────────────────────────────────────────────
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable as NoBackendAvailable
@@ -146,9 +150,9 @@ from agentbox.core.service.workspace_admin import save_env_doc as save_env_doc
 from agentbox.core.service.workspace_admin import set_workspace_mcp_policy as set_workspace_mcp_policy
 from agentbox.core.service.workspace_admin import set_workspace_mcp_server_override as set_workspace_mcp_server_override
 from agentbox.core.service.workspace_admin import update_agent_meta as update_agent_meta
-from agentbox.core.workspaces.envdoc.renderers import AgentsMdRenderer as AgentsMdRenderer
-from agentbox.core.workspaces.envdoc.renderers import ClaudeMdRenderer as ClaudeMdRenderer
-from agentbox.core.workspaces.envdoc.schema import EnvDocContent as EnvDocContent
+from agentbox.core.workspaces.env_doc.renderers import AgentsMdRenderer as AgentsMdRenderer
+from agentbox.core.workspaces.env_doc.renderers import ClaudeMdRenderer as ClaudeMdRenderer
+from agentbox.core.workspaces.env_doc.schema import EnvDocContent as EnvDocContent
 
 # ── Workspace ─────────────────────────────────────────────────────────
 from agentbox.core.workspaces.manager import WorkspaceInfo as WorkspaceInfo
@@ -157,7 +161,7 @@ from agentbox.core.workspaces.manager import claude_agents_path as claude_agents
 from agentbox.core.workspaces.manager import claude_settings_path as claude_settings_path
 from agentbox.core.workspaces.manager import ensure as ensure
 from agentbox.core.workspaces.manager import info as info
-from agentbox.core.workspaces.manager import list_all as list_all
+from agentbox.core.service.workspaces.registry import list_all_workspaces as list_all
 from agentbox.core.workspaces.manager import load_capabilities as load_capabilities
 from agentbox.core.workspaces.manager import opencode_config_path as opencode_config_path
 from agentbox.core.workspaces.manager import reset as reset
