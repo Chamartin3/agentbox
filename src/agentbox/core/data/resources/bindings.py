@@ -22,7 +22,7 @@ from collections.abc import Iterable
 
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.records import now_iso
+from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import (
     agent_prompt_resource_bindings,
     workspace_file_resource_bindings,
