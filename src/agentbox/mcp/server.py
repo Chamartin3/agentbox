@@ -12,7 +12,7 @@ from agentbox.mcp.tools import (
     prompts,
     resources,
     runs,
-    stats,
+    feedback,
     time,
 )
 
@@ -38,7 +38,7 @@ def build_server() -> FastMCP:
     runs.register(mcp)
     prompts.register(mcp)
     agents.register(mcp)
-    stats.register(mcp)
+    feedback.register(mcp)
     time.register(mcp)
     resources.register(mcp)
     agent_tools.register(mcp)

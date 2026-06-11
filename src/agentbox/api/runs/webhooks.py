@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.data import AgentDef, RunRecord, SessionStore
+from agentbox.core.service import AgentDef, RunRecord, SessionStore
 from agentbox.core.execution.webhooks import deliver_webhook, schedule_webhook as _schedule_webhook
 
 logger = logging.getLogger(__name__)

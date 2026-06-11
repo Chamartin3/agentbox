@@ -311,37 +311,6 @@ def register(mcp: FastMCP) -> None:
         return {"run_id": run_id, "output": rec.output, "status": rec.status}
 
     @mcp.tool
-    def list_run_comments(run_id: str) -> dict:
-        """List human/agent comments attached to a run.
-
-        Comments are free-form notes (typically from reviewers) used to
-        drive prompt improvements. Returns rows ordered by ``created_at``.
-        """
-        store = get_context().store
-        rec = store.get_run(run_id)
-        if rec is None:
-            return {"error": "not_found", "run_id": run_id}
-        items = store.list_run_comments(run_id)
-        return {"run_id": run_id, "items": items, "total": len(items)}
-
-    @mcp.tool
-    def add_run_comment(run_id: str, body: str, author: str = "mcp") -> dict:
-        """Append a review comment to a run.
-
-        ``body`` is required and must be non-empty. ``author`` defaults to
-        ``"mcp"`` — pass an agent name (e.g. ``"agent_reviewer"``) so the
-        provenance is preserved.
-        """
-        if not body or not body.strip():
-            return {"error": "empty_body"}
-        store = get_context().store
-        rec = store.get_run(run_id)
-        if rec is None:
-            return {"error": "not_found", "run_id": run_id}
-        row = store.add_run_comment(run_id, author, body)
-        return {"run_id": run_id, "comment": row}
-
-    @mcp.tool
     def get_run_errors(run_id: str) -> dict:
         """Error + validation errors for a failed run."""
         rec = get_context().store.get_run(run_id)
