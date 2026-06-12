@@ -5,13 +5,10 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from agentbox.core.data.manifest import (
-    AgentDef,
-    CompositionConfig,
-    ProjectManifest,
-    RunnerSpec,
-    WorkspaceDef,
-)
+from agentbox.core.data.agents.manifest import AgentDef, CompositionConfig
+from agentbox.core.data.engines.manifest import RunnerSpec
+from agentbox.core.data.system.manifest import ProjectManifest
+from agentbox.core.data.workspaces.manifest import WorkspaceDef
 
 
 class TestRunnerSpec:

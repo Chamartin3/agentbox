@@ -288,7 +288,7 @@ class RunSetupStore(Protocol):
 
     def list_active_grants(self, agent_id: str) -> set[str]: ...
 
-    def get_project_mcp_servers(self) -> list[dict]: ...
+    def get_project_mcp_servers(self) -> list[McpServerSpec]: ...
 
     def get_tool_manifest_path(self) -> str | None: ...
 
@@ -320,13 +320,13 @@ class RunSetupStore(Protocol):
 class SnapshotStore(Protocol):
     """Minimal store surface needed by the snapshot-writing layer."""
 
-    def get_runner_profile(self, profile_id: str) -> dict | None: ...
+    def get_runner_profile(self, profile_id: str) -> RunnerProfile | None: ...
 
     def save_run_runner_snapshot(
-        self, run_id: str, runner_snapshot: Any
+        self, run_id: str, runner_snapshot: RunnerSnapshot
     ) -> None: ...
 
-    def get_project_mcp_servers(self) -> list[dict]: ...
+    def get_project_mcp_servers(self) -> list[McpServerSpec]: ...
 
     def resolve_workspace_mcp(
         self,
@@ -340,8 +340,8 @@ class SnapshotStore(Protocol):
         self,
         run_id: str,
         *,
-        resource_snapshot: list | None = None,
-        mcp_snapshot: dict | None = None,
+        resource_snapshot: list[ResourceSnapshotEntry] | None = None,
+        mcp_snapshot: McpSnapshot | None = None,
     ) -> None: ...
 
     def resolve_workspace_host_env(

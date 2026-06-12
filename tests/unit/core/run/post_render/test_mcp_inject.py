@@ -64,7 +64,7 @@ class TestRequireReason:
 class TestSetPromptResources:
     def test_short_reason_returns_error(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.bindings.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_prompt_resources")
             result = fn("ag1", [], "xy")
@@ -73,7 +73,7 @@ class TestSetPromptResources:
     def test_calls_store(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
         ctx.store.replace_prompt_bindings.return_value = []
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.bindings.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_prompt_resources")
             result = fn("ag1", [], "add first binding")
@@ -98,7 +98,7 @@ class TestPreviewPrompt:
         ctx.store.get_agent_def.return_value = agent
         ctx.loader.get.return_value = agent
         ctx.store.list_prompt_bindings.return_value = []
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.prompts.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "preview_prompt")
             result = fn("ag1")
@@ -114,7 +114,7 @@ class TestPreviewPrompt:
         # Both DB and manifest must miss for resolve_agent to return None.
         ctx.store.get_agent_def.return_value = None
         ctx.loader.get.return_value = None
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.prompts.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "preview_prompt")
             result = fn("missing")
@@ -131,9 +131,9 @@ class TestDryRunWorkspaceResources:
         ctx = _make_ctx(tmp_path)
         fake = [{"dest_path": "docs/ref.md", "resource_id": "r1"}]
         with (
-            patch("agentbox.mcp.tools.resources.get_context", return_value=ctx),
+            patch("agentbox.mcp.tools.resources.workspace.get_context", return_value=ctx),
             patch(
-                "agentbox.mcp.tools.resources.resolve_workspace_resources",
+                "agentbox.mcp.tools.resources.workspace.resolve_workspace_resources",
                 return_value=fake,
             ),
         ):
@@ -152,7 +152,7 @@ class TestDryRunWorkspaceResources:
 class TestSetHostEnvGrants:
     def test_short_reason_rejected(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.workspace.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_host_env_grants")
             result = fn("ws1", {}, "xy")
@@ -162,7 +162,7 @@ class TestSetHostEnvGrants:
         ctx = _make_ctx(tmp_path)
         ctx.store.set_workspace_host_env.return_value = {"workspace_id": "ws1"}
         grants = {"fs.read": {"allowed_paths": ["/tmp"]}}
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.workspace.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_host_env_grants")
             result = fn("ws1", grants, "grant fs read")
@@ -183,7 +183,7 @@ class TestListHostEnvCalls:
         ctx.store.list_host_env_calls_for_run.return_value = [
             {"capability": "fs.read", "status": "ok"}
         ] * 3
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.workspace.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "list_host_env_calls")
             result = fn("run1")
@@ -213,7 +213,7 @@ class TestCreateRepoResourceZipRouting:
 
         ctx = _make_ctx(tmp_path)
         ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.repo.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource")
             result = fn(
@@ -231,7 +231,7 @@ class TestCreateRepoResourceZipRouting:
         ctx = _make_ctx(tmp_path)
         ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "document"}
         zip_b64 = base64.b64encode(_make_zip_bytes({"a.md": b"hi"})).decode()
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.repo.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource")
             result = fn(
@@ -257,7 +257,7 @@ class TestCreateRepoResourceZipRouting:
                 }
             )
         ).decode()
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.repo.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource")
             result = fn(
@@ -281,7 +281,7 @@ class TestCreateRepoResourceZipRouting:
 class TestCreateRepoResourceFromFiles:
     def test_rejects_non_skill_or_folder(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -295,7 +295,7 @@ class TestCreateRepoResourceFromFiles:
 
     def test_rejects_short_changelog(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -309,7 +309,7 @@ class TestCreateRepoResourceFromFiles:
 
     def test_rejects_empty_files(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -323,7 +323,7 @@ class TestCreateRepoResourceFromFiles:
 
     def test_rejects_unsafe_path(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -338,7 +338,7 @@ class TestCreateRepoResourceFromFiles:
 
     def test_rejects_duplicate_path(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -356,7 +356,7 @@ class TestCreateRepoResourceFromFiles:
 
     def test_skill_requires_skill_md(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -373,7 +373,7 @@ class TestCreateRepoResourceFromFiles:
         ctx = _make_ctx(tmp_path)
         ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
         ctx.store.import_repo_version.return_value = {"id": "v1"}
-        with patch("agentbox.mcp.tools.resources.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(

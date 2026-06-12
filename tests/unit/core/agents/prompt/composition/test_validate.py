@@ -44,7 +44,7 @@ class _ValidatorShim:
     def _validate_output(
         self, output: str, agent, workdir: Path
     ) -> tuple[bool, str, str]:
-        from agentbox.core.execution.validate import validate_output
+        from agentbox.core.execution.output_validate import validate_output
 
         agent.__dict__["_config_json"] = {
             "execution": {

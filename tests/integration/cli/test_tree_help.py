@@ -15,7 +15,7 @@ def test_root_help() -> None:
         "runners",
         "workspaces",
         "resources",
-        "analytics",
+        "feedback",
         "system",
         "ops",
         "serve",
@@ -75,8 +75,8 @@ def test_runners_help() -> None:
     assert "backends" in result.output
 
 
-def test_analytics_help() -> None:
-    result = runner.invoke(app, ["analytics", "--help"])
+def test_feedback_help() -> None:
+    result = runner.invoke(app, ["feedback", "--help"])
     assert result.exit_code == 0
     assert "activity" in result.output
     assert "usage" in result.output

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from agentbox.core.workspaces.envdoc.renderers.agents_md import AgentsMdRenderer
-from agentbox.core.workspaces.envdoc.renderers.base import (
+from agentbox.core.workspaces.env_doc.renderers.agents_md import AgentsMdRenderer
+from agentbox.core.workspaces.env_doc.renderers.base import (
     ReferenceEntry,
     RuntimeContext,
     _render_body,
     _visible_for,
 )
-from agentbox.core.workspaces.envdoc.renderers.claude_md import ClaudeMdRenderer
-from agentbox.core.workspaces.envdoc.schema import (
+from agentbox.core.workspaces.env_doc.renderers.claude_md import ClaudeMdRenderer
+from agentbox.core.workspaces.env_doc.schema import (
     Command,
     EnvDocContent,
     References,

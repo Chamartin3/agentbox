@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from agentbox.core.data.records import (
-    SharedResourceRecord,
-    now_iso,
-)
-from agentbox.core.data.runs.records import RunRecord
+from agentbox.core.data.execution.records import RunRecord
+from agentbox.core.data.resources.shared import SharedResourceRecord
+from agentbox.core.data.utils import now_iso
 
 
 class TestNowIso:

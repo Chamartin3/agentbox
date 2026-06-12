@@ -79,6 +79,7 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "workspace_runtime_permissions",
         "workspace_subagents",
         "workspaces",
+        "workenv_templates",
         # mixins
         "AgentConfigEventsMixin",
         "AgentSyncMixin",
@@ -99,9 +100,13 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "RuntimePermissionsMixin",
         "SettingsMixin",
         "SharedResourcesMixin",
+        "WorkenvTemplatesMixin",
         "WorkspacesMixin",
         # store
+        "RunSetupStore",
         "SessionStore",
+        "SnapshotStore",
+        "UsageStore",
         # domain helpers / constants
         "DEFAULT_PROFILES",
         "RunnerProfile",

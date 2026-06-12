@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data import SessionStore
-from agentbox.core.resources.boot_import import (
+from agentbox.core.resources.boot import (
     import_one_skill,
     import_repo_resources,
     resolve_skill_roots,

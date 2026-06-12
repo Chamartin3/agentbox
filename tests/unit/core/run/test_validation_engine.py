@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from agentbox.core.agents.composition.bundle import _append_validation_engine_hint
 from agentbox.core.data import AgentDef, RunnerSpec
-from agentbox.core.execution.validate import validate_output
+from agentbox.core.execution.output_validate import validate_output
 
 
 # ---------------------------------------------------------------------------

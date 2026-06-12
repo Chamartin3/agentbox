@@ -1,12 +1,12 @@
-"""Tests for ``core.service.analytics`` — enrichment + rollups over run rows."""
+"""Tests for ``core.service.feedback`` — enrichment + rollups over run rows."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import SessionStore
-from agentbox.core.execution.evaluate.activity import (
+from agentbox.core.service import SessionStore
+from agentbox.core.service.feedback import (
     enrich_recent_runs,
     since_iso,
     summary,
