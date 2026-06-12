@@ -113,7 +113,7 @@ class McpRegistry:
             tools_data = await client.list_tools()
             tools = [
                 Tool(
-                    name=t["name"],
+                    name=t.get("name", ""),
                     description=t.get("description", ""),
                     input_schema=t.get("inputSchema"),
                 )

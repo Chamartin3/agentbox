@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -29,12 +30,12 @@ from agentbox.cli._deps import (
 )
 from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
+from agentbox.core.constants import RunnerKind
 from agentbox.core.service import AgentDef
-from agentbox.core.engines.render import ConfigGenerator
+from agentbox.core.service.workspaces import generate_legacy_runner_configs
 from agentbox.core.workspaces.build import build_workspace
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
-SUPPORTED_RUNNERS = ("claude", "opencode", "codex", "pi", "shell")
 DEFAULT_WORKSPACE_NAME = "default"
 
 # Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
@@ -69,7 +70,7 @@ def _require_binary(runner: str) -> None:
 def launch_cmd(
     runner: str = typer.Argument(
         "claude",
-        help=f"Runner to launch interactively. One of: {', '.join(SUPPORTED_RUNNERS)}.",
+        help=f"Runner to launch interactively. One of: {', '.join(RunnerKind.values())}.",
     ),
     agent: str | None = typer.Option(
         None, "--agent", "-a", help="Optional agent ID to scope the session to."
@@ -127,10 +128,12 @@ def _launch_session(
             "no interactive CLI.[/red]\nUse [bold]agentbox run[/bold] or the HTTP API."
         )
         raise typer.Exit(2)
-    if runner not in SUPPORTED_RUNNERS:
+    try:
+        RunnerKind.coerce(runner, label="runner")
+    except ValueError:
         console.print(
             f"[red]Unknown runner:[/red] {runner!r}. "
-            f"Expected one of: {', '.join(SUPPORTED_RUNNERS)}."
+            f"Expected one of: {', '.join(RunnerKind.values())}."
         )
         raise typer.Exit(2)
 
@@ -138,7 +141,6 @@ def _launch_session(
 
     settings = load_settings()
     loader = _get_loader()
-    manifest = loader.load()
 
     agent_def: AgentDef | None = None
     if agent:
@@ -185,8 +187,14 @@ def _launch_session(
                 gen_dir_is_persistent = True
             else:
                 gen_dir = Path(tempfile.mkdtemp(prefix="agentbox-launch-"))
-            gen = _make_generator(settings, manifest, workspace_name)
-            gen.generate_configs_into(gen_dir)
+            mcp_registry2, servers = _resolve_mcp_for_launch(settings, workspace_name)
+            generate_legacy_runner_configs(
+                gen_dir,
+                store=get_store(),
+                settings=settings,
+                mcp_registry=mcp_registry2,
+                servers=servers,
+            )
             # Workspace-local `.mcp.json` for shell mode (and anything
             # else that runs Claude from inside the workspace cwd).
             claude_mcp_src = gen_dir / "claude_mcp.json"
@@ -230,7 +238,7 @@ def _resolve_workspace(
     workspace_override: str | None,
     force_ephemeral: bool,
     settings: Settings,
-    loader: object,
+    loader: Any,
 ) -> tuple[Path, bool, str | None, str | None]:
     """Return (workspace_path, is_ephemeral, creds, workspace_name).
 
@@ -325,28 +333,21 @@ def _apply_creds(creds: str | None, settings: Settings) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_generator(
+def _resolve_mcp_for_launch(
     settings: Settings,
-    manifest: object,
     workspace_id: str | None = None,
-) -> ConfigGenerator:
+) -> tuple[McpRegistry, list[dict] | None]:
+    """Resolve MCP registry and workspace-specific server overrides.
 
-    mcp_server_name = "mcp"
-    mcp_command: list[str] = ["mcp_serve.sh"]
-    mcp_url: str | None = None
-    mcp_transport: str = "http"
+    Returns ``(mcp_registry, servers)`` where *servers* is the
+    workspace-filtered MCP server list (or None when there's no
+    workspace_id).
+    """
     manifest_specs = list(get_store().get_project_mcp_servers())
-    if manifest_specs:
-        srv = manifest_specs[0]
-        mcp_server_name = srv.name
-        mcp_url = srv.url
-        mcp_transport = srv.transport
-        if srv.command:
-            mcp_command = srv.command
 
     # Per-workspace MCP isolation: resolve overrides and only emit
-    # enabled servers. Without a workspace_id we fall back to a single
-    # legacy entry (build_claude_mcp_config back-compat path).
+    # enabled servers. Without a workspace_id we fall back to the
+    # global server list (handled by make_generator).
     servers: list[dict] | None = None
     if workspace_id and manifest_specs:
         manifest_dicts = [
@@ -371,16 +372,7 @@ def _make_generator(
             )
 
     mcp_registry = McpRegistry(settings.mcp_cache_dir)
-    return ConfigGenerator(
-        agentbox_toml=settings.manifest_path,
-        mcp_manifest=mcp_registry.manifest,
-        mcp_server_name=mcp_server_name,
-        mcp_command=mcp_command,
-        mcp_url=mcp_url,
-        mcp_transport=mcp_transport,
-        servers=servers,
-        verbose=False,
-    )
+    return mcp_registry, servers
 
 
 # ---------------------------------------------------------------------------

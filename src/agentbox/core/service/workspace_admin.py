@@ -6,13 +6,13 @@ of reaching into ``SessionStore`` directly.
 
 from __future__ import annotations
 
-from agentbox.core.data import SessionStore
+from agentbox.core.data import EnvDocRow, SessionStore, WorkspaceRow
 
 
 # ── Workspace registry ──────────────────────────────────────────────────
 
 
-def get_workspace(store: SessionStore, name: str) -> dict | None:
+def get_workspace(store: SessionStore, name: str) -> WorkspaceRow | None:
     return store.get_workspace(name)
 
 
@@ -115,7 +115,7 @@ def list_host_env_calls_for_run(
 # ── Env docs ────────────────────────────────────────────────────────────
 
 
-def get_active_env_doc(store: SessionStore, workspace_id: str) -> dict | None:
+def get_active_env_doc(store: SessionStore, workspace_id: str) -> EnvDocRow | None:
     return store.get_active_env_doc(workspace_id)
 
 
@@ -154,13 +154,6 @@ def rollback_env_doc(
     return store.rollback_env_doc(
         workspace_id, version_id, changelog=changelog, actor=actor
     )
-
-
-# ── Usage ───────────────────────────────────────────────────────────────
-
-
-def aggregate_usage(store: SessionStore) -> dict:
-    return store.aggregate_usage()
 
 
 # ── Agent versions ──────────────────────────────────────────────────────

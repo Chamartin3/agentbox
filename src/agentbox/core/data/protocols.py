@@ -8,11 +8,11 @@ concrete SessionStore.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from collections.abc import Iterator
+from typing import Protocol, runtime_checkable
 
 from sqlalchemy.engine import Engine as _Engine
 
-from agentbox.core.data.engines.profiles import RunnerProfile
 from agentbox.core.data.engines.profiles import RunnerProfile
 from agentbox.core.data.execution.records import RunRecord
 from agentbox.core.data.execution.snapshots import (
@@ -21,7 +21,6 @@ from agentbox.core.data.execution.snapshots import (
     RunnerSnapshot,
 )
 from agentbox.core.data.row_types import EnvDocRow, RepoResourceRow, WorkspaceRow
-from agentbox.core.data.workspaces.manifest import McpServerSpec
 from agentbox.core.data.workspaces.manifest import McpServerSpec
 
 
@@ -188,7 +187,7 @@ class RunStore(Protocol):
 
     def get_repo_version(self, version_id: str) -> dict | None: ...
 
-    def iter_repo_blobs(self, version_id: str) -> object: ...
+    def iter_repo_blobs(self, version_id: str) -> Iterator[dict]: ...
 
     def resolve_workspace_host_env(self, workspace_id: str) -> dict: ...
 
@@ -206,7 +205,7 @@ class RunStore(Protocol):
         manifest_servers: list[dict],
         *,
         discovered_tools: dict[str, list[str]] | None = None,
-    ) -> dict: ...
+    ) -> McpSnapshot: ...
 
     # ------------------------------------------------------------------
     # Workspace build surface (WorkspaceBuildStore)
@@ -267,8 +266,17 @@ class StartupStore(Protocol):
 
 
 @runtime_checkable
+class WorkspaceLookupStore(Protocol):
+    """Minimal store surface for resolving a workspace by name."""
+
+    def get_workspace(self, name: str) -> WorkspaceRow | None: ...
+
+
+@runtime_checkable
 class RunSetupStore(Protocol):
     """Minimal store surface needed by the run-setup layer."""
+
+    def get_workspace(self, name: str) -> WorkspaceRow | None: ...
 
     def get_workspace_runtime_permissions(
         self, workspace_id: str
@@ -334,7 +342,7 @@ class SnapshotStore(Protocol):
         manifest_servers: list[dict],
         *,
         discovered_tools: dict[str, list[str]] | None = None,
-    ) -> dict: ...
+    ) -> McpSnapshot: ...
 
     def save_resource_snapshots(
         self,
@@ -372,7 +380,7 @@ class WorkspaceBuildStore(Protocol):
 
     def get_active_repo_version(self, resource_id: str) -> dict | None: ...
 
-    def iter_repo_blobs(self, version_id: str) -> object: ...
+    def iter_repo_blobs(self, version_id: str) -> Iterator[dict]: ...
 
     def resolve_workspace_host_env(
         self, workspace_id: str

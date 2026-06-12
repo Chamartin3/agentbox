@@ -1,15 +1,12 @@
-"""Tests for ``core/validation.py`` + ``BackendAdapter.validate_output()``."""
+"""Tests for the Agents output validation helpers."""
 
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
 from pathlib import Path
 from types import SimpleNamespace
 
-from agentbox.core.data import RunEvent
-from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
-from agentbox.core.execution.output_validate import (
+from agentbox.core.agents.validation import (
     ValidationResult,
     extract_json,
     validate_jsonschema,
@@ -130,28 +127,3 @@ def test_validate_pydantic_smoke() -> None:
     deep coverage lives in ``test_pydantic_validate``."""
     result = validate_pydantic('{"name": "x"}', _SCHEMA)
     assert result.engine == "pydantic"
-
-
-def test_backend_adapter_default_validate_output(tmp_path: Path) -> None:
-    """``BackendAdapter`` default impl delegates to validation.validate_output."""
-
-    class _Stub(BackendAdapter):
-        name = "stub"
-
-        def render(
-            self, agent, workdir, mcp_tools=None, creds=None, runner_config=None
-        ):  # type: ignore[no-untyped-def]
-            return RenderedConfig()
-
-        async def run(self, rendered, input, run_id) -> AsyncIterator[RunEvent]:  # type: ignore[override]
-            if False:
-                yield  # pragma: no cover
-
-    adapter = _Stub()
-    agent = _FakeAgent()
-    composed = SimpleNamespace(schema=_SCHEMA)
-    result = adapter.validate_output(
-        agent, tmp_path, '{"name": "x"}', composed=composed
-    )
-    assert result.ok
-    assert result.engine == "jsonschema"

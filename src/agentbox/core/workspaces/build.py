@@ -22,9 +22,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.workspaces.subagent_render import materialize_subagents
+from agentbox.core.workspaces.generation.materialize import materialize_subagents
 from agentbox.core.resources.workspace_materialize import materialize_workspace
-from agentbox.core.execution.prepare.envdoc import (
+from agentbox.core.workspaces.prep import (
     render_env_doc,
     resolve_workspace_resources,
     resolve_workspace_subagents,
@@ -186,9 +186,10 @@ def resolve_workspace_workdir(
     if not workspace_id or workspace_id == "<ephemeral>":
         return None
     record = store.get_workspace(workspace_id)
-    if record is not None and record.get("path"):
-        rel = record["path"]
-        return (settings.project_root / rel).resolve()
+    if record is not None:
+        rel = record.get("path")
+        if rel:
+            return (settings.project_root / rel).resolve()
     candidate = settings.workspaces_root / workspace_id
     return candidate if candidate.exists() else None
 

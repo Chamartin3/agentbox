@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import uuid
+from typing import Protocol
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.utils import now_iso
 from agentbox.core.data.row_types import RepoResourceRow
+from agentbox.core.constants import ResourceType
 from agentbox.core.data.schema import (
     resources as resources_table,
 )
-from agentbox.core.data.resources.models import RESOURCE_TYPES
 from agentbox.core.data.resources.crud._helpers import (
     _tags_to_db,
     _validate_changelog,
 )
+from agentbox.core.data.resources.crud._versions import CrudVersionSurface
 
 
 class ResourceCrudMixin:
@@ -34,10 +36,7 @@ class ResourceCrudMixin:
         tags: list[str] | None = None,
         created_by: str | None = None,
     ) -> RepoResourceRow | dict:
-        if type not in RESOURCE_TYPES:
-            raise ValueError(
-                f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}"
-            )
+        ResourceType.coerce(type, label="resource type")
         if not slug or not slug.strip():
             raise ValueError("slug is required")
         rid = uuid.uuid4().hex
@@ -72,10 +71,7 @@ class ResourceCrudMixin:
         """Update mutable resource fields."""
         values: dict = {}
         if type is not None:
-            if type not in RESOURCE_TYPES:
-                raise ValueError(
-                    f"Invalid resource type {type!r}; must be one of {RESOURCE_TYPES}"
-                )
+            ResourceType.coerce(type, label="resource type")
             values["type"] = type
         if display_name is not None:
             values["display_name"] = display_name
@@ -177,6 +173,12 @@ class ResourceCrudMixin:
                 .values(status="deleted", updated_at=now_iso())
             )
 
-    def get_active_repo_hash(self, resource_id: str) -> str | None:
+    def get_active_repo_hash(self: "CrudVersionSurface", resource_id: str) -> str | None:
         v = self.get_active_repo_version(resource_id)
         return v["content_hash"] if v else None
+
+
+class CrudRepoSurface(Protocol):
+    """Type-only view of ResourceCrudMixin for sibling-mixin self-binding."""
+
+    def get_repo_resource(self, resource_id: str) -> RepoResourceRow | None: ...

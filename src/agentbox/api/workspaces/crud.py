@@ -14,9 +14,11 @@ from typing import NoReturn
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from agentbox.api._pagination import paginate_list
+from agentbox.api._pagination import PaginatedEnvelope, paginate_list
 from agentbox.api.deps import get_loader, get_mcp_registry, get_settings, get_store
+from agentbox.core.data import WorkspaceRow
 from agentbox.core.service import workspaces as workspaces_service
+from agentbox.core.workspaces.build import build_workspace_by_name
 from agentbox.core.service.prompts import AgentNotFound
 from agentbox.core.service.workspaces.errors import (
     WorkspaceExists,
@@ -43,8 +45,6 @@ def _raise_agent_not_found(agent_id: str) -> NoReturn:
 
 
 def _build_workspace_cb(store, settings, name: str) -> None:
-    from agentbox.core.workspaces.build import build_workspace_by_name
-
     build_workspace_by_name(store, settings, name)
 
 
@@ -61,7 +61,7 @@ def list_workspaces(
     order: str = "asc",
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-) -> list[dict] | dict:
+) -> list[dict] | PaginatedEnvelope:
     result = workspaces_service.list_workspaces_enriched(
         store=get_store(), settings=get_settings(), loader=get_loader()
     )
@@ -85,7 +85,7 @@ class CreateWorkspaceBody(BaseModel):
 
 
 @router.post("", status_code=201)
-def create_workspace_registry(body: CreateWorkspaceBody) -> dict:
+def create_workspace_registry(body: CreateWorkspaceBody) -> WorkspaceRow:
     try:
         return workspaces_service.create_workspace_registry(
             body.name,

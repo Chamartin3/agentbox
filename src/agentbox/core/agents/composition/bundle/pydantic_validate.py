@@ -1,4 +1,4 @@
-"""Shim — moved to ``core.execution.output_validate`` in Plan 23."""
+"""Shim — moved to ``core.agents.validation`` in Plan 43."""
 
-from agentbox.core.execution.output_validate import *  # noqa: F401,F403
-from agentbox.core.execution.output_validate import validate_with_pydantic  # noqa: F401
+from agentbox.core.agents.validation import *  # noqa: F401,F403
+from agentbox.core.agents.validation import validate_with_pydantic  # noqa: F401

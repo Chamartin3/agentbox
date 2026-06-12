@@ -1,18 +1,20 @@
 """Compose — bundle composition into system + user prompts."""
 
 from __future__ import annotations
-import hashlib, json, tomllib
+import hashlib
+import json
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from agentbox.core.constants import BundleFile
 from agentbox.core.agents.composition.bundle._helpers import (
-    _INPUT_SCHEMA_TEMPLATE, _OUTPUT_SCHEMA_TEMPLATE,
     _append_input_schema, _append_schema, _format_template,
     _read_text, _ref_heading_fallback, _sha256,
 )
 from agentbox.core.agents.composition.bundle.sources import BundleSource
 
+@dataclass(frozen=True)
 class ComposedReference:
     """One reference section as composed (raw, rendered text)."""
 
@@ -149,9 +151,10 @@ def compose(
     output_schema_path = composition.get("output_schema")
     schema_file: Path | None = None
     if output_schema_path:
-        schema_file = bundle_path / output_schema_path
-        if not schema_file.exists():
-            raise FileNotFoundError(f"Output schema not found: {schema_file}")
+        explicit_schema_file = bundle_path / output_schema_path
+        if not explicit_schema_file.exists():
+            raise FileNotFoundError(f"Output schema not found: {explicit_schema_file}")
+        schema_file = explicit_schema_file
     else:
         for fallback in (BundleFile.OUTPUT_SCHEMA, BundleFile.OUTPUT_SCHEMA_ALT):
             candidate = bundle_path / fallback
@@ -162,7 +165,8 @@ def compose(
     if schema_file is not None:
         schema = json.loads(_read_text(schema_file))
         schema_sha = _sha256(json.dumps(schema, sort_keys=True, separators=(",", ":")))
-        system_rendered = _append_schema(system_rendered, schema)
+        if isinstance(schema, dict):
+            system_rendered = _append_schema(system_rendered, schema)
 
     # -- bundle sha ----------------------------------------------------
     # Hash every file we read, in sorted order, as a simple manifest.
@@ -198,15 +202,6 @@ def compose(
         schema_sha=schema_sha,
         bundle_sha=bundle_sha,
     )
-
-
-def _ref_heading_fallback(path: str) -> str:
-    if path.startswith("shared://"):
-        tail = path[len("shared://") :].rsplit("/", 1)[-1]
-    else:
-        tail = path.rsplit("/", 1)[-1]
-    stem, _, _ = tail.partition(".")
-    return stem or tail
 
 
 def compose_from_source(

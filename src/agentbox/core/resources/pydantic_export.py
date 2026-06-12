@@ -9,7 +9,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from datamodel_code_generator import DataModelType, InputFileType, generate
+from datamodel_code_generator import InputFileType, generate
+from datamodel_code_generator.enums import DataModelType
 from datamodel_code_generator.format import Formatter
 
 

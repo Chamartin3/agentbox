@@ -15,26 +15,20 @@ a ``UsageEvent`` (e.g. on timeout).
 
 from __future__ import annotations
 
+import inspect
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
-if TYPE_CHECKING:
-    from agentbox.core.execution.prepare.prompts import ComposedState
-    from agentbox.core.execution.streaming.session import RunStreamSession
-
-from agentbox.core.data import DoneEvent, RunEvent
-from agentbox.core.engines.render.postrender import (
-    inject_agent_tools_mcp,
-    inject_host_env_mcp,
-)
-from agentbox.core.execution.output_validate import ValidationResult, validate_output
-
+from agentbox.core.data import RunEvent
 from ._mcp_types import McpToolSpec
 from .rendered import RenderedConfig
-from .requests import BackendRunResult, PostRenderContext, RunRequest
-from .views import PythonAgentConfigView, RuntimeConfigView
+from .views import ComposedView, RuntimeConfigView
+
+if TYPE_CHECKING:
+    from agentbox.core.data import AgentDef
 
 
 class HasAgentConfig(Protocol):
@@ -46,6 +40,45 @@ class HasAgentConfig(Protocol):
     """
 
     _config_json: dict[str, object] | str | None
+
+
+class ComposedContext(Protocol):
+    """Minimal interface for composed prompt metadata.
+
+    Backends only need ``system`` and ``user`` from the composed result.
+    """
+
+    system: str
+    user: str
+
+
+@dataclass(frozen=True)
+class McpConfig:
+    """MCP server configuration shared across backends."""
+
+    server_name: str = "mcp"
+    url: str | None = None
+    transport: str = "http"
+    command: list[str] | None = None
+
+
+class BackendConfigGenerator(ABC):
+    """Translate prompts/ into a backend's native run-directory format."""
+
+    @abstractmethod
+    def generate(
+        self,
+        backend_dir: Path,
+        agent: AgentDef,
+        composed: ComposedContext,
+        mcp: McpConfig | None = None,
+    ) -> None:
+        """Write backend-specific files into ``backend_dir``.
+
+        Implementations must be idempotent — they should skip files that
+        already exist unless regeneration is explicitly requested.
+        """
+        raise NotImplementedError
 
 
 class BackendAdapter(ABC):
@@ -89,6 +122,16 @@ class BackendAdapter(ABC):
         """
         return None
 
+    def recipe_path(self) -> Path | None:
+        """Return the path to this backend's generation recipe, if any.
+
+        Defaults to ``recipe.yaml`` in the backend's package directory.
+        Backends without a recipe (e.g. in-process runners) can leave the
+        default, which returns ``None`` when the file does not exist.
+        """
+        candidate = Path(inspect.getfile(self.__class__)).parent / "recipe.yaml"
+        return candidate if candidate.exists() else None
+
     @abstractmethod
     def render(
         self,
@@ -97,7 +140,7 @@ class BackendAdapter(ABC):
         mcp_tools: list[McpToolSpec] | None = None,
         creds: dict[str, str] | None = None,
         runner_config: Any | None = None,
-        composed: "ComposedState | None" = None,
+        composed: ComposedView | None = None,
         *,
         runtime_config: RuntimeConfigView | None = None,
         host_capabilities: dict[str, Any] | None = None,
@@ -130,129 +173,9 @@ class BackendAdapter(ABC):
         ``rendered.files`` have already been materialised on disk by
         the executor. The implementation must yield a terminal
         ``DoneEvent``.
-
-        This is the lower-level iterator-based entry point. New code
-        should use :meth:`run_into_session` instead — it pushes events
-        through the executor's central capture object and returns the
-        terminal status as a value. Subclasses can keep implementing
-        ``run`` (the bridge below adapts it) or override
-        ``run_into_session`` directly for cleaner control flow.
         """
         if False:
             yield  # pragma: no cover — signals async generator
-
-    async def run_into_session(
-        self,
-        rendered: RenderedConfig,
-        input: str,
-        session: "RunStreamSession",
-    ) -> BackendRunResult:
-        """Execute the agent, pushing events through ``session``.
-
-        Canonical entry point — the executor calls this. Returns the
-        terminal status as a :class:`BackendRunResult`; the executor
-        runs validation against the accumulated output and then emits
-        the final ``DoneEvent`` itself, guaranteeing it lands LAST.
-
-        Default implementation bridges the legacy
-        ``run() -> AsyncIterator`` contract by pumping each event into
-        the session, intercepting ``DoneEvent`` to extract terminal
-        status (without emitting it — the executor will). Backends that
-        want to skip the iterator overhead, integrate native validation,
-        or simplify their control flow can override this directly.
-
-        The default exists so the 5 existing iterator-based backends
-        keep working unchanged through the new central path. Backends
-        migrated to direct ``session.emit*`` calls override this method.
-        """
-        result = BackendRunResult(ok=False)
-        async for ev in self.run(rendered, input, session.run_id):
-            if isinstance(ev, DoneEvent):
-                # Capture terminal status; do NOT publish — the executor
-                # will emit the final DoneEvent after validation runs.
-                result = BackendRunResult(
-                    ok=ev.ok,
-                    exit_code=ev.exit_code,
-                    error=ev.error,
-                    status=ev.status,
-                )
-                continue
-            session.emit(ev)
-        return result
-
-    def post_render(
-        self,
-        rendered: RenderedConfig,
-        ctx: PostRenderContext,
-    ) -> None:
-        """Post-materialization hook — called by the executor after
-        ``render()``'s files have been written into ``ctx.run_dir``.
-
-        Default implementation injects the agentbox MCP servers
-        (host-env, agent-tools) into the generated ``claude_mcp.json``
-        when the executor passes resolved grants. Backends that don't
-        consume ``claude_mcp.json`` (in-process backends like ``token``,
-        or backends with a different MCP config format) override to
-        no-op or to write their own format.
-
-        Must be idempotent: the executor may call it multiple times
-        across re-renders. Must not raise — the executor wraps the call
-        in a try/except and logs.
-        """
-        if ctx.host_env_grants:
-            inject_host_env_mcp(
-                run_dir=ctx.run_dir,
-                grants=ctx.host_env_grants,
-                workspace_id=ctx.workspace_id or "",
-                workdir=ctx.workdir,
-                db_path=ctx.db_path,
-            )
-        if ctx.agent_tool_grants:
-            inject_agent_tools_mcp(
-                run_dir=ctx.run_dir,
-                grants=ctx.agent_tool_grants,
-                agent_id=ctx.agent_id,
-                workdir=ctx.workdir,
-                db_path=ctx.db_path,
-            )
-
-    def validate_output(
-        self,
-        agent: Any,
-        workdir: Path,
-        output: str | None,
-        *,
-        project_root: Path | None = None,
-        store: Any | None = None,
-        composed: "ComposedState | None" = None,
-    ) -> ValidationResult:
-        """Validate ``output`` against the agent's declared schema.
-
-        Default implementation resolves the schema from ``composed.schema``
-        (preferred — set by the composition pipeline or the
-        ``output_schema`` prompt-binding) or from
-        ``runner.output_schema_path`` (legacy disk path), and runs the
-        engine declared by ``runner.output_validation_engine``.
-
-        Backends that already produce typed objects (token / pydantic-ai
-        with structured returns) should override and either short-circuit
-        with ``ValidationResult(ok=True, engine="pydantic")`` or wrap
-        their native validation error.
-
-        Lives on the adapter (not the executor) so validation can run
-        in the same place as the rest of the backend's run lifecycle —
-        keeps the executor backend-agnostic and lets the
-        ``BackendAdapter`` ABC own the full "render → run → validate"
-        contract.
-        """
-        return validate_output(
-            agent,
-            workdir,
-            output,
-            project_root=project_root,
-            store=store,
-            composed=composed,
-        )
 
     # ----- protected helpers (shared across backends) ----------------------
 
@@ -260,7 +183,7 @@ class BackendAdapter(ABC):
         self,
         agent: Any,
         workdir: Path,
-        composed: "ComposedState | None" = None,
+        composed: ComposedView | None = None,
     ) -> dict[Path, bytes]:
         """Collect the CLAUDE.md system-context file for materialisation.
 
@@ -282,7 +205,7 @@ class BackendAdapter(ABC):
         self,
         agent: Any,
         workdir: Path,
-        composed: "ComposedState | None" = None,
+        composed: ComposedView | None = None,
     ) -> str:
         """Resolve the system prompt for in-process backends.
 

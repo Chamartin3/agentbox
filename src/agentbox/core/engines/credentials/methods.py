@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import getpass
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,8 +32,6 @@ class Method:
 
 
 def _import_host_credential(host_source: str, container_target: str) -> None:
-    import shutil
-
     src_path = Path(os.path.expanduser(host_source))
     if not src_path.exists():
         raise FileNotFoundError(f"Host credential not found at {src_path}")
@@ -51,8 +51,6 @@ def _run_interactive_login(command: list[str], creds_base: str) -> None:
 
 
 def _prompt_and_store_env_key(env_var: str, env_file: str) -> None:
-    import getpass
-
     key_value = getpass.getpass(f"Enter value for {env_var}: ").strip()
     if not key_value:
         raise ValueError(f"No value provided for {env_var}")

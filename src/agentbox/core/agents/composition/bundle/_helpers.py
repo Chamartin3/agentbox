@@ -11,12 +11,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import tomllib
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.constants import BundleFile
 
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")

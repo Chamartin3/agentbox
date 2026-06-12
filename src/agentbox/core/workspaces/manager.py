@@ -10,8 +10,10 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
+from typing import cast
+
 from agentbox.config import Settings
-from agentbox.core.data import SessionStore
+from agentbox.core.data import AgentDef, SessionStore
 from agentbox.core.workspaces.crud import WorkspaceInfo, info, resolve_path
 
 __all__ = [
@@ -37,7 +39,8 @@ def list_all(store: SessionStore, settings: Settings) -> list[WorkspaceInfo]:
         DeprecationWarning,
         stacklevel=2,
     )
-    return [info(a, settings, store) for a in store.list_agents_with_latest()]
+    agents = store.list_agents_with_latest()
+    return [info(cast(AgentDef, a), settings, store) for a in agents]
 
 
 # Re-export crud operations for backward compatibility

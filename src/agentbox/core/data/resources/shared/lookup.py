@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.engine import Engine
 
@@ -113,3 +115,16 @@ class SharedResourceLookupMixin:
             )
             records = [row_to_record(r._mapping) for r in rows]
             return [r for r in records if r is not None]
+
+
+class SharedResourceLookupSurface(Protocol):
+    """Type-only view of SharedResourceLookupMixin for sibling-mixin self-binding.
+
+    Sibling mixins call into the lookup surface via ``self.<method>`` at runtime;
+    pyright cannot see through the MRO across split files. Consumers declare
+    ``self: SharedResourceLookupSurface`` so pyright resolves the calls. Runtime
+    behavior is unaffected.
+    """
+
+    def get_resource(self, id: str, version: int) -> SharedResourceRecord | None: ...
+    def get_active_resource(self, id: str) -> SharedResourceRecord | None: ...

@@ -19,20 +19,38 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from typing import Protocol
 
+from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
+from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
 from agentbox.core.data.utils import now_iso
+from agentbox.core.data.row_types import RepoResourceRow
 from agentbox.core.data.schema import (
     agent_prompt_resource_bindings,
     workspace_file_resource_bindings,
     workspace_subagents,
 )
 
-VALID_PROMPT_MODES = ("inline", "skill_primer", "name_only", "manifest")
-VALID_PROMPT_SLOTS = ("system", "user_template", "input_schema", "output_schema")
-VALID_MATERIALIZE_MODES = ("copy", "symlink", "mount")
-VALID_ON_CONFLICT = ("error", "overwrite", "skip")
+
+class _BindingsCrudSurface(Protocol):
+    """Cross-mixin surface used by methods in ResourceBindingsMixin that also
+    need repo-resource lookups. Runtime MRO satisfies this; pyright needs it
+    declared explicitly due to the mixin split."""
+
+    engine: Engine
+
+    def get_repo_resource(self, resource_id: str) -> RepoResourceRow | None: ...
+    def list_workspace_file_bindings(self, workspace_id: str) -> list[dict]: ...
+    def replace_workspace_file_bindings(
+        self,
+        workspace_id: str,
+        bindings: Iterable[dict],
+        *,
+        reason: str,
+        actor: str | None,
+    ) -> list[dict]: ...
 
 
 def _validate_reason(reason: str) -> str:
@@ -77,10 +95,7 @@ class ResourceBindingsMixin:
             mode = b.get("mode")
             marker = b.get("marker")
             if slot is not None:
-                if slot not in VALID_PROMPT_SLOTS:
-                    raise ValueError(
-                        f"Invalid prompt-binding slot {slot!r}; must be one of {VALID_PROMPT_SLOTS}"
-                    )
+                PromptSlot.coerce(slot, label="prompt-binding slot")
                 if slot in slots_seen:
                     raise ValueError(
                         f"Duplicate prompt-binding slot {slot!r} for agent {agent_id!r}"
@@ -96,10 +111,7 @@ class ResourceBindingsMixin:
                 # template). A synthetic non-splicing marker is stored to
                 # satisfy the legacy NOT-NULL check constraint.
                 if marker:
-                    if mode not in VALID_PROMPT_MODES:
-                        raise ValueError(
-                            f"Invalid prompt-binding mode {mode!r}; must be one of {VALID_PROMPT_MODES}"
-                        )
+                    PromptMode.coerce(mode or "inline", label="prompt-binding mode")
                 else:
                     marker = f"ref_{uuid.uuid4().hex[:8]}"
                     mode = "inline"
@@ -146,8 +158,6 @@ class ResourceBindingsMixin:
 
     def count_workspace_file_bindings_by_workspace(self) -> dict[str, int]:
         """Return `{workspace_id: binding_count}` for all workspaces with bindings."""
-        from sqlalchemy import func, select
-
         with self.engine.connect() as conn:
             rows = conn.execute(
                 select(
@@ -158,7 +168,7 @@ class ResourceBindingsMixin:
             return {r._mapping["workspace_id"]: int(r._mapping["n"]) for r in rows}
 
     def replace_workspace_file_bindings(
-        self,
+        self: "_BindingsCrudSurface",
         workspace_id: str,
         bindings: Iterable[dict],
         *,
@@ -176,15 +186,9 @@ class ResourceBindingsMixin:
         seen_folder_targets: dict[str, str] = {}
         for idx, b in enumerate(bindings):
             mode = b.get("materialize_mode", "copy")
-            if mode not in VALID_MATERIALIZE_MODES:
-                raise ValueError(
-                    f"Invalid materialize_mode {mode!r}; must be one of {VALID_MATERIALIZE_MODES}"
-                )
+            MaterializeMode.coerce(mode, label="materialize_mode")
             on_conflict = b.get("on_conflict", "error")
-            if on_conflict not in VALID_ON_CONFLICT:
-                raise ValueError(
-                    f"Invalid on_conflict {on_conflict!r}; must be one of {VALID_ON_CONFLICT}"
-                )
+            OnConflict.coerce(on_conflict, label="on_conflict")
             if not b.get("resource_id"):
                 raise ValueError("resource_id is required for workspace bindings")
             target_path = b.get("target_path")
@@ -234,7 +238,7 @@ class ResourceBindingsMixin:
         return self.list_workspace_file_bindings(workspace_id)
 
     def replace_workspace_skill_bindings(
-        self,
+        self: "_BindingsCrudSurface",
         workspace_id: str,
         skill_resource_ids: Iterable[str],
         *,

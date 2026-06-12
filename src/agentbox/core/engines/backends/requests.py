@@ -7,26 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from ._mcp_types import McpToolSpec  # noqa: F401  # re-export
-from .views import PythonAgentConfigView, RuntimeConfigView
-
-
-@dataclass(frozen=True)
-class PostRenderContext:
-    """Inputs to :meth:`BackendAdapter.post_render`.
-
-    The executor resolves grants and run paths before the hook runs;
-    backends just do file mutations (or skip). ``host_env_grants`` /
-    ``agent_tool_grants`` are ``None`` when there's nothing to inject —
-    the default :meth:`BackendAdapter.post_render` checks for this.
-    """
-
-    run_dir: Path
-    workdir: Path
-    db_path: Path
-    workspace_id: str | None
-    agent_id: str
-    host_env_grants: dict[str, Any] | None = None
-    agent_tool_grants: set[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -36,7 +16,7 @@ class BackendRunResult:
     Backends report their *runner-level* outcome here — did the
     subprocess exit cleanly, was there a runtime error, what was the
     exit code. Validation outcome is the executor's concern: it runs
-    schema checks AFTER ``run_into_session`` returns and adjusts the
+    schema checks after the execution-layer pump returns and adjusts the
     final state accordingly before emitting the terminal ``DoneEvent``.
 
     Why a return value instead of a streamed ``DoneEvent``: the executor

@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.data import (
     DoneEvent,
     LogEvent,
@@ -23,7 +24,7 @@ from agentbox.core.engines.backends.opencode.session import (
     parse_event_stream_with_thinking,
     strip_code_fences,
 )
-from agentbox.core.execution.streaming.rate_limit import (
+from agentbox.core.engines.streaming.rate_limit import (
     detect_in_opencode_event,
     detect_in_text_line,
 )
@@ -143,7 +144,7 @@ async def _run_opencode_stream(
                 msg = stderr_queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
-            out.append(LogEvent(run_id=run_id, level="warn", message=msg))
+            out.append(LogEvent(run_id=run_id, level=LogLevel.WARN, message=msg))
             if fatal is None:
                 fatal = detect_in_text_line(msg)
         return out, fatal
@@ -179,7 +180,7 @@ async def _run_opencode_stream(
                         break
                     yield LogEvent(
                         run_id=run_id,
-                        level="info",
+                        level=LogLevel.INFO,
                         message=(
                             f"opencode silent for {int(_HEARTBEAT_INTERVAL_SECONDS)}s "
                             f"(pid={proc.pid}); waiting for next event"
@@ -190,7 +191,7 @@ async def _run_opencode_stream(
                 if queue_task in done:
                     msg = queue_task.result()
                     queue_task = None
-                    yield LogEvent(run_id=run_id, level="warn", message=msg)
+                    yield LogEvent(run_id=run_id, level=LogLevel.WARN, message=msg)
                     fatal_msg = detect_in_text_line(msg)
                     drained, fatal = _drain_stderr_queue()
                     for log_ev in drained:
@@ -274,9 +275,9 @@ async def _run_opencode_stream(
                 yield TextEvent(run_id=run_id, text="".join(text_parts))
         for sl in stderr_lines:
             if sl.strip():
-                yield LogEvent(run_id=run_id, level="warn", message=sl)
+                yield LogEvent(run_id=run_id, level=LogLevel.WARN, message=sl)
         yield TimeoutEvent(run_id=run_id, timeout_seconds=timeout, error=f"timeout after {timeout}s")
-        yield DoneEvent(run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout")
+        yield DoneEvent(run_id=run_id, ok=False, error=f"timeout after {timeout}s", status=RunStatus.TIMEOUT)
         return
 
     if rate_limit_error is not None:
@@ -302,7 +303,7 @@ async def _run_opencode_stream(
 
     for sl in stderr_lines:
         if sl.strip():
-            yield LogEvent(run_id=run_id, level="warn", message=sl)
+            yield LogEvent(run_id=run_id, level=LogLevel.WARN, message=sl)
 
     raw = "".join(stdout_chunks).strip()
     if not raw:
@@ -315,7 +316,7 @@ async def _run_opencode_stream(
     if parsed_sid:
         backend._session_id = parsed_sid
     if parse_failed and not text_parts:
-        yield LogEvent(run_id=run_id, level="warn", message="opencode --format json output was not parseable; using raw stdout")
+        yield LogEvent(run_id=run_id, level=LogLevel.WARN, message="opencode --format json output was not parseable; using raw stdout")
         yield TextEvent(run_id=run_id, text=raw)
         yield DoneEvent(run_id=run_id, ok=proc.returncode == 0, exit_code=proc.returncode)
         return

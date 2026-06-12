@@ -12,25 +12,32 @@ from agentbox.core.data import AgentDef, RunStore
 from agentbox.core.engines.profiles import RunnerProfileResolver
 from agentbox.core.execution.orchestrate._runner import _run as _run_loop
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
-from agentbox.core.execution.orchestrate.finalizer import RunFinalizer
 from agentbox.core.execution.orchestrate.cancel import cancel_run as _cancel_run_helper
-from agentbox.core.execution.orchestrate.init_run import init_run, launch_background_task
-from agentbox.core.execution.orchestrate.mcp_inject import (
-    inject_agent_tools_mcp as _inject_agent_tools_mcp_helper_fn,
-    inject_host_env_mcp as _inject_host_env_mcp_helper_fn,
-)
-from agentbox.core.execution.orchestrate.pre_run import (
+from agentbox.core.execution.orchestrate.finalizer import RunFinalizer
+from agentbox.core.execution.orchestrate.init_run import (
     fail_pre_run as _fail_pre_run_fn,
+    init_run,
+    launch_background_task,
+)
+from agentbox.core.execution.orchestrate.materialize import (
+    materialize_rendered_config,
 )
 from agentbox.core.execution.orchestrate.setup import (
     NoBackendAvailable,
     RunSetup,
 )
-from agentbox.core.execution.orchestrate.snapshots import SnapshotWriter
+from agentbox.core.execution.observability.snapshot import SnapshotWriter
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
-from agentbox.core.execution.prepare import prepare_run_resources
-from agentbox.core.execution.retry import _adapter_run_into_session  # noqa: F401
-from agentbox.core.execution.webhooks import WebhookDispatcher
+from agentbox.core.execution.prepare.prompts import resolve_run_prompt
+from agentbox.core.execution.retry import pump_into_session  # noqa: F401
+from agentbox.core.engines.backends.rendered import RenderedConfig
+from agentbox.core.workspaces import (
+    prepare_run_workdir,
+)
+from agentbox.core.workspaces.generation.engine_config.inject import (
+    inject_agent_tools_mcp,
+    inject_host_env_mcp,
+)
 
 if TYPE_CHECKING:
     from agentbox.core.workspaces import McpRegistry
@@ -56,9 +63,8 @@ class RunExecutor:
         self._profile_resolver = RunnerProfileResolver()
         self._setup = RunSetup(store, settings, mcp_registry)
         self._snapshots = SnapshotWriter(store)
-        self._webhooks = WebhookDispatcher(store)
         self._step_loop = RunStepLoop(store, settings)
-        self._finalizer = RunFinalizer(store, self._webhooks)
+        self._finalizer = RunFinalizer(store, settings)
 
     def broadcaster(self, run_id: str) -> RunBroadcaster | None:
         return self._broadcasters.get(run_id)
@@ -87,19 +93,19 @@ class RunExecutor:
         if webhook_url is not None:
             agent = agent.model_copy(update={"webhook_url": webhook_url})
 
-        prepared = prepare_run_resources(
+        # ── Prompt / composition resolution (agents domain) ───────────────
+        resolved = resolve_run_prompt(
             store=self.store,
             settings=self.settings,
             agent=agent,
             input_=input_,
             variables=variables,
-            workdir=workdir,
         )
-        agent = prepared.agent
-        input_ = prepared.input_
-        composed = prepared.composed
-        _resource_snapshot_entries = prepared.resource_snapshot_entries
-        _workspace_id = prepared.workspace_id
+        agent = resolved.agent
+        input_ = resolved.input_
+        composed = resolved.to_composed_state()
+        _prompt_snapshot_entries = resolved.snapshot_entries
+        _workspace_id = agent.workspace if agent.workspace != "<ephemeral>" else None
 
         try:
             effective = self._profile_resolver.resolve(
@@ -135,19 +141,46 @@ class RunExecutor:
         adapter, rendered = self._setup.select_backend(
             agent, workdir, backend, runner_config=effective, composed=composed
         )
-        rendered, run_dir = self._setup.render_for_run(
-            adapter, agent, workdir, rendered
+
+        # ── Workspace materialization + run_dir creation ──────────────────
+        run_dir, _workspace_snapshot_entries = prepare_run_workdir(
+            store=self.store,
+            settings=self.settings,
+            workspace_id=_workspace_id,
+            agent=agent,
+            workdir=workdir,
+            mcp_registry=self._mcp_registry,
         )
+        # ── Materialize backend-rendered config into run_dir ──────────────
+        materialize_rendered_config(rendered, run_dir)
+        # ── Resolve cwd relative to run_dir ───────────────────────────────
+        _raw_cwd = rendered.cwd
+        if not _raw_cwd.is_absolute():
+            _raw_cwd = run_dir / _raw_cwd
+        rendered = RenderedConfig(
+            files=rendered.files,
+            argv=rendered.argv,
+            env=rendered.env,
+            cwd=_raw_cwd,
+            agent_meta=rendered.agent_meta,
+            model=rendered.model,
+        )
+        _resource_snapshot_entries = _prompt_snapshot_entries + _workspace_snapshot_entries
 
         _host_env_grants = self._snapshots.resolve_host_env_grants(_workspace_id)
         _agent_tool_grants = self._setup.resolve_agent_tool_grants(agent.id)
-        self._setup.post_render(
-            adapter, rendered,
-            run_dir=run_dir, workdir=workdir,
-            workspace_id=_workspace_id, agent_id=agent.id,
-            host_env_grants=_host_env_grants,
-            agent_tool_grants=_agent_tool_grants,
-        )
+        if _host_env_grants:
+            inject_host_env_mcp(
+                run_dir=run_dir, grants=_host_env_grants,
+                workspace_id=_workspace_id or "", workdir=workdir,
+                db_path=self.settings.db_path,
+            )
+        if _agent_tool_grants:
+            inject_agent_tools_mcp(
+                run_dir=run_dir, grants=_agent_tool_grants,
+                agent_id=agent.id, workdir=workdir,
+                db_path=self.settings.db_path,
+            )
 
         transcripts_dir = self.settings.data_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)
@@ -175,7 +208,7 @@ class RunExecutor:
             timeout_override=timeout_seconds,
             workspace_id=_workspace_id,
             resource_snapshot_entries=_resource_snapshot_entries,
-            prepared_composed_result=prepared.composed_result,
+            prepared_composed_result=resolved.composition_result,
             variables=variables,
         )
 
@@ -208,32 +241,12 @@ class RunExecutor:
             store=self.store,
             broadcasters=self._broadcasters,
             run_tasks=self._run_tasks,
-            webhooks=self._webhooks,
+            settings=self.settings,
         )
-
-    # ------------------------------------------------------------------ wrappers (preserved for external callers)
-    def _inject_host_env_mcp(
-        self, run_dir, grants, workspace_id, workdir
-    ) -> None:
-        _inject_host_env_mcp_helper_fn(
-            run_dir=run_dir, grants=grants,
-            workspace_id=workspace_id, workdir=workdir,
-            db_path=self.settings.db_path,
-        )
-
-    def _inject_agent_tools_mcp(
-        self, run_dir, grants, agent_id, workdir
-    ) -> None:
-        _inject_agent_tools_mcp_helper_fn(
-            run_dir=run_dir, grants=grants,
-            agent_id=agent_id, workdir=workdir,
-            db_path=self.settings.db_path,
-        )
-
 
 __all__ = [
     "NoBackendAvailable",
     "RunBroadcaster",
     "RunExecutor",
-    "_adapter_run_into_session",
+    "pump_into_session",
 ]

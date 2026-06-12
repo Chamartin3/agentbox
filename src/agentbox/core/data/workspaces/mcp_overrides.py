@@ -14,20 +14,17 @@ filtered set the runner should see.
 from __future__ import annotations
 
 import uuid
-from typing import Literal
 
 from sqlalchemy.engine import Engine
 
-from agentbox.core.data.constants import VALID_POLICIES
+from agentbox.core.constants import McpPolicy
+from agentbox.core.data.execution.snapshots import McpSnapshot
 from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import (
     workspace_mcp_overrides,
     workspace_mcp_policies,
     workspace_mcp_tool_overrides,
 )
-
-Policy = Literal["allow_all_unless_disabled", "deny_all_unless_enabled"]
-
 
 def _validate_changelog(s: str) -> str:
     if not s or len(s.strip()) < 3:
@@ -46,7 +43,7 @@ class McpOverridesMixin:
 
     # --- policy ---
 
-    def get_workspace_mcp_policy(self, workspace_id: str) -> Policy:
+    def get_workspace_mcp_policy(self, workspace_id: str) -> McpPolicy:
         with self.engine.connect() as conn:
             row = conn.execute(
                 workspace_mcp_policies.select().where(
@@ -54,12 +51,11 @@ class McpOverridesMixin:
                 )
             ).first()
             if not row:
-                return "allow_all_unless_disabled"
-            return row.default_policy  # type: ignore[return-value]
+                return McpPolicy.ALLOW_ALL_UNLESS_DISABLED
+            return McpPolicy(row.default_policy)
 
-    def set_workspace_mcp_policy(self, workspace_id: str, policy: str) -> Policy:
-        if policy not in VALID_POLICIES:
-            raise ValueError(f"policy must be one of {VALID_POLICIES}")
+    def set_workspace_mcp_policy(self, workspace_id: str, policy: str) -> McpPolicy:
+        resolved = McpPolicy.coerce(policy, label="policy")
         with self.engine.begin() as conn:
             existing = conn.execute(
                 workspace_mcp_policies.select().where(
@@ -70,15 +66,15 @@ class McpOverridesMixin:
                 conn.execute(
                     workspace_mcp_policies.update()
                     .where(workspace_mcp_policies.c.workspace_id == workspace_id)
-                    .values(default_policy=policy)
+                    .values(default_policy=resolved)
                 )
             else:
                 conn.execute(
                     workspace_mcp_policies.insert().values(
-                        workspace_id=workspace_id, default_policy=policy
+                        workspace_id=workspace_id, default_policy=resolved
                     )
                 )
-        return policy  # type: ignore[return-value]
+        return resolved
 
     # --- server-level ---
 
@@ -214,7 +210,7 @@ class McpOverridesMixin:
         manifest_servers: list[dict],
         *,
         discovered_tools: dict[str, list[str]] | None = None,
-    ) -> dict:
+    ) -> McpSnapshot:
         """Apply overrides to ``manifest_servers``.
 
         Each manifest entry is a dict with at least ``name`` and ``config``

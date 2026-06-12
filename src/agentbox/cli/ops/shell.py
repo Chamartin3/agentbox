@@ -20,10 +20,11 @@ import typer
 
 from agentbox.cli._deps import get_loader as _get_loader
 from agentbox.cli._common import console
-from agentbox.cli.ops.launch import _apply_creds, _make_generator, _resolve_workspace
+from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
 from agentbox.config import load_settings
+from agentbox.core.service.workspaces import generate_legacy_runner_configs
 from agentbox.core.service import SessionStore
-from agentbox.core.execution.prepare.envdoc import render_env_doc
+from agentbox.core.workspaces.prep import render_env_doc
 from agentbox.core.service import get_agent_def, get_workspace
 
 
@@ -66,8 +67,9 @@ def shell_cmd(
         shutil.rmtree(gen_dir)
     gen_dir.mkdir(parents=True, exist_ok=True)
 
-    gen = _make_generator(settings, None)
-    gen.generate_configs_into(gen_dir)
+    generate_legacy_runner_configs(
+        gen_dir, store=store, settings=settings, mcp_registry=None,
+    )
 
     env_doc_rendered = _render_env_doc(settings, workspace, agent_def, workspace_path)
 

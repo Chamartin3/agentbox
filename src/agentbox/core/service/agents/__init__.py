@@ -4,6 +4,18 @@ The DB (``agent_versions`` / ``active_agent_versions``) is the single
 source of truth. There is no manifest fallback.
 
 Import from this package — the submodules are internal.
+
+Submodule responsibilities (N9 note):
+- ``crud``: read-only resolution + listing (resolve_agent, list_all_agents).
+- ``lifecycle``: version lifecycle CRUD (create/publish/rollback/delete
+  agent versions, runner-profile binding, tool grants).
+  Original C10 plan named this ``sync.py``; the current name better
+  reflects that it's not filesystem-sync but DB-level lifecycle ops.
+- ``admin``: version config replacement and agent meta updates.
+  Original C10 plan named this ``grants.py``; the current file holds
+  admin/meta ops, not grant management. Tool grants live in ``lifecycle``.
+- ``prompt``: config patching and validator management.
+- ``versions``: version-file upload/delete and draft/publish workflows.
 """
 
 from agentbox.core.agents.composition.drift import (

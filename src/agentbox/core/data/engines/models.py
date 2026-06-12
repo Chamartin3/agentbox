@@ -27,7 +27,7 @@ class RunnerProfileStats(BaseModel):
 
 def _row_to_profile(row) -> RunnerProfile:
     """Convert a database row to a RunnerProfile model."""
-    from agentbox.core.data.engines.profiles import RunnerProfile
+    from agentbox.core.data.engines.profiles import RunnerProfile  # noqa: PLC0415
 
     m = row._mapping
     return RunnerProfile(

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import tempfile
-import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -13,19 +11,20 @@ from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, RunSetupStore
 from agentbox.config import Settings
 from agentbox.core.engines.backends.base import (
-    PostRenderContext,
-    PythonAgentConfigView,
     RenderedConfig,
     RuntimeConfigView,
 )
+from agentbox.core.engines.backends.views import (
+    ComposedReferenceView,
+    ComposedView,
+    PythonAgentConfigView,
+)
 from agentbox.core.execution.orchestrate.generator import (
     _read_agent_config_json,
-    make_generator,
 )
-from agentbox.core.execution.orchestrate.materialize import materialize_rendered_config
-from agentbox.core.execution.orchestrate.permissions import load_workspace_permissions
 from agentbox.core.workspaces import (
     load_capabilities,
+    load_workspace_permissions,
     resolve_path,
 )
 
@@ -34,6 +33,25 @@ if TYPE_CHECKING:
     from agentbox.core.workspaces import McpRegistry
 
 logger = logging.getLogger(__name__)
+
+
+def _composed_view(composed: Any | None) -> ComposedView | None:
+    if composed is None:
+        return None
+    references = tuple(
+        ComposedReferenceView(path=r.path, heading=r.heading, content=r.content)
+        for r in (getattr(composed, "references", None) or ())
+    )
+    return ComposedView(
+        system=getattr(composed, "system", None),
+        system_base=getattr(composed, "system_base", None),
+        schema=getattr(composed, "schema", None),
+        input_schema=getattr(composed, "input_schema", None),
+        user=getattr(composed, "user", None),
+        references=references,
+        bundle_sha=getattr(composed, "bundle_sha", None),
+        validation_mode=getattr(composed, "validation_mode", None),
+    )
 
 
 class NoBackendAvailable(RuntimeError):
@@ -67,18 +85,20 @@ class RunSetup:
         session_id: str | None,
         workspace_override: str | None = None,
     ) -> tuple[Path, str | None]:
+        import tempfile  # noqa: PLC0415
+
         if workspace_override:
             original = agent.workspace
             agent.workspace = workspace_override
             try:
-                path, ephemeral = resolve_path(agent, self.settings, self.store)  # type: ignore[arg-type]
+                path, ephemeral = resolve_path(agent, self.settings, self.store)
             finally:
                 agent.workspace = original
             if not ephemeral:
                 path.mkdir(parents=True, exist_ok=True)
                 return path, session_id
 
-        path, ephemeral = resolve_path(agent, self.settings, self.store)  # type: ignore[arg-type]
+        path, ephemeral = resolve_path(agent, self.settings, self.store)
         if not ephemeral:
             path.mkdir(parents=True, exist_ok=True)
             return path, session_id
@@ -145,7 +165,7 @@ class RunSetup:
                     agent,
                     workdir,
                     runner_config=runner_config,
-                    composed=composed,
+                    composed=_composed_view(composed),
                     runtime_config=runtime_config_view,
                     python_agent_config=python_agent_config_view,
                     host_capabilities=host_capabilities,
@@ -153,46 +173,6 @@ class RunSetup:
                 return adapter, rendered
 
         raise NoBackendAvailable(agent_id=agent.id, attempted=candidates)
-
-    # ------------------------------------------------------------------ render
-    def render_for_run(
-        self,
-        adapter: BackendAdapter,
-        agent: AgentDef,
-        workdir: Path,
-        rendered: RenderedConfig,
-    ) -> tuple[RenderedConfig, Path]:
-        run_dir = self.settings.runs_tmpfs_dir / uuid.uuid4().hex
-        materialize_rendered_config(rendered, run_dir)
-
-        permissions = load_workspace_permissions(
-            workdir, agent, self.settings, self.store
-        )
-        generator = make_generator(
-            settings=self.settings, store=self.store, mcp_registry=self._mcp_registry
-        )
-        generator.generate_configs_into(
-            run_dir,
-            allowed_builtin_tools=permissions.get("allowed_builtin_tools") or [],
-            files=permissions.get("files") or [],
-            project_root=self.settings.project_root,
-        )
-
-        effective_cwd = rendered.cwd
-        if not effective_cwd.is_absolute():
-            effective_cwd = run_dir / effective_cwd
-
-        return (
-            RenderedConfig(
-                files=rendered.files,
-                argv=rendered.argv,
-                env=rendered.env,
-                cwd=effective_cwd,
-                agent_meta=rendered.agent_meta,
-                model=rendered.model,
-            ),
-            run_dir,
-        )
 
     # ------------------------------------------------------------------ MCP grants
     def resolve_agent_tool_grants(self, agent_id: str) -> set[str] | None:
@@ -207,40 +187,8 @@ class RunSetup:
             )
         return None
 
-    def post_render(
-        self,
-        adapter: BackendAdapter,
-        rendered: RenderedConfig,
-        *,
-        run_dir: Path,
-        workdir: Path,
-        workspace_id: str | None,
-        agent_id: str,
-        host_env_grants: dict | None,
-        agent_tool_grants: set[str] | None,
-    ) -> None:
-        try:
-            adapter.post_render(
-                rendered,
-                PostRenderContext(
-                    run_dir=run_dir,
-                    workdir=workdir,
-                    db_path=self.settings.db_path,
-                    workspace_id=workspace_id,
-                    agent_id=agent_id,
-                    host_env_grants=host_env_grants,
-                    agent_tool_grants=agent_tool_grants,
-                ),
-            )
-        except Exception:
-            logger.exception(
-                "executor: post_render failed for agent %r",
-                agent_id,
-            )
-
-
-# fail_pre_run re-exported from pre_run.py for backward compatibility.
-from agentbox.core.execution.orchestrate.pre_run import fail_pre_run  # noqa: F401, E402
+# fail_pre_run re-exported for backward compatibility.
+from agentbox.core.execution.orchestrate.init_run import fail_pre_run  # noqa: F401, E402
 
 __all__ = [
     "NoBackendAvailable",

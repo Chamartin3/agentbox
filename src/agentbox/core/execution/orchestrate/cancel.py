@@ -5,14 +5,16 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.constants import RunStatus
-from agentbox.core.data import DoneEvent, LogEvent
+from agentbox.config import Settings
+from agentbox.core.constants import LogLevel, RunStatus
+from agentbox.core.data import AgentDef, DoneEvent, LogEvent
+from agentbox.core.execution.dispatch import dispatch_completion
 
 if TYPE_CHECKING:
     from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
-    from agentbox.core.execution.webhooks import WebhookDispatcher
     from agentbox.core.data import RunStore
 
 logger = logging.getLogger(__name__)
@@ -24,7 +26,7 @@ def cancel_run(
     store: RunStore,
     broadcasters: dict[str, RunBroadcaster],
     run_tasks: dict[str, asyncio.Task[None]],
-    webhooks: WebhookDispatcher,
+    settings: Settings,
 ) -> bool:
     """Cancel an in-progress run."""
     task = run_tasks.get(run_id)
@@ -48,17 +50,43 @@ def cancel_run(
     if broadcaster is not None:
         with contextlib.suppress(Exception):
             broadcaster.publish(
-                LogEvent(run_id=run_id, level="warn", message=error_msg)
+                LogEvent(run_id=run_id, level=LogLevel.WARN, message=error_msg)
             )
             broadcaster.publish(
                 DoneEvent(
                     run_id=run_id,
                     ok=False,
                     error=error_msg,
-                    status=RunStatus.INCOMPLETE.value,
+                    status=RunStatus.ERROR,
                 )
             )
 
     task.cancel()
-    webhooks.deliver_for_cancel(run_id, broadcaster)
+    try:
+        refreshed = store.get_run(run_id)
+        if refreshed is not None:
+            agent: Any | None = None
+            try:
+                _agent = store.get_agent_def(refreshed.agent_id)
+                if isinstance(_agent, AgentDef):
+                    agent = _agent
+            except Exception:
+                logger.exception(
+                    "cancel dispatch: failed to resolve agent for run %s", run_id
+                )
+            transcript_path = (
+                Path(refreshed.transcript_path)
+                if refreshed.transcript_path
+                else None
+            )
+            dispatch_completion(
+                run=refreshed,
+                agent=agent,
+                store=store,
+                broadcaster=broadcaster,
+                transcript_path=transcript_path,
+                settings=settings,
+            )
+    except Exception:
+        logger.exception("cancel dispatch failed for %s", run_id)
     return True

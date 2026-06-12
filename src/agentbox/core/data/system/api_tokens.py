@@ -116,6 +116,7 @@ class ApiTokensMixin:
             row = conn.execute(
                 api_tokens.select().where(api_tokens.c.id == token_id)
             ).first()
+        assert row is not None
         m = row._mapping
         return {
             "id": m["id"],
@@ -147,6 +148,7 @@ class ApiTokensMixin:
             row = conn.execute(
                 api_tokens.select().where(api_tokens.c.id == token_id)
             ).first()
+        assert row is not None
         m = row._mapping
         return {
             "id": m["id"],

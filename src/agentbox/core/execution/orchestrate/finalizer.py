@@ -24,10 +24,11 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agentbox.config import Settings
 from agentbox.core.data import AgentDef, RunStore
 
+from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
-from agentbox.core.execution.webhooks import WebhookDispatcher
 
 if TYPE_CHECKING:
     from agentbox.core.execution.orchestrate.steploop import StepResult
@@ -55,11 +56,11 @@ def cleanup_workdir(agent: AgentDef, workdir: Path) -> None:
 
 
 class RunFinalizer:
-    """Persists terminal state, fires the webhook, and cleans up."""
+    """Persists terminal state, fires dispatch channels, and cleans up."""
 
-    def __init__(self, store: RunStore, webhooks: WebhookDispatcher) -> None:
+    def __init__(self, store: RunStore, settings: Settings) -> None:
         self.store = store
-        self.webhooks = webhooks
+        self.settings = settings
 
     def finalize(
         self,
@@ -126,9 +127,18 @@ class RunFinalizer:
             )
 
         try:
-            self.webhooks.deliver(run_id, agent, broadcaster, transcript_path)
+            refreshed = self.store.get_run(run_id)
+            if refreshed is not None:
+                dispatch_completion(
+                    run=refreshed,
+                    agent=agent,
+                    store=self.store,
+                    broadcaster=broadcaster,
+                    transcript_path=transcript_path,
+                    settings=self.settings,
+                )
         except Exception:
-            logger.exception("finalizer: webhook delivery failed for %s", run_id)
+            logger.exception("finalizer: dispatch failed for %s", run_id)
 
         with contextlib.suppress(Exception):
             broadcaster.close()

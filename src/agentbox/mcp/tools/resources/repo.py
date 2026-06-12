@@ -26,7 +26,6 @@ def _require_reason(reason: str) -> dict | None:
 
 
 _ZIP_MAGIC = b"PK\x03\x04"
-_MULTI_FILE_TYPES = {"folder", "skill"}
 
 
 def register_repo(mcp: FastMCP) -> None:
@@ -104,7 +103,7 @@ def register_repo(mcp: FastMCP) -> None:
             raw = (content or "").encode("utf-8")
 
         is_zip = raw[:4] == _ZIP_MAGIC
-        if rtype.value in _MULTI_FILE_TYPES:
+        if rtype.is_multi_file:
             if not is_zip:
                 return {
                     "error": "invalid_payload",

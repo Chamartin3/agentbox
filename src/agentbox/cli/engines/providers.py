@@ -10,7 +10,12 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.engines.providers import list_providers
+from agentbox.core.engines import (
+    get_provider,
+    list_models as registry_list_models,
+    list_providers,
+    refresh_opencode_providers,
+)
 from agentbox.core.service import get_runner_profile
 
 app = typer.Typer(
@@ -66,9 +71,6 @@ def provider_models(
     refresh: bool = typer.Option(False, help="Bypass cache and fetch fresh models"),
 ) -> None:
     """List available models for a provider."""
-    from agentbox.core.engines.providers import get_provider
-    from agentbox.core.engines.providers.registry import list_models as registry_list_models
-
     store = get_store()
 
     if profile_id:
@@ -132,8 +134,6 @@ def provider_models(
 @app.command("refresh")
 def provider_refresh() -> None:
     """Re-discover dynamic providers (currently: opencode CLI)."""
-    from agentbox.core.engines.providers.registry import refresh_opencode_providers
-
     discovered = refresh_opencode_providers()
     if not discovered:
         console.print(

@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
-from agentbox.core.engines.render.discovery import DiscoveredAgent
-from agentbox.core.engines.render.generator import ConfigGenerator
-from agentbox.core.engines.render.writers import (
-    DEFAULT_WRITERS,
+from agentbox.core.workspaces.generation.engine_config import (
+    ConfigGenerator,
     ConfigWriter,
+    DEFAULT_WRITERS,
+    DiscoveredAgent,
     WriteContext,
     WriteResult,
 )

@@ -13,11 +13,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from agentbox.core.data import DoneEvent
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.token import TokenBackend
 
-DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.TOKEN)
+DEFAULT_RUNNER = RunnerSpec(kind="token")
 
 
 def _make_agent(**overrides: object) -> AgentDef:
@@ -76,7 +75,7 @@ class TestTokenProviderRouting:
         """render() does not read agent.runner.model as runtime config."""
         agent = _make_agent(
             runner=RunnerSpec(
-                kind=RunnerKind.TOKEN,
+                kind="token",
                 model="legacy:model",
             )
         )
@@ -91,7 +90,7 @@ class TestTokenProviderRouting:
         """runner_config.model is the runtime source of truth."""
         agent = _make_agent(
             runner=RunnerSpec(
-                kind=RunnerKind.TOKEN,
+                kind="token",
                 model="spec:default",
             )
         )
@@ -183,7 +182,7 @@ class TestTokenProviderRouting:
 
         agent = _make_agent(
             runner=RunnerSpec(
-                kind=RunnerKind.TOKEN,
+                kind="token",
                 agent_module="fake:Agent",
             )
         )
@@ -229,7 +228,7 @@ class TestTokenProviderRouting:
         """run() without provider config (legacy behavior) still executes."""
         agent = _make_agent(
             runner=RunnerSpec(
-                kind=RunnerKind.TOKEN,
+                kind="token",
                 agent_module="fake:Agent",
             )
         )

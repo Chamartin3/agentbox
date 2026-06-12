@@ -7,19 +7,24 @@ Avoids magic strings and makes refactoring safer.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal, Self
 
 
-class RunnerKind(StrEnum):
-    """Supported agent runner implementations."""
+class CatalogEnum(StrEnum):
+    """StrEnum that is its own validation catalog."""
 
-    CLAUDE_CODE = "claude_code"
-    OPENCODE = "opencode"
-    CODEX = "codex"
-    PI = "pi"
-    TOKEN = "token"
-    HTTP = "http"
-    SUBPROCESS = "subprocess"
-    ADAPTER = "adapter"
+    @classmethod
+    def values(cls) -> tuple[str, ...]:
+        return tuple(e.value for e in cls)
+
+    @classmethod
+    def coerce(cls, value: str, *, label: str = "value") -> Self:
+        try:
+            return cls(value)
+        except ValueError:
+            raise ValueError(
+                f"{label} must be one of {', '.join(cls.values())}"
+            ) from None
 
 
 class SessionMode(StrEnum):
@@ -68,6 +73,29 @@ class RunStatus(StrEnum):
     TIMEOUT = "timeout"
     INCOMPLETE = "incomplete"
 
+    @classmethod
+    def terminal(cls) -> frozenset[RunStatus]:
+        """The non-running terminal statuses a finished run can hold."""
+        return frozenset({cls.OK, cls.ERROR, cls.FAILED, cls.TIMEOUT})
+
+    @property
+    def is_terminal(self) -> bool:
+        return self in RunStatus.terminal()
+
+    @property
+    def is_running(self) -> bool:
+        return self is RunStatus.RUNNING
+
+
+# The terminal status a ``DoneEvent`` / stream session reports. Defined
+# once here so the subset isn't re-spelled as a bare Literal at each use.
+TerminalRunStatus = Literal[
+    RunStatus.OK, RunStatus.ERROR, RunStatus.TIMEOUT, RunStatus.FAILED
+]
+
+# The coarse run states the activity feed filters by.
+ActivityStateFilter = Literal[RunStatus.RUNNING, RunStatus.OK, RunStatus.ERROR]
+
 
 class BundleFile(StrEnum):
     """Conventional file names inside an agent bundle directory."""
@@ -78,7 +106,7 @@ class BundleFile(StrEnum):
     INPUT_SCHEMA = "input_schema.json"
 
 
-class ResourceType(StrEnum):
+class ResourceType(CatalogEnum):
     """Allowed values for ``repo_resources.type``.
 
     Mirrors the SQL CHECK constraint in ``core/data/schema.py``.
@@ -89,6 +117,22 @@ class ResourceType(StrEnum):
     SKILL = "skill"
     SCHEMA = "schema"
     SCRIPT = "script"
+
+    @property
+    def is_multi_file(self) -> bool:
+        return self in (ResourceType.FOLDER, ResourceType.SKILL)
+
+    @property
+    def is_single_file(self) -> bool:
+        return not self.is_multi_file
+
+    @property
+    def default_extension(self) -> str:
+        return {
+            ResourceType.DOCUMENT: ".md",
+            ResourceType.SCHEMA: ".json",
+            ResourceType.SCRIPT: "",
+        }.get(self, "")
 
 
 class EventType(StrEnum):
@@ -109,3 +153,122 @@ class EventType(StrEnum):
     TIMEOUT = "timeout"
     VALIDATION = "validation"
     DONE = "done"
+
+
+class MessageRole(StrEnum):
+    """Conversation message roles, shared across backend conversation
+    decoders and the ``TextEvent`` wire format."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+    TOOL = "tool"
+
+
+class ContentBlockType(StrEnum):
+    """Kinds of content part inside a parsed conversation turn."""
+
+    TEXT = "text"
+    THINKING = "thinking"
+    TOOL_USE = "tool_use"
+    TOOL_RESULT = "tool_result"
+
+
+class ValidationMode(StrEnum):
+    """Output-validation engine selection."""
+
+    JSONSCHEMA = "jsonschema"
+    PYDANTIC = "pydantic"
+    BOTH = "both"
+    NONE = "none"
+
+
+# Engines a config can *select* (always picks one — ``none`` is a runtime
+# outcome on ``ValidationEvent``, not a configurable choice).
+ConfiguredValidationMode = Literal[
+    ValidationMode.JSONSCHEMA, ValidationMode.PYDANTIC, ValidationMode.BOTH
+]
+
+
+class LogLevel(StrEnum):
+    """Severity for ``LogEvent`` and stream-session logging."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    WARN = "warn"
+    ERROR = "error"
+
+
+class PromptMode(CatalogEnum):
+    """How a prompt-resource binding is embedded into the prompt."""
+
+    INLINE = "inline"
+    SKILL_PRIMER = "skill_primer"
+    NAME_ONLY = "name_only"
+    MANIFEST = "manifest"
+
+
+class PromptSlot(CatalogEnum):
+    """Which prompt slot a binding targets."""
+
+    SYSTEM = "system"
+    USER_TEMPLATE = "user_template"
+    INPUT_SCHEMA = "input_schema"
+    OUTPUT_SCHEMA = "output_schema"
+
+
+class McpPolicy(CatalogEnum):
+    """Default workspace MCP allow/deny policy."""
+
+    ALLOW_ALL_UNLESS_DISABLED = "allow_all_unless_disabled"
+    DENY_ALL_UNLESS_ENABLED = "deny_all_unless_enabled"
+
+
+class ValidatorKind(CatalogEnum):
+    """Kinds of output/input validators in agent config."""
+
+    HTTP = "http"
+    SCRIPT = "script"
+
+
+class ImportSource(CatalogEnum):
+    """How a resource version was imported into the store."""
+
+    UPLOAD = "upload"
+    HOST_PATH = "host_path"
+    TOML_MIGRATION = "toml_migration"
+    DB_ONLY = "db_only"
+
+
+class MaterializeMode(CatalogEnum):
+    """How a resource is materialized into a workspace file tree."""
+
+    COPY = "copy"
+    SYMLINK = "symlink"
+    MOUNT = "mount"
+
+
+class OnConflict(CatalogEnum):
+    """Behaviour when materializing a resource would overwrite an existing file."""
+
+    ERROR = "error"
+    OVERWRITE = "overwrite"
+    SKIP = "skip"
+
+
+class ValidationCheckMode(CatalogEnum):
+    """Aggressiveness of output schema checks during run composition."""
+
+    STRICT = "strict"
+    WARN = "warn"
+    OFF = "off"
+
+
+class RunnerKind(CatalogEnum):
+    """Supported interactive runner backends for ``agentbox launch``."""
+
+    CLAUDE = "claude"
+    OPENCODE = "opencode"
+    CODEX = "codex"
+    PI = "pi"
+    SHELL = "shell"

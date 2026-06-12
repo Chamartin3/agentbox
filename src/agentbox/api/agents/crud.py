@@ -117,7 +117,7 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
                 event="agent.published",
                 agent_id=agent_id,
                 version=version,
-                version_id=result.get("id"),
+                version_id=result["id"],
                 reason=body.reason,
             )
         except Exception:  # pragma: no cover

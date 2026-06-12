@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import cast
 
 from agentbox.core.constants import ResourceType
-
-if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+from agentbox.core.data import RepoResourceRow, SessionStore
 
 __all__ = [
     "ResourceNotFound",
@@ -108,11 +106,12 @@ def create_resource(
     display_name: str,
     description: str | None = None,
     tags: list[str] | None = None,
-) -> dict:
+) -> RepoResourceRow:
     try:
-        return store.create_repo_resource(
+        result = store.create_repo_resource(
             slug=slug, type=type, display_name=display_name, description=description, tags=tags or [],
         )
+        return cast(RepoResourceRow, result)
     except ValueError as exc:
         raise InvalidResource(str(exc)) from exc
 
@@ -124,7 +123,7 @@ def get_resource(resource_id: str, *, store: SessionStore) -> dict:
     return {"resource": r, "active_version": active}
 
 
-def update_resource(resource_id: str, *, store: SessionStore, display_name: str | None = None, description: str | None = None, tags: list[str] | None = None) -> dict:
+def update_resource(resource_id: str, *, store: SessionStore, display_name: str | None = None, description: str | None = None, tags: list[str] | None = None) -> RepoResourceRow:
     rid = _resolve_or_raise(store, resource_id)
     updated = store.update_repo_resource(rid, display_name=display_name, description=description, tags=tags)
     if updated is None:
@@ -160,7 +159,7 @@ def soft_delete_resource(resource_id: str, *, store: SessionStore, reason: str) 
     store.soft_delete_repo_resource(resource_id, reason=reason)
 
 
-def _require_resource(store: SessionStore, resource_id: str) -> dict:
+def _require_resource(store: SessionStore, resource_id: str) -> RepoResourceRow:
     resource = store.get_repo_resource(resource_id)
     if not resource:
         raise ResourceNotFound(resource_id)
@@ -171,12 +170,14 @@ def list_repo_resources(store: SessionStore, *, type: str | None = None, limit: 
     return store.list_repo_resources(type=type, limit=limit)
 
 
-def get_repo_resource_by_slug(store: SessionStore, slug: str) -> dict | None:
-    return store.get_repo_resource_by_slug(slug)
+def get_repo_resource_by_slug(store: SessionStore, slug: str) -> RepoResourceRow | None:
+    result = store.get_repo_resource_by_slug(slug)
+    return cast("RepoResourceRow | None", result)
 
 
-def create_repo_resource(store: SessionStore, slug: str, type: str, display_name: str, *, description: str | None = None, tags: list[str] | None = None, created_by: str | None = None) -> dict:
-    return store.create_repo_resource(slug, type, display_name, description=description, tags=tags, created_by=created_by)
+def create_repo_resource(store: SessionStore, slug: str, type: str, display_name: str, *, description: str | None = None, tags: list[str] | None = None, created_by: str | None = None) -> RepoResourceRow:
+    result = store.create_repo_resource(slug, type, display_name, description=description, tags=tags, created_by=created_by)
+    return cast(RepoResourceRow, result)
 
 
 def list_repo_versions(store: SessionStore, resource_id: str) -> list[dict]:

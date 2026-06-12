@@ -9,6 +9,7 @@ import zipfile
 
 from fastmcp import FastMCP
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.service import (
     ImporterContext,
     ZipUploadImporter,
@@ -23,9 +24,6 @@ def _require_reason(reason: str) -> dict | None:
             "detail": "reason must be at least 3 characters",
         }
     return None
-
-
-_MULTI_FILE_TYPES = {"folder", "skill"}
 
 
 def register_importers(mcp: FastMCP) -> None:
@@ -54,7 +52,14 @@ def register_importers(mcp: FastMCP) -> None:
         Paths must be relative POSIX paths (no leading slash, no ``..``).
         Symlinks cannot be represented; pre-resolve them at the caller.
         """
-        if type not in _MULTI_FILE_TYPES:
+        try:
+            rtype = ResourceType(type)
+        except ValueError:
+            return {
+                "error": "invalid_type",
+                "detail": f"type must be 'folder' or 'skill' (got {type!r})",
+            }
+        if not rtype.is_multi_file:
             return {
                 "error": "invalid_type",
                 "detail": f"type must be 'folder' or 'skill' (got {type!r})",
@@ -97,7 +102,7 @@ def register_importers(mcp: FastMCP) -> None:
                 }
             entries.append((path, raw))
 
-        if type == "skill" and not any(p.lower() == "skill.md" for p, _ in entries):
+        if rtype is ResourceType.SKILL and not any(p.lower() == "skill.md" for p, _ in entries):
             return {
                 "error": "invalid_request",
                 "detail": "skill resources require a SKILL.md at the archive root",
@@ -113,7 +118,7 @@ def register_importers(mcp: FastMCP) -> None:
         try:
             resource = ctx.store.create_repo_resource(
                 slug=slug,
-                type=type,
+                type=rtype.value,
                 display_name=display_name,
                 description=description,
                 tags=tags or [],
@@ -124,7 +129,7 @@ def register_importers(mcp: FastMCP) -> None:
         importer = ZipUploadImporter(
             filename=f"{slug.replace('/', '_')}.zip",
             content=zip_bytes,
-            as_skill=(type == "skill"),
+            as_skill=(rtype is ResourceType.SKILL),
         )
         try:
             imported = importer.run(

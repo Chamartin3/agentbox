@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
+from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
 
 from agentbox.core.service import read_transcript
-from agentbox.core.execution.history import get as get_conversation_source
-from agentbox.core.execution.history.sources.transcript import TranscriptSource
+from agentbox.core.execution.observability.conversation import get as get_conversation_source
+from agentbox.core.execution.observability.conversation.transcript import TranscriptSource
 from agentbox.mcp.deps import get_context
 from agentbox.mcp.schemas import clamp_limit
 
 
 def _serialize(obj: Any) -> Any:
-    if is_dataclass(obj):
+    if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
     return obj
 
@@ -131,8 +132,6 @@ def register(mcp: FastMCP) -> None:
                 "offset": offset,
                 "has_more": False,
             }
-        from pathlib import Path
-
         events = read_transcript(
             Path(rec.transcript_path), get_context().settings.data_dir
         )
@@ -260,8 +259,6 @@ def register(mcp: FastMCP) -> None:
                 "offset": offset,
                 "has_more": False,
             }
-        from pathlib import Path
-
         events = read_transcript(
             Path(rec.transcript_path), get_context().settings.data_dir
         )

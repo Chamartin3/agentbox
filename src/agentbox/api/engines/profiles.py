@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from agentbox.api._pagination import paginate_list
+from agentbox.api._pagination import PaginatedEnvelope, paginate_list
 from agentbox.api.deps import get_store
 from agentbox.core.service import (
     RunnerProfile,
@@ -37,7 +37,7 @@ def list_runner_profiles(
     offset: int = 0,
     paginated: bool = False,
     store: SessionStore = Depends(get_store),
-) -> list[RunnerProfile] | dict:
+) -> list[RunnerProfile] | PaginatedEnvelope:
     """List runner profiles with optional filters.
 
     Pass ``paginated=true`` (or any of ``q/sort/order/offset``) to get the

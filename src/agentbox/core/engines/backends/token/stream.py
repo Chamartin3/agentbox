@@ -21,6 +21,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from agentbox.core.constants import LogLevel, MessageRole
 from agentbox.core.data import (
     LogEvent,
     RunEvent,
@@ -29,6 +30,11 @@ from agentbox.core.data import (
     ToolCallEvent,
     ToolResultEvent,
 )
+
+try:
+    from pydantic_ai.exceptions import UnexpectedModelBehavior as _UnexpectedModelBehavior
+except Exception:
+    _UnexpectedModelBehavior = None  # type: ignore[assignment,misc]
 
 
 @dataclass(frozen=True)
@@ -61,12 +67,7 @@ def _format_provider_error(exc: Exception, *, model: str, provider: str | None) 
             f"for model={model} (upstream provider failure). Raw: {raw}"
         )
 
-    try:
-        from pydantic_ai.exceptions import UnexpectedModelBehavior
-    except Exception:
-        UnexpectedModelBehavior = None  # type: ignore[assignment]
-
-    if UnexpectedModelBehavior is not None and isinstance(exc, UnexpectedModelBehavior):
+    if _UnexpectedModelBehavior is not None and isinstance(exc, _UnexpectedModelBehavior):
         body = getattr(exc, "body", None)
         if body:
             return f"agent execution error: {exc}; body: {body}"
@@ -105,7 +106,7 @@ def _iter_message_history_events(run_id: str, messages: Any) -> list[RunEvent]:
                 text = getattr(part, "content", None) or getattr(part, "text", None)
                 if text:
                     events.append(
-                        TextEvent(run_id=run_id, role="assistant", text=str(text))
+                        TextEvent(run_id=run_id, role=MessageRole.ASSISTANT, text=str(text))
                     )
                 continue
             if "thinking" in kind or "reasoning" in kind:
@@ -158,7 +159,7 @@ def _iter_message_history_events(run_id: str, messages: Any) -> list[RunEvent]:
                     or getattr(part, "id", None)
                 )
                 ok = not bool(getattr(part, "is_error", False))
-                if hasattr(content, "success"):
+                if content is not None and hasattr(content, "success"):
                     ok = bool(content.success)
                 events.append(
                     ToolResultEvent(
@@ -176,10 +177,11 @@ def _emit_message_history(run_id: str, messages: Any) -> list[RunEvent]:
     try:
         return _iter_message_history_events(run_id, messages)
     except Exception as exc:
-        return [
+        result: list[RunEvent] = [
             LogEvent(
                 run_id=run_id,
-                level="warn",
+                level=LogLevel.WARN,
                 message=f"could not emit pydantic-ai message history: {exc}",
             )
         ]
+        return result

@@ -7,7 +7,7 @@ It does *not* persist the terminal state — that's the finalizer's job.
 The actual per-event work (transcript append, WS broadcast, usage
 record, schema validation, retry-on-validation-failure) is handled by
 :class:`agentbox.core.execution.retry.RetryOrchestrator` and
-:class:`agentbox.core.execution.streaming.session.RunStreamSession`.
+:class:`agentbox.core.execution.observability.stream.RunStreamSession`.
 """
 
 from __future__ import annotations
@@ -16,17 +16,18 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from agentbox.core.data import UsageEvent
 from agentbox.config import Settings
 from agentbox.core.agents import AgentRuntimeView
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
-from agentbox.core.data import AgentDef, UsageStore
+from agentbox.core.data import AgentDef, RunStore
 from agentbox.core.engines.backends.base import RenderedConfig
 from agentbox.core.execution.retry import RetryOrchestrator
-from agentbox.core.execution.streaming.session import RunStreamSession
+from agentbox.core.execution.observability.stream import RunStreamSession
+from agentbox.core.execution.observability.stream.session import DoneStatus
 
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 
@@ -108,7 +109,7 @@ class RunStepLoop:
     :class:`StepResult` ready for the finalizer.
     """
 
-    def __init__(self, store: UsageStore, settings: Settings) -> None:
+    def __init__(self, store: RunStore, settings: Settings) -> None:
         self.store = store
         self.settings = settings
 
@@ -221,10 +222,12 @@ class RunStepLoop:
             # ALWAYS emit the terminal DoneEvent through the session so
             # it lands last in both the transcript and WS stream.
             if not session.done_emitted:
+                # cast is safe: classify_terminal_error returns "failed" or None,
+                # both valid DoneStatus values
                 session.emit_done(
                     ok=bool(final_ok),
                     error=final_error,
-                    status=final_status,
+                    status=cast(DoneStatus, final_status) if final_status is not None else None,
                 )
 
         return StepResult(

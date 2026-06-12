@@ -165,7 +165,7 @@ def publish(
     if agent and agent.prompt_path:
         write_to_disk(agent, project_root, committed["content"])
     return PromptDoc(
-        path=agent.prompt_path if agent else "",
+        path=agent.prompt_path if agent and agent.prompt_path else "",
         content=committed["content"],
         size=len(committed["content"].encode("utf-8")),
         mtime=committed["created_at"],
@@ -185,7 +185,7 @@ def rollback(
     if agent and agent.prompt_path:
         write_to_disk(agent, project_root, committed["content"])
     return PromptDoc(
-        path=agent.prompt_path if agent else "",
+        path=agent.prompt_path if agent and agent.prompt_path else "",
         content=committed["content"],
         size=len(committed["content"].encode("utf-8")),
         mtime=committed["created_at"],

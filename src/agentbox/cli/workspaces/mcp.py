@@ -6,12 +6,12 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from agentbox.cli._deps import get_store
+from agentbox.cli._deps import get_mcp_registry, get_settings, get_store
 from agentbox.cli._common import console
-from agentbox.core.service import VALID_POLICIES
 from agentbox.core.service import (
     get_project_mcp_servers,
     get_workspace_mcp_policy,
+    get_workspace_mcp_tools,
     list_workspace_mcp_server_overrides,
     list_workspace_mcp_tool_overrides,
     set_workspace_mcp_policy,
@@ -81,14 +81,12 @@ def mcp_policy(
     ),
 ) -> None:
     """Set the default MCP policy for a workspace."""
-    if policy_name not in VALID_POLICIES:
-        console.print(
-            f"[red]Invalid policy.[/red] Must be one of: {', '.join(VALID_POLICIES)}"
-        )
-        raise typer.Exit(1)
-
     store = get_store()
-    result = set_workspace_mcp_policy(store, workspace_id, policy_name)
+    try:
+        result = set_workspace_mcp_policy(store, workspace_id, policy_name)
+    except ValueError as exc:
+        console.print(f"[red]Invalid policy.[/red] {exc}")
+        raise typer.Exit(1) from exc
     console.print(
         f"[green]✓[/green] policy set to [bold]{result}[/bold] for workspace {workspace_id!r}"
     )
@@ -154,8 +152,6 @@ def mcp_refresh(workspace_id: str) -> None:
         )
         return
 
-    from agentbox.cli._deps import get_mcp_registry, get_settings
-
     registry = get_mcp_registry()
     settings = get_settings()
     cache_dir = settings.mcp_cache_dir
@@ -173,16 +169,11 @@ def mcp_refresh(workspace_id: str) -> None:
 @mcp_workspace_app.command("tools")
 def mcp_tools(workspace_id: str) -> None:
     """List MCP tools available to a workspace."""
-    from agentbox.cli._deps import get_settings
-    from agentbox.core.service.workspaces.permissions import get_workspace_mcp_tools
-
     store = get_store()
     result = get_workspace_mcp_tools(workspace_id, store=store, settings=get_settings())
     if not result:
         console.print(f"[dim]no MCP tools for workspace {workspace_id!r}[/dim]")
         return
-
-    from rich.table import Table
 
     table = Table(title=f"MCP Tools — {workspace_id}", header_style="bold cyan")
     table.add_column("Server", style="bold")

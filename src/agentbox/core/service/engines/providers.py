@@ -22,14 +22,13 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.engines.providers import get_provider, list_providers
-from agentbox.core.engines.providers.base import ProviderDescriptor, ProviderModel
-from agentbox.core.engines.providers.registry import (
-    _MODEL_CACHE,
+from agentbox.core.engines import (
+    EffectiveRunnerConfig,
+    ProviderDescriptor,
+    ProviderModel,
+    get_provider,
     list_models as registry_list_models,
-)
-from agentbox.core.engines.providers.registry import (
+    list_providers,
     refresh_opencode_providers,
 )
 
@@ -81,7 +80,7 @@ def list_runner_providers(
 def refresh_providers() -> dict[str, Any]:
     """Re-run dynamic provider discovery and invalidate model caches."""
     discovered = refresh_opencode_providers()
-    _MODEL_CACHE.clear()
+    # refresh_opencode_providers() already clears _MODEL_CACHE internally.
     return {
         "opencode": discovered,
         "opencode_count": len(discovered),

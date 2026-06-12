@@ -15,7 +15,7 @@ from agentbox.config import Settings
 from agentbox.core.resources.skills import discover_skills
 
 if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef, SessionStore
+    from agentbox.core.data import AgentDef, SessionStore, WorkspaceLookupStore
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class WorkspaceInfo:
 def resolve_path(
     agent: AgentDef,
     settings: Settings,
-    store: SessionStore | None = None,
+    store: WorkspaceLookupStore | None = None,
 ) -> tuple[Path, bool]:
     """Return (workspace_path, is_ephemeral) for an agent.
 
@@ -49,8 +49,9 @@ def resolve_path(
     if agent.workspace:
         if store is not None:
             row = store.get_workspace(agent.workspace)
-            if row and row.get("path"):
-                return settings.project_root / row["path"], False
+            row_path = row.get("path") if row else None
+            if row_path:
+                return settings.project_root / row_path, False
         return settings.project_root / agent.workspace, False
 
     return settings.workspaces_root / agent.id, False

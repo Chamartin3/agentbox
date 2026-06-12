@@ -259,8 +259,8 @@ async def test_codex_scenario_1_text_only() -> None:
     ]
     gen = await _fake_jsonl_stream(fake_events)
     with (
-        patch.object(codex_mod.shutil, "which", return_value="/usr/bin/codex"),
-        patch.object(codex_mod, "stream_jsonl_subprocess", gen),
+        patch.object(codex_mod.adapter.shutil, "which", return_value="/usr/bin/codex"),
+        patch.object(codex_mod.adapter, "stream_jsonl_subprocess", gen),
     ):
         events = await _collect(codex_mod.CodexBackend().run(rendered, "hi", "rid"))
 
@@ -289,8 +289,8 @@ async def test_pi_scenario_1_text_only() -> None:
     ]
     gen = await _fake_jsonl_stream(fake_events)
     with (
-        patch.object(pi_mod.shutil, "which", return_value="/usr/bin/pi"),
-        patch.object(pi_mod, "stream_jsonl_subprocess", gen),
+        patch.object(pi_mod.adapter.shutil, "which", return_value="/usr/bin/pi"),
+        patch.object(pi_mod.adapter, "stream_jsonl_subprocess", gen),
     ):
         events = await _collect(pi_mod.PiBackend().run(rendered, "hi", "rid"))
 

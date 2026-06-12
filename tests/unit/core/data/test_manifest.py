@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data.agents.manifest import AgentDef, CompositionConfig
 from agentbox.core.data.engines.manifest import RunnerSpec
 from agentbox.core.data.system.manifest import ProjectManifest
@@ -53,7 +52,7 @@ class TestAgentDef:
 
     def test_runner_defaults(self) -> None:
         agent = AgentDef(id="a", description="d")
-        assert agent.runner.kind == RunnerKind.TOKEN
+        assert agent.runner.kind == "token"
 
     def test_with_composition(self) -> None:
         agent = AgentDef(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
-from typing import Any
+from typing import Any, cast
 
 from fastmcp import FastMCP
 
@@ -13,11 +13,12 @@ from agentbox.mcp.schemas import clamp_limit
 
 
 def _agent_dict(agent: Any) -> dict:
-    if is_dataclass(agent):
+    if is_dataclass(agent) and not isinstance(agent, type):
         return asdict(agent)
-    if hasattr(agent, "model_dump"):
-        return agent.model_dump()
-    return dict(agent.__dict__)
+    dump = getattr(agent, "model_dump", None)
+    if callable(dump):
+        return cast(dict, dump())
+    return dict(vars(agent))
 
 
 def _strip_legacy_runner_model(d: dict) -> dict:

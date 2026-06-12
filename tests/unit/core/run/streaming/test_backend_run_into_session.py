@@ -1,6 +1,6 @@
-"""Tests for ``BackendAdapter.run_into_session()`` — the iterator bridge.
+"""Tests for ``pump_into_session()`` — the iterator bridge.
 
-The default implementation pumps the legacy
+The execution-layer pump bridges the legacy
 ``run() -> AsyncIterator[RunEvent]`` contract into the central
 ``RunStreamSession``. These tests pin down the bridge's contract:
 content events go through ``session.emit()``, ``DoneEvent`` is
@@ -14,12 +14,10 @@ from collections.abc import AsyncIterator
 
 import pytest
 from agentbox.core.data import DoneEvent, LogEvent, RunEvent, TextEvent
-from agentbox.core.engines.backends.base import (
-    BackendAdapter,
-    BackendRunResult,
-    RenderedConfig,
-)
-from agentbox.core.execution.streaming.session import CaptureSession
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.requests import BackendRunResult
+from agentbox.core.execution.retry import pump_into_session
+from agentbox.core.execution.observability.stream import CaptureSession
 
 
 class _IteratorBackend(BackendAdapter):
@@ -52,7 +50,7 @@ async def test_content_events_go_through_session() -> None:
     ]
     backend = _IteratorBackend(events)
     with CaptureSession(run_id="r") as session:
-        result = await backend.run_into_session(RenderedConfig(), "input", session)
+        result = await pump_into_session(backend, RenderedConfig(), "input", session)
 
     # DoneEvent was NOT emitted — the executor owns the final emit.
     assert [type(e) for e in session.captured] == [LogEvent, TextEvent]
@@ -68,7 +66,7 @@ async def test_done_with_error_captured() -> None:
     ]
     backend = _IteratorBackend(events)
     with CaptureSession(run_id="r") as session:
-        result = await backend.run_into_session(RenderedConfig(), "input", session)
+        result = await pump_into_session(backend, RenderedConfig(), "input", session)
 
     assert result.ok is False
     assert result.error == "boom"
@@ -90,7 +88,7 @@ async def test_assistant_text_lands_in_session_output_text() -> None:
     ]
     backend = _IteratorBackend(events)
     with CaptureSession(run_id="r") as session:
-        await backend.run_into_session(RenderedConfig(), "input", session)
+        await pump_into_session(backend, RenderedConfig(), "input", session)
 
     # Non-delta assistant text accumulates; delta is UI-only.
     assert session.output_text == ["chunk1", "chunk2"]
@@ -106,14 +104,14 @@ async def test_backend_with_no_done_event_returns_default_failure() -> None:
     events = [LogEvent(run_id="r", level="info", message="hi")]
     backend = _IteratorBackend(events)
     with CaptureSession(run_id="r") as session:
-        result = await backend.run_into_session(RenderedConfig(), "input", session)
+        result = await pump_into_session(backend, RenderedConfig(), "input", session)
 
     assert result.ok is False
     assert [type(e) for e in session.captured] == [LogEvent]
 
 
 class _DirectBackend(BackendAdapter):
-    """Backend that overrides ``run_into_session`` instead of ``run``.
+    """Backend that exposes ``run_into_session`` instead of using ``run``.
 
     The future migration target — backends call ``session.emit()``
     directly and return their status, with no iterator overhead.
@@ -143,10 +141,10 @@ class _DirectBackend(BackendAdapter):
 
 @pytest.mark.asyncio
 async def test_direct_override_skips_iterator() -> None:
-    """Backends migrated past the bridge work the same way."""
+    """Backends that provide a direct pump hook work the same way."""
     backend = _DirectBackend()
     with CaptureSession(run_id="r") as session:
-        result = await backend.run_into_session(RenderedConfig(), "input", session)
+        result = await pump_into_session(backend, RenderedConfig(), "input", session)
 
     assert result == BackendRunResult(ok=True)
     assert len(session.captured) == 1

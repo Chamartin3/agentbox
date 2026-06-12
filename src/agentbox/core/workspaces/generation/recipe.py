@@ -7,17 +7,30 @@ from pathlib import Path
 
 import yaml
 
-_RECIPES_ROOT = Path(__file__).parent / "recipes"
+from agentbox.core.engines.backends import get_backend, list_backends
+
+# Recipe engine name → backend entry-point name. Preserves backward compat
+# for the old recipe directory names (``claude`` maps to the ``claude_code``
+# backend package).
+_RECIPE_ENGINE_TO_BACKEND: dict[str, str] = {"claude": "claude_code"}
+_BACKEND_TO_RECIPE_ENGINE: dict[str, str] = {
+    v: k for k, v in _RECIPE_ENGINE_TO_BACKEND.items()
+}
+
+
+def _backend_name(engine: str) -> str:
+    return _RECIPE_ENGINE_TO_BACKEND.get(engine, engine)
 
 
 @dataclass(frozen=True)
 class Recipe:
     """Engine-specific workspace layout.
 
-    Loaded from a ``recipe.yaml`` file under ``recipes/<engine>/``.
+    Loaded from a backend's ``recipe.yaml`` file.
     """
 
     engine: str
+    recipe_dir: Path
     layout: dict[str, str] = field(default_factory=dict)
     serialization: dict[str, str] = field(default_factory=dict)
     templates: dict[str, str] = field(default_factory=dict)
@@ -32,22 +45,25 @@ class Recipe:
         tmpl_path = self.templates.get(role)
         if tmpl_path is None:
             return None
-        recipe_dir = _RECIPES_ROOT / self.engine
-        full_path = recipe_dir / tmpl_path
+        full_path = self.recipe_dir / tmpl_path
         if not full_path.is_file():
             return None
         return full_path.read_text(encoding="utf-8")
 
 
 def load_recipe(engine: str) -> Recipe:
-    """Load a recipe from ``recipes/<engine>/recipe.yaml``."""
-    recipe_dir = _RECIPES_ROOT / engine
-    recipe_file = recipe_dir / "recipe.yaml"
-    if not recipe_file.is_file():
+    """Load a recipe from the backend package registered for *engine*."""
+    backend_name = _backend_name(engine)
+    try:
+        recipe_path = get_backend(backend_name).recipe_path()
+    except KeyError:
+        recipe_path = None
+    if recipe_path is None or not recipe_path.is_file():
         raise FileNotFoundError(f"No recipe for engine: {engine}")
-    data = yaml.safe_load(recipe_file.read_text(encoding="utf-8"))
+    data = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
     return Recipe(
         engine=data.get("engine", engine),
+        recipe_dir=recipe_path.parent,
         layout=data.get("layout", {}),
         serialization=data.get("serialization", {}),
         templates=data.get("templates", {}),
@@ -55,10 +71,19 @@ def load_recipe(engine: str) -> Recipe:
 
 
 def list_recipes() -> list[str]:
-    """List available engine recipes."""
-    if not _RECIPES_ROOT.is_dir():
-        return []
-    return sorted(
-        p.parent.name
-        for p in _RECIPES_ROOT.rglob("recipe.yaml")
-    )
+    """List available engine recipes.
+
+    Returns recipe engine names (e.g. ``claude``, ``opencode``), not
+    backend entry-point names, so existing callers and CLI flags keep
+    working.
+    """
+    engines: list[str] = []
+    for backend_name in list_backends():
+        backend = get_backend(backend_name)
+        # Defensive: test fixtures may swap in a minimal fake backend.
+        if not hasattr(backend, "recipe_path"):
+            continue
+        recipe_path = backend.recipe_path()
+        if recipe_path is not None and recipe_path.is_file():
+            engines.append(_BACKEND_TO_RECIPE_ENGINE.get(backend_name, backend_name))
+    return sorted(engines)

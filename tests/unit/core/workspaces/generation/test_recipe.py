@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.workspaces.generation.recipe import Recipe, list_recipes, load_recipe
+from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
 
 
 class TestRecipe:

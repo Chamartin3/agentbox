@@ -15,7 +15,7 @@ from agentbox.core.agents.resolve import (
     list_engines,
     resolve_engine_by_name,
 )
-from agentbox.core.engines.providers import get_provider, list_providers
+from agentbox.core.engines import get_provider, list_providers
 
 if TYPE_CHECKING:
     from agentbox.core.data import RunnerProfileCreate, RunnerProfilePatch

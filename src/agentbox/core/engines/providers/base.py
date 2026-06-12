@@ -75,7 +75,8 @@ class ProviderDescriptor(BaseModel):
 class ProviderAdapter(Protocol):
     """Structural protocol every adapter satisfies."""
 
-    descriptor: ProviderDescriptor
+    @property
+    def descriptor(self) -> ProviderDescriptor: ...
 
     async def list_models(self, config: Any) -> list[ProviderModel]: ...
 

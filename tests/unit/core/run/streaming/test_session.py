@@ -14,7 +14,7 @@ from agentbox.core.data import (
     ValidationEvent,
 )
 from agentbox.core.execution.orchestrate.executor import RunBroadcaster
-from agentbox.core.execution.streaming.session import (
+from agentbox.core.execution.observability.stream import (
     CaptureSession,
     DoneAlreadyEmittedError,
     RunStreamSession,

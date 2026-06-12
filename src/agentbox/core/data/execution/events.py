@@ -16,7 +16,13 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.constants import EventType
+from agentbox.core.constants import (
+    EventType,
+    LogLevel,
+    MessageRole,
+    TerminalRunStatus,
+    ValidationMode,
+)
 
 
 class _EventBase(BaseModel):
@@ -43,7 +49,9 @@ class ToolResultEvent(_EventBase):
 class TextEvent(_EventBase):
     type: Literal[EventType.TEXT] = EventType.TEXT
     text: str
-    role: Literal["assistant", "user", "system"] = "assistant"
+    role: Literal[MessageRole.ASSISTANT, MessageRole.USER, MessageRole.SYSTEM] = (
+        MessageRole.ASSISTANT
+    )
     # True when this event is an incremental chunk emitted live during
     # the run. The executor skips appending deltas to ``output_text`` —
     # a non-delta TextEvent with the consolidated/cleaned text is
@@ -63,7 +71,7 @@ class UsageEvent(_EventBase):
 
 class LogEvent(_EventBase):
     type: Literal[EventType.LOG] = EventType.LOG
-    level: Literal["debug", "info", "warn", "error"] = "info"
+    level: LogLevel = LogLevel.INFO
     message: str
 
 
@@ -94,7 +102,7 @@ class ValidationEvent(_EventBase):
     ok: bool
     attempt: int = 1
     mode: Literal["strict", "warn", "off"] = "strict"
-    engine: Literal["jsonschema", "pydantic", "both", "none"] = "none"
+    engine: ValidationMode = ValidationMode.NONE
     error: str | None = None
     """Validation error message when ok=False."""
 
@@ -105,9 +113,11 @@ class DoneEvent(_EventBase):
     exit_code: int | None = None
     error: str | None = None
     # Specific failure category. ``"timeout"`` means the runner's
-    # ``timeout_seconds`` expired before the process exited. Any other
-    # non-ok run is recorded as ``"error"``. None when ``ok=True``.
-    status: Literal["ok", "error", "timeout"] | None = None
+    # ``timeout_seconds`` expired before the process exited. ``"failed"``
+    # means the run failed with a recoverable/expected error (rate-limit,
+    # auth, validation). ``"error"`` is the catch-all for other non-ok
+    # runs. None when ``ok=True``.
+    status: TerminalRunStatus | None = None
 
 
 RunEvent = Annotated[

@@ -6,18 +6,17 @@ Transport-only: parses bodies, calls
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
+from agentbox.core.constants import McpPolicy
 from agentbox.core.service import SessionStore
 from agentbox.core.service import workspaces as ws_service
 
 router = APIRouter(tags=["workspace-mcp"])
-
-Policy = Literal["allow_all_unless_disabled", "deny_all_unless_enabled"]
 
 
 class ServerOverrideBody(BaseModel):
@@ -33,7 +32,7 @@ class ToolOverrideBody(BaseModel):
 
 
 class PolicyBody(BaseModel):
-    default_policy: Policy
+    default_policy: McpPolicy
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp")

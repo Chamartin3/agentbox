@@ -1,6 +1,6 @@
 """Webhook payload contract tests.
 
-Verify that ``webhook_payload`` and ``_parsed_output`` maintain a
+Verify that ``completion_payload`` and ``_parsed_output`` maintain a
 stable, unambiguous wire contract regardless of backend.
 """
 
@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import json
 
-from agentbox.core.execution.webhooks import (
+from agentbox.core.data import RunRecord
+from agentbox.core.execution.dispatch.payload import (
     _parsed_output,
     _parsed_output_structured,
-    webhook_payload,
+    completion_payload,
 )
-from agentbox.core.data import RunRecord
 
 
 def _make_run(output: str, validation_status: str = "ok") -> RunRecord:
@@ -37,7 +37,7 @@ def _make_run(output: str, validation_status: str = "ok") -> RunRecord:
 
 def test_output_is_always_string():
     """``output`` field must always be a string — never a dict or list."""
-    payload = webhook_payload(
+    payload = completion_payload(
         _make_run('{"key": "value"}'),
         usage=None,
         duration_ms=None,
@@ -50,7 +50,7 @@ def test_output_is_always_string():
 
 def test_output_structured_is_dict_when_valid():
     """``output_structured`` is a dict when validation passes and output is JSON."""
-    payload = webhook_payload(
+    payload = completion_payload(
         _make_run('{"key": "value"}'),
         usage=None,
         duration_ms=None,
@@ -60,7 +60,7 @@ def test_output_structured_is_dict_when_valid():
 
 def test_output_structured_is_none_when_not_validated():
     """``output_structured`` is None when validation didn't pass."""
-    payload = webhook_payload(
+    payload = completion_payload(
         _make_run('{"key": "value"}', validation_status="fail"),
         usage=None,
         duration_ms=None,
@@ -70,7 +70,7 @@ def test_output_structured_is_none_when_not_validated():
 
 def test_output_structured_is_none_when_not_json():
     """``output_structured`` is None when output isn't parseable JSON."""
-    payload = webhook_payload(
+    payload = completion_payload(
         _make_run("plain text output"),
         usage=None,
         duration_ms=None,
@@ -80,7 +80,7 @@ def test_output_structured_is_none_when_not_json():
 
 def test_output_never_dict_or_list():
     """Even structured JSON output must be serialized as a string in ``output``."""
-    payload = webhook_payload(
+    payload = completion_payload(
         _make_run(json.dumps({"nested": [1, 2, 3]})),
         usage=None,
         duration_ms=None,
@@ -93,7 +93,7 @@ def test_output_never_dict_or_list():
 
 def test_output_empty_string_when_none():
     """Empty or None run.output should be handled gracefully."""
-    payload = webhook_payload(
+    payload = completion_payload(
         _make_run(""),
         usage=None,
         duration_ms=None,

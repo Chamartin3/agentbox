@@ -14,7 +14,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from agentbox.core.agents.resolve import list_engines as registered_backends
-from agentbox.core.engines.providers import list_providers
+from agentbox.core.engines import list_providers
 
 router = APIRouter(prefix="/api/runner-backends", tags=["runner-backends"])
 

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.token import TokenBackend
 
-DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.TOKEN)
+DEFAULT_RUNNER = RunnerSpec(kind="token")
 
 
 def _make_agent(**overrides: object) -> AgentDef:
@@ -41,7 +40,7 @@ def test_render_returns_minimal_config() -> None:
 def test_render_stores_agent_meta() -> None:
     agent = _make_agent(
         runner=RunnerSpec(
-            kind=RunnerKind.TOKEN,
+            kind="token",
             agent_module="my_module:MyAgent",
         )
     )
@@ -78,13 +77,13 @@ def test_digest_changes_when_agent_module_changes() -> None:
 
     agent_a = _make_agent(
         runner=RunnerSpec(
-            kind=RunnerKind.TOKEN,
+            kind="token",
             agent_module="mod_a:AgentA",
         )
     )
     agent_b = _make_agent(
         runner=RunnerSpec(
-            kind=RunnerKind.TOKEN,
+            kind="token",
             agent_module="mod_b:AgentB",
         )
     )

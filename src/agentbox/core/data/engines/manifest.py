@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
-from agentbox.core.constants import RunnerKind
+from agentbox.core.constants import ConfiguredValidationMode, ValidationMode
 
 
 class RunnerSpec(BaseModel):
-    kind: RunnerKind = RunnerKind.TOKEN
+    kind: str = "token"
     """Which backend to dispatch to (deprecated — use ``backend`` on the
     run request or ``backend_preference`` on the project manifest instead).
 
@@ -80,7 +78,7 @@ class RunnerSpec(BaseModel):
 
     output_schema_path: str | None = None
 
-    output_validation_engine: Literal["jsonschema", "pydantic", "both"] = "both"
+    output_validation_engine: ConfiguredValidationMode = ValidationMode.BOTH
     """Which engine(s) to use when validating output against the schema.
 
     ``"jsonschema"`` — jsonschema only (legacy behaviour).
@@ -103,7 +101,7 @@ class RunnerManifest(BaseModel):
     do not appear here.
     """
 
-    kind: RunnerKind = RunnerKind.TOKEN
+    kind: str = "token"
     """Defaults to ``token`` so markdown-only agents need no
     explicit runner configuration."""
 

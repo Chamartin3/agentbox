@@ -20,16 +20,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.claude_code import ClaudeCodeBackend
 from agentbox.core.engines.backends.opencode import OpenCodeBackend
+
+_CLAUDE_CODE = "claude_code"
+_OPENCODE = "opencode"
 
 _DEFAULT_AGENT_TIMEOUT = 1200
 
 
 def _agent(
-    runner_kind: RunnerKind, timeout: int, model: str | None = "haiku"
+    runner_kind: str, timeout: int, model: str | None = "haiku"
 ) -> AgentDef:
     return AgentDef(
         id="stage.example",
@@ -40,12 +42,12 @@ def _agent(
 @pytest.mark.parametrize(
     "runner_kind,backend_cls",
     [
-        (RunnerKind.CLAUDE_CODE, ClaudeCodeBackend),
-        (RunnerKind.OPENCODE, OpenCodeBackend),
+        ("claude_code", ClaudeCodeBackend),
+        ("opencode", OpenCodeBackend),
     ],
 )
 def test_backend_render_propagates_active_timeout(
-    tmp_path: Path, runner_kind: RunnerKind, backend_cls
+    tmp_path: Path, runner_kind: str, backend_cls
 ) -> None:
     """The backend's RenderedConfig carries the active version's timeout.
 
@@ -71,7 +73,7 @@ def test_claude_backend_render_propagates_active_model(tmp_path: Path) -> None:
     the model selector — if the active version says ``sonnet``, the
     rendered argv must include ``--model sonnet``.
     """
-    agent = _agent(RunnerKind.CLAUDE_CODE, timeout=300, model="sonnet")
+    agent = _agent("claude_code", timeout=300, model="sonnet")
     rendered = ClaudeCodeBackend().render(agent, tmp_path)
 
     assert "--model" in rendered.argv
@@ -86,8 +88,8 @@ def test_config_change_invalidates_render_digest(tmp_path: Path) -> None:
     digest doesn't change when the active config does, a stale run dir
     is reused with the old timeout.
     """
-    first = ClaudeCodeBackend().render(_agent(RunnerKind.CLAUDE_CODE, 120), tmp_path)
-    second = ClaudeCodeBackend().render(_agent(RunnerKind.CLAUDE_CODE, 600), tmp_path)
+    first = ClaudeCodeBackend().render(_agent("claude_code", 120), tmp_path)
+    second = ClaudeCodeBackend().render(_agent("claude_code", 600), tmp_path)
 
     assert first.agent_meta["timeout_seconds"] == 120
     assert second.agent_meta["timeout_seconds"] == 600
@@ -97,12 +99,12 @@ def test_config_change_invalidates_render_digest(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "runner_kind,backend_cls",
     [
-        (RunnerKind.CLAUDE_CODE, ClaudeCodeBackend),
-        (RunnerKind.OPENCODE, OpenCodeBackend),
+        ("claude_code", ClaudeCodeBackend),
+        ("opencode", OpenCodeBackend),
     ],
 )
 def test_active_version_always_overrides_default_timeout(
-    tmp_path: Path, runner_kind: RunnerKind, backend_cls
+    tmp_path: Path, runner_kind: str, backend_cls
 ) -> None:
     """The active version's timeout must always override the default.
 

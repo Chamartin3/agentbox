@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
+from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.data import (
     DoneEvent,
     LogEvent,
@@ -27,7 +28,7 @@ from agentbox.core.engines.backends.claude_code.views import (
     _build_usage_event,
     _parse_envelope,
 )
-from agentbox.core.execution.streaming.rate_limit import detect_in_text_line
+from agentbox.core.engines.streaming.rate_limit import detect_in_text_line
 
 _NAME = "claude_code"
 
@@ -213,7 +214,7 @@ async def _run_claude(
                     elapsed += int(_HEARTBEAT_INTERVAL_SECONDS)
                     yield LogEvent(
                         run_id=run_id,
-                        level="info",
+                        level=LogLevel.INFO,
                         message=(
                             f"claude silent for {elapsed}s "
                             f"(pid={proc.pid}); still waiting for child to exit"
@@ -238,7 +239,7 @@ async def _run_claude(
             run_id=run_id, timeout_seconds=timeout, error=f"timeout after {timeout}s"
         )
         yield DoneEvent(
-            run_id=run_id, ok=False, error=f"timeout after {timeout}s", status="timeout"
+            run_id=run_id, ok=False, error=f"timeout after {timeout}s", status=RunStatus.TIMEOUT
         )
         return
 
@@ -248,13 +249,13 @@ async def _run_claude(
     if rate_limit_error is not None:
         for sl in stderr_lines:
             if sl.strip():
-                yield LogEvent(run_id=run_id, level="warn", message=sl)
+                yield LogEvent(run_id=run_id, level=LogLevel.WARN, message=sl)
         yield DoneEvent(run_id=run_id, ok=False, error=rate_limit_error)
         return
 
     for sl in stderr_lines:
         if sl.strip():
-            yield LogEvent(run_id=run_id, level="warn", message=sl)
+            yield LogEvent(run_id=run_id, level=LogLevel.WARN, message=sl)
 
     raw = stdout.decode(errors="replace").strip()
     if not raw:

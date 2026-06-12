@@ -9,7 +9,7 @@ from rich.table import Table
 
 from agentbox.cli._common import console
 from agentbox.core.agents.resolve import list_engines as registered_backends
-from agentbox.core.engines.providers import list_providers
+from agentbox.core.engines import list_providers
 
 app = typer.Typer(
     name="backends",

@@ -12,7 +12,7 @@ import logging
 import warnings
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.data import RunnerProfileCreate
@@ -20,8 +20,17 @@ from agentbox.core.data import RunnerProfileCreate
 if TYPE_CHECKING:
     from agentbox.core.data import AgentVersionsMixin
     from agentbox.core.data import AgentDef
-    from agentbox.core.data import PromptVersionsMixin
     from agentbox.core.data import RunnerProfilesMixin
+
+
+class _PromptSyncStore(Protocol):
+    def sync_prompt_from_disk(
+        self,
+        agent_id: str,
+        content: str,
+        author: str = "filesystem",
+        changelog: str | None = None,
+    ) -> dict | None: ...
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +106,7 @@ def _load_prompt_safe(agent: AgentDef) -> str:
 
 def _sync_prompt(
     agent: AgentDef,
-    store: PromptVersionsMixin,
+    store: _PromptSyncStore,
     project_root: Path | None,
 ) -> None:
     """Capture the on-disk prompt as a new committed prompt version if it changed.
@@ -197,7 +206,6 @@ def _ingest_runner_profile(
             description="Imported from legacy agent runner config",
             backend=str(runner_spec.kind),
             model=runner_spec.model,
-            timeout_seconds=runner_spec.timeout_seconds,
             extra_args=runner_spec.extra_args or [],
         )
 
@@ -317,7 +325,7 @@ def startup_sweep(
 
         # Always sync prompt content — prompt edits are independent of
         # agent-definition drift and must be versioned in their own table.
-        _sync_prompt(agent, store, project_root)
+        _sync_prompt(agent, cast(_PromptSyncStore, store), project_root)
 
     # Phase 5: degraded-mode boot — warn (don't fail) for agents with no
     # runner profile binding. They remain non-runnable until bound; the

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
+from agentbox.core.agents.runtime import ComposedPrompt
 from agentbox.core.data import AgentDef
+from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 from agentbox.core.execution.orchestrate.finalizer import RunFinalizer
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
@@ -13,8 +15,8 @@ from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 
 async def _run(
     run_id: str,
-    adapter: Any,
-    rendered: Any,
+    adapter: BackendAdapter,
+    rendered: RenderedConfig,
     agent: AgentDef,
     input_: str,
     workdir: Path,
@@ -23,8 +25,8 @@ async def _run(
     broadcaster: RunBroadcaster,
     step_loop: RunStepLoop,
     finalizer: RunFinalizer,
-    effective: Any = None,
-    composed: Any | None = None,
+    effective: EffectiveRunnerConfig | None = None,
+    composed: ComposedPrompt | None = None,
 ) -> None:
     step_result = None
     try:

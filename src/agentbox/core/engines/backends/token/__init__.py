@@ -13,7 +13,7 @@ during the Phase-5 backend refactor. The public surface is unchanged:
 
 The submodule layout:
 
-* :mod:`._backend` — the :class:`TokenBackend` adapter.
+* :mod:`.adapter` — the :class:`TokenBackend` adapter.
 * :mod:`._stream` — pydantic-ai message-history adaptation, error
   formatting, and the ``TokenDeps`` carrier.
 * :mod:`._schema` — loose JSON-Schema → pydantic fallback converter.
@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import importlib
 
-from agentbox.core.engines.backends.token.backend import TokenBackend
+from agentbox.core.engines.backends.token.adapter import TokenBackend
 from agentbox.core.engines.backends.token.schema import _json_schema_to_pydantic_model
 from agentbox.core.engines.backends.token.stream import (
     _RefSection,

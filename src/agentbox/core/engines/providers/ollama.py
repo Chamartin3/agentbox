@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlparse, urlunparse
 
 import httpx
@@ -107,7 +107,7 @@ class OllamaAdapter(HTTPProviderAdapter):
         default_base_url="http://localhost:11434",
         default_api_key_env=None,
     )
-    static_models: list[str] = []
+    static_models: ClassVar[list[str]] = []
     request_timeout_s = 5.0
 
     def _models_url(self, base_url: str) -> str:

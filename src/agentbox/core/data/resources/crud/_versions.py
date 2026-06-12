@@ -4,22 +4,57 @@ from __future__ import annotations
 
 import json
 import uuid
+from typing import Protocol
 
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
+from agentbox.core.constants import ImportSource
 from agentbox.core.data.utils import now_iso
+from agentbox.core.data.row_types import RepoResourceRow
 from agentbox.core.data.schema import (
     active_resource_versions,
     resource_blobs,
     resource_versions,
     resources as resources_table,
 )
-from agentbox.core.data.resources.models import IMPORT_SOURCES
 from agentbox.core.data.resources.crud._helpers import (
     _hash_blobs,
     _validate_changelog,
 )
+
+
+class _VersionImportSurface(Protocol):
+    """Combined surface for import_repo_version / rollback_repo_resource:
+    own mixin methods + get_repo_resource from ResourceCrudMixin.
+    Pyright cannot see through MRO; this Protocol bridges the gap."""
+
+    engine: Engine
+
+    def get_repo_resource(self, resource_id: str) -> RepoResourceRow | None: ...
+    def get_repo_version(self, version_id: str) -> dict | None: ...
+    def _next_version_number(self, resource_id: str) -> int: ...
+    def _activate_version_in_conn(
+        self,
+        conn: object,
+        resource_id: str,
+        version_id: str,
+        *,
+        activated_by: str | None,
+    ) -> None: ...
+    def import_repo_version(
+        self,
+        resource_id: str,
+        blobs: list[tuple[str, bytes, str | None, str | None]],
+        *,
+        import_source: str,
+        changelog: str,
+        source_metadata: dict | None = ...,
+        metadata: dict | None = ...,
+        draft: bool = ...,
+        created_by: str | None = ...,
+        activate: bool = ...,
+    ) -> dict: ...
 
 
 class ResourceVersionMixin:
@@ -37,7 +72,7 @@ class ResourceVersionMixin:
         return int(row[0]) + 1 if row else 1
 
     def import_repo_version(
-        self,
+        self: "_VersionImportSurface",
         resource_id: str,
         blobs: list[tuple[str, bytes, str | None, str | None]],
         *,
@@ -50,10 +85,7 @@ class ResourceVersionMixin:
         activate: bool = True,
     ) -> dict:
         """Create a new resource version."""
-        if import_source not in IMPORT_SOURCES:
-            raise ValueError(
-                f"Invalid import_source {import_source!r}; must be one of {IMPORT_SOURCES}"
-            )
+        ImportSource.coerce(import_source, label="import_source")
         changelog = _validate_changelog(changelog)
         if not self.get_repo_resource(resource_id):
             raise ValueError(f"Resource {resource_id!r} not found")
@@ -181,7 +213,7 @@ class ResourceVersionMixin:
         return self.get_repo_version(version_id) or {}
 
     def rollback_repo_resource(
-        self,
+        self: "_VersionImportSurface",
         resource_id: str,
         target_version: int,
         *,
@@ -232,3 +264,9 @@ class ResourceVersionMixin:
             created_by=activated_by,
             activate=True,
         )
+
+
+class CrudVersionSurface(Protocol):
+    """Type-only view of ResourceVersionMixin for sibling-mixin self-binding."""
+
+    def get_active_repo_version(self, resource_id: str) -> dict | None: ...

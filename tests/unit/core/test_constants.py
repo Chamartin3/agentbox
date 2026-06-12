@@ -6,18 +6,9 @@ from agentbox.core.constants import (
     BundleFile,
     EventType,
     ResourceType,
-    RunnerKind,
     RunStatus,
     SessionMode,
 )
-
-
-def test_runner_kind_values() -> None:
-    assert RunnerKind.CLAUDE_CODE == "claude_code"
-    assert RunnerKind.OPENCODE == "opencode"
-    assert RunnerKind.CODEX == "codex"
-    assert RunnerKind.PI == "pi"
-    assert RunnerKind.TOKEN == "token"
 
 
 def test_run_status_terminal_values() -> None:

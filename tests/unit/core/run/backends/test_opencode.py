@@ -5,12 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.opencode import OpenCodeBackend
 
 DEFAULT_RUNNER = RunnerSpec(
-    kind=RunnerKind.OPENCODE,
+    kind="opencode",
     extra_args=["--agent", "test-agent"],
 )
 
@@ -60,7 +59,7 @@ def test_render_includes_effective_extra_args() -> None:
 
 
 def test_render_applies_default_model_when_missing() -> None:
-    agent = _make_agent(runner=RunnerSpec(kind=RunnerKind.OPENCODE, extra_args=[]))
+    agent = _make_agent(runner=RunnerSpec(kind="opencode", extra_args=[]))
     adapter = OpenCodeBackend()
     rendered = adapter.render(agent, Path("/tmp/workdir"))
 
@@ -117,7 +116,7 @@ def test_digest_changes_when_effective_extra_args_change() -> None:
 
 
 def test_effective_model_is_passed_even_when_agent_has_legacy_model() -> None:
-    agent = _make_agent(runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, model="haiku"))
+    agent = _make_agent(runner=RunnerSpec(kind="claude_code", model="haiku"))
     adapter = OpenCodeBackend()
     rendered = adapter.render(
         agent,

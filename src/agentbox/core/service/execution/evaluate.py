@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from agentbox.core.service.execution.types import RunNotFound
+from agentbox.core.service.feedback.stats import (
+    activity_summary as activity_summary,
+    aggregate_usage as aggregate_usage,
+)
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
@@ -22,16 +26,6 @@ def add_comment(
     if store.get_run(run_id) is None:
         raise RunNotFound(run_id)
     return store.add_run_comment(run_id, author, body)
-
-
-def aggregate_usage(*, store: SessionStore) -> dict:
-    """Total tokens + cost across all runs."""
-    return store.aggregate_usage()
-
-
-def activity_summary(*, store: SessionStore, since: str, agent_id: str | None = None) -> dict:
-    """Roll up runs since ``since`` (ISO-8601) into totals + breakdowns."""
-    return store.activity_summary(since, agent=agent_id)
 
 
 def distinct_executors(*, store: SessionStore) -> list[str]:

@@ -25,21 +25,21 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import traceback as _tb
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from agentbox.core.agents.validation import extract_json, validate_output
+from agentbox.core.constants import LogLevel
 from agentbox.core.data import DoneEvent
 from agentbox.core.data import RunStatus
-from agentbox.core.engines.backends.base import BackendRunResult
-from agentbox.core.execution.output_validate import extract_json
-
-if TYPE_CHECKING:
-    from agentbox.core.engines.backends.base import (
-        BackendAdapter,
-        RenderedConfig,
-    )
-    from agentbox.core.execution.streaming.session import RunStreamSession
+from agentbox.core.engines.backends.base import (
+    BackendAdapter,
+    RenderedConfig,
+)
+from agentbox.core.engines.backends.requests import BackendRunResult
+from agentbox.core.execution.observability.stream import RunStreamSession
 
 logger = logging.getLogger(__name__)
 
@@ -122,15 +122,16 @@ def maybe_load_output_file(current: str | None, workdir: Path) -> str | None:
     return current
 
 
-async def _adapter_run_into_session(
+async def pump_into_session(
     adapter: Any,
     rendered: RenderedConfig,
     input_: str,
     session: RunStreamSession,
 ) -> BackendRunResult:
-    """Invoke ``adapter.run_into_session`` or bridge a legacy iterator backend."""
-    if hasattr(adapter, "run_into_session"):
-        return await adapter.run_into_session(rendered, input_, session)
+    """Pump backend events into ``session`` and return terminal status."""
+    direct = getattr(adapter, "run_into_session", None)
+    if direct is not None:
+        return await direct(rendered, input_, session)
 
     result = BackendRunResult(ok=False)
     async for ev in adapter.run(rendered, input_, session.run_id):
@@ -209,12 +210,12 @@ class RetryOrchestrator:
                 final_ok = False
                 final_status = RunStatus.TIMEOUT.value
                 session.emit_timeout(timeout_seconds=timeout_seconds, error=run_error)
-                session.emit_log(level="error", message=run_error)
+                session.emit_log(level=LogLevel.ERROR, message=run_error)
                 break
 
             try:
                 async with asyncio.timeout_at(deadline):
-                    backend_result = await _adapter_run_into_session(
+                    backend_result = await pump_into_session(
                         self.adapter, self.rendered, current_input, session
                     )
                     final_ok = backend_result.ok
@@ -230,8 +231,6 @@ class RetryOrchestrator:
                         timeout_seconds=timeout_seconds, error=run_error
                     )
             except Exception as exc:
-                import traceback as _tb
-
                 tb_text = _tb.format_exc()
                 run_error = (
                     f"executor error: {type(exc).__name__}: {exc}\n{tb_text}"
@@ -241,7 +240,7 @@ class RetryOrchestrator:
                 logger.exception("runner crashed for run %s", session.run_id)
 
             if run_error:
-                session.emit_log(level="error", message=run_error)
+                session.emit_log(level=LogLevel.ERROR, message=run_error)
 
             output = "\n".join(session.output_text).strip() or None
 
@@ -266,7 +265,7 @@ class RetryOrchestrator:
                         error=final_error,
                     )
                     session.emit_log(
-                        level="warn",
+                        level=LogLevel.WARN,
                         message=(
                             f"Run failed (attempt {attempt + 1}): "
                             f"{final_error} — retrying "
@@ -278,7 +277,7 @@ class RetryOrchestrator:
 
             # --- Validation retry (output schema check) -----------
             if has_schema and validation_mode != "off":
-                result = self.adapter.validate_output(
+                result = validate_output(
                     self.agent,
                     self.workdir,
                     output,
@@ -303,7 +302,7 @@ class RetryOrchestrator:
                 if validation_retries_left > 0:
                     validation_retries_left -= 1
                     current_input = build_retry_prompt(
-                        initial_input, output, result.error
+                        initial_input, output or "", result.error
                     )
                     session.emit_retry(
                         attempt=attempt + 1,
@@ -311,7 +310,7 @@ class RetryOrchestrator:
                         error=result.error,
                     )
                     session.emit_log(
-                        level="warn",
+                        level=LogLevel.WARN,
                         message=(
                             f"Validation failed (attempt {attempt + 1}): "
                             f"{result.error} — retrying "

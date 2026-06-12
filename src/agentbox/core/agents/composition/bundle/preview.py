@@ -1,13 +1,15 @@
 """Preview — read-only snapshot of a bundle composition block."""
 
 from __future__ import annotations
-import json, tomllib
+import json
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from agentbox.core.constants import BundleFile
 from agentbox.core.agents.composition.bundle._helpers import _read_text
 
+@dataclass(frozen=True)
 class ReferencePreview:
     """One reference file as exposed in a composition preview."""
 

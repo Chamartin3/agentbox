@@ -67,7 +67,7 @@ def create_agent_record(
         **agent_def.model_dump(mode="json", exclude_none=True),
         **build_config_json_payload(agent_def),
     }
-    common_kwargs = dict(
+    common_kwargs: dict[str, Any] = dict(
         agent_id=agent_id,
         config_json=config_payload,
         prompt_content=prompt,

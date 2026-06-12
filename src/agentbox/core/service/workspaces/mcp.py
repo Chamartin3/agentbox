@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from agentbox.core.data import SessionStore
+from agentbox.core.data.execution.snapshots import McpSnapshot
 
 __all__ = [
     "resolve_workspace_mcp",
@@ -22,7 +23,7 @@ def _manifest_servers(store: SessionStore) -> list[dict]:
     return [{"name": s.name, "config": s.model_dump(exclude={"name"})} for s in servers]
 
 
-def resolve_workspace_mcp(workspace_id: str, *, store: SessionStore) -> dict:
+def resolve_workspace_mcp(workspace_id: str, *, store: SessionStore) -> McpSnapshot:
     """Effective per-workspace MCP servers — union of manifest + overrides."""
     return store.resolve_workspace_mcp(workspace_id, _manifest_servers(store))
 

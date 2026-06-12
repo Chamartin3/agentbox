@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import tomlkit
 import typer
 
 from agentbox.cli._common import console
 from agentbox.cli._deps import get_store
-from agentbox.core.service import AgentDef, get_agent_def
 from agentbox.cli.agents.crud import agent_app
+from agentbox.core.data import SessionStore
+from agentbox.core.service import AgentDef, get_agent_def
 
 @agent_app.command("export")
 def agent_export(
@@ -50,7 +52,7 @@ def agent_export(
     console.print(f"[green]done[/green] → {base.resolve()}")
 
 
-def _list_agent_ids(store: "SessionStore") -> list[str]:
+def _list_agent_ids(store: SessionStore) -> list[str]:
     rows = store.list_agents_with_latest()
     return [r["agent_id"] for r in rows]
 

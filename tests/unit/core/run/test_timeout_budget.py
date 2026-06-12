@@ -23,8 +23,8 @@ from agentbox.core.engines.backends.base import (
     BackendAdapter,
     RenderedConfig,
 )
-from agentbox.core.execution.orchestrate.executor import _adapter_run_into_session
-from agentbox.core.execution.streaming.session import CaptureSession
+from agentbox.core.execution.orchestrate.executor import pump_into_session
+from agentbox.core.execution.observability.stream import CaptureSession
 
 
 class _SlowBackend(BackendAdapter):
@@ -63,7 +63,7 @@ async def test_shared_deadline_fires_inside_attempt() -> None:
 
     with CaptureSession(run_id="r") as session, pytest.raises(TimeoutError):
         async with asyncio.timeout_at(deadline):
-            await _adapter_run_into_session(backend, RenderedConfig(), "input", session)
+            await pump_into_session(backend, RenderedConfig(), "input", session)
 
 
 @pytest.mark.asyncio
@@ -78,7 +78,7 @@ async def test_shared_deadline_carries_across_attempts() -> None:
     # First attempt completes within budget.
     with CaptureSession(run_id="r") as session:
         async with asyncio.timeout_at(deadline):
-            await _adapter_run_into_session(backend, RenderedConfig(), "input", session)
+            await pump_into_session(backend, RenderedConfig(), "input", session)
 
     # Burn the rest of the budget so the next attempt is already past it.
     await asyncio.sleep(0.2)

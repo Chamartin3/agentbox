@@ -11,9 +11,9 @@ from agentbox.core.agents.composition.drift import _build_config_json as build_c
 from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure  # noqa: F401
 from agentbox.core.agents.resolve import list_engines as backends  # noqa: F401
 from agentbox.core.agents.resolve import resolve_engine_by_name as get_backend  # noqa: F401
-from agentbox.core.engines.profiles import EffectiveRunnerConfig as EffectiveRunnerConfig
-from agentbox.core.engines.providers import get_provider as get_provider
-from agentbox.core.engines.providers import list_providers as list_providers
+from agentbox.core.engines import EffectiveRunnerConfig as EffectiveRunnerConfig
+from agentbox.core.engines import get_provider as get_provider
+from agentbox.core.engines import list_providers as list_providers
 
 # ── Constants ─────────────────────────────────────────────────────────
 from agentbox.core.constants import EventType as EventType
@@ -26,7 +26,6 @@ from agentbox.core.data import CompositionConfig as CompositionConfig
 from agentbox.core.data import McpServerSpec as McpServerSpec
 from agentbox.core.data import ProjectManifest as ProjectManifest
 from agentbox.core.data import RunnerSpec as RunnerSpec
-from agentbox.core.data import VALID_POLICIES as VALID_POLICIES
 from agentbox.core.data import RunnerProfile as RunnerProfile
 from agentbox.core.data import RunnerProfileCreate as RunnerProfileCreate
 from agentbox.core.data import RunnerProfilePatch as RunnerProfilePatch
@@ -61,10 +60,10 @@ from agentbox.core.resources.skills import find_skill as find_skill
 # ── Run execution ─────────────────────────────────────────────────────
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable as NoBackendAvailable
 from agentbox.core.execution.orchestrate.executor import RunExecutor as RunExecutor
-from agentbox.core.execution.history import get as get_conversation  # noqa: F401
-from agentbox.core.execution.prepare.envdoc import render_env_doc as render_env_doc
-from agentbox.core.execution.prepare.envdoc import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
-from agentbox.core.execution.prepare.envdoc import resolve_workspace_resources as resolve_workspace_resources
+from agentbox.core.execution.observability.conversation import get as get_conversation  # noqa: F401
+from agentbox.core.workspaces.prep import render_env_doc as render_env_doc
+from agentbox.core.workspaces.prep import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
+from agentbox.core.workspaces.prep import resolve_workspace_resources as resolve_workspace_resources
 
 # ── Cross-cutting agents service ──────────────────────────────────────
 from agentbox.core.service.agents import build_agent_snapshot as build_agent_snapshot
@@ -130,7 +129,7 @@ from agentbox.core.service.system_admin import set_setting as set_setting
 from agentbox.core.service.system_admin import update_settings_section as update_settings_section
 
 # ── Workspace admin service ────────────────────────────────────────────
-from agentbox.core.service.workspace_admin import aggregate_usage as aggregate_usage
+from agentbox.core.service.feedback import aggregate_usage as aggregate_usage
 from agentbox.core.service.workspace_admin import get_active_env_doc as get_active_env_doc
 from agentbox.core.service.workspace_admin import get_workspace as get_workspace
 from agentbox.core.service.workspace_admin import get_workspace_host_env as get_workspace_host_env
@@ -161,7 +160,13 @@ from agentbox.core.workspaces.manager import claude_agents_path as claude_agents
 from agentbox.core.workspaces.manager import claude_settings_path as claude_settings_path
 from agentbox.core.workspaces.manager import ensure as ensure
 from agentbox.core.workspaces.manager import info as info
-from agentbox.core.service.workspaces.registry import list_all_workspaces as list_all
+from agentbox.core.service.workspaces.registry import (
+    list_all_workspaces as list_all_workspaces,
+)
+from agentbox.core.service.workspaces import (
+    generate_legacy_runner_configs as generate_legacy_runner_configs,
+    get_workspace_mcp_tools as get_workspace_mcp_tools,
+)
 from agentbox.core.workspaces.manager import load_capabilities as load_capabilities
 from agentbox.core.workspaces.manager import opencode_config_path as opencode_config_path
 from agentbox.core.workspaces.manager import reset as reset

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Protocol
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.engine import Engine
@@ -16,13 +17,24 @@ from agentbox.core.data.resources.shared._models import (
 from agentbox.core.data.resources.shared.hash import _compute_sha256
 
 
+class _SharedWriteSurface(Protocol):
+    """Combined surface for SharedResourceWriteMixin methods that call into
+    SharedResourceLookupMixin. Avoids importing the lookup class at runtime."""
+
+    engine: Engine
+
+    def _next_shared_version(self, id: str) -> int: ...
+    def get_resource(self, id: str, version: int) -> SharedResourceRecord | None: ...
+    def get_active_resource(self, id: str) -> SharedResourceRecord | None: ...
+
+
 class SharedResourceWriteMixin:
     """Write operations for shared resources. Requires ``self.engine: Engine``."""
 
     engine: Engine
 
     def create_resource(
-        self,
+        self: "_SharedWriteSurface",
         id: str,
         kind: str,
         name: str,
@@ -78,7 +90,7 @@ class SharedResourceWriteMixin:
         return result
 
     def create_resource_version(
-        self,
+        self: "_SharedWriteSurface",
         id: str,
         *,
         content: str | None = None,
@@ -155,7 +167,7 @@ class SharedResourceWriteMixin:
         assert result is not None
         return result
 
-    def activate_resource(self, id: str, version: int) -> SharedResourceRecord:
+    def activate_resource(self: "_SharedWriteSurface", id: str, version: int) -> SharedResourceRecord:
         """Atomically activate a specific version and deactivate others."""
         target = self.get_resource(id, version)
         if not target:

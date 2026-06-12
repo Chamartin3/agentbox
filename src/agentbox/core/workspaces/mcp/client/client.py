@@ -90,13 +90,15 @@ class McpClient:
             "method": method,
             "params": params,
         }
-        if self._transport in ("http", "sse") and self._url:
+        if self._transport in ("http", "sse"):
+            assert self._url is not None, "http/sse transport requires a URL"
             return await self._http_request(body)
         if self._transport == "stdio":
             return self._stdio_request(body)
         raise McpError(f"unsupported transport: {self._transport}")
 
     async def _http_request(self, body: dict) -> dict:
+        assert self._url is not None, "http_request requires a URL"
         try:
             resp = await self._http.post(
                 self._url,

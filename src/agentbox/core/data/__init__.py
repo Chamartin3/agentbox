@@ -131,7 +131,6 @@ from agentbox.core.data.store import SessionStore
 # Domain-specific helpers / constants
 # ---------------------------------------------------------------------------
 from agentbox.core.data.execution.claude_session import find_session_log, parse_session_log
-from agentbox.core.data.constants import VALID_POLICIES
 from agentbox.core.data.resources._rows import hash_blobs as hash_blobs  # noqa: F401
 from agentbox.core.data.engines.models import RunnerProfileStats
 from agentbox.core.data.engines.profiles import (
@@ -172,6 +171,7 @@ from agentbox.core.data.protocols import (
     StartupStore,
     UsageStore,
     WorkspaceBuildStore,
+    WorkspaceLookupStore,
 )
 
 # ---------------------------------------------------------------------------
@@ -304,7 +304,6 @@ __all__ = [
     "RunnerProfileCreate",
     "RunnerProfilePatch",
     "RunnerProfileStats",
-    "VALID_POLICIES",
     "find_session_log",
     "parse_session_log",
     "read_transcript",
@@ -329,6 +328,7 @@ __all__ = [
     "StartupStore",
     "UsageStore",
     "WorkspaceBuildStore",
+    "WorkspaceLookupStore",
     # row types
     "EnvDocRow",
     "PromptVersionRow",

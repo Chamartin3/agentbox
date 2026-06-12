@@ -6,7 +6,6 @@ from pathlib import Path
 
 from agentbox.core.data import TextEvent, UsageEvent
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.codex import (
     CodexBackend,
@@ -14,7 +13,7 @@ from agentbox.core.engines.backends.codex import (
     parse_codex_event,
 )
 
-DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.CODEX, extra_args=[])
+DEFAULT_RUNNER = RunnerSpec(kind="codex", extra_args=[])
 
 
 def _agent(**overrides: object) -> AgentDef:

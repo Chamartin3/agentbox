@@ -24,6 +24,7 @@ from pydantic_ai import NativeOutput, PromptedOutput, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
+from agentbox.core.constants import LogLevel, MessageRole, RunStatus
 from agentbox.core.data import (
     DoneEvent,
     LogEvent,
@@ -63,7 +64,7 @@ async def run_direct_agent_mode(
 ) -> AsyncIterator[RunEvent]:
     """Drive a directly-constructed ``pydantic_ai.Agent`` to completion."""
     try:
-        from pydantic_ai import Agent
+        from pydantic_ai import Agent  # noqa: PLC0415
     except ImportError:
         yield DoneEvent(
             run_id=run_id,
@@ -92,7 +93,7 @@ async def run_direct_agent_mode(
         except UnsupportedSchema as exc:
             yield LogEvent(
                 run_id=run_id,
-                level="warn",
+                level=LogLevel.WARN,
                 message=(
                     f"strict schema conversion failed ({exc}); "
                     "falling back to loose conversion — pydantic-ai "
@@ -133,7 +134,7 @@ async def run_direct_agent_mode(
         except UnsupportedSchema as exc:
             yield LogEvent(
                 run_id=run_id,
-                level="warn",
+                level=LogLevel.WARN,
                 message=f"could not validate input against input_schema: {exc}",
             )
         except ValidationError as exc:
@@ -217,8 +218,8 @@ async def run_direct_agent_mode(
 
     # We're inside an async generator — pydantic-ai's run_sync() would
     # try to start its own event loop and fail. Use the async API.
-    yield TextEvent(run_id=run_id, role="system", text=prompt)
-    yield TextEvent(run_id=run_id, role="user", text=user_message)
+    yield TextEvent(run_id=run_id, role=MessageRole.SYSTEM, text=prompt)
+    yield TextEvent(run_id=run_id, role=MessageRole.USER, text=user_message)
     yield LogEvent(
         run_id=run_id,
         message=f"sending to model {model_str}...",
@@ -279,11 +280,11 @@ async def run_direct_agent_mode(
         if body:
             yield LogEvent(
                 run_id=run_id,
-                level="info",
+                level=LogLevel.INFO,
                 message=f"model raw response: {body}",
             )
-        yield LogEvent(run_id=run_id, level="error", message=err_text)
-        yield DoneEvent(run_id=run_id, ok=False, error=err_text, status="error")
+        yield LogEvent(run_id=run_id, level=LogLevel.ERROR, message=err_text)
+        yield DoneEvent(run_id=run_id, ok=False, error=err_text, status=RunStatus.ERROR)
         return
     _elapsed = time.monotonic() - start
 

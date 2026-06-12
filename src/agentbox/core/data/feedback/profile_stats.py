@@ -16,7 +16,7 @@ class RunnerStatsMixin:
 
     def get_system_default_runner_profile(self):
         """Get the system-wide default runner profile."""
-        from agentbox.core.data.schema import runner_profiles
+        from agentbox.core.data.schema import runner_profiles  # noqa: PLC0415
 
         with self.engine.connect() as conn:
             row = conn.execute(
@@ -31,7 +31,7 @@ class RunnerStatsMixin:
         until: str | None = None,
     ) -> RunnerProfileStats:
         """Get aggregated statistics for a specific runner profile."""
-        from agentbox.core.data.schema import runs, usage
+        from agentbox.core.data.schema import runs, usage  # noqa: PLC0415
 
         base_filters = [runs.c.runner_profile_id == profile_id]
         if since:
@@ -93,7 +93,7 @@ class RunnerStatsMixin:
         until: str | None = None,
     ) -> list[RunnerProfileStats]:
         """Get aggregated statistics for all runner profiles."""
-        from agentbox.core.data.schema import runs, usage
+        from agentbox.core.data.schema import runs, usage  # noqa: PLC0415
 
         base_filters = []
         if since:

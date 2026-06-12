@@ -113,7 +113,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "RunnerProfileCreate",
         "RunnerProfilePatch",
         "RunnerProfileStats",
-        "VALID_POLICIES",
         "find_session_log",
         "parse_session_log",
         "read_transcript",
@@ -134,6 +133,7 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "RunStore",
         "StartupStore",
         "WorkspaceBuildStore",
+        "WorkspaceLookupStore",
         # row TypedDicts (Plan 06)
         "EnvDocRow",
         "PromptVersionRow",

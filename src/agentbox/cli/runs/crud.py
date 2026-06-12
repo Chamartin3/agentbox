@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.cli._deps import get_store
+from agentbox.cli._deps import get_executor, get_store
 from agentbox.cli._common import console, event_color
 from agentbox.core.service.execution import runs
 from agentbox.core.service.execution.runs import (
@@ -83,7 +83,7 @@ def runs_list(
     console.print(table)
 
     store = get_store()
-    agg = aggregate_usage(store)
+    agg = aggregate_usage(store=store)
     console.print(
         f"[dim]totals:[/dim] "
         f"[cyan]{agg['input_tokens']}[/cyan] in · "
@@ -330,8 +330,6 @@ def runs_cancel(
     cancelled flag.
     """
     async def _cancel() -> None:
-        from agentbox.cli._deps import get_executor
-
         try:
             await runs.cancel_run(
                 run_id, store=get_store(), executor=get_executor()

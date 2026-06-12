@@ -63,7 +63,7 @@ class ProjectConfigMixin(SettingsMixin):
         )
 
     def delete_project_mcp_server(self, name: str) -> None:
-        from agentbox.core.data.schema import settings as settings_table
+        from agentbox.core.data.schema import settings as settings_table  # noqa: PLC0415
 
         with self.engine.begin() as conn:
             conn.execute(
@@ -85,7 +85,7 @@ class ProjectConfigMixin(SettingsMixin):
         self.set_setting(PROJECT_SHARED_ASSETS, name, path, author=author)
 
     def delete_project_shared_asset(self, name: str) -> None:
-        from agentbox.core.data.schema import settings as settings_table
+        from agentbox.core.data.schema import settings as settings_table  # noqa: PLC0415
 
         with self.engine.begin() as conn:
             conn.execute(

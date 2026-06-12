@@ -27,3 +27,34 @@ class PythonAgentConfigView:
 
     agent_module: str | None = None
     output_schema_path: str | None = None
+
+
+@dataclass(frozen=True)
+class ComposedReferenceView:
+    """Engine-local view of a composed prompt reference section.
+
+    Mirrors ``core.agents.composition.bundle.compose.ComposedReference``
+    so backend adapters do not import the Agents domain.
+    """
+
+    path: str
+    heading: str
+    content: str
+
+
+@dataclass(frozen=True)
+class ComposedView:
+    """Engine-local view of composed prompt state.
+
+    Execution builds this from its richer ComposedState at the render
+    boundary so backend adapters do not import the Execution domain.
+    """
+
+    system: str | None = None
+    system_base: str | None = None
+    schema: dict | None = None
+    input_schema: dict | None = None
+    user: str | None = None
+    references: tuple[ComposedReferenceView, ...] = ()
+    bundle_sha: str | None = None
+    validation_mode: str | None = None

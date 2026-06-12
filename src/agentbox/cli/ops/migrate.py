@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import tomllib
+from pathlib import Path
 import typer
 from rich.table import Table
 from rich.text import Text
@@ -140,9 +142,6 @@ def import_manifest(
     - ``backend_preference``/``tool_manifest_path``/``project`` →
       section ``project_runtime``
     """
-    import tomllib
-    from pathlib import Path
-
     settings = get_settings()
     store = get_store()
 

@@ -144,6 +144,7 @@ def resolve_run_prompt(
         input_=input_,
         variables=variables,
     )
+    assert composed.agent is not None
     return ResolvedPrompt(
         agent=composed.agent,
         input_=composed.input_,

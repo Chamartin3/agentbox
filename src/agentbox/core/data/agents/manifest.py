@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import enum
+import json as _json
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -172,8 +173,6 @@ class AgentDef(BaseModel):
         snapshot); falls back to ``content_snapshot`` for legacy rows.
         Missing rows raise ``ValueError``.
         """
-        import json as _json
-
         raw = row.get("config_json") or row.get("content_snapshot")
         if raw is None:
             raise ValueError("agent_versions row has no config payload")
@@ -186,7 +185,7 @@ class AgentDef(BaseModel):
         # Falls back to the same data dict when config_json was absent —
         # the accessors only consume sub-keys they recognize.
         with contextlib.suppress(Exception):
-            inst.__dict__["_config_json"] = data
+            object.__setattr__(inst, "_config_json", data)
         return inst
 
 

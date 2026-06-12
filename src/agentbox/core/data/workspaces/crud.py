@@ -60,7 +60,7 @@ class WorkspacesMixin:
         path: str | None = None,
         source: str = "db",
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceRow:
         if not name or not name.strip():
             raise ValueError("workspace name is required")
         if source not in ("manifest", "db"):
@@ -95,7 +95,7 @@ class WorkspacesMixin:
         path: str | None = None,
         source: str | None = None,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceRow:
         """Insert if missing, update metadata otherwise. Used by manifest sync."""
         now = now_iso()
         with self.engine.begin() as conn:

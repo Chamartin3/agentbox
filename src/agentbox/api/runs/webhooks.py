@@ -1,40 +1,37 @@
-"""API-layer webhook routes — URL resolution, resend, agent-event hooks."""
+"""API-layer webhook routes — URL resolution, resend, agent-event hooks.
+
+These are *outbound* webhook operations: agentbox telling a caller that
+something happened. Inbound webhooks from agents reporting completion
+live in ``api/runs/crud.py`` (``/complete`` and ``/post_outcome``).
+"""
 
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import logging
 from pathlib import Path
 from typing import Any
 
+from agentbox.api.deps import get_settings
+from agentbox.config import Settings
+from agentbox.core.execution.dispatch import deliver_webhook, dispatch_completion
+from agentbox.core.execution.dispatch.payload import build_completion_payload
+from agentbox.core.execution.dispatch.policy import apply_delivery_outcome
 from agentbox.core.service import AgentDef, RunRecord, SessionStore
-from agentbox.core.execution.webhooks import deliver_webhook, schedule_webhook as _schedule_webhook
 
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# URL resolution (depends on api settings)
-# ---------------------------------------------------------------------------
-
-
 def _resolve_webhook_url(agent: AgentDef | None) -> str | None:
-    if agent is None:
-        return None
-    if agent.webhook_url is not None:
+    """Resolve the webhook URL from agent config, then global settings."""
+    if agent is not None and agent.webhook_url is not None:
         return agent.webhook_url or None
     try:
-        from agentbox.api.deps import get_settings
-
         settings = get_settings()
     except Exception:
         return None
     return getattr(settings, "completion_webhook_url", None)
-
-
-# ---------------------------------------------------------------------------
-# Public API — thin wrappers around core logic
-# ---------------------------------------------------------------------------
 
 
 def schedule_webhook(
@@ -44,15 +41,20 @@ def schedule_webhook(
     broadcaster: Any | None = None,
     transcript_path: Path | None = None,
 ) -> None:
-    """Schedule webhook delivery, resolving the URL through agent + settings."""
-    fallback = _resolve_webhook_url(agent)
-    return _schedule_webhook(
-        agent,
-        run,
-        store,
-        broadcaster,
-        transcript_path,
-        fallback_webhook_url=fallback,
+    """Schedule webhook delivery, resolving the URL through agent + settings.
+
+    Thin wrapper around :func:`dispatch_completion` that preserves the
+    historical callback signature used by ``api/runs/crud.py`` and the
+    lifecycle service.
+    """
+    settings = get_settings()
+    dispatch_completion(
+        run=run,
+        agent=agent,
+        store=store,
+        broadcaster=broadcaster,
+        transcript_path=transcript_path,
+        settings=settings if isinstance(settings, Settings) else None,
     )
 
 
@@ -65,14 +67,9 @@ async def resend_webhook(
     url = _resolve_webhook_url(agent)
     if not url:
         return False, "no webhook_url configured"
-    from agentbox.core.execution.webhooks import (
-        _apply_delivery_outcome,
-        _build_payload,
-    )
-
-    payload = _build_payload(run, store)
-    delivered = await deliver_webhook(url, payload)
-    _apply_delivery_outcome(store, run.id, delivered)
+    payload = build_completion_payload(run, store)
+    delivered = await deliver_webhook(url, dict(payload))
+    apply_delivery_outcome(store, run.id, delivered)
     return delivered, None if delivered else "delivery failed; see server logs"
 
 
@@ -86,8 +83,6 @@ def schedule_agent_event_webhook(
     reason: str,
 ) -> None:
     """Best-effort: schedule an agent event webhook."""
-    from datetime import datetime
-
     payload = {
         "event": event,
         "agent_id": agent_id,

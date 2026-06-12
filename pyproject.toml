@@ -33,12 +33,15 @@ pi = "agentbox.core.engines.backends.pi:PiBackend"
 
 
 [project.entry-points."agentbox.conversations"]
-claude-cli-jsonl = "agentbox.core.execution.history.sources.claude_cli:ClaudeCliJsonlSource"
-opencode-session = "agentbox.core.execution.history.sources.opencode:OpencodeSessionSource"
-pydantic-ai-history = "agentbox.core.execution.history.sources.pydantic_ai:PydanticAiHistorySource"
-agentbox-transcript = "agentbox.core.execution.history.sources.transcript:TranscriptSource"
-codex-session = "agentbox.core.execution.history.sources.codex:CodexSessionSource"
-pi-session = "agentbox.core.execution.history.sources.pi:PiSessionSource"
+claude-cli-jsonl = "agentbox.core.engines.backends.claude_code.conversation:ClaudeCliJsonlSource"
+opencode-session = "agentbox.core.engines.backends.opencode.conversation:OpencodeSessionSource"
+pydantic-ai-history = "agentbox.core.engines.backends.token.conversation:PydanticAiHistorySource"
+agentbox-transcript = "agentbox.core.execution.observability.conversation.transcript:TranscriptSource"
+codex-session = "agentbox.core.engines.backends.codex.conversation:CodexSessionSource"
+pi-session = "agentbox.core.engines.backends.pi.conversation:PiSessionSource"
+
+[project.entry-points."agentbox.dispatch_channels"]
+webhook = "agentbox.core.execution.dispatch.channels.webhook:WebhookChannel"
 
 [project.entry-points."agentbox.agent_tools"]
 # consumers register their tools here; agentbox ships none by default
@@ -64,6 +67,9 @@ include = ["alembic/**/*"]
 
 [tool.ruff.lint]
 extend-select = ["PLC0415"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = ["PLC0415"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

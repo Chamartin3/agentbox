@@ -15,10 +15,14 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
 
+from agentbox.config import Settings
 from agentbox.core.agents.composition.bundle import (
     _append_validation_engine_hint,
+)
+from agentbox.core.agents.composition.bundle.compose import (
+    ComposedReference,
+    ComposeResult,
 )
 from agentbox.core.agents.composition.bundle.loader import (
     load_bundle_from_bindings,
@@ -39,13 +43,15 @@ from agentbox.core.agents.config import (
     ExecutionConfig,
     OutputConfig as _OutputConfig,
     PythonAgentConfig,
+    ValidatorConfig,
     resolve_output_config as _resolve_output_config,
 )
+from agentbox.core.data import AgentDef, RunStore, SessionStore
 from agentbox.core.engines.backends.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
 )
-from agentbox.core.execution.output_validate import (
+from agentbox.core.agents.validation import (
     ValidationResult,
     call_http_validator,
     call_script_validator,
@@ -54,10 +60,10 @@ from agentbox.core.execution.output_validate import (
     validate_jsonschema,
     validate_pydantic,
 )
-
-if TYPE_CHECKING:
-    from agentbox.config import Settings
-    from agentbox.core.data import AgentDef, RunStore
+from agentbox.core.workspaces.prep import (
+    prompt_resolution_to_snapshot,
+    resolve_agent_prompt_bindings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,12 +85,12 @@ class AgentRuntimeView:
     max_error_retries: int = 0
     output_validation_engine: str = "both"
     output_schema_path: str | None = None
-    json_schema: dict[str, Any] | None = None
-    validators: tuple[Any, ...] = ()
+    json_schema: dict[str, object] | None = None
+    validators: tuple[ValidatorConfig, ...] = ()
 
     @classmethod
     def from_agent(
-        cls, agent: Any, *, store: Any | None = None
+        cls, agent: AgentDef, *, store: RunStore | SessionStore | None = None
     ) -> AgentRuntimeView:
         exec_cfg = ExecutionConfig.from_agent(agent)
         python_cfg = PythonAgentConfig.from_agent(agent)
@@ -119,17 +125,17 @@ class ComposedPrompt:
 
     system_text: str | None = None
     system_base: str | None = None
-    composed_schema: dict[str, Any] | None = None
-    composed_input_schema: dict[str, Any] | None = None
+    composed_schema: dict[str, object] | None = None
+    composed_input_schema: dict[str, object] | None = None
     composed_user: str | None = None
-    agent: Any = None
+    agent: AgentDef | None = None
     input_: str = ""
-    composed_references: Any = None
+    composed_references: tuple[ComposedReference, ...] | None = None
     composed_bundle_sha: str | None = None
     validation_mode: str | None = None
-    composition_result: Any = None
-    prompt_bindings: list[dict] = field(default_factory=list)
-    snapshot_entries: list[dict] = field(default_factory=list)
+    composition_result: ComposeResult | None = None
+    prompt_bindings: list[dict[str, object]] = field(default_factory=list)
+    snapshot_entries: list[dict[str, object]] = field(default_factory=list)
     runtime_view: AgentRuntimeView | None = None
 
 
@@ -142,7 +148,7 @@ def compose_prompt(
     settings: Settings,
     agent: AgentDef,
     input_: str,
-    variables: dict[str, Any] | None,
+    variables: dict[str, str] | None,
 ) -> ComposedPrompt:
     """Compose the agent's prompt bundle + resolve bindings + output contract.
 
@@ -155,17 +161,17 @@ def compose_prompt(
     needs — it should *not* drill into ``core.agents.composition.*``
     internals for any of the returned data.
     """
-    snapshot_entries: list[dict] = []
+    snapshot_entries: list[dict[str, object]] = []
     agent_copied = False
 
     # ---- Stage 1: composition ------------------------------------------
     composition_result = None
     system_text: str | None = None
     system_base: str | None = None
-    composed_schema: dict | None = None
-    composed_input_schema: dict | None = None
+    composed_schema: dict[str, object] | None = None
+    composed_input_schema: dict[str, object] | None = None
     composed_user: str | None = None
-    composed_references: Any = None
+    composed_references: tuple[ComposedReference, ...] | None = None
     composed_bundle_sha: str | None = None
 
     if agent.composition is not None and variables is not None:
@@ -199,13 +205,7 @@ def compose_prompt(
         validation_mode = agent.composition.output_validation
 
     # ---- Stage 2: prompt-resource binding substitution ------------------
-    # Lazy import avoids circular dependency: execution/prepare → core.agents.
-    from agentbox.core.execution.prepare.envdoc import (  # noqa: PLC0415
-        prompt_resolution_to_snapshot,
-        resolve_agent_prompt_bindings,
-    )
-
-    prompt_bindings: list[dict] = []
+    prompt_bindings: list[dict[str, object]] = []
     try:
         prompt_bindings = resolve_agent_prompt_bindings(store, agent.id)
         if prompt_bindings:
@@ -262,8 +262,13 @@ def compose_prompt(
         for _b in prompt_bindings:
             if _b.get("slot") != "output_schema":
                 continue
-            for _blob in _b.get("blobs") or []:
-                _raw = (_blob.get("content_text") or "").strip()
+            _blobs = _b.get("blobs")
+            if not isinstance(_blobs, list):
+                break
+            for _blob in _blobs:
+                if not isinstance(_blob, dict):
+                    continue
+                _raw = (str(_blob.get("content_text") or "")).strip()
                 if not _raw:
                     continue
                 try:
@@ -329,7 +334,7 @@ def capture_fragments(
     project_root: Path,
     argv: list[str] | None = None,
     store: SessionStore | None = None,
-    composed: Any | None = None,
+    composed: ComposedPrompt | None = None,
 ) -> str:
     """Build prompt fragments and return them as a JSON string.
 
@@ -355,9 +360,9 @@ def validate_output(
     view: AgentRuntimeView,
     workdir: Path | None = None,
     project_root: Path | None = None,
-    agent: Any | None = None,
-    composed_schema: dict[str, Any] | None = None,
-) -> Any:
+    agent: AgentDef | None = None,
+    composed_schema: dict[str, object] | None = None,
+) -> ValidationResult:
     """Validate ``payload`` against the agent's declared output contract.
 
     This wraps the two-gate validation architecture from

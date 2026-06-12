@@ -9,12 +9,22 @@ from agentbox.core.data import SessionStore
 from agentbox.core.data.feedback.snapshots import snapshot_fields
 from agentbox.core.data.feedback.types import ActivityRange, since_iso
 from agentbox.core.service.execution.evaluate import (
-    activity_summary,
-    add_comment as _add_run_comment,
-    aggregate_usage,
+    add_comment as _add_run_comment,  # noqa: F401
     distinct_executors,
-    list_comments as _list_run_comments,
+    list_comments as _list_run_comments,  # noqa: F401
 )
+from agentbox.core.service.feedback.stats import (
+    activity_summary,
+    aggregate_usage,
+)
+
+__all__ = [
+    "activity_summary",
+    "aggregate_usage",
+    "distinct_executors",
+    "enrich_recent_runs",
+    "summary",
+]
 
 
 def _state_label(status: str) -> str:

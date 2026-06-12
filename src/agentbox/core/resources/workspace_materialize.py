@@ -13,24 +13,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from agentbox.core.constants import ResourceType
 from agentbox.core.resources.materializer import materialize_blobs
 
 DEFAULT_SKILLS_ROOT = ".claude/skills"
-
-# Resource types whose payload is a single blob (a file). For these, the
-# binding's ``target_path`` identifies a FOLDER destination and the
-# filename is resolved from the source. Anything not in this set is
-# treated as a folder/multi-blob payload where ``target_path`` IS the
-# destination directory and ``relative_path`` of each blob is preserved.
-_SINGLE_FILE_TYPES = {"document", "schema", "script"}
-
-# Fallback extensions when the source's original filename isn't
-# recoverable from ``source_metadata``.
-_TYPE_DEFAULT_EXTENSION = {
-    "document": ".md",
-    "schema": ".json",
-    "script": "",
-}
 
 
 @dataclass(frozen=True)
@@ -72,7 +58,7 @@ def _resolve_single_file_name(
     if not name:
         name = "document"
     if "." not in Path(name).name:
-        name += _TYPE_DEFAULT_EXTENSION.get(resource_type, "")
+        name += ResourceType(resource_type).default_extension
     return Path(name).name
 
 
@@ -95,7 +81,7 @@ def _resolve_target_path(b: dict) -> str:
             return target_path
         name = (b.get("skill_meta") or {}).get("skill_name") or display_name
         return f"{DEFAULT_SKILLS_ROOT}/{name}"
-    if resource_type in _SINGLE_FILE_TYPES:
+    if ResourceType(resource_type).is_single_file:
         filename = _resolve_single_file_name(
             resource_type=resource_type,
             display_name=display_name,

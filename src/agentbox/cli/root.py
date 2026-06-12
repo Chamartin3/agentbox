@@ -18,11 +18,8 @@ from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
 from agentbox.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
-from agentbox.core.engines.backends.registry import backends as plugins_backends
-from agentbox.core.engines.render import ConfigGenerator
-from agentbox.core.engines.credentials import list_all as _creds_list
-from agentbox.core.engines.credentials.state import CredentialState
-from agentbox.core.service import get_project_mcp_servers
+from agentbox.core.engines import CredentialState, list_backends, list_credentials as _creds_list
+from agentbox.core.service.workspaces import generate_legacy_runner_configs
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
 app = typer.Typer(
@@ -105,6 +102,7 @@ def doctor() -> None:
     table.add_column("Detail")
 
     failures = 0
+    store = get_store()
 
     def _ok(check: str, detail: str = "") -> None:
         table.add_row(Text("OK", style="bold green"), check, detail)
@@ -150,7 +148,6 @@ def doctor() -> None:
 
     # 4. DB reachable
     try:
-        store = get_store()
         store.list_runs(limit=1)
         _ok("Database", str(settings.db_path))
     except Exception as exc:
@@ -158,7 +155,7 @@ def doctor() -> None:
 
     # 5. Plugins loadable
     try:
-        backend_count = len(plugins_backends.backends())
+        backend_count = len(list_backends())
         _ok(
             "Plugins",
             f"{backend_count} backend(s)",
@@ -169,24 +166,13 @@ def doctor() -> None:
     # 6. Generated configs fresh
     try:
         mcp_registry = McpRegistry(settings.mcp_cache_dir)
-        mcp_server_name = "mcp"
-        mcp_command = ["mcp_serve.sh"]
-        servers = get_project_mcp_servers(store)
-        if servers:
-            srv = servers[0]
-            mcp_server_name = srv.name
-            if srv.command:
-                mcp_command = srv.command
-
-        gen = ConfigGenerator(
-            agentbox_toml=settings.manifest_path,
-            mcp_manifest=mcp_registry.manifest,
-            mcp_server_name=mcp_server_name,
-            mcp_command=mcp_command,
-            verbose=False,
-        )
         with tempfile.TemporaryDirectory() as tmp:
-            gen.generate_configs_into(Path(tmp))
+            generate_legacy_runner_configs(
+                Path(tmp),
+                store=store,
+                settings=settings,
+                mcp_registry=mcp_registry,
+            )
         _ok("Generated configs", "dry-run succeeded")
     except Exception as exc:
         _warn("Generated configs", str(exc))

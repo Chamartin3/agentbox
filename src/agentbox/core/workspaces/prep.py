@@ -1,9 +1,11 @@
 """Workspace-side prep helpers — env-doc rendering, binding resolution,
-and per-run secrets injection.
+per-run secrets injection, workspace permissions, and per-run workdir
+materialization.
 
-Hosted here (rather than under ``core/run/``) so ``core/workspace/`` no
-longer needs to import from ``core/run/``. Run-side prep imports these;
-the reverse direction is gone.
+This module is the single owner of all workspace-to-disk projection
+logic. Both the save-time path (``build_workspace``) and the per-run
+path (``prepare_run_workdir``) delegate here.  Execution code imports
+from this module; the reverse direction is forbidden.
 """
 
 from __future__ import annotations
@@ -11,18 +13,28 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
+from agentbox.core.resources.workspace_materialize import materialize_workspace
 from agentbox.core.workspaces.env_doc.renderers.agents_md import AgentsMdRenderer
 from agentbox.core.workspaces.env_doc.renderers.base import RuntimeContext
 from agentbox.core.workspaces.env_doc.renderers.claude_md import ClaudeMdRenderer
 from agentbox.core.workspaces.env_doc.schema import EnvDocContent
+from agentbox.core.workspaces.generation.engine_config import make_generator
+from agentbox.core.workspaces.generation.materialize import materialize_subagents
 
 if TYPE_CHECKING:
-    from agentbox.core.data import WorkspaceBuildStore
+    from agentbox.config import Settings
+    from agentbox.core.data import AgentDef, RunStore, WorkspaceBuildStore
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Workspace resource resolution
+# ---------------------------------------------------------------------------
 
 
 def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -> list[dict]:
@@ -56,9 +68,16 @@ def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -
                 continue
             version_id = active["id"]
         version = store.get_repo_version(version_id)
+        if version is None:
+            logger.warning(
+                "workspace prep: version %s not found — skipping workspace binding %s",
+                version_id,
+                b["id"],
+            )
+            continue
         blobs = list(store.iter_repo_blobs(version_id))
         source_metadata: dict = {}
-        raw_meta = version.get("source_metadata") if version else None
+        raw_meta = version.get("source_metadata")
         if raw_meta:
             if isinstance(raw_meta, str):
                 try:
@@ -85,6 +104,11 @@ def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -
             }
         )
     return resolved
+
+
+# ---------------------------------------------------------------------------
+# Workspace subagent resolution
+# ---------------------------------------------------------------------------
 
 
 def resolve_workspace_subagents(store: WorkspaceBuildStore, workspace_id: str) -> list[dict]:
@@ -125,6 +149,11 @@ def resolve_workspace_subagents(store: WorkspaceBuildStore, workspace_id: str) -
             }
         )
     return resolved
+
+
+# ---------------------------------------------------------------------------
+# Env-doc rendering
+# ---------------------------------------------------------------------------
 
 
 def render_env_doc(
@@ -184,6 +213,11 @@ def render_env_doc(
     return snapshot_entries
 
 
+# ---------------------------------------------------------------------------
+# Snapshot helpers
+# ---------------------------------------------------------------------------
+
+
 def workspace_outcomes_to_snapshot(outcomes: list) -> list[dict]:
     """Convert MaterializeOutcome list to JSON-serializable snapshot entries."""
     entries = []
@@ -205,8 +239,229 @@ def workspace_outcomes_to_snapshot(outcomes: list) -> list[dict]:
     return entries
 
 
+def prompt_resolution_to_snapshot(resolution: Any) -> list[dict]:
+    """Convert PromptResolution snapshot list to JSON-serializable entries."""
+    entries = []
+    for rb in resolution.snapshot:
+        entries.append(
+            {
+                "role": "prompt_embed",
+                "binding_id": rb.binding_id,
+                "marker": rb.marker,
+                "resource_id": rb.resource_id,
+                "version_id": rb.version_id,
+                "content_hash": rb.content_hash,
+                "mode": rb.mode,
+            }
+        )
+    return entries
+
+
 # ---------------------------------------------------------------------------
-# Per-run secrets injection (APP-DEP: Runs → Workspaces contract)
+# Agent prompt binding resolution
+# ---------------------------------------------------------------------------
+
+
+def resolve_agent_prompt_bindings(store: RunStore, agent_id: str) -> list[dict]:
+    """Hydrate all active prompt bindings for an agent into resolver-ready dicts.
+
+    Returns the same shape as ``_resolve_binding_for_prompt`` in the API
+    route, so ``resolve_prompt`` can consume them directly.
+    """
+    bindings = store.list_prompt_bindings(agent_id)
+    if not bindings:
+        return []
+
+    resolved: list[dict] = []
+    for b in bindings:
+        resource = store.get_repo_resource(b["resource_id"])
+        if not resource:
+            logger.warning(
+                "workspace prep: prompt binding %s references missing resource %s — skipping",
+                b["id"],
+                b["resource_id"],
+            )
+            continue
+        version_id = b.get("pinned_version_id")
+        if version_id:
+            version_id = str(version_id)
+        if not version_id:
+            active = store.get_active_repo_version(b["resource_id"])
+            if not active:
+                logger.warning(
+                    "workspace prep: resource %s has no active version — skipping prompt binding %s",
+                    resource["slug"],
+                    b["id"],
+                )
+                continue
+            version_id = str(active["id"])
+        version = store.get_repo_version(version_id)
+        if version is None:
+            continue
+        blobs = list(store.iter_repo_blobs(version_id))
+        resolved.append(
+            {
+                "binding_id": b["id"],
+                "marker": b.get("marker"),
+                "slot": b.get("slot"),
+                "attach_as_reference": bool(b.get("attach_as_reference")),
+                "resource_id": b["resource_id"],
+                "version_id": version_id,
+                "content_hash": version["content_hash"],
+                "type": resource["type"],
+                "mode": b.get("mode"),
+                "display_name": resource["display_name"],
+                "required": bool(b.get("required", 1)),
+                "blobs": blobs,
+            }
+        )
+    return resolved
+
+
+# ---------------------------------------------------------------------------
+# Workspace permission resolution
+# ---------------------------------------------------------------------------
+
+
+def load_workspace_permissions(
+    workdir: Path,
+    agent: AgentDef,
+    settings: Settings,
+    store: WorkspaceBuildStore | None = None,
+) -> dict:
+    """Resolve effective workspace permissions from the DB overlay.
+
+    ``workspace_runtime_permissions`` is the single source of truth for
+    built-in tools, file scopes, max_tokens, and network/write flags.
+    Workspaces with no overlay row receive an empty permissions dict —
+    callers downstream treat that as "no constraints declared".
+    """
+    if not agent.workspace or agent.workspace == "<ephemeral>":
+        return {}
+    if store is None:
+        return {}
+    try:
+        overlay = store.get_workspace_runtime_permissions(agent.workspace)
+    except Exception:
+        return {}
+    if not overlay:
+        return {}
+    perms: dict = {}
+    if overlay.get("allowed_builtin_tools") is not None:
+        perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
+    if overlay.get("files") is not None:
+        perms["files"] = overlay["files"]
+    if overlay.get("max_tokens") is not None:
+        perms["max_tokens"] = overlay["max_tokens"]
+    if overlay.get("allow_file_write") is not None:
+        perms["allow_file_write"] = bool(overlay["allow_file_write"])
+    if overlay.get("allow_network") is not None:
+        perms["allow_network"] = bool(overlay["allow_network"])
+    return perms
+
+
+# ---------------------------------------------------------------------------
+# Per-run workdir preparation (consolidated entry point)
+# ---------------------------------------------------------------------------
+
+
+def prepare_run_workdir(
+    *,
+    store: RunStore,
+    settings: Settings,
+    workspace_id: str | None,
+    agent: AgentDef,
+    workdir: Path,
+    mcp_registry: Any = None,
+) -> tuple[Path, list[dict]]:
+    """Project workspace state into a fresh per-run run dir.
+
+    Steps:
+      1. Render the env-doc (CLAUDE.md / AGENTS.md) into ``workdir``.
+      2. Materialize workspace resource bindings into ``workdir``.
+      3. Materialize workspace subagents into ``workdir``.
+      4. Create a fresh ``run_dir`` (UUID-keyed under ``settings.runs_tmpfs_dir``).
+      5. Apply the workspace permission overlay (``generate_configs_into``).
+
+    Returns ``(run_dir, resource_snapshot_entries)``.
+    The executor materializes the renderer's file dict into ``run_dir``
+    separately (see ``execution/orchestrate/materialize.py``).
+
+    Replaces:
+    - ``RunSetup.render_for_run``
+    - ``execution/prepare/envdoc.py:render_env_doc``
+    - ``execution/prepare/resources.py:prepare_run_resources`` (resource side)
+    """
+
+    resource_snapshot_entries: list[dict] = []
+
+    # ── 1. Workspace resources, env-doc, subagents ────────────────────────
+    if workspace_id and workspace_id != "<ephemeral>":
+        try:
+            ws_bindings = resolve_workspace_resources(store, workspace_id)
+            if ws_bindings:
+                outcomes = materialize_workspace(
+                    workdir,
+                    ws_bindings,
+                    cache_root=settings.resource_cache_dir,
+                )
+                resource_snapshot_entries.extend(workspace_outcomes_to_snapshot(outcomes))
+        except Exception:
+            logger.exception(
+                "prepare_run_workdir: workspace resource materialization failed for workspace %r",
+                workspace_id,
+            )
+
+        try:
+            env_doc_entries = render_env_doc(store, workspace_id, workdir)
+            resource_snapshot_entries.extend(env_doc_entries)
+        except Exception:
+            logger.exception(
+                "prepare_run_workdir: env doc rendering failed for workspace %r",
+                workspace_id,
+            )
+
+        try:
+            resolved_subagents = resolve_workspace_subagents(store, workspace_id)
+            if resolved_subagents:
+                sub_outcomes = materialize_subagents(workdir, resolved_subagents)
+                for o in sub_outcomes:
+                    resource_snapshot_entries.append(
+                        {
+                            "role": "workspace_subagent",
+                            "workspace_id": o.workspace_id,
+                            "agent_id": o.agent_id,
+                            "alias": o.alias,
+                            "files_written": o.files_written,
+                        }
+                    )
+        except Exception:
+            logger.exception(
+                "prepare_run_workdir: workspace subagent materialization failed for workspace %r",
+                workspace_id,
+            )
+
+    # ── 2. Create fresh run_dir ───────────────────────────────────────────
+    run_dir = settings.runs_tmpfs_dir / uuid.uuid4().hex
+    run_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
+
+    # ── 3. Apply workspace permission overlay ─────────────────────────────
+    permissions = load_workspace_permissions(workdir, agent, settings, store)
+    generator = make_generator(
+        settings=settings, store=store, mcp_registry=mcp_registry
+    )
+    generator.generate_configs_into(
+        run_dir,
+        allowed_builtin_tools=permissions.get("allowed_builtin_tools") or [],
+        files=permissions.get("files") or [],
+        project_root=settings.project_root,
+    )
+
+    return run_dir, resource_snapshot_entries
+
+
+# ---------------------------------------------------------------------------
+# Per-run secrets injection
 # ---------------------------------------------------------------------------
 
 

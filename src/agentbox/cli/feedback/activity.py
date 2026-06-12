@@ -35,6 +35,10 @@ def activity_runs(
     range_: ActivityRange = typer.Option("30d", "--range", help="Time range."),
     agent: str | None = typer.Option(None, help="Filter by agent id."),
     executor: str | None = typer.Option(None, help="Filter by executor."),
+    # ponytail: plain str Literal, not constants.ActivityStateFilter — typer/click
+    # renders Literal[StrEnum] choices by member NAME (RUNNING|OK|ERROR), which
+    # would break the lowercase `--state ok` CLI contract. The API side uses the
+    # shared alias (pydantic matches by value); the CLI keeps the value literals.
     state: Literal["running", "ok", "error"] | None = typer.Option(
         None, help="Filter by state: running|ok|error."
     ),

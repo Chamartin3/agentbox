@@ -207,12 +207,14 @@ class RunnerProfileResolver:
             Fully populated EffectiveRunnerConfig.
         """
         # Convert Pydantic model to dict if needed
-        if hasattr(profile, "model_dump"):
+        if isinstance(profile, dict):
+            profile_dict = profile
+        elif hasattr(profile, "model_dump"):
             profile_dict = profile.model_dump(exclude_none=False)
         elif hasattr(profile, "dict"):
             profile_dict = profile.dict()
         else:
-            profile_dict = dict(profile) if not isinstance(profile, dict) else profile
+            profile_dict = dict(profile)
 
         config = EffectiveRunnerConfig(
             backend=profile_dict.get("backend"),

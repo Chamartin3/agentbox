@@ -188,6 +188,8 @@ def get_agent_detail(
     composed_user: str | None = None
     try:
         bundle = load_bundle_from_bindings(agent_id=agent_id, store=store)
+        if bundle.source is None:
+            raise FileNotFoundError("agent has no composition source")
         result = compose_from_source(bundle.source, variables={}, render=False)
         composed_system = result.system
         composed_user = result.user

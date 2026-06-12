@@ -37,6 +37,11 @@ from agentbox.core.agents.runtime import (
     compose_prompt as compose_prompt,
     validate_output as validate_output,
 )
+from agentbox.core.agents.validation import (
+    ValidationEngine as ValidationEngine,
+    ValidationResult as ValidationResult,
+    resolve_schema as resolve_schema,
+)
 
 __all__ = [
     "AgentRuntimeView",
@@ -47,6 +52,8 @@ __all__ = [
     "PythonAgentConfig",
     "RuntimeConfig",
     "ScriptValidatorConfig",
+    "ValidationEngine",
+    "ValidationResult",
     "build_config_json_payload",
     "build_fragments",
     "capture_fragments",
@@ -55,6 +62,7 @@ __all__ = [
     "load_bundle_from_bindings",
     "resolve_output_config",
     "resolve_prompt",
+    "resolve_schema",
     "validate_output",
     "_append_output_contract",
 ]

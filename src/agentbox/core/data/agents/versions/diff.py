@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 from typing import Any
 
@@ -15,11 +16,6 @@ def _text_diff(a: str, b: str) -> str:
         return ""
     lines_a = a.splitlines(keepends=True)
     lines_b = b.splitlines(keepends=True)
-
-    try:
-        import difflib
-    except ImportError:
-        return f"<{len(lines_a)} lines → {len(lines_b)} lines>"
 
     return "".join(difflib.unified_diff(lines_a, lines_b, lineterm=""))
 

@@ -133,7 +133,7 @@ class HostEnvMixin:
         return row
 
     def resolve_workspace_host_env(self, workspace_id: str) -> dict:
-        from agentbox.core.workspaces.permissions import resolve_grants
+        from agentbox.core.workspaces.permissions import resolve_grants  # noqa: PLC0415 — avoid import cycle
         row = self.get_workspace_host_env(workspace_id)
         if not row:
             return {"grants": resolve_grants(None, None), "profile_id": None}

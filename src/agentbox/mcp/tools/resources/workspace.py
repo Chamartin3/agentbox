@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastmcp import FastMCP
 
+from agentbox.api.deps import get_settings
 from agentbox.core.service import (
     EnvDocContent,
+    build_workspace_by_name,
     resolve_workspace_resources,
 )
 from agentbox.core.service.env_doc import (
@@ -76,9 +80,6 @@ def register_workspace(mcp: FastMCP) -> None:
         After saving, the workspace is re-synced so CLAUDE.md / AGENTS.md
         reflect the new content right away.
         """
-        from agentbox.api.deps import get_settings
-        from agentbox.core.service import build_workspace_by_name
-
         try:
             validated = EnvDocContent.model_validate(content).model_dump()
         except Exception as exc:
@@ -91,8 +92,6 @@ def register_workspace(mcp: FastMCP) -> None:
         try:
             build_workspace_by_name(ctx.store, get_settings(), workspace_id)
         except Exception:
-            import logging
-
             logging.getLogger(__name__).exception(
                 "set_env_doc: sync failed for %s", workspace_id
             )

@@ -21,8 +21,9 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from agentbox.core.constants import LogLevel, MessageRole, RunStatus
 from agentbox.core.data import (
     DoneEvent,
     LogEvent,
@@ -86,8 +87,6 @@ def resolve_request_model(agent_cls: type) -> type:
             return args[0]
 
     # Fallback: accept any dict.
-    from pydantic import Field
-
     class _GenericInput(BaseModel):
         data: dict[str, Any] = Field(default_factory=dict)
 
@@ -172,13 +171,13 @@ async def run_full_agent_mode(
         except Exception:
             system_prompt = prompt
             user_message = json.dumps(input_data, indent=2, default=str)
-        yield TextEvent(run_id=run_id, role="system", text=system_prompt)
-        yield TextEvent(run_id=run_id, role="user", text=user_message)
+        yield TextEvent(run_id=run_id, role=MessageRole.SYSTEM, text=system_prompt)
+        yield TextEvent(run_id=run_id, role=MessageRole.USER, text=user_message)
         result = agent_instance.run_sync(request)
     except Exception as exc:
         err_text = _format_provider_error(exc, model=model_str, provider=provider)
-        yield LogEvent(run_id=run_id, level="error", message=err_text)
-        yield DoneEvent(run_id=run_id, ok=False, error=err_text, status="error")
+        yield LogEvent(run_id=run_id, level=LogLevel.ERROR, message=err_text)
+        yield DoneEvent(run_id=run_id, ok=False, error=err_text, status=RunStatus.ERROR)
         return
     _elapsed = time.monotonic() - start
 

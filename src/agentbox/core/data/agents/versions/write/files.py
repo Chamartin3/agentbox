@@ -67,7 +67,9 @@ class _AgentVersionsFilesMixin(_AgentVersionsReadMixin):
                         for row in prepared
                     ],
                 )
-        return self.get_version(agent_id, version)
+        created = self.get_version(agent_id, version)
+        assert created is not None
+        return created
 
     def insert_version_files(self, version_id: int, files: list[dict]) -> None:
         prepared = _prepare_files(files)

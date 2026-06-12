@@ -6,7 +6,6 @@ from pathlib import Path
 
 from agentbox.core.data import TextEvent, ThinkingEvent, UsageEvent
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.pi import (
     PiBackend,
@@ -14,7 +13,7 @@ from agentbox.core.engines.backends.pi import (
     parse_pi_event,
 )
 
-DEFAULT_RUNNER = RunnerSpec(kind=RunnerKind.PI, extra_args=[])
+DEFAULT_RUNNER = RunnerSpec(kind="pi", extra_args=[])
 
 
 def _agent(**overrides: object) -> AgentDef:

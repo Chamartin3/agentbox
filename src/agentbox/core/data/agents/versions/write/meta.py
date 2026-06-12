@@ -165,7 +165,7 @@ class _AgentVersionsMetaMixin(_AgentVersionsReadMixin):
                         disabled_at=now,
                     )
                 )
-        return self.get_agent_meta(agent_id)
+        return self.get_agent_meta(agent_id) or {}
 
     def enable_agent(self, agent_id: str) -> dict | None:
         """Clear ``disabled_at``."""
@@ -190,7 +190,9 @@ class _AgentVersionsMetaMixin(_AgentVersionsReadMixin):
                     created_at=now_iso(),
                 )
             )
-        return self.get_comment(version_id)
+        comment = self.get_comment(version_id)
+        assert comment is not None
+        return comment
 
     def set_rating(self, version_id: int, rating: int, rater: str) -> dict:
         if not (1 <= rating <= 5):

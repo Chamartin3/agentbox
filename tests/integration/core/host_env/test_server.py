@@ -392,22 +392,21 @@ class TestAuditLog:
 
 class TestExecutorInjection:
     def test_injects_host_env_into_mcp_config(self, tmp_path: Path):
-        from agentbox.core.execution.orchestrate.executor import RunExecutor
-
-        executor = object.__new__(RunExecutor)
-        executor.settings = MagicMock()
-        executor.settings.db_path = tmp_path / "db.sqlite"
+        from agentbox.core.workspaces.generation.engine_config.inject import (
+            inject_host_env_mcp,
+        )
 
         existing = {"mcpServers": {"existing-server": {"command": "other"}}}
         mcp_path = tmp_path / "claude_mcp.json"
         mcp_path.write_text(json.dumps(existing))
 
         grants = {"fs.read": {"allowed_paths": [str(tmp_path)]}}
-        executor._inject_host_env_mcp(
+        inject_host_env_mcp(
             run_dir=tmp_path,
             grants=grants,
             workspace_id="ws1",
             workdir=tmp_path / "work",
+            db_path=tmp_path / "db.sqlite",
         )
 
         updated = json.loads(mcp_path.read_text())
@@ -421,18 +420,17 @@ class TestExecutorInjection:
         assert "existing-server" in updated["mcpServers"]
 
     def test_creates_mcp_config_when_missing(self, tmp_path: Path):
-        from agentbox.core.execution.orchestrate.executor import RunExecutor
-
-        executor = object.__new__(RunExecutor)
-        executor.settings = MagicMock()
-        executor.settings.db_path = tmp_path / "db.sqlite"
+        from agentbox.core.workspaces.generation.engine_config.inject import (
+            inject_host_env_mcp,
+        )
 
         grants = {"agentbox.workspace_info": {}}
-        executor._inject_host_env_mcp(
+        inject_host_env_mcp(
             run_dir=tmp_path,
             grants=grants,
             workspace_id="ws2",
             workdir=tmp_path,
+            db_path=tmp_path / "db.sqlite",
         )
 
         updated = json.loads((tmp_path / "claude_mcp.json").read_text())

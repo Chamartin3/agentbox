@@ -14,7 +14,9 @@ from rich.tree import Tree
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.config import load_settings
-from agentbox.core.engines.render import ConfigGenerator
+from agentbox.core import workspaces as ws_mod
+from agentbox.core.service.agents import list_all_agents
+from agentbox.core.service.workspaces import generate_legacy_runner_configs
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
 cfg_app = typer.Typer(
@@ -91,9 +93,6 @@ def cfg_paths() -> None:
         _add(settings.outputs_dir, tree, "outputs/")
 
     ws = tree.add("[bold]workspaces/[/bold]")
-    from agentbox.core import workspaces as ws_mod
-    from agentbox.core.service.agents import list_all_agents
-
     for a in list_all_agents(store=get_store()):
         path, _eph = ws_mod.resolve_path(a, settings, get_store())
         _add(path, ws, a.id + (" [yellow](ephemeral)[/yellow]" if _eph else ""))
@@ -113,8 +112,6 @@ def cfg_gen(
 ) -> None:
     """Generate runner configs into a temp dir and print the JSON (diagnostic dry-run)."""
     settings = load_settings()
-    from agentbox.core.service.agents import list_all_agents
-
     all_agents = list_all_agents(store=get_store())
     if agent is not None:
         target_agents = [a for a in all_agents if a.id == agent]
@@ -128,36 +125,16 @@ def cfg_gen(
         console.print("[yellow]No agents to generate configs for.[/yellow]")
         return
 
-    # Build MCP server info from the manifest
-    mcp_server_name = "mcp"
-    mcp_command: list[str] = ["mcp_serve.sh"]
-    mcp_url: str | None = None
-    mcp_transport: str = "http"
-
-    servers = get_store().get_project_mcp_servers()
-    if servers:
-        srv = servers[0]
-        mcp_server_name = srv.name
-        mcp_url = srv.url
-        mcp_transport = srv.transport
-        if srv.command:
-            mcp_command = srv.command
-
     mcp_registry = McpRegistry(settings.mcp_cache_dir)
-
-    gen = ConfigGenerator(
-        agentbox_toml=settings.manifest_path,
-        mcp_manifest=mcp_registry.manifest,
-        mcp_server_name=mcp_server_name,
-        mcp_command=mcp_command,
-        mcp_url=mcp_url,
-        mcp_transport=mcp_transport,
-        verbose=False,
-    )
 
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp = Path(tmp_str)
-        result = gen.generate_configs_into(tmp)
+        result = generate_legacy_runner_configs(
+            tmp,
+            store=get_store(),
+            settings=settings,
+            mcp_registry=mcp_registry,
+        )
 
         for config_type, filepath in result.items():
             if filepath.exists():

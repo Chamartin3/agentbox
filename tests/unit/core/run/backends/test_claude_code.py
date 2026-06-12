@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.constants import RunnerKind
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.claude_code import ClaudeCodeBackend
 
 DEFAULT_RUNNER = RunnerSpec(
-    kind=RunnerKind.CLAUDE_CODE,
+    kind="claude_code",
     model="claude-sonnet-4-20250514",
     allowed_tools=["Read", "Grep", "Write"],
     extra_args=["--verbose"],
@@ -49,7 +48,7 @@ def test_render_produces_expected_argv() -> None:
 
 def test_render_excludes_model_when_not_set() -> None:
     agent = _make_agent(
-        runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, allowed_tools=[])
+        runner=RunnerSpec(kind="claude_code", allowed_tools=[])
     )
     adapter = ClaudeCodeBackend()
     rendered = adapter.render(agent, Path("/tmp/workdir"))
@@ -90,10 +89,10 @@ def test_digest_changes_when_tool_added() -> None:
     adapter = ClaudeCodeBackend()
 
     agent_a = _make_agent(
-        runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, allowed_tools=["Read"])
+        runner=RunnerSpec(kind="claude_code", allowed_tools=["Read"])
     )
     agent_b = _make_agent(
-        runner=RunnerSpec(kind=RunnerKind.CLAUDE_CODE, allowed_tools=["Read", "Grep"])
+        runner=RunnerSpec(kind="claude_code", allowed_tools=["Read", "Grep"])
     )
 
     r_a = adapter.render(agent_a, Path("/tmp/workdir"))

@@ -60,7 +60,7 @@ class TestRenderClaude:
         config = _make_fixture_config()
         recipe = load_recipe("claude")
         with tempfile.TemporaryDirectory() as td:
-            result = render(Path(td), config, recipe)
+            render(Path(td), config, recipe)
 
             claude_md = Path(td) / "CLAUDE.md"
             assert claude_md.exists()

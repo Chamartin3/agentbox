@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
@@ -108,7 +108,7 @@ def create_app() -> FastAPI:
     index_html = SPA_DIR / "index.html"
 
     @app.get("/{path:path}")
-    def spa_fallback(path: str, request: Request) -> FileResponse:
+    def spa_fallback(path: str, request: Request) -> Response:
         if not index_html.exists():
             return JSONResponse(
                 {

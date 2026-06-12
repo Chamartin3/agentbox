@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 from fastmcp import FastMCP
@@ -43,9 +44,7 @@ def register(mcp: FastMCP) -> None:
         snap_raw = getattr(run, "runner_snapshot", None)
         if snap_raw:
             try:
-                import json as _json
-
-                snap = _json.loads(snap_raw) if isinstance(snap_raw, str) else snap_raw
+                snap = json.loads(snap_raw) if isinstance(snap_raw, str) else snap_raw
                 if isinstance(snap, dict):
                     timeout = snap.get("timeout_seconds")
             except (ValueError, TypeError):

@@ -7,9 +7,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-RESOURCE_TYPES = ("document", "folder", "skill", "schema", "script")
-IMPORT_SOURCES = ("upload", "host_path", "toml_migration", "db_only")
-
 
 @dataclass(frozen=True)
 class Resource:

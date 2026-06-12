@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 from agentbox.core.tools.registry import agent_tool
@@ -35,18 +34,16 @@ def test_agent_tools_mcp_injected_when_grants_exist(tmp_path: Path):
     run_dir = tmp_path / "run"
     run_dir.mkdir()
 
-    from agentbox.core.execution.orchestrate.executor import RunExecutor
+    from agentbox.core.workspaces.generation.engine_config.inject import (
+        inject_agent_tools_mcp,
+    )
 
-    executor = MagicMock(spec=RunExecutor)
-    executor.settings = MagicMock()
-    executor.settings.db_path = tmp_path / "store.db"
-
-    RunExecutor._inject_agent_tools_mcp(
-        executor,
+    inject_agent_tools_mcp(
         run_dir=run_dir,
         grants={"test.count_chars"},
         agent_id="agent-1",
         workdir=tmp_path / "workdir",
+        db_path=tmp_path / "store.db",
     )
 
     config = json.loads((run_dir / "claude_mcp.json").read_text())

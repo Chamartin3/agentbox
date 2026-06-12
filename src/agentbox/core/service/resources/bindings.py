@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from agentbox.core.agents.composition.preview import PreviewError, render_agent_prompt_preview
 from agentbox.core.agents.composition.rendering import render_for_type
+from agentbox.core.constants import PromptMode, PromptSlot
+from agentbox.core.service.resources.repo import ResourceNotFound
 
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
@@ -35,10 +37,6 @@ class AgentVersionMissing(LookupError):
     def __init__(self, agent_id: str) -> None:
         super().__init__(f"no agent version found for {agent_id!r}")
         self.agent_id = agent_id
-
-
-PromptMode = Literal["inline", "skill_primer", "name_only", "manifest"]
-PromptSlot = Literal["system", "user_template", "input_schema", "output_schema"]
 
 
 def list_prompt_resources(agent_id: str, *, store: SessionStore) -> dict:
@@ -138,7 +136,6 @@ def dry_run_workspace_resources(workspace_id: str, *, store: SessionStore) -> di
 
 
 def preview_modes(resource_id: str, *, store: SessionStore) -> dict:
-    from agentbox.core.service.resources.repo import ResourceNotFound
     resource = store.get_repo_resource(resource_id)
     if not resource:
         raise ResourceNotFound(resource_id)

@@ -8,12 +8,13 @@ service stays transport-agnostic.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_settings, get_store
+from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
 from agentbox.core.service import SessionStore
 from agentbox.core.service import bindings as bindings_service
 from agentbox.core.service.bindings import (
@@ -25,11 +26,6 @@ from agentbox.core.service.resources import ResourceNotFound
 from agentbox.core.service import build_workspace_by_name
 
 router = APIRouter(tags=["resource-bindings"])
-
-PromptMode = Literal["inline", "skill_primer", "name_only", "manifest"]
-PromptSlot = Literal["system", "user_template", "input_schema", "output_schema"]
-MaterializeMode = Literal["copy", "symlink", "mount"]
-OnConflict = Literal["error", "overwrite", "skip"]
 
 
 # --- request models ---
@@ -66,8 +62,8 @@ class ReplaceSubagents(BaseModel):
 class WorkspaceBindingIn(BaseModel):
     resource_id: str
     target_path: str | None = None
-    materialize_mode: MaterializeMode = "copy"
-    on_conflict: OnConflict = "error"
+    materialize_mode: MaterializeMode = MaterializeMode.COPY
+    on_conflict: OnConflict = OnConflict.ERROR
     pinned_version_id: str | None = None
     display_order: int = 0
 

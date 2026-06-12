@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
+from agentbox.core.tools import SharedToolRegistry
 from agentbox.mcp.deps import get_context
 
 
@@ -13,8 +14,6 @@ def register(mcp: FastMCP) -> None:
         description="List all consumer-registered shared agent tools discovered at startup.",
     )
     def list_agent_tools(tags: list[str] | None = None) -> dict:
-        from agentbox.core.tools import SharedToolRegistry
-
         specs = SharedToolRegistry.all()
         if tags:
             specs = [s for s in specs if set(tags) & set(s.tags)]

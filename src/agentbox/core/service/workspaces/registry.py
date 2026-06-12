@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 from typing import Any
 
 from agentbox.config import Settings
-from agentbox.core.data import SessionStore
+from agentbox.core.data import SessionStore, WorkspaceRow
 from agentbox.core.resources.skills import discover_skills
+from agentbox.core.service.agents import list_all_agents
 from agentbox.core.workspaces.crud import info as _workspace_info
 
 from .errors import WorkspaceExists, WorkspaceNotFound
@@ -99,7 +101,7 @@ def create_workspace_registry(
     store: SessionStore,
     description: str | None = None,
     path: str | None = None,
-) -> dict:
+) -> WorkspaceRow:
     try:
         return store.create_workspace(name, description=description, path=path)
     except ValueError as exc:
@@ -119,11 +121,12 @@ def delete_workspace_registry(
     counts = store.delete_workspace_cascade(name)
     disk_removed = False
     if purge_disk:
-        ws_path = (
-            settings.project_root / existing["path"]
-            if existing.get("path")
-            else (settings.workspaces_root / name)
-        )
+        existing_path = existing.get("path")
+        ws_path: Path
+        if existing_path:
+            ws_path = settings.project_root / existing_path
+        else:
+            ws_path = settings.workspaces_root / name
         if ws_path.exists() and ws_path.is_dir():
             shutil.rmtree(ws_path)
             disk_removed = True
@@ -168,8 +171,6 @@ def list_all_workspaces(
     service layer to fix the R4 violation (domain importing upward
     into service).
     """
-    from agentbox.core.service.agents import list_all_agents
-
     return [
         _workspace_info(a, settings, store)
         for a in list_all_agents(store=store)
