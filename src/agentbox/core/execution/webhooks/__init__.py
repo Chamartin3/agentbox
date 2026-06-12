@@ -106,7 +106,9 @@ class WebhookDispatcher:
                 return
             agent: AgentDef | None = None
             try:
-                agent = self._store.get_agent_def(refreshed.agent_id)
+                _agent = self._store.get_agent_def(refreshed.agent_id)
+                if isinstance(_agent, AgentDef):
+                    agent = _agent
             except Exception:
                 logger.exception(
                     "cancel webhook: failed to resolve agent for run %s", run_id

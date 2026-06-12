@@ -57,7 +57,7 @@ from agentbox.core.execution.output_validate import (
 
 if TYPE_CHECKING:
     from agentbox.config import Settings
-    from agentbox.core.data import AgentDef, SessionStore
+    from agentbox.core.data import AgentDef, RunStore
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ class ComposedPrompt:
 
 def compose_prompt(
     *,
-    store: SessionStore,
+    store: RunStore,
     settings: Settings,
     agent: AgentDef,
     input_: str,
