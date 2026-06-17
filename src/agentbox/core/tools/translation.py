@@ -1,121 +1,18 @@
-"""Canonical ↔ backend-native tool name translation.
+"""Canonical → backend-native tool name translation.
 
-This module owns the translation table per ``APP_DOMAINS §7``. It is a
-taxonomy module and must not import from any domain (especially Engines)
-so that render/engines initialization stays cycle-free.
+This module owns the translation *algorithm* and the effective-tool
+intersection helper.  It must stay agnostic: it does not import any
+backend and depends solely on ``CanonicalTool``.
+
+Per-backend native-name maps live in
+``agentbox.core.engines.backends.<be>.tools`` and are passed into
+:func:`translate_tool` by the consumer that knows which backend it is
+targeting.
 """
 
 from __future__ import annotations
 
-# Mapping of backend name -> canonical capability name -> native tool name.
-# This is the single source of truth for tool-name translation; both
-# ``core.engines.render`` and the backend adapters read it from here.
-NATIVE_TOOL_NAMES: dict[str, dict[str, str]] = {
-    "claude_code": {
-        "fs.read": "Read",
-        "fs.write": "Write",
-        "fs.edit": "Edit",
-        "fs.multi_edit": "MultiEdit",
-        "fs.list": "LS",
-        "fs.glob": "Glob",
-        "fs.grep": "Grep",
-        "shell.exec": "Bash",
-        "http.fetch": "WebFetch",
-        "web.search": "WebSearch",
-        "notebook.edit": "NotebookEdit",
-        "interaction.ask_user": "AskUserQuestion",
-        "agent.task": "Task",
-    },
-    "opencode": {
-        "fs.read": "read_file",
-        "fs.write": "write_file",
-        "fs.list": "list_directory",
-        "fs.glob": "glob",
-        "fs.grep": "grep",
-        "shell.exec": "run_command",
-        "http.fetch": "web_fetch",
-        "interaction.ask_user": "question",
-        "agent.task": "task",
-        "todo.read": "todoread",
-        "todo.write": "todowrite",
-    },
-}
-
-
-class UnknownToolError(KeyError):
-    """Raised when a canonical tool or backend is not in the taxonomy."""
-
-
-def _mapping_for(backend: str) -> dict[str, str]:
-    """Return the canonical→native mapping for *backend*.
-
-    Raises :class:`UnknownToolError` when the backend is not known.
-    """
-    mapping = NATIVE_TOOL_NAMES.get(backend)
-    if mapping is None:
-        raise UnknownToolError(f"Unknown backend {backend!r}")
-    return mapping
-
-
-def to_native(capability: str, backend: str) -> str:
-    """Translate a canonical capability name to a backend-native tool name.
-
-    Raises :class:`UnknownToolError` if the capability or backend mapping
-    is not in the taxonomy.
-    """
-    mapping = _mapping_for(backend)
-    native = mapping.get(capability)
-    if native is None:
-        raise UnknownToolError(
-            f"No {backend!r} mapping for canonical tool {capability!r}"
-        )
-    return native
-
-
-def from_native(native: str, backend: str) -> str:
-    """Translate a backend-native tool name back to its canonical name.
-
-    Raises :class:`UnknownToolError` if the native name / backend pair
-    is not in the taxonomy.
-    """
-    mapping = _mapping_for(backend)
-    for canonical, nn in mapping.items():
-        if nn == native:
-            return canonical
-    raise UnknownToolError(f"Unknown {backend!r} native tool {native!r}")
-
-
-def native_tool_names(backend: str) -> frozenset[str]:
-    """Return every native tool name registered for *backend*."""
-    return frozenset(_mapping_for(backend).values())
-
-
-def backend_tool_name(canonical_name: str, backend: str) -> str | None:
-    """Return the backend-specific tool name for a canonical tool.
-
-    Returns ``None`` when the backend is unknown or has no mapping for the
-    tool. This is the lenient lookup used by callers that need to degrade
-    gracefully.
-    """
-    mapping = NATIVE_TOOL_NAMES.get(backend)
-    if mapping is None:
-        return None
-    return mapping.get(canonical_name)
-
-
-def canonicalize(name: str) -> str | None:
-    """Return the canonical name for *name* if it is known to any backend.
-
-    *name* may already be canonical (a key in any backend's mapping) or it
-    may be a backend-native name. If it matches neither, return ``None``.
-    """
-    for backend_mapping in NATIVE_TOOL_NAMES.values():
-        if name in backend_mapping:
-            return name
-        for canonical, native in backend_mapping.items():
-            if native == name:
-                return canonical
-    return None
+from agentbox.core.tools.canonical import CanonicalTool
 
 
 def _target_mcp_prefix(
@@ -139,40 +36,69 @@ def _target_mcp_prefix(
 
 def translate_tool(
     name: str,
-    target_backend: str,
+    native_map: dict[CanonicalTool, str],
     *,
     mcp_prefixes: dict[str, str] | None = None,
 ) -> str:
-    """Translate any tool name into *target_backend*'s native vocabulary.
+    """Translate any tool name into the target backend's native vocabulary.
+
+    *native_map* is a ``CanonicalTool`` → native-name mapping owned by
+    the target backend (e.g. ``claude_code.tools.NATIVE_TOOLS``).
 
     Resolution order:
 
-    1. Already canonical or native to some backend → ``to_native``.
-    2. MCP-prefixed (``mcp_prefixes`` maps source→target prefix) → rewrite
-       the prefix.
-    3. Unknown → passthrough unchanged.
-
-    Gap coverage: when step 1 yields a canonical tool with no native
-    mapping in *target_backend*, the env-MCP name
-    ``<target_prefix><canonical>`` is returned instead of dropping the
-    tool. The target prefix is taken from *mcp_prefixes*; if no prefixes
-    are supplied the original name is passed through.
+    1. *name* is already a canonical tool → direct lookup in
+       *native_map*.  If the canonical tool has no native mapping the
+       env‑MCP fallback is used (gap coverage).
+    2. *name* is a native tool of the target backend (appears as a
+       value in *native_map*) → returned unchanged (idempotent).
+    3. *name* carries an MCP prefix that appears in *mcp_prefixes* →
+       the prefix is rewritten.
+    4. Unknown → passthrough unchanged.
     """
-    canonical = canonicalize(name)
-    if canonical is not None:
-        mapping = NATIVE_TOOL_NAMES.get(target_backend)
-        if mapping is not None and canonical in mapping:
-            return mapping[canonical]
-        # Gap coverage: expose the canonical capability through the env-MCP.
+    # 1 – canonical tool?
+    try:
+        tool = CanonicalTool(name)
+    except ValueError:
+        pass
+    else:
+        if tool in native_map:
+            return native_map[tool]
+        # Gap coverage: canonical tool, no native mapping.
         target_prefix = _target_mcp_prefix(mcp_prefixes)
         if target_prefix is not None:
-            return f"{target_prefix}{canonical}"
-        # ponytail: no target prefix supplied, cannot construct env-MCP name
+            return f"{target_prefix}{name}"
         return name
 
+    # 2 – already a native name of the target backend?
+    for native in native_map.values():
+        if native == name:
+            return name
+
+    # 3 – MCP prefix rewrite?
     if mcp_prefixes:
         for source_prefix, target_prefix in mcp_prefixes.items():
             if name.startswith(source_prefix):
                 return f"{target_prefix}{name[len(source_prefix):]}"
 
+    # 4 – passthrough
     return name
+
+
+def intersect_allowed_tools(
+    agent_tools: set[CanonicalTool],
+    workspace_tools: set[CanonicalTool] | None,
+) -> set[CanonicalTool]:
+    """Effective allow list = agent ∩ workspace.
+
+    If either side is empty/None, treat it as "no restriction" so the
+    other side governs alone.  Returns the set of canonical tools that
+    are authorized by the agent AND available in the workspace.
+    """
+    if not agent_tools and not workspace_tools:
+        return set()
+    if not agent_tools:
+        return set(workspace_tools or set())
+    if not workspace_tools:
+        return set(agent_tools)
+    return agent_tools & workspace_tools

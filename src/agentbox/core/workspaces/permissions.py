@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES
 
 
@@ -72,12 +73,12 @@ def check_capability(grants: dict, capability: str, params: dict | None = None) 
     params = params or {}
 
     if capability in {
-        "fs.read",
-        "fs.list",
-        "fs.write",
-        "git.status",
-        "git.log",
-        "git.diff",
+        CanonicalTool.FS_READ,
+        CanonicalTool.FS_LIST,
+        CanonicalTool.FS_WRITE,
+        CanonicalTool.GIT_STATUS,
+        CanonicalTool.GIT_LOG,
+        CanonicalTool.GIT_DIFF,
     }:
         path = params.get("path")
         if not path:
@@ -89,7 +90,7 @@ def check_capability(grants: dict, capability: str, params: dict | None = None) 
             raise GrantViolation(
                 f"{capability}: path {path!r} not within allowed_paths"
             )
-        if capability in {"fs.read", "fs.write"}:
+        if capability in {CanonicalTool.FS_READ, CanonicalTool.FS_WRITE}:
             max_bytes = int(grant.get("max_bytes", 1_048_576))
             size = params.get("size_hint")
             if size is not None and int(size) > max_bytes:
@@ -97,7 +98,7 @@ def check_capability(grants: dict, capability: str, params: dict | None = None) 
                     f"{capability}: size {size} exceeds max_bytes {max_bytes}"
                 )
 
-    elif capability == "shell.exec":
+    elif capability == CanonicalTool.SHELL_EXEC:
         cmd = params.get("cmd")
         if not cmd:
             raise GrantViolation("shell.exec: missing 'cmd' param")
@@ -107,7 +108,7 @@ def check_capability(grants: dict, capability: str, params: dict | None = None) 
         if not any(re.fullmatch(pat, cmd) for pat in allowlist):
             raise GrantViolation(f"shell.exec: command {cmd!r} not on allowlist")
 
-    elif capability == "http.fetch":
+    elif capability == CanonicalTool.HTTP_FETCH:
         url = params.get("url")
         if not url:
             raise GrantViolation("http.fetch: missing 'url' param")
@@ -122,7 +123,7 @@ def check_capability(grants: dict, capability: str, params: dict | None = None) 
         if method not in methods:
             raise GrantViolation(f"http.fetch: method {method!r} not allowed")
 
-    elif capability == "env.get":
+    elif capability == CanonicalTool.ENV_GET:
         name = params.get("name")
         if not name:
             raise GrantViolation("env.get: missing 'name' param")

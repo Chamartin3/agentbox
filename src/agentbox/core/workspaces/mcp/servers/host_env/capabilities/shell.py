@@ -4,23 +4,24 @@ from __future__ import annotations
 
 import subprocess
 
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.workspaces.permissions import GrantViolation, check_capability
 from fastmcp import FastMCP
 
 
 def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
     @mcp.tool(
-        name="shell.exec",
+        name=CanonicalTool.SHELL_EXEC.value,
         description="Run an allowlisted shell command. Requires shell.exec grant.",
     )
     def shell_exec(cmd: str, cwd: str | None = None, timeout: int = 30) -> dict:
         ctx = ctx_factory()
         try:
-            check_capability(ctx.grants, "shell.exec", {"cmd": cmd})
+            check_capability(ctx.grants, CanonicalTool.SHELL_EXEC, {"cmd": cmd})
         except GrantViolation as exc:
-            ctx.audit("shell.exec", {"cmd": cmd}, outcome="denied", error=str(exc))
+            ctx.audit(CanonicalTool.SHELL_EXEC, {"cmd": cmd}, outcome="denied", error=str(exc))
             raise
-        grant = ctx.grants.get("shell.exec") or {}
+        grant = ctx.grants.get(CanonicalTool.SHELL_EXEC) or {}
         effective_timeout = int(grant.get("timeout_seconds", timeout))
         effective_cwd = cwd or grant.get("cwd") or None
         try:
@@ -35,9 +36,9 @@ def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
             outcome = "ok"
             error = None
         except subprocess.TimeoutExpired:
-            ctx.audit("shell.exec", {"cmd": cmd}, outcome="timeout", error="timed out")
+            ctx.audit(CanonicalTool.SHELL_EXEC, {"cmd": cmd}, outcome="timeout", error="timed out")
             raise
-        ctx.audit("shell.exec", {"cmd": cmd}, outcome=outcome, error=error)
+        ctx.audit(CanonicalTool.SHELL_EXEC, {"cmd": cmd}, outcome=outcome, error=error)
         return {
             "returncode": result.returncode,
             "stdout": result.stdout,

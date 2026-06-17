@@ -6,8 +6,14 @@ import pytest
 from agentbox.core.tools.builtin import (
     BUILTIN_TOOLS,
     BuiltinToolSpec,
-    backend_tool_name,
     get_builtin,
+)
+from agentbox.core.tools.translation import translate_tool
+from agentbox.core.engines.backends.claude_code.tools import (
+    NATIVE_TOOLS as CLAUDE_TOOLS,
+)
+from agentbox.core.engines.backends.opencode.tools import (
+    NATIVE_TOOLS as OPENCODE_TOOLS,
 )
 
 
@@ -41,27 +47,30 @@ class TestRegistry:
 
 class TestBackendNames:
     @pytest.mark.parametrize(
-        "tool_name,runner,expected",
+        "tool_name,native_map,expected",
         [
-            ("fs.read", "claude_code", "Read"),
-            ("fs.write", "claude_code", "Write"),
-            ("fs.list", "claude_code", "LS"),
-            ("shell.exec", "claude_code", "Bash"),
-            ("http.fetch", "claude_code", "WebFetch"),
-            ("web.search", "claude_code", "WebSearch"),
-            ("fs.read", "opencode", "read_file"),
-            ("fs.write", "opencode", "write_file"),
-            ("shell.exec", "opencode", "run_command"),
+            ("fs.read", CLAUDE_TOOLS, "Read"),
+            ("fs.write", CLAUDE_TOOLS, "Write"),
+            ("fs.list", CLAUDE_TOOLS, "LS"),
+            ("shell.exec", CLAUDE_TOOLS, "Bash"),
+            ("http.fetch", CLAUDE_TOOLS, "WebFetch"),
+            ("web.search", CLAUDE_TOOLS, "WebSearch"),
+            ("fs.read", OPENCODE_TOOLS, "read_file"),
+            ("fs.write", OPENCODE_TOOLS, "write_file"),
+            ("shell.exec", OPENCODE_TOOLS, "run_command"),
         ],
     )
-    def test_parity_matrix(self, tool_name: str, runner: str, expected: str):
-        result = backend_tool_name(tool_name, runner)
+    def test_parity_matrix(
+        self, tool_name: str, native_map: dict, expected: str
+    ):
+        result = translate_tool(tool_name, native_map)
         assert result == expected, (
-            f"{tool_name} → {runner}: expected {expected!r}, got {result!r}"
+            f"{tool_name}: expected {expected!r}, got {result!r}"
         )
 
-    def test_unknown_tool_returns_none(self):
-        assert backend_tool_name("no.such.tool", "claude_code") is None
+    def test_unknown_tool_passthrough(self):
+        assert translate_tool("no.such.tool", CLAUDE_TOOLS) == "no.such.tool"
 
-    def test_unknown_backend_returns_none(self):
-        assert backend_tool_name("fs.read", "unknown_backend") is None
+    def test_foreign_native_passthrough(self):
+        # "read_file" is native to OpenCode, not Claude → passthrough.
+        assert translate_tool("read_file", CLAUDE_TOOLS) == "read_file"

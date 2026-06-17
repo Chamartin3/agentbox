@@ -1,21 +1,15 @@
 """Canonical built-in tools taxonomy (Plan 08 Phase 10).
 
 Defines the standardized tool names, signatures, and capability
-alignment. Per-backend native names live in ``core.tools.translation``;
-this module re-exports the lookup helpers for backward compatibility.
+alignment. Per-backend native-name maps live in
+``agentbox.core.engines.backends.<be>.tools``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from agentbox.core.tools.translation import (
-    UnknownToolError,
-    backend_tool_name,
-    from_native,
-    native_tool_names,
-    to_native,
-)
+from agentbox.core.tools.canonical import CanonicalTool
 
 
 @dataclass(frozen=True)
@@ -29,9 +23,9 @@ class BuiltinToolSpec:
         params:        Canonical parameter names (documentation only).
     """
 
-    name: str
+    name: CanonicalTool
     description: str
-    capability: str | None
+    capability: CanonicalTool | None
     params: list[str] = field(default_factory=list)
 
 
@@ -39,43 +33,43 @@ class BuiltinToolSpec:
 
 BUILTIN_TOOLS: tuple[BuiltinToolSpec, ...] = (
     BuiltinToolSpec(
-        name="fs.read",
+        name=CanonicalTool.FS_READ,
         description="Read file contents from the local filesystem.",
-        capability="fs.read",
+        capability=CanonicalTool.FS_READ,
         params=["path"],
     ),
     BuiltinToolSpec(
-        name="fs.write",
+        name=CanonicalTool.FS_WRITE,
         description="Write or overwrite a file on the local filesystem.",
-        capability="fs.write",
+        capability=CanonicalTool.FS_WRITE,
         params=["path", "content"],
     ),
     BuiltinToolSpec(
-        name="fs.edit",
+        name=CanonicalTool.FS_EDIT,
         description="Perform exact string replacements in a file.",
         capability=None,
         params=["file_path", "old_string", "new_string"],
     ),
     BuiltinToolSpec(
-        name="fs.multi_edit",
+        name=CanonicalTool.FS_MULTI_EDIT,
         description="Perform multiple string replacements across files.",
         capability=None,
         params=[],
     ),
     BuiltinToolSpec(
-        name="fs.list",
+        name=CanonicalTool.FS_LIST,
         description="List directory contents.",
-        capability="fs.list",
+        capability=CanonicalTool.FS_LIST,
         params=["path"],
     ),
     BuiltinToolSpec(
-        name="fs.glob",
+        name=CanonicalTool.FS_GLOB,
         description="Find files by glob patterns.",
         capability=None,
         params=["pattern"],
     ),
     BuiltinToolSpec(
-        name="fs.grep",
+        name=CanonicalTool.FS_GREP,
         description="Search file contents with regex.",
         capability=None,
         params=["pattern"],
@@ -84,22 +78,22 @@ BUILTIN_TOOLS: tuple[BuiltinToolSpec, ...] = (
     # ── Shell ────────────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="shell.exec",
+        name=CanonicalTool.SHELL_EXEC,
         description="Execute a shell command.",
-        capability="shell.exec",
+        capability=CanonicalTool.SHELL_EXEC,
         params=["cmd", "cwd", "timeout"],
     ),
 
     # ── HTTP / Web ───────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="http.fetch",
+        name=CanonicalTool.HTTP_FETCH,
         description="Fetch a URL over HTTP/HTTPS.",
-        capability="http.fetch",
+        capability=CanonicalTool.HTTP_FETCH,
         params=["url", "method"],
     ),
     BuiltinToolSpec(
-        name="web.search",
+        name=CanonicalTool.WEB_SEARCH,
         description="Search the web.",
         capability=None,
         params=["query"],
@@ -108,25 +102,25 @@ BUILTIN_TOOLS: tuple[BuiltinToolSpec, ...] = (
     # ── Git ──────────────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="git.status",
+        name=CanonicalTool.GIT_STATUS,
         description="Show the working tree status.",
-        capability="git.status",
+        capability=CanonicalTool.GIT_STATUS,
         params=["repo_path"],
     ),
 
     # ── Environment ──────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="env.get",
+        name=CanonicalTool.ENV_GET,
         description="Read an environment variable.",
-        capability="env.get",
+        capability=CanonicalTool.ENV_GET,
         params=["name"],
     ),
 
     # ── Notebook ─────────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="notebook.edit",
+        name=CanonicalTool.NOTEBOOK_EDIT,
         description="Edit a Jupyter notebook cell.",
         capability=None,
         params=[],
@@ -135,7 +129,7 @@ BUILTIN_TOOLS: tuple[BuiltinToolSpec, ...] = (
     # ── Interaction ──────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="interaction.ask_user",
+        name=CanonicalTool.INTERACTION_ASK_USER,
         description="Ask the user a question during execution.",
         capability=None,
         params=["question"],
@@ -144,7 +138,7 @@ BUILTIN_TOOLS: tuple[BuiltinToolSpec, ...] = (
     # ── Agent / Task ─────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="agent.task",
+        name=CanonicalTool.AGENT_TASK,
         description="Delegate work to a sub-agent.",
         capability=None,
         params=[],
@@ -153,13 +147,13 @@ BUILTIN_TOOLS: tuple[BuiltinToolSpec, ...] = (
     # ── Todo ─────────────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="todo.read",
+        name=CanonicalTool.TODO_READ,
         description="Read the current todo list.",
         capability=None,
         params=[],
     ),
     BuiltinToolSpec(
-        name="todo.write",
+        name=CanonicalTool.TODO_WRITE,
         description="Create or update the todo list.",
         capability=None,
         params=[],
@@ -168,30 +162,29 @@ BUILTIN_TOOLS: tuple[BuiltinToolSpec, ...] = (
     # ── Agentbox ─────────────────────────────────────────────────────────────
 
     BuiltinToolSpec(
-        name="agentbox.workspace_info",
+        name=CanonicalTool.AGENTBOX_WORKSPACE_INFO,
         description="Return workspace metadata (always granted).",
-        capability="agentbox.workspace_info",
+        capability=CanonicalTool.AGENTBOX_WORKSPACE_INFO,
         params=[],
     ),
 )
 
 # ── Lookup helpers ───────────────────────────────────────────────────────────
 
-_TOOL_BY_NAME: dict[str, BuiltinToolSpec] = {t.name: t for t in BUILTIN_TOOLS}
+_TOOL_BY_NAME: dict[CanonicalTool, BuiltinToolSpec] = {t.name: t for t in BUILTIN_TOOLS}
 
 
 def get_builtin(name: str) -> BuiltinToolSpec | None:
     """Return the spec for a canonical tool name, or None if unknown."""
-    return _TOOL_BY_NAME.get(name)
+    try:
+        tool = CanonicalTool(name)
+    except ValueError:
+        return None
+    return _TOOL_BY_NAME.get(tool)
 
 
 __all__ = [
     "BUILTIN_TOOLS",
     "BuiltinToolSpec",
-    "UnknownToolError",
-    "backend_tool_name",
-    "from_native",
     "get_builtin",
-    "native_tool_names",
-    "to_native",
 ]
