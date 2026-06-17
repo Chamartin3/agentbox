@@ -1,36 +1,9 @@
-"""pi backend config generator — symmetric with :mod:`agentbox.core.engines.backends.codex.render`.
+"""Pi backend config generator.
 
-pi's CLI consumes the prompt via stdin and uses the working directory's
-``CLAUDE.md`` for system context. This generator only writes that file.
+The backend config-generator abstraction was removed when its only subclass
+(the Pi generator) was found to be dead code — the executor never
+instantiates it. The composed system prompt reaches the workdir via
+``BackendAdapter._collect_system_files()``, which is the live path.
+
+This module is kept as a placeholder so the package import path is stable.
 """
-
-from __future__ import annotations
-
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-from agentbox.core.engines.backends.base import (
-    BackendConfigGenerator,
-    ComposedContext,
-    McpConfig,
-)
-
-if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef
-
-
-class PiConfigGenerator(BackendConfigGenerator):
-    def generate(
-        self,
-        backend_dir: Path,
-        agent: AgentDef,
-        composed: ComposedContext,
-        mcp: McpConfig | None = None,
-    ) -> None:
-        self._write_claude_md(backend_dir, composed)
-
-    def _write_claude_md(self, backend_dir: Path, composed: ComposedContext) -> None:
-        claude_md = backend_dir / "CLAUDE.md"
-        if claude_md.exists():
-            return
-        claude_md.write_text(composed.system, encoding="utf-8")

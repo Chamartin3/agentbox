@@ -11,6 +11,7 @@ class Role(str, Enum):
     """Role of an output item — determines its file path via recipe layout."""
 
     context = "context"
+    engine_config = "engine_config"
     subagent = "subagent"
     skill = "skill"
     mcp_config = "mcp_config"

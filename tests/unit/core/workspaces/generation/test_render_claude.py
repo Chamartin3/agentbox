@@ -47,7 +47,7 @@ def _make_fixture_config(**overrides: object) -> WorkenvConfig:
 class TestRenderClaude:
     def test_render_minimal(self) -> None:
         config = WorkenvConfig(name="minimal")
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             result = render(Path(td), config, recipe)
             assert result.target_dir == Path(td)
@@ -58,19 +58,19 @@ class TestRenderClaude:
 
     def test_render_full(self) -> None:
         config = _make_fixture_config()
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
 
             claude_md = Path(td) / "CLAUDE.md"
             assert claude_md.exists()
             content = claude_md.read_text()
-            assert "test-workspace" in content
+            # CLAUDE.md is the raw env-doc body (no context template).
             assert "env doc" in content
 
     def test_render_subagents(self) -> None:
         config = _make_fixture_config()
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
 
@@ -80,9 +80,30 @@ class TestRenderClaude:
             assert sub2.exists()
             assert "sub-1" in sub1.read_text()
 
+    def test_subagent_carries_description_and_prompt(self) -> None:
+        # Native .claude/agents/*.md must hold real content, not empty
+        # placeholders — the format the Claude engine reads.
+        config = WorkenvConfig(
+            name="ws",
+            agents=[
+                AgentRef(
+                    id="sub-1",
+                    role="subagent",
+                    description="does the thing",
+                    prompt="You are a careful worker.",
+                )
+            ],
+        )
+        recipe = load_recipe("claude_code")
+        with tempfile.TemporaryDirectory() as td:
+            render(Path(td), config, recipe)
+            text = (Path(td) / ".claude" / "agents" / "sub-1.md").read_text()
+            assert 'description: "does the thing"' in text
+            assert "You are a careful worker." in text
+
     def test_render_main_agent_not_a_subagent(self) -> None:
         config = _make_fixture_config()
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
 
@@ -91,7 +112,7 @@ class TestRenderClaude:
 
     def test_render_mcp_config(self) -> None:
         config = _make_fixture_config()
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
 
@@ -107,7 +128,7 @@ class TestRenderClaude:
 
     def test_render_permissions(self) -> None:
         config = _make_fixture_config()
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
 
@@ -119,7 +140,7 @@ class TestRenderClaude:
 
     def test_idempotent(self) -> None:
         config = _make_fixture_config()
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             result1 = render(Path(td), config, recipe)
             result2 = render(Path(td), config, recipe)
@@ -127,14 +148,14 @@ class TestRenderClaude:
 
     def test_no_mcp_when_empty(self) -> None:
         config = _make_fixture_config(mcp_servers=[])
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
             assert not (Path(td) / ".mcp.json").exists()
 
     def test_no_permissions_when_empty(self) -> None:
         config = _make_fixture_config(permissions=Permissions(data={}))
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
             assert not (Path(td) / ".claude" / "settings.json").exists()
@@ -145,7 +166,7 @@ class TestRenderClaude:
         restored = WorkenvConfig.from_yaml(yaml_text)
         assert original == restored
 
-        recipe = load_recipe("claude")
+        recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), restored, recipe)
             assert (Path(td) / "CLAUDE.md").exists()

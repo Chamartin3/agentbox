@@ -1,104 +1,49 @@
-"""OpenCode backend config generator.
+"""OpenCode workspace config generation.
 
-Produces:
-- opencode.json (workspace config with agent list + MCP)
-- agents/<agent_id>.md (per-agent markdown with YAML frontmatter)
+Builds ``opencode.json`` — the engine-shaped config blob (schema, theme,
+agent table, MCP servers). This is logic a ``recipe.yaml`` can't express,
+so it lives here in the backend that owns the OpenCode format and is
+surfaced to the generic generator via ``OpenCodeBackend.build_workspace_items``.
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import TYPE_CHECKING
 
-from agentbox.core.engines.backends.base import (
-    BackendConfigGenerator,
-    ComposedContext,
-    McpConfig,
+from agentbox.core.engines.backends.opencode.schema import (
+    AgentEntry,
+    McpLocal,
+    McpRemote,
+    OpenCodeConfig,
 )
+from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
+from agentbox.core.workspaces.generation.payload import Item, Role
 
-if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef
+
+def build_opencode_items(config: WorkenvConfig) -> list[Item]:
+    """Return the ``opencode.json`` Item for *config* (placed via recipe layout)."""
+    oc = OpenCodeConfig(
+        tools={"skill": True},
+        permission={"*": "allow"},
+        agent={a.id: AgentEntry() for a in config.agents if a.role == "main"},
+        mcp=_mcp_entries(config.mcp_servers),
+    )
+    content = json.dumps(oc.model_dump(by_alias=True), indent=2) + "\n"
+    return [Item(role=Role.engine_config, name=config.name, content=content)]
 
 
-class OpenCodeConfigGenerator(BackendConfigGenerator):
-    def generate(
-        self,
-        backend_dir: Path,
-        agent: AgentDef,
-        composed: ComposedContext,
-        mcp: McpConfig | None = None,
-    ) -> None:
-        self._write_opencode_json(backend_dir, agent, mcp)
-        self._write_agent_markdown(backend_dir, agent, composed)
-
-    def _write_opencode_json(
-        self,
-        backend_dir: Path,
-        agent: AgentDef,
-        mcp: McpConfig | None,
-    ) -> None:
-        """Write workspace-level opencode.json with agent list + MCP config."""
-        oc_json = backend_dir / "opencode.json"
-        if oc_json.exists():
-            return
-
-        config: dict[str, object] = {
-            "$schema": "https://opencode.ai/config.json",
-            "theme": "dracula",
-            "tools": {"skill": True},
-            "permission": {"*": "allow"},
-            "agent": {
-                agent.id: {
-                    "description": agent.description or "",
-                }
-            },
-        }
-
-        if mcp is not None:
-            config["mcp"] = {mcp.server_name: self._build_mcp_entry(mcp)}
-
-        oc_json.write_text(json.dumps(config, indent=2), encoding="utf-8")
-
-    def _build_mcp_entry(self, mcp: McpConfig) -> dict[str, object]:
-        """Build OpenCode-specific MCP entry."""
-        if mcp.url:
-            return {"type": "remote", "url": mcp.url, "enabled": True}
-        return {
-            "type": "local",
-            "command": mcp.command or ["mcp_serve.sh"],
-            "enabled": True,
-        }
-
-    def _write_agent_markdown(
-        self,
-        backend_dir: Path,
-        agent: AgentDef,
-        composed: ComposedContext,
-    ) -> None:
-        """Generate agents/<agent_id>.md with YAML frontmatter + full prompt."""
-        agents_dir = backend_dir / "agents"
-        agents_dir.mkdir(parents=True, exist_ok=True)
-
-        md_path = agents_dir / f"{agent.id}.md"
-        if md_path.exists():
-            return
-
-        frontmatter = self._build_frontmatter(agent)
-        full_prompt = "\n\n".join(
-            p for p in (composed.system, composed.user) if p
-        )
-
-        md_path.write_text(f"{frontmatter}\n\n{full_prompt}", encoding="utf-8")
-
-    def _build_frontmatter(self, agent: AgentDef) -> str:
-        lines = ["---"]
-        if agent.description:
-            lines.append(f'description: "{agent.description}"')
-        if agent.runner.model:
-            lines.append(f"model: {agent.runner.model}")
-        lines.append("tools:")
-        lines.append("  skill_list: true")
-        lines.append("  skill_get_content: true")
-        lines.append("---")
-        return "\n".join(lines)
+def _mcp_entries(servers: list[McpRef]) -> dict[str, McpRemote | McpLocal]:
+    entries: dict[str, McpRemote | McpLocal] = {}
+    for srv in servers:
+        if not isinstance(srv, McpRef):
+            continue
+        url = srv.config.get("url")
+        command = srv.config.get("command")
+        transport = srv.config.get("transport", "stdio")
+        if url:
+            entries[srv.name] = McpRemote(
+                type="remote" if transport == "http" else transport, url=url
+            )
+        elif command:
+            entries[srv.name] = McpLocal(command=command)
+    return entries

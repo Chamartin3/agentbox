@@ -1,4 +1,4 @@
-engine: claude
+engine: claude_code
 
 layout:
   context: CLAUDE.md
@@ -15,5 +15,4 @@ serialization:
   skill: raw
 
 templates:
-  context: templates/context.md.tmpl
   subagent: templates/subagent.md.tmpl

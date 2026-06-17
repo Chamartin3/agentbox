@@ -1,0 +1,13 @@
+# Pi coding agent (pi -p) native layout.
+# Refs: https://pi.dev/ ; https://github.com/badlogic/pi-mono
+# - Instructions: AGENTS.md (loaded from ~/.pi/agent/, parent dirs, cwd).
+# - No subagents: Pi has no built-in subagent concept ("skips features like
+#   sub agents"); its extensibility is Skills (.pi/skills/), not subagents.
+#   So this recipe renders the context file only.
+engine: pi
+
+layout:
+  context: AGENTS.md
+
+serialization:
+  context: raw

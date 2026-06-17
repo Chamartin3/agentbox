@@ -50,9 +50,28 @@ def load_workenv(
     if agent_def is not None:
         agents.append(AgentRef(id=workspace_id, role="main"))
 
-    # Subagents
+    # Subagents — id is the workspace alias (the subagent's name in this
+    # workspace); the body is the agent's active prompt so the recipe can
+    # render native .claude/agents/{alias}.md (replacing materialize_subagents).
     for sa in store.list_workspace_subagents(workspace_id):
-        agents.append(AgentRef(id=sa["subagent_id"], role="subagent"))
+        sub_agent_id = sa["agent_id"]
+        active = store.get_active_version(sub_agent_id)
+        prompt = (
+            (active or {}).get("prompt_content")
+            or (active or {}).get("prompt_snapshot")
+            or ""
+        )
+        if not prompt:
+            continue
+        sub_def = store.get_agent_def(sub_agent_id)
+        agents.append(
+            AgentRef(
+                id=sa["alias"],
+                role="subagent",
+                description=getattr(sub_def, "description", "") or "",
+                prompt=prompt,
+            )
+        )
 
     # Resource bindings
     resources: list[ResourceRef] = []

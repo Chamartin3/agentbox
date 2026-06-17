@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 
+from agentbox.core.constants import BackendName
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ def save_as_preset(
     name: str,
     config: WorkenvConfig,
     *,
-    engine: str = "claude",
+    engine: str = BackendName.CLAUDE_CODE,
     description: str | None = None,
 ) -> dict:
     """Persist a ``WorkenvConfig`` as a named template."""

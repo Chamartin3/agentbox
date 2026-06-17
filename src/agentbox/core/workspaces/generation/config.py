@@ -18,10 +18,20 @@ class ResourceRef:
 
 @dataclass(frozen=True)
 class AgentRef:
-    """Reference to an agent (main or subagent) with its role in the workspace."""
+    """Reference to an agent (main or subagent) with its role in the workspace.
+
+    ``description``/``prompt``/``tools`` carry the engine-config payload that
+    backends need to build their agent tables (Claude ``claude_agents.json``,
+    OpenCode ``opencode.json``). ``tools`` are *resolved* MCP tool names
+    (e.g. ``mcp__mcp__foo_get``) — the same shape the legacy
+    ``AgentDiscovery.discover_mcp_agents`` produced as ``mcp_tools``.
+    """
 
     id: str
     role: str = "subagent"  # "main" | "subagent"
+    description: str = ""
+    prompt: str = ""
+    tools: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -51,6 +61,8 @@ class WorkenvConfig:
 
     name: str
     description: str = ""
+    # Raw env-doc body text, placed verbatim into the engine's instruction
+    # file (CLAUDE.md / AGENTS.md) by the recipe. ResourceRef = id-only ref.
     env_doc: str | ResourceRef | None = None
     agents: list[AgentRef] = field(default_factory=list)
     resources: list[ResourceRef] = field(default_factory=list)
@@ -103,7 +115,14 @@ class WorkenvConfig:
                 else {"__ref__": "resource", "id": self.env_doc.id}
             ),
             "agents": [
-                {"id": a.id, "role": a.role} for a in self.agents
+                {
+                    "id": a.id,
+                    "role": a.role,
+                    "description": a.description,
+                    "prompt": a.prompt,
+                    "tools": a.tools,
+                }
+                for a in self.agents
             ],
             "resources": [{"id": r.id} for r in self.resources],
             "skills": [{"id": s.id} for s in self.skills],
@@ -139,7 +158,13 @@ class WorkenvConfig:
             description=data.get("description", ""),
             env_doc=env_doc,
             agents=[
-                AgentRef(id=a["id"], role=a.get("role", "subagent"))
+                AgentRef(
+                    id=a["id"],
+                    role=a.get("role", "subagent"),
+                    description=a.get("description", ""),
+                    prompt=a.get("prompt", ""),
+                    tools=list(a.get("tools", [])),
+                )
                 for a in data.get("agents", [])
             ],
             resources=[ResourceRef(id=r["id"]) for r in data.get("resources", [])],

@@ -1,4 +1,9 @@
-"""Env-doc orchestration: render context, save+sync, preview."""
+"""Env-doc orchestration: save+sync, preview.
+
+The env-doc is plain markdown text, stored as ``content_json = {"body": ...}``
+and placed verbatim into each engine's instruction file (CLAUDE.md / AGENTS.md)
+by the recipe generator.
+"""
 
 from __future__ import annotations
 
@@ -7,42 +12,25 @@ from typing import Any
 
 from agentbox.config import Settings
 from agentbox.core.data import SessionStore
-from agentbox.core.workspaces.env_doc.renderers import (
-    AgentsMdRenderer,
-    ClaudeMdRenderer,
-    RuntimeContext,
-)
-from agentbox.core.workspaces.env_doc.renderers.base import ReferenceEntry
-from agentbox.core.workspaces.env_doc.schema import EnvDocContent
 from agentbox.core.workspaces.build import build_workspace_by_name
 
 _log = logging.getLogger(__name__)
 
 
-def build_env_doc_context(store: SessionStore, workspace_id: str) -> RuntimeContext:
-    skills: list[ReferenceEntry] = []
-    folders: list[ReferenceEntry] = []
-    for b in store.list_workspace_file_bindings(workspace_id):
-        resource = store.get_repo_resource(b["resource_id"])
-        if not resource:
-            continue
-        entry = ReferenceEntry(
-            label=resource["display_name"], detail=b.get("target_path") or ""
-        )
-        if resource["type"] == "skill":
-            skills.append(entry)
-        elif resource["type"] == "folder":
-            folders.append(entry)
-    return RuntimeContext(skills=skills, folders=folders)
+def env_doc_body(content: Any) -> str:
+    """Extract the markdown body from a raw string or a ``{"body": ...}`` dict."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        body = content.get("body") or content.get("content") or ""
+        return body if isinstance(body, str) else str(body)
+    return ""
 
 
-def render_env_doc_preview(
-    content: EnvDocContent, ctx: RuntimeContext
-) -> dict[str, str]:
-    return {
-        "claude_md": ClaudeMdRenderer().render(content, ctx),
-        "agents_md": AgentsMdRenderer().render(content, ctx),
-    }
+def render_env_doc_preview(content: Any) -> dict[str, str]:
+    """Preview the instruction files. Identical body for every engine."""
+    body = env_doc_body(content)
+    return {"claude_md": body, "agents_md": body}
 
 
 def save_and_sync_env_doc(
@@ -50,7 +38,7 @@ def save_and_sync_env_doc(
     settings: Settings,
     workspace_id: str,
     *,
-    content: dict[str, Any],
+    content: Any,
     reason: str = "edit",
     actor: str | None = None,
 ) -> dict[str, Any]:
@@ -61,7 +49,7 @@ def save_and_sync_env_doc(
     """
     result = store.save_env_doc(
         workspace_id,
-        content,
+        {"body": env_doc_body(content)},
         changelog=reason,
         publish=True,
         actor=actor,

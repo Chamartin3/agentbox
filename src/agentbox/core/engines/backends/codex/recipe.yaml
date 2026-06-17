@@ -1,0 +1,18 @@
+# Codex CLI (codex exec) native layout.
+# Refs: https://developers.openai.com/codex/guides/agents-md
+#       https://developers.openai.com/codex/subagents
+# - Instructions: AGENTS.md (walked from project root to cwd).
+# - Subagents: project-scoped TOML files under .codex/agents/{name}.toml
+#   (fields: name, description, developer_instructions).
+engine: codex
+
+layout:
+  context: AGENTS.md
+  subagent: .codex/agents/{name}.toml
+
+serialization:
+  context: raw
+  subagent: raw
+
+# Subagents are emitted as escaped TOML by CodexBackend.build_workspace_items
+# (see codex/render.py), not a text template — so no `templates:` here.

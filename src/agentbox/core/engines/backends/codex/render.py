@@ -1,38 +1,48 @@
-"""Codex backend config generator.
+"""Codex backend workspace config — escaped TOML subagent files.
 
-Codex's ``codex exec`` CLI takes the user prompt from stdin and the
-system context from the working directory's ``CLAUDE.md`` (when
-present). This generator only needs to materialise a single fallback
-``CLAUDE.md`` for backends that rely on it.
+Codex defines project-scoped subagents as TOML files under
+``.codex/agents/{name}.toml`` (fields ``name`` / ``description`` /
+``developer_instructions``). The values are user prompt text that can
+contain quotes, backslashes and newlines, so they're emitted as escaped
+TOML basic strings here in code rather than via a text template — the
+backend owns its format. Surfaced to the generic generator via
+``CodexBackend.build_workspace_items``.
+
+Ref: https://developers.openai.com/codex/subagents
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.engines.backends.base import (
-    BackendConfigGenerator,
-    ComposedContext,
-    McpConfig,
-)
+from agentbox.core.workspaces.generation.payload import Item, Role
 
 if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef
+    from agentbox.core.workspaces.generation.config import WorkenvConfig
 
 
-class CodexConfigGenerator(BackendConfigGenerator):
-    def generate(
-        self,
-        backend_dir: Path,
-        agent: AgentDef,
-        composed: ComposedContext,
-        mcp: McpConfig | None = None,
-    ) -> None:
-        self._write_claude_md(backend_dir, composed)
+def _toml_basic_string(s: str) -> str:
+    """Quote *s* as a TOML basic string, escaping it so any content is valid."""
+    out = (
+        s.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+    )
+    return f'"{out}"'
 
-    def _write_claude_md(self, backend_dir: Path, composed: ComposedContext) -> None:
-        claude_md = backend_dir / "CLAUDE.md"
-        if claude_md.exists():
-            return
-        claude_md.write_text(composed.system, encoding="utf-8")
+
+def build_codex_items(config: "WorkenvConfig") -> list[Item]:
+    """Return one TOML ``Item`` per subagent (routed by the recipe layout)."""
+    items: list[Item] = []
+    for agent in config.agents:
+        if agent.role == "main":
+            continue
+        content = (
+            f"name = {_toml_basic_string(agent.id)}\n"
+            f"description = {_toml_basic_string(agent.description)}\n"
+            f"developer_instructions = {_toml_basic_string(agent.prompt)}\n"
+        )
+        items.append(Item(role=Role.subagent, name=agent.id, content=content))
+    return items

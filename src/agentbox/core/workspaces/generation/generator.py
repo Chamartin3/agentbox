@@ -9,9 +9,9 @@ import json
 import string
 from pathlib import Path
 
-from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
+from agentbox.core.workspaces.generation.config import McpRef, ResourceRef, WorkenvConfig
 from agentbox.core.workspaces.generation.payload import Item, RenderedDir, Role
-from agentbox.core.workspaces.generation.recipe import Recipe
+from agentbox.core.workspaces.generation.recipe import Recipe, backend_for_engine
 
 
 def render(
@@ -21,15 +21,19 @@ def render(
 ) -> RenderedDir:
     """Render a ``WorkenvConfig`` to disk against a ``Recipe``.
 
-    Resolves refs in *config* to content, builds a list of :class:`Item`
-    objects, then writes each item to the path prescribed by the recipe
-    layout.
+    Builds a list of :class:`Item` objects, then writes each to the path
+    the recipe layout prescribes. Engine-specific config blobs come from
+    the backend's ``build_workspace_items`` hook.
 
     Callers may want to call ``config.validate()`` before rendering.
     """
     items = _build_items(config, recipe)
-    written: list[Path] = []
+    try:
+        items += backend_for_engine(recipe.engine).build_workspace_items(config)
+    except KeyError:
+        pass  # no backend registered for this recipe engine
 
+    written: list[Path] = []
     for item in items:
         layout_path = recipe.resolve_layout(item.role, name=item.name)
         if not layout_path:
@@ -45,32 +49,36 @@ def render(
 def _build_items(config: WorkenvConfig, recipe: Recipe) -> list[Item]:
     items: list[Item] = []
 
-    if recipe.serialization.get("context") == "json":
-        items.append(
-            _build_json_context(config, recipe)
-        )
-    else:
-        items.append(
-            _build_raw_context(config, recipe)
-        )
+    # Env-doc body → the engine's instruction file (CLAUDE.md / AGENTS.md).
+    # Plain text, identical for every engine; the recipe owns the filename.
+    if recipe.layout.get("context"):
+        items.append(_build_context(config, recipe))
 
-    for agent in config.agents:
-        if agent.role == "main":
-            continue
-        tmpl = recipe.resolve_template("subagent") or _default_subagent_template
-        content = string.Template(tmpl).safe_substitute(
-            name=agent.id,
-            description="",
-        )
-        items.append(Item(role=Role.subagent, name=agent.id, content=content))
+    # Subagents render from the recipe's subagent template. Engines whose
+    # format can't be expressed as a text template (e.g. Codex's escaped
+    # TOML) ship no template and emit subagents via their backend
+    # build_workspace_items hook instead, so skip them here.
+    subagent_tmpl = recipe.resolve_template("subagent")
+    if subagent_tmpl is not None:
+        for agent in config.agents:
+            if agent.role == "main":
+                continue
+            content = string.Template(subagent_tmpl).safe_substitute(
+                name=agent.id,
+                description=agent.description,
+                prompt=agent.prompt,
+            )
+            items.append(
+                Item(role=Role.subagent, name=agent.id, content=content)
+            )
 
     if config.mcp_servers:
-        mcp_data = _build_mcp_json(config.mcp_servers)
         items.append(
             Item(
                 role=Role.mcp_config,
                 name="mcp",
-                content=json.dumps(mcp_data, indent=2) + "\n",
+                content=json.dumps(_build_mcp_json(config.mcp_servers), indent=2)
+                + "\n",
             )
         )
 
@@ -98,48 +106,18 @@ def _build_items(config: WorkenvConfig, recipe: Recipe) -> list[Item]:
     return items
 
 
-def _build_raw_context(config: WorkenvConfig, recipe: Recipe) -> Item:
-    env_doc = _resolve_env_doc(config)
-    permissions_text = (
-        json.dumps(config.permissions.data, indent=2)
-        if config.permissions.data
-        else ""
-    )
+def _build_context(config: WorkenvConfig, recipe: Recipe) -> Item:
     tmpl = recipe.resolve_template("context") or _default_context_template
-    content = string.Template(tmpl).safe_substitute(
-        name=config.name,
-        description=config.description,
-        env_doc=env_doc,
-        permissions=permissions_text,
-    )
+    content = string.Template(tmpl).safe_substitute(env_doc=_resolve_env_doc(config))
     return Item(role=Role.context, name=config.name, content=content)
 
 
-def _build_json_context(config: WorkenvConfig, recipe: Recipe) -> Item:
-    blob: dict[str, object] = {
-        "$schema": "https://opencode.ai/config.json",
-        "theme": "dracula",
-        "tools": {"skill": True},
-        "permission": {"*": "allow"},
-    }
-
-    agents: dict[str, object] = {}
-    for a in config.agents:
-        if a.role == "main":
-            agents[a.id] = {"description": ""}
-    blob["agent"] = agents
-
-    blob["mcp"] = _build_opencode_mcp_json(config.mcp_servers)
-
-    return Item(role=Role.context, name=config.name, content=json.dumps(blob, indent=2) + "\n")
-
-
 def _resolve_env_doc(config: WorkenvConfig) -> str:
-    if config.env_doc is None:
-        return ""
     if isinstance(config.env_doc, str):
         return config.env_doc
-    return f"[ref:{config.env_doc.id}]"
+    if isinstance(config.env_doc, ResourceRef):
+        return f"[ref:{config.env_doc.id}]"
+    return ""
 
 
 def _build_mcp_json(
@@ -157,36 +135,9 @@ def _build_mcp_json(
                 entry["type"] = transport
                 entry["url"] = url
             elif command:
-                entry["command"] = (
-                    command if isinstance(command, str) else command
-                )
+                entry["command"] = command
             mcp_servers[srv.name] = entry
     return {"mcpServers": mcp_servers}
 
 
-def _build_opencode_mcp_json(
-    servers: list,
-) -> dict[str, object]:
-    mcp_servers: dict[str, object] = {}
-    for srv in servers:
-        if isinstance(srv, McpRef):
-            entry: dict[str, object] = {"enabled": True}
-            url = srv.config.get("url")
-            command = srv.config.get("command")
-            transport = srv.config.get("transport", "stdio")
-
-            if url:
-                entry["type"] = "remote" if transport == "http" else transport
-                entry["url"] = url
-            elif command:
-                entry["type"] = "local"
-                entry["command"] = (
-                    command if isinstance(command, str) else command
-                )
-            mcp_servers[srv.name] = entry
-    return mcp_servers
-
-
-_default_context_template = "# $name\n\n$description\n\n$env_doc"
-
-_default_subagent_template = "---\nname: $name\n---\n\n# $name\n\n$description\n"
+_default_context_template = "$env_doc"

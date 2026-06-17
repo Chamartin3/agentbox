@@ -1,4 +1,7 @@
-"""Tests for ``core.service.env_doc`` — context building, preview, save+sync."""
+"""Tests for ``core.service.env_doc`` — preview, save+sync.
+
+The env-doc is plain markdown text stored as ``content_json = {"body": ...}``.
+"""
 
 from __future__ import annotations
 
@@ -7,12 +10,10 @@ from pathlib import Path
 import pytest
 from agentbox.core.data import SessionStore
 from agentbox.core.service.env_doc import (
-    build_env_doc_context,
+    env_doc_body,
     render_env_doc_preview,
     save_and_sync_env_doc,
 )
-from agentbox.core.workspaces.env_doc.renderers import RuntimeContext
-from agentbox.core.workspaces.env_doc.schema import EnvDocContent
 
 
 @pytest.fixture
@@ -32,28 +33,22 @@ def settings() -> object:
     return _S()
 
 
-# ── build_env_doc_context ───────────────────────────────────────────────
+# ── env_doc_body ────────────────────────────────────────────────────────
 
 
-def test_build_env_doc_context_empty_workspace(store: SessionStore) -> None:
-    ctx = build_env_doc_context(store, "nonexistent")
-    assert isinstance(ctx, RuntimeContext)
-    assert ctx.skills == []
-    assert ctx.folders == []
+def test_env_doc_body_from_string_and_dict() -> None:
+    assert env_doc_body("# Hi") == "# Hi"
+    assert env_doc_body({"body": "# Hi"}) == "# Hi"
+    assert env_doc_body({}) == ""
+    assert env_doc_body(None) == ""
 
 
 # ── render_env_doc_preview ──────────────────────────────────────────────
 
 
-def test_render_env_doc_preview_produces_both_formats() -> None:
-    content = EnvDocContent(
-        project_name="Test Workspace",
-        overview="Integration testing",
-    )
-    ctx = RuntimeContext(skills=[], folders=[])
-    result = render_env_doc_preview(content, ctx)
-    assert "claude_md" in result
-    assert "agents_md" in result
+def test_render_env_doc_preview_identical_body() -> None:
+    result = render_env_doc_preview("# Test Workspace\n\nIntegration testing")
+    assert result["claude_md"] == result["agents_md"]
     assert "Test Workspace" in result["claude_md"]
 
 
@@ -64,23 +59,22 @@ def test_save_and_sync_env_doc_creates_version(
     store: SessionStore, settings: object
 ) -> None:
     store.create_workspace("test-ws")
-    content = {"project_name": "Test", "overview": "Testing"}
     result = save_and_sync_env_doc(
-        store, settings, "test-ws", content=content  # type: ignore[arg-type]
+        store, settings, "test-ws", content="# Test\n\nTesting"  # type: ignore[arg-type]
     )
     assert isinstance(result, dict)
     assert result.get("changelog") is not None
+    active = store.get_active_env_doc("test-ws")
+    assert active is not None
+    assert active["content_json"]["body"] == "# Test\n\nTesting"
 
 
 def test_save_and_sync_missing_workspace(
     store: SessionStore, settings: object
 ) -> None:
-    """Missing workspace raises an error from store.save_env_doc.
-    
-    save_env_doc in store creates a workspace record if none exists,
-    so this test verifies the function completes rather than crashing.
-    """
+    """save_env_doc creates a workspace record if none exists, so this
+    verifies the function completes rather than crashing."""
     result = save_and_sync_env_doc(
-        store, settings, "nonexistent", content={"project_name": "X"}  # type: ignore[arg-type]
+        store, settings, "nonexistent", content="# X"  # type: ignore[arg-type]
     )
     assert isinstance(result, dict)

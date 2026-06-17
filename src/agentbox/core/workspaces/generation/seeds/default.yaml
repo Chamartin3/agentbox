@@ -1,7 +1,7 @@
 # Default WorkenvConfig preset — single-agent Claude workspace.
 name: default
 description: "Default single-agent Claude workspace"
-engine: claude
+engine: claude_code
 config_json:
   name: default
   agents:

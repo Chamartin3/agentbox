@@ -9,17 +9,14 @@ import yaml
 
 from agentbox.core.engines.backends import get_backend, list_backends
 
-# Recipe engine name → backend entry-point name. Preserves backward compat
-# for the old recipe directory names (``claude`` maps to the ``claude_code``
-# backend package).
-_RECIPE_ENGINE_TO_BACKEND: dict[str, str] = {"claude": "claude_code"}
-_BACKEND_TO_RECIPE_ENGINE: dict[str, str] = {
-    v: k for k, v in _RECIPE_ENGINE_TO_BACKEND.items()
-}
 
+def backend_for_engine(engine: str):
+    """Return the registered backend for a recipe *engine* name.
 
-def _backend_name(engine: str) -> str:
-    return _RECIPE_ENGINE_TO_BACKEND.get(engine, engine)
+    Recipe engine names match backend entry-point names directly.
+    Raises ``KeyError`` if no backend is registered.
+    """
+    return get_backend(engine)
 
 
 @dataclass(frozen=True)
@@ -53,9 +50,8 @@ class Recipe:
 
 def load_recipe(engine: str) -> Recipe:
     """Load a recipe from the backend package registered for *engine*."""
-    backend_name = _backend_name(engine)
     try:
-        recipe_path = get_backend(backend_name).recipe_path()
+        recipe_path = get_backend(engine).recipe_path()
     except KeyError:
         recipe_path = None
     if recipe_path is None or not recipe_path.is_file():
@@ -71,12 +67,7 @@ def load_recipe(engine: str) -> Recipe:
 
 
 def list_recipes() -> list[str]:
-    """List available engine recipes.
-
-    Returns recipe engine names (e.g. ``claude``, ``opencode``), not
-    backend entry-point names, so existing callers and CLI flags keep
-    working.
-    """
+    """List available engine recipes (``claude_code``, ``opencode``, …)."""
     engines: list[str] = []
     for backend_name in list_backends():
         backend = get_backend(backend_name)
@@ -85,5 +76,5 @@ def list_recipes() -> list[str]:
             continue
         recipe_path = backend.recipe_path()
         if recipe_path is not None and recipe_path.is_file():
-            engines.append(_BACKEND_TO_RECIPE_ENGINE.get(backend_name, backend_name))
+            engines.append(backend_name)
     return sorted(engines)

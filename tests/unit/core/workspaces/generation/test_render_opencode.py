@@ -93,7 +93,7 @@ class TestRenderOpenCode:
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe)
 
-            sub = Path(td) / "agents" / "sub-1.md"
+            sub = Path(td) / ".opencode" / "agents" / "sub-1.md"
             assert sub.exists()
             content = sub.read_text()
             assert "description:" in content

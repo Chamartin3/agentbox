@@ -17,13 +17,13 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
 
-from agentbox.core.resources.workspace_materialize import materialize_workspace
-from agentbox.core.workspaces.env_doc.renderers.agents_md import AgentsMdRenderer
-from agentbox.core.workspaces.env_doc.renderers.base import RuntimeContext
-from agentbox.core.workspaces.env_doc.renderers.claude_md import ClaudeMdRenderer
-from agentbox.core.workspaces.env_doc.schema import EnvDocContent
-from agentbox.core.workspaces.generation.engine_config import make_generator
-from agentbox.core.workspaces.generation.materialize import materialize_subagents
+from agentbox.core.resources.binding_materialize import materialize_workspace
+from agentbox.core.workspaces.generation.builders.from_db import load_workenv
+from agentbox.core.workspaces.generation.generator import render
+from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
+from agentbox.core.workspaces.generation.workspace_files import (
+    materialize_workspace_files,
+)
 
 if TYPE_CHECKING:
     from agentbox.config import Settings
@@ -180,34 +180,37 @@ def render_env_doc(
             )
             return []
 
-    try:
-        content = EnvDocContent.model_validate(content_json)
-    except Exception:
-        logger.warning(
-            "workspace prep: could not parse env doc content for workspace %s",
-            workspace_id,
-        )
-        return []
+    body = ""
+    if isinstance(content_json, dict):
+        body = content_json.get("body") or content_json.get("content") or ""
+    if not isinstance(body, str):
+        body = str(body)
 
-    ctx = RuntimeContext()
-    claude_text = ClaudeMdRenderer().render(content, ctx)
-    agents_text = AgentsMdRenderer().render(content, ctx)
+    # The env-doc body is plain text; each engine's recipe ``context`` layout
+    # names the instruction file it reads (claude → CLAUDE.md,
+    # opencode → AGENTS.md). The workdir is engine-agnostic, so write the
+    # same body to every engine's context file.
+    filenames: set[str] = set()
+    for engine in list_recipes():
+        try:
+            recipe = load_recipe(engine)
+        except Exception:
+            continue
+        filename = recipe.resolve_layout("context")
+        if filename:
+            filenames.add(filename)
 
     snapshot_entries: list[dict] = []
-    for filename, text, audience in (
-        ("CLAUDE.md", claude_text, "claude_only"),
-        ("AGENTS.md", agents_text, "agents_only"),
-    ):
+    for filename in sorted(filenames):
         dest = workdir / filename
-        dest.write_text(text, encoding="utf-8")
+        dest.write_text(body, encoding="utf-8")
         snapshot_entries.append(
             {
                 "role": "env_doc",
                 "file": filename,
                 "workspace_id": workspace_id,
                 "env_doc_version_id": doc["id"],
-                "audience": audience,
-                "bytes": len(text.encode()),
+                "bytes": len(body.encode()),
             }
         )
     return snapshot_entries
@@ -421,41 +424,35 @@ def prepare_run_workdir(
                 workspace_id,
             )
 
-        try:
-            resolved_subagents = resolve_workspace_subagents(store, workspace_id)
-            if resolved_subagents:
-                sub_outcomes = materialize_subagents(workdir, resolved_subagents)
-                for o in sub_outcomes:
-                    resource_snapshot_entries.append(
-                        {
-                            "role": "workspace_subagent",
-                            "workspace_id": o.workspace_id,
-                            "agent_id": o.agent_id,
-                            "alias": o.alias,
-                            "files_written": o.files_written,
-                        }
-                    )
-        except Exception:
-            logger.exception(
-                "prepare_run_workdir: workspace subagent materialization failed for workspace %r",
-                workspace_id,
-            )
+        # Subagents are rendered natively into the run dir by the engine
+        # recipes (step 3 render()), which is the run's cwd — no separate
+        # workdir materialization needed.
 
     # ── 2. Create fresh run_dir ───────────────────────────────────────────
     run_dir = settings.runs_tmpfs_dir / uuid.uuid4().hex
     run_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
 
-    # ── 3. Apply workspace permission overlay ─────────────────────────────
+    # ── 3. Render native per-engine config into the run dir ───────────────
+    # One WorkenvConfig, rendered through every engine recipe (Claude →
+    # CLAUDE.md/.mcp.json/.claude/agents, OpenCode → AGENTS.md/opencode.json).
+    # Tool gating is enforced by the backend at dispatch (--allowedTools),
+    # not by a settings file, so permissions are left off the config here.
     permissions = load_workspace_permissions(workdir, agent, settings, store)
-    generator = make_generator(
-        settings=settings, store=store, mcp_registry=mcp_registry
-    )
-    generator.generate_configs_into(
-        run_dir,
-        allowed_builtin_tools=permissions.get("allowed_builtin_tools") or [],
-        files=permissions.get("files") or [],
-        project_root=settings.project_root,
-    )
+    wsid = workspace_id if workspace_id and workspace_id != "<ephemeral>" else agent.id
+    config = load_workenv(store, wsid, settings=settings, permissions=None)
+    for engine in list_recipes():
+        render(run_dir, config, load_recipe(engine))
+
+    # Claude runs with `--mcp-config .mcp.json --strict-mcp-config`, which
+    # errors if the file is absent; render only emits it when servers exist.
+    # ponytail: guarantee an empty one so a server-less run still launches.
+    mcp_json = run_dir / ".mcp.json"
+    if not mcp_json.exists():
+        mcp_json.write_text('{\n  "mcpServers": {}\n}\n', encoding="utf-8")
+
+    files = permissions.get("files") or []
+    if files:
+        materialize_workspace_files(run_dir, files, settings.project_root)
 
     return run_dir, resource_snapshot_entries
 

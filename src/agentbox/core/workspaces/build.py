@@ -17,17 +17,19 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.workspaces.generation.materialize import materialize_subagents
-from agentbox.core.resources.workspace_materialize import materialize_workspace
+from agentbox.core.resources.binding_materialize import materialize_workspace
+from agentbox.core.workspaces.generation.builders.from_db import load_workenv
+from agentbox.core.workspaces.generation.generator import render
+from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
 from agentbox.core.workspaces.prep import (
     render_env_doc,
     resolve_workspace_resources,
-    resolve_workspace_subagents,
     workspace_outcomes_to_snapshot,
 )
 
@@ -151,10 +153,27 @@ def build_workspace(
         result.errors.append(f"env_doc: {e}")
 
     try:
-        resolved_subagents = resolve_workspace_subagents(store, workspace_id)
-        if resolved_subagents:
-            sub_outcomes = materialize_subagents(workdir, resolved_subagents)
-            result.subagents_written = [o.alias for o in sub_outcomes]
+        # Subagents come from the engine recipes — render to a temp dir and
+        # copy only the per-engine agents files into the workspace (env-doc
+        # and runner config are handled elsewhere; the DB is source of truth
+        # so overwriting is fine).
+        config = load_workenv(store, workspace_id, settings=settings)
+        subagents = [a for a in config.agents if a.role != "main"]
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            for engine in list_recipes():
+                recipe = load_recipe(engine)
+                if not recipe.layout.get("subagent"):
+                    continue
+                render(tmp_dir, config, recipe)
+                for a in subagents:
+                    rel = recipe.resolve_layout("subagent", name=a.id)
+                    src = tmp_dir / rel
+                    if src.is_file():
+                        dst = workdir / rel
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(src, dst)
+        result.subagents_written = [a.id for a in subagents]
     except Exception as e:
         logger.exception(
             "workspace_build: subagent materialization failed for %r", workspace_id

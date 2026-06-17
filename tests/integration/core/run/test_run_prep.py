@@ -249,11 +249,7 @@ class TestRenderEnvDoc:
     def test_renders_both_files(self, tmp_path: Path):
         from agentbox.core.workspaces.prep import render_env_doc
 
-        doc_content = {
-            "project_name": "Test Project",
-            "overview": "An overview.",
-            "sections": [],
-        }
+        doc_content = {"body": "# Test Project\n\nAn overview."}
         env_doc = {"id": "ver1", "content_json": json.dumps(doc_content)}
         store = _make_store(active_env_doc=env_doc)
 
@@ -263,8 +259,9 @@ class TestRenderEnvDoc:
         agents_md = tmp_path / "AGENTS.md"
         assert claude_md.exists()
         assert agents_md.exists()
-        assert "Test Project" in claude_md.read_text()
-        assert "Test Project" in agents_md.read_text()
+        # Both files get the identical raw body.
+        assert claude_md.read_text() == doc_content["body"]
+        assert agents_md.read_text() == doc_content["body"]
 
         assert len(entries) == 2
         roles = {e["role"] for e in entries}
@@ -287,7 +284,7 @@ class TestRenderEnvDoc:
     def test_dict_content_json(self, tmp_path: Path):
         from agentbox.core.workspaces.prep import render_env_doc
 
-        doc_content = {"project_name": "Dict Project", "overview": "", "sections": []}
+        doc_content = {"body": "# Dict Project"}
         env_doc = {"id": "ver3", "content_json": doc_content}
         store = _make_store(active_env_doc=env_doc)
 
@@ -303,7 +300,7 @@ class TestRenderEnvDoc:
 
 class TestSnapshotHelpers:
     def test_workspace_outcomes_to_snapshot(self):
-        from agentbox.core.resources.workspace_materialize import MaterializeOutcome
+        from agentbox.core.resources.binding_materialize import MaterializeOutcome
         from agentbox.core.workspaces.prep import workspace_outcomes_to_snapshot
 
         outcomes = [
