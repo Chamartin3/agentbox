@@ -1,0 +1,24 @@
+"""Claude Code native tool-name mapping.
+
+CanonicalTool → Claude Code PascalCase native name.
+"""
+
+from __future__ import annotations
+
+from agentbox.core.tools.canonical import CanonicalTool
+
+NATIVE_TOOLS: dict[CanonicalTool, str] = {
+    CanonicalTool.FS_READ: "Read",
+    CanonicalTool.FS_WRITE: "Write",
+    CanonicalTool.FS_EDIT: "Edit",
+    CanonicalTool.FS_MULTI_EDIT: "MultiEdit",
+    CanonicalTool.FS_LIST: "LS",
+    CanonicalTool.FS_GLOB: "Glob",
+    CanonicalTool.FS_GREP: "Grep",
+    CanonicalTool.SHELL_EXEC: "Bash",
+    CanonicalTool.HTTP_FETCH: "WebFetch",
+    CanonicalTool.WEB_SEARCH: "WebSearch",
+    CanonicalTool.NOTEBOOK_EDIT: "NotebookEdit",
+    CanonicalTool.INTERACTION_ASK_USER: "AskUserQuestion",
+    CanonicalTool.AGENT_TASK: "Task",
+}
