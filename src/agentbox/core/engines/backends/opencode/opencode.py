@@ -14,8 +14,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from ._model_registry import OPENCODE_MODELS
-
 OPENCODE_SCHEMA_URL = "https://opencode.ai/config.json"
 
 Permission = Literal["allow", "ask"]
@@ -111,26 +109,3 @@ class OpenCodeUserConfig(BaseModel):
     autoshare: bool = False
 
     model_config = {"extra": "allow"}
-
-
-# ---------------------------------------------------------------------------
-# Model validation helper
-# ---------------------------------------------------------------------------
-
-
-def validate_opencode_model(model: str | None) -> str | None:
-    """Raise ValueError if *model* is not a known OpenCode model string.
-
-    OpenCode model strings use ``provider/model-id`` notation.
-    Run ``scripts/fetch_models.py`` to refresh the registry.
-    """
-    if model is None:
-        return None
-    if model not in OPENCODE_MODELS:
-        known = ", ".join(sorted(OPENCODE_MODELS))
-        raise ValueError(
-            f"Unknown OpenCode model {model!r}. "
-            f"Run scripts/fetch_models.py to refresh the registry. "
-            f"Known models: {known}"
-        )
-    return model

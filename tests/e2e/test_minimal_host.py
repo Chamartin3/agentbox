@@ -11,10 +11,15 @@ from pathlib import Path
 from typing import Any
 
 
-def _register_noop_backend() -> None:
-    """Inject a noop BackendAdapter into the plugins registry under 'claude_code'."""
+def _register_noop_backend(monkeypatch: Any) -> None:
+    """Inject a noop BackendAdapter into the plugins registry under 'claude_code'.
+
+    Uses monkeypatch.setitem so the global registry is restored after the test —
+    otherwise the swap leaks into later tests (e.g. list_recipes() would drop
+    claude_code because _NoopBackend has no recipe.yaml).
+    """
     from agentbox.core.data import DoneEvent, RunEvent
-    from agentbox.core.engines.backends.base import RenderedConfig
+    from agentbox.core.engines.contracts.base import RenderedConfig
 
     class _NoopBackend:
         name = "claude_code"
@@ -37,7 +42,7 @@ def _register_noop_backend() -> None:
     import agentbox.core.engines.backends.registry as _plugins
 
     _plugins.backends()
-    _plugins._BACKEND_CLASSES["claude_code"] = _NoopBackend  # type: ignore[index]
+    monkeypatch.setitem(_plugins._BACKEND_CLASSES, "claude_code", _NoopBackend)  # type: ignore[arg-type]
 
 
 def test_health_with_minimal_mounts(client: Any) -> None:
@@ -75,14 +80,16 @@ def test_workspaces_root_absent_does_not_crash(
     assert resp.status_code == 200
 
 
-def test_run_with_db_seeded_noop_agent(isolated_data_dir: Path, client: Any) -> None:
+def test_run_with_db_seeded_noop_agent(
+    isolated_data_dir: Path, client: Any, monkeypatch: Any
+) -> None:
     """POST /api/runs completes against an agent stored only in the DB."""
     import warnings
 
     from agentbox.api.deps import get_store
     from agentbox.core.data import AgentDef
 
-    _register_noop_backend()
+    _register_noop_backend(monkeypatch)
 
     agent = AgentDef.model_validate(
         {

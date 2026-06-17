@@ -10,9 +10,9 @@ def _materialize_files(
     files: list[dict],
     project_root: Path,
 ) -> None:
-    from agentbox.core.workspaces.generation.engine_config._common import _materialize_workspace_files
+    from agentbox.core.workspaces.generation.workspace_files import materialize_workspace_files
 
-    _materialize_workspace_files(target_dir, files, project_root)
+    materialize_workspace_files(target_dir, files, project_root)
 
 
 class TestWorkspaceFilesIdempotent:

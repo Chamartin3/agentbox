@@ -15,8 +15,6 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, RootModel
 
-from ._model_registry import CLAUDE_MODELS
-
 # ---------------------------------------------------------------------------
 # claude_agents.json
 # ---------------------------------------------------------------------------
@@ -115,26 +113,3 @@ class ClaudeUserConfig(BaseModel):
     verbose: bool = False
 
     model_config = {"extra": "allow"}
-
-
-# ---------------------------------------------------------------------------
-# Model validation helper (used by agent markdown + RunnerSpec validation)
-# ---------------------------------------------------------------------------
-
-
-def validate_claude_model(model: str | None) -> str | None:
-    """Raise ValueError if *model* is not a known Claude model ID.
-
-    Pass ``strict=False`` (default) to only warn; raises when called directly.
-    Returns the model unchanged if valid or None.
-    """
-    if model is None:
-        return None
-    if model not in CLAUDE_MODELS:
-        known = ", ".join(sorted(CLAUDE_MODELS))
-        raise ValueError(
-            f"Unknown Claude model {model!r}. "
-            f"Run scripts/fetch_models.py to refresh the registry. "
-            f"Known models: {known}"
-        )
-    return model

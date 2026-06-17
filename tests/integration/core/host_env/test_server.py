@@ -8,7 +8,7 @@ Python functions (without MCP transport), verifying:
 - env allowlist: off-list vars rejected
 - workspace_info: always granted, returns correct metadata
 - audit log: calls are recorded to the store
-- executor injection: claude_mcp.json gets patched correctly
+- executor injection: .mcp.json gets patched correctly
 """
 
 from __future__ import annotations
@@ -392,12 +392,12 @@ class TestAuditLog:
 
 class TestExecutorInjection:
     def test_injects_host_env_into_mcp_config(self, tmp_path: Path):
-        from agentbox.core.workspaces.generation.engine_config.inject import (
+        from agentbox.core.workspaces.generation.inject import (
             inject_host_env_mcp,
         )
 
         existing = {"mcpServers": {"existing-server": {"command": "other"}}}
-        mcp_path = tmp_path / "claude_mcp.json"
+        mcp_path = tmp_path / ".mcp.json"
         mcp_path.write_text(json.dumps(existing))
 
         grants = {"fs.read": {"allowed_paths": [str(tmp_path)]}}
@@ -420,7 +420,7 @@ class TestExecutorInjection:
         assert "existing-server" in updated["mcpServers"]
 
     def test_creates_mcp_config_when_missing(self, tmp_path: Path):
-        from agentbox.core.workspaces.generation.engine_config.inject import (
+        from agentbox.core.workspaces.generation.inject import (
             inject_host_env_mcp,
         )
 
@@ -433,5 +433,5 @@ class TestExecutorInjection:
             db_path=tmp_path / "db.sqlite",
         )
 
-        updated = json.loads((tmp_path / "claude_mcp.json").read_text())
+        updated = json.loads((tmp_path / ".mcp.json").read_text())
         assert "agentbox-host-env" in updated["mcpServers"]
