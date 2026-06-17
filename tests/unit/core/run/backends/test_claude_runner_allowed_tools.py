@@ -8,50 +8,47 @@ to narrow the set when desired.
 
 from __future__ import annotations
 
-from agentbox.core.engines.backends.claude_code import _intersect_allowed_tools
+from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.tools.translation import intersect_allowed_tools
+
+_READ = CanonicalTool.FS_READ
+_WRITE = CanonicalTool.FS_WRITE
+_GREP = CanonicalTool.FS_GREP
+_BASH = CanonicalTool.SHELL_EXEC
 
 
 def test_both_empty_returns_empty() -> None:
-    assert _intersect_allowed_tools([], None) == []
-    assert _intersect_allowed_tools([], []) == []
+    assert intersect_allowed_tools(set(), None) == set()
+    assert intersect_allowed_tools(set(), set()) == set()
 
 
 def test_agent_only_passes_through() -> None:
-    assert _intersect_allowed_tools(["Read", "Grep"], None) == ["Read", "Grep"]
-    assert _intersect_allowed_tools(["Read", "Grep"], []) == ["Read", "Grep"]
+    assert intersect_allowed_tools({_READ, _GREP}, None) == {_READ, _GREP}
+    assert intersect_allowed_tools({_READ, _GREP}, set()) == {_READ, _GREP}
 
 
 def test_workspace_only_passes_through() -> None:
-    assert _intersect_allowed_tools([], ["Read", "Write"]) == ["Read", "Write"]
+    assert intersect_allowed_tools(set(), {_READ, _WRITE}) == {_READ, _WRITE}
 
 
 def test_intersection_when_both_present() -> None:
-    result = _intersect_allowed_tools(
-        ["Read", "Grep", "Write"], ["Read", "Write", "Bash"]
+    result = intersect_allowed_tools(
+        {_READ, _GREP, _WRITE}, {_READ, _WRITE, _BASH}
     )
-    assert set(result) == {"Read", "Write"}
-
-
-def test_intersection_preserves_agent_order() -> None:
-    # Agent order is meaningful (CLI args).
-    result = _intersect_allowed_tools(
-        ["Grep", "Read", "Write"], ["Write", "Read", "Bash"]
-    )
-    assert result == ["Read", "Write"]
+    assert result == {_READ, _WRITE}
 
 
 def test_workspace_narrower_than_agent() -> None:
     # Workspace clamps the agent's allow list.
-    result = _intersect_allowed_tools(["Read", "Grep", "Write", "Bash"], ["Read"])
-    assert result == ["Read"]
+    result = intersect_allowed_tools({_READ, _GREP, _WRITE, _BASH}, {_READ})
+    assert result == {_READ}
 
 
 def test_agent_narrower_than_workspace() -> None:
-    result = _intersect_allowed_tools(["Read"], ["Read", "Grep", "Write"])
-    assert result == ["Read"]
+    result = intersect_allowed_tools({_READ}, {_READ, _GREP, _WRITE})
+    assert result == {_READ}
 
 
 def test_disjoint_returns_empty() -> None:
-    # Nothing in common — the runner gets an empty allow list and (by the
-    # caller's check) skips --allowedTools entirely.
-    assert _intersect_allowed_tools(["Read"], ["Bash"]) == []
+    # Nothing in common — the runner gets an empty set.
+    assert intersect_allowed_tools({_READ}, {_BASH}) == set()

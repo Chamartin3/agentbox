@@ -1,7 +1,10 @@
-"""Workspace MCP override routes (Plan 05).
+"""Workspace MCP provisioning routes (Plan 062).
 
-Transport-only: parses bodies, calls
-:mod:`agentbox.core.service.workspaces`, maps store ValueErrors to 400.
+MCP server setup and tool toggles are **provisioning / scope** controls,
+not authorization.  They express *what is installed and visible* in the
+workspace — the agent's ``tool_grants`` endpoint is the sole
+authorization surface.  Enable/disable here means “shown vs hidden”,
+never “allowed vs forbidden”.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from agentbox.core.constants import McpPolicy
 from agentbox.core.service import SessionStore
 from agentbox.core.service import workspaces as ws_service
 
-router = APIRouter(tags=["workspace-mcp"])
+router = APIRouter(tags=["workspace-mcp-provisioning"])
 
 
 class ServerOverrideBody(BaseModel):

@@ -316,7 +316,7 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
       {/* ---- Execution -------------------------------------------------- */}
       <RunnerProfileSection agentId={agent.id} />
 
-      <AgentToolGrantsPicker agentId={agent.id} />
+      <AgentToolGrantsPicker agentId={agent.id} workspaceId={agent.workspace} />
 
       <fieldset className="config-fieldset">
         <legend>execution</legend>

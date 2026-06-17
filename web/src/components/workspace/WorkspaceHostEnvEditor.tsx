@@ -60,7 +60,7 @@ export default function WorkspaceHostEnvEditor({ workspaceId }: Props) {
         return;
       }
     }
-    const reason = window.prompt('Reason for grant change:', 'updated workspace host-env grants');
+    const reason = window.prompt('Reason for configuration change:', 'updated workspace host-env capabilities');
     if (!reason || reason.trim().length < 3) return;
     setBusy(true);
     try {
@@ -78,14 +78,15 @@ export default function WorkspaceHostEnvEditor({ workspaceId }: Props) {
     }
   };
 
-  if (loading) return <p className="dim" style={{ fontSize: 12 }}>loading host-env grants…</p>;
+  if (loading) return <p className="dim" style={{ fontSize: 12 }}>loading host-env capabilities…</p>;
   if (error) return <p style={{ color: 'crimson', fontSize: 12 }}>{error}</p>;
 
   return (
     <div className="stack" style={{ gap: 12 }}>
       <p className="dim" style={{ fontSize: 11, marginTop: 0 }}>
-        Capabilities granted to this workspace via the <code>agentbox-host-env</code> MCP server.
-        Per-cap grant params are JSON.
+        Host-environment capabilities <strong>available</strong> in this workspace
+        (<em>provisioning</em>, not per-agent authorization). Scoping constraints
+        (paths, allowlists) are JSON.
       </p>
       <table style={{ fontSize: 12, width: '100%' }}>
         <thead>
@@ -93,7 +94,7 @@ export default function WorkspaceHostEnvEditor({ workspaceId }: Props) {
             <th style={{ textAlign: 'left', width: 40 }}></th>
             <th style={{ textAlign: 'left' }}>Capability</th>
             <th style={{ textAlign: 'left' }}>Description</th>
-            <th style={{ textAlign: 'left' }}>Grant params (JSON)</th>
+            <th style={{ textAlign: 'left' }}>Scope (JSON)</th>
           </tr>
         </thead>
         <tbody>
@@ -137,7 +138,7 @@ export default function WorkspaceHostEnvEditor({ workspaceId }: Props) {
       </table>
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button onClick={save} disabled={busy} className="primary">
-          {busy ? 'saving…' : 'save grants'}
+          {busy ? 'saving…' : 'save capabilities'}
         </button>
       </div>
     </div>

@@ -41,8 +41,8 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
 
   const toggleServer = async (srv: McpServerView) => {
     const reason = window.prompt(
-      `${srv.enabled ? 'Disable' : 'Enable'} MCP server "${srv.name}" — reason:`,
-      srv.enabled ? 'disabling for this workspace' : 'enabling for this workspace',
+      `${srv.enabled ? 'Hide' : 'Show'} MCP server "${srv.name}" — reason:`,
+      srv.enabled ? 'hiding for this workspace' : 'showing for this workspace',
     );
     if (!reason || reason.trim().length < 3) return;
     setBusy(true);
@@ -81,7 +81,7 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
     }
   };
 
-  if (loading) return <p className="dim" style={{ fontSize: 12 }}>loading MCP overrides…</p>;
+  if (loading) return <p className="dim" style={{ fontSize: 12 }}>loading MCP server configuration…</p>;
   if (error) return <p style={{ color: 'crimson', fontSize: 12 }}>{error}</p>;
   if (!data) return null;
 
@@ -97,7 +97,7 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
               disabled={busy}
               onChange={() => setPolicy('allow_all_unless_disabled')}
             />
-            <span style={{ fontSize: 12 }}>allow all unless disabled</span>
+            <span style={{ fontSize: 12 }}>show all servers</span>
           </label>
           <label className="row" style={{ gap: 4, display: 'inline-flex' }}>
             <input
@@ -106,7 +106,7 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
               disabled={busy}
               onChange={() => setPolicy('deny_all_unless_enabled')}
             />
-            <span style={{ fontSize: 12 }}>deny all unless enabled</span>
+            <span style={{ fontSize: 12 }}>hide all servers unless shown</span>
           </label>
         </div>
         <button onClick={refresh} disabled={busy} style={{ fontSize: 11 }}>
@@ -121,9 +121,9 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
           <thead>
             <tr>
               <th style={{ textAlign: 'left' }}>Server</th>
-              <th style={{ textAlign: 'left' }}>Enabled</th>
+              <th style={{ textAlign: 'left' }}>Shown</th>
               <th style={{ textAlign: 'left' }}>Source</th>
-              <th style={{ textAlign: 'left' }}>Disabled tools</th>
+              <th style={{ textAlign: 'left' }}>Hidden tools</th>
               <th></th>
             </tr>
           </thead>
@@ -141,7 +141,7 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
                         className={s.enabled ? 'primary' : ''}
                         style={{ fontSize: 11, minWidth: 60 }}
                       >
-                        {s.enabled ? 'on' : 'off'}
+                        {s.enabled ? 'shown' : 'hidden'}
                       </button>
                     </td>
                     <td><span className="dim">{s.source}</span></td>
@@ -176,7 +176,7 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
                                 disabled={busy}
                                 className={disabled ? '' : 'primary'}
                                 style={{ fontSize: 11 }}
-                                title={disabled ? 'disabled — click to enable' : 'enabled — click to disable'}
+                                title={disabled ? 'hidden — click to show' : 'shown — click to hide'}
                               >
                                 {t}
                               </button>

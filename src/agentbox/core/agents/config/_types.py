@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from agentbox.core.constants import ConfiguredValidationMode, ValidationMode
+from agentbox.core.tools.canonical import CanonicalTool
 
 _CONFIGURED_ENGINES = frozenset(
     {ValidationMode.JSONSCHEMA, ValidationMode.PYDANTIC, ValidationMode.BOTH}
@@ -80,7 +81,7 @@ class RuntimeConfig:
     """
 
     mcp_config_path: str | None = None
-    allowed_tools: tuple[str, ...] = ()
+    allowed_tools: tuple[CanonicalTool, ...] = ()
 
     @classmethod
     def from_agent(cls, agent: Any) -> RuntimeConfig:
