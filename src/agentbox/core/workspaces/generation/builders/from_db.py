@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.data import SessionStore
+from agentbox.core.data import RunStore
 from agentbox.core.workspaces.generation.config import (
     AgentRef,
     McpRef,
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 def load_workenv(
-    store: SessionStore,
+    store: RunStore,
     workspace_id: str,
     *,
     settings: Settings,
