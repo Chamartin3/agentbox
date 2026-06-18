@@ -14,6 +14,7 @@ is rejected with a helpful message.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import subprocess
@@ -32,7 +33,7 @@ from agentbox.cli._common import console
 from agentbox.config import Settings, load_settings
 from agentbox.core.constants import RunnerKind
 from agentbox.core.service import AgentDef
-from agentbox.core.service.workspaces import generate_legacy_runner_configs
+from agentbox.core.service.workspaces import launch_runner_configs
 from agentbox.core.workspaces.build import build_workspace
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
@@ -50,7 +51,7 @@ _RUNNER_BINARIES = {
 # Runners that need a generated config bundle (claude_agents.json, MCP
 # config, etc.). ``shell`` only generates when ``--keep-configs`` is set,
 # so the user can poke at the bundle from inside the shell.
-_RUNNERS_NEEDING_CONFIG = {"claude", "opencode"}
+_RUNNERS_NEEDING_CONFIG = {RunnerKind.CLAUDE, RunnerKind.OPENCODE}
 
 
 def _require_binary(runner: str) -> None:
@@ -176,52 +177,35 @@ def _launch_session(
     # `.mcp.json` from the resolved per-workspace MCP set so an
     # interactively-launched Claude (run from inside the shell) picks
     # up the workspace-scoped MCP list instead of the global one.
-    needs_config = runner in _RUNNERS_NEEDING_CONFIG or runner == "shell"
-    gen_dir: Path | None = None
-    gen_dir_is_persistent = False
-    try:
-        if needs_config:
-            if keep_configs:
-                gen_dir = workspace_path / ".agentbox" / "generated"
-                gen_dir.mkdir(parents=True, exist_ok=True)
-                gen_dir_is_persistent = True
-            else:
-                gen_dir = Path(tempfile.mkdtemp(prefix="agentbox-launch-"))
-            mcp_registry2, servers = _resolve_mcp_for_launch(settings, workspace_name)
-            generate_legacy_runner_configs(
-                gen_dir,
-                store=get_store(),
-                settings=settings,
-                mcp_registry=mcp_registry2,
-                servers=servers,
-            )
-            # Workspace-local `.mcp.json` for shell mode (and anything
-            # else that runs Claude from inside the workspace cwd).
-            claude_mcp_src = gen_dir / "claude_mcp.json"
-            if claude_mcp_src.is_file():
-                shutil.copy(claude_mcp_src, workspace_path / ".mcp.json")
-
-        _print_banner(
-            agent, runner, model, workspace_path, is_ephemeral, creds, gen_dir
+    needs_config = runner in _RUNNERS_NEEDING_CONFIG or runner == RunnerKind.SHELL
+    config_cm: contextlib.AbstractContextManager = contextlib.nullcontext()
+    if needs_config:
+        _registry, servers = _resolve_mcp_for_launch(settings, workspace_name)
+        # The service owns placing native runner config in the workspace
+        # cwd (where the engine discovers it) and cleaning up what it wrote.
+        config_cm = launch_runner_configs(
+            workspace_path,
+            store=get_store(),
+            settings=settings,
+            servers=servers,
+            keep=keep_configs,
         )
-
-        if runner == "claude":
-            assert gen_dir is not None
-            rc = _run_claude(agent, model, workspace_path, gen_dir, agent_def)
-        elif runner == "opencode":
-            assert gen_dir is not None
-            rc = _run_opencode(agent, model, workspace_path, gen_dir)
-        elif runner == "codex":
-            rc = _run_codex(model, workspace_path)
-        elif runner == "pi":
-            rc = _run_pi(model, workspace_path)
-        elif runner == "shell":
-            rc = _run_shell(workspace_path)
-        else:  # pragma: no cover — guarded above
-            rc = 2
+    try:
+        with config_cm:
+            _print_banner(agent, runner, model, workspace_path, is_ephemeral, creds)
+            if runner == RunnerKind.CLAUDE:
+                rc = _run_claude(agent, model, workspace_path, agent_def)
+            elif runner == RunnerKind.OPENCODE:
+                rc = _run_opencode(agent, model, workspace_path)
+            elif runner == RunnerKind.CODEX:
+                rc = _run_codex(model, workspace_path)
+            elif runner == RunnerKind.PI:
+                rc = _run_pi(model, workspace_path)
+            elif runner == RunnerKind.SHELL:
+                rc = _run_shell(workspace_path)
+            else:  # pragma: no cover — guarded above
+                rc = 2
     finally:
-        if gen_dir is not None and not gen_dir_is_persistent:
-            shutil.rmtree(gen_dir, ignore_errors=True)
         if is_ephemeral:
             shutil.rmtree(workspace_path, ignore_errors=True)
 
@@ -309,11 +293,11 @@ def _resolve_workspace(
 def _apply_creds(creds: str | None, settings: Settings) -> None:
     """Set CLAUDE_CONFIG_DIR or ANTHROPIC_API_KEY based on the creds profile.
 
-    Credential profiles live under ``AGENTBOX_CREDS_DIR`` (default:
-    ``/agentbox/creds``). Today only Claude OAuth profiles are wired up;
-    other backends pick up whatever is in ``$HOME`` inside the container.
+    Credential profiles live under ``SETTINGS.creds_dir``. Today only
+    Claude OAuth profiles are wired up; other backends pick up whatever
+    is in ``$HOME`` inside the container.
     """
-    creds_base = Path(os.environ.get("AGENTBOX_CREDS_DIR", "/agentbox/creds"))
+    creds_base = settings.creds_dir
     if not creds or creds == "default":
         os.environ["CLAUDE_CONFIG_DIR"] = str(creds_base / "claude")
     elif creds.startswith("env:"):
@@ -384,7 +368,6 @@ def _run_claude(
     agent: str | None,
     model: str | None,
     workspace_path: Path,
-    gen_dir: Path,
     agent_def: AgentDef | None,
 ) -> int:
     cmd = ["claude"]
@@ -395,16 +378,10 @@ def _run_claude(
     )
     if allowed_tools:
         cmd += ["--allowedTools", *allowed_tools]
-    cmd += [
-        "--mcp-config",
-        str(gen_dir / "claude_mcp.json"),
-        "--strict-mcp-config",
-        "--settings",
-        str(gen_dir / "claude_settings.json"),
-    ]
+    # Native config lives in the cwd: .mcp.json + .claude/agents/*.md.
+    cmd += ["--mcp-config", ".mcp.json", "--strict-mcp-config"]
     if agent:
-        agents_json = (gen_dir / "claude_agents.json").read_text(encoding="utf-8")
-        cmd += ["--agents", agents_json, "--agent", agent]
+        cmd += ["--agent", agent]
     result = subprocess.run(cmd, cwd=workspace_path)
     return result.returncode
 
@@ -413,11 +390,8 @@ def _run_opencode(
     agent: str | None,
     model: str | None,
     workspace_path: Path,
-    gen_dir: Path,
 ) -> int:
-    oc_config = gen_dir / "opencode.json"
-    if oc_config.exists():
-        shutil.copy(oc_config, workspace_path / "opencode.json")
+    # opencode.json is rendered into the cwd by launch_runner_configs.
     cmd = ["opencode"]
     if agent:
         cmd += ["--agent", agent]
@@ -462,7 +436,6 @@ def _print_banner(
     workspace_path: Path,
     is_ephemeral: bool,
     creds: str | None,
-    gen_dir: Path | None,
 ) -> None:
     mode = "ephemeral (tmp)" if is_ephemeral else f"workspace ({workspace_path})"
     console.print("━" * 50)
@@ -472,6 +445,4 @@ def _print_banner(
     console.print(f"  model:  {model or '<runner default>'}")
     console.print(f"  mode:   {mode}")
     console.print(f"  creds:  {creds or 'default'}")
-    if gen_dir is not None:
-        console.print(f"  configs:{gen_dir}")
     console.print()

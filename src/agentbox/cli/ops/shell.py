@@ -22,7 +22,7 @@ from agentbox.cli._deps import get_loader as _get_loader
 from agentbox.cli._common import console
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
 from agentbox.config import load_settings
-from agentbox.core.service.workspaces import generate_legacy_runner_configs
+from agentbox.core.service.workspaces import launch_runner_configs
 from agentbox.core.service import SessionStore
 from agentbox.core.workspaces.prep import render_env_doc
 from agentbox.core.service import get_agent_def, get_workspace
@@ -62,18 +62,17 @@ def shell_cmd(
 
     _apply_creds(creds, settings)
 
-    gen_dir = workspace_path / ".agentbox" / "generated"
-    if gen_dir.exists():
-        shutil.rmtree(gen_dir)
-    gen_dir.mkdir(parents=True, exist_ok=True)
-
-    generate_legacy_runner_configs(
-        gen_dir, store=store, settings=settings, mcp_registry=None,
+    # Place native runner config in the workspace cwd for the interactive
+    # session. ``keep=True`` — the exec'd shell needs it to persist; the
+    # service never clobbers the user's own config files.
+    launch_cm = launch_runner_configs(
+        workspace_path, store=store, settings=settings, keep=True
     )
+    launch_cm.__enter__()
 
     env_doc_rendered = _render_env_doc(settings, workspace, agent_def, workspace_path)
 
-    _print_banner(agent, workspace_path, is_ephemeral, creds, gen_dir, env_doc_rendered)
+    _print_banner(agent, workspace_path, is_ephemeral, creds, env_doc_rendered)
 
     if yazi:
         bin_path = shutil.which("yazi")
@@ -116,7 +115,6 @@ def _print_banner(
     workspace_path: Path,
     is_ephemeral: bool,
     creds: str | None,
-    gen_dir: Path,
     env_doc_rendered: bool,
 ) -> None:
     console.print("━" * 60)
@@ -125,14 +123,11 @@ def _print_banner(
     console.print(
         f"  workdir:   {workspace_path}{'  (ephemeral)' if is_ephemeral else ''}"
     )
-    console.print(f"  configs:   {gen_dir}")
     console.print(
         f"  env-doc:   {'rendered (CLAUDE.md / AGENTS.md)' if env_doc_rendered else 'none'}"
     )
     console.print(f"  creds:     {creds or 'default'}")
     console.print()
-    console.print(
-        "  Browse with [bold]yazi[/bold] or [bold]ls -R .agentbox/generated[/bold]."
-    )
+    console.print("  Native config (.mcp.json / .claude / opencode.json) is in cwd.")
     console.print("  Exit the shell to return.")
     console.print()

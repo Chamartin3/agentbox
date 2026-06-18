@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
 from fastmcp import FastMCP
 
+from agentbox.config import SETTINGS
 from agentbox.core.tools import discover_tools
 from agentbox.mcp.tools import (
     agent_tools,
@@ -45,12 +44,14 @@ def build_server() -> FastMCP:
 
 
 def main() -> None:
-    transport = os.environ.get("AGENTBOX_MCP_TRANSPORT", "stdio")
+    transport = SETTINGS.mcp_transport
     mcp = build_server()
     if transport == "http":
-        host = os.environ.get("AGENTBOX_MCP_HOST", "0.0.0.0")
-        port = int(os.environ.get("AGENTBOX_MCP_PORT", "8766"))
-        mcp.run(transport="streamable-http", host=host, port=port)
+        mcp.run(
+            transport="streamable-http",
+            host=SETTINGS.mcp_host,
+            port=SETTINGS.mcp_port,
+        )
     else:
         mcp.run(show_banner=False)
 

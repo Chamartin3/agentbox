@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from fastmcp import FastMCP
 
+from agentbox.core.constants import RunStatus
 from agentbox.mcp.deps import get_context
 
 
@@ -25,7 +26,7 @@ def register(mcp: FastMCP) -> None:
         if run is None:
             return {"error": f"run {run_id!r} not found"}
 
-        if run.status != "running":
+        if not RunStatus(run.status).is_running:
             return {
                 "run_id": run_id,
                 "status": run.status,

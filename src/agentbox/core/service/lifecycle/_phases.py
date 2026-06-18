@@ -15,7 +15,7 @@ from agentbox.core.resources.boot import (
     import_repo_resources,
     sweep_workspace_skill_bindings,
 )
-from agentbox.core.resources.composition_to_bindings import (
+from agentbox.core.resources.composition import (
     migrate_composition_to_bindings,
 )
 from agentbox.core.resources.migration import (

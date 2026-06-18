@@ -23,6 +23,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from agentbox.config import SETTINGS
 from agentbox.core.constants import LogLevel, MessageRole, RunStatus
 from agentbox.core.data import (
     DoneEvent,
@@ -40,11 +41,11 @@ from agentbox.core.engines.backends.token.stream import (
 def import_agent(module_path: str) -> type:
     """Import a pydantic-ai Agent class from ``module.path:ClassName``.
 
-    Adds ``project_root`` (from env ``AGENTBOX_PROJECT_ROOT``) to
+    Adds ``project_root`` (from ``SETTINGS.consumer_project_root``) to
     ``sys.path`` so project-local modules (``apps.*``, ``agents.*``)
     are importable without Django.
     """
-    project_root = os.environ.get("AGENTBOX_PROJECT_ROOT", "/project")
+    project_root = str(SETTINGS.consumer_project_root)
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
         libs_dir = os.path.join(project_root, "libs")

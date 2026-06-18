@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
@@ -17,8 +18,8 @@ class OpenAIAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.OPENAI.value,
         label="OpenAI",
-        backend="token",
-        compatible_backends=["token"],
+        backend=BackendName.TOKEN,
+        compatible_backends=[BackendName.TOKEN],
         requires_api_key=True,
         supports_base_url=True,
         supports_model_listing=True,

@@ -8,12 +8,11 @@ from fastmcp import FastMCP
 
 from agentbox.api.deps import get_settings
 from agentbox.core.service import (
-    EnvDocContent,
     build_workspace_by_name,
     resolve_workspace_resources,
 )
 from agentbox.core.service.env_doc import (
-    build_env_doc_context,
+    env_doc_body,
     render_env_doc_preview,
 )
 from agentbox.mcp.deps import get_context
@@ -65,29 +64,21 @@ def register_workspace(mcp: FastMCP) -> None:
     @mcp.tool
     def set_env_doc(
         workspace_id: str,
-        content: dict,
+        content: str,
         reason: str = "edit",
     ) -> dict:
         """Save the workspace env-doc — immediately live (no drafts).
 
-        ``content`` is a structured ``EnvDocContent`` dict, with fields:
-        ``project_name``, ``overview``, ``conventions[]``, ``commands[]``,
-        ``sections[{id,title,body_markdown,visibility}]``, ``references``.
-        Per-section ``visibility`` ('both' | 'claude_only' | 'agents_only')
-        is the only audience control — there is no top-level audience.
+        ``content`` is the raw markdown body. It is placed verbatim into the
+        workspace's CLAUDE.md / AGENTS.md by the recipe generator.
 
         ``reason`` is recorded for audit; defaults to ``"edit"``.
         After saving, the workspace is re-synced so CLAUDE.md / AGENTS.md
         reflect the new content right away.
         """
-        try:
-            validated = EnvDocContent.model_validate(content).model_dump()
-        except Exception as exc:
-            return {"error": "invalid_content", "detail": str(exc)}
-
         ctx = get_context()
         row = ctx.store.save_env_doc(
-            workspace_id, validated, changelog=reason or "edit"
+            workspace_id, {"body": env_doc_body(content)}, changelog=reason or "edit"
         )
         try:
             build_workspace_by_name(ctx.store, get_settings(), workspace_id)
@@ -98,28 +89,22 @@ def register_workspace(mcp: FastMCP) -> None:
         return row
 
     @mcp.tool
-    def render_env_doc(
-        workspace_id: str,
-        audience: str | None = None,
-    ) -> dict:
+    def render_env_doc(workspace_id: str) -> dict:
         """Preview the rendered env-doc for the workspace.
 
-        Returns the CLAUDE.md and/or AGENTS.md content without writing files.
-        audience: 'claude_only', 'agents_only', or None for both."""
+        Returns the CLAUDE.md / AGENTS.md content (identical body) without
+        writing files."""
         ctx = get_context()
         doc = ctx.store.get_active_env_doc(workspace_id)
         if doc is None:
             return {"workspace_id": workspace_id, "claude_md": None, "agents_md": None}
 
-        content = EnvDocContent.model_validate(doc.get("content_json") or {})
-        rctx = build_env_doc_context(ctx.store, workspace_id)
-        rendered = render_env_doc_preview(content, rctx)
-        result: dict = {"workspace_id": workspace_id}
-        if audience != "agents_only":
-            result["claude_md"] = rendered["claude_md"]
-        if audience != "claude_only":
-            result["agents_md"] = rendered["agents_md"]
-        return result
+        rendered = render_env_doc_preview(doc.get("content_json") or {})
+        return {
+            "workspace_id": workspace_id,
+            "claude_md": rendered["claude_md"],
+            "agents_md": rendered["agents_md"],
+        }
 
     @mcp.tool
     def set_host_env_grants(

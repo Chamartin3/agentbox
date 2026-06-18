@@ -10,11 +10,11 @@ from agentbox.core.agents.resolve import resolve_engine
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, RunSetupStore
 from agentbox.config import Settings
-from agentbox.core.engines.backends.base import (
+from agentbox.core.engines.contracts.base import (
     RenderedConfig,
     RuntimeConfigView,
 )
-from agentbox.core.engines.backends.views import (
+from agentbox.core.engines.contracts.views import (
     ComposedReferenceView,
     ComposedView,
     PythonAgentConfigView,
@@ -29,7 +29,7 @@ from agentbox.core.workspaces import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.engines.backends.base import BackendAdapter
+    from agentbox.core.engines.contracts.base import BackendAdapter
     from agentbox.core.workspaces import McpRegistry
 
 logger = logging.getLogger(__name__)

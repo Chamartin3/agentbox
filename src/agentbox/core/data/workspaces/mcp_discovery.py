@@ -9,15 +9,15 @@ environment variable.
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.engine import Engine
 
+from agentbox.config import SETTINGS
 from agentbox.core.data.schema import mcp_tool_discovery_cache
 
-TTL_SECONDS = int(os.environ.get("AGENTBOX_MCP_DISCOVERY_TTL", "86400"))
+TTL_SECONDS = SETTINGS.mcp_discovery_ttl
 
 
 def _now_utc() -> datetime:

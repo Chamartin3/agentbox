@@ -18,7 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.constants import BackendName, ResourceType
 from agentbox.core.data._metadata import metadata
 
 _RESOURCE_TYPES_SQL = ", ".join(f"'{t.value}'" for t in ResourceType)
@@ -178,7 +178,7 @@ workenv_templates = Table(
     metadata,
     Column("name", String, primary_key=True),
     Column("description", String, nullable=True),
-    Column("engine", String, nullable=False, server_default="claude"),
+    Column("engine", String, nullable=False, server_default=BackendName.CLAUDE_CODE),
     Column("config_json", JSON, nullable=False),
     Column("created_at", String, nullable=False),
     Column("updated_at", String, nullable=False),

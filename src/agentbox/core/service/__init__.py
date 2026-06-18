@@ -149,9 +149,6 @@ from agentbox.core.service.workspace_admin import save_env_doc as save_env_doc
 from agentbox.core.service.workspace_admin import set_workspace_mcp_policy as set_workspace_mcp_policy
 from agentbox.core.service.workspace_admin import set_workspace_mcp_server_override as set_workspace_mcp_server_override
 from agentbox.core.service.workspace_admin import update_agent_meta as update_agent_meta
-from agentbox.core.workspaces.env_doc.renderers import AgentsMdRenderer as AgentsMdRenderer
-from agentbox.core.workspaces.env_doc.renderers import ClaudeMdRenderer as ClaudeMdRenderer
-from agentbox.core.workspaces.env_doc.schema import EnvDocContent as EnvDocContent
 
 # ── Workspace ─────────────────────────────────────────────────────────
 from agentbox.core.workspaces.manager import WorkspaceInfo as WorkspaceInfo
@@ -164,8 +161,8 @@ from agentbox.core.service.workspaces.registry import (
     list_all_workspaces as list_all_workspaces,
 )
 from agentbox.core.service.workspaces import (
-    generate_legacy_runner_configs as generate_legacy_runner_configs,
     get_workspace_mcp_tools as get_workspace_mcp_tools,
+    launch_runner_configs as launch_runner_configs,
 )
 from agentbox.core.workspaces.manager import load_capabilities as load_capabilities
 from agentbox.core.workspaces.manager import opencode_config_path as opencode_config_path

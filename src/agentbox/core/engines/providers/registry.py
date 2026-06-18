@@ -4,6 +4,7 @@ import logging
 import time
 from typing import Any
 
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers import (
     anthropic,
     cli,
@@ -75,7 +76,7 @@ def _initialize_providers() -> None:
     _PROVIDERS["openrouter"] = openrouter.OpenRouterAdapter()
     _PROVIDERS["xai"] = xai.XAIAdapter()
     _PROVIDERS["ollama"] = ollama.OllamaAdapter()
-    _PROVIDERS["codex"] = cli.CodexCLIAdapter()
+    _PROVIDERS[BackendName.CODEX] = cli.CodexCLIAdapter()
 
 
 def refresh_opencode_providers() -> list[str]:
@@ -99,7 +100,7 @@ def refresh_opencode_providers() -> list[str]:
         existing = _PROVIDERS.get(prefix)
         if existing is not None:
             compat = list(existing.descriptor.compatible_backends or [])
-            if "opencode" in compat:
+            if BackendName.OPENCODE in compat:
                 # A first-class adapter already covers this prefix for the
                 # opencode backend (e.g. Ollama) — don't shadow it.
                 continue

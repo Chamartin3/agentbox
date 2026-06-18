@@ -12,6 +12,7 @@ import logging
 
 from sqlalchemy.engine import Engine
 
+from agentbox.core.constants import BackendName
 from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import workenv_templates
 
@@ -44,7 +45,7 @@ class WorkenvTemplatesMixin:
         self,
         name: str,
         *,
-        engine: str = "claude",
+        engine: str = BackendName.CLAUDE_CODE,
         config_json: dict,
         description: str | None = None,
     ) -> dict:
@@ -105,7 +106,7 @@ class WorkenvTemplatesMixin:
                 continue
             self.upsert_workenv_template(
                 tmpl["name"],
-                engine=tmpl.get("engine", "claude"),
+                engine=tmpl.get("engine", BackendName.CLAUDE_CODE),
                 config_json=tmpl["config_json"],
                 description=tmpl.get("description"),
             )

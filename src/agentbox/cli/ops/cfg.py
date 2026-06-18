@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import json
 import os
-import tempfile
 from pathlib import Path
 
 import typer
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.table import Table
 from rich.tree import Tree
 
@@ -16,8 +13,6 @@ from agentbox.cli._common import console
 from agentbox.config import load_settings
 from agentbox.core import workspaces as ws_mod
 from agentbox.core.service.agents import list_all_agents
-from agentbox.core.service.workspaces import generate_legacy_runner_configs
-from agentbox.core.workspaces.mcp.client import McpRegistry
 
 cfg_app = typer.Typer(
     name="cfg",
@@ -104,48 +99,3 @@ def cfg_paths() -> None:
     _add(settings.mcp_cache_dir, data, "mcp_cache/")
 
     console.print(tree)
-
-
-@cfg_app.command("gen")
-def cfg_gen(
-    agent: str | None = typer.Option(None, "--agent", help="Filter to a single agent"),
-) -> None:
-    """Generate runner configs into a temp dir and print the JSON (diagnostic dry-run)."""
-    settings = load_settings()
-    all_agents = list_all_agents(store=get_store())
-    if agent is not None:
-        target_agents = [a for a in all_agents if a.id == agent]
-        if not target_agents:
-            console.print(f"[red]unknown agent[/red] {agent!r}")
-            raise typer.Exit(2)
-    else:
-        target_agents = all_agents
-
-    if not target_agents:
-        console.print("[yellow]No agents to generate configs for.[/yellow]")
-        return
-
-    mcp_registry = McpRegistry(settings.mcp_cache_dir)
-
-    with tempfile.TemporaryDirectory() as tmp_str:
-        tmp = Path(tmp_str)
-        result = generate_legacy_runner_configs(
-            tmp,
-            store=get_store(),
-            settings=settings,
-            mcp_registry=mcp_registry,
-        )
-
-        for config_type, filepath in result.items():
-            if filepath.exists():
-                data = json.loads(filepath.read_text(encoding="utf-8"))
-                console.print(
-                    f"\n[bold cyan]─── {config_type}[/bold cyan]  [dim]{filepath.name}[/dim]"
-                )
-                console.print(
-                    Syntax(
-                        json.dumps(data, indent=2, ensure_ascii=False),
-                        "json",
-                        theme="ansi_dark",
-                    )
-                )

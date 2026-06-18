@@ -32,7 +32,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import TextIO
 
-from agentbox.core.constants import LogLevel, TerminalRunStatus, ValidationMode
+from agentbox.core.constants import LogLevel, TerminalRunStatus, ValidationCheckMode, ValidationMode
 from agentbox.core.data import (
     DoneEvent,
     LogEvent,
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 DoneStatus = TerminalRunStatus
 
-_VALIDATION_MODES = ("strict", "warn", "off")
+_VALIDATION_CHECK_MODES = frozenset(ValidationCheckMode)
 _VALIDATION_ENGINES = frozenset(ValidationMode)
 
 
@@ -175,7 +175,7 @@ class RunStreamSession:
                 run_id=self.run_id,
                 ok=ok,
                 attempt=attempt,
-                mode=mode if mode in _VALIDATION_MODES else "strict",
+                mode=ValidationCheckMode(mode) if mode in _VALIDATION_CHECK_MODES else ValidationCheckMode.STRICT,
                 engine=ValidationMode(engine)
                 if engine in _VALIDATION_ENGINES
                 else ValidationMode.NONE,

@@ -33,7 +33,7 @@ from agentbox.core.data import (
     ThinkingEvent,
     UsageEvent,
 )
-from agentbox.core.engines.backends.schema_to_model import (
+from agentbox.core.engines.contracts.schema_to_model import (
     UnsupportedSchema,
     json_schema_to_pydantic_model,
 )

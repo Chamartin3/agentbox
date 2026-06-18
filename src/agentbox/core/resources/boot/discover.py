@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from agentbox.config import SETTINGS
+
 DEFAULT_SKILLS_SOURCES: list[str] = [
     "apps/cvman/mcp/skills",
     "agentbox/skills",
@@ -25,7 +27,7 @@ def _is_skipped_skill_root(p: Path) -> bool:
 
 def resolve_skill_roots(root: Path) -> list[Path]:
     candidates: list[Path] = [root / rel for rel in DEFAULT_SKILLS_SOURCES]
-    extra = os.environ.get("AGENTBOX_EXTRA_SKILL_ROOTS", "")
+    extra = SETTINGS.extra_skill_roots
     for token in extra.split(":"):
         token = token.strip()
         if not token:

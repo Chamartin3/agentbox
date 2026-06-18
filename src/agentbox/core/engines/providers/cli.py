@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from typing import Any
 
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers.base import (
     Provider,
     ProviderDescriptor,
@@ -100,8 +101,8 @@ class CodexCLIAdapter:
     descriptor = ProviderDescriptor(
         id=Provider.CODEX.value,
         label="Codex CLI",
-        backend="codex",
-        compatible_backends=["codex"],
+        backend=BackendName.CODEX,
+        compatible_backends=[BackendName.CODEX],
         requires_api_key=False,
         supports_base_url=False,
         supports_model_listing=True,
@@ -187,8 +188,8 @@ class OpenCodeCLIAdapter:
         return ProviderDescriptor(
             id=self.provider_id,
             label=self.label,
-            backend="opencode",
-            compatible_backends=["opencode"],
+            backend=BackendName.OPENCODE,
+            compatible_backends=[BackendName.OPENCODE],
             requires_api_key=False,
             supports_base_url=False,
             supports_model_listing=True,

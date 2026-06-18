@@ -19,12 +19,11 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.config import Settings
+from agentbox.config import SETTINGS, Settings
 from agentbox.core.data import AgentDef, RunStore
 
 from agentbox.core.execution.dispatch import dispatch_completion
@@ -40,7 +39,7 @@ def cleanup_run_dir(run_dir: Path | None) -> None:
     """Remove the per-run scratch dir unless ``AGENTBOX_KEEP_RUN_DIRS=1``."""
     if run_dir is None:
         return
-    if os.environ.get("AGENTBOX_KEEP_RUN_DIRS") == "1":
+    if SETTINGS.keep_run_dirs:
         return
     shutil.rmtree(run_dir, ignore_errors=True)
 

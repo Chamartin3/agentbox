@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
@@ -31,8 +32,8 @@ class GoogleAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.GOOGLE.value,
         label="Google Gemini",
-        backend="token",
-        compatible_backends=["token"],
+        backend=BackendName.TOKEN,
+        compatible_backends=[BackendName.TOKEN],
         requires_api_key=True,
         supports_base_url=True,
         supports_model_listing=True,

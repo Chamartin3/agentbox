@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import tempfile
-from pathlib import Path
 
 import httpx
 import typer
@@ -19,8 +17,6 @@ from agentbox.cli._common import console, event_color
 from agentbox.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
 from agentbox.core.engines import CredentialState, list_backends, list_credentials as _creds_list
-from agentbox.core.service.workspaces import generate_legacy_runner_configs
-from agentbox.core.workspaces.mcp.client import McpRegistry
 
 app = typer.Typer(
     name="agentbox",
@@ -162,20 +158,6 @@ def doctor() -> None:
         )
     except Exception as exc:
         _fail("Plugins", str(exc))
-
-    # 6. Generated configs fresh
-    try:
-        mcp_registry = McpRegistry(settings.mcp_cache_dir)
-        with tempfile.TemporaryDirectory() as tmp:
-            generate_legacy_runner_configs(
-                Path(tmp),
-                store=store,
-                settings=settings,
-                mcp_registry=mcp_registry,
-            )
-        _ok("Generated configs", "dry-run succeeded")
-    except Exception as exc:
-        _warn("Generated configs", str(exc))
 
     # 7. Credentials
     try:

@@ -3,12 +3,18 @@
 Uses the engine-agnostic ``core.workspaces.generation`` pipeline:
 ``load_workenv()`` → ``load_recipe()`` → ``render()``.
 
-Also provides a ``generate_legacy_runner_configs`` wrapper around the
-legacy ``ConfigGenerator`` (engine_config/) for CLI tools and diagnostics.
+Also owns interactive-launch config placement (``launch_runner_configs``):
+the engine discovers config natively from its cwd, so this service renders
+into the workspace without ever clobbering the user's own files, and
+removes exactly what it created on exit.
 """
 
 from __future__ import annotations
 
+import contextlib
+import shutil
+import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -16,10 +22,7 @@ from agentbox.config import Settings
 from agentbox.core import workspaces as ws
 from agentbox.core.data import SessionStore
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
-from agentbox.core.workspaces.generation.engine_config import (
-    ConfigGenerator,
-    make_generator,
-)
+from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
 
@@ -29,8 +32,76 @@ from .permissions import load_effective_permissions
 __all__ = [
     "generate_configs_by_name",
     "generate_configs_for_agent",
-    "generate_legacy_runner_configs",
+    "launch_runner_configs",
 ]
+
+
+def _project_mcp_refs(
+    store: SessionStore, servers: list[dict] | None
+) -> list[McpRef]:
+    """Build ``McpRef``s from project (or override) MCP servers."""
+    specs = servers if servers is not None else store.get_project_mcp_servers()
+    refs: list[McpRef] = []
+    for s in specs:
+        name = s["name"] if isinstance(s, dict) else s.name
+        if isinstance(s, dict):
+            cfg = {k: v for k, v in s.items() if k != "name"}
+        else:
+            cfg = {
+                k: v
+                for k, v in {
+                    "url": s.url,
+                    "command": s.command,
+                    "transport": str(s.transport) if s.transport else None,
+                }.items()
+                if v is not None
+            }
+        refs.append(McpRef(name=name, config=cfg))
+    return refs
+
+
+@contextlib.contextmanager
+def launch_runner_configs(
+    workspace_path: Path,
+    *,
+    store: SessionStore,
+    settings: Settings,
+    servers: list[dict] | None = None,
+    keep: bool = False,
+) -> Iterator[Path]:
+    """Place native runner config in *workspace_path* for an interactive launch.
+
+    The engine (Claude / OpenCode) discovers its config from the cwd, so the
+    files have to live in the workspace — but a persistent workspace may hold
+    the user's own ``.mcp.json`` / ``.claude`` / ``opencode.json``. This
+    renders into a temp dir first and copies in only files that don't already
+    exist, then removes exactly those on exit (unless *keep*). Never
+    overwrites or deletes a user file. Yields *workspace_path*.
+    """
+    config = WorkenvConfig(
+        name="project", mcp_servers=_project_mcp_refs(store, servers)
+    )
+    created: list[Path] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        rels: set[str] = set()
+        for engine in list_recipes():
+            for p in render(tmp_dir, config, load_recipe(engine)).written_paths:
+                rels.add(str(p.relative_to(tmp_dir)))
+        for rel in rels:
+            dst = workspace_path / rel
+            if dst.exists():
+                continue  # never clobber the user's own config
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(tmp_dir / rel, dst)
+            created.append(dst)
+    try:
+        yield workspace_path
+    finally:
+        if not keep:
+            for p in created:
+                with contextlib.suppress(OSError):
+                    p.unlink()
 
 
 def _generate_into(
@@ -78,55 +149,6 @@ def generate_configs_by_name(
         "workspace": str(ws_path),
         "generated": paths,
     }
-
-
-def generate_legacy_runner_configs(
-    target_dir: Path,
-    *,
-    store: SessionStore,
-    settings: Settings,
-    mcp_registry: Any = None,
-    servers: list[dict] | None = None,
-    allowed_builtin_tools: list[str] | None = None,
-    files: list[dict] | None = None,
-    project_root: Path | None = None,
-) -> dict[str, Path]:
-    """Generate legacy runner configs (claude_agents.json, claude_mcp.json,
-    opencode.json, etc.) into *target_dir* using the engine_config generator.
-
-    Wraps ``make_generator()`` so callers (CLI, diagnostics) do not import
-    ``workspaces.generation.engine_config`` directly.  When *servers* is
-    provided (workspace-filtered MCP overrides), the wrapper builds a
-    ``ConfigGenerator`` with those servers instead of the global list.
-    """
-    if servers is not None:
-        # Workspace-specific MCP overrides: build a ConfigGenerator
-        # with the filtered server list instead of the global one.
-        mcp_manifest = getattr(mcp_registry, "manifest", None) if mcp_registry else None
-        mcp_specs = store.get_project_mcp_servers()
-        mcp_spec = mcp_specs[0] if mcp_specs else None
-        generator = ConfigGenerator(
-            agentbox_toml=settings.project_root / "agentbox.toml",
-            mcp_manifest=mcp_manifest,
-            mcp_server_name=mcp_spec.name if mcp_spec else "mcp",
-            mcp_command=mcp_spec.command if mcp_spec and mcp_spec.command else ["mcp_serve.sh"],
-            mcp_url=mcp_spec.url if mcp_spec else None,
-            mcp_transport=str(mcp_spec.transport) if mcp_spec else "http",
-            servers=servers,
-            verbose=False,
-        )
-    else:
-        generator = make_generator(
-            settings=settings,
-            store=store,
-            mcp_registry=mcp_registry,
-        )
-    return generator.generate_configs_into(
-        target_dir,
-        allowed_builtin_tools=allowed_builtin_tools,
-        files=files,
-        project_root=project_root,
-    )
 
 
 def generate_configs_for_agent(

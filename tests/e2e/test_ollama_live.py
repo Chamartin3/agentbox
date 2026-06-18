@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data import DoneEvent, LogEvent, TextEvent
-from agentbox.core.engines.backends.base import RenderedConfig
+from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 
 pytestmark = [

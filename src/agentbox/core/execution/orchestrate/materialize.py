@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.engines.backends.rendered import RenderedConfig
+from agentbox.core.engines.contracts.rendered import RenderedConfig
 
 
 def materialize_rendered_config(

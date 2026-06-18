@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tomllib
 from pathlib import Path
 import typer
@@ -8,6 +9,7 @@ from rich.text import Text
 
 from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
+from agentbox.core.constants import BackendName
 from agentbox.core.data.system.project_config import (
     PROJECT_MCP_SERVERS,
     PROJECT_RUNTIME,
@@ -221,3 +223,30 @@ def migrate_prompt_versions() -> None:
     store = get_store()
     n = _backfill_prompt_versions(store)
     console.print(f"[green]✓[/green] backfilled {n} run(s) with prompt_version_id")
+
+
+@migrate_app.command("workenv-engine")
+def migrate_workenv_engine() -> None:
+    """Rename the old ``claude`` workenv-template engine to ``claude_code``.
+
+    The recipe engine name now matches the backend entry-point name. Rows
+    seeded before the rename still carry ``engine='claude'``; this updates
+    them in place. Idempotent.
+    """
+    store = get_store()
+    renamed = 0
+    for tmpl in store.list_workenv_templates():
+        if tmpl.get("engine") == "claude":
+            store.upsert_workenv_template(
+                tmpl["name"],
+                engine=BackendName.CLAUDE_CODE,
+                config_json=json.loads(tmpl["config_json"])
+                if isinstance(tmpl.get("config_json"), str)
+                else tmpl.get("config_json", {}),
+                description=tmpl.get("description"),
+            )
+            renamed += 1
+    console.print(
+        f"[green]✓[/green] updated {renamed} template(s) "
+        f"claude → {BackendName.CLAUDE_CODE}"
+    )

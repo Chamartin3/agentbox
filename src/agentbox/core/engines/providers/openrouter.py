@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
@@ -17,8 +18,8 @@ class OpenRouterAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.OPENROUTER.value,
         label="OpenRouter",
-        backend="token",
-        compatible_backends=["token", "opencode"],
+        backend=BackendName.TOKEN,
+        compatible_backends=[BackendName.TOKEN, BackendName.OPENCODE],
         requires_api_key=False,
         supports_base_url=True,
         supports_model_listing=True,

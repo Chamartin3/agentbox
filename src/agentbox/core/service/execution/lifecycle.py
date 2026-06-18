@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.execution.types import RunNotFound
 
+from agentbox.core.constants import RunStatus
+
 if TYPE_CHECKING:
     from agentbox.core.data import SessionStore
     from agentbox.core.execution.orchestrate.executor import RunExecutor
@@ -118,7 +120,7 @@ async def cancel_run(
     existing = store.get_run(run_id)
     if existing is None:
         raise RunNotFound(run_id)
-    if existing.status != "running":
+    if not RunStatus(existing.status).is_running:
         return {"run_id": run_id, "cancelled": False, "status": existing.status}
     cancelled = await executor.cancel_run(run_id)
     refreshed = store.get_run(run_id) or existing

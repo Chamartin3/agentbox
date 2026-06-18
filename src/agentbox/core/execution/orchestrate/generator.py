@@ -1,6 +1,5 @@
 """Config generator helpers extracted from RunSetup.
 
-``make_generator`` lives in :mod:`agentbox.core.workspaces.generation.engine_config`.
 This module retains only the agent-config reader used exclusively by
 :class:`~.setup.RunSetup`.
 """
@@ -9,9 +8,6 @@ from __future__ import annotations
 
 import json as _json
 from typing import Any
-
-# Re-export for any code that still imports from this module.
-from agentbox.core.workspaces.generation.engine_config import make_generator as make_generator  # noqa: F401
 
 
 def _read_agent_config_json(agent: Any) -> dict[str, Any]:

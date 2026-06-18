@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from agentbox.core.tools.canonical import CanonicalTool
+
 
 @dataclass(frozen=True)
 class RuntimeConfigView:
@@ -14,7 +16,7 @@ class RuntimeConfigView:
     domain imports.
     """
 
-    allowed_tools: tuple[str, ...] = ()
+    allowed_tools: tuple[CanonicalTool, ...] = ()
 
 
 @dataclass(frozen=True)

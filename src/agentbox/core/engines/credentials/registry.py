@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from agentbox.config import SETTINGS
 from agentbox.core.engines.credentials.methods import Method
 from agentbox.core.engines.credentials.state import CredentialState
 
@@ -39,7 +40,7 @@ def clear() -> None:
     _registry.clear()
 
 
-_CREDS_BASE = Path(os.environ.get("AGENTBOX_CREDS_DIR", "/agentbox/creds"))
+_CREDS_BASE = SETTINGS.creds_dir
 
 
 def _detect_oauth(container_path: str) -> CredentialState:

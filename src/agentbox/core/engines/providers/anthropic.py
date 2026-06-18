@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
@@ -23,8 +24,8 @@ class AnthropicAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.ANTHROPIC.value,
         label="Anthropic",
-        backend="token",
-        compatible_backends=["token", "claude_code"],
+        backend=BackendName.TOKEN,
+        compatible_backends=[BackendName.TOKEN, BackendName.CLAUDE_CODE],
         requires_api_key=True,
         supports_base_url=True,
         supports_model_listing=True,

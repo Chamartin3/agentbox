@@ -29,9 +29,10 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, Field
 
 from agentbox.core.data import DoneEvent, LogEvent, RunEvent
-from agentbox.core.engines.backends.base import BackendAdapter, HasAgentConfig, RenderedConfig
-from agentbox.core.engines.backends.views import PythonAgentConfigView
+from agentbox.core.engines.contracts.base import BackendAdapter, HasAgentConfig, RenderedConfig
+from agentbox.core.engines.contracts.views import PythonAgentConfigView
 from agentbox.core.engines.backends.token.run_direct import run_direct_agent_mode
+from agentbox.core.tools.translation import intersect_allowed_tools
 from agentbox.core.engines.backends.token.run_full import (
     import_agent,
     resolve_request_model,
@@ -89,6 +90,8 @@ class TokenBackend(BackendAdapter):
         composed: Any | None = None,
         *,
         python_agent_config: PythonAgentConfigView | None = None,
+        runtime_config: Any = None,
+        host_capabilities: dict | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         python_cfg = (
@@ -98,10 +101,17 @@ class TokenBackend(BackendAdapter):
         )
         model = getattr(runner_config, "model", None) or self.default_model
 
-        # Load output schema for result_type construction (direct-agent mode).
-        # Prefer the in-memory schema attached by the composition pipeline
-        # (DB-only agents have no on-disk bundle to read from); fall back to
-        # ``output_schema_path`` for legacy file-based agents.
+        # Effective tools = agent ∩ workspace (canonical).
+        capabilities = host_capabilities or {}
+        effective_tools: set = set()
+        if runtime_config is not None:
+            ws_allowed = capabilities.get("allowed_tools")
+            effective_tools = intersect_allowed_tools(
+                set(runtime_config.allowed_tools),
+                set(ws_allowed) if ws_allowed else None,
+            )
+
+        # Load output schema …
         output_schema: dict[str, Any] | None = None
         composed_schema = composed.schema if composed is not None else None
         if isinstance(composed_schema, dict):
@@ -146,6 +156,7 @@ class TokenBackend(BackendAdapter):
             "timeout_seconds": getattr(
                 getattr(agent, "runner", None), "timeout_seconds", None
             ),
+            "effective_tools": sorted(effective_tools),
         }
 
         # Store provider routing info from runner_config if present.

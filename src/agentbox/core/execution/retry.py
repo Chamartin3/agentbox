@@ -34,11 +34,11 @@ from agentbox.core.agents.validation import extract_json, validate_output
 from agentbox.core.constants import LogLevel
 from agentbox.core.data import DoneEvent
 from agentbox.core.data import RunStatus
-from agentbox.core.engines.backends.base import (
+from agentbox.core.engines.contracts.base import (
     BackendAdapter,
     RenderedConfig,
 )
-from agentbox.core.engines.backends.requests import BackendRunResult
+from agentbox.core.engines.contracts.requests import BackendRunResult
 from agentbox.core.execution.observability.stream import RunStreamSession
 
 logger = logging.getLogger(__name__)

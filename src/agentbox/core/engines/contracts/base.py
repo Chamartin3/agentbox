@@ -18,9 +18,10 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol
+
+import yaml
 
 from agentbox.core.data import RunEvent
 from ._mcp_types import McpToolSpec
@@ -28,7 +29,8 @@ from .rendered import RenderedConfig
 from .views import ComposedView, RuntimeConfigView
 
 if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef
+    from agentbox.core.workspaces.generation.config import WorkenvConfig
+    from agentbox.core.workspaces.generation.payload import Item
 
 
 class HasAgentConfig(Protocol):
@@ -40,45 +42,6 @@ class HasAgentConfig(Protocol):
     """
 
     _config_json: dict[str, object] | str | None
-
-
-class ComposedContext(Protocol):
-    """Minimal interface for composed prompt metadata.
-
-    Backends only need ``system`` and ``user`` from the composed result.
-    """
-
-    system: str
-    user: str
-
-
-@dataclass(frozen=True)
-class McpConfig:
-    """MCP server configuration shared across backends."""
-
-    server_name: str = "mcp"
-    url: str | None = None
-    transport: str = "http"
-    command: list[str] | None = None
-
-
-class BackendConfigGenerator(ABC):
-    """Translate prompts/ into a backend's native run-directory format."""
-
-    @abstractmethod
-    def generate(
-        self,
-        backend_dir: Path,
-        agent: AgentDef,
-        composed: ComposedContext,
-        mcp: McpConfig | None = None,
-    ) -> None:
-        """Write backend-specific files into ``backend_dir``.
-
-        Implementations must be idempotent — they should skip files that
-        already exist unless regeneration is explicitly requested.
-        """
-        raise NotImplementedError
 
 
 class BackendAdapter(ABC):
@@ -132,6 +95,17 @@ class BackendAdapter(ABC):
         candidate = Path(inspect.getfile(self.__class__)).parent / "recipe.yaml"
         return candidate if candidate.exists() else None
 
+    def build_workspace_items(self, config: "WorkenvConfig") -> "list[Item]":
+        """Engine-specific workspace config files, as generator ``Item``s.
+
+        The generic generator builds everything a ``recipe.yaml`` can
+        describe (layout + templates + serialization). Logic that data
+        can't express — agent tables, permission merges, engine-shaped
+        config blobs like ``opencode.json`` — is produced here, in the
+        backend that owns that engine's format. Default: none.
+        """
+        return []
+
     @abstractmethod
     def render(
         self,
@@ -179,26 +153,45 @@ class BackendAdapter(ABC):
 
     # ----- protected helpers (shared across backends) ----------------------
 
+    def context_filename(self) -> str:
+        """Instruction-file name this backend reads, per its ``recipe.yaml``.
+
+        Claude reads ``CLAUDE.md``; OpenCode / Codex / Pi read ``AGENTS.md``.
+        Sourced from the backend's own recipe (``layout.context``) so the
+        adapter materialises only the file its engine actually reads. Reads
+        the recipe file directly to avoid an engines→workspaces import.
+        Defaults to ``CLAUDE.md`` when the backend has no recipe.
+        """
+        path = self.recipe_path()
+        if path is not None and path.is_file():
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            ctx = (data.get("layout") or {}).get("context")
+            if isinstance(ctx, str) and ctx:
+                return ctx
+        return "CLAUDE.md"
+
     def _collect_system_files(
         self,
         agent: Any,
         workdir: Path,
         composed: ComposedView | None = None,
     ) -> dict[Path, bytes]:
-        """Collect the CLAUDE.md system-context file for materialisation.
+        """Collect the engine's instruction file for materialisation.
 
-        Prefers ``composed.system`` (set by the prompt composer when
-        fragments are merged) over the on-disk ``CLAUDE.md`` in the
-        workdir. Returns an empty dict when neither exists.
+        Targets the filename the engine actually reads (see
+        :meth:`context_filename`). Prefers ``composed.system`` (set by the
+        prompt composer when fragments are merged) over the on-disk file in
+        the workdir. Returns an empty dict when neither exists.
         """
+        name = self.context_filename()
         files: dict[Path, bytes] = {}
         composed_system = composed.system if composed is not None else None
         if composed_system is not None:
-            files[Path("CLAUDE.md")] = composed_system.encode("utf-8")
+            files[Path(name)] = composed_system.encode("utf-8")
         else:
-            claude_md = workdir / "CLAUDE.md"
-            if claude_md.exists():
-                files[Path("CLAUDE.md")] = claude_md.read_bytes()
+            existing = workdir / name
+            if existing.exists():
+                files[Path(name)] = existing.read_bytes()
         return files
 
     def _resolve_prompt(

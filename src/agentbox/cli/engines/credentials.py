@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 from pathlib import Path
@@ -12,6 +11,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agentbox.cli._common import console
+from agentbox.config import SETTINGS
 from agentbox.core.engines.credentials import (
     CredentialMethod,
     CredentialState,
@@ -28,8 +28,8 @@ creds_app = typer.Typer(
     no_args_is_help=True,
 )
 
-_CREDS_BASE = Path(os.environ.get("AGENTBOX_CREDS_DIR", "/agentbox/creds"))
-_ENV_FILE = _CREDS_BASE / ".env"
+_CREDS_BASE = SETTINGS.creds_dir
+_ENV_FILE = SETTINGS.creds_env_file
 
 
 @creds_app.command()

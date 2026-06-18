@@ -1,4 +1,12 @@
-"""Host-env profile + workspace grant routes (Plan 06)."""
+"""Host-env provisioning routes (Plan 062).
+
+Host-environment capabilities are **provisioning**, not authorization.
+They declare what host capabilities *exist* in a workspace (filesystem
+access, shell execution, HTTP, etc.) and the scoping constraints
+(paths, allowlists) on those capabilities.  The agent's ``tool_grants``
+endpoint is the sole authorization surface; effective permissions are
+``agent_authorizes ∩ host_env_exists ∩ host_env_scope``.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +19,7 @@ from agentbox.api.deps import get_store
 from agentbox.core.service import SessionStore
 from agentbox.core.tools import CAPABILITIES
 
-router = APIRouter(tags=["host-env"])
+router = APIRouter(tags=["host-env-provisioning"])
 
 
 class ProfileBody(BaseModel):
@@ -21,7 +29,13 @@ class ProfileBody(BaseModel):
     actor: str | None = None
 
 
-class WorkspaceGrantBody(BaseModel):
+class WorkspaceHostEnvBody(BaseModel):
+    """Provisioning payload: host-env capabilities available in a workspace.
+
+    These declare what host capabilities *exist* and their scoping
+    (paths, allowlists).  The agent's ``tool_grants`` is the sole
+    authorization surface.
+    """
     profile_id: str | None = None
     overrides: dict | None = None
     reason: str = Field(..., min_length=3)
@@ -83,16 +97,17 @@ def delete_profile(profile_id: str, store: Annotated[SessionStore, Depends(get_s
 
 
 @router.get("/api/workspaces/{workspace_id}/host-env")
-def get_workspace_grants(
+def get_workspace_host_env(
     workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
 ):
+    """Read the host-env provisioning config for *workspace_id*."""
     return store.resolve_workspace_host_env(workspace_id)
 
 
 @router.put("/api/workspaces/{workspace_id}/host-env")
-def set_workspace_grants(
+def set_workspace_host_env(
     workspace_id: str,
-    body: WorkspaceGrantBody,
+    body: WorkspaceHostEnvBody,
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     try:

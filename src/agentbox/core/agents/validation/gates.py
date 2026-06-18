@@ -5,12 +5,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 from typing import Any
 
 import httpx
 import jsonschema as _jsonschema
 
+from agentbox.config import SETTINGS
 from agentbox.core.agents.validation.errors import (
     extract_json,
     format_jsonschema_error,
@@ -63,7 +63,7 @@ def call_http_validator(validator_cfg: Any, output: str) -> ValidationResult:
     """
     body = json.dumps({"output": output}).encode("utf-8")
 
-    secret = os.environ.get("AGENTBOX_WEBHOOK_SECRET", "")
+    secret = SETTINGS.webhook_secret
     sig = (
         hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
         if secret

@@ -11,7 +11,7 @@ runs (Claude CLI hid the bug because it never built a ``result_type``).
 from __future__ import annotations
 
 import pytest
-from agentbox.core.engines.backends.schema_to_model import (
+from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,
     UnsupportedSchema,
     assert_schema_consistent,

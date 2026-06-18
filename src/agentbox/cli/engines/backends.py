@@ -9,6 +9,7 @@ from rich.table import Table
 
 from agentbox.cli._common import console
 from agentbox.core.agents.resolve import list_engines as registered_backends
+from agentbox.core.constants import BackendName
 from agentbox.core.engines import list_providers
 
 app = typer.Typer(
@@ -18,11 +19,11 @@ app = typer.Typer(
 )
 
 _LABELS: dict[str, str] = {
-    "claude_code": "Claude Code (CLI)",
-    "opencode": "OpenCode (CLI)",
-    "codex": "OpenAI Codex (CLI)",
-    "pi": "pi.dev (CLI)",
-    "token": "Token / pydantic-ai (in-process)",
+    BackendName.CLAUDE_CODE: "Claude Code (CLI)",
+    BackendName.OPENCODE: "OpenCode (CLI)",
+    BackendName.CODEX: "OpenAI Codex (CLI)",
+    BackendName.PI: "pi.dev (CLI)",
+    BackendName.TOKEN: "Token / pydantic-ai (in-process)",
 }
 
 

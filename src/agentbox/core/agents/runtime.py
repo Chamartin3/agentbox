@@ -6,7 +6,7 @@ fragments, and validate output live here.  Execution code imports from
 ``core.agents.composition.*`` or ``core.agents.config``.
 
 Mirrors the inversion pattern established for Engines in
-:mod:`agentbox.core.engines.backends.views`.
+:mod:`agentbox.core.engines.contracts.views`.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ from agentbox.core.agents.config import (
     resolve_output_config as _resolve_output_config,
 )
 from agentbox.core.data import AgentDef, RunStore, SessionStore
-from agentbox.core.engines.backends.schema_to_model import (
+from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
 )

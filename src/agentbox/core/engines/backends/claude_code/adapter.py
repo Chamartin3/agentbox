@@ -19,10 +19,16 @@ from agentbox.core.data import (
     TextEvent,
     TimeoutEvent,
 )
-from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.backends.claude_code.render import (
-    _intersect_allowed_tools,
     _runtime_config_view_from_agent,
+)
+from agentbox.core.engines.backends.claude_code.tools import (
+    NATIVE_TOOLS as _CLAUDE_TOOLS,
+)
+from agentbox.core.tools.translation import (
+    intersect_allowed_tools,
+    translate_tool,
 )
 from agentbox.core.engines.backends.claude_code.views import (
     _build_usage_event,
@@ -81,20 +87,24 @@ class ClaudeCodeBackend(BackendAdapter):
         if model:
             argv += ["--model", model]
 
+        # Native MCP config in the run cwd. Permissions are bypassed at
+        # dispatch (--permission-mode bypassPermissions) and tools are gated
+        # via --allowedTools, so no settings file is needed.
         argv += [
             "--mcp-config",
-            "claude_mcp.json",
+            ".mcp.json",
             "--strict-mcp-config",
-            "--settings",
-            "claude_settings.json",
         ]
 
         capabilities = host_capabilities or {}
-        effective_tools = _intersect_allowed_tools(
-            list(runtime_config.allowed_tools), capabilities.get("allowed_tools")
+        ws_allowed = capabilities.get("allowed_tools")
+        effective_tools = intersect_allowed_tools(
+            set(runtime_config.allowed_tools),
+            set(ws_allowed) if ws_allowed else None,
         )
         if effective_tools:
-            argv += ["--allowedTools", *effective_tools]
+            native_tools = [translate_tool(t, _CLAUDE_TOOLS) for t in effective_tools]
+            argv += ["--allowedTools", *native_tools]
 
         argv += ["--output-format", "json", "--permission-mode", "bypassPermissions"]
         argv += extra_args

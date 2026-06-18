@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 
+from agentbox.core.constants import BackendName
 from agentbox.core.data.engines.profiles import RunnerProfileCreate
 
 _log = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
         id="openai-default",
         name="OpenAI (default)",
         description="OpenAI GPT-4o via the token backend.",
-        backend="token",
+        backend=BackendName.TOKEN,
         provider="openai",
         model="openai:gpt-4o",
         api_key_env="OPENAI_API_KEY",
@@ -31,7 +32,7 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
         id="anthropic-default",
         name="Anthropic Claude",
         description="Anthropic Claude Sonnet via the token backend.",
-        backend="token",
+        backend=BackendName.TOKEN,
         provider="anthropic",
         model="anthropic:claude-sonnet-4-6",
         api_key_env="ANTHROPIC_API_KEY",
@@ -41,7 +42,7 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
         id="google-gemini-default",
         name="Google Gemini",
         description="Google Gemini 2.0 Flash via the token backend.",
-        backend="token",
+        backend=BackendName.TOKEN,
         provider="google",
         model="google:gemini-2.0-flash",
         api_key_env="GOOGLE_API_KEY",
@@ -51,7 +52,7 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
         id="ollama-local",
         name="Ollama (local)",
         description="Local Ollama via the token backend.",
-        backend="token",
+        backend=BackendName.TOKEN,
         provider="ollama",
         model="ollama:llama3",
         base_url="http://localhost:11434",
@@ -61,7 +62,7 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
         id="grok-default",
         name="Grok (xAI)",
         description="xAI Grok via the token backend.",
-        backend="token",
+        backend=BackendName.TOKEN,
         provider="xai",
         model="xai:grok-3",
         api_key_env="XAI_API_KEY",
@@ -71,7 +72,7 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
         id="qwen-via-openrouter",
         name="Qwen (OpenRouter)",
         description="Qwen 2.5 72B via OpenRouter, token backend.",
-        backend="token",
+        backend=BackendName.TOKEN,
         provider="openrouter",
         model="openrouter:qwen/qwen-2.5-72b-instruct",
         api_key_env="OPENROUTER_API_KEY",

@@ -24,7 +24,7 @@ from agentbox.core.agents import AgentRuntimeView
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef, RunStore
-from agentbox.core.engines.backends.base import RenderedConfig
+from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.execution.retry import RetryOrchestrator
 from agentbox.core.execution.observability.stream import RunStreamSession
 from agentbox.core.execution.observability.stream.session import DoneStatus
@@ -32,7 +32,7 @@ from agentbox.core.execution.observability.stream.session import DoneStatus
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 
 if TYPE_CHECKING:
-    from agentbox.core.engines.backends.base import BackendAdapter
+    from agentbox.core.engines.contracts.base import BackendAdapter
 
 logger = logging.getLogger(__name__)
 

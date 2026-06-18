@@ -30,11 +30,11 @@ from agentbox.core.execution.observability.snapshot import SnapshotWriter
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 from agentbox.core.execution.prepare.prompts import resolve_run_prompt
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
-from agentbox.core.engines.backends.rendered import RenderedConfig
+from agentbox.core.engines.contracts.rendered import RenderedConfig
 from agentbox.core.workspaces import (
     prepare_run_workdir,
 )
-from agentbox.core.workspaces.generation.engine_config.inject import (
+from agentbox.core.workspaces.generation.inject import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )

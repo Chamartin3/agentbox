@@ -31,7 +31,7 @@ from agentbox.core.service.prompts import AgentNotFound
 from .configs import (
     generate_configs_by_name,
     generate_configs_for_agent,
-    generate_legacy_runner_configs,
+    launch_runner_configs,
 )
 from .errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
 from .files import (
@@ -80,7 +80,7 @@ __all__ = [
     "set_permissions",
     "get_workspace_mcp_tools",
     "generate_configs_by_name",
-    "generate_legacy_runner_configs",
+    "launch_runner_configs",
     # Skills
     "generate_skills_by_name",
     "list_skills_by_name",

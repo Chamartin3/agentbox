@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from agentbox.core.agents.resolve import list_engines as registered_backends
+from agentbox.core.constants import BackendName
 from agentbox.core.engines import list_providers
 
 router = APIRouter(prefix="/api/runner-backends", tags=["runner-backends"])
@@ -32,11 +33,11 @@ class BackendDescriptor(BaseModel):
 
 
 _LABELS: dict[str, str] = {
-    "claude_code": "Claude Code (CLI)",
-    "opencode": "OpenCode (CLI)",
-    "codex": "OpenAI Codex (CLI)",
-    "pi": "pi.dev (CLI)",
-    "token": "Token / pydantic-ai (in-process)",
+    BackendName.CLAUDE_CODE: "Claude Code (CLI)",
+    BackendName.OPENCODE: "OpenCode (CLI)",
+    BackendName.CODEX: "OpenAI Codex (CLI)",
+    BackendName.PI: "pi.dev (CLI)",
+    BackendName.TOKEN: "Token / pydantic-ai (in-process)",
 }
 
 

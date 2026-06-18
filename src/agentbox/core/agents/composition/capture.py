@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agentbox.core.constants import BackendName
 from agentbox.core.data import AgentDef
 
 if TYPE_CHECKING:
@@ -122,14 +123,14 @@ def build_fragments(
                 )
             )
 
-    if agent.runner.kind == "claude_code":
+    if agent.runner.kind == BackendName.CLAUDE_CODE:
         frags.extend(_claude_code_fragments(agent, project_root, argv))
-    elif agent.runner.kind == "token":
+    elif agent.runner.kind == BackendName.TOKEN:
         frags.append(
             PromptFragment(
                 name="token_note",
                 source="agentbox",
-                injected_by="token",
+                injected_by=BackendName.TOKEN,
                 content=(
                     "The pydantic-ai Agent assembles its own message list at "
                     "call time (system prompt registered in the Agent ctor, "

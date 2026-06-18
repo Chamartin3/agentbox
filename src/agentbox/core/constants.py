@@ -27,6 +27,22 @@ class CatalogEnum(StrEnum):
             ) from None
 
 
+class BackendName(CatalogEnum):
+    """Canonical names of the built-in backend adapters / recipe engines.
+
+    These MUST match the keys under ``[project.entry-points."agentbox.backends"]``
+    in pyproject.toml — that registry is the runtime catalog (and the only place
+    plugin-provided backends appear). This enum names the built-ins so callers
+    use ``BackendName.CLAUDE_CODE`` instead of the literal ``"claude_code"``.
+    """
+
+    CLAUDE_CODE = "claude_code"
+    OPENCODE = "opencode"
+    TOKEN = "token"
+    CODEX = "codex"
+    PI = "pi"
+
+
 class SessionMode(StrEnum):
     """Session lifetime modes."""
 
@@ -72,15 +88,6 @@ class RunStatus(StrEnum):
     FAILED = "failed"
     TIMEOUT = "timeout"
     INCOMPLETE = "incomplete"
-
-    @classmethod
-    def terminal(cls) -> frozenset[RunStatus]:
-        """The non-running terminal statuses a finished run can hold."""
-        return frozenset({cls.OK, cls.ERROR, cls.FAILED, cls.TIMEOUT})
-
-    @property
-    def is_terminal(self) -> bool:
-        return self in RunStatus.terminal()
 
     @property
     def is_running(self) -> bool:

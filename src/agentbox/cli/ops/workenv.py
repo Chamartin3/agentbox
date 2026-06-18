@@ -20,6 +20,7 @@ from rich.syntax import Syntax
 
 from agentbox.cli._common import console
 from agentbox.cli._deps import get_settings, get_store
+from agentbox.core.constants import BackendName
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
 from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
@@ -60,7 +61,10 @@ def workenv_generate(
         None, help="Workspace name or agent ID (omit for interactive)"
     ),
     engine: str = typer.Option(
-        "claude", "--engine", "-e", help="Recipe engine to use (claude, opencode)"
+        BackendName.CLAUDE_CODE,
+        "--engine",
+        "-e",
+        help=f"Recipe engine to use ({', '.join(BackendName.values())})",
     ),
     target_dir: str | None = typer.Option(
         None,

@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import os
 import uuid
 
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.engine import Engine
 
+from agentbox.config import SETTINGS
 from agentbox.core.data.utils import now_iso
 from agentbox.core.data.schema import api_tokens
 
@@ -29,7 +29,7 @@ def _key_from_env_or_db(store) -> bytes:
     """Return a Fernet key. Prefers ``AGENTBOX_SECRET_KEY``; falls back to
     a per-DB key persisted under settings(secrets, fernet_key).
     """
-    env_val = os.environ.get("AGENTBOX_SECRET_KEY")
+    env_val = SETTINGS.secret_key
     if env_val:
         # Accept either a raw Fernet key or any string we can hash to 32 bytes.
         try:

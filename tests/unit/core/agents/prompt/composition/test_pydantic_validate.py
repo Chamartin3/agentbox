@@ -95,3 +95,76 @@ class TestValidateWithPydantic:
         # when the input is a dict rather than a model instance. The jsonschema
         # engine catches this; pydantic validates types but not nested dicts.
         # This test documents that behavior.
+
+    def test_oneof_schema_validates(self) -> None:
+        """Schema with oneOf branches — the canonical converter handles these,
+        while the old naive ``_build_model_from_schema`` would have
+        mis-modeled or rejected them."""
+        schema = {
+            "type": "object",
+            "oneOf": [
+                {"$ref": "#/$defs/Success"},
+                {"$ref": "#/$defs/Failure"},
+            ],
+            "$defs": {
+                "Success": {
+                    "type": "object",
+                    "required": ["result"],
+                    "properties": {"result": {"type": "string"}},
+                },
+                "Failure": {
+                    "type": "object",
+                    "required": ["error"],
+                    "properties": {
+                        "error": {"type": "string"},
+                        "code": {"type": "integer"},
+                    },
+                },
+            },
+        }
+        ok_success, _ = validate_with_pydantic(
+            json.dumps({"result": "done"}), schema
+        )
+        assert ok_success
+        ok_failure, _ = validate_with_pydantic(
+            json.dumps({"error": "timeout", "code": 408}), schema
+        )
+        assert ok_failure
+
+    def test_discriminated_union_validates_branches(self) -> None:
+        """Root-level oneOf with type discriminator — the canonical converter
+        wraps branches in a RootModel so both sides are reachable."""
+        schema = {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["kind", "value"],
+                    "properties": {
+                        "kind": {"const": "text"},
+                        "value": {"type": "string"},
+                    },
+                },
+                {
+                    "type": "object",
+                    "required": ["kind", "value"],
+                    "properties": {
+                        "kind": {"const": "number"},
+                        "value": {"type": "integer"},
+                    },
+                },
+            ],
+        }
+        ok_text, _ = validate_with_pydantic(
+            json.dumps({"kind": "text", "value": "hello"}), schema
+        )
+        assert ok_text
+        ok_number, _ = validate_with_pydantic(
+            json.dumps({"kind": "number", "value": 42}), schema
+        )
+        assert ok_number
+        # Mismatched branch should fail
+        ok_bad, err = validate_with_pydantic(
+            json.dumps({"kind": "text", "value": 99}), schema
+        )
+        assert not ok_bad
+        assert "value" in err

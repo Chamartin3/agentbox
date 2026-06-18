@@ -21,6 +21,7 @@ from agentbox.core.constants import (
     LogLevel,
     MessageRole,
     TerminalRunStatus,
+    ValidationCheckMode,
     ValidationMode,
 )
 
@@ -101,7 +102,7 @@ class ValidationEvent(_EventBase):
     type: Literal[EventType.VALIDATION] = EventType.VALIDATION
     ok: bool
     attempt: int = 1
-    mode: Literal["strict", "warn", "off"] = "strict"
+    mode: ValidationCheckMode = ValidationCheckMode.STRICT
     engine: ValidationMode = ValidationMode.NONE
     error: str | None = None
     """Validation error message when ok=False."""

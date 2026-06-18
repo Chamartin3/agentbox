@@ -181,7 +181,7 @@ class ResourceBindingsMixin:
         # Collect folder-type target paths separately from single-file paths.
         # Single-file bindings with the same ``target_path`` no longer
         # collide because each resolves to a different filename inside it
-        # (see ``_resolve_target_path`` in workspace_materialize.py).
+        # (see ``_resolve_target_path`` in binding_materialize.py).
         # Folder-type bindings DO collide on the same path.
         seen_folder_targets: dict[str, str] = {}
         for idx, b in enumerate(bindings):

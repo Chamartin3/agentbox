@@ -14,8 +14,14 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from agentbox.core.data import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
-from agentbox.core.engines.backends.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.codex.render import build_codex_items
+from agentbox.core.engines.backends.codex.tools import NATIVE_TOOLS as _CODEX_TOOLS
 from agentbox.core.engines.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.tools.translation import (
+    intersect_allowed_tools,
+    translate_tool,
+)
 
 _NAME = "codex"
 _DEFAULT_CODEX_MODEL: str | None = None  # let codex pick its own default
@@ -113,6 +119,9 @@ class CodexBackend(BackendAdapter):
     ) -> str | None:
         return self._session_id
 
+    def build_workspace_items(self, config: Any) -> list[Any]:
+        return build_codex_items(config)
+
     def render(
         self,
         agent: Any,
@@ -121,6 +130,9 @@ class CodexBackend(BackendAdapter):
         creds: dict | None = None,
         runner_config: Any | None = None,
         composed: Any | None = None,
+        *,
+        runtime_config: Any = None,
+        host_capabilities: dict | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
@@ -128,6 +140,17 @@ class CodexBackend(BackendAdapter):
         extra_args = list(getattr(runner_config, "extra_args", None) or [])
 
         argv = build_codex_argv(model, extra_args, self.default_model)
+
+        capabilities = host_capabilities or {}
+        if runtime_config is not None:
+            ws_allowed = capabilities.get("allowed_tools")
+            effective_tools = intersect_allowed_tools(
+                set(runtime_config.allowed_tools),
+                set(ws_allowed) if ws_allowed else None,
+            )
+            if effective_tools:
+                native_tools = [translate_tool(t, _CODEX_TOOLS) for t in effective_tools]
+                argv += ["--allowedTools", *native_tools]
 
         env = dict(os.environ)
 

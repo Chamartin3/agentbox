@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from agentbox.config import SETTINGS
+
 
 @dataclass
 class Method:
@@ -26,9 +28,9 @@ class Method:
         if self.key == "import_host" and self.host_source and self.container_target:
             _import_host_credential(self.host_source, self.container_target)
         elif self.key == "login" and self.command:
-            _run_interactive_login(self.command, ctx.get("creds_base", "/agentbox/creds"))
+            _run_interactive_login(self.command, ctx.get("creds_base", str(SETTINGS.creds_dir)))
         elif self.key in ("env_file", "paste_key") and self.env_var:
-            _prompt_and_store_env_key(self.env_var, ctx.get("env_file", "/agentbox/creds/.env"))
+            _prompt_and_store_env_key(self.env_var, ctx.get("env_file", str(SETTINGS.creds_env_file)))
 
 
 def _import_host_credential(host_source: str, container_target: str) -> None:

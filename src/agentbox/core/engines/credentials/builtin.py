@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from agentbox.config import SETTINGS
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.credentials.methods import Method
 from agentbox.core.engines.credentials.registry import (
     CredentialMethod,
@@ -14,7 +16,7 @@ from agentbox.core.engines.credentials.registry import (
     register,
 )
 
-_CREDS_BASE = Path(os.environ.get("AGENTBOX_CREDS_DIR", "/agentbox/creds"))
+_CREDS_BASE = SETTINGS.creds_dir
 
 
 def _detect_claude() -> CredentialState:
@@ -29,7 +31,7 @@ def _detect_claude() -> CredentialState:
 
 register(
     CredentialMethod(
-        backend="claude",
+        backend=BackendName.CLAUDE_CODE,
         label="Claude Code",
         detect=_detect_claude,
         methods=[
@@ -62,7 +64,7 @@ def _detect_opencode() -> CredentialState:
 
 register(
     CredentialMethod(
-        backend="opencode",
+        backend=BackendName.OPENCODE,
         label="OpenCode",
         detect=_detect_opencode,
         methods=[
@@ -94,7 +96,7 @@ def _detect_codex() -> CredentialState:
 
 register(
     CredentialMethod(
-        backend="codex",
+        backend=BackendName.CODEX,
         label="Codex CLI",
         detect=_detect_codex,
         methods=[
@@ -120,7 +122,7 @@ def _detect_pi() -> CredentialState:
 
 register(
     CredentialMethod(
-        backend="pi",
+        backend=BackendName.PI,
         label="pi CLI",
         detect=_detect_pi,
         methods=[
@@ -155,7 +157,7 @@ for _backend, _label, _env_var in _PROVIDERS:
             methods=[
                 Method(
                     key="env_file",
-                    label=f"Set {_env_var} in /agentbox/creds/.env",
+                    label=f"Set {_env_var} in {SETTINGS.creds_env_file}",
                     env_var=_env_var,
                 ),
             ],

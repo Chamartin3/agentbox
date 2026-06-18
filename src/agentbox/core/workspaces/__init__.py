@@ -5,23 +5,8 @@ Re-exports the names execution/ callers need so they never import from
 """
 
 from agentbox.core.resources.skills import discover_skills as discover_skills
-from agentbox.core.workspaces.generation.materialize import (
-    materialize_subagents as materialize_subagents,
-)
-from agentbox.core.resources.workspace_materialize import (
+from agentbox.core.resources.binding_materialize import (
     materialize_workspace as materialize_workspace,
-)
-from agentbox.core.workspaces.env_doc.renderers.agents_md import (
-    AgentsMdRenderer as AgentsMdRenderer,
-)
-from agentbox.core.workspaces.env_doc.renderers.base import (
-    RuntimeContext as RuntimeContext,
-)
-from agentbox.core.workspaces.env_doc.renderers.claude_md import (
-    ClaudeMdRenderer as ClaudeMdRenderer,
-)
-from agentbox.core.workspaces.env_doc.schema import (
-    EnvDocContent as EnvDocContent,
 )
 from agentbox.core.workspaces.crud import (
     WorkspaceInfo as WorkspaceInfo,
@@ -46,16 +31,11 @@ from agentbox.core.workspaces.prep import (
 )
 
 __all__ = [
-    "AgentsMdRenderer",
-    "ClaudeMdRenderer",
-    "EnvDocContent",
     "McpRegistry",
-    "RuntimeContext",
     "WorkspaceInfo",
     "discover_skills",
     "load_capabilities",
     "load_workspace_permissions",
-    "materialize_subagents",
     "materialize_workspace",
     "prepare_run_workdir",
     "prompt_resolution_to_snapshot",

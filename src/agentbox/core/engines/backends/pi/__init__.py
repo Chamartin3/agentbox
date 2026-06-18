@@ -5,5 +5,6 @@ from agentbox.core.engines.backends.pi.adapter import (
     build_pi_argv,
     parse_pi_event,
 )
+from agentbox.core.engines.backends.pi.tools import NATIVE_TOOLS
 
-__all__ = ["PiBackend", "build_pi_argv", "parse_pi_event"]
+__all__ = ["NATIVE_TOOLS", "PiBackend", "build_pi_argv", "parse_pi_event"]

@@ -7,7 +7,7 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store, get_settings
 from agentbox.cli._common import console
-from agentbox.core.resources.composition_to_bindings import (
+from agentbox.core.resources.composition import (
     migrate_composition_to_bindings,
 )
 from agentbox.core.service import (

@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from typing import Final
 
-from agentbox.config import Settings
+from agentbox.config import SETTINGS, Settings
 from agentbox.core.agents.composition.drift import startup_sweep
 from agentbox.core.data import ProjectManifest, SessionStore
 from agentbox.core.data.engines.seeds import seed_default_runner_profiles
@@ -87,7 +86,7 @@ def import_on_start_sweep(
     Without ``AGENTBOX_IMPORT_ON_START=1`` the manifest is read-only at
     boot, so files cannot silently overwrite DB state.
     """
-    if os.environ.get(ENV_IMPORT_ON_START) != "1":
+    if not SETTINGS.import_on_start:
         return StartupReport()
     if manifest is None or not manifest.agents:
         return StartupReport()
@@ -111,7 +110,7 @@ def import_on_start_sweep(
 
 def seed_runner_profiles(store: SessionStore) -> StartupReport:
     """Idempotent seed of the default runner profiles."""
-    if os.environ.get(ENV_SKIP_DEFAULT_PROFILES):
+    if SETTINGS.skip_default_profiles:
         return StartupReport()
     try:
         created = seed_default_runner_profiles(store)
@@ -134,14 +133,14 @@ def boot_import_resources(
     workspace skill bindings, composition refs. Optionally runs the
     composition→bindings migration when its rollout flag is set.
     """
-    if os.environ.get(ENV_SKIP_RESOURCE_IMPORT):
+    if SETTINGS.skip_resource_import:
         return StartupReport()
 
     out = _phase_import_repo(store, settings)
     out = _merge(out, _phase_legacy_migration(store))
     out = _merge(out, _phase_workspace_bindings(store, manifest))
     out = _merge(out, _phase_composition_refs(store, settings, manifest))
-    if os.environ.get(ENV_MIGRATE_COMPOSITION):
+    if SETTINGS.migrate_composition:
         out = _merge(out, _phase_composition_migration(store, settings))
     return out
 

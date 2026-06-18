@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.constants import ConfiguredValidationMode, ValidationMode
+from agentbox.core.constants import (
+    BackendName,
+    ConfiguredValidationMode,
+    ValidationMode,
+)
 
 
 class RunnerSpec(BaseModel):
-    kind: str = "token"
+    kind: str = BackendName.TOKEN
     """Which backend to dispatch to (deprecated — use ``backend`` on the
     run request or ``backend_preference`` on the project manifest instead).
 
@@ -101,7 +105,7 @@ class RunnerManifest(BaseModel):
     do not appear here.
     """
 
-    kind: str = "token"
+    kind: str = BackendName.TOKEN
     """Defaults to ``token`` so markdown-only agents need no
     explicit runner configuration."""
 

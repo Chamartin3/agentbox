@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import urlparse, urlunparse
 
 import httpx
 
+from agentbox.config import SETTINGS
+from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,
@@ -27,7 +28,7 @@ _DEFAULT_CONTAINER_REWRITE = (
 
 def _running_in_container() -> bool:
     """Best-effort container detection — used to pick the default rewrite map."""
-    if os.environ.get("AGENTBOX_IN_CONTAINER", "").lower() in {"1", "true", "yes"}:
+    if SETTINGS.in_container:
         return True
     return Path("/.dockerenv").exists()
 
@@ -56,7 +57,7 @@ def _resolved_rewrite_map() -> dict[str, str]:
          when running inside Docker.
       3. No rewrites.
     """
-    override = os.environ.get("AGENTBOX_OLLAMA_URL_REWRITE")
+    override = SETTINGS.ollama_url_rewrite
     if override is not None:
         return _parse_rewrite_map(override)
     if _running_in_container():
@@ -99,8 +100,8 @@ class OllamaAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.OLLAMA.value,
         label="Ollama",
-        backend="token",
-        compatible_backends=["token", "opencode"],
+        backend=BackendName.TOKEN,
+        compatible_backends=[BackendName.TOKEN, BackendName.OPENCODE],
         requires_api_key=False,
         supports_base_url=True,
         supports_model_listing=True,
@@ -140,7 +141,7 @@ class OllamaAdapter(HTTPProviderAdapter):
             logger.warning("ollama: live local model listing failed (%s)", exc)
             return []
 
-        if getattr(config, "backend", None) == "opencode":
+        if getattr(config, "backend", None) == BackendName.OPENCODE:
             return [
                 ProviderModel(
                     id=f"ollama/{model.id}",
