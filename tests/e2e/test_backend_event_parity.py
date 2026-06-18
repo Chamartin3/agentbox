@@ -15,7 +15,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from agentbox.core.data import (
+from agentbox.core.db import (
     DoneEvent,
     LogEvent,
     TextEvent,
@@ -51,7 +51,6 @@ def _rendered_direct(**meta: Any) -> RenderedConfig:
     agent_meta.update(meta)
     return RenderedConfig(
         cwd=Path("."),
-        files={},
         agent_meta=agent_meta,
         model="openrouter:test/model",
     )
@@ -238,14 +237,13 @@ async def _fake_jsonl_stream(events: list[Any]) -> Any:
 
 
 async def test_codex_scenario_1_text_only() -> None:
-    from agentbox.core.data import UsageEvent
+    from agentbox.core.db import UsageEvent
     from agentbox.core.engines.backends import codex as codex_mod
 
     rendered = RenderedConfig(
         argv=["codex", "exec", "--json"],
         env={},
         cwd=Path("."),
-        files={},
         agent_meta={"timeout_seconds": 60},
         model="o4-mini",
     )
@@ -271,14 +269,13 @@ async def test_codex_scenario_1_text_only() -> None:
 
 
 async def test_pi_scenario_1_text_only() -> None:
-    from agentbox.core.data import UsageEvent
+    from agentbox.core.db import UsageEvent
     from agentbox.core.engines.backends import pi as pi_mod
 
     rendered = RenderedConfig(
         argv=["pi", "-p", "--mode", "json"],
         env={},
         cwd=Path("."),
-        files={},
         agent_meta={"timeout_seconds": 60},
         model="pi-1",
     )

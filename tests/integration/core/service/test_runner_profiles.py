@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import (
+from agentbox.core.db import (
     RunnerProfileCreate,
     RunnerProfilePatch,
     SessionStore,

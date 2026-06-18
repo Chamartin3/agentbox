@@ -37,8 +37,8 @@ from agentbox.core.service.workspaces.files import resolve_workspace_path
 from agentbox.core.service.workspaces.permissions import load_effective_permissions
 
 if TYPE_CHECKING:
-    from agentbox.config import Settings
-    from agentbox.core.data import SessionStore
+    from agentbox.core.config import Settings
+    from agentbox.core.db import SessionStore
 
 workenv_app = typer.Typer(
     name="workenv",

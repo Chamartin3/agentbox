@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.core.data import RunStore
+from agentbox.core.db import RunStore
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult
 from agentbox.core.execution.dispatch.payload import CompletionPayload
 from agentbox.core.execution.dispatch.policy import DispatchPolicy

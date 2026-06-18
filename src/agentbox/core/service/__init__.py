@@ -19,21 +19,21 @@ from agentbox.core.engines import list_providers as list_providers
 from agentbox.core.constants import EventType as EventType
 from agentbox.core.constants import ResourceType as ResourceType
 from agentbox.core.constants import RunStatus as RunStatus
-from agentbox.core.data import read_transcript as read_transcript
-from agentbox.core.data import AgentDef as AgentDef
-from agentbox.core.data import AgentSource as AgentSource
-from agentbox.core.data import CompositionConfig as CompositionConfig
-from agentbox.core.data import McpServerSpec as McpServerSpec
-from agentbox.core.data import ProjectManifest as ProjectManifest
-from agentbox.core.data import RunnerSpec as RunnerSpec
-from agentbox.core.data import RunnerProfile as RunnerProfile
-from agentbox.core.data import RunnerProfileCreate as RunnerProfileCreate
-from agentbox.core.data import RunnerProfilePatch as RunnerProfilePatch
-from agentbox.core.data import RunnerProfileStats as RunnerProfileStats
-from agentbox.core.data import RunRecord as RunRecord
-from agentbox.core.data import SessionStore as SessionStore
-from agentbox.core.data import SharedResourceRecord as SharedResourceRecord
-from agentbox.core.data import WorkspaceDef as WorkspaceDef
+from agentbox.core.db import read_transcript as read_transcript
+from agentbox.core.db import AgentDef as AgentDef
+from agentbox.core.db import AgentSource as AgentSource
+from agentbox.core.db import CompositionConfig as CompositionConfig
+from agentbox.core.db import McpServerSpec as McpServerSpec
+from agentbox.core.db import ProjectManifest as ProjectManifest
+from agentbox.core.db import RunnerSpec as RunnerSpec
+from agentbox.core.db import RunnerProfile as RunnerProfile
+from agentbox.core.db import RunnerProfileCreate as RunnerProfileCreate
+from agentbox.core.db import RunnerProfilePatch as RunnerProfilePatch
+from agentbox.core.db import RunnerProfileStats as RunnerProfileStats
+from agentbox.core.db import RunRecord as RunRecord
+from agentbox.core.db import SessionStore as SessionStore
+from agentbox.core.db import SharedResourceRecord as SharedResourceRecord
+from agentbox.core.db import WorkspaceDef as WorkspaceDef
 
 # ── Infra ─────────────────────────────────────────────────────────────
 from agentbox.core.tools import CAPABILITIES as CAPABILITIES  # noqa: F401
@@ -129,7 +129,7 @@ from agentbox.core.service.system_admin import set_setting as set_setting
 from agentbox.core.service.system_admin import update_settings_section as update_settings_section
 
 # ── Workspace admin service ────────────────────────────────────────────
-from agentbox.core.service.feedback import aggregate_usage as aggregate_usage
+from agentbox.core.service.execution.feedback import aggregate_usage as aggregate_usage
 from agentbox.core.service.workspace_admin import get_active_env_doc as get_active_env_doc
 from agentbox.core.service.workspace_admin import get_workspace as get_workspace
 from agentbox.core.service.workspace_admin import get_workspace_host_env as get_workspace_host_env
@@ -152,7 +152,6 @@ from agentbox.core.service.workspace_admin import update_agent_meta as update_ag
 
 # ── Workspace ─────────────────────────────────────────────────────────
 from agentbox.core.workspaces.manager import WorkspaceInfo as WorkspaceInfo
-from agentbox.core.workspaces.manager import capabilities_path as capabilities_path
 from agentbox.core.workspaces.manager import claude_agents_path as claude_agents_path
 from agentbox.core.workspaces.manager import claude_settings_path as claude_settings_path
 from agentbox.core.workspaces.manager import ensure as ensure
@@ -164,7 +163,6 @@ from agentbox.core.service.workspaces import (
     get_workspace_mcp_tools as get_workspace_mcp_tools,
     launch_runner_configs as launch_runner_configs,
 )
-from agentbox.core.workspaces.manager import load_capabilities as load_capabilities
 from agentbox.core.workspaces.manager import opencode_config_path as opencode_config_path
 from agentbox.core.workspaces.manager import reset as reset
 from agentbox.core.workspaces.manager import resolve_path as resolve_path

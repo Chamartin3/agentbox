@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any, NotRequired, TypedDict
 
 from agentbox.core.agents.validation import extract_json
-from agentbox.core.data import RunRecord, RunStore
+from agentbox.core.db import RunRecord, RunStore
 
 
 class CompletionPayload(TypedDict):

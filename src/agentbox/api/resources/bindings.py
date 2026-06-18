@@ -85,7 +85,7 @@ class ReplaceSkillBindings(BaseModel):
     actor: str | None = None
 
 
-# --- prompt bindings (Plan 02) ---
+# --- prompt bindings ---
 
 
 @router.get("/api/agents/{agent_id}/prompt-resources")
@@ -136,7 +136,7 @@ def preview_prompt(
         raise HTTPException(400, exc.detail) from exc
 
 
-# --- workspace file bindings (Plan 03) ---
+# --- workspace file bindings ---
 
 
 @router.get("/api/workspaces/{workspace_id}/resources")

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.resources.migration import (
     KIND_TO_TYPE,
     migrate_shared_resources_to_repo,

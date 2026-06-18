@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.data import McpSnapshot, SnapshotStore
+from agentbox.core.db import McpSnapshot, SnapshotStore
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,7 @@
 """Public facade for the prompt composition subtree.
 
 Re-exports the names available from `core.agent.prompt.*` so external callers
-import from one place. Names match what exists today; renames per the
-modularization plan land in Phase 6.
+import from one place.
 """
 
 from agentbox.core.agents.composition.capture import (

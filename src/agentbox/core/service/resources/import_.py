@@ -16,7 +16,7 @@ from agentbox.core.resources.importers.zip import ZipUploadImporter
 from agentbox.core.service.resources.repo import InvalidResource, _require_resource
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 __all__ = [
     "import_upload_version",

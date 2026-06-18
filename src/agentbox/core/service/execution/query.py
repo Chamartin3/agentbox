@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from agentbox.core.service.execution.types import RunNotFound
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 
 def _enrich_with_version(store: SessionStore, d: dict) -> dict:

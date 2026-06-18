@@ -12,7 +12,6 @@ from agentbox.core.workspaces.crud import (
     WorkspaceInfo as WorkspaceInfo,
 )
 from agentbox.core.workspaces.manager import (
-    load_capabilities as load_capabilities,
     resolve_path as resolve_path,
 )
 from agentbox.core.workspaces.mcp.client.registry import (
@@ -34,7 +33,6 @@ __all__ = [
     "McpRegistry",
     "WorkspaceInfo",
     "discover_skills",
-    "load_capabilities",
     "load_workspace_permissions",
     "materialize_workspace",
     "prepare_run_workdir",

@@ -24,6 +24,36 @@ logger = logging.getLogger(__name__)
 # Claude reads MCP servers from .mcp.json in the run cwd (native discovery).
 _MCP_FILENAME = ".mcp.json"
 
+# Canonical name for the host-env stdio MCP server. Shared so every consumer
+# (Claude's .mcp.json, the token backend's pydantic-ai toolset) spawns the same
+# server under the same name.
+HOST_ENV_SERVER_NAME = "agentbox-host-env"
+
+
+def host_env_server_spec(
+    *,
+    grants: dict,
+    workspace_id: str,
+    workdir: Path,
+    db_path: Path,
+) -> dict:
+    """Return the stdio MCP server spec (``{command, args, env}``) for host-env.
+
+    Single source of truth for *how* to spawn the host-env server: both the
+    .mcp.json injection (MCP-aware backends) and the token backend's pydantic-ai
+    MCP toolset build their connection from this.
+    """
+    return {
+        "command": sys.executable,
+        "args": ["-m", "agentbox.core.workspaces.mcp.servers.host_env"],
+        "env": {
+            "AGENTBOX_HOST_ENV_GRANTS_JSON": json.dumps(grants),
+            "AGENTBOX_HOST_ENV_WORKSPACE_ID": workspace_id,
+            "AGENTBOX_HOST_ENV_WORKDIR": str(workdir),
+            "AGENTBOX_DB_PATH": str(db_path),
+        },
+    }
+
 
 def _load_mcp(run_dir: Path) -> tuple[Path, dict]:
     mcp_path = run_dir / _MCP_FILENAME
@@ -57,16 +87,9 @@ def inject_host_env_mcp(
     can enforce them and write to the audit log.
     """
     mcp_path, mcp_data = _load_mcp(run_dir)
-    mcp_data["mcpServers"]["agentbox-host-env"] = {
-        "command": sys.executable,
-        "args": ["-m", "agentbox.core.workspaces.mcp.servers.host_env"],
-        "env": {
-            "AGENTBOX_HOST_ENV_GRANTS_JSON": json.dumps(grants),
-            "AGENTBOX_HOST_ENV_WORKSPACE_ID": workspace_id,
-            "AGENTBOX_HOST_ENV_WORKDIR": str(workdir),
-            "AGENTBOX_DB_PATH": str(db_path),
-        },
-    }
+    mcp_data["mcpServers"][HOST_ENV_SERVER_NAME] = host_env_server_spec(
+        grants=grants, workspace_id=workspace_id, workdir=workdir, db_path=db_path
+    )
     _write_mcp(mcp_path, mcp_data)
     logger.debug(
         "post_render: injected host-env MCP server for workspace %r with caps: %s",

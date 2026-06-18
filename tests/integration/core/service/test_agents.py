@@ -13,8 +13,8 @@ import warnings
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import AgentDef
-from agentbox.core.data import SessionStore
+from agentbox.core.db import AgentDef
+from agentbox.core.db import SessionStore
 from agentbox.core.service.agents import list_all_agents, resolve_agent
 
 

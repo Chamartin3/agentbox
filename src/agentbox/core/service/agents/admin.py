@@ -6,7 +6,7 @@ from workspace concerns per the domain split.
 
 from __future__ import annotations
 
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 
 
 def replace_version_config(

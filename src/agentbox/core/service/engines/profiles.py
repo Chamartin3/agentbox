@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from agentbox.core.service.engines import profile_validation
 
 if TYPE_CHECKING:
-    from agentbox.core.data import (
+    from agentbox.core.db import (
         RunnerProfile,
         RunnerProfileCreate,
         RunnerProfilePatch,

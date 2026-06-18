@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 
 
 def _seed(store: SessionStore, agent: str, status: str, model: str = "haiku") -> str:

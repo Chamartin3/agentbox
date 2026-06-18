@@ -20,7 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import AgentDef, RunnerSpec
+from agentbox.core.db import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.claude_code import ClaudeCodeBackend
 from agentbox.core.engines.backends.opencode import OpenCodeBackend
 

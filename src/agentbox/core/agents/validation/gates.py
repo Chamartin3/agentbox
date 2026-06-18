@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 import jsonschema as _jsonschema
 
-from agentbox.config import SETTINGS
+from agentbox.core.config import SETTINGS
 from agentbox.core.agents.validation.errors import (
     extract_json,
     format_jsonschema_error,

@@ -16,7 +16,7 @@ from agentbox.core.constants import BackendName
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 
 if TYPE_CHECKING:
-    from agentbox.core.data.workspaces.templates import WorkenvTemplatesMixin
+    from agentbox.core.db.workspaces.templates import WorkenvTemplatesMixin
 
 _SEEDS_DIR = Path(__file__).parent / "seeds"
 

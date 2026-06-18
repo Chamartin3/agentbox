@@ -1,4 +1,4 @@
-"""Canonical tool-name vocabulary (Plan 061).
+"""Canonical tool-name vocabulary.
 
 A single enum that is the authoritative list of internal tool names.
 Because ``CanonicalTool`` extends ``CatalogEnum`` (which extends

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.api.deps import get_settings
-from agentbox.config import Settings
+from agentbox.core.config import Settings
 from agentbox.core.execution.dispatch import deliver_webhook, dispatch_completion
 from agentbox.core.execution.dispatch.payload import build_completion_payload
 from agentbox.core.execution.dispatch.policy import apply_delivery_outcome

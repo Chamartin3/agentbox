@@ -113,7 +113,7 @@ class TestJsonSchemaToPydanticModel:
 
 class TestTokenBackendRender:
     def test_render_builds_agent_meta(self, tmp_path: Path) -> None:
-        from agentbox.core.data import AgentDef, RunnerSpec
+        from agentbox.core.db import AgentDef, RunnerSpec
         from agentbox.core.engines.backends.token import TokenBackend
 
         schema = {"type": "object", "properties": {"name": {"type": "string"}}}
@@ -146,7 +146,7 @@ class TestTokenBackendRender:
         assert rendered.agent_meta["timeout_seconds"] == 60
 
     def test_render_handles_missing_schema(self, tmp_path: Path) -> None:
-        from agentbox.core.data import AgentDef, RunnerSpec
+        from agentbox.core.db import AgentDef, RunnerSpec
         from agentbox.core.engines.backends.token import TokenBackend
 
         agent = AgentDef(

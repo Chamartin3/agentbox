@@ -18,7 +18,7 @@ from agentbox.core.agents.resolve import (
 from agentbox.core.engines import get_provider, list_providers
 
 if TYPE_CHECKING:
-    from agentbox.core.data import RunnerProfileCreate, RunnerProfilePatch
+    from agentbox.core.db import RunnerProfileCreate, RunnerProfilePatch
 
 
 class InvalidProfile(ValueError):

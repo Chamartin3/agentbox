@@ -1,7 +1,4 @@
-"""Subprocess streaming helpers for backend adapters.
-
-Moved from ``core.execution.streaming`` in Plan 44.
-"""
+"""Subprocess streaming helpers for backend adapters."""
 
 from agentbox.core.engines.streaming.jsonl import stream_jsonl_subprocess
 from agentbox.core.engines.streaming.rate_limit import (

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.data import SnapshotStore
+from agentbox.core.db import SnapshotStore
 from agentbox.core.tools.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )

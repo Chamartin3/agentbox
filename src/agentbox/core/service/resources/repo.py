@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import cast
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.data import RepoResourceRow, SessionStore
+from agentbox.core.db import RepoResourceRow, SessionStore
 
 __all__ = [
     "ResourceNotFound",

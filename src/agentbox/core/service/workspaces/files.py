@@ -10,9 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from agentbox.config import Settings
+from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.service.prompts import AgentNotFound
 
 from .errors import WorkspaceNotFound, WorkspacePathEscape

@@ -1,4 +1,4 @@
-"""Agent validation config management — extracted from prompt.py per plan 037.
+"""Agent validation config management.
 
 Handles validator normalization, ``get_agent_validation``, and
 ``put_agent_validation``.
@@ -15,7 +15,7 @@ from agentbox.core.agents.composition.drift import (
     _build_snapshot,
 )
 from agentbox.core.constants import ValidatorKind
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.agents.prompt.patch import (
     AgentServiceError,

@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.config import Settings
-from agentbox.core.data import ProjectManifest, SessionStore
+from agentbox.core.config import Settings
+from agentbox.core.db import ProjectManifest, SessionStore
 from agentbox.core.resources.boot import (
     import_composition_references,
     import_repo_resources,
     sweep_workspace_skill_bindings,
 )
-from agentbox.core.resources.composition import (
+from agentbox.core.resources.legacy_composition import (
     migrate_composition_to_bindings,
 )
 from agentbox.core.resources.migration import (

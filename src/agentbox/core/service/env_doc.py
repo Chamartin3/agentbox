@@ -10,8 +10,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agentbox.config import Settings
-from agentbox.core.data import SessionStore
+from agentbox.core.config import Settings
+from agentbox.core.db import SessionStore
 from agentbox.core.workspaces.build import build_workspace_by_name
 
 _log = logging.getLogger(__name__)

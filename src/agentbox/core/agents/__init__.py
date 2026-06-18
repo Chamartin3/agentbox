@@ -35,12 +35,12 @@ from agentbox.core.agents.runtime import (
     ComposedPrompt as ComposedPrompt,
     capture_fragments as capture_fragments,
     compose_prompt as compose_prompt,
-    validate_output as validate_output,
 )
 from agentbox.core.agents.validation import (
     ValidationEngine as ValidationEngine,
     ValidationResult as ValidationResult,
     resolve_schema as resolve_schema,
+    validate_output as validate_output,
 )
 
 __all__ = [

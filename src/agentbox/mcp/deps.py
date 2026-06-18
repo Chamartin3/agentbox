@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
-from agentbox.config import Settings, load_settings
+from agentbox.core.config import Settings, load_settings
+from agentbox.core.db import Database
 from agentbox.core.service import SessionStore
 from agentbox.core.service import ProjectManifest
 
@@ -35,6 +36,7 @@ class _NoopLoader:
 class Context:
     settings: Settings
     store: SessionStore
+    db: Database
     loader: _NoopLoader
 
 
@@ -42,4 +44,5 @@ class Context:
 def get_context() -> Context:
     settings = load_settings()
     store = SessionStore(settings.db_path)
-    return Context(settings=settings, store=store, loader=_NoopLoader())
+    db = Database(settings.db_path)
+    return Context(settings=settings, store=store, db=db, loader=_NoopLoader())

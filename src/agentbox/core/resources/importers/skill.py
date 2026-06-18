@@ -3,7 +3,7 @@
 A "skill" is a folder with a `SKILL.md` entry file. Frontmatter (YAML
 between the first two ``---`` markers, or simple ``key: value`` lines
 before the first heading) provides ``name`` / ``description`` shown in
-listings and used by prompt-embed bindings (Plan 02).
+listings and used by prompt-embed bindings.
 """
 
 from __future__ import annotations

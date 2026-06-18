@@ -1,17 +1,14 @@
 """Conversation source for pi sessions.
 
-Plan 16 Phase 2 — first cut. pi exposes session state on disk under
-``~/.pi/sessions/`` but the schema isn't pinned across versions; rather
-than guess, this source returns an empty ``ConversationView`` pointing
-at the captured session id so the UI / MCP can fall back to the
-agentbox JSONL transcript.
-
-Promote to a real parser once the pi session layout is stable.
+pi exposes session state on disk under ``~/.pi/sessions/`` but the schema
+isn't pinned across versions; rather than guess, this source returns an
+empty ``ConversationView`` pointing at the captured session id so the
+UI / MCP can fall back to the agentbox JSONL transcript.
 """
 
 from __future__ import annotations
 
-from agentbox.core.data import RunRecord
+from agentbox.core.db import RunRecord
 from agentbox.core.execution.observability.conversation.base import ConversationSource
 from agentbox.core.execution.observability.conversation.types import ConversationView, TokenTotals
 

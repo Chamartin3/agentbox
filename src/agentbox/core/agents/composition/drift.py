@@ -15,12 +15,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
 from agentbox.core.agents.config import build_config_json_payload
-from agentbox.core.data import RunnerProfileCreate
+from agentbox.core.db import RunnerProfileCreate
 
 if TYPE_CHECKING:
-    from agentbox.core.data import AgentVersionsMixin
-    from agentbox.core.data import AgentDef
-    from agentbox.core.data import RunnerProfilesMixin
+    from agentbox.core.db import AgentVersionsMixin
+    from agentbox.core.db import AgentDef
+    from agentbox.core.db import RunnerProfilesMixin
 
 
 class _PromptSyncStore(Protocol):
@@ -266,7 +266,7 @@ def startup_sweep(
     TOML definition is unchanged.
 
     For agents with a [runner] block, creates or reuses a runner profile
-    and binds it to the agent (Phase 13f import).
+    and binds it to the agent.
     """
     shared_roots = shared_roots or {}
     for agent in agents:
@@ -327,7 +327,7 @@ def startup_sweep(
         # agent-definition drift and must be versioned in their own table.
         _sync_prompt(agent, cast(_PromptSyncStore, store), project_root)
 
-    # Phase 5: degraded-mode boot — warn (don't fail) for agents with no
+    # Degraded-mode boot — warn (don't fail) for agents with no
     # runner profile binding. They remain non-runnable until bound; the
     # executor enforces this at dispatch time via `_fail_pre_run`.
     if hasattr(store, "get_agent_runner_profile"):

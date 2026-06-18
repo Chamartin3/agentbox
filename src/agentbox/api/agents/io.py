@@ -1,8 +1,4 @@
-"""DB-only write endpoints under /api/agents (Plan 18).
-
-These supersede the legacy ``/api/manifest/agents/*`` write endpoints.
-The manifest routes 308-redirect here for one release.
-"""
+"""DB-only write endpoints under /api/agents."""
 
 from __future__ import annotations
 

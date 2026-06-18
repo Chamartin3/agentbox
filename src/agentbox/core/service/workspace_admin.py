@@ -6,7 +6,7 @@ of reaching into ``SessionStore`` directly.
 
 from __future__ import annotations
 
-from agentbox.core.data import EnvDocRow, SessionStore, WorkspaceRow
+from agentbox.core.db import EnvDocRow, SessionStore, WorkspaceRow
 
 
 # ── Workspace registry ──────────────────────────────────────────────────

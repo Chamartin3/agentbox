@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.service.env_doc import (
     env_doc_body,
     render_env_doc_preview,

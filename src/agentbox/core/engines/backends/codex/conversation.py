@@ -1,20 +1,15 @@
 """Conversation source for Codex sessions.
 
-Plan 16 Phase 2 — first cut. Codex does not currently expose a stable
-``export`` command for replaying past sessions, so this source returns
-an empty ``ConversationView`` pointing at the captured session id. The
-caller (UI / MCP) can render a "no native conversation available, see
-the agentbox transcript" hint and fall back to ``TranscriptSource``.
-
-Once codex exposes a deterministic session export (or a documented
-on-disk layout under ``~/.codex/sessions/``), grow this source to parse
-the messages into ``Turn`` objects analogous to
-:class:`~agentbox.core.engines.backends.opencode.conversation.OpencodeSessionSource`.
+Codex does not currently expose a stable ``export`` command for replaying
+past sessions, so this source returns an empty ``ConversationView`` pointing
+at the captured session id. The caller (UI / MCP) can render a "no native
+conversation available, see the agentbox transcript" hint and fall back to
+``TranscriptSource``.
 """
 
 from __future__ import annotations
 
-from agentbox.core.data import RunRecord
+from agentbox.core.db import RunRecord
 from agentbox.core.execution.observability.conversation.base import ConversationSource
 from agentbox.core.execution.observability.conversation.types import ConversationView, TokenTotals
 

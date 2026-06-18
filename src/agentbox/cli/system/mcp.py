@@ -7,7 +7,7 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.config import load_settings
+from agentbox.core.config import load_settings
 
 mcp_app = typer.Typer(
     name="mcp",

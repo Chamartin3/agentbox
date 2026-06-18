@@ -10,12 +10,12 @@ from rich.text import Text
 from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.constants import BackendName
-from agentbox.core.data.system.project_config import (
+from agentbox.core.db.system.project_config import (
     PROJECT_MCP_SERVERS,
     PROJECT_RUNTIME,
     PROJECT_SHARED_ASSETS,
 )
-from agentbox.core.data.system.seeds import backfill as _backfill_prompt_versions
+from agentbox.core.db.system.seeds import backfill as _backfill_prompt_versions
 from agentbox.core.migrations import migrate_capabilities_to_manifest
 from agentbox.core.service import (
     ProjectManifest,
@@ -218,7 +218,7 @@ def import_manifest(
 def migrate_prompt_versions() -> None:
     """Backfill ``runs.prompt_version_id`` from historical prompt_versions.
 
-    See ``agentbox.core.data.backfill_prompt_versions``.
+    See ``agentbox.core.db.backfill_prompt_versions``.
     """
     store = get_store()
     n = _backfill_prompt_versions(store)

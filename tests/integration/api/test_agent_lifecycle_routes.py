@@ -223,7 +223,7 @@ class TestPublishWebhook:
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        from agentbox.core.data import agent_versions
+        from agentbox.core.db import agent_versions
 
         with store.engine.begin() as conn:
             conn.execute(
@@ -274,7 +274,7 @@ class TestPublishWebhook:
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        from agentbox.core.data import agent_versions
+        from agentbox.core.db import agent_versions
 
         with store.engine.begin() as conn:
             conn.execute(
@@ -322,7 +322,7 @@ class TestPublishWebhook:
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        from agentbox.core.data import agent_versions
+        from agentbox.core.db import agent_versions
 
         with store.engine.begin() as conn:
             conn.execute(

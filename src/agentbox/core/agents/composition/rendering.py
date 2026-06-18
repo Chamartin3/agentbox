@@ -1,11 +1,10 @@
-"""Render a resource version for prompt-embed callers (Plan 02).
+"""Render a resource version for prompt-embed callers.
 
 Per-type semantics:
 
 - ``document`` — the entire blob (text decoded).
-- ``folder``  — a manifest listing of relative paths (NOT the bodies),
-  matching the Plan 01/D6 decision that folder embeds are summaries
-  only.
+- ``folder``  — a manifest listing of relative paths (NOT the bodies);
+  folder embeds are summaries only.
 - ``skill``   — the ``SKILL.md`` body only (the rest of the skill folder
   is delivered via workspace materialize, not prompt-embed).
 

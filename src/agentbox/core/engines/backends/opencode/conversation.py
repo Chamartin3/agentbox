@@ -21,7 +21,7 @@ from contextlib import suppress
 from typing import Final
 
 from agentbox.core.constants import ContentBlockType, MessageRole
-from agentbox.core.data import RunRecord
+from agentbox.core.db import RunRecord
 from agentbox.core.execution.observability.conversation.base import ConversationSource
 from agentbox.core.execution.observability.conversation.types import (
     ContentPart,

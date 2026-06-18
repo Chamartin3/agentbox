@@ -1,4 +1,4 @@
-"""Resolve `{{resource:<marker>}}` markers in an agent prompt (Plan 02).
+"""Resolve `{{resource:<marker>}}` markers in an agent prompt.
 
 Pure function: takes a prompt template and the agent's bindings (with
 their resolved blob lists) and returns the spliced prompt plus a

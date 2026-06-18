@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from agentbox.config import SETTINGS
+from agentbox.core.config import SETTINGS
 from agentbox.core.tools import discover_tools
 from agentbox.mcp.tools import (
     agent_tools,

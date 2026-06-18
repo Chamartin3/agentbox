@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import pytest
 from agentbox.core.engines.providers.base import ProviderDescriptor
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.service.engines.providers import (
     InvalidProviderRequest,
     ProviderAuthFailed,

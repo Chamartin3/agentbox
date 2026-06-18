@@ -11,7 +11,7 @@ from agentbox.core.service.execution.types import RunNotFound
 from agentbox.core.constants import RunStatus
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
     from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)

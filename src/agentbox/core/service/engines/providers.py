@@ -33,7 +33,7 @@ from agentbox.core.engines import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

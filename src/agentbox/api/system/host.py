@@ -1,4 +1,4 @@
-"""Host-env provisioning routes (Plan 062).
+"""Host-env provisioning routes.
 
 Host-environment capabilities are **provisioning**, not authorization.
 They declare what host capabilities *exist* in a workspace (filesystem

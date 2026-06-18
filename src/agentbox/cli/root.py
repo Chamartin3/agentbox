@@ -14,7 +14,7 @@ from rich.text import Text
 from agentbox.cli._deps import get_loader as _DefinitionLoaderShim
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
-from agentbox.config import load_settings
+from agentbox.core.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
 from agentbox.core.engines import CredentialState, list_backends, list_credentials as _creds_list
 

@@ -1,4 +1,4 @@
-"""Resource blob cache for symlink materialization (Plan 08 Phase 2).
+"""Resource blob cache for symlink materialization.
 
 ``ensure_cached(version_id, blobs, cache_root)`` writes blobs to
 ``<cache_root>/<version_id>/`` exactly once (idempotent). Uses an

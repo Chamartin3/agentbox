@@ -1,4 +1,4 @@
-"""Workspace MCP provisioning routes (Plan 062).
+"""Workspace MCP provisioning routes.
 
 MCP server setup and tool toggles are **provisioning / scope** controls,
 not authorization.  They express *what is installed and visible* in the

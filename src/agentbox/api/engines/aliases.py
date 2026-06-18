@@ -1,11 +1,8 @@
 """Alias router: ``/api/providers/**`` → ``/api/runner-profiles/**``.
 
-Part of IMPROVEMENTS.md Phase 4. The Settings UI uses the new name
-("providers"). Server keeps the old prefix as the canonical implementation
-for one release; this router 307-redirects so request bodies and methods
-are preserved.
-
-A future cleanup can swap the canonical prefix and flip the alias direction.
+The Settings UI uses the new name ("providers"). Server keeps the old prefix
+as the canonical implementation; this router 307-redirects so request bodies
+and methods are preserved.
 """
 
 from __future__ import annotations

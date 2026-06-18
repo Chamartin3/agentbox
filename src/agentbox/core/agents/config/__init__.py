@@ -1,8 +1,6 @@
 """Structured accessors for agent semantics stored in ``config_json``.
 
-Phase 2 of the runner-DB-as-source-of-truth refactor. These dataclasses
-split what was historically jammed into ``AgentDef.runner`` into three
-logical buckets:
+These dataclasses split agent config into three logical buckets:
 
 - ``ExecutionConfig`` — validation/retry semantics (executor-level).
 - ``RuntimeConfig`` — runtime/tooling knobs (MCP config, allowed tools).

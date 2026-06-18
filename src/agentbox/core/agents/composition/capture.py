@@ -21,10 +21,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.constants import BackendName
-from agentbox.core.data import AgentDef
+from agentbox.core.db import AgentDef
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 
 @dataclass

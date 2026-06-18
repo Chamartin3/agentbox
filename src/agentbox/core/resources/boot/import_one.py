@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.data.resources._rows import hash_blobs
+from agentbox.core.db.resources._rows import hash_blobs
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.skill import SkillImporter
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

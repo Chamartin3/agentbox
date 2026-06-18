@@ -23,10 +23,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
 import yaml
 
-from agentbox.core.data import RunEvent
+from agentbox.core.db import RunEvent
 from ._mcp_types import McpToolSpec
 from .rendered import RenderedConfig
 from .views import ComposedView, RuntimeConfigView
+
+if TYPE_CHECKING:
+    from agentbox.core.tools.canonical import CanonicalTool
 
 if TYPE_CHECKING:
     from agentbox.core.workspaces.generation.config import WorkenvConfig
@@ -118,6 +121,7 @@ class BackendAdapter(ABC):
         *,
         runtime_config: RuntimeConfigView | None = None,
         host_capabilities: dict[str, Any] | None = None,
+        ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         """Analyse ``agent`` and ``workdir``, return a frozen run config.
@@ -130,9 +134,9 @@ class BackendAdapter(ABC):
         adapters must not read ``agent.runner`` for backend/model/timeout/
         extra_args fallback.
 
-        ``runtime_config`` and ``host_capabilities`` are pre-computed by
-        the executor so backends never import ``core.agents.*`` or
-        ``core.workspace.*`` directly.
+        ``runtime_config``, ``host_capabilities``, and ``ws_allowed_tools``
+        are pre-computed by the executor so backends never import
+        ``core.agents.*`` or ``core.workspace.*`` directly.
         """
 
     @abstractmethod
@@ -144,9 +148,9 @@ class BackendAdapter(ABC):
     ) -> AsyncIterator[RunEvent]:
         """Execute the agent using ``rendered`` and stream events.
 
-        ``rendered.files`` have already been materialised on disk by
-        the executor. The implementation must yield a terminal
-        ``DoneEvent``.
+        Workspace files are materialised on disk by the workspace generator
+        before this method is called. The implementation must yield a
+        terminal ``DoneEvent``.
         """
         if False:
             yield  # pragma: no cover — signals async generator
@@ -169,30 +173,6 @@ class BackendAdapter(ABC):
             if isinstance(ctx, str) and ctx:
                 return ctx
         return "CLAUDE.md"
-
-    def _collect_system_files(
-        self,
-        agent: Any,
-        workdir: Path,
-        composed: ComposedView | None = None,
-    ) -> dict[Path, bytes]:
-        """Collect the engine's instruction file for materialisation.
-
-        Targets the filename the engine actually reads (see
-        :meth:`context_filename`). Prefers ``composed.system`` (set by the
-        prompt composer when fragments are merged) over the on-disk file in
-        the workdir. Returns an empty dict when neither exists.
-        """
-        name = self.context_filename()
-        files: dict[Path, bytes] = {}
-        composed_system = composed.system if composed is not None else None
-        if composed_system is not None:
-            files[Path(name)] = composed_system.encode("utf-8")
-        else:
-            existing = workdir / name
-            if existing.exists():
-                files[Path(name)] = existing.read_bytes()
-        return files
 
     def _resolve_prompt(
         self,

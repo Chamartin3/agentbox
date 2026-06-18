@@ -15,7 +15,7 @@ from agentbox.core.agents.composition.output_contract import render as _render_o
 from agentbox.core.agents.composition.rendering import render_for_type
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 
 class PreviewError(Exception):

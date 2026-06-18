@@ -100,8 +100,8 @@ class PythonAgentConfig:
 
     ``output_schema_path`` is included here because it's part of how
     the runtime locates the schema for the executor's validation loop.
-    Long-term it should move to a binding (per the original plan); for
-    now we keep the path-based contract.
+    Long-term it should move to a binding; for now we keep the
+    path-based contract.
     """
 
     agent_module: str | None = None
@@ -125,7 +125,7 @@ class HttpValidatorConfig:
     ``description`` is the human-readable constraint this validator
     enforces. It's rendered into the system prompt as a bullet under
     ``## Constraints`` so the model sees both the rule and knows it's
-    enforced. Plan 22 — validators own their constraint text.
+    enforced. Validators own their constraint text.
     """
 
     kind: Literal["http"] = "http"
@@ -167,7 +167,7 @@ ValidatorConfig = HttpValidatorConfig | ScriptValidatorConfig
 class OutputConfig:
     """Resolved output validation surface for a single run.
 
-    Two independent pieces (Plan 22 retired the floating ``rules[]``):
+    Two independent pieces:
 
     - ``json_schema`` — Gate-1 structural validation. Sourced from the
       agent's ``slot='output_schema'`` resource binding. Its existence

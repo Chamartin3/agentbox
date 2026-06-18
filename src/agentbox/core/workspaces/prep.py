@@ -26,8 +26,8 @@ from agentbox.core.workspaces.generation.workspace_files import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.config import Settings
-    from agentbox.core.data import AgentDef, RunStore, WorkspaceBuildStore
+    from agentbox.core.config import Settings
+    from agentbox.core.db import AgentDef, RunStore, WorkspaceBuildStore
 
 logger = logging.getLogger(__name__)
 
@@ -376,6 +376,7 @@ def prepare_run_workdir(
     agent: AgentDef,
     workdir: Path,
     mcp_registry: Any = None,
+    system_prompt: str | None = None,
 ) -> tuple[Path, list[dict]]:
     """Project workspace state into a fresh per-run run dir.
 
@@ -441,7 +442,7 @@ def prepare_run_workdir(
     wsid = workspace_id if workspace_id and workspace_id != "<ephemeral>" else agent.id
     config = load_workenv(store, wsid, settings=settings, permissions=None)
     for engine in list_recipes():
-        render(run_dir, config, load_recipe(engine))
+        render(run_dir, config, load_recipe(engine), system_prompt=system_prompt)
 
     # Claude runs with `--mcp-config .mcp.json --strict-mcp-config`, which
     # errors if the file is absent; render only emits it when servers exist.

@@ -10,8 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.config import load_settings
-from agentbox.core.data import SessionStore
+from agentbox.core.config import load_settings
+from agentbox.core.db import SessionStore
 from agentbox.core.service.lifecycle import (
     StartupReport,
     run_startup_tasks,

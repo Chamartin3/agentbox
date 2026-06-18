@@ -1,4 +1,4 @@
-"""Control-plane MCP tools for agent tool grant management (Plan 19)."""
+"""Control-plane MCP tools for agent tool grant management."""
 
 from __future__ import annotations
 

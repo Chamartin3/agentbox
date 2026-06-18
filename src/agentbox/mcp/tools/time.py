@@ -19,10 +19,10 @@ def register(mcp: FastMCP) -> None:
         Use this to decide whether you have enough budget to perform
         additional tool calls, reasoning steps, or output generation.
         """
-        store = get_context().store
-        loader = get_context().loader
+        ctx = get_context()
+        loader = ctx.loader
 
-        run = store.get_run(run_id)
+        run = ctx.db.runs.get(run_id)
         if run is None:
             return {"error": f"run {run_id!r} not found"}
 

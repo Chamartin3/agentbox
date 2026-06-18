@@ -11,11 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.config import Settings
+from agentbox.core.config import Settings
 from agentbox.core.resources.skills import discover_skills
 
 if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef, SessionStore, WorkspaceLookupStore
+    from agentbox.core.db import AgentDef, SessionStore, WorkspaceLookupStore
 
 
 @dataclass(frozen=True)

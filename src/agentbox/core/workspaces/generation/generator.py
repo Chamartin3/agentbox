@@ -18,6 +18,8 @@ def render(
     target_dir: Path,
     config: WorkenvConfig,
     recipe: Recipe,
+    *,
+    system_prompt: str | None = None,
 ) -> RenderedDir:
     """Render a ``WorkenvConfig`` to disk against a ``Recipe``.
 
@@ -25,9 +27,12 @@ def render(
     the recipe layout prescribes. Engine-specific config blobs come from
     the backend's ``build_workspace_items`` hook.
 
+    When ``system_prompt`` is provided, it replaces the env-doc baseline
+    as the content for the ``context`` role item (CLAUDE.md / AGENTS.md).
+
     Callers may want to call ``config.validate()`` before rendering.
     """
-    items = _build_items(config, recipe)
+    items = _build_items(config, recipe, system_prompt=system_prompt)
     try:
         items += backend_for_engine(recipe.engine).build_workspace_items(config)
     except KeyError:
@@ -46,13 +51,19 @@ def render(
     return RenderedDir(target_dir=target_dir, written_paths=written)
 
 
-def _build_items(config: WorkenvConfig, recipe: Recipe) -> list[Item]:
+def _build_items(
+    config: WorkenvConfig,
+    recipe: Recipe,
+    *,
+    system_prompt: str | None = None,
+) -> list[Item]:
     items: list[Item] = []
 
     # Env-doc body → the engine's instruction file (CLAUDE.md / AGENTS.md).
     # Plain text, identical for every engine; the recipe owns the filename.
+    # When a per-run system_prompt is provided, it replaces the env-doc baseline.
     if recipe.layout.get("context"):
-        items.append(_build_context(config, recipe))
+        items.append(_build_context(config, recipe, system_prompt=system_prompt))
 
     # Subagents render from the recipe's subagent template. Engines whose
     # format can't be expressed as a text template (e.g. Codex's escaped
@@ -106,9 +117,15 @@ def _build_items(config: WorkenvConfig, recipe: Recipe) -> list[Item]:
     return items
 
 
-def _build_context(config: WorkenvConfig, recipe: Recipe) -> Item:
+def _build_context(
+    config: WorkenvConfig,
+    recipe: Recipe,
+    *,
+    system_prompt: str | None = None,
+) -> Item:
     tmpl = recipe.resolve_template("context") or _default_context_template
-    content = string.Template(tmpl).safe_substitute(env_doc=_resolve_env_doc(config))
+    env_content = system_prompt if system_prompt is not None else _resolve_env_doc(config)
+    content = string.Template(tmpl).safe_substitute(env_doc=env_content)
     return Item(role=Role.context, name=config.name, content=content)
 
 

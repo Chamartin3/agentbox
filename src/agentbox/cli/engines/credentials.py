@@ -11,7 +11,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agentbox.cli._common import console
-from agentbox.config import SETTINGS
+from agentbox.core.config import SETTINGS
 from agentbox.core.engines.credentials import (
     CredentialMethod,
     CredentialState,

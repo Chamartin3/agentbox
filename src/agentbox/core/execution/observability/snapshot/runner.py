@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agentbox.core.data import AgentDef, RunnerSnapshot, SnapshotStore, now_iso
+from agentbox.core.db import AgentDef, RunnerSnapshot, SnapshotStore, now_iso
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 
 logger = logging.getLogger(__name__)

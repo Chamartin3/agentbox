@@ -10,7 +10,7 @@ from typing import Any, cast
 
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.constants import SessionMode
-from agentbox.core.data import AgentDef, SessionStore
+from agentbox.core.db import AgentDef, SessionStore
 
 
 class AgentAlreadyExists(ValueError):

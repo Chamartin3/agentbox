@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.workspaces.build import build_workspace, build_workspace_by_name
 
 

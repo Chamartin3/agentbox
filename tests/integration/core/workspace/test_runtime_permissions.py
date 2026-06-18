@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 
 
 def test_no_overlay_row_returns_none(tmp_path: Path) -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
-from agentbox.core.data import RunRecord
+from agentbox.core.db import RunRecord
 from agentbox.core.execution.observability.conversation.types import ConversationView
 
 

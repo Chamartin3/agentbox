@@ -1,4 +1,4 @@
-"""Tests for ``core.service.feedback`` — enrichment + rollups over run rows."""
+"""Tests for ``core.service.execution.feedback`` — enrichment + rollups over run rows."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.service import SessionStore
-from agentbox.core.service.feedback import (
+from agentbox.core.service.execution.feedback import (
     enrich_recent_runs,
     since_iso,
     summary,
@@ -60,3 +60,34 @@ def test_summary_shapes_correctly(store: SessionStore) -> None:
     """Verify summary returns a dict-shaped response."""
     result = summary(store, range_="7d")
     assert isinstance(result, dict)
+
+
+# ── facade contract ─────────────────────────────────────────────────────
+
+
+def test_feedback_facade_exports_required_functions() -> None:
+    from agentbox.core.service.execution.feedback import (
+        activity_summary,
+        add_comment,
+        aggregate_usage,
+        distinct_executors,
+        enrich_recent_runs,
+        list_comments,
+        success_rate,
+        summary,
+    )
+
+    assert callable(activity_summary)
+    assert callable(add_comment)
+    assert callable(aggregate_usage)
+    assert callable(distinct_executors)
+    assert callable(enrich_recent_runs)
+    assert callable(list_comments)
+    assert callable(success_rate)
+    assert callable(summary)
+
+
+def test_old_feedback_package_is_gone() -> None:
+    parts = ["agentbox", "core", "service", "feedback"]
+    with pytest.raises(ImportError):
+        __import__(".".join(parts))

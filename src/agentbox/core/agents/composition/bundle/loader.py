@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.data import CompositionConfig
+from agentbox.core.db import CompositionConfig
 from agentbox.core.agents.composition.bundle import (
     ComposeResult,
     compose_from_source,
@@ -54,10 +54,9 @@ def load_bundle_from_bindings(
 ) -> Bundle:
     """Build a Bundle backed by agent_prompt_resource_bindings.
 
-    DB-as-source-of-truth (Plan 18): composition state comes from
-    bindings, with a fallback to ``agent_versions.prompt_content``
-    when no slot='system' binding exists. The on-disk bundle is
-    never consulted at runtime.
+    DB-as-source-of-truth: composition state comes from bindings, with a
+    fallback to ``agent_versions.prompt_content`` when no slot='system'
+    binding exists. The on-disk bundle is never consulted at runtime.
     """
     source = BindingsBundleSource(agent_id=agent_id, store=store)
     # Synthesize a CompositionConfig from the source's composition dict so

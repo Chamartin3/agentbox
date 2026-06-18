@@ -21,7 +21,8 @@ import typer
 from agentbox.cli._deps import get_loader as _get_loader
 from agentbox.cli._common import console
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.config import load_settings
+from agentbox.core.config import load_settings
+from agentbox.core.db import Database
 from agentbox.core.service.workspaces import launch_runner_configs
 from agentbox.core.service import SessionStore
 from agentbox.core.workspaces.prep import render_env_doc
@@ -49,6 +50,7 @@ def shell_cmd(
     """
     settings = load_settings()
     loader = _get_loader()
+    _db = Database(settings.db_path)
     store = SessionStore(settings.db_path)
 
     agent_def = get_agent_def(store, agent)
@@ -99,6 +101,7 @@ def _render_env_doc(
     if not ws_name or ws_name == "<ephemeral>":
         return False
     try:
+        _db = Database(settings.db_path)
         store = SessionStore(settings.db_path)
         ws = get_workspace(store, ws_name)
         if not ws:

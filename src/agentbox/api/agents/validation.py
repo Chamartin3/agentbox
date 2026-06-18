@@ -1,5 +1,4 @@
-"""Per-agent validation: inline ``config_json[direction].validators``
-endpoints (Plan 23 Phase 3).
+"""Per-agent validation: inline ``config_json[direction].validators`` endpoints.
 
 Two endpoints:
 

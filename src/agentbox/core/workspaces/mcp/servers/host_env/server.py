@@ -1,4 +1,4 @@
-"""Host-environment FastMCP stdio server (Plan 08 Phase 3).
+"""Host-environment FastMCP stdio server.
 
 Spawned by the executor as a subprocess when a run's workspace has
 host-env grants. Communicates over stdio (MCP protocol).

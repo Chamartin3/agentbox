@@ -10,7 +10,7 @@ import typer
 from agentbox.cli._common import console
 from agentbox.cli._deps import get_store
 from agentbox.cli.agents.crud import agent_app
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.service import AgentDef, get_agent_def
 
 @agent_app.command("export")

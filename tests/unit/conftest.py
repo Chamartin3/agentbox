@@ -37,7 +37,7 @@ def mock_executor() -> MagicMock:
 @pytest.fixture
 def make_agent_def():
     """Factory returning a minimal valid AgentDef for unit tests."""
-    from agentbox.core.data import AgentDef, RunnerSpec
+    from agentbox.core.db import AgentDef, RunnerSpec
 
     def _make(**overrides) -> AgentDef:
         defaults: dict = {
@@ -54,7 +54,7 @@ def make_agent_def():
 @pytest.fixture
 def make_runner_spec():
     """Factory returning a minimal valid RunnerSpec."""
-    from agentbox.core.data import RunnerSpec
+    from agentbox.core.db import RunnerSpec
 
     def _make(**overrides) -> RunnerSpec:
         defaults: dict = {"kind": "claude_code"}

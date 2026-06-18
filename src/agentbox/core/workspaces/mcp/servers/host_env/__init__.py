@@ -1,4 +1,4 @@
-"""Host-environment FastMCP server (Plan 08 Phase 3).
+"""Host-environment FastMCP server.
 
 Run as a stdio subprocess via the executor:
     python -m agentbox.core.workspaces.mcp.servers.host_env

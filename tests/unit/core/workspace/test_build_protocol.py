@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from agentbox.core.data import WorkspaceBuildStore
+from agentbox.core.db import WorkspaceBuildStore
 from agentbox.core.workspaces.build import build_workspace
 
 

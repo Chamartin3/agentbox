@@ -30,7 +30,7 @@ from agentbox.cli._deps import (
     get_store,
 )
 from agentbox.cli._common import console
-from agentbox.config import Settings, load_settings
+from agentbox.core.config import Settings, load_settings
 from agentbox.core.constants import RunnerKind
 from agentbox.core.service import AgentDef
 from agentbox.core.service.workspaces import launch_runner_configs
@@ -156,7 +156,7 @@ def _launch_session(
 
     _apply_creds(creds, settings)
 
-    # Phase 1: sync env-doc, subagents, and resource bindings into the
+    # Sync env-doc, subagents, and resource bindings into the
     # workspace before the runner starts. Skipped for ephemeral/unnamed
     # workspaces (build_workspace also no-ops on those).
     if workspace_name and not is_ephemeral:

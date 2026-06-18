@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.resources.boot import (
     import_one_skill,
     import_repo_resources,

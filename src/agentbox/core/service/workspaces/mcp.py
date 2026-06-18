@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from agentbox.core.data import SessionStore
-from agentbox.core.data.execution.snapshots import McpSnapshot
+from agentbox.core.db import SessionStore
+from agentbox.core.db.execution.snapshots import McpSnapshot
 
 __all__ = [
     "resolve_workspace_mcp",

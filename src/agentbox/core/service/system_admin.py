@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import secrets as _secrets
 
-from agentbox.core.data import McpServerSpec
-from agentbox.core.data import SessionStore
+from agentbox.core.db import McpServerSpec
+from agentbox.core.db import SessionStore
 
 
 # ── Settings ────────────────────────────────────────────────────────────

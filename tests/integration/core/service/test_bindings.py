@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 from agentbox.core.service import bindings as bs
 from agentbox.core.service import resources as res_service
 from agentbox.core.service.bindings import AgentVersionMissing

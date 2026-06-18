@@ -35,11 +35,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.agents import compose_prompt
-from agentbox.core.data import AgentDef
+from agentbox.core.db import AgentDef
 
 if TYPE_CHECKING:
-    from agentbox.config import Settings
-    from agentbox.core.data import RunStore
+    from agentbox.core.config import Settings
+    from agentbox.core.db import RunStore
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-"""Canonical built-in tools taxonomy (Plan 08 Phase 10).
+"""Canonical built-in tools taxonomy.
 
 Defines the standardized tool names, signatures, and capability
 alignment. Per-backend native-name maps live in

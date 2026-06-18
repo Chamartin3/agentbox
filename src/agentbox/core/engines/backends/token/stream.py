@@ -22,7 +22,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from agentbox.core.constants import LogLevel, MessageRole
-from agentbox.core.data import (
+from agentbox.core.db import (
     LogEvent,
     RunEvent,
     TextEvent,

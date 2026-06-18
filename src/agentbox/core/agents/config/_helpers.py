@@ -92,7 +92,7 @@ def resolve_output_config(store: Any, agent: Any) -> OutputConfig:
     1. **Schema** — from the agent's active ``slot='output_schema'``
        prompt binding (resolved blob of the pinned-or-active version).
     2. **Validators** — inline ``config_json["output"].validators`` on
-       the active agent_version (the only path after Plan 23).
+       the active agent_version.
 
     Either may be absent.
     """

@@ -21,7 +21,7 @@ from agentbox.core.service.resources.repo import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 __all__ = [
     "get_blob",

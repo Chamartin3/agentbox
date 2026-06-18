@@ -1,4 +1,4 @@
-"""Workspace environment-instruction doc routes (Plan 04)."""
+"""Workspace environment-instruction doc routes."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Workspace sync orchestrator (Plan: interactive-sessions Phase 1).
+"""Workspace sync orchestrator.
 
 A single entrypoint that materializes the full workspace context onto
 disk: env-doc (CLAUDE.md / AGENTS.md), per-provider subagent files,
@@ -34,8 +34,8 @@ from agentbox.core.workspaces.prep import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.config import Settings
-    from agentbox.core.data import SessionStore
+    from agentbox.core.config import Settings
+    from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 
 from agentbox.core.constants import RunStatus
-from agentbox.core.data import RunStore
+from agentbox.core.db import RunStore
 
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult
 

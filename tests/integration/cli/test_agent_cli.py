@@ -43,7 +43,7 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def _seed_agent(store, agent_id: str = "t1", **kw) -> dict:
-    from agentbox.core.data import AgentDef
+    from agentbox.core.db import AgentDef
 
     agent_def = AgentDef(
         id=agent_id,

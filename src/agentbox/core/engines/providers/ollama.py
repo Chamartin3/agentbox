@@ -9,7 +9,7 @@ from urllib.parse import urlparse, urlunparse
 
 import httpx
 
-from agentbox.config import SETTINGS
+from agentbox.core.config import SETTINGS
 from agentbox.core.constants import BackendName
 from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,

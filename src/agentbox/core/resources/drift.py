@@ -1,4 +1,4 @@
-"""Resource migration sweeps (Plan 08 Phase 8).
+"""Resource migration sweeps.
 
 Boot-time sweeps that import existing on-disk content into the resource
 repository and propose bindings for prompt markers. Designed to be called
@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from agentbox.core.constants import ResourceType
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

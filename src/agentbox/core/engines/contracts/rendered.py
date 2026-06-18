@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.resources.skills import SkillPack
+from agentbox.core.tools.canonical import CanonicalTool
 from ._mcp_types import McpToolSpec
 from .views import PythonAgentConfigView, RuntimeConfigView
 
@@ -19,17 +20,14 @@ class RenderedConfig:
     """Immutable description of an agent run's runtime configuration.
 
     ``render()`` on a backend adapter produces one of these. The executor
-    materialises ``files`` to disk, then passes the same object to
-    ``run()`` so the adapter never needs to re-inspect the workspace.
+    passes the same object to ``run()`` so the adapter never needs to
+    re-inspect the workspace.
 
     Cross-domain values that backends previously fetched via direct
     imports from ``core.agents.*``, ``core.workspace.*``, or
     ``core.resource.*`` are populated here by the executor during setup.
     Backends read them from this object — never from other domains.
     """
-
-    files: Mapping[Path, bytes] = field(default_factory=dict)
-    """Files to materialise inside the run workdir (relative paths)."""
 
     argv: list[str] = field(default_factory=list)
     """Command + arguments to execute."""
@@ -54,7 +52,7 @@ class RenderedConfig:
     """
 
     digest: str = ""
-    """sha256 over a sorted JSON serialisation of (files, argv, env, cwd, agent_meta).
+    """sha256 over a sorted JSON serialisation of (argv, env, cwd, agent_meta).
 
     Computed automatically by ``compute_digest()``. Stable across identical
     inputs; changes when any tool, arg, or env var is added/removed.
@@ -86,8 +84,18 @@ class RenderedConfig:
     Populated by the executor before ``render()`` so backends never
     import ``core.agents.config`` directly."""
 
+    ws_allowed_tools: set[CanonicalTool] | None = None
+    """Canonical tool names available in the workspace, pre-resolved via
+    the workspace-tool catalog.
+
+    Replaces the legacy ``host_capabilities`` dict.  Populated by the
+    executor before ``render()`` so backends never import workspace or
+    resource domains directly.  Backends feed this into
+    ``intersect_allowed_tools`` as the workspace side of the
+    agent ∩ workspace intersection."""
+
     host_capabilities: dict[str, Any] = field(default_factory=dict)
-    """Workspace host capabilities dict (allowed_tools, mcp_config_path, …).
+    """Deprecated: use ``ws_allowed_tools`` instead.
 
     Populated by the executor before ``render()`` so backends never
     import ``core.workspace.manager`` directly."""
@@ -105,7 +113,6 @@ class RenderedConfig:
     def compute_digest(self) -> str:
         canonical = json.dumps(
             {
-                "files": {str(p): h.hex() for p, h in sorted(self.files.items())},
                 "argv": list(self.argv),
                 "env": dict(self.env),
                 "cwd": str(self.cwd),

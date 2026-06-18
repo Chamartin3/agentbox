@@ -263,11 +263,11 @@ def register(mcp: FastMCP) -> None:
         ``injected_by`` (which layer pushed it into model context).
         Inspectable=False means agentbox knows the fragment exists but
         cannot read its bytes (e.g. Claude CLI envelope)."""
-        store = get_context().store
-        rec = store.get_run(run_id)
+        ctx = get_context()
+        rec = ctx.db.runs.get(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
-        raw = store.get_run_prompt(run_id)
+        raw = ctx.store.get_run_prompt(run_id)
         if raw is None:
             return {
                 "run_id": run_id,

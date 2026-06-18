@@ -14,7 +14,7 @@ from agentbox.core.agents.composition.preview._helpers import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 
 def render_agent_prompt_preview(

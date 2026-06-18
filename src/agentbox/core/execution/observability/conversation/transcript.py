@@ -13,7 +13,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from agentbox.core.constants import ContentBlockType, MessageRole
-from agentbox.core.data import RunRecord, read_transcript
+from agentbox.core.db import RunRecord, read_transcript
 from agentbox.core.execution.observability.conversation.base import ConversationSource
 from agentbox.core.execution.observability.conversation.types import (
     ContentPart,

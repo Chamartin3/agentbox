@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from agentbox.core.data import TextEvent
+from agentbox.core.db import TextEvent
 from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 from pydantic import BaseModel, ValidationError
@@ -28,7 +28,7 @@ def _direct_rendered(**meta: object) -> RenderedConfig:
     }
     agent_meta.update(meta)
     return RenderedConfig(
-        cwd=Path("."), files={}, agent_meta=agent_meta, model="openrouter:test/model"
+        cwd=Path("."), agent_meta=agent_meta, model="openrouter:test/model"
     )
 
 
@@ -198,7 +198,6 @@ async def test_full_agent_mode_emits_system_user_assistant() -> None:
 
     rendered = RenderedConfig(
         cwd=Path("."),
-        files={},
         agent_meta={
             "agent_module": "fake.module:FakeAgent",
             "prompt": "fallback system",

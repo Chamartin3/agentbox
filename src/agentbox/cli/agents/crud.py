@@ -154,7 +154,7 @@ def agent_show(agent_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Plan 18 — DB-only write commands. These talk to the store directly so they
+# DB-only write commands. These talk to the store directly so they
 # work in offline contexts (no HTTP server required).
 # ---------------------------------------------------------------------------
 

@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.data import read_transcript
+from agentbox.core.db import read_transcript
 from agentbox.core.service.execution.types import RunNotFound
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 
 def get_transcript(run_id: str, *, store: SessionStore) -> list[dict]:

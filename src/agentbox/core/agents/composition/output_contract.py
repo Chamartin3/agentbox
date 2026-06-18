@@ -1,8 +1,6 @@
 """Unified renderer for the ``output_config`` system-prompt fragment.
 
-Phase 2 of the validation-callback migration (see
-``docs/plans/validation-callback-architecture.md``). The new
-``config_json["output"]`` block carries three optional pieces that must
+The ``config_json["output"]`` block carries three optional pieces that must
 appear in every agent's system prompt the same way regardless of which
 backend will run it:
 
@@ -12,9 +10,7 @@ backend will run it:
 
 Rendering lives in one place here so the token backend (pydantic-ai)
 and the file/string backends (claude_code, opencode, codex) produce
-byte-identical fragments. Drift between backends has historically
-caused silent contract divergence; this module is the single source
-of truth.
+byte-identical fragments. This module is the single source of truth.
 """
 
 from __future__ import annotations
@@ -44,11 +40,11 @@ def render(output_config: OutputConfig) -> str:
             "```json\n" + json.dumps(output_config.json_schema, indent=2) + "\n```"
         )
 
-    # Plan 22: validators carry their own constraint text (description).
+    # Validators carry their own constraint text (description).
     # Build the Constraints bullets from each validator's description.
     # Multi-line descriptions explode into one bullet per non-empty line
-    # so legacy multi-rule descriptions migrated by Plan 22 Phase 3 stay
-    # rendered as discrete bullets (not a single multi-line bullet).
+    # so multi-rule descriptions stay rendered as discrete bullets (not a
+    # single multi-line bullet).
     bullets: list[str] = []
     for v in output_config.validators:
         desc = getattr(v, "description", "")

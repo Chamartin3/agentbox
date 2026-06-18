@@ -59,8 +59,7 @@ def _sweep_legacy_generated(workspaces_root: Path) -> None:
 def _on_startup() -> None:
     """Run boot-time service-layer tasks.
 
-    The disk manifest loader was removed in Plan 25; the DB is the
-    source of truth, so the manifest is always ``None`` here.
+    The DB is the source of truth, so the manifest is always ``None`` here.
     """
     settings = _deps.get_settings()
     store = _deps.get_store()

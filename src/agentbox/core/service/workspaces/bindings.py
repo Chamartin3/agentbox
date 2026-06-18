@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from agentbox.core.service.resources.bindings import BindingError
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 __all__ = [
     "list_workspace_subagents",

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agentbox.config import SETTINGS
+from agentbox.core.config import SETTINGS
 
 
 @dataclass

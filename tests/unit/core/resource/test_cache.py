@@ -119,7 +119,7 @@ class TestSettingsResourceCacheDir:
     ):
         monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
         monkeypatch.delenv("AGENTBOX_RESOURCE_CACHE_DIR", raising=False)
-        from agentbox.config import load_settings
+        from agentbox.core.config import load_settings
 
         settings = load_settings()
         assert settings.resource_cache_dir == tmp_path / "resource_cache"
@@ -127,7 +127,7 @@ class TestSettingsResourceCacheDir:
     def test_custom_cache_dir(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         custom = tmp_path / "my_cache"
         monkeypatch.setenv("AGENTBOX_RESOURCE_CACHE_DIR", str(custom))
-        from agentbox.config import load_settings
+        from agentbox.core.config import load_settings
 
         settings = load_settings()
         assert settings.resource_cache_dir == custom

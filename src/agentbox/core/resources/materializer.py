@@ -1,8 +1,7 @@
 """Write a resource version's blobs into a target directory.
 
-Used by Plan 03 (workspace file-materialize bindings) to lay resources
-into the run workdir. Kept in core/resources so the same materializer
-can be reused by tests and CLI.
+Lays workspace file-materialize bindings into the run workdir. Kept in
+core/resources so the same materializer can be reused by tests and CLI.
 """
 
 from __future__ import annotations

@@ -43,7 +43,7 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def _seed_agent(store, agent_id: str = "test-agent") -> None:
-    from agentbox.core.data import AgentDef
+    from agentbox.core.db import AgentDef
 
     agent_def = AgentDef(
         id=agent_id,
@@ -63,7 +63,7 @@ def _seed_agent(store, agent_id: str = "test-agent") -> None:
 
 
 def _seed_profile(store, profile_id: str = "prof-1", **kw) -> None:
-    from agentbox.core.data import RunnerProfileCreate
+    from agentbox.core.db import RunnerProfileCreate
 
     profile = RunnerProfileCreate(
         id=profile_id,

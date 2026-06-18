@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
+from agentbox.core.db import Database
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,10 @@ class AgentToolsContext:
     @cached_property
     def store(self):
         return SessionStore(self.db_path)
+
+    @cached_property
+    def db(self):
+        return Database(self.db_path)
 
     def is_granted(self, tool_name: str) -> bool:
         return tool_name in self.grants

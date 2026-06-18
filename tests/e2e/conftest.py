@@ -29,7 +29,8 @@ def pytest_collection_modifyitems(
     if not os.environ.get("AGENTBOX_E2E"):
         skip_e2e = pytest.mark.skip(reason="AGENTBOX_E2E not set")
         for item in items:
-            item.add_marker(skip_e2e)
+            if "/tests/e2e/" in str(item.fspath):
+                item.add_marker(skip_e2e)
 
 
 # --------------------------------------------------------------------------- #
@@ -80,9 +81,17 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @pytest.fixture
 def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk SessionStore (sqlite) under ``tmp_path``."""
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
     return SessionStore(tmp_path / "db.sqlite")
+
+
+@pytest.fixture
+def db(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """Fresh on-disk Database (sqlite) under ``tmp_path``."""
+    from agentbox.core.db import Database
+
+    return Database(tmp_path / "db.sqlite")
 
 
 @pytest.fixture

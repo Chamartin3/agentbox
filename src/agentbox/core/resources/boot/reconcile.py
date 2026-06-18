@@ -13,7 +13,7 @@ from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.config import Settings, _optional_dir, load_settings
+from agentbox.core.config import Settings, _optional_dir, load_settings
 
 # ---------------------------------------------------------------------------
 # Helpers

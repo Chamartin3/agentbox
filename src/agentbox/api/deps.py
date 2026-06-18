@@ -5,7 +5,8 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-from agentbox.config import Settings, load_settings
+from agentbox.core.config import Settings, load_settings
+from agentbox.core.db import Database
 from agentbox.core.service import SessionStore
 from agentbox.core.service import ProjectManifest
 from agentbox.core.execution.orchestrate.executor import RunExecutor
@@ -45,13 +46,18 @@ def get_store() -> SessionStore:
 
 
 @lru_cache(maxsize=1)
+def get_db() -> Database:
+    return Database(get_settings().db_path)
+
+
+@lru_cache(maxsize=1)
 def get_loader() -> _NoopLoader:
     return _NoopLoader()
 
 
 @lru_cache(maxsize=1)
 def get_executor() -> RunExecutor:
-    return RunExecutor(get_store(), get_settings(), get_mcp_registry())
+    return RunExecutor(get_store(), get_settings(), get_mcp_registry(), db=get_db())
 
 
 @lru_cache(maxsize=1)

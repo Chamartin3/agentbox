@@ -1,7 +1,7 @@
 """One-shot sweep: shared_resources → unified resources table.
 
 Moves every active row in the legacy ``shared_resources`` table into the
-unified ``resources`` repository (Plan 01) with the new typed taxonomy:
+unified ``resources`` repository with the new typed taxonomy:
 
 - ``output_schema``, ``input_schema``  → ``schema``
 - ``user_template``, ``system_fragment`` → ``document`` (with metadata.role)

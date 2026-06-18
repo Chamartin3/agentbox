@@ -32,8 +32,8 @@ from typing import Any
 
 from agentbox.core.agents.validation import extract_json, validate_output
 from agentbox.core.constants import LogLevel
-from agentbox.core.data import DoneEvent
-from agentbox.core.data import RunStatus
+from agentbox.core.db import DoneEvent
+from agentbox.core.db import RunStatus
 from agentbox.core.engines.contracts.base import (
     BackendAdapter,
     RenderedConfig,

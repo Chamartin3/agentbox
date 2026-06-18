@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from agentbox.api.deps import get_executor, get_loader, get_store
+from agentbox.api.deps import get_db, get_executor, get_loader, get_store
 from agentbox.api.runs.schemas import (
     CompleteRunBody,
     CreateRunBody,
@@ -271,7 +271,7 @@ async def stream_run(ws: WebSocket, run_id: str) -> None:
     broadcaster = get_executor().broadcaster(run_id)
     if broadcaster is None:
         # Replay transcript from disk if run is already finished.
-        rec = get_store().get_run(run_id)
+        rec = get_db().runs.get(run_id)
         if rec is None or not rec.transcript_path:
             await ws.close(code=4404)
             return

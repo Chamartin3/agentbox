@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.data import SessionStore
+from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

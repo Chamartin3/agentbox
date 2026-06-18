@@ -11,7 +11,7 @@ from agentbox.core.constants import PromptMode, PromptSlot
 from agentbox.core.service.resources.repo import ResourceNotFound
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 __all__ = [
     "BindingError",

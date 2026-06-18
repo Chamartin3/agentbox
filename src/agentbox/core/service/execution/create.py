@@ -21,7 +21,7 @@ def _assert_enabled(store: "SessionStore", agent_id: str) -> None:
         raise AgentDisabled(agent_id, meta.get("disabled_at"))
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
     from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)

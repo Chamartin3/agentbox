@@ -13,12 +13,12 @@ from sqlalchemy import func, select
 from agentbox.core import workspaces as ws
 from agentbox.core.agents.composition.bundle import compose_from_source
 from agentbox.core.agents.composition.bundle.loader import load_bundle_from_bindings
-from agentbox.core.data import AgentDef, agent_runner_profiles
-from agentbox.core.data import runs as runs_table
+from agentbox.core.db import AgentDef, agent_runner_profiles
+from agentbox.core.db import runs as runs_table
 
 if TYPE_CHECKING:
-    from agentbox.config import Settings
-    from agentbox.core.data import SessionStore
+    from agentbox.core.config import Settings
+    from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

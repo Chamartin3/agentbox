@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from agentbox.config import SETTINGS
+from agentbox.core.config import SETTINGS
 
 DEFAULT_SKILLS_SOURCES: list[str] = [
     "apps/cvman/mcp/skills",

@@ -18,7 +18,7 @@ def _register_noop_backend(monkeypatch: Any) -> None:
     otherwise the swap leaks into later tests (e.g. list_recipes() would drop
     claude_code because _NoopBackend has no recipe.yaml).
     """
-    from agentbox.core.data import DoneEvent, RunEvent
+    from agentbox.core.db import DoneEvent, RunEvent
     from agentbox.core.engines.contracts.base import RenderedConfig
 
     class _NoopBackend:
@@ -32,7 +32,7 @@ def _register_noop_backend(monkeypatch: Any) -> None:
             creds: Any = None,
             runner_config: Any = None,
         ) -> RenderedConfig:
-            return RenderedConfig(files={}, argv=["true"], env={}, cwd=Path("."))
+            return RenderedConfig(argv=["true"], env={}, cwd=Path("."))
 
         async def run(  # type: ignore[override]
             self, rendered: RenderedConfig, input: str, run_id: str
@@ -61,7 +61,7 @@ def test_optional_mounts_absent_from_settings(
     isolated_data_dir: Path,
 ) -> None:
     """With only AGENTBOX_MANIFEST set, all optional dirs resolve to None."""
-    from agentbox.config import SETTINGS
+    from agentbox.core.config import SETTINGS
 
     assert SETTINGS.agents_dir is None
     assert SETTINGS.prompts_dir is None
@@ -72,7 +72,7 @@ def test_optional_mounts_absent_from_settings(
 def test_workspaces_root_absent_does_not_crash(
     isolated_data_dir: Path, client: Any
 ) -> None:
-    from agentbox.config import SETTINGS
+    from agentbox.core.config import SETTINGS
 
     assert not SETTINGS.workspaces_root.exists()
 
@@ -87,7 +87,7 @@ def test_run_with_db_seeded_noop_agent(
     import warnings
 
     from agentbox.api.deps import get_store
-    from agentbox.core.data import AgentDef
+    from agentbox.core.db import AgentDef
 
     _register_noop_backend(monkeypatch)
 

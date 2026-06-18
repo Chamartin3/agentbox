@@ -1,4 +1,4 @@
-"""Materialize workspace file bindings into a run's workdir (Plan 03).
+"""Materialize workspace file bindings into a run's workdir.
 
 Higher-level wrapper over :mod:`agentbox.core.resources.materializer`
 that understands the binding metadata: ``target_path`` defaults,

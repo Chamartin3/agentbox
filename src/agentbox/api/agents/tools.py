@@ -1,4 +1,4 @@
-"""Read-only endpoints for the canonical tool catalog (Plan 062).
+"""Read-only endpoints for the canonical tool catalog.
 
 Returns the union of built-in canonical tools (``BUILTIN_TOOLS``) and
 runtime-registered shared agent tools (``SharedToolRegistry``).
