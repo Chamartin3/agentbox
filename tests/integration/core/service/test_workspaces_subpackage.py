@@ -84,7 +84,7 @@ def test_get_workspace_by_name_unknown(store: SessionStore, settings: _FakeSetti
 def test_list_workspaces_enriched(store: SessionStore, settings: _FakeSettings) -> None:
     _register(store, "ws1")
     _register(store, "ws2")
-    result = list_workspaces_enriched(store=store, settings=settings, loader=None)  # type: ignore[arg-type]
+    result = list_workspaces_enriched(store=store, settings=settings)  # type: ignore[arg-type]
     assert len(result) >= 2
 
 

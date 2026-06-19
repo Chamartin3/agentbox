@@ -16,13 +16,12 @@ runner = CliRunner()
 def _clear_deps_caches() -> None:
     from agentbox.cli._deps import (
         get_executor,
-        get_loader,
         get_mcp_registry,
         get_settings,
         get_store,
     )
 
-    for fn in (get_settings, get_store, get_loader, get_executor, get_mcp_registry):
+    for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
 
 
@@ -52,7 +51,9 @@ def _seed_agent(store, agent_id: str = "t1") -> str:
     )
     store.create_agent(
         agent_id=agent_id,
-        config_json=agent_def.model_dump(mode="python", exclude_none=True, warnings=False),
+        config_json=agent_def.model_dump(
+            mode="python", exclude_none=True, warnings=False
+        ),
         prompt_content="# Test prompt\n",
         author="test",
         changelog="seed",

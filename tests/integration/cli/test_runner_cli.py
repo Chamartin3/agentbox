@@ -16,13 +16,12 @@ runner = CliRunner()
 def _clear_deps_caches() -> None:
     from agentbox.cli._deps import (
         get_executor,
-        get_loader,
         get_mcp_registry,
         get_settings,
         get_store,
     )
 
-    for fn in (get_settings, get_store, get_loader, get_executor, get_mcp_registry):
+    for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
 
 
@@ -52,7 +51,9 @@ def _seed_agent(store, agent_id: str = "test-agent") -> None:
     )
     store.create_agent(
         agent_id=agent_id,
-        config_json=agent_def.model_dump(mode="python", exclude_none=True, warnings=False),
+        config_json=agent_def.model_dump(
+            mode="python", exclude_none=True, warnings=False
+        ),
         prompt_content="# Test prompt\n",
         author="test",
         changelog="seed",
@@ -134,24 +135,40 @@ def test_profiles_get_existing(store_fixture) -> None:
 
 
 def test_profiles_create(store_fixture) -> None:
-    result = runner.invoke(app, [
-        "runners", "profiles", "create",
-        "--id", "new-prof",
-        "--name", "New Profile",
-        "--backend", "token",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "runners",
+            "profiles",
+            "create",
+            "--id",
+            "new-prof",
+            "--name",
+            "New Profile",
+            "--backend",
+            "token",
+        ],
+    )
     assert result.exit_code == 0
     assert "new-prof" in result.output
 
 
 def test_profiles_create_duplicate(store_fixture) -> None:
     _seed_profile(store_fixture, "dup-prof")
-    result = runner.invoke(app, [
-        "runners", "profiles", "create",
-        "--id", "dup-prof",
-        "--name", "Duplicate",
-        "--backend", "token",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "runners",
+            "profiles",
+            "create",
+            "--id",
+            "dup-prof",
+            "--name",
+            "Duplicate",
+            "--backend",
+            "token",
+        ],
+    )
     assert result.exit_code != 0
 
 
@@ -167,16 +184,12 @@ def test_profiles_create_duplicate(store_fixture) -> None:
 
 def test_profiles_delete(store_fixture) -> None:
     _seed_profile(store_fixture, "to-delete")
-    result = runner.invoke(
-        app, ["runners", "profiles", "delete", "to-delete", "--yes"]
-    )
+    result = runner.invoke(app, ["runners", "profiles", "delete", "to-delete", "--yes"])
     assert result.exit_code == 0
 
 
 def test_profiles_delete_not_found(store_fixture) -> None:
-    result = runner.invoke(
-        app, ["runners", "profiles", "delete", "no-such", "--yes"]
-    )
+    result = runner.invoke(app, ["runners", "profiles", "delete", "no-such", "--yes"])
     assert result.exit_code != 0
 
 

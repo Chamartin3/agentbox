@@ -27,7 +27,6 @@ def test_startup_with_no_manifest_and_empty_db(
     for fn in (
         _deps.get_settings,
         _deps.get_store,
-        _deps.get_loader,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -49,7 +48,6 @@ def test_startup_with_no_manifest_and_empty_db(
     for fn in (
         _deps.get_settings,
         _deps.get_store,
-        _deps.get_loader,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -129,7 +127,6 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
     for fn in (
         _deps.get_settings,
         _deps.get_store,
-        _deps.get_loader,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -148,7 +145,6 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
     for fn in (
         _deps.get_settings,
         _deps.get_store,
-        _deps.get_loader,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):

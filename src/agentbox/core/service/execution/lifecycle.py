@@ -25,7 +25,6 @@ def complete_run(
     output: str | None,
     error: str | None,
     usage: dict | None,
-    loader: Any = None,
     schedule_webhook_cb: Any = None,
 ) -> dict:
     """Finalize a run from an external worker."""
@@ -42,7 +41,7 @@ def complete_run(
 
     refreshed = store.get_run(run_id) or existing
     if schedule_webhook_cb is not None:
-        agent = resolve_agent(refreshed.agent_id, store=store, loader=loader)
+        agent = resolve_agent(refreshed.agent_id, store=store)
         schedule_webhook_cb(agent, refreshed, store)
     return {"ok": True, "run_id": run_id, "status": refreshed.status}
 
@@ -57,7 +56,6 @@ def snapshot_run(
     validation_status: str = "ok",
     validation_errors: list[str] | None = None,
     composition_snapshot: dict | None = None,
-    loader: Any = None,
     schedule_webhook_cb: Any = None,
 ) -> dict:
     """Store a snapshot for an embedded run; idempotent on terminal runs."""
@@ -86,7 +84,7 @@ def snapshot_run(
 
     refreshed = store.get_run(run_id) or existing
     if schedule_webhook_cb is not None:
-        agent = resolve_agent(refreshed.agent_id, store=store, loader=loader)
+        agent = resolve_agent(refreshed.agent_id, store=store)
         if agent is not None:
             schedule_webhook_cb(agent, refreshed, store)
     return {"ok": True, "run_id": run_id}

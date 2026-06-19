@@ -61,18 +61,6 @@ def test_resolve_agent_returns_none_when_unknown(store: SessionStore) -> None:
     assert resolve_agent("missing", store=store) is None
 
 
-def test_resolve_agent_ignores_loader_kwarg(store: SessionStore) -> None:
-    """``loader`` is accepted for backward compatibility but ignored."""
-    _seed_db_agent(store, "in_db")
-
-    agent = resolve_agent("in_db", store=store, loader=object())
-
-    assert agent is not None
-    assert agent.id == "in_db"
-
-    assert resolve_agent("not_in_db", store=store, loader=object()) is None
-
-
 def test_list_all_agents_returns_db_agents_only(store: SessionStore) -> None:
     _seed_db_agent(store, "db_one")
     _seed_db_agent(store, "db_two")

@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_loader, get_store
+from agentbox.api.deps import get_store
 from agentbox.core.service import agents as agents_service
 from agentbox.core.service.agents import AgentNotFound
 
@@ -19,9 +19,7 @@ router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
 
 def _require_agent(agent_id: str) -> None:
     try:
-        agents_service.require_agent_exists(
-            agent_id, store=get_store(), loader=get_loader()
-        )
+        agents_service.require_agent_exists(agent_id, store=get_store())
     except AgentNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -158,8 +156,7 @@ class NewVersionBody(BaseModel):
 @router.post("")
 def create_agent_version(agent_id: str, body: NewVersionBody) -> dict:
     """Create a new version from a full agent definition snapshot."""
-    loader = get_loader()
-    agent = loader.get(agent_id)
+    agent = get_store().get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404, f"unknown agent {agent_id!r}")
     return get_store().create_version(

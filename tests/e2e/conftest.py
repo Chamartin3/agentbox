@@ -24,7 +24,8 @@ import pytest
 
 
 def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item],
+    config: pytest.Config,
+    items: list[pytest.Item],
 ) -> None:
     if not os.environ.get("AGENTBOX_E2E"):
         skip_e2e = pytest.mark.skip(reason="AGENTBOX_E2E not set")
@@ -44,6 +45,7 @@ def _check_ollama() -> bool:
 
 def _check_backend_binary(name: str) -> bool:
     import shutil
+
     return shutil.which(name) is not None
 
 
@@ -68,7 +70,6 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         for fn in (
             _deps.get_settings,
             _deps.get_store,
-            _deps.get_loader,
             _deps.get_executor,
             _deps.get_mcp_registry,
         ):
@@ -104,7 +105,6 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
     for fn in (
         deps.get_settings,
         deps.get_store,
-        deps.get_loader,
         deps.get_executor,
         deps.get_mcp_registry,
     ):
@@ -116,7 +116,6 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
     for fn in (
         deps.get_settings,
         deps.get_store,
-        deps.get_loader,
         deps.get_executor,
         deps.get_mcp_registry,
     ):

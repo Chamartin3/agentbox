@@ -6,7 +6,7 @@ import typer
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.cli._deps import get_loader, get_settings, get_store
+from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.service.prompts import (
     AgentNotFound,
@@ -37,7 +37,6 @@ def prompts_show(
             agent_id,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
         )
     except AgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
@@ -67,7 +66,6 @@ def prompts_edit(
             content,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
         )
     except AgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
@@ -84,7 +82,7 @@ def prompts_versions(
 ) -> None:
     """List prompt versions for an agent."""
     try:
-        payload = list_versions(agent_id, store=get_store(), loader=get_loader())
+        payload = list_versions(agent_id, store=get_store())
     except AgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -132,9 +130,7 @@ def prompts_show_version(
 ) -> None:
     """Show a specific prompt version."""
     try:
-        payload = get_version(
-            agent_id, version, store=get_store(), loader=get_loader()
-        )
+        payload = get_version(agent_id, version, store=get_store())
     except AgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -143,9 +139,7 @@ def prompts_show_version(
         console.print(f"[red]version {version} not found[/red]")
         raise typer.Exit(1)
 
-    console.print(
-        Syntax(payload.get("content", ""), "markdown", theme="ansi_dark")
-    )
+    console.print(Syntax(payload.get("content", ""), "markdown", theme="ansi_dark"))
     console.print(
         f"[dim]v{payload.get('version')} — {payload.get('author', '')} "
         f"{payload.get('created_at', '')}[/dim]"
@@ -164,7 +158,6 @@ def prompts_draft(
             agent_id,
             content,
             store=get_store(),
-            loader=get_loader(),
             author=author,
         )
     except AgentNotFound:
@@ -185,7 +178,6 @@ def prompts_publish(
             agent_id,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
             changelog=changelog,
             author=author,
         )
@@ -214,7 +206,6 @@ def prompts_rollback(
             target_version,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
             author=author,
         )
     except AgentNotFound:

@@ -198,7 +198,6 @@ def _resolve_source(
         name,
         store=store,
         settings=settings,
-        loader=None,
         mcp_manifest=None,
     )
     config = load_workenv(store, name, settings=settings, permissions=perms)
@@ -216,7 +215,7 @@ def _resolve_target_dir(
         return Path(target_dir)
     if name is not None:
         ws_path, _project_root = resolve_workspace_path(
-            name, store=store, settings=settings, loader=None
+            name, store=store, settings=settings
         )
         return ws_path
     return Path.cwd() / "out"
@@ -242,9 +241,7 @@ def workenv_list_presets() -> None:
     for p in presets:
         desc = p.get("description", "") or ""
         engine = p.get("engine", "?")
-        console.print(
-            f"  [bold]{p['name']}[/bold]  [dim]({engine})[/dim]  {desc}"
-        )
+        console.print(f"  [bold]{p['name']}[/bold]  [dim]({engine})[/dim]  {desc}")
 
 
 @workenv_app.command("list-engines")
@@ -269,8 +266,10 @@ def _print_dry_run(config: WorkenvConfig, recipe: Recipe) -> None:
             console.print(f"\n[bold cyan]─── {rel}[/bold cyan]")
             syntax = Syntax(
                 content,
-                "json" if rel.suffix == ".json"
-                else "yaml" if rel.suffix in (".yaml", ".yml")
+                "json"
+                if rel.suffix == ".json"
+                else "yaml"
+                if rel.suffix in (".yaml", ".yml")
                 else "markdown",
                 theme="ansi_dark",
             )

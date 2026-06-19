@@ -154,11 +154,7 @@ class AgentNotFound(LookupError):
         self.agent_id = agent_id
 
 
-def require_agent_exists(
-    agent_id: str, *, store: SessionStore, loader: Any = None
-) -> None:
+def require_agent_exists(agent_id: str, *, store: SessionStore) -> None:
     if store.get_agent_def(agent_id) is not None:
-        return
-    if loader is not None and loader.get(agent_id) is not None:
         return
     raise AgentNotFound(agent_id)

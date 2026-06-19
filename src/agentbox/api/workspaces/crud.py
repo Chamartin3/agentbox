@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from agentbox.api._pagination import PaginatedEnvelope, paginate_list
-from agentbox.api.deps import get_loader, get_mcp_registry, get_settings, get_store
+from agentbox.api.deps import get_mcp_registry, get_settings, get_store
 from agentbox.core.db import WorkspaceRow
 from agentbox.core.service import workspaces as workspaces_service
 from agentbox.core.workspaces.build import build_workspace_by_name
@@ -63,7 +63,7 @@ def list_workspaces(
     offset: int = Query(0, ge=0),
 ) -> list[dict] | PaginatedEnvelope:
     result = workspaces_service.list_workspaces_enriched(
-        store=get_store(), settings=get_settings(), loader=get_loader()
+        store=get_store(), settings=get_settings()
     )
     if paginated:
         return paginate_list(
@@ -119,7 +119,7 @@ def delete_workspace_registry(name: str, purge_disk: bool = False) -> dict:
 def get_workspace_by_name(name: str) -> dict:
     try:
         return workspaces_service.get_workspace_by_name(
-            name, store=get_store(), settings=get_settings(), loader=get_loader()
+            name, store=get_store(), settings=get_settings()
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
@@ -137,7 +137,6 @@ def get_permissions_by_name(name: str) -> dict:
             name,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
             mcp_manifest=_try_get_mcp_manifest(),
         )
     except WorkspaceNotFound:
@@ -156,7 +155,6 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
             body.permissions,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
             mcp_manifest=_try_get_mcp_manifest(),
             sync_cb=_build_workspace_cb,
         )
@@ -171,7 +169,6 @@ def get_workspace_mcp_tools(name: str) -> dict:
             name,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
             mcp_manifest=_try_get_mcp_manifest(),
         )
     except WorkspaceNotFound:
@@ -190,7 +187,6 @@ def generate_configs_by_name(name: str) -> dict:
             name,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
             mcp_manifest=_try_get_mcp_manifest(),
         )
     except WorkspaceNotFound:
@@ -201,7 +197,7 @@ def generate_configs_by_name(name: str) -> dict:
 def generate_skills_by_name(name: str) -> dict:
     try:
         return workspaces_service.generate_skills_by_name(
-            name, store=get_store(), settings=get_settings(), loader=get_loader()
+            name, store=get_store(), settings=get_settings()
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
@@ -211,7 +207,7 @@ def generate_skills_by_name(name: str) -> dict:
 def list_skills_by_name(name: str) -> dict:
     try:
         return workspaces_service.list_skills_by_name(
-            name, store=get_store(), settings=get_settings(), loader=get_loader()
+            name, store=get_store(), settings=get_settings()
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
@@ -225,7 +221,6 @@ def get_skill_content_by_name(name: str, skill_name: str) -> dict:
             skill_name,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
@@ -248,7 +243,7 @@ class FileBody(BaseModel):
 def read_file_by_name(name: str, path: str) -> dict:
     try:
         payload = workspaces_service.read_file_by_name(
-            name, path, store=get_store(), settings=get_settings(), loader=get_loader()
+            name, path, store=get_store(), settings=get_settings()
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
@@ -268,7 +263,6 @@ def write_file_by_name(name: str, body: FileBody) -> dict:
             body.content,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
@@ -285,7 +279,7 @@ def write_file_by_name(name: str, body: FileBody) -> dict:
 def get_workspace(agent_id: str) -> dict:
     try:
         return workspaces_service.get_workspace_for_agent(
-            agent_id, store=get_store(), settings=get_settings(), loader=get_loader()
+            agent_id, store=get_store(), settings=get_settings()
         )
     except AgentNotFound:
         _raise_agent_not_found(agent_id)
@@ -295,7 +289,7 @@ def get_workspace(agent_id: str) -> dict:
 def create_workspace(agent_id: str) -> dict:
     try:
         return workspaces_service.create_workspace_for_agent(
-            agent_id, store=get_store(), settings=get_settings(), loader=get_loader()
+            agent_id, store=get_store(), settings=get_settings()
         )
     except AgentNotFound as exc:
         raise HTTPException(404) from exc
@@ -305,7 +299,7 @@ def create_workspace(agent_id: str) -> dict:
 def reset_workspace(agent_id: str) -> dict:
     try:
         return workspaces_service.reset_workspace_for_agent(
-            agent_id, store=get_store(), settings=get_settings(), loader=get_loader()
+            agent_id, store=get_store(), settings=get_settings()
         )
     except AgentNotFound as exc:
         raise HTTPException(404) from exc
@@ -318,7 +312,6 @@ def generate_configs(agent_id: str) -> dict:
             agent_id,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
             mcp_manifest=_try_get_mcp_manifest(),
         )
     except AgentNotFound as exc:
@@ -329,7 +322,7 @@ def generate_configs(agent_id: str) -> dict:
 def list_skills(agent_id: str) -> dict:
     try:
         return workspaces_service.list_skills_for_agent(
-            agent_id, store=get_store(), settings=get_settings(), loader=get_loader()
+            agent_id, store=get_store(), settings=get_settings()
         )
     except AgentNotFound as exc:
         raise HTTPException(404) from exc
@@ -343,7 +336,6 @@ def read_file(agent_id: str, path: str) -> dict:
             path,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
         )
     except AgentNotFound as exc:
         raise HTTPException(404) from exc
@@ -363,7 +355,6 @@ def write_file(agent_id: str, body: FileBody) -> dict:
             body.content,
             store=get_store(),
             settings=get_settings(),
-            loader=get_loader(),
         )
     except AgentNotFound as exc:
         raise HTTPException(404) from exc

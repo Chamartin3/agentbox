@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_loader, get_settings, get_store
+from agentbox.api.deps import get_settings, get_store
 from agentbox.api.runs.webhooks import schedule_agent_event_webhook
 from agentbox.core.service import RunnerProfile
 from agentbox.core.service.agents import (
@@ -41,9 +41,7 @@ def list_agents(include_disabled: bool = False) -> list[dict]:
 
 @router.get("/{agent_id}")
 def get_agent(agent_id: str) -> dict:
-    detail = get_agent_detail(
-        agent_id, store=get_store(), settings=get_settings()
-    )
+    detail = get_agent_detail(agent_id, store=get_store(), settings=get_settings())
     if detail is None:
         raise HTTPException(404)
     return detail
@@ -68,9 +66,8 @@ def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
     # For v1, we return what the workspace *would* be.
     # Editing agentbox.toml programmatically is fragile; the UI can
     # display the effective workspace and guide the user to edit the file.
-    loader = get_loader()
     store = get_store()
-    agent = resolve_agent(agent_id, store=store, loader=loader)
+    agent = resolve_agent(agent_id, store=store)
     if agent is None:
         raise HTTPException(404)
     # TODO: implement TOML editing via tomlkit
@@ -98,7 +95,6 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
         {active_version, version_id, version, author, changelog}.
     """
     store = get_store()
-    loader = get_loader()
     try:
         result = store.publish_version(agent_id, version, body.reason)
     except ValueError as exc:
@@ -109,7 +105,7 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
         raise HTTPException(422, error_msg) from exc
 
     # Schedule webhook if agent has a webhook_url configured
-    agent = resolve_agent(agent_id, store=store, loader=loader)
+    agent = resolve_agent(agent_id, store=store)
     if agent and agent.webhook_url:
         try:
             schedule_agent_event_webhook(

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.db import SessionStore, WorkspaceRow
@@ -28,14 +27,8 @@ def list_workspaces_enriched(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> list[dict]:
     """Return all named workspaces with agent assignments + summary stats."""
-    try:
-        manifest = loader.load() if loader is not None else None
-    except Exception:
-        manifest = None
-
     registry = store.list_workspaces()
     ws_root = settings.workspaces_root
     disk_ids: set[str] = set()
@@ -47,10 +40,6 @@ def list_workspaces_enriched(
         }
 
     workspace_agents: dict[str, list[str]] = {}
-    if manifest:
-        for a in manifest.agents:
-            ws_name = a.workspace or "default"
-            workspace_agents.setdefault(ws_name, []).append(a.id)
 
     try:
         resource_counts = store.count_workspace_file_bindings_by_workspace()
@@ -61,11 +50,7 @@ def list_workspaces_enriched(
     for ws_row in registry:
         name = ws_row["name"]
         rel_path = ws_row.get("path")
-        ws_path = (
-            settings.project_root / rel_path
-            if rel_path
-            else ws_root / name
-        )
+        ws_path = settings.project_root / rel_path if rel_path else ws_root / name
         agents = workspace_agents.get(name, [])
         file_count = 0
         skill_count = 0
@@ -138,11 +123,8 @@ def get_workspace_by_name(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     files: list[dict] = []
     if ws_path.exists():
         for p in sorted(ws_path.rglob("*")):
@@ -171,7 +153,4 @@ def list_all_workspaces(
     service layer to fix the R4 violation (domain importing upward
     into service).
     """
-    return [
-        _workspace_info(a, settings, store)
-        for a in list_all_agents(store=store)
-    ]
+    return [_workspace_info(a, settings, store) for a in list_all_agents(store=store)]

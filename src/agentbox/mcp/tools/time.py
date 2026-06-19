@@ -20,7 +20,6 @@ def register(mcp: FastMCP) -> None:
         additional tool calls, reasoning steps, or output generation.
         """
         ctx = get_context()
-        loader = ctx.loader
 
         run = ctx.db.runs.get(run_id)
         if run is None:
@@ -34,7 +33,7 @@ def register(mcp: FastMCP) -> None:
                 "message": f"run is {run.status} — no time budget remaining",
             }
 
-        agent = loader.get(run.agent_id)
+        agent = ctx.store.get_agent_def(run.agent_id)
         if agent is None:
             return {"error": f"agent {run.agent_id!r} not found"}
 

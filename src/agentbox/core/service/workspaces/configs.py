@@ -36,9 +36,7 @@ __all__ = [
 ]
 
 
-def _project_mcp_refs(
-    store: SessionStore, servers: list[dict] | None
-) -> list[McpRef]:
+def _project_mcp_refs(store: SessionStore, servers: list[dict] | None) -> list[McpRef]:
     """Build ``McpRef``s from project (or override) MCP servers."""
     specs = servers if servers is not None else store.get_project_mcp_servers()
     refs: list[McpRef] = []
@@ -116,7 +114,6 @@ def _generate_into(
         workspace_id,
         store=store,
         settings=settings,
-        loader=None,
         mcp_manifest=None,
     )
     config = load_workenv(store, workspace_id, settings=settings, permissions=perms)
@@ -138,11 +135,10 @@ def generate_configs_by_name(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
     mcp_manifest: Any | None = None,
 ) -> dict:
     ws_path, _project_root = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
+        name, store=store, settings=settings
     )
     paths = _generate_into(ws_path, name, store=store, settings=settings)
     return {
@@ -156,12 +152,15 @@ def generate_configs_for_agent(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any,
     mcp_manifest: Any | None = None,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, loader=loader)
+    agent = _resolve_agent_or_raise(agent_id, store=store)
     workspace_path, _ = ws.resolve_path(agent, settings, store)
-    workspace_id = agent.workspace if agent.workspace != "<ephemeral>" else agent_id
+    workspace_id = (
+        agent.workspace
+        if agent.workspace and agent.workspace != "<ephemeral>"
+        else agent_id
+    )
     paths = _generate_into(workspace_path, workspace_id, store=store, settings=settings)
     return {
         "workspace": str(workspace_path),

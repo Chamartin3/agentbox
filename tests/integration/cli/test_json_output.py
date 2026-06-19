@@ -16,13 +16,12 @@ runner = CliRunner()
 def _clear_deps_caches() -> None:
     from agentbox.cli._deps import (
         get_executor,
-        get_loader,
         get_mcp_registry,
         get_settings,
         get_store,
     )
 
-    for fn in (get_settings, get_store, get_loader, get_executor, get_mcp_registry):
+    for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
 
 

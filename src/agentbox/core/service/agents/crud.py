@@ -6,7 +6,7 @@ Import from ``service.agents`` (the package), never from this module directly.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 
@@ -27,19 +27,15 @@ def resolve_agent(
     agent_id: str,
     *,
     store: SessionStore,
-    loader: Any = None,
 ) -> AgentDef | None:
-    del loader  # deprecated, ignored
     return store.get_agent_def(agent_id)
 
 
 def list_all_agents(
     *,
     store: SessionStore,
-    loader: Any = None,
     include_disabled: bool = False,
 ) -> list[AgentDef]:
-    del loader  # deprecated, ignored
     out: list[AgentDef] = []
     for row in store.list_agents_with_latest(include_disabled=include_disabled):
         try:
@@ -97,9 +93,7 @@ def _aggregate_run_metadata(
 
 def _strip_legacy_runner_model(dumped: dict) -> dict:
     if isinstance(dumped.get("runner"), dict):
-        dumped["runner"] = {
-            k: v for k, v in dumped["runner"].items() if k != "model"
-        }
+        dumped["runner"] = {k: v for k, v in dumped["runner"].items() if k != "model"}
     return dumped
 
 

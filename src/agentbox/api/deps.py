@@ -3,36 +3,12 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db import Database
 from agentbox.core.service import SessionStore
-from agentbox.core.service import ProjectManifest
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.mcp.client import McpRegistry
-
-
-class _NoopLoader:
-    """Empty loader stub.
-
-    The disk manifest loader is deprecated; the DB is the source of truth.
-    This stub keeps the existing ``get_loader()`` call surface alive while
-    we migrate call sites to talk to the store directly. All accessors
-    return ``None`` / empty, matching "no manifest is available".
-    """
-
-    def get(self, agent_id: str) -> Any:
-        return None
-
-    def load(self) -> ProjectManifest:
-        return ProjectManifest()
-
-    def get_workspace(self, name: str) -> Any:
-        return None
-
-    def list_workspaces(self) -> list:
-        return []
 
 
 @lru_cache(maxsize=1)
@@ -48,11 +24,6 @@ def get_store() -> SessionStore:
 @lru_cache(maxsize=1)
 def get_db() -> Database:
     return Database(get_settings().db_path)
-
-
-@lru_cache(maxsize=1)
-def get_loader() -> _NoopLoader:
-    return _NoopLoader()
 
 
 @lru_cache(maxsize=1)

@@ -8,7 +8,6 @@ them here avoids circular imports across the package.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
@@ -30,8 +29,8 @@ __all__ = [
 ]
 
 
-def _resolve_agent_or_raise(agent_id: str, *, loader: Any):
-    agent = loader.get(agent_id) if loader is not None else None
+def _resolve_agent_or_raise(agent_id: str, *, store: SessionStore):
+    agent = store.get_agent_def(agent_id)
     if agent is None:
         raise AgentNotFound(agent_id)
     return agent
@@ -55,8 +54,7 @@ def is_user_file(rel_path: str) -> bool:
     if rel_path in _RENDERED_ARTIFACT_FILES:
         return False
     return not any(
-        rel_path == p.rstrip("/") or rel_path.startswith(p)
-        for p in _FILE_HIDE_PREFIXES
+        rel_path == p.rstrip("/") or rel_path.startswith(p) for p in _FILE_HIDE_PREFIXES
     )
 
 
@@ -65,23 +63,17 @@ def resolve_workspace_path(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> tuple[Path, Path]:
     """Return ``(workspace_path, project_root)`` for a named workspace.
 
     Registry-first: the canonical ``workspaces`` table is the source of
-    truth for existence. The manifest loader is consulted only to
-    enrich the path when the registry row has no explicit ``path``.
-    Raises :class:`WorkspaceNotFound` when the name is unknown.
+    truth for existence. Raises :class:`WorkspaceNotFound` when the name
+    is unknown.
     """
     row = store.get_workspace(name)
     if row is None:
         raise WorkspaceNotFound(name)
     rel_path = row.get("path")
-    if not rel_path and loader is not None:
-        w = loader.get_workspace(name)
-        if w is not None and getattr(w, "path", None):
-            rel_path = w.path
     ws_path = (
         settings.project_root / rel_path
         if rel_path
@@ -103,11 +95,8 @@ def read_file_by_name(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> dict | None:
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     target = _safe_resolve(ws_path, path)
     if not target.is_file():
         return None
@@ -121,11 +110,8 @@ def write_file_by_name(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     target = _safe_resolve(ws_path, path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
@@ -142,10 +128,9 @@ def get_workspace_for_agent(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, loader=loader)
-    info = ws.info(agent, settings, loader)
+    agent = _resolve_agent_or_raise(agent_id, store=store)
+    info = ws.info(agent, settings, store)
     files: list[dict] = []
     if info.exists:
         for p in sorted(info.path.rglob("*")):
@@ -169,9 +154,8 @@ def create_workspace_for_agent(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, loader=loader)
+    agent = _resolve_agent_or_raise(agent_id, store=store)
     path = ws.ensure(agent, settings, store, scaffold=True)
     return {"path": str(path)}
 
@@ -181,9 +165,8 @@ def reset_workspace_for_agent(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, loader=loader)
+    agent = _resolve_agent_or_raise(agent_id, store=store)
     path = ws.reset(agent, settings, store)
     return {"path": str(path)}
 
@@ -194,9 +177,8 @@ def read_file_for_agent(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any,
 ) -> dict | None:
-    agent = _resolve_agent_or_raise(agent_id, loader=loader)
+    agent = _resolve_agent_or_raise(agent_id, store=store)
     ws_path, _ = ws.resolve_path(agent, settings, store)
     target = _safe_resolve(ws_path, path)
     if not target.is_file():
@@ -211,9 +193,8 @@ def write_file_for_agent(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, loader=loader)
+    agent = _resolve_agent_or_raise(agent_id, store=store)
     ws_path = ws.ensure(agent, settings, store, scaffold=False)
     target = _safe_resolve(ws_path, path)
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -20,6 +20,7 @@ def _assert_enabled(store: "SessionStore", agent_id: str) -> None:
         meta = store.get_agent_meta(agent_id) or {}
         raise AgentDisabled(agent_id, meta.get("disabled_at"))
 
+
 if TYPE_CHECKING:
     from agentbox.core.db import SessionStore
     from agentbox.core.execution.orchestrate.executor import RunExecutor
@@ -43,14 +44,13 @@ async def create_run(
     runner_profile: str | None = None,
     runner_config: dict[str, Any] | None = None,
     runner_embedded: bool = False,
-    loader: Any = None,
 ) -> dict:
     """Validate input, resolve the agent, and dispatch to the executor.
 
     Raises :class:`AgentNotFound`, :class:`InvalidRunInput`, or
     :class:`NoBackendAvailable`. Returns ``{"run_id", "agent"}``.
     """
-    agent = resolve_agent(agent_id, store=store, loader=loader)
+    agent = resolve_agent(agent_id, store=store)
     if agent is None:
         raise AgentNotFound(agent_id)
     _assert_enabled(store, agent.id)
@@ -101,13 +101,12 @@ async def rerun(
     *,
     store: SessionStore,
     executor: RunExecutor,
-    loader: Any = None,
 ) -> dict:
     """Re-execute a finished run with the same agent + input/variables."""
     rec = store.get_run(run_id)
     if rec is None:
         raise RunNotFound(run_id)
-    agent = resolve_agent(rec.agent_id, store=store, loader=loader)
+    agent = resolve_agent(rec.agent_id, store=store)
     if agent is None:
         raise AgentNotFound(rec.agent_id)
     _assert_enabled(store, agent.id)

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from agentbox.api.deps import get_db, get_executor, get_loader, get_store
+from agentbox.api.deps import get_db, get_executor, get_store
 from agentbox.api.runs.schemas import (
     CompleteRunBody,
     CreateRunBody,
@@ -40,7 +40,6 @@ async def create_run(body: CreateRunBody) -> dict:
             body.agent,
             store=get_store(),
             executor=get_executor(),
-            loader=get_loader(),
             input_=body.input,
             variables=body.variables,
             session_id=body.session_id,
@@ -123,7 +122,6 @@ def runs_stats(
     )
 
 
-
 @router.post("/{run_id}/complete")
 async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
     try:
@@ -134,12 +132,10 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
             output=body.output,
             error=body.error,
             usage=body.usage,
-            loader=get_loader(),
             schedule_webhook_cb=schedule_webhook,
         )
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
-
 
 
 @router.post("/{run_id}/snapshot")
@@ -154,12 +150,10 @@ async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
             validation_status=body.validation_status,
             validation_errors=body.validation_errors,
             composition_snapshot=body.composition_snapshot,
-            loader=get_loader(),
             schedule_webhook_cb=schedule_webhook,
         )
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
-
 
 
 @router.post("/{run_id}/post_outcome")
@@ -185,14 +179,11 @@ async def rerun(run_id: str) -> dict:
             run_id,
             store=get_store(),
             executor=get_executor(),
-            loader=get_loader(),
         )
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
     except AgentNotFound as exc:
-        raise HTTPException(
-            404, f"agent {exc.agent_id!r} no longer exists"
-        ) from exc
+        raise HTTPException(404, f"agent {exc.agent_id!r} no longer exists") from exc
     except AgentDisabled as exc:
         raise HTTPException(
             403,
@@ -203,7 +194,6 @@ async def rerun(run_id: str) -> dict:
                 "disabled_at": exc.disabled_at,
             },
         ) from exc
-
 
 
 @router.get("/{run_id}/comments")
@@ -228,9 +218,7 @@ def add_comment(run_id: str, body: RunCommentBody) -> dict:
 async def cancel_run(run_id: str) -> dict:
     """Cancel an in-progress run. Idempotent."""
     try:
-        return await runs.cancel_run(
-            run_id, store=get_store(), executor=get_executor()
-        )
+        return await runs.cancel_run(run_id, store=get_store(), executor=get_executor())
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
 

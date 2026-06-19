@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.cli._deps import get_loader, get_store
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, handle_cli_errors
 from agentbox.core.service import (
     add_version_comment,
@@ -42,7 +42,7 @@ def versions_ls(
 ) -> None:
     """List all versions for an agent."""
     try:
-        require_agent_exists(agent_id, store=get_store(), loader=get_loader())
+        require_agent_exists(agent_id, store=get_store())
     except ServiceAgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -88,7 +88,7 @@ def versions_show(
 ) -> None:
     """Show full details for a specific version."""
     try:
-        require_agent_exists(agent_id, store=get_store(), loader=get_loader())
+        require_agent_exists(agent_id, store=get_store())
     except ServiceAgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -110,7 +110,9 @@ def versions_show(
     )
     console.print(f"created: {v.get('created_at', '')}")
     if rating:
-        console.print(f"rating: [yellow]{rating['rating']}/5[/yellow] by {rating.get('rater', '')}")
+        console.print(
+            f"rating: [yellow]{rating['rating']}/5[/yellow] by {rating.get('rater', '')}"
+        )
 
     if v.get("content_snapshot"):
         try:
@@ -150,7 +152,7 @@ def versions_diff(
 ) -> None:
     """Diff two agent versions."""
     try:
-        require_agent_exists(agent_id, store=get_store(), loader=get_loader())
+        require_agent_exists(agent_id, store=get_store())
     except ServiceAgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -177,7 +179,7 @@ def versions_comment(
 ) -> None:
     """Add a comment to a version."""
     try:
-        require_agent_exists(agent_id, store=get_store(), loader=get_loader())
+        require_agent_exists(agent_id, store=get_store())
     except ServiceAgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -205,7 +207,7 @@ def versions_rate(
         raise typer.Exit(2)
 
     try:
-        require_agent_exists(agent_id, store=get_store(), loader=get_loader())
+        require_agent_exists(agent_id, store=get_store())
     except ServiceAgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -230,8 +232,7 @@ def versions_create(
     prompt_snapshot: str = typer.Option("", "--prompt", help="Prompt snapshot"),
 ) -> None:
     """Create a new agent version from a snapshot."""
-    loader = get_loader()
-    agent = loader.get(agent_id)
+    agent = get_store().get_agent_def(agent_id)
     if agent is None:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)
@@ -241,9 +242,7 @@ def versions_create(
         store,
         agent_id=agent_id,
         source_path=str(agent.source_path) if agent.source_path else "",
-        source_format=(
-            agent.source_format.value if agent.source_format else "unknown"
-        ),
+        source_format=(agent.source_format.value if agent.source_format else "unknown"),
         content_snapshot=content_snapshot,
         prompt_snapshot=prompt_snapshot,
         content_hash="",
@@ -265,7 +264,7 @@ def versions_prompt_revision(
 ) -> None:
     """Create a new agent version with edited prompt content."""
     try:
-        require_agent_exists(agent_id, store=get_store(), loader=get_loader())
+        require_agent_exists(agent_id, store=get_store())
     except ServiceAgentNotFound:
         console.print(f"[red]unknown agent {agent_id!r}[/red]")
         raise typer.Exit(1)

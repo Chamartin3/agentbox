@@ -18,7 +18,6 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli._deps import get_loader as _get_loader
 from agentbox.cli._common import console
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
 from agentbox.core.config import load_settings
@@ -49,7 +48,6 @@ def shell_cmd(
     ``<workspace>/.agentbox/generated/`` and are overwritten each invocation.
     """
     settings = load_settings()
-    loader = _get_loader()
     _db = Database(settings.db_path)
     store = SessionStore(settings.db_path)
 
@@ -59,7 +57,7 @@ def shell_cmd(
         raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, _ = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings, loader
+        agent_def, workspace, ephemeral, settings
     )
 
     _apply_creds(creds, settings)

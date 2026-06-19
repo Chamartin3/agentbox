@@ -49,7 +49,6 @@ def _app(_tmp_path):
     for fn in (
         deps.get_settings,
         deps.get_store,
-        deps.get_loader,
         deps.get_executor,
         deps.get_mcp_registry,
     ):

@@ -21,14 +21,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import typer
 
-from agentbox.cli._deps import (
-    get_loader as _get_loader,  # _NoopLoader stub
-    get_store,
-)
+from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.constants import RunnerKind
@@ -36,8 +32,6 @@ from agentbox.core.service import AgentDef
 from agentbox.core.service.workspaces import launch_runner_configs
 from agentbox.core.workspaces.build import build_workspace
 from agentbox.core.workspaces.mcp.client import McpRegistry
-
-DEFAULT_WORKSPACE_NAME = "default"
 
 # Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
 # ``$SHELL`` (falling back to /bin/bash) and never needs a runner binary.
@@ -141,7 +135,6 @@ def _launch_session(
     _require_binary(runner)
 
     settings = load_settings()
-    loader = _get_loader()
 
     agent_def: AgentDef | None = None
     if agent:
@@ -151,7 +144,7 @@ def _launch_session(
             raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, workspace_name = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings, loader
+        agent_def, workspace, ephemeral, settings
     )
 
     _apply_creds(creds, settings)
@@ -222,18 +215,16 @@ def _resolve_workspace(
     workspace_override: str | None,
     force_ephemeral: bool,
     settings: Settings,
-    loader: Any,
 ) -> tuple[Path, bool, str | None, str | None]:
     """Return (workspace_path, is_ephemeral, creds, workspace_name).
 
     Resolution order:
       1. ``--ephemeral`` flag → tmp dir.
-      2. Explicit ``--workspace`` name (named workspace, then explicit path).
+      2. Explicit ``--workspace`` name (DB registry, then explicit path).
       3. Agent's declared workspace (when ``--agent`` is given).
-      4. ``default`` named workspace from the manifest.
-      5. Error.
+      4. Error.
 
-    ``workspace_name`` is the manifest name (used as workspace_id for
+    ``workspace_name`` is the registry name (used as workspace_id for
     sync). It's ``None`` for ephemeral workspaces and for explicit-path
     overrides that don't correspond to a named workspace.
     """
@@ -248,16 +239,9 @@ def _resolve_workspace(
         return Path(tempfile.mkdtemp(prefix="agentbox-ws-")), True, None, None
 
     if ws_name:
-        ws_def = loader.get_workspace(ws_name)
-        if ws_def is not None:
-            path = settings.project_root / ws_def.path
-            path.mkdir(parents=True, exist_ok=True)
-            creds = getattr(ws_def, "creds", None)
-            return path, False, creds, ws_name
-        # Manifest miss — try the DB registry (db-only workspaces created
-        # via the API/UI). Returning the name lets build_workspace
-        # materialize env-doc + resource bindings.
-
+        # Look up the DB registry (workspaces created via the API/UI).
+        # Returning the name lets build_workspace materialize env-doc +
+        # resource bindings.
         db_row = get_store().get_workspace(ws_name)
         if db_row is not None:
             rel_path = db_row.get("path")
@@ -273,14 +257,6 @@ def _resolve_workspace(
             path = settings.workspaces_root / ws_name
             path.mkdir(parents=True, exist_ok=True)
             return path, False, None, None
-
-    # Fall back to the manifest's "default" workspace
-    default_def = loader.get_workspace(DEFAULT_WORKSPACE_NAME)
-    if default_def is not None:
-        path = settings.project_root / default_def.path
-        path.mkdir(parents=True, exist_ok=True)
-        creds = getattr(default_def, "creds", None)
-        return path, False, creds, DEFAULT_WORKSPACE_NAME
 
     console.print(
         "[red]No workspace specified and no 'default' workspace defined.[/red]\n"

@@ -48,9 +48,7 @@ def _load_tool_manifest(
             else:
                 prefix = suffix[:dot]
                 sub = suffix[dot + 1 :]
-                group_name = (
-                    f"{prefix}.{sub}" if sub in ("read", "write") else prefix
-                )
+                group_name = f"{prefix}.{sub}" if sub in ("read", "write") else prefix
                 result[group_name] = result.get(group_name, []) + tool_names
         return result
     manifest_path = project_root / "bin" / "_generated" / "tool_manifest.json"
@@ -122,7 +120,6 @@ def load_effective_permissions(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
     mcp_manifest: Any | None = None,
 ) -> dict:
     perms: dict = {
@@ -133,15 +130,6 @@ def load_effective_permissions(
         "allow_file_write": True,
         "allow_network": True,
     }
-    if name and loader is not None:
-        ws_def = loader.get_workspace(name)
-        if ws_def is not None:
-            perms["allowed_builtin_tools"] = list(ws_def.allowed_builtin_tools)
-            perms["files"] = [f.model_dump() for f in ws_def.files]
-            perms["max_tokens"] = ws_def.max_tokens
-            perms["allow_file_write"] = ws_def.allow_file_write
-            perms["allow_network"] = ws_def.allow_network
-
     if not name:
         return perms
 
@@ -179,17 +167,13 @@ def get_permissions(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
     mcp_manifest: Any | None = None,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     permissions = load_effective_permissions(
         name,
         store=store,
         settings=settings,
-        loader=loader,
         mcp_manifest=mcp_manifest,
     )
     return {
@@ -205,12 +189,11 @@ def set_permissions(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
     mcp_manifest: Any | None = None,
     sync_cb: Any = None,
 ) -> dict:
     ws_path, _project_root = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
+        name, store=store, settings=settings
     )
 
     store.set_workspace_runtime_permissions(
@@ -234,7 +217,6 @@ def set_permissions(
         name,
         store=store,
         settings=settings,
-        loader=loader,
         mcp_manifest=mcp_manifest,
     )
     _write_capabilities_artifact(ws_path, effective)
@@ -246,7 +228,6 @@ def set_permissions(
         name,
         store=store,
         settings=settings,
-        loader=loader,
         mcp_manifest=mcp_manifest,
     )
 
@@ -269,7 +250,6 @@ def get_workspace_mcp_tools(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
     mcp_manifest: Any | None = None,
 ) -> dict:
     servers = store.get_project_mcp_servers()
@@ -302,14 +282,11 @@ def get_workspace_mcp_tools(
         "WebSearch",
     ]
 
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     permissions = load_effective_permissions(
         name,
         store=store,
         settings=settings,
-        loader=loader,
         mcp_manifest=mcp_manifest,
     )
     allowed = set(permissions.get("allowed_tools", []))

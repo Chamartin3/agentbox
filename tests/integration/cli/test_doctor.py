@@ -14,7 +14,6 @@ def _clear_deps_caches() -> None:
     for fn in (
         deps.get_settings,
         deps.get_store,
-        deps.get_loader,
         deps.get_executor,
         deps.get_mcp_registry,
     ):

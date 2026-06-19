@@ -5,7 +5,7 @@ MCP-derived tool resolution, config generation, and skill discovery
 that used to live in ``api/routes/workspaces.py``. Routes become a
 thin transport adapter: parse -> call -> map domain errors to HTTP.
 
-Dependency injection is explicit (``store``, ``settings``, ``loader``,
+Dependency injection is explicit (``store``, ``settings``,
 ``mcp_manifest``) so this package has no import of FastAPI deps. That
 lets MCP tools and the CLI consume the same use-cases.
 

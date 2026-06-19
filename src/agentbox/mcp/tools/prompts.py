@@ -52,7 +52,7 @@ def register(mcp: FastMCP) -> None:
         template); for those use ``get_agent_prompt_fragments``. For the
         per-run captured fragments, use ``get_run_prompt_fragments``."""
         ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
+        agent = resolve_agent(agent_id, store=ctx.store)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if version is not None:
@@ -128,7 +128,7 @@ def register(mcp: FastMCP) -> None:
                 "detail": "reason must be at least 3 characters",
             }
         ctx = get_context()
-        if resolve_agent(agent_id, store=ctx.store, loader=ctx.loader) is None:
+        if resolve_agent(agent_id, store=ctx.store) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
             new_row = ctx.store.save_prompt_revision(
@@ -163,7 +163,7 @@ def register(mcp: FastMCP) -> None:
                 "detail": "reason must be at least 3 characters",
             }
         ctx = get_context()
-        if resolve_agent(agent_id, store=ctx.store, loader=ctx.loader) is None:
+        if resolve_agent(agent_id, store=ctx.store) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
             new_row = ctx.store.rollback_to(
@@ -213,7 +213,7 @@ def register(mcp: FastMCP) -> None:
         injection. For the run-time fragments (user input, MCP config,
         argv, claude_cli envelope), use ``get_run_prompt_fragments``."""
         ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
+        agent = resolve_agent(agent_id, store=ctx.store)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if agent.source_path is None:

@@ -28,7 +28,7 @@ def register_prompts(mcp: FastMCP) -> None:
         candidate prompt body instead of the agent's current one."""
         ctx = get_context()
         if template_override is None:
-            agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
+            agent = resolve_agent(agent_id, store=ctx.store)
             if agent is None:
                 return {"error": "agent_not_found", "agent_id": agent_id}
             template = agent.prompt or ""

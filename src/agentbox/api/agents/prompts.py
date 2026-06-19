@@ -11,7 +11,7 @@ from typing import NoReturn
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_loader, get_settings, get_store
+from agentbox.api.deps import get_settings, get_store
 from agentbox.core.service import prompts as prompts_service
 from agentbox.core.service.prompts import AgentNotFound, PromptError
 
@@ -34,7 +34,6 @@ def get_prompt(agent_id: str) -> dict:
             agent_id,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
         )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
@@ -56,7 +55,6 @@ def put_prompt(agent_id: str, body: PromptBody) -> dict:
             body.content,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
         )
     except AgentNotFound as exc:
         raise HTTPException(404) from exc
@@ -73,9 +71,7 @@ def put_prompt(agent_id: str, body: PromptBody) -> dict:
 @router.get("/agents/{agent_id}/prompt/versions")
 def list_versions(agent_id: str) -> dict:
     try:
-        return prompts_service.list_versions(
-            agent_id, store=get_store(), loader=get_loader()
-        )
+        return prompts_service.list_versions(agent_id, store=get_store())
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
 
@@ -83,9 +79,7 @@ def list_versions(agent_id: str) -> dict:
 @router.get("/agents/{agent_id}/prompt/versions/{version}")
 def get_version(agent_id: str, version: int) -> dict:
     try:
-        payload = prompts_service.get_version(
-            agent_id, version, store=get_store(), loader=get_loader()
-        )
+        payload = prompts_service.get_version(agent_id, version, store=get_store())
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
     if payload is None:
@@ -110,7 +104,6 @@ def save_draft(agent_id: str, body: DraftBody) -> dict:
             agent_id,
             body.content,
             store=get_store(),
-            loader=get_loader(),
             author=body.author,
         )
     except AgentNotFound as exc:
@@ -130,7 +123,6 @@ def publish_prompt(agent_id: str, body: PublishBody) -> dict:
             agent_id,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
             changelog=body.changelog,
             author=body.author,
         )
@@ -156,7 +148,6 @@ def rollback_prompt(agent_id: str, body: RollbackBody) -> dict:
             body.target_version,
             store=get_store(),
             project_root=get_settings().project_root,
-            loader=get_loader(),
             author=body.author,
         )
     except AgentNotFound as exc:

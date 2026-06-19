@@ -11,12 +11,15 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.cli._deps import get_loader as _DefinitionLoaderShim
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console, event_color
 from agentbox.core.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
-from agentbox.core.engines import CredentialState, list_backends, list_credentials as _creds_list
+from agentbox.core.engines import (
+    CredentialState,
+    list_backends,
+    list_credentials as _creds_list,
+)
 
 app = typer.Typer(
     name="agentbox",
@@ -118,18 +121,7 @@ def doctor() -> None:
     else:
         _fail("Manifest exists", f"not found at {path}")
 
-    # 2. Manifest parses
-    loader = _DefinitionLoaderShim()
-    try:
-        manifest = loader.load()
-        _ok(
-            "Manifest parses",
-            f"{len(manifest.agents)} agent(s), {len(manifest.workspaces)} workspace(s)",
-        )
-    except Exception as exc:
-        _fail("Manifest parses", str(exc))
-
-    # 3. All workspaces resolvable
+    # 2. All workspaces resolvable
     try:
         rows = ws_workspaces.list_all(get_store(), settings)
         resolvable = True
@@ -142,14 +134,14 @@ def doctor() -> None:
     except Exception as exc:
         _fail("Workspaces", str(exc))
 
-    # 4. DB reachable
+    # 3. DB reachable
     try:
         store.list_runs(limit=1)
         _ok("Database", str(settings.db_path))
     except Exception as exc:
         _fail("Database", str(exc))
 
-    # 5. Plugins loadable
+    # 4. Plugins loadable
     try:
         backend_count = len(list_backends())
         _ok(
@@ -159,7 +151,7 @@ def doctor() -> None:
     except Exception as exc:
         _fail("Plugins", str(exc))
 
-    # 7. Credentials
+    # 5. Credentials
     try:
         rows = _creds_list()
         if not rows:
@@ -179,7 +171,7 @@ def doctor() -> None:
     except Exception as exc:
         _warn("Credentials", str(exc))
 
-    # 8. MCP cache present
+    # 6. MCP cache present
     cache = settings.mcp_cache_dir
     if cache.exists():
         files = list(cache.glob("*.json"))

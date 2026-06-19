@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
@@ -38,11 +37,8 @@ def generate_skills_by_name(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     skills = discover_skills(ws_path)
     claude_dir = _generate_skills_dir(skills, ws_path, ".claude")
     opencode_dir = _generate_skills_dir(skills, ws_path, ".opencode")
@@ -61,11 +57,8 @@ def list_skills_by_name(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     skills = discover_skills(ws_path)
     return {
         "workspace": name,
@@ -87,11 +80,8 @@ def get_skill_content_by_name(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any = None,
 ) -> dict | None:
-    ws_path, _ = resolve_workspace_path(
-        name, store=store, settings=settings, loader=loader
-    )
+    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
     skill_md = find_skill(ws_path, skill_name)
     if skill_md is None:
         return None
@@ -108,9 +98,8 @@ def list_skills_for_agent(
     *,
     store: SessionStore,
     settings: Settings,
-    loader: Any,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, loader=loader)
+    agent = _resolve_agent_or_raise(agent_id, store=store)
     workspace_path, _ = ws.resolve_path(agent, settings, store)
     skills = discover_skills(workspace_path)
     return {

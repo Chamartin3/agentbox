@@ -16,13 +16,12 @@ runner = CliRunner()
 def _clear_deps_caches() -> None:
     from agentbox.cli._deps import (
         get_executor,
-        get_loader,
         get_mcp_registry,
         get_settings,
         get_store,
     )
 
-    for fn in (get_settings, get_store, get_loader, get_executor, get_mcp_registry):
+    for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
 
 
@@ -48,12 +47,21 @@ def _seed_agent(store, agent_id: str = "t1", **kw) -> dict:
     agent_def = AgentDef(
         id=agent_id,
         description=kw.get("description", "Test agent"),
-        runner={"kind": kw.get("runner_kind", "token"), "model": kw.get("model", "gpt-4o")},
-        **{k: v for k, v in kw.items() if k not in ("description", "runner_kind", "model")},
+        runner={
+            "kind": kw.get("runner_kind", "token"),
+            "model": kw.get("model", "gpt-4o"),
+        },
+        **{
+            k: v
+            for k, v in kw.items()
+            if k not in ("description", "runner_kind", "model")
+        },
     )
     return store.create_agent(
         agent_id=agent_id,
-        config_json=agent_def.model_dump(mode="python", exclude_none=True, warnings=False),
+        config_json=agent_def.model_dump(
+            mode="python", exclude_none=True, warnings=False
+        ),
         prompt_content=kw.get("prompt", "# Test prompt\n"),
         author="test",
         changelog="seed",
@@ -115,11 +123,15 @@ def test_agents_show_existing(store_fixture) -> None:
 
 def test_agents_create_from_config(store_fixture, tmp_path: Path) -> None:
     config_path = tmp_path / "agent.json"
-    config_path.write_text(json.dumps({
-        "id": "cli-created",
-        "description": "Created via CLI",
-        "runner": {"kind": "token"},
-    }))
+    config_path.write_text(
+        json.dumps(
+            {
+                "id": "cli-created",
+                "description": "Created via CLI",
+                "runner": {"kind": "token"},
+            }
+        )
+    )
     result = runner.invoke(
         app, ["agents", "create", "--config", str(config_path), "--author", "test"]
     )
@@ -131,11 +143,15 @@ def test_agents_create_from_config(store_fixture, tmp_path: Path) -> None:
 def test_agents_create_duplicate(store_fixture, tmp_path: Path) -> None:
     _seed_agent(store_fixture, "dup")
     config_path = tmp_path / "dup.json"
-    config_path.write_text(json.dumps({
-        "id": "dup",
-        "description": "Duplicate",
-        "runner": {"kind": "token"},
-    }))
+    config_path.write_text(
+        json.dumps(
+            {
+                "id": "dup",
+                "description": "Duplicate",
+                "runner": {"kind": "token"},
+            }
+        )
+    )
     result = runner.invoke(
         app, ["agents", "create", "--config", str(config_path), "--author", "test"]
     )
@@ -213,4 +229,3 @@ def test_agents_runner_profile_get_none(store_fixture) -> None:
     result = runner.invoke(app, ["agents", "runner-profile", "t1", "--get"])
     assert result.exit_code == 0
     assert "no runner profile" in result.output.lower()
-

@@ -109,7 +109,6 @@ def register(mcp: FastMCP) -> None:
             )
             for a in list_all_agents(
                 store=ctx.store,
-                loader=ctx.loader,
                 include_disabled=include_disabled,
             )
         ]
@@ -131,7 +130,7 @@ def register(mcp: FastMCP) -> None:
         q = query.lower().strip()
         ctx = get_context()
         results = []
-        for a in list_all_agents(store=ctx.store, loader=ctx.loader):
+        for a in list_all_agents(store=ctx.store):
             d = _agent_dict(a)
             hay = " ".join(
                 [
@@ -142,9 +141,7 @@ def register(mcp: FastMCP) -> None:
             ).lower()
             if q in hay:
                 results.append(
-                    _inject_profile_model(
-                        _strip_legacy_runner_model(d), ctx.store
-                    )
+                    _inject_profile_model(_strip_legacy_runner_model(d), ctx.store)
                 )
         return _paginate(results, limit, offset)
 
@@ -156,7 +153,7 @@ def register(mcp: FastMCP) -> None:
         DB-as-source-of-truth tables the UI uses). Falls back to
         ``latest_version`` when no active pointer is set."""
         ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
+        agent = resolve_agent(agent_id, store=ctx.store)
         if agent is None:
             return {"error": "not_found", "agent_id": agent_id}
         active = ctx.store.get_active_version(agent_id) or ctx.store.latest_version(
@@ -183,7 +180,7 @@ def register(mcp: FastMCP) -> None:
         """Distinct tags across all known agents (DB + manifest)."""
         ctx = get_context()
         tags: set[str] = set()
-        for a in list_all_agents(store=ctx.store, loader=ctx.loader):
+        for a in list_all_agents(store=ctx.store):
             tags.update(_agent_dict(a).get("tags") or [])
         return {"items": sorted(tags), "total": len(tags)}
 
@@ -249,7 +246,7 @@ def register(mcp: FastMCP) -> None:
                 "detail": "reason must be at least 3 characters",
             }
         ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store, loader=ctx.loader)
+        agent = resolve_agent(agent_id, store=ctx.store)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         v = ctx.store.get_version(agent_id, version)
