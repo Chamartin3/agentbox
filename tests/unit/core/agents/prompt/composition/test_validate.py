@@ -66,7 +66,7 @@ def _make_executor(tmp_path: Path):  # type: ignore[no-untyped-def]
 
 def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
     """_validate_output catches missing required field via jsonschema."""
-    from agentbox.core.data import AgentDef, RunnerSpec
+    from agentbox.core.db import AgentDef, RunnerSpec
 
     schema = {
         "type": "object",
@@ -101,7 +101,7 @@ def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
 
 def test_validate_output_rejects_enum_violation(tmp_path: Path) -> None:
     """_validate_output rejects invalid enum values."""
-    from agentbox.core.data import AgentDef, RunnerSpec
+    from agentbox.core.db import AgentDef, RunnerSpec
 
     schema = {
         "type": "object",
@@ -184,7 +184,7 @@ def test_empty_output_treated_as_validation_failure(tmp_path: Path) -> None:
     was falsy (``if agent.runner.output_schema_path and output``), letting
     empty responses through to the post-processor which then crashed.
     """
-    from agentbox.core.data import AgentDef, RunnerSpec
+    from agentbox.core.db import AgentDef, RunnerSpec
 
     schema = {
         "type": "object",

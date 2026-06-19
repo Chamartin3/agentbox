@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agentbox.config import Settings
+from agentbox.core.config import Settings
 from agentbox.core.agents.composition.bundle import (
     _append_validation_engine_hint,
 )
@@ -46,19 +46,10 @@ from agentbox.core.agents.config import (
     ValidatorConfig,
     resolve_output_config as _resolve_output_config,
 )
-from agentbox.core.data import AgentDef, RunStore, SessionStore
+from agentbox.core.db import AgentDef, RunStore, SessionStore
 from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
-)
-from agentbox.core.agents.validation import (
-    ValidationResult,
-    call_http_validator,
-    call_script_validator,
-    resolve_schema,
-    run_json_schema,
-    validate_jsonschema,
-    validate_pydantic,
 )
 from agentbox.core.workspaces.prep import (
     prompt_resolution_to_snapshot,
@@ -354,110 +345,9 @@ def capture_fragments(
     return _fragments_to_json(frags)
 
 
-def validate_output(
-    *,
-    payload: str | None,
-    view: AgentRuntimeView,
-    workdir: Path | None = None,
-    project_root: Path | None = None,
-    agent: AgentDef | None = None,
-    composed_schema: dict[str, object] | None = None,
-) -> ValidationResult:
-    """Validate ``payload`` against the agent's declared output contract.
-
-    This wraps the two-gate validation architecture from
-    ``core/execution/output_validate.py`` but consumes a pre-resolved
-    :class:`AgentRuntimeView` instead of reaching into
-    ``core.agents.config`` at call time.
-
-    The legacy path (file-based schema resolution) is preserved via
-    ``workdir`` / ``project_root`` / ``agent`` / ``composed_schema``
-    kwargs.  New code should pass ``view`` only.
-    """
-
-    # ---- New path: pre-resolved OutputConfig from view -------------------
-    if view.json_schema is not None or view.validators:
-        if not payload:
-            return ValidationResult(
-                ok=False,
-                error="output is empty but an output schema is required",
-                engine="none",
-            )
-        # Gate 1: implicit jsonschema validator
-        if view.json_schema is not None:
-            result = run_json_schema(view.json_schema, payload)
-            if not result.ok:
-                return result
-        # Gate 2..N: explicit validators
-        ran_http = False
-        ran_script = False
-        for vcfg in view.validators:
-            if vcfg.kind == "http":
-                result = call_http_validator(vcfg, payload)
-                if not result.ok:
-                    return result
-                ran_http = True
-            elif vcfg.kind == "script":
-                result = call_script_validator(vcfg, payload)
-                if not result.ok:
-                    return result
-                ran_script = True
-            else:
-                return ValidationResult(
-                    ok=False,
-                    error=f"unknown validator kind: {vcfg.kind}",
-                    engine="none",
-                )
-        if view.json_schema is not None and ran_http:
-            engine = "json-schema+http-callback"
-        elif view.json_schema is not None and ran_script:
-            engine = "json-schema+script"
-        elif ran_http:
-            engine = "http-callback"
-        elif ran_script:
-            engine = "script"
-        elif view.json_schema is not None:
-            engine = "json-schema"
-        else:
-            engine = "off"
-        return ValidationResult(ok=True, engine=engine)
-
-    # ---- Legacy path: file-based schema resolution ----------------------
-    schema, schema_err = resolve_schema(
-        agent, workdir or Path("."), project_root, composed_schema=composed_schema
-    )
-    if schema is None:
-        if schema_err:
-            return ValidationResult(ok=False, error=schema_err, engine="none")
-        return ValidationResult(ok=True, engine="off")
-
-    if not payload:
-        return ValidationResult(
-            ok=False,
-            error="output is empty but an output schema is required",
-            engine="none",
-        )
-
-    engine_name = view.output_validation_engine
-
-    if engine_name == "jsonschema":
-        return validate_jsonschema(payload, schema)
-    if engine_name == "pydantic":
-        return validate_pydantic(payload, schema)
-
-    js = validate_jsonschema(payload, schema)
-    if not js.ok:
-        return js
-    py = validate_pydantic(payload, schema)
-    if not py.ok:
-        return py
-    return ValidationResult(ok=True, engine="both")
-
-
 __all__ = [
     "AgentRuntimeView",
     "ComposedPrompt",
     "capture_fragments",
     "compose_prompt",
-    "validate_output",
 ]

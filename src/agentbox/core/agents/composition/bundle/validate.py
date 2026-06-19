@@ -32,10 +32,14 @@ def validate_input(
     return missing
 
 
-def validate_output(
+def precompose_check(
     response: str, schema: dict[str, Any] | None, mode: str = "strict"
 ) -> tuple[bool, list[str]]:
-    """Validate a runner's output against a JSON Schema.
+    """Pre-compose validation of a runner's output against a JSON Schema.
+
+    This is **not** the runtime ``validate_output`` entrypoint — it is a
+    composition-time helper for checking bundle output before the run starts.
+    Runtime validation lives in ``core.agents.validation.orchestrate``.
 
     Args:
         response: raw output text (expected to be JSON).

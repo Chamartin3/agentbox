@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from agentbox.core.agents.config import ExecutionConfig, resolve_output_config
@@ -18,6 +19,60 @@ from agentbox.core.agents.validation.schema import (
     ValidationResult,
     resolve_schema,
 )
+
+
+def _run_gates(
+    json_schema: dict[str, Any] | None,
+    validators: Iterable[Any],
+    output: str,
+) -> ValidationResult:
+    """Execute the two-gate validation sequence.
+
+    Gate 1 (structural): JSON Schema validation.
+    Gate 2..N (semantic): explicit http/script validators.
+
+    This helper exists in exactly one place so both the agent-based and
+    view-based entrypoints run identical gate logic.
+    """
+    if json_schema is not None:
+        result = run_json_schema(json_schema, output)
+        if not result.ok:
+            return result
+
+    ran_http = False
+    ran_script = False
+    for vcfg in validators:
+        if vcfg.kind == "http":
+            result = call_http_validator(vcfg, output)
+            if not result.ok:
+                return result
+            ran_http = True
+        elif vcfg.kind == "script":
+            result = call_script_validator(vcfg, output)
+            if not result.ok:
+                return result
+            ran_script = True
+        else:
+            return ValidationResult(
+                ok=False,
+                error=f"unknown validator kind: {vcfg.kind}",
+                engine="none",
+            )
+
+    engine: ValidationEngine
+    if json_schema is not None and ran_http:
+        engine = "json-schema+http-callback"
+    elif json_schema is not None and ran_script:
+        engine = "json-schema+script"
+    elif ran_http:
+        engine = "http-callback"
+    elif ran_script:
+        engine = "script"
+    elif json_schema is not None:
+        engine = "json-schema"
+    else:
+        engine = "off"
+    return ValidationResult(ok=True, engine=engine)
 
 
 def validate_output(
@@ -55,43 +110,7 @@ def validate_output(
                 error="output is empty but an output schema is required",
                 engine="none",
             )
-        if output_cfg.json_schema is not None:
-            result = run_json_schema(output_cfg.json_schema, output)
-            if not result.ok:
-                return result
-        ran_http = False
-        ran_script = False
-        for vcfg in output_cfg.validators:
-            if vcfg.kind == "http":
-                result = call_http_validator(vcfg, output)
-                if not result.ok:
-                    return result
-                ran_http = True
-            elif vcfg.kind == "script":
-                result = call_script_validator(vcfg, output)
-                if not result.ok:
-                    return result
-                ran_script = True
-            else:
-                return ValidationResult(
-                    ok=False,
-                    error=f"unknown validator kind: {vcfg.kind}",
-                    engine="none",
-                )
-        engine: ValidationEngine
-        if output_cfg.json_schema is not None and ran_http:
-            engine = "json-schema+http-callback"
-        elif output_cfg.json_schema is not None and ran_script:
-            engine = "json-schema+script"
-        elif ran_http:
-            engine = "http-callback"
-        elif ran_script:
-            engine = "script"
-        elif output_cfg.json_schema is not None:
-            engine = "json-schema"
-        else:
-            engine = "off"
-        return ValidationResult(ok=True, engine=engine)
+        return _run_gates(output_cfg.json_schema, output_cfg.validators, output)
 
     composed_schema = getattr(composed, "schema", None) if composed is not None else None
     schema, schema_err = resolve_schema(

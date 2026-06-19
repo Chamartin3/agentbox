@@ -12,7 +12,6 @@ from unittest.mock import MagicMock
 from agentbox.core.agents.runtime import (
     AgentRuntimeView,
     capture_fragments,
-    validate_output,
 )
 
 
@@ -54,27 +53,4 @@ class TestCaptureFragments:
         assert "hello" in result
 
 
-class TestValidateOutput:
-    def test_validate_no_schema_skips(self) -> None:
-        view = AgentRuntimeView()
-        result = validate_output(payload='{"ok": true}', view=view)
-        assert result.ok is True
-        assert result.engine == "off"
 
-    def test_validate_with_schema_empty_payload(self) -> None:
-        view = AgentRuntimeView(json_schema={"type": "object"})
-        result = validate_output(payload=None, view=view)
-        assert result.ok is False
-        assert result.engine == "none"
-
-    def test_validate_with_schema_valid_json(self) -> None:
-        view = AgentRuntimeView(json_schema={"type": "object"})
-        result = validate_output(payload='{"key": "val"}', view=view)
-        assert result.ok is True
-        assert result.engine == "json-schema"
-
-    def test_validate_with_schema_invalid_json(self) -> None:
-        view = AgentRuntimeView(json_schema={"type": "object"})
-        result = validate_output(payload="not json", view=view)
-        assert result.ok is False
-        assert result.engine == "jsonschema"
