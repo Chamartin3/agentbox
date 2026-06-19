@@ -94,7 +94,8 @@ def build_host_env_toolsets(
     if os.environ.get("AGENTBOX_TOKEN_MCP_TOOLS", "1") == "0":
         return []  # kill-switch: force the in-process fallback
     try:
-        from pydantic_ai.mcp import MCPToolset, StdioTransport  # noqa: PLC0415
+        from pydantic_ai.mcp import MCPToolset  # noqa: PLC0415
+        from fastmcp.client.transports import StdioTransport  # noqa: PLC0415
 
         from agentbox.core.workspaces.generation.inject import (  # noqa: PLC0415
             HOST_ENV_SERVER_NAME,

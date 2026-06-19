@@ -22,12 +22,9 @@ from typing import Any
 
 from pydantic import ValidationError
 from pydantic_ai import NativeOutput, PromptedOutput, RunContext
-# ponytail: pydantic-ai >=2.0 renamed OpenAIModel -> OpenAIChatModel; alias
-# both so the token backend loads on either. Pin pydantic-ai if 2.x drifts more.
-try:
-    from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
-except ImportError:  # pydantic-ai <2.0
-    from pydantic_ai.models.openai import OpenAIModel
+# OpenAIChatModel is pydantic-ai's canonical class; the old OpenAIModel name is
+# now a deprecated subclass. Import the canonical name (aliased for local use).
+from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from agentbox.core.constants import LogLevel, MessageRole, RunStatus
