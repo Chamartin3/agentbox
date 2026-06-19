@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from agentbox.core.service.feedback import (
-    _add_run_comment,
-    _list_run_comments,
+from agentbox.core.service.execution.feedback import (
     activity_summary as svc_activity_summary,
+    add_comment as _add_run_comment,
     aggregate_usage as svc_aggregate_usage,
     distinct_executors as svc_distinct_executors,
+    list_comments as _list_run_comments,
     success_rate,
 )
 from agentbox.mcp.deps import get_context

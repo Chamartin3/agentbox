@@ -1,30 +1,13 @@
-"""Feedback service — enrichment over raw run rows."""
+"""Feedback analytics service helpers."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
 
-from agentbox.core.data import SessionStore
-from agentbox.core.data.feedback.snapshots import snapshot_fields
-from agentbox.core.data.feedback.types import ActivityRange, since_iso
-from agentbox.core.service.execution.evaluate import (
-    add_comment as _add_run_comment,  # noqa: F401
-    distinct_executors,
-    list_comments as _list_run_comments,  # noqa: F401
-)
-from agentbox.core.service.feedback.stats import (
-    activity_summary,
-    aggregate_usage,
-)
-
-__all__ = [
-    "activity_summary",
-    "aggregate_usage",
-    "distinct_executors",
-    "enrich_recent_runs",
-    "summary",
-]
+from agentbox.core.db import SessionStore
+from agentbox.core.db.feedback.snapshots import snapshot_fields
+from agentbox.core.db.feedback.types import ActivityRange, since_iso
 
 
 def _state_label(status: str) -> str:
@@ -102,3 +85,18 @@ def summary(
     agent: str | None = None,
 ) -> dict[str, Any]:
     return store.activity_summary(since_iso(range_), agent=agent)
+
+
+def aggregate_usage(*, store: SessionStore) -> dict:
+    """Total tokens + cost across all runs."""
+    return store.aggregate_usage()
+
+
+def activity_summary(*, store: SessionStore, since: str, agent_id: str | None = None) -> dict:
+    """Roll up runs since ``since`` (ISO-8601) into totals + breakdowns."""
+    return store.activity_summary(since, agent=agent_id)
+
+
+def distinct_executors(*, store: SessionStore) -> list[str]:
+    """Distinct executor/model names across all recorded runs."""
+    return store.distinct_executors()

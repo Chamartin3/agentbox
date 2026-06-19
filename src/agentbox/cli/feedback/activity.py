@@ -11,7 +11,7 @@ from rich.table import Table
 
 from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.service.feedback import ActivityRange, enrich_recent_runs, summary
+from agentbox.core.service.execution.feedback import ActivityRange, enrich_recent_runs, summary
 
 app = typer.Typer(
     name="activity",

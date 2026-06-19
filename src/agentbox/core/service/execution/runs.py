@@ -1,7 +1,7 @@
 """Run services — backward-compatible facade re-exporting from submodules."""
 
 from agentbox.core.service.execution.create import create_run, rerun
-from agentbox.core.service.execution.evaluate import add_comment, list_comments
+from agentbox.core.service.execution.feedback import add_comment, list_comments
 from agentbox.core.service.execution.lifecycle import (
     cancel_run,
     complete_run,

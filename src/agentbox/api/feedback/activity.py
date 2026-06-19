@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query
 
 from agentbox.api.deps import get_store
 from agentbox.core.constants import ActivityStateFilter
-from agentbox.core.service.feedback import ActivityRange, enrich_recent_runs, summary
+from agentbox.core.service.execution.feedback import ActivityRange, enrich_recent_runs, summary
 
 router = APIRouter(prefix="/api/activity", tags=["activity"])
 
