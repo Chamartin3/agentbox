@@ -1,4 +1,4 @@
-"""REST endpoints for per-agent tool grant management (Plan 19, 062_01).
+"""REST endpoints for per-agent tool grant management.
 
 Grants are validated against the workspace's installed catalog when a
 ``workspace_id`` is supplied.  Unbacked grants (tool not in the catalog)
@@ -14,8 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_mcp_registry, get_store
-from agentbox.api.workspaces.catalog import _resolve_host_env_tools, _resolve_mcp_tools
 from agentbox.core.service import SessionStore
+from agentbox.core.workspaces.catalog import resolve_host_env_callables
+from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
 from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 
 router = APIRouter(prefix="/api/agents", tags=["agent-tool-grants"])
@@ -41,10 +42,10 @@ def _catalog_tool_names(
     """Return the set of tool/resource names installed in *workspace_id*."""
     names: set[str] = set()
 
-    for t in _resolve_mcp_tools(workspace_id, store, mcp_registry):
-        names.add(t["name"])
-    for t in _resolve_host_env_tools(workspace_id, store):
-        names.add(t["name"])
+    for t in resolve_mcp_callables(workspace_id, store, mcp_registry):
+        names.add(t.name)
+    for t in resolve_host_env_callables(workspace_id, store):
+        names.add(t.name)
 
     # Resource bindings are included but only by resource_id / target_path.
     for b in store.list_workspace_file_bindings(workspace_id):

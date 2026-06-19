@@ -1,8 +1,7 @@
 """Backend adapter for the OpenCode CLI.
 
-Self-contained after Plan 16 Phase 4 — ``render()`` builds argv/env
-from the ``AgentDef`` and ``run()`` streams events from the OpenCode
-subprocess directly.
+``render()`` builds argv/env from the ``AgentDef`` and ``run()`` streams
+events from the OpenCode subprocess directly.
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from typing import Any, ClassVar
 
 from agentbox.core.engines.backends.opencode.stream import _run_opencode_stream
 
-from agentbox.core.data import (
+from agentbox.core.db import (
     DoneEvent,
     LogEvent,
     RunEvent,
@@ -26,6 +25,7 @@ from agentbox.core.engines.backends.opencode.session import (  # noqa: F401
     parse_event_stream_with_thinking,
     strip_code_fences,
 )
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 from agentbox.core.workspaces.generation.payload import Item
@@ -69,6 +69,7 @@ class OpenCodeBackend(BackendAdapter):
         *,
         runtime_config: Any = None,
         host_capabilities: dict | None = None,
+        ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
@@ -100,20 +101,17 @@ class OpenCodeBackend(BackendAdapter):
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
         # Effective tools = agent ∩ workspace (canonical).
-        capabilities = host_capabilities or {}
         effective_tools: set = set()
         if runtime_config is not None:
-            ws_allowed = capabilities.get("allowed_tools")
             effective_tools = intersect_allowed_tools(
                 set(runtime_config.allowed_tools),
-                set(ws_allowed) if ws_allowed else None,
+                ws_allowed_tools,
             )
 
         return RenderedConfig(
             argv=argv,
             env=env,
             cwd=Path("."),
-            files=self._collect_system_files(agent, workdir, composed),
             agent_meta={
                 "timeout_seconds": timeout_seconds,
                 "effective_tools": sorted(effective_tools),

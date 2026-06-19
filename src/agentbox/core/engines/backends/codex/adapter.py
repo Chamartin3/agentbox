@@ -1,8 +1,7 @@
 """Backend adapter for the OpenAI Codex CLI (``codex exec --json``).
 
-Self-contained adapter introduced in Plan 16 Phase 2. Streaming uses
-the shared :func:`agentbox.core.engines.streaming.jsonl.stream_jsonl_subprocess`
-helper.
+Streaming uses the shared
+:func:`agentbox.core.engines.streaming.jsonl.stream_jsonl_subprocess` helper.
 """
 
 from __future__ import annotations
@@ -13,11 +12,12 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.core.data import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
+from agentbox.core.db import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.backends.codex.render import build_codex_items
 from agentbox.core.engines.backends.codex.tools import NATIVE_TOOLS as _CODEX_TOOLS
 from agentbox.core.engines.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import (
     intersect_allowed_tools,
     translate_tool,
@@ -133,6 +133,7 @@ class CodexBackend(BackendAdapter):
         *,
         runtime_config: Any = None,
         host_capabilities: dict | None = None,
+        ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
@@ -141,12 +142,10 @@ class CodexBackend(BackendAdapter):
 
         argv = build_codex_argv(model, extra_args, self.default_model)
 
-        capabilities = host_capabilities or {}
         if runtime_config is not None:
-            ws_allowed = capabilities.get("allowed_tools")
             effective_tools = intersect_allowed_tools(
                 set(runtime_config.allowed_tools),
-                set(ws_allowed) if ws_allowed else None,
+                ws_allowed_tools,
             )
             if effective_tools:
                 native_tools = [translate_tool(t, _CODEX_TOOLS) for t in effective_tools]
@@ -160,7 +159,6 @@ class CodexBackend(BackendAdapter):
             argv=argv,
             env=env,
             cwd=Path("."),
-            files=self._collect_system_files(agent, workdir, composed),
             agent_meta={"timeout_seconds": timeout_seconds},
             model=model,
         )

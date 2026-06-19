@@ -7,8 +7,9 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from agentbox.config import Settings
-from agentbox.core.data import AgentDef, RunStore
+from agentbox.core.config import Settings
+from agentbox.core.db import AgentDef, RunStore
+from agentbox.core.db import Database
 from agentbox.core.engines.profiles import RunnerProfileResolver
 from agentbox.core.execution.orchestrate._runner import _run as _run_loop
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
@@ -18,9 +19,6 @@ from agentbox.core.execution.orchestrate.init_run import (
     fail_pre_run as _fail_pre_run_fn,
     init_run,
     launch_background_task,
-)
-from agentbox.core.execution.orchestrate.materialize import (
-    materialize_rendered_config,
 )
 from agentbox.core.execution.orchestrate.setup import (
     NoBackendAvailable,
@@ -53,8 +51,10 @@ class RunExecutor:
         store: RunStore,
         settings: Settings,
         mcp_registry: "McpRegistry | None" = None,
+        db: Database | None = None,
     ):
         self.store = store
+        self.db = db
         self.settings = settings
         self._mcp_registry = mcp_registry
         self._broadcasters: dict[str, RunBroadcaster] = {}
@@ -105,7 +105,13 @@ class RunExecutor:
         input_ = resolved.input_
         composed = resolved.to_composed_state()
         _prompt_snapshot_entries = resolved.snapshot_entries
-        _workspace_id = agent.workspace if agent.workspace != "<ephemeral>" else None
+        # Prefer the run-requested workspace (same source prepare_workdir used
+        # for the workdir); fall back to the agent's bound workspace. Using
+        # only agent.workspace silently dropped host-env grants for runs that
+        # set the workspace per-request (e.g. API-bound agents whose binding
+        # isn't persisted to the agent def), starving every backend of tools.
+        _ws_from_agent = agent.workspace if agent.workspace != "<ephemeral>" else None
+        _workspace_id = workspace_override or _ws_from_agent
 
         try:
             effective = self._profile_resolver.resolve(
@@ -150,15 +156,13 @@ class RunExecutor:
             agent=agent,
             workdir=workdir,
             mcp_registry=self._mcp_registry,
+            system_prompt=composed.system if composed else None,
         )
-        # ── Materialize backend-rendered config into run_dir ──────────────
-        materialize_rendered_config(rendered, run_dir)
         # ── Resolve cwd relative to run_dir ───────────────────────────────
         _raw_cwd = rendered.cwd
         if not _raw_cwd.is_absolute():
             _raw_cwd = run_dir / _raw_cwd
         rendered = RenderedConfig(
-            files=rendered.files,
             argv=rendered.argv,
             env=rendered.env,
             cwd=_raw_cwd,
@@ -181,6 +185,18 @@ class RunExecutor:
                 agent_id=agent.id, workdir=workdir,
                 db_path=self.settings.db_path,
             )
+
+        # The token direct path (pydantic-ai → OpenAI-compatible) can't read
+        # the injected .mcp.json; hand it the resolved grants via agent_meta so
+        # it can wire the host-env fs tools in-process (see token/tools.py).
+        if _host_env_grants:
+            rendered.agent_meta["host_env_grants"] = _host_env_grants
+            rendered.agent_meta["agent_tool_grants"] = (
+                sorted(_agent_tool_grants) if _agent_tool_grants else None
+            )
+            rendered.agent_meta["host_env_workspace_id"] = _workspace_id or ""
+            rendered.agent_meta["host_env_workdir"] = str(workdir)
+            rendered.agent_meta["host_env_db_path"] = str(self.settings.db_path)
 
         transcripts_dir = self.settings.data_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)

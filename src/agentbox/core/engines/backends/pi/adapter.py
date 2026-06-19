@@ -1,6 +1,6 @@
 """Backend adapter for the pi.dev CLI (``pi -p ... --mode json``).
 
-Plan 16 Phase 2 — first cut. Mirrors :mod:`agentbox.core.engines.backends.codex`.
+Mirrors :mod:`agentbox.core.engines.backends.codex`.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.core.data import (
+from agentbox.core.db import (
     DoneEvent,
     LogEvent,
     RunEvent,
@@ -21,6 +21,7 @@ from agentbox.core.data import (
 )
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 
 _NAME = "pi"
@@ -128,6 +129,7 @@ class PiBackend(BackendAdapter):
         *,
         runtime_config: Any = None,
         host_capabilities: dict | None = None,
+        ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
@@ -141,20 +143,17 @@ class PiBackend(BackendAdapter):
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
         # Effective tools = agent ∩ workspace (canonical).
-        capabilities = host_capabilities or {}
         effective_tools: set = set()
         if runtime_config is not None:
-            ws_allowed = capabilities.get("allowed_tools")
             effective_tools = intersect_allowed_tools(
                 set(runtime_config.allowed_tools),
-                set(ws_allowed) if ws_allowed else None,
+                ws_allowed_tools,
             )
 
         return RenderedConfig(
             argv=argv,
             env=env,
             cwd=Path("."),
-            files=self._collect_system_files(agent, workdir, composed),
             agent_meta={
                 "timeout_seconds": timeout_seconds,
                 "effective_tools": sorted(effective_tools),

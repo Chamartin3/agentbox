@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.core.agents.resolve import resolve_engine
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.data import AgentDef, RunSetupStore
-from agentbox.config import Settings
+from agentbox.core.db import AgentDef, RunSetupStore
+from agentbox.core.config import Settings
 from agentbox.core.engines.contracts.base import (
     RenderedConfig,
     RuntimeConfigView,
@@ -22,11 +22,12 @@ from agentbox.core.engines.contracts.views import (
 from agentbox.core.execution.orchestrate.generator import (
     _read_agent_config_json,
 )
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.workspaces import (
-    load_capabilities,
     load_workspace_permissions,
     resolve_path,
 )
+from agentbox.core.workspaces.catalog import resolve_workspace_callables
 
 if TYPE_CHECKING:
     from agentbox.core.engines.contracts.base import BackendAdapter
@@ -144,7 +145,17 @@ class RunSetup:
             agent_module=python_config_raw.get("agent_module"),
             output_schema_path=python_config_raw.get("output_schema_path"),
         )
-        host_capabilities = load_capabilities(workdir)
+
+        # Resolve the workspace-tool catalog and extract canonical tool
+        # names for the agent ∩ workspace intersection.
+        ws_id = agent.workspace
+        ws_callables = resolve_workspace_callables(ws_id, self.store, self._mcp_registry) if ws_id else []
+        ws_allowed_tools: set[CanonicalTool] = set()
+        for item in ws_callables:
+            try:
+                ws_allowed_tools.add(CanonicalTool(item.name))
+            except ValueError:
+                pass  # non-canonical tools (MCP, resources) aren't intersected
 
         def _try_backend(name: str) -> BackendAdapter | None:
             try:
@@ -168,7 +179,7 @@ class RunSetup:
                     composed=_composed_view(composed),
                     runtime_config=runtime_config_view,
                     python_agent_config=python_agent_config_view,
-                    host_capabilities=host_capabilities,
+                    ws_allowed_tools=ws_allowed_tools,
                 )
                 return adapter, rendered
 

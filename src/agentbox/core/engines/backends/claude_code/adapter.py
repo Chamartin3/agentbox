@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from agentbox.core.constants import LogLevel, RunStatus
-from agentbox.core.data import (
+from agentbox.core.db import (
     DoneEvent,
     LogEvent,
     RunEvent,
@@ -26,6 +26,7 @@ from agentbox.core.engines.backends.claude_code.render import (
 from agentbox.core.engines.backends.claude_code.tools import (
     NATIVE_TOOLS as _CLAUDE_TOOLS,
 )
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import (
     intersect_allowed_tools,
     translate_tool,
@@ -66,6 +67,7 @@ class ClaudeCodeBackend(BackendAdapter):
         *,
         runtime_config: Any = None,
         host_capabilities: dict | None = None,
+        ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         if runtime_config is None:
@@ -96,11 +98,9 @@ class ClaudeCodeBackend(BackendAdapter):
             "--strict-mcp-config",
         ]
 
-        capabilities = host_capabilities or {}
-        ws_allowed = capabilities.get("allowed_tools")
         effective_tools = intersect_allowed_tools(
             set(runtime_config.allowed_tools),
-            set(ws_allowed) if ws_allowed else None,
+            ws_allowed_tools,
         )
         if effective_tools:
             native_tools = [translate_tool(t, _CLAUDE_TOOLS) for t in effective_tools]
@@ -119,7 +119,6 @@ class ClaudeCodeBackend(BackendAdapter):
             argv=argv,
             env=env,
             cwd=Path("."),
-            files=self._collect_system_files(agent, workdir, composed),
             agent_meta={"timeout_seconds": timeout_seconds},
             model=model,
         )
