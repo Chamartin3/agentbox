@@ -28,10 +28,11 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.data import DoneEvent, LogEvent, RunEvent
+from agentbox.core.db import DoneEvent, LogEvent, RunEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, HasAgentConfig, RenderedConfig
 from agentbox.core.engines.contracts.views import PythonAgentConfigView
 from agentbox.core.engines.backends.token.run_direct import run_direct_agent_mode
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 from agentbox.core.engines.backends.token.run_full import (
     import_agent,
@@ -92,6 +93,7 @@ class TokenBackend(BackendAdapter):
         python_agent_config: PythonAgentConfigView | None = None,
         runtime_config: Any = None,
         host_capabilities: dict | None = None,
+        ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
         python_cfg = (
@@ -102,13 +104,11 @@ class TokenBackend(BackendAdapter):
         model = getattr(runner_config, "model", None) or self.default_model
 
         # Effective tools = agent ∩ workspace (canonical).
-        capabilities = host_capabilities or {}
         effective_tools: set = set()
         if runtime_config is not None:
-            ws_allowed = capabilities.get("allowed_tools")
             effective_tools = intersect_allowed_tools(
                 set(runtime_config.allowed_tools),
-                set(ws_allowed) if ws_allowed else None,
+                ws_allowed_tools,
             )
 
         # Load output schema …
@@ -187,7 +187,6 @@ class TokenBackend(BackendAdapter):
 
         return RenderedConfig(
             cwd=Path("."),
-            files=self._collect_system_files(agent, workdir, composed),
             agent_meta=agent_meta,
             model=model,
         )
@@ -273,6 +272,15 @@ class TokenBackend(BackendAdapter):
             output_retries=rendered.agent_meta.get("output_retries"),
             references=rendered.agent_meta.get("references") or [],
             input_data=input_data,
+            host_env_grants=rendered.agent_meta.get("host_env_grants"),
+            agent_tool_grants=(
+                set(_atg)
+                if (_atg := rendered.agent_meta.get("agent_tool_grants")) is not None
+                else None
+            ),
+            workspace_id=rendered.agent_meta.get("host_env_workspace_id"),
+            workdir=rendered.agent_meta.get("host_env_workdir"),
+            db_path=rendered.agent_meta.get("host_env_db_path"),
         ):
             yield ev
 
