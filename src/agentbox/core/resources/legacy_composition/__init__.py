@@ -1,9 +1,9 @@
 """Public API for composition-to-bindings migration."""
 
-from agentbox.core.resources.composition._migrate import (
+from agentbox.core.resources.legacy_composition._migrate import (
     migrate_composition_to_bindings,
 )
-from agentbox.core.resources.composition._report import (
+from agentbox.core.resources.legacy_composition._report import (
     CompositionMigrationReport,
 )
 

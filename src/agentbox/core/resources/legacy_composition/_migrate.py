@@ -6,23 +6,23 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.resources.composition._report import (
+from agentbox.core.resources.legacy_composition._report import (
     USER_TEMPLATE_MARKER,
     USER_TEMPLATE_MODE,
     MIGRATION_REASON,
     MIGRATION_ACTOR,
     CompositionMigrationReport,
 )
-from agentbox.core.resources.composition._helpers import (
+from agentbox.core.resources.legacy_composition._helpers import (
     read_disk_file,
     binding_to_input,
     slug_for,
     backfill_slot_active_flag,
 )
-from agentbox.core.resources.composition._store import get_or_create_resource
+from agentbox.core.resources.legacy_composition._store import get_or_create_resource
 
 if TYPE_CHECKING:
-    from agentbox.core.data import SessionStore
+    from agentbox.core.db import SessionStore
 
 logger = logging.getLogger(__name__)
 

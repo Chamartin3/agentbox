@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import hashlib
 
-from agentbox.core.resources.composition._report import (
+from agentbox.core.resources.legacy_composition._report import (
     MIGRATION_ACTOR,
     CompositionMigrationReport,
 )
-from agentbox.core.resources.composition._helpers import (
+from agentbox.core.resources.legacy_composition._helpers import (
     parse_tags,
     slug_for,
     mime_for,
