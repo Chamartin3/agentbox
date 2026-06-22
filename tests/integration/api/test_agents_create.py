@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentbox.api.deps import get_store
+
 
 def test_create_agent_happy_path(client: Any) -> None:
     """POST /api/agents creates a new agent and returns 201."""
@@ -213,6 +215,4 @@ def test_delete_file_from_published_returns_409(client: Any) -> None:
 
 def _get_store(client: Any) -> Any:
     """Helper to get the store from the client fixture."""
-    from agentbox.api.deps import get_store
-
     return get_store()

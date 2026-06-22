@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from agentbox.core.db import RunnerProfileCreate, RunnerProfilePatch
 
 
@@ -154,8 +156,6 @@ class TestRunnerProfilesCRUD:
         original_updated_at = original.updated_at
 
         # Patch only some fields
-        import time
-
         time.sleep(0.01)  # Ensure timestamp advances
         updated = session_store.update_runner_profile(
             "p1",

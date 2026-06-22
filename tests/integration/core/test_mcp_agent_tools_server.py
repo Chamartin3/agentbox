@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import pytest
 from agentbox.core.tools.registry import agent_tool
@@ -77,8 +78,6 @@ def test_ungranted_tool_is_registered(echo_tool, ctx_no_grants):
 
 
 def test_context_from_env(monkeypatch, tmp_path):
-    import json
-
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_GRANTS_JSON", json.dumps(["cv.score"]))
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_AGENT_ID", "agent-abc")
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_RUN_ID", "run-xyz")

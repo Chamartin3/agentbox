@@ -7,12 +7,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from agentbox.core.db import SessionStore
+from agentbox.core.db.workspaces import mcp_discovery as _mod
 
 
 @pytest.fixture()
 def store(tmp_path: Path):  # type: ignore[no-untyped-def]
-    from agentbox.core.db import SessionStore
-
     return SessionStore(tmp_path / "db.sqlite")
 
 
@@ -46,8 +46,6 @@ class TestCacheTools:
 class TestTtlExpiry:
     def test_expired_entry_returns_none(self, store) -> None:  # type: ignore[no-untyped-def]
         """Entries older than TTL must return None."""
-        from agentbox.core.db.workspaces import mcp_discovery as _mod
-
         # Freeze "now" to a moment 25 hours in the past when caching
         past = datetime.now(UTC) - timedelta(hours=25)
         with patch.object(_mod, "_now_utc", return_value=past):

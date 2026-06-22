@@ -8,6 +8,7 @@ sites break.
 from __future__ import annotations
 
 import agentbox.core.db as data
+from agentbox.core.db.store import SessionStore as direct
 
 
 EXPECTED_EXPORTS: frozenset[str] = frozenset(
@@ -204,6 +205,4 @@ def test_every_export_is_importable() -> None:
 
 
 def test_session_store_is_the_store_class() -> None:
-    from agentbox.core.db.store import SessionStore as direct
-
     assert data.SessionStore is direct

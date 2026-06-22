@@ -9,6 +9,10 @@ from unittest.mock import MagicMock, patch
 from agentbox.core.db import TextEvent
 from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
+from agentbox.core.execution.observability.stream import RunStreamSession
+from agentbox.core.execution.observability.conversation.transcript import (
+    _events_to_conversation_view,
+)
 from pydantic import BaseModel, ValidationError
 
 
@@ -237,8 +241,6 @@ def test_role_filter_in_session_does_not_include_system_or_user_text_in_output()
     """System/user TextEvents are transcribed + broadcast but not added to
     the run output — only assistant turns contribute to ``output_text``.
     Logic lives on ``RunStreamSession.emit`` post-Plan 16."""
-    from agentbox.core.execution.observability.stream import RunStreamSession
-
     tf = StringIO()
     broadcaster = SimpleNamespace(publish=lambda ev: None)
     session = RunStreamSession(
@@ -260,10 +262,6 @@ def test_role_filter_in_session_does_not_include_system_or_user_text_in_output()
 def test_transcript_conversation_source_preserves_prompt_roles_and_tool_payloads() -> (
     None
 ):
-    from agentbox.core.execution.observability.conversation.transcript import (
-        _events_to_conversation_view,
-    )
-
     view = _events_to_conversation_view(
         events=[
             {"type": "text", "run_id": "rid", "role": "system", "text": "sys"},

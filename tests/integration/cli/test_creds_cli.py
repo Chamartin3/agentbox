@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import importlib
+import subprocess
 from pathlib import Path
 
+import agentbox.cli.shared.deps as deps
+import agentbox.core.engines.credentials.builtin as reg
 import pytest
 from typer.testing import CliRunner
 
@@ -16,11 +20,7 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def _clear_creds_registry() -> None:
     """Reset the credential registry so each test sees the built-in set."""
-    import importlib
-
     creds_clear()
-    import agentbox.core.engines.credentials.builtin as reg
-
     importlib.reload(reg)
     yield
     creds_clear()
@@ -33,7 +33,7 @@ def _clear_creds_registry() -> None:
 
 
 def test_creds_help() -> None:
-    result = runner.invoke(app, ["engine", "creds", "--help"])
+    result = runner.invoke(app, ["engine", "cred", "--help"])
     assert result.exit_code == 0
     assert "setup" in result.output
     assert "status" in result.output
@@ -42,7 +42,7 @@ def test_creds_help() -> None:
 
 
 def test_creds_status_output() -> None:
-    result = runner.invoke(app, ["engine", "creds", "status"])
+    result = runner.invoke(app, ["engine", "cred", "status"])
     assert result.exit_code == 0
     assert "Credential Status" in result.output
     # Should list all registered backends
@@ -51,7 +51,7 @@ def test_creds_status_output() -> None:
 
 
 def test_creds_setup_help() -> None:
-    result = runner.invoke(app, ["engine", "creds", "setup", "--help"])
+    result = runner.invoke(app, ["engine", "cred", "setup", "--help"])
     assert result.exit_code == 0
     assert "--all" in result.output
 
@@ -66,32 +66,30 @@ def test_creds_setup_all_exits_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     ):
         monkeypatch.setenv(var, "sk-test1234567890abcdef")
     # Mock subprocess.run to prevent interactive login commands from hanging
-    import subprocess
-
     def _fake_run(*args: object, **kwargs: object) -> object:
         class _Completed:
             returncode = 1
         return _Completed()
 
     monkeypatch.setattr(subprocess, "run", _fake_run)
-    result = runner.invoke(app, ["engine", "creds", "setup", "--all"])
+    result = runner.invoke(app, ["engine", "cred", "setup", "--all"])
     assert result.exit_code == 0
 
 
 def test_creds_setup_unknown_backend() -> None:
-    result = runner.invoke(app, ["engine", "creds", "setup", "nonexistent"])
+    result = runner.invoke(app, ["engine", "cred", "setup", "nonexistent"])
     assert result.exit_code == 1
     assert "Unknown backend" in result.output
 
 
 def test_creds_import_unknown_backend() -> None:
-    result = runner.invoke(app, ["engine", "creds", "import", "nonexistent"])
+    result = runner.invoke(app, ["engine", "cred", "import", "nonexistent"])
     assert result.exit_code == 1
     assert "Unknown backend" in result.output
 
 
 def test_creds_clear_unknown_backend() -> None:
-    result = runner.invoke(app, ["engine", "creds", "clear", "nonexistent"])
+    result = runner.invoke(app, ["engine", "cred", "clear", "nonexistent"])
     assert result.exit_code == 1
     assert "Unknown backend" in result.output
 
@@ -116,8 +114,6 @@ def test_doctor_includes_credentials(
 
 
 def _clear_deps_caches() -> None:
-    import agentbox.cli._deps as deps
-
     for fn in (
         deps.get_settings,
         deps.get_store,

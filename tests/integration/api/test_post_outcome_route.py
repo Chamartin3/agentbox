@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import agentbox.api.deps as deps
+
 
 def _seed_run(store: Any, *, ok: bool = True) -> str:
     rid = store.create_run(
@@ -18,8 +20,6 @@ def _seed_run(store: Any, *, ok: bool = True) -> str:
 
 
 def test_post_outcome_ok(client: Any, isolated_data_dir: Any) -> None:
-    import agentbox.api.deps as deps
-
     store = deps.get_store()
     rid = _seed_run(store)
 
@@ -36,8 +36,6 @@ def test_post_outcome_ok(client: Any, isolated_data_dir: Any) -> None:
 
 
 def test_post_outcome_validation_fail(client: Any, isolated_data_dir: Any) -> None:
-    import agentbox.api.deps as deps
-
     store = deps.get_store()
     rid = _seed_run(store, ok=True)
 

@@ -9,18 +9,19 @@ import pytest
 from typer.testing import CliRunner
 
 from agentbox.cli import app
+from agentbox.cli.shared import (
+    get_executor,
+    get_mcp_registry,
+    get_settings,
+    get_store,
+)
+from agentbox.cli.shared import get_store as _get_store
+from agentbox.core.db import AgentDef
 
 runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    from agentbox.cli._deps import (
-        get_executor,
-        get_mcp_registry,
-        get_settings,
-        get_store,
-    )
-
     for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
 
@@ -34,16 +35,12 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     _clear_deps_caches()
-    from agentbox.cli._deps import get_store as _get_store
-
     store = _get_store()
     yield store
     _clear_deps_caches()
 
 
 def _seed_agent(store, agent_id: str = "t1", **kw) -> dict:
-    from agentbox.core.db import AgentDef
-
     agent_def = AgentDef(
         id=agent_id,
         description=kw.get("description", "Test agent"),

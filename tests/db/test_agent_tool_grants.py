@@ -1,14 +1,11 @@
 import pytest
-from agentbox.core.db import SessionStore
+from agentbox.core.db import SessionStore, agents, now_iso
 
 
 @pytest.fixture
 def store(tmp_path):
     s = SessionStore(tmp_path / "db.sqlite")
     with s.engine.begin() as conn:
-        from agentbox.core.db import now_iso
-        from agentbox.core.db import agents
-
         conn.execute(
             agents.insert().values(
                 id="agent-1", name="Test Agent", created_at=now_iso()

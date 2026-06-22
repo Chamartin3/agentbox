@@ -1,4 +1,4 @@
-"""Verify every sub-app's --help shows the expected commands (6-branch tree)."""
+"""Verify every sub-app's --help shows the expected commands (new 7-branch tree)."""
 
 from agentbox.cli import app
 from typer.testing import CliRunner
@@ -9,7 +9,7 @@ runner = CliRunner()
 def test_root_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for grp in ("agent", "run", "work", "engine", "system", "ops"):
+    for grp in ("agent", "run", "work", "engine", "system", "ops", "history"):
         assert grp in result.output
 
 
@@ -30,15 +30,31 @@ def test_agent_def_help() -> None:
 def test_work_help() -> None:
     result = runner.invoke(app, ["work", "--help"])
     assert result.exit_code == 0
-    assert "ls" in result.output
-    assert "path" in result.output
+    assert "ws" in result.output
+    assert "mcp" in result.output
 
 
-def test_run_runs_help() -> None:
-    result = runner.invoke(app, ["run", "runs", "--help"])
+def test_run_cmd_help() -> None:
+    """run is a unified command (not a group) — check its option flags."""
+    result = runner.invoke(app, ["run", "--help"])
     assert result.exit_code == 0
-    for sub in ("ls", "show", "tail", "stats", "facets", "comments",
-                "prompt", "transcript", "post-outcome", "cancel"):
+    # Core options of the unified run command
+    assert "--prompt" in result.output
+    assert "--backend" in result.output
+    assert "--workspace" in result.output
+
+
+def test_history_help() -> None:
+    result = runner.invoke(app, ["history", "--help"])
+    assert result.exit_code == 0
+    for cmd in ("ls", "show", "cancel", "log", "stat"):
+        assert cmd in result.output
+
+
+def test_history_log_help() -> None:
+    result = runner.invoke(app, ["history", "log", "--help"])
+    assert result.exit_code == 0
+    for sub in ("tail", "transcript", "prompt", "comments", "outcome"):
         assert sub in result.output
 
 
@@ -48,8 +64,8 @@ def test_ops_help() -> None:
     assert "serve" in result.output
     assert "cfg" in result.output
     assert "migrate" in result.output
-    assert "launch" in result.output
-    assert "resources" in result.output
+    # launch has been removed — it lives under `agentbox run`
+    assert "resource" in result.output
 
 
 def test_system_help() -> None:
@@ -62,24 +78,17 @@ def test_system_help() -> None:
 def test_engine_help() -> None:
     result = runner.invoke(app, ["engine", "--help"])
     assert result.exit_code == 0
-    assert "profiles" in result.output
-    assert "providers" in result.output
-    assert "backends" in result.output
-    assert "creds" in result.output
-
-
-def test_run_feedback_help() -> None:
-    result = runner.invoke(app, ["run", "feedback", "--help"])
-    assert result.exit_code == 0
-    assert "activity" in result.output
-    assert "usage" in result.output
+    assert "profile" in result.output
+    assert "provider" in result.output
+    assert "backend" in result.output
+    assert "cred" in result.output
 
 
 def test_ops_resources_help() -> None:
-    result = runner.invoke(app, ["ops", "resources", "--help"])
+    result = runner.invoke(app, ["ops", "resource", "--help"])
     assert result.exit_code == 0
     assert "repo" in result.output
-    assert "bindings" in result.output
+    assert "bind" in result.output
 
 
 def test_agent_tool_help() -> None:
@@ -119,7 +128,7 @@ def test_work_mcp_help() -> None:
 
 
 def test_work_skills_help() -> None:
-    result = runner.invoke(app, ["work", "skills", "--help"])
+    result = runner.invoke(app, ["work", "skill", "--help"])
     assert result.exit_code == 0
     assert "ls" in result.output
     assert "show" in result.output

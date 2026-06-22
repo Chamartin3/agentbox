@@ -9,8 +9,10 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import SQLModel
 
+import agentbox.core.db as db_pkg
 from agentbox.core.db import Database
 from agentbox.core.db.models.runs.run import Run
 
@@ -190,8 +192,6 @@ def test_generic_reads_return_models(blank_db: Database) -> None:
 
 def test_facade_exports_database_and_models(blank_db: Database) -> None:
     """The facade exports Database + Models but not engine/Entity/Manager."""
-    import agentbox.core.db as db_pkg
-
     public = set(getattr(db_pkg, "__all__", []))
     assert "Database" in public
     assert "Run" in public
@@ -203,8 +203,6 @@ def test_facade_exports_database_and_models(blank_db: Database) -> None:
 
 def test_create_missing_required_field_raises(blank_db: Database) -> None:
     """create() with a missing NOT NULL column raises IntegrityError."""
-    from sqlalchemy.exc import IntegrityError
-
     with pytest.raises(IntegrityError):
         blank_db.runs.create(
             id="no-input",

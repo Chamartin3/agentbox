@@ -15,6 +15,7 @@ from agentbox.core.engines.backends.claude_code.tools import (
 from agentbox.core.engines.backends.opencode.tools import (
     NATIVE_TOOLS as OPENCODE_TOOLS,
 )
+from agentbox.core.tools import CAPABILITIES
 
 
 class TestRegistry:
@@ -36,8 +37,6 @@ class TestRegistry:
 
     def test_capability_alignment(self):
         """Tools with a capability must have the same name as the capability key."""
-        from agentbox.core.tools import CAPABILITIES
-
         for tool in BUILTIN_TOOLS:
             if tool.capability is not None:
                 assert tool.capability in CAPABILITIES, (

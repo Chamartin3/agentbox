@@ -5,6 +5,7 @@ The env-doc is plain markdown text stored as ``content_json = {"body": ...}``.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -24,7 +25,6 @@ def store(tmp_path: Path) -> SessionStore:
 @pytest.fixture
 def settings() -> object:
     """Fake settings with minimal attributes for build_workspace_by_name."""
-    from dataclasses import dataclass
 
     @dataclass
     class _S:

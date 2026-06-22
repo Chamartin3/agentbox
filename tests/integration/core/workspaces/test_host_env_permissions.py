@@ -14,16 +14,22 @@ Python functions (without MCP transport), verifying:
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
+from pathlib import Path as _Path
 from unittest.mock import MagicMock
 
 import pytest
+from agentbox.core.workspaces.generation.inject import inject_host_env_mcp
+from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 
 from agentbox.core.workspaces.permissions import (  # noqa: E402
     GrantViolation,
     check_capability,
     resolve_grants,
 )
+from fastmcp import FastMCP
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -37,8 +43,6 @@ def _make_grants(**caps) -> dict:
 
 
 def _make_ctx(grants: dict, tmp_path: Path, store=None):
-    from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
-
     ctx = HostEnvContext(
         grants=grants,
         run_id="run1",
@@ -52,8 +56,6 @@ def _make_ctx(grants: dict, tmp_path: Path, store=None):
 
 def _build_tool(cap_module, tool_name: str, ctx_factory):
     """Register capabilities and return the raw tool function."""
-    from fastmcp import FastMCP
-
     mcp = FastMCP("test")
     cap_module.register(mcp, ctx_factory)
 
@@ -81,8 +83,6 @@ def _build_tool(cap_module, tool_name: str, ctx_factory):
 # Direct-import approach: import registered function via a thin wrapper
 def _make_fs_fns(ctx_factory):
     """Return (fs_read, fs_list, fs_write) functions with ctx wired in."""
-    from pathlib import Path as _Path
-
 
     def fs_read(path: str) -> str:
         ctx = ctx_factory()
@@ -208,9 +208,6 @@ class TestFsCapability:
 
 
 def _make_shell_fn(ctx_factory):
-    import subprocess
-
-
     def shell_exec(cmd: str, cwd: str | None = None, timeout: int = 30) -> dict:
         ctx = ctx_factory()
         try:
@@ -310,10 +307,6 @@ class TestHttpCapability:
 
 class TestEnvCapability:
     def test_allowed_var(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        import os
-
-
-
         monkeypatch.setenv("MY_VAR", "secret_value")
         grants = _make_grants(**{"env.get": {"allowlist": ["MY_VAR"]}})
         check_capability(grants, "env.get", {"name": "MY_VAR"})  # should not raise
@@ -392,10 +385,6 @@ class TestAuditLog:
 
 class TestExecutorInjection:
     def test_injects_host_env_into_mcp_config(self, tmp_path: Path):
-        from agentbox.core.workspaces.generation.inject import (
-            inject_host_env_mcp,
-        )
-
         existing = {"mcpServers": {"existing-server": {"command": "other"}}}
         mcp_path = tmp_path / ".mcp.json"
         mcp_path.write_text(json.dumps(existing))
@@ -420,10 +409,6 @@ class TestExecutorInjection:
         assert "existing-server" in updated["mcpServers"]
 
     def test_creates_mcp_config_when_missing(self, tmp_path: Path):
-        from agentbox.core.workspaces.generation.inject import (
-            inject_host_env_mcp,
-        )
-
         grants = {"agentbox.workspace_info": {}}
         inject_host_env_mcp(
             run_dir=tmp_path,

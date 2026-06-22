@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.db import SessionStore
+from agentbox.core.db import runs
 
 
 def test_reap_marks_orphaned_running_rows_as_incomplete(tmp_path: Path) -> None:
@@ -54,8 +55,6 @@ def test_reap_preserves_existing_error_text(tmp_path: Path) -> None:
     store = SessionStore(db)
     rid = store.create_run("a", "{}", "/tmp/wd", "/tmp/t.jsonl")
     # Manually inject prior error text on a still-running row.
-    from agentbox.core.db import runs
-
     with store.engine.begin() as conn:
         conn.execute(
             runs.update().where(runs.c.id == rid).values(error="warn: slow tool ")

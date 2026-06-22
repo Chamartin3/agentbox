@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-import asyncio
-import json
-
-import httpx
 import typer
 import uvicorn
-import websockets
-from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.cli._deps import get_store
-from agentbox.cli._common import console, event_color
+from agentbox.cli.shared import console, get_store
 from agentbox.core.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
 from agentbox.core.engines import (
@@ -23,7 +16,7 @@ from agentbox.core.engines import (
 
 app = typer.Typer(
     name="agentbox",
-    help="Agent orchestration — serve, exec, doctor, and introspection commands",
+    help="Agent orchestration — serve, doctor, and introspection commands",
     rich_markup_mode="rich",
     no_args_is_help=True,
 )
@@ -38,47 +31,6 @@ app = typer.Typer(
 def serve(host: str = "0.0.0.0", port: int = 8765) -> None:
     """Run the FastAPI server."""
     uvicorn.run("agentbox.api.app:app", host=host, port=port, log_level="info")
-
-
-# ---------------------------------------------------------------------------
-# exec  (renamed from run)
-# ---------------------------------------------------------------------------
-
-
-@app.command("exec")
-def exec_cmd(
-    agent: str,
-    input_: str = typer.Argument(..., metavar="INPUT"),
-    api: str = "http://localhost:8765",
-    session_id: str | None = None,
-    follow: bool = True,
-) -> None:
-    """POST a run to the API and stream its events."""
-    body = {"agent": agent, "input": input_, "session_id": session_id}
-    resp = httpx.post(f"{api}/api/runs", json=body, timeout=30)
-    resp.raise_for_status()
-    run_id = resp.json()["run_id"]
-    console.print(f"[dim]run_id={run_id}[/dim]")
-    console.print(
-        Panel.fit(
-            f"View: [link={api}/runs/{run_id}]{api}/runs/{run_id}[/link]",
-            border_style="cyan",
-        )
-    )
-    if not follow:
-        typer.echo(run_id)
-        return
-    asyncio.run(_stream(api, run_id))
-
-
-async def _stream(api: str, run_id: str) -> None:
-    ws_url = api.replace("http", "ws") + f"/api/runs/{run_id}/stream"
-    async with websockets.connect(ws_url) as ws:
-        async for msg in ws:
-            ev = json.loads(msg)
-            t = ev.get("type", "?")
-            style = event_color(t)
-            console.print(f"[{style}][{t}][/{style}] {json.dumps(ev)[:300]}")
 
 
 # ---------------------------------------------------------------------------

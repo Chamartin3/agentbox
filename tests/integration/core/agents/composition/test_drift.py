@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from agentbox.core.db import AgentDef, AgentSource, RunnerSpec
@@ -49,8 +50,6 @@ class TestCheckDrift:
         f = tmp_path / "agent.toml"
         f.write_text("id = 'test'")
         agent = _agent(source_path=f)
-        import hashlib
-
         h = hashlib.sha256(f.read_bytes()).hexdigest()
         session_store.create_version(
             agent_id="drift-test",
@@ -121,8 +120,6 @@ class TestStartupSweep:
         f = tmp_path / "agent.toml"
         f.write_text("id = 'test'")
         agent = _agent(agent_id="sweep-same", source_path=f)
-        import hashlib
-
         h = hashlib.sha256(f.read_bytes()).hexdigest()
         session_store.create_version(
             agent_id="sweep-same",
@@ -150,8 +147,6 @@ class TestStartupSweep:
         same_f = tmp_path / "same.toml"
         same_f.write_text("same agent")
         same_agent = _agent(agent_id="mixed-same", source_path=same_f)
-        import hashlib
-
         h = hashlib.sha256(same_f.read_bytes()).hexdigest()
         session_store.create_version(
             agent_id="mixed-same",

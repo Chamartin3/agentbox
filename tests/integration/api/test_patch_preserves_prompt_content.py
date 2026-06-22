@@ -16,6 +16,7 @@ from __future__ import annotations
 import contextlib
 import warnings
 
+import agentbox.api.deps as deps
 import pytest
 from agentbox.api.app import create_app
 from fastapi.testclient import TestClient
@@ -44,8 +45,6 @@ _PROMPT_BODY = "You are a test agent. Emit a single JSON object."
 
 
 def _app(_tmp_path):
-    import agentbox.api.deps as deps
-
     for fn in (
         deps.get_settings,
         deps.get_store,

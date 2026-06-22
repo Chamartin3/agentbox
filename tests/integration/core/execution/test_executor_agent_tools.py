@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 from agentbox.core.tools.registry import agent_tool
 from agentbox.core.tools.registry import SharedToolRegistry
+from agentbox.core.workspaces.generation.inject import (
+    inject_agent_tools_mcp,
+)
 from pydantic import BaseModel
 
 
@@ -33,10 +36,6 @@ def test_agent_tools_mcp_injected_when_grants_exist(tmp_path: Path):
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-
-    from agentbox.core.workspaces.generation.inject import (
-        inject_agent_tools_mcp,
-    )
 
     inject_agent_tools_mcp(
         run_dir=run_dir,

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import agentbox.cli.shared.deps as deps
 from agentbox.cli import app
 from typer.testing import CliRunner
 
@@ -9,8 +10,6 @@ runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    import agentbox.api.deps as deps
-
     for fn in (
         deps.get_settings,
         deps.get_store,

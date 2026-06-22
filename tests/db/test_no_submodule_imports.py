@@ -39,7 +39,7 @@ ALLOWED = {
     # Integration / unit tests that access submodules directly by design.
     REPO_ROOT / "tests" / "integration" / "core" / "db" / "test_facade_exports.py",
     REPO_ROOT / "tests" / "integration" / "core" / "db" / "test_metadata_tables.py",
-    REPO_ROOT / "tests" / "unit" / "core" / "data" / "test_records.py",
+    REPO_ROOT / "tests" / "unit" / "core" / "db" / "test_records.py",
     REPO_ROOT / "tests" / "unit" / "core" / "data" / "test_manifest.py",
     REPO_ROOT / "tests" / "unit" / "core" / "agents" / "test_manifest.py",
     # This guard.

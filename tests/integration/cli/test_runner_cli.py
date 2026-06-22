@@ -9,18 +9,19 @@ import pytest
 from typer.testing import CliRunner
 
 from agentbox.cli import app
+from agentbox.cli.shared import (
+    get_executor,
+    get_mcp_registry,
+    get_settings,
+    get_store,
+)
+from agentbox.cli.shared import get_store as _get_store
+from agentbox.core.db import AgentDef, RunnerProfileCreate
 
 runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    from agentbox.cli._deps import (
-        get_executor,
-        get_mcp_registry,
-        get_settings,
-        get_store,
-    )
-
     for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
 
@@ -34,16 +35,12 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     _clear_deps_caches()
-    from agentbox.cli._deps import get_store as _get_store
-
     store = _get_store()
     yield store
     _clear_deps_caches()
 
 
 def _seed_agent(store, agent_id: str = "test-agent") -> None:
-    from agentbox.core.db import AgentDef
-
     agent_def = AgentDef(
         id=agent_id,
         description="Test agent",
@@ -64,8 +61,6 @@ def _seed_agent(store, agent_id: str = "test-agent") -> None:
 
 
 def _seed_profile(store, profile_id: str = "prof-1", **kw) -> None:
-    from agentbox.core.db import RunnerProfileCreate
-
     profile = RunnerProfileCreate(
         id=profile_id,
         name=kw.get("name", "Test Profile"),
@@ -78,19 +73,19 @@ def _seed_profile(store, profile_id: str = "prof-1", **kw) -> None:
 
 
 # ---------------------------------------------------------------------------
-# runners profiles ls
+# engine profile ls
 # ---------------------------------------------------------------------------
 
 
 def test_profiles_ls_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["engine", "profiles", "ls"])
+    result = runner.invoke(app, ["engine", "profile", "ls"])
     assert result.exit_code == 0
     assert "No runner profiles found" in result.output
 
 
 def test_profiles_ls_shows_profile(store_fixture) -> None:
     _seed_profile(store_fixture)
-    result = runner.invoke(app, ["engine", "profiles", "ls"])
+    result = runner.invoke(app, ["engine", "profile", "ls"])
     assert result.exit_code == 0
     assert "prof-1" in result.output
     assert "Test Profile" in result.output
@@ -98,7 +93,7 @@ def test_profiles_ls_shows_profile(store_fixture) -> None:
 
 def test_profiles_ls_json(store_fixture) -> None:
     _seed_profile(store_fixture)
-    result = runner.invoke(app, ["engine", "profiles", "ls", "--json"])
+    result = runner.invoke(app, ["engine", "profile", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert len(parsed) == 1
@@ -107,30 +102,30 @@ def test_profiles_ls_json(store_fixture) -> None:
 
 def test_profiles_ls_filter_backend(store_fixture) -> None:
     _seed_profile(store_fixture, "prof-tok", backend="token")
-    result = runner.invoke(app, ["engine", "profiles", "ls", "--backend", "token"])
+    result = runner.invoke(app, ["engine", "profile", "ls", "--backend", "token"])
     assert result.exit_code == 0
     assert "prof-tok" in result.output
 
 
 # ---------------------------------------------------------------------------
-# runners profiles get
+# engine profile show
 # ---------------------------------------------------------------------------
 
 
 def test_profiles_get_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["engine", "profiles", "get", "no-such"])
+    result = runner.invoke(app, ["engine", "profile", "show", "no-such"])
     assert result.exit_code != 0
 
 
 def test_profiles_get_existing(store_fixture) -> None:
     _seed_profile(store_fixture)
-    result = runner.invoke(app, ["engine", "profiles", "get", "prof-1"])
+    result = runner.invoke(app, ["engine", "profile", "show", "prof-1"])
     assert result.exit_code == 0
     assert "prof-1" in result.output
 
 
 # ---------------------------------------------------------------------------
-# runners profiles create
+# engine profile new
 # ---------------------------------------------------------------------------
 
 
@@ -139,8 +134,8 @@ def test_profiles_create(store_fixture) -> None:
         app,
         [
             "engine",
-            "profiles",
-            "create",
+            "profile",
+            "new",
             "--id",
             "new-prof",
             "--name",
@@ -159,8 +154,8 @@ def test_profiles_create_duplicate(store_fixture) -> None:
         app,
         [
             "engine",
-            "profiles",
-            "create",
+            "profile",
+            "new",
             "--id",
             "dup-prof",
             "--name",
@@ -173,39 +168,39 @@ def test_profiles_create_duplicate(store_fixture) -> None:
 
 
 # ---------------------------------------------------------------------------
-# runners profiles bind
+# engine profile bind
 # ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
-# runners profiles delete
+# engine profile rm
 # ---------------------------------------------------------------------------
 
 
 def test_profiles_delete(store_fixture) -> None:
     _seed_profile(store_fixture, "to-delete")
-    result = runner.invoke(app, ["engine", "profiles", "delete", "to-delete", "--yes"])
+    result = runner.invoke(app, ["engine", "profile", "rm", "to-delete", "--yes"])
     assert result.exit_code == 0
 
 
 def test_profiles_delete_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["engine", "profiles", "delete", "no-such", "--yes"])
+    result = runner.invoke(app, ["engine", "profile", "rm", "no-such", "--yes"])
     assert result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------
-# runners backends ls
+# engine backend ls
 # ---------------------------------------------------------------------------
 
 
 def test_backends_ls(store_fixture) -> None:
-    result = runner.invoke(app, ["engine", "backends", "ls"])
+    result = runner.invoke(app, ["engine", "backend", "ls"])
     assert result.exit_code == 0
     assert "Runner Backends" in result.output
 
 
 def test_backends_ls_json(store_fixture) -> None:
-    result = runner.invoke(app, ["engine", "backends", "ls", "--json"])
+    result = runner.invoke(app, ["engine", "backend", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert isinstance(parsed, list)

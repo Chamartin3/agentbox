@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import shutil
 import time
 from pathlib import Path
 from threading import Thread
 
 import pytest
+from agentbox.core.config import load_settings
 from agentbox.core.resources.cache import ensure_cached, prune_cache
 
 
@@ -82,8 +84,6 @@ class TestEnsureCached:
         (cache / "v1" / "a.txt").unlink()
         # ensure_cached won't re-write because the dir still exists (idempotent)
         # Caller must remove the dir to trigger re-materialization
-        import shutil
-
         shutil.rmtree(cache / "v1")
         result = ensure_cached("v1", _blobs(["a.txt"]), cache)
         assert (result / "a.txt").exists()
@@ -119,15 +119,11 @@ class TestSettingsResourceCacheDir:
     ):
         monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
         monkeypatch.delenv("AGENTBOX_RESOURCE_CACHE_DIR", raising=False)
-        from agentbox.core.config import load_settings
-
         settings = load_settings()
         assert settings.resource_cache_dir == tmp_path / "resource_cache"
 
     def test_custom_cache_dir(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         custom = tmp_path / "my_cache"
         monkeypatch.setenv("AGENTBOX_RESOURCE_CACHE_DIR", str(custom))
-        from agentbox.core.config import load_settings
-
         settings = load_settings()
         assert settings.resource_cache_dir == custom

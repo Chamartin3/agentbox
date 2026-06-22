@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import warnings as _w
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from agentbox.core.db import SessionStore
+from agentbox.core.db import AgentDef, SessionStore
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
 from agentbox.core.service.execution import runs as runs_service
 from agentbox.core.service.execution.runs import (
@@ -38,10 +39,6 @@ class _FakeExecutor:
 
 
 def _seed_agent(store: SessionStore, agent_id: str = "alpha") -> None:
-    import warnings as _w
-
-    from agentbox.core.db import AgentDef
-
     agent = AgentDef.model_validate({"id": agent_id, "description": "x"})
     with _w.catch_warnings():
         _w.simplefilter("ignore", category=UserWarning)

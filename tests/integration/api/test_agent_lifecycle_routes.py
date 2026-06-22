@@ -6,10 +6,14 @@ Each test creates its own app + DB to avoid DI cache pollution.
 from __future__ import annotations
 
 import contextlib
+import json
 from unittest.mock import patch
 
+import agentbox.api.deps as deps
 from agentbox.api.app import create_app
+from agentbox.core.db import agent_versions
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
 
 class _ManagedTestClient(TestClient):
@@ -40,8 +44,6 @@ def _setup_agent_with_active_version(store) -> dict:
 
 def _app(tmp_path):
     """Clear DI, create app with startup triggered, return (client, store)."""
-    import agentbox.api.deps as deps
-
     for fn in (
         deps.get_settings,
         deps.get_store,
@@ -203,10 +205,6 @@ class TestRollbackVersion:
 
 class TestPublishWebhook:
     def test_publish_fires_webhook_when_configured(self, isolated_data_dir) -> None:
-        import json
-
-        from sqlalchemy import update
-
         client, store = _app(isolated_data_dir)
         # Create agent with webhook_url
         config_json = {
@@ -222,8 +220,6 @@ class TestPublishWebhook:
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        from agentbox.core.db import agent_versions
-
         with store.engine.begin() as conn:
             conn.execute(
                 update(agent_versions)
@@ -255,10 +251,6 @@ class TestPublishWebhook:
         assert call_kwargs["reason"] == "Test publish webhook"
 
     def test_publish_skips_webhook_when_url_missing(self, isolated_data_dir) -> None:
-        import json
-
-        from sqlalchemy import update
-
         client, store = _app(isolated_data_dir)
         # Create agent without webhook_url
         config_json = {
@@ -273,8 +265,6 @@ class TestPublishWebhook:
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        from agentbox.core.db import agent_versions
-
         with store.engine.begin() as conn:
             conn.execute(
                 update(agent_versions)
@@ -302,10 +292,6 @@ class TestPublishWebhook:
     def test_publish_webhook_failure_does_not_break_response(
         self, isolated_data_dir
     ) -> None:
-        import json
-
-        from sqlalchemy import update
-
         client, store = _app(isolated_data_dir)
         # Create agent with webhook_url
         config_json = {
@@ -321,8 +307,6 @@ class TestPublishWebhook:
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        from agentbox.core.db import agent_versions
-
         with store.engine.begin() as conn:
             conn.execute(
                 update(agent_versions)

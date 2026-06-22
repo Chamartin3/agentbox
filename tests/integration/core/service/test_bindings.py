@@ -14,6 +14,7 @@ from agentbox.core.db import SessionStore
 from agentbox.core.service import bindings as bs
 from agentbox.core.service import resources as res_service
 from agentbox.core.service.bindings import AgentVersionMissing
+from agentbox.core.service.resources import ResourceNotFound
 
 
 @pytest.fixture
@@ -102,8 +103,6 @@ def test_dry_run_workspace_resources_shape(store: SessionStore) -> None:
 
 
 def test_preview_modes_unknown_resource_raises(store: SessionStore) -> None:
-    from agentbox.core.service.resources import ResourceNotFound
-
     with pytest.raises(ResourceNotFound):
         bs.preview_modes("nope", store=store)
 

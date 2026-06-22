@@ -1,15 +1,11 @@
-"""agentbox launch — interactive runner for any supported backend.
+"""Launch helpers — shared session logic for interactive backend sessions.
 
-Launches the bare CLI (no `-p` / `exec --json` / non-interactive flags) inside
-a resolved workspace so the user gets a real TTY session. Supports:
+Provides ``_launch_session`` (the core launch logic), workspace/creds
+resolution, MCP config generation, and per-runner launchers. These are
+shared by ``agentbox run`` (interactive mode) and ``agentbox ops shell``.
 
-- ``claude``    — Claude Code CLI (default)
-- ``opencode``  — OpenCode CLI
-- ``codex``     — OpenAI Codex CLI
-- ``pi``        — pi.dev CLI
-
-The ``token`` (in-process pydantic-ai) backend has no CLI to attach to and
-is rejected with a helpful message.
+Supports: claude, opencode, codex, pi. The ``token`` backend has no
+interactive CLI and is rejected with a helpful message.
 """
 
 from __future__ import annotations
@@ -18,7 +14,6 @@ import contextlib
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
@@ -60,51 +55,6 @@ def _require_binary(runner: str) -> None:
             f"into the running container) and try again."
         )
         raise typer.Exit(127)
-
-
-def launch_cmd(
-    runner: str = typer.Argument(
-        "claude",
-        help=f"Runner to launch interactively. One of: {', '.join(RunnerKind.values())}.",
-    ),
-    agent: str | None = typer.Option(
-        None, "--agent", "-a", help="Optional agent ID to scope the session to."
-    ),
-    workspace: str | None = typer.Option(
-        None,
-        "--workspace",
-        "-w",
-        help="Named workspace (defaults to the 'default' workspace).",
-    ),
-    model: str | None = typer.Option(None, "--model", "-m", help="Model alias"),
-    ephemeral: bool = typer.Option(
-        False, "--ephemeral", "-e", help="Force an ephemeral (tmp) workspace"
-    ),
-    keep_configs: bool = typer.Option(
-        False,
-        "--keep-configs/--no-keep-configs",
-        help=(
-            "Materialize generated runner configs into "
-            "<workspace>/.agentbox/generated/ instead of a tmp dir. "
-            "Useful for inspecting configs from inside a 'shell' session."
-        ),
-    ),
-) -> None:
-    """Launch an interactive backend session inside a workspace.
-
-    Resolves the workspace, applies credentials, generates runner configs
-    (for backends that need them), and exec's into the bare CLI.
-    """
-    sys.exit(
-        _launch_session(
-            runner=runner,
-            agent=agent,
-            workspace=workspace,
-            model=model,
-            ephemeral=ephemeral,
-            keep_configs=keep_configs,
-        )
-    )
 
 
 def _launch_session(

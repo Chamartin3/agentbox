@@ -12,6 +12,12 @@ from pathlib import Path
 
 import pytest
 
+import agentbox.api.deps as _deps
+from agentbox.api.app import create_app
+from agentbox.core.config import load_settings
+from agentbox.core.db import SessionStore
+from fastapi.testclient import TestClient
+
 
 def test_startup_with_no_manifest_and_empty_db(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -22,8 +28,6 @@ def test_startup_with_no_manifest_and_empty_db(
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
 
     # Clear caches so the next call reads the new env vars
-    import agentbox.api.deps as _deps
-
     for fn in (
         _deps.get_settings,
         _deps.get_store,
@@ -33,9 +37,6 @@ def test_startup_with_no_manifest_and_empty_db(
         fn.cache_clear()
 
     # Create the app — should not raise
-    from agentbox.api.app import create_app
-    from fastapi.testclient import TestClient
-
     app = create_app()
     assert app is not None
 
@@ -61,9 +62,6 @@ def test_check_runtime_sources_allows_empty_db(
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
 
-    from agentbox.core.config import load_settings
-    from agentbox.core.db import SessionStore
-
     settings = load_settings()
     store = SessionStore(tmp_path / "db.sqlite")
 
@@ -80,8 +78,6 @@ def test_check_runtime_sources_detects_manifest(
 
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest_path))
 
-    from agentbox.core.config import load_settings
-
     settings = load_settings()
 
     # Should return True because manifest exists
@@ -95,9 +91,6 @@ def test_check_runtime_sources_detects_db_agents(
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     nonexistent = str(tmp_path / "nonexistent.toml")
     monkeypatch.setenv("AGENTBOX_MANIFEST", nonexistent)
-
-    from agentbox.core.config import load_settings
-    from agentbox.core.db import SessionStore
 
     settings = load_settings()
     store = SessionStore(tmp_path / "db.sqlite")
@@ -122,8 +115,6 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
 
     # Clear caches
-    import agentbox.api.deps as _deps
-
     for fn in (
         _deps.get_settings,
         _deps.get_store,
@@ -131,9 +122,6 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
         _deps.get_mcp_registry,
     ):
         fn.cache_clear()
-
-    from agentbox.api.app import create_app
-    from fastapi.testclient import TestClient
 
     app = create_app()
     with TestClient(app) as client:

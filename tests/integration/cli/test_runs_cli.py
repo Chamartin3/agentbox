@@ -1,4 +1,4 @@
-"""Smoke tests for runs CLI commands — happy paths against an in-memory store."""
+"""Smoke tests for history CLI commands — happy paths against an in-memory store."""
 
 from __future__ import annotations
 
@@ -9,18 +9,19 @@ import pytest
 from typer.testing import CliRunner
 
 from agentbox.cli import app
+from agentbox.cli.shared import (
+    get_executor,
+    get_mcp_registry,
+    get_settings,
+    get_store,
+)
+from agentbox.cli.shared import get_store as _get_store
+from agentbox.core.db import AgentDef
 
 runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    from agentbox.cli._deps import (
-        get_executor,
-        get_mcp_registry,
-        get_settings,
-        get_store,
-    )
-
     for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
 
@@ -34,16 +35,12 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     _clear_deps_caches()
-    from agentbox.cli._deps import get_store as _get_store
-
     store = _get_store()
     yield store
     _clear_deps_caches()
 
 
 def _seed_agent(store, agent_id: str = "t1") -> str:
-    from agentbox.core.db import AgentDef
-
     agent_def = AgentDef(
         id=agent_id,
         description="Test agent",
@@ -65,84 +62,84 @@ def _seed_agent(store, agent_id: str = "t1") -> str:
 
 
 # ---------------------------------------------------------------------------
-# runs ls
+# history ls
 # ---------------------------------------------------------------------------
 
 
 def test_runs_ls_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "ls"])
+    result = runner.invoke(app, ["history", "ls"])
     assert result.exit_code == 0
     assert "No runs yet" in result.output
 
 
 def test_runs_ls_json_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "ls", "--json"])
+    result = runner.invoke(app, ["history", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert parsed == []
 
 
 # ---------------------------------------------------------------------------
-# runs show (not found)
+# history show (not found)
 # ---------------------------------------------------------------------------
 
 
 def test_runs_show_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "show", "nonexistent"])
+    result = runner.invoke(app, ["history", "show", "nonexistent"])
     assert result.exit_code != 0
     assert "no such run" in result.output.lower()
 
 
 # ---------------------------------------------------------------------------
-# runs stats / facets (empty)
+# history stat (empty)
 # ---------------------------------------------------------------------------
 
 
 def test_runs_stats_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "stats"])
+    result = runner.invoke(app, ["history", "stat", "stats"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert "totals" in parsed
 
 
 def test_runs_facets_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "facets"])
+    result = runner.invoke(app, ["history", "stat", "facets"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert "agents" in parsed
 
 
 # ---------------------------------------------------------------------------
-# runs cancel (not found)
+# history cancel (not found)
 # ---------------------------------------------------------------------------
 
 
 def test_runs_cancel_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "cancel", "nonexistent"])
+    result = runner.invoke(app, ["history", "cancel", "nonexistent"])
     assert result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------
-# runs comments / prompt / post-outcome (not found via error handling)
+# history log commands (not found via error handling)
 # ---------------------------------------------------------------------------
 
 
 def test_runs_comments_not_found(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["run", "runs", "comments", "run-999"])
+    result = runner.invoke(app, ["history", "log", "comments", "run-999"])
     assert result.exit_code != 0
 
 
 def test_runs_prompt_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "prompt", "nonexistent"])
+    result = runner.invoke(app, ["history", "log", "prompt", "nonexistent"])
     assert result.exit_code != 0
 
 
 def test_runs_transcript_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "transcript", "nonexistent"])
+    result = runner.invoke(app, ["history", "log", "transcript", "nonexistent"])
     assert result.exit_code != 0
 
 
 def test_runs_post_outcome_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["run", "runs", "post-outcome", "nonexistent", "deployed"])
+    result = runner.invoke(app, ["history", "log", "outcome", "nonexistent", "deployed"])
     assert result.exit_code != 0

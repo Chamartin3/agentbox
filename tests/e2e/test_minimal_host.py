@@ -6,9 +6,16 @@ is absent — DB is the source of truth.
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
+
+import agentbox.core.engines.backends.registry as _plugins
+from agentbox.api.deps import get_store
+from agentbox.core.config import SETTINGS
+from agentbox.core.db import AgentDef, DoneEvent, RunEvent
+from agentbox.core.engines.contracts.base import RenderedConfig
 
 
 def _register_noop_backend(monkeypatch: Any) -> None:
@@ -18,8 +25,6 @@ def _register_noop_backend(monkeypatch: Any) -> None:
     otherwise the swap leaks into later tests (e.g. list_recipes() would drop
     claude_code because _NoopBackend has no recipe.yaml).
     """
-    from agentbox.core.db import DoneEvent, RunEvent
-    from agentbox.core.engines.contracts.base import RenderedConfig
 
     class _NoopBackend:
         name = "claude_code"
@@ -38,8 +43,6 @@ def _register_noop_backend(monkeypatch: Any) -> None:
             self, rendered: RenderedConfig, input: str, run_id: str
         ) -> AsyncIterator[RunEvent]:
             yield DoneEvent(run_id=run_id, ok=True, output="noop done")
-
-    import agentbox.core.engines.backends.registry as _plugins
 
     _plugins.backends()
     monkeypatch.setitem(_plugins._BACKEND_CLASSES, "claude_code", _NoopBackend)  # type: ignore[arg-type]
@@ -61,8 +64,6 @@ def test_optional_mounts_absent_from_settings(
     isolated_data_dir: Path,
 ) -> None:
     """With only AGENTBOX_MANIFEST set, all optional dirs resolve to None."""
-    from agentbox.core.config import SETTINGS
-
     assert SETTINGS.agents_dir is None
     assert SETTINGS.prompts_dir is None
     assert SETTINGS.skills_dir is None
@@ -72,8 +73,6 @@ def test_optional_mounts_absent_from_settings(
 def test_workspaces_root_absent_does_not_crash(
     isolated_data_dir: Path, client: Any
 ) -> None:
-    from agentbox.core.config import SETTINGS
-
     assert not SETTINGS.workspaces_root.exists()
 
     resp = client.get("/api/agents")
@@ -84,11 +83,6 @@ def test_run_with_db_seeded_noop_agent(
     isolated_data_dir: Path, client: Any, monkeypatch: Any
 ) -> None:
     """POST /api/runs completes against an agent stored only in the DB."""
-    import warnings
-
-    from agentbox.api.deps import get_store
-    from agentbox.core.db import AgentDef
-
     _register_noop_backend(monkeypatch)
 
     agent = AgentDef.model_validate(

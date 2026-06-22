@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 from agentbox.core.workspaces.mcp.client.client import McpClient, McpError
 
 
 @pytest.mark.asyncio
 async def test_initialize_http_success() -> None:
-    import httpx
-
     async with httpx.AsyncClient() as http:
         client = McpClient(
             "test",
@@ -23,8 +22,6 @@ async def test_initialize_http_success() -> None:
 
 @pytest.mark.asyncio
 async def test_list_tools_not_initialized() -> None:
-    import httpx
-
     async with httpx.AsyncClient() as http:
         client = McpClient(
             "test",
@@ -45,8 +42,6 @@ async def test_unsupported_transport_raises() -> None:
 
 @pytest.mark.asyncio
 async def test_close_idempotent() -> None:
-    import httpx
-
     async with httpx.AsyncClient() as http:
         client = McpClient("test", url="http://localhost:9999/mcp", http_client=http)
         await client.close()

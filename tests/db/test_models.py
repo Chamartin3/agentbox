@@ -4,9 +4,11 @@ Verifies schema construction, round-trips, validation, and facade encapsulation.
 """
 from __future__ import annotations
 
+import pydantic
 from sqlalchemy import create_engine
 from sqlmodel import SQLModel
 
+import agentbox.core.db as db_pkg
 from agentbox.core.db import metadata as old_metadata
 from agentbox.core.db import (
     Run,
@@ -15,6 +17,7 @@ from agentbox.core.db import (
     Agent,
     Workspace,
     Setting,
+    AgentVersion,
 )
 from agentbox.core.db.models.engines.runner_profile import RunnerProfile
 
@@ -47,8 +50,6 @@ def test_json_blob_roundtrip() -> None:
     """A model with a JSON-blob field round-trips: construct → dump → validate."""
     # AgentVersion has resolved_tool_grants which uses JSON (sa_type=JSON).
     # We construct with an explicit id because autoincrement PKs need one.
-    from agentbox.core.db import AgentVersion
-
     original = AgentVersion(
         id=1,
         agent_id="test-agent",
@@ -75,8 +76,6 @@ def test_json_blob_roundtrip() -> None:
 def test_invalid_construction_raises() -> None:
     """Invalid construction raises (validation works on the non-table models)."""
     # Run requires agent_id (non-nullable str) and input (non-nullable str)
-    import pydantic
-
     try:
         Run(id="test", agent_id="x", status="initial", input="hello", created_at="now")
     except pydantic.ValidationError:
@@ -99,8 +98,6 @@ def test_invalid_construction_raises() -> None:
 
 def test_facade_encapsulation() -> None:
     """core.db.__init__.__all__ contains Models but not Entity/Engine."""
-    import agentbox.core.db as db_pkg
-
     public_names = set(getattr(db_pkg, "__all__", dir(db_pkg)))
     # Models should be present
     assert "Run" in public_names

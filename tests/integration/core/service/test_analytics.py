@@ -7,8 +7,14 @@ from pathlib import Path
 import pytest
 from agentbox.core.service import SessionStore
 from agentbox.core.service.execution.feedback import (
+    activity_summary,
+    add_comment,
+    aggregate_usage,
+    distinct_executors,
     enrich_recent_runs,
+    list_comments,
     since_iso,
+    success_rate,
     summary,
 )
 
@@ -66,17 +72,6 @@ def test_summary_shapes_correctly(store: SessionStore) -> None:
 
 
 def test_feedback_facade_exports_required_functions() -> None:
-    from agentbox.core.service.execution.feedback import (
-        activity_summary,
-        add_comment,
-        aggregate_usage,
-        distinct_executors,
-        enrich_recent_runs,
-        list_comments,
-        success_rate,
-        summary,
-    )
-
     assert callable(activity_summary)
     assert callable(add_comment)
     assert callable(aggregate_usage)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from agentbox.core.agents.validation import orchestrate as _orch
 from agentbox.core.agents.validation.orchestrate import validate_output
 
 
@@ -42,8 +43,6 @@ class TestValidateOutput:
         agent = make_agent_def(id="test.gate_order")
 
         # Patch resolve_output_config so we bypass the store entirely.
-        from agentbox.core.agents.validation import orchestrate as _orch
-
         monkeypatch.setattr(
             _orch,
             "resolve_output_config",

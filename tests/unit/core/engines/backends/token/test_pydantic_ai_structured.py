@@ -7,12 +7,15 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.engines.backends.token import (
+    TokenBackend,
+    _json_schema_to_pydantic_model,
+)
 
 
 class TestJsonSchemaToPydanticModel:
     def _make_model(self):
-        from agentbox.core.engines.backends.token import _json_schema_to_pydantic_model
-
         return _json_schema_to_pydantic_model
 
     def test_simple_object_schema(self) -> None:
@@ -113,9 +116,6 @@ class TestJsonSchemaToPydanticModel:
 
 class TestTokenBackendRender:
     def test_render_builds_agent_meta(self, tmp_path: Path) -> None:
-        from agentbox.core.db import AgentDef, RunnerSpec
-        from agentbox.core.engines.backends.token import TokenBackend
-
         schema = {"type": "object", "properties": {"name": {"type": "string"}}}
         (tmp_path / "output_schema.json").write_text(json.dumps(schema))
 
@@ -146,9 +146,6 @@ class TestTokenBackendRender:
         assert rendered.agent_meta["timeout_seconds"] == 60
 
     def test_render_handles_missing_schema(self, tmp_path: Path) -> None:
-        from agentbox.core.db import AgentDef, RunnerSpec
-        from agentbox.core.engines.backends.token import TokenBackend
-
         agent = AgentDef(
             id="test",
             description="t",

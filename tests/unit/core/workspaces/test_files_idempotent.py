@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from agentbox.core.workspaces.generation.workspace_files import materialize_workspace_files
+
 
 def _materialize_files(
     target_dir: Path,
     files: list[dict],
     project_root: Path,
 ) -> None:
-    from agentbox.core.workspaces.generation.workspace_files import materialize_workspace_files
-
     materialize_workspace_files(target_dir, files, project_root)
 
 
@@ -65,8 +66,6 @@ class TestWorkspaceFilesIdempotent:
         assert (run_dir / "data.txt").read_text(encoding="utf-8") == "v2"
 
     def test_missing_src_raises_file_not_found(self, tmp_path: Path) -> None:
-        import pytest
-
         run_dir = tmp_path / "run"
         run_dir.mkdir()
 

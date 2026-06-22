@@ -1,9 +1,10 @@
-"""System CLI commands: env-doc, host env, MCP, health, settings, tokens, project."""
+"""System CLI commands: doctor, env-doc, host env, MCP, health, settings, tokens, project."""
 
 from __future__ import annotations
 
 import typer
 
+from agentbox.cli.system.doctor import doctor
 from agentbox.cli.system.env import env_doc_app as _env_app
 from agentbox.cli.system.health import health_app
 from agentbox.cli.system.host import host_env_app as _host_app
@@ -14,9 +15,10 @@ from agentbox.cli.system.tokens import tokens_app
 
 app = typer.Typer(
     name="system",
-    help="System-scoped commands: env-doc, host env grants, MCP discovery.",
+    help="System-scoped commands: doctor, env-doc, host env grants, MCP discovery.",
     no_args_is_help=True,
 )
+app.command("doctor")(doctor)
 app.add_typer(_env_app, name="env")
 app.add_typer(health_app, name="health")
 app.add_typer(_host_app, name="host")

@@ -11,21 +11,21 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import jsonschema
 import pytest
+from agentbox.core.agents.validation import validate_output
+from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 
 def test_jsonschema_importable() -> None:
     """jsonschema must be importable — it is a hard dep, not optional."""
-    import jsonschema
-
     assert hasattr(jsonschema, "validate")
     assert hasattr(jsonschema, "ValidationError")
 
 
 def test_no_basic_shape_check_fallback() -> None:
     """The executor must not have a _basic_shape_check fallback method."""
-    from agentbox.core.execution.orchestrate.executor import RunExecutor
-
     assert not hasattr(RunExecutor, "_basic_shape_check"), (
         "_basic_shape_check was deleted in plan-011 — if it's back, "
         "someone reintroduced the silent-fallback path"
@@ -44,8 +44,6 @@ class _ValidatorShim:
     def _validate_output(
         self, output: str, agent, workdir: Path
     ) -> tuple[bool, str, str]:
-        from agentbox.core.agents.validation import validate_output
-
         agent.__dict__["_config_json"] = {
             "execution": {
                 "output_validation_engine": agent.runner.output_validation_engine,
@@ -66,8 +64,6 @@ def _make_executor(tmp_path: Path):  # type: ignore[no-untyped-def]
 
 def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
     """_validate_output catches missing required field via jsonschema."""
-    from agentbox.core.db import AgentDef, RunnerSpec
-
     schema = {
         "type": "object",
         "required": ["name", "value"],
@@ -101,8 +97,6 @@ def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
 
 def test_validate_output_rejects_enum_violation(tmp_path: Path) -> None:
     """_validate_output rejects invalid enum values."""
-    from agentbox.core.db import AgentDef, RunnerSpec
-
     schema = {
         "type": "object",
         "required": ["status"],
@@ -131,8 +125,6 @@ def test_validate_output_rejects_enum_violation(tmp_path: Path) -> None:
 
 def test_oneof_schemas_are_valid_meta_schemas() -> None:
     """The oneOf discriminated-union pattern used in cvman specs is valid JSON Schema."""
-    import jsonschema
-
     oneof_schema = {
         "oneOf": [
             {
@@ -184,8 +176,6 @@ def test_empty_output_treated_as_validation_failure(tmp_path: Path) -> None:
     was falsy (``if agent.runner.output_schema_path and output``), letting
     empty responses through to the post-processor which then crashed.
     """
-    from agentbox.core.db import AgentDef, RunnerSpec
-
     schema = {
         "type": "object",
         "required": ["name"],

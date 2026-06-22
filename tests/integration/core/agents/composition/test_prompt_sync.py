@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.db import AgentDef, AgentSource, RunnerSpec
+from agentbox.core.db import prompt_versions
 from agentbox.core.agents.composition.drift import startup_sweep
 
 
@@ -55,8 +56,6 @@ class TestSyncPromptFromDisk:
 
     def test_handles_legacy_rows_without_hash(self, session_store) -> None:
         # Simulate a legacy row written before content_hash existed.
-        from agentbox.core.db import prompt_versions
-
         with session_store.engine.begin() as conn:
             conn.execute(
                 prompt_versions.insert().values(

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -21,7 +22,10 @@ from agentbox.core.db import (
     TextEvent,
     ToolCallEvent,
     ToolResultEvent,
+    UsageEvent,
 )
+from agentbox.core.engines.backends import codex as codex_mod
+from agentbox.core.engines.backends import pi as pi_mod
 from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 from pydantic import BaseModel, ValidationError
@@ -146,8 +150,6 @@ async def test_token_scenario_2_tools_used() -> None:
     """Walks the message-history helper through a tool-call + tool-result pair."""
     # Build pydantic-ai-style message parts. The helper introspects via
     # _part_kind(), so a SimpleNamespace with `part_kind` attribute is enough.
-    from types import SimpleNamespace
-
     call_part = SimpleNamespace(
         part_kind="tool-call",
         tool_name="add",
@@ -237,9 +239,6 @@ async def _fake_jsonl_stream(events: list[Any]) -> Any:
 
 
 async def test_codex_scenario_1_text_only() -> None:
-    from agentbox.core.db import UsageEvent
-    from agentbox.core.engines.backends import codex as codex_mod
-
     rendered = RenderedConfig(
         argv=["codex", "exec", "--json"],
         env={},
@@ -269,9 +268,6 @@ async def test_codex_scenario_1_text_only() -> None:
 
 
 async def test_pi_scenario_1_text_only() -> None:
-    from agentbox.core.db import UsageEvent
-    from agentbox.core.engines.backends import pi as pi_mod
-
     rendered = RenderedConfig(
         argv=["pi", "-p", "--mode", "json"],
         env={},

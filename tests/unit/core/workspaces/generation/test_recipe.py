@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
 
 
@@ -40,12 +41,10 @@ class TestRecipe:
         assert recipe.resolve_template("nonexistent") is None
 
     def test_load_nonexistent_recipe(self) -> None:
-        import pytest
         with pytest.raises(FileNotFoundError):
             load_recipe("nonexistent")
 
     def test_recipe_frozen(self) -> None:
         recipe = load_recipe("claude_code")
-        import pytest
         with pytest.raises(Exception):
             recipe.engine = "other"  # type: ignore[misc]

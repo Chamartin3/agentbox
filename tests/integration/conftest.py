@@ -10,7 +10,12 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import agentbox.api.deps as api_deps
+import agentbox.cli._deps as cli_deps
 import pytest
+from agentbox.api.app import create_app
+from agentbox.core.db import Database, SessionStore
+from fastapi.testclient import TestClient
 
 
 # --------------------------------------------------------------------------- #
@@ -22,9 +27,6 @@ import pytest
 def _reset_agentbox_deps_caches() -> Iterator[None]:
     """Clear every lru_cache in agentbox.api.deps and agentbox.cli._deps
     before AND after each integration test so cached singletons don't leak."""
-    import agentbox.api.deps as api_deps
-    import agentbox.cli._deps as cli_deps
-
     for deps in (api_deps, cli_deps):
         for fn in (
             deps.get_settings,
@@ -63,18 +65,13 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     manifest.write_text("# test manifest\n")
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
 
-    try:
-        import agentbox.api.deps as _deps
-
-        for fn in (
-            _deps.get_settings,
-            _deps.get_store,
-            _deps.get_executor,
-            _deps.get_mcp_registry,
-        ):
-            fn.cache_clear()
-    except (ImportError, AttributeError):
-        pass
+    for fn in (
+        api_deps.get_settings,
+        api_deps.get_store,
+        api_deps.get_executor,
+        api_deps.get_mcp_registry,
+    ):
+        fn.cache_clear()
     return tmp_path
 
 
@@ -86,16 +83,12 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @pytest.fixture
 def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk SessionStore (sqlite) under ``tmp_path``."""
-    from agentbox.core.db import SessionStore
-
     return SessionStore(tmp_path / "db.sqlite")
 
 
 @pytest.fixture
 def db(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk Database (sqlite) under ``tmp_path``."""
-    from agentbox.core.db import Database
-
     return Database(tmp_path / "db.sqlite")
 
 
@@ -106,15 +99,11 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
     Clears DI caches before and after each test so every ``client``
     sees the per-test ``AGENTBOX_DATA_DIR``.
     """
-    import agentbox.api.deps as deps
-    from agentbox.api.app import create_app
-    from fastapi.testclient import TestClient
-
     for fn in (
-        deps.get_settings,
-        deps.get_store,
-        deps.get_executor,
-        deps.get_mcp_registry,
+        api_deps.get_settings,
+        api_deps.get_store,
+        api_deps.get_executor,
+        api_deps.get_mcp_registry,
     ):
         fn.cache_clear()
 
@@ -122,9 +111,9 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
         yield c
 
     for fn in (
-        deps.get_settings,
-        deps.get_store,
-        deps.get_executor,
-        deps.get_mcp_registry,
+        api_deps.get_settings,
+        api_deps.get_store,
+        api_deps.get_executor,
+        api_deps.get_mcp_registry,
     ):
         fn.cache_clear()

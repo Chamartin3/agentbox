@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from agentbox.core.workspaces.mcp.client.grouping import derive_groups, resolve_group_ref
 from agentbox.core.workspaces.mcp.client.tool_manifest import Tool
 
@@ -137,14 +138,10 @@ def test_resolve_mcp_tool_ref() -> None:
 
 
 def test_unknown_group_raises() -> None:
-    import pytest
-
     with pytest.raises(ValueError, match="unknown group"):
         resolve_group_ref("@nonexistent", {})
 
 
 def test_non_group_ref_raises() -> None:
-    import pytest
-
     with pytest.raises(ValueError, match="not a group reference"):
         resolve_group_ref("just_a_tool", {})

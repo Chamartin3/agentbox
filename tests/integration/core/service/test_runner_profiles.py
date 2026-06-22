@@ -10,11 +10,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import agentbox.core.service.engines.profile_validation as pv
 from agentbox.core.db import (
     RunnerProfileCreate,
     RunnerProfilePatch,
     SessionStore,
 )
+from agentbox.core.engines.providers.base import ProviderDescriptor as PD
 from agentbox.core.service.engines.profile_validation import (
     InvalidProfile,
     validate_create,
@@ -45,8 +47,6 @@ class _FakeBackend:
 
 class _FakeProvider:
     def __init__(self, compatible_backends: list[str] | None = None) -> None:
-        from agentbox.core.engines.providers.base import ProviderDescriptor as PD
-
         self.descriptor = PD(
             id="mock",
             label="Mock Provider",
@@ -60,8 +60,6 @@ class _FakeProvider:
 
 
 def _patch_backends(monkeypatch, *, fail_load: str | None = None) -> None:
-    import agentbox.core.service.engines.profile_validation as pv
-
     assert hasattr(pv, "resolve_engine_by_name"), (
         "profile_validation contract changed — update _patch_backends"
     )

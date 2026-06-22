@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import getpass
 import json
 import os
 from pathlib import Path
@@ -190,7 +191,6 @@ def test_method_apply_env_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     # Simulate user input by pre-setting env var
     monkeypatch.setenv("MY_KEY", "test-api-key-123")
 
-    import getpass
     original_getpass = getpass.getpass
     getpass.getpass = lambda prompt="": os.environ.get("MY_KEY", "")
 

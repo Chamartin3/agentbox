@@ -1,31 +1,40 @@
-"""agentbox CLI — restructured into per-group subpackages.
+"""agentbox CLI — 7-branch tree.
 
-Top-level command groups mirror the API layout under
-``src/agentbox/api/``: ``agents``, ``runs``, ``runners``,
-``workspaces``, ``resources``, ``analytics``, ``system``, ``ops``.
+Top-level branches: agent | work | engine | system | ops | history.
+Top-level commands: run.
 
 Entry point: ``agentbox.cli:app`` (wired in pyproject.toml).
 """
 
 from __future__ import annotations
 
-from agentbox.cli.agents import app as agents_app
-from agentbox.cli.feedback import app as feedback_app
-from agentbox.cli.ops import app as ops_app
-from agentbox.cli.resources import app as resources_app
-from agentbox.cli.root import app
-from agentbox.cli.engines import app as runners_app
-from agentbox.cli.runs import app as runs_app
-from agentbox.cli.system import app as system_app
-from agentbox.cli.workspaces import app as workspaces_app
+import typer
 
-app.add_typer(agents_app, name="agents")
-app.add_typer(runs_app, name="runs")
-app.add_typer(runners_app, name="runners")
-app.add_typer(workspaces_app, name="workspaces")
-app.add_typer(resources_app, name="resources")
-app.add_typer(feedback_app, name="feedback")
+from agentbox.cli.agent import app as agent_app
+from agentbox.cli.engine import app as engine_app
+from agentbox.cli.history import app as history_app
+from agentbox.cli.ops import app as ops_app
+from agentbox.cli.run import run_cmd
+from agentbox.cli.system import app as system_app
+from agentbox.cli.work import app as work_app
+
+app = typer.Typer(
+    name="agentbox",
+    help=(
+        "Agent orchestration — "
+        "branches: agent | work | engine | system | ops | history  "
+        "commands: run"
+    ),
+    rich_markup_mode="rich",
+    no_args_is_help=True,
+)
+
+app.add_typer(agent_app, name="agent")
+app.command("run")(run_cmd)
+app.add_typer(work_app, name="work")
+app.add_typer(engine_app, name="engine")
 app.add_typer(system_app, name="system")
 app.add_typer(ops_app, name="ops")
+app.add_typer(history_app, name="history")
 
 __all__ = ["app"]

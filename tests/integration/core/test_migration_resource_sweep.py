@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from agentbox.core.db import SessionStore
 from agentbox.core.resources.drift import (
     detect_resource_hash_mismatches,
     extract_prompt_markers,
@@ -17,8 +18,6 @@ from agentbox.core.resources.drift import (
 
 @pytest.fixture
 def store(tmp_path: Path):
-    from agentbox.core.db import SessionStore
-
     return SessionStore(tmp_path / "db.sqlite")
 
 

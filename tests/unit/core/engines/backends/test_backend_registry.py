@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import pytest
+import agentbox.core.engines.backends.registry as plugins
 from agentbox.core.engines.backends.registry import backends
 from agentbox.core.engines.backends import get_backend, list_backends
+from agentbox.core.engines.contracts.base import RenderedConfig
 
 
 def test_registry_loads_all_entry_points() -> None:
@@ -39,8 +41,6 @@ def test_backend_adapter_has_name_attr() -> None:
 
 
 def test_fake_adapter_can_be_registered(monkeypatch) -> None:
-    from agentbox.core.engines.contracts.base import RenderedConfig
-
     class FakeBackend:
         name = "fake"
 
@@ -51,8 +51,6 @@ def test_fake_adapter_can_be_registered(monkeypatch) -> None:
 
         async def run(self, rendered, input, run_id):
             yield None  # type: ignore[return-value]
-
-    import agentbox.core.engines.backends.registry as plugins
 
     plugins._BACKEND_CLASSES = None  # type: ignore[attr-defined]
     with monkeypatch.context() as m:

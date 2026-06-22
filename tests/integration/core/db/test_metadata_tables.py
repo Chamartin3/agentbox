@@ -11,7 +11,8 @@ Lock the table set here so the split can't quietly drop one.
 
 from __future__ import annotations
 
-from agentbox.core.db import metadata
+from agentbox.core.db import metadata, schema
+from agentbox.core.db._metadata import metadata as private
 
 EXPECTED_TABLES: frozenset[str] = frozenset(
     {
@@ -77,8 +78,6 @@ def test_metadata_is_shared_singleton() -> None:
     its tables silently won't appear in ``agentbox.core.db.metadata``
     — Alembic would miss them. This test catches that.
     """
-    from agentbox.core.db._metadata import metadata as private
-
     assert metadata is private
 
 
@@ -86,6 +85,4 @@ def test_shared_metadata_seen_by_legacy_schema_module() -> None:
     """Until Phase 6 deletes the monolith, the old ``schema.py`` is the
     canonical table location. Its ``metadata`` must be the shared one.
     """
-    from agentbox.core.db import schema
-
     assert schema.metadata is metadata
