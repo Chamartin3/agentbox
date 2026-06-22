@@ -7,9 +7,8 @@ from fastmcp import FastMCP
 from agentbox.core.service import (
     PreviewError,
     render_agent_prompt_preview,
-    resolve_agent,
 )
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_agent_service, get_context
 
 
 def register_prompts(mcp: FastMCP) -> None:
@@ -28,7 +27,7 @@ def register_prompts(mcp: FastMCP) -> None:
         candidate prompt body instead of the agent's current one."""
         ctx = get_context()
         if template_override is None:
-            agent = resolve_agent(agent_id, store=ctx.store)
+            agent = get_agent_service().resolve_agent(agent_id)
             if agent is None:
                 return {"error": "agent_not_found", "agent_id": agent_id}
             template = agent.prompt or ""

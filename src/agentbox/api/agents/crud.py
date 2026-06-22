@@ -7,14 +7,9 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_settings, get_store
+from agentbox.api.deps import get_agent_service, get_store
 from agentbox.api.runs.webhooks import schedule_agent_event_webhook
 from agentbox.core.service import RunnerProfile
-from agentbox.core.service.agents import (
-    get_agent_detail,
-    list_agents_enriched,
-    resolve_agent,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +27,12 @@ def list_agents(include_disabled: bool = False) -> list[dict]:
     ``?include_disabled=true`` to surface agents that have been disabled
     (each carries a ``disabled_at`` timestamp).
     """
-    return list_agents_enriched(
-        store=get_store(),
-        settings=get_settings(),
-        include_disabled=include_disabled,
-    )
+    return get_agent_service().list_agents_enriched(include_disabled=include_disabled)
 
 
 @router.get("/{agent_id}")
 def get_agent(agent_id: str) -> dict:
-    detail = get_agent_detail(agent_id, store=get_store(), settings=get_settings())
+    detail = get_agent_service().get_agent_detail(agent_id)
     if detail is None:
         raise HTTPException(404)
     return detail
@@ -66,8 +57,7 @@ def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
     # For v1, we return what the workspace *would* be.
     # Editing agentbox.toml programmatically is fragile; the UI can
     # display the effective workspace and guide the user to edit the file.
-    store = get_store()
-    agent = resolve_agent(agent_id, store=store)
+    agent = get_agent_service().resolve_agent(agent_id)
     if agent is None:
         raise HTTPException(404)
     # TODO: implement TOML editing via tomlkit
@@ -94,9 +84,8 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
     Returns:
         {active_version, version_id, version, author, changelog}.
     """
-    store = get_store()
     try:
-        result = store.publish_version(agent_id, version, body.reason)
+        result = get_agent_service().publish_version(agent_id, version, body.reason)
     except ValueError as exc:
         error_msg = str(exc)
         if "not found" in error_msg:
@@ -105,7 +94,7 @@ def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
         raise HTTPException(422, error_msg) from exc
 
     # Schedule webhook if agent has a webhook_url configured
-    agent = resolve_agent(agent_id, store=store)
+    agent = get_agent_service().resolve_agent(agent_id)
     if agent and agent.webhook_url:
         try:
             schedule_agent_event_webhook(
@@ -141,9 +130,8 @@ def branch_draft(agent_id: str, body: DraftRequest) -> dict:
     Returns:
         {version, version_id, author, changelog}.
     """
-    store = get_store()
     try:
-        result = store.branch_draft(agent_id, author=body.author)
+        result = get_agent_service().branch_draft(agent_id, author=body.author)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -215,8 +203,7 @@ def delete_agent(agent_id: str) -> None:
     Version history is retained; the agent is hidden from list endpoints
     and ``get_agent_def`` returns ``None`` so dispatch fails fast.
     """
-    store = get_store()
-    result = store.soft_delete_agent(agent_id)
+    result = get_agent_service().soft_delete(agent_id)
     if result is None:
         raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
 
@@ -226,8 +213,7 @@ def disable_agent(agent_id: str) -> dict:
     """Mark an agent disabled — visible in lists with ``include_disabled``
     but the run dispatcher refuses to invoke it with HTTP 403.
     """
-    store = get_store()
-    meta = store.disable_agent(agent_id)
+    meta = get_agent_service().disable(agent_id)
     if meta is None:
         raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
     return {"agent_id": agent_id, "disabled_at": meta.get("disabled_at")}
@@ -237,8 +223,7 @@ def disable_agent(agent_id: str) -> dict:
 def enable_agent(agent_id: str) -> dict:
     """Clear the disabled marker. Idempotent — returns 200 even when the
     agent was already enabled."""
-    store = get_store()
-    meta = store.enable_agent(agent_id)
+    meta = get_agent_service().enable(agent_id)
     if meta is None:
         raise HTTPException(404, {"code": "unknown_agent", "detail": agent_id})
     return {"agent_id": agent_id, "disabled_at": meta.get("disabled_at")}
@@ -251,9 +236,10 @@ def rollback_version(agent_id: str, version: int, body: RollbackRequest) -> dict
     Returns:
         {version, version_id, active_version, author, changelog}.
     """
-    store = get_store()
     try:
-        result = store.rollback_to(agent_id, version, body.reason, author=body.author)
+        result = get_agent_service().rollback_to(
+            agent_id, version, body.reason, author=body.author
+        )
     except ValueError as exc:
         error_msg = str(exc)
         if "not found" in error_msg:

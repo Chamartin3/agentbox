@@ -12,7 +12,7 @@ from agentbox.core.service.execution.feedback import (
     list_comments as _list_run_comments,
     success_rate,
 )
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_agent_service, get_context
 
 
 def register(mcp: FastMCP) -> None:
@@ -88,9 +88,9 @@ def register(mcp: FastMCP) -> None:
         """Rate an agent version (1–5)."""
         if not 1 <= rating <= 5:
             return {"error": "rating must be 1–5"}
-        store = get_context().store
+        svc = get_agent_service()
         try:
-            store.set_rating(version_id, rating, rater=rater)
+            svc.set_rating(version_id, rating, rater=rater)
             return {"version_id": version_id, "rating": rating, "rater": rater}
         except Exception as exc:
             return {"error": str(exc), "version_id": version_id}
@@ -98,9 +98,9 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool
     def list_agent_version_ratings(version_id: int) -> dict:
         """Return ratings + comments for an agent version."""
-        store = get_context().store
-        rating = store.get_rating(version_id)
-        comments = store.list_comments(version_id)
+        svc = get_agent_service()
+        rating = svc.get_rating(version_id)
+        comments = svc.list_comments(version_id)
         return {
             "version_id": version_id,
             "rating": rating,

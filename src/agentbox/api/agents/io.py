@@ -7,8 +7,8 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_settings, get_store
-from agentbox.core.service.agents import AgentServiceError, patch_agent_config
+from agentbox.api.deps import get_agent_service
+from agentbox.core.service.agents import AgentServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +67,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     """
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
     try:
-        updated = patch_agent_config(
-            store=get_store(),
-            settings=get_settings(),
-            agent_id=agent_id,
-            patch=patch,
-        )
+        updated = get_agent_service().patch_agent_config(agent_id, patch)
     except AgentServiceError as exc:
         detail: object = (
             exc.detail if exc.code == "empty_patch" else {"code": exc.code, "detail": exc.detail}

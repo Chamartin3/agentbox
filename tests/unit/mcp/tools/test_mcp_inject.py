@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import io
+import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -93,12 +96,17 @@ class TestPreviewPrompt:
         ctx = _make_ctx(tmp_path)
         agent = MagicMock()
         agent.prompt = "Hello {{resource:foo}}"
-        # Lookup now goes through ``resolve_agent`` (DB first, manifest
-        # fallback). Stub both sides so the resolver returns this agent.
-        ctx.store.get_agent_def.return_value = agent
-        ctx.loader.get.return_value = agent
+        # Agent lookup now goes through ``AgentService.resolve_agent``.
+        svc = MagicMock()
+        svc.resolve_agent.return_value = agent
         ctx.store.list_prompt_bindings.return_value = []
-        with patch("agentbox.mcp.tools.resources.prompts.get_context", return_value=ctx):
+        with (
+            patch("agentbox.mcp.tools.resources.prompts.get_context", return_value=ctx),
+            patch(
+                "agentbox.mcp.tools.resources.prompts.get_agent_service",
+                return_value=svc,
+            ),
+        ):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "preview_prompt")
             result = fn("ag1")
@@ -111,10 +119,16 @@ class TestPreviewPrompt:
 
     def test_agent_not_found(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        # Both DB and manifest must miss for resolve_agent to return None.
-        ctx.store.get_agent_def.return_value = None
-        ctx.loader.get.return_value = None
-        with patch("agentbox.mcp.tools.resources.prompts.get_context", return_value=ctx):
+        # ``AgentService.resolve_agent`` returning None → agent_not_found.
+        svc = MagicMock()
+        svc.resolve_agent.return_value = None
+        with (
+            patch("agentbox.mcp.tools.resources.prompts.get_context", return_value=ctx),
+            patch(
+                "agentbox.mcp.tools.resources.prompts.get_agent_service",
+                return_value=svc,
+            ),
+        ):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "preview_prompt")
             result = fn("missing")
@@ -197,9 +211,6 @@ class TestListHostEnvCalls:
 
 
 def _make_zip_bytes(files: dict[str, bytes]) -> bytes:
-    import io
-    import zipfile
-
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for path, raw in files.items():
@@ -209,8 +220,6 @@ def _make_zip_bytes(files: dict[str, bytes]) -> bytes:
 
 class TestCreateRepoResourceZipRouting:
     def test_skill_requires_zip_bytes(self, tmp_path: Path):
-        import base64
-
         ctx = _make_ctx(tmp_path)
         ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
         with patch("agentbox.mcp.tools.resources.repo.get_context", return_value=ctx):
@@ -226,8 +235,6 @@ class TestCreateRepoResourceZipRouting:
         assert result["error"] == "invalid_payload"
 
     def test_document_rejects_zip_bytes(self, tmp_path: Path):
-        import base64
-
         ctx = _make_ctx(tmp_path)
         ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "document"}
         zip_b64 = base64.b64encode(_make_zip_bytes({"a.md": b"hi"})).decode()
@@ -244,8 +251,6 @@ class TestCreateRepoResourceZipRouting:
         assert result["error"] == "invalid_payload"
 
     def test_skill_with_zip_routes_to_zip_importer(self, tmp_path: Path):
-        import base64
-
         ctx = _make_ctx(tmp_path)
         ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
         ctx.store.import_repo_version.return_value = {"id": "v1"}

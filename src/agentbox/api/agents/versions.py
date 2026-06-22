@@ -10,8 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_store
-from agentbox.core.service import agents as agents_service
+from agentbox.api.deps import get_agent_service
 from agentbox.core.service.agents import AgentNotFound
 
 router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
@@ -19,7 +18,7 @@ router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
 
 def _require_agent(agent_id: str) -> None:
     try:
-        agents_service.require_agent_exists(agent_id, store=get_store())
+        get_agent_service().require_agent_exists(agent_id)
     except AgentNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -32,10 +31,10 @@ def _require_agent(agent_id: str) -> None:
 @router.get("")
 def list_agent_versions(agent_id: str) -> dict:
     _require_agent(agent_id)
-    store = get_store()
-    versions = store.list_versions(agent_id)
-    active = store.get_active_version(agent_id)
-    latest = store.latest_version(agent_id)
+    svc = get_agent_service()
+    versions = svc.list_versions(agent_id)
+    active = svc.active_version(agent_id)
+    latest = svc.latest_version(agent_id)
     # Fall back to latest when no active pointer exists (legacy agents
     # imported before active_agent_versions was populated).
     if active is None and latest is not None:
@@ -66,12 +65,12 @@ def list_agent_versions(agent_id: str) -> dict:
 @router.get("/{version}")
 def get_agent_version(agent_id: str, version: int) -> dict:
     _require_agent(agent_id)
-    store = get_store()
-    v = store.get_version(agent_id, version)
+    svc = get_agent_service()
+    v = svc.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
-    rating = store.get_rating(v["id"])
-    comments = store.list_comments(v["id"])
+    rating = svc.get_rating(v["id"])
+    comments = svc.list_comments(v["id"])
     return {
         "id": v["id"],
         "version": v["version"],
@@ -93,7 +92,7 @@ def get_agent_version(agent_id: str, version: int) -> dict:
 def diff_agent_versions(agent_id: str, a: int, b: int) -> dict:
     _require_agent(agent_id)
     try:
-        return get_store().diff_versions(agent_id, a, b)
+        return get_agent_service().diff_versions(agent_id, a, b)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -111,11 +110,11 @@ class CommentBody(BaseModel):
 @router.post("/{version}/comments")
 def add_comment(agent_id: str, version: int, body: CommentBody) -> dict:
     _require_agent(agent_id)
-    store = get_store()
-    v = store.get_version(agent_id, version)
+    svc = get_agent_service()
+    v = svc.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
-    return store.add_comment(v["id"], body.author, body.body)
+    return svc.add_comment(v["id"], body.author, body.body)
 
 
 # ---------------------------------------------------------------------------
@@ -131,12 +130,12 @@ class RatingBody(BaseModel):
 @router.put("/{version}/rating")
 def set_rating(agent_id: str, version: int, body: RatingBody) -> dict:
     _require_agent(agent_id)
-    store = get_store()
-    v = store.get_version(agent_id, version)
+    svc = get_agent_service()
+    v = svc.get_version(agent_id, version)
     if v is None:
         raise HTTPException(404, f"version {version} not found")
     try:
-        return store.set_rating(v["id"], body.rating, body.rater)
+        return svc.set_rating(v["id"], body.rating, body.rater)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -156,10 +155,11 @@ class NewVersionBody(BaseModel):
 @router.post("")
 def create_agent_version(agent_id: str, body: NewVersionBody) -> dict:
     """Create a new version from a full agent definition snapshot."""
-    agent = get_store().get_agent_def(agent_id)
+    svc = get_agent_service()
+    agent = svc.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404, f"unknown agent {agent_id!r}")
-    return get_store().create_version(
+    return svc.create_version(
         agent_id=agent_id,
         source_path=str(agent.source_path) if agent.source_path else "",
         source_format=(agent.source_format.value if agent.source_format else "unknown"),
@@ -188,7 +188,7 @@ def save_prompt_revision(agent_id: str, body: PromptRevisionBody) -> dict:
     """
     _require_agent(agent_id)
     try:
-        return get_store().save_prompt_revision(
+        return get_agent_service().save_prompt_revision(
             agent_id,
             prompt_content=body.prompt_content,
             author=body.author,

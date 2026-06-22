@@ -1,7 +1,7 @@
 """AgentVersion, AgentVersionFile, AgentVersionRating, AgentVersionComment managers."""
 from __future__ import annotations
 
-from sqlalchemy import select, update as sa_update
+from sqlalchemy import func, select, update as sa_update
 
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.base.manager import Manager
@@ -11,10 +11,69 @@ from agentbox.core.db.models.agents.version import (
     AgentVersionFile,
     AgentVersionRating,
 )
+from agentbox.core.db.schema import (
+    active_agent_versions,
+    agent_version_comments,
+    agent_version_files,
+    agent_version_ratings,
+    agent_versions,
+)
+from agentbox.core.db.utils import now_iso as _now_iso
+
+
+def _row_dict(row: object) -> dict:
+    """Shape a version row into a dict (int→bool for ``is_legacy``)."""
+    d = dict(row._mapping)  # type: ignore[attr-defined]
+    d["is_legacy"] = bool(d.get("is_legacy", False))
+    return d
+
+
+def _insert_files(conn: object, version_id: int, prepared: list[dict]) -> None:
+    """Bulk-insert prepared file rows for ``version_id`` (adds created_at)."""
+    if not prepared:
+        return
+    conn.execute(  # type: ignore[attr-defined]
+        agent_version_files.insert(),
+        [
+            {**row, "version_id": version_id, "created_at": _now_iso()}
+            for row in prepared
+        ],
+    )
+
+
+def _copy_files(conn: object, src_version_id: int, dst_version_id: int) -> None:
+    """Copy all ``agent_version_files`` rows from ``src`` to ``dst``."""
+    files = conn.execute(  # type: ignore[attr-defined]
+        agent_version_files.select().where(
+            agent_version_files.c.version_id == src_version_id
+        )
+    ).fetchall()
+    if not files:
+        return
+    conn.execute(  # type: ignore[attr-defined]
+        agent_version_files.insert(),
+        [
+            {
+                "version_id": dst_version_id,
+                "relative_path": f._mapping["relative_path"],
+                "kind": f._mapping["kind"],
+                "content": f._mapping["content"],
+                "sha256": f._mapping["sha256"],
+                "source_uri": f._mapping.get("source_uri"),
+                "position": f._mapping.get("position", 0),
+                "created_at": _now_iso(),
+            }
+            for f in files
+        ],
+    )
 
 
 class AgentVersionManager(Manager[AgentVersion]):
-    """Manager for the ``agent_versions`` table."""
+    """Manager for the ``agent_versions`` table.
+
+    Reads return shaped dicts to match callers; resolution policy (active
+    vs latest fallback, hidden-agent filtering) lives in ``AgentService``.
+    """
 
     model = AgentVersion
 
@@ -28,6 +87,71 @@ class AgentVersionManager(Manager[AgentVersion]):
         )
         return self._scalar(stmt)
 
+    def exists_for_agent(self, agent_id: str) -> bool:
+        """True if the agent has any version history."""
+        with self._engine.connect() as conn:
+            return (
+                conn.execute(
+                    agent_versions.select()
+                    .where(agent_versions.c.agent_id == agent_id)
+                    .limit(1)
+                ).first()
+                is not None
+            )
+
+    def get_latest(self, agent_id: str) -> dict | None:
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                agent_versions.select()
+                .where(agent_versions.c.agent_id == agent_id)
+                .order_by(agent_versions.c.version.desc())
+                .limit(1)
+            ).first()
+            return _row_dict(row) if row else None
+
+    def get_active(self, agent_id: str) -> dict | None:
+        """Row pointed at by ``active_agent_versions``, or None if unset."""
+        with self._engine.connect() as conn:
+            pointer = conn.execute(
+                active_agent_versions.select().where(
+                    active_agent_versions.c.agent_id == agent_id
+                )
+            ).first()
+            if pointer is None:
+                return None
+            row = conn.execute(
+                agent_versions.select().where(
+                    agent_versions.c.id == pointer._mapping["version_id"]
+                )
+            ).first()
+            return _row_dict(row) if row else None
+
+    def get_by_id(self, version_id: int) -> dict | None:
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                agent_versions.select().where(agent_versions.c.id == version_id)
+            ).first()
+            return _row_dict(row) if row else None
+
+    def get_by_number(self, agent_id: str, version: int) -> dict | None:
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                agent_versions.select().where(
+                    agent_versions.c.agent_id == agent_id,
+                    agent_versions.c.version == version,
+                )
+            ).first()
+            return _row_dict(row) if row else None
+
+    def list_for_agent(self, agent_id: str) -> list[dict]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                agent_versions.select()
+                .where(agent_versions.c.agent_id == agent_id)
+                .order_by(agent_versions.c.version.desc())
+            )
+            return [_row_dict(r) for r in rows]
+
     def set_active(self, agent_id: str, version_id: int) -> None:
         """Set a version as the active version for an agent."""
         stmt = (
@@ -37,17 +161,183 @@ class AgentVersionManager(Manager[AgentVersion]):
         )
         self._query(stmt)
 
+    def next_version(self, agent_id: str) -> int:
+        """Max(version)+1 for an agent (1 when it has no history)."""
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                select(func.coalesce(func.max(agent_versions.c.version), 0)).where(
+                    agent_versions.c.agent_id == agent_id
+                )
+            ).first()
+            return int(row[0]) + 1 if row else 1
+
+    def list_latest_per_agent(self) -> list[dict]:
+        """One row per agent_id — its highest-numbered version snapshot.
+
+        No hidden-agent filtering here; the deleted/disabled policy lives in
+        ``AgentService.list_agents_with_latest``.
+        """
+        with self._engine.connect() as conn:
+            inner = (
+                select(
+                    agent_versions.c.agent_id,
+                    func.max(agent_versions.c.version).label("max_version"),
+                )
+                .group_by(agent_versions.c.agent_id)
+                .subquery()
+            )
+            q = (
+                agent_versions.select()
+                .join(
+                    inner,
+                    (agent_versions.c.agent_id == inner.c.agent_id)
+                    & (agent_versions.c.version == inner.c.max_version),
+                )
+                .order_by(agent_versions.c.created_at.desc())
+            )
+            return [_row_dict(r) for r in conn.execute(q)]
+
+    def insert_version(
+        self,
+        *,
+        copy_files_from: int | None = None,
+        files: list[dict] | None = None,
+        activate_for: str | None = None,
+        activated_at: str | None = None,
+        **fields: object,
+    ) -> int:
+        """Insert one version row and return the new id.
+
+        Atomic, in a single txn, because a partial write breaks an invariant:
+        a version and its files (copied or inserted) and, when
+        ``activate_for`` is set, the active-pointer swap must all land or none
+        of them do. ``activated_at`` must be supplied when ``activate_for`` is.
+        """
+        with self._engine.begin() as conn:
+            result = conn.execute(agent_versions.insert().values(**fields))
+            pk = result.inserted_primary_key
+            assert pk is not None
+            version_id = int(pk[0])
+            if copy_files_from is not None:
+                _copy_files(conn, copy_files_from, version_id)
+            if files:
+                _insert_files(conn, version_id, files)
+            if activate_for is not None:
+                assert activated_at is not None
+                conn.execute(
+                    active_agent_versions.delete().where(
+                        active_agent_versions.c.agent_id == activate_for
+                    )
+                )
+                conn.execute(
+                    active_agent_versions.insert().values(
+                        agent_id=activate_for,
+                        version_id=version_id,
+                        activated_at=activated_at,
+                    )
+                )
+            return version_id
+
+    def patch(self, version_id: int, **values: object) -> None:
+        """Update the supplied columns on one version row."""
+        with self._engine.begin() as conn:
+            conn.execute(
+                agent_versions.update()
+                .where(agent_versions.c.id == version_id)
+                .values(**values)
+            )
+
 
 class AgentVersionFileManager(Manager[AgentVersionFile]):
-    """Manager for the ``agent_version_files`` table."""
+    """Manager for the ``agent_version_files`` table — pure row ops.
+
+    File validation/preparation (kind checks, sha256, dedupe) is policy and
+    lives in ``AgentService``; these methods take already-prepared rows.
+    """
     model = AgentVersionFile
+
+    def list_for_version(self, version_id: int) -> list[dict]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                agent_version_files.select()
+                .where(agent_version_files.c.version_id == version_id)
+                .order_by(agent_version_files.c.position, agent_version_files.c.id)
+            )
+            return [dict(r._mapping) for r in rows]
+
+    def insert_files(self, version_id: int, prepared: list[dict]) -> None:
+        with self._engine.begin() as conn:
+            _insert_files(conn, version_id, prepared)
+
+    def replace_files(self, version_id: int, prepared: list[dict]) -> None:
+        """Atomically swap a version's files (delete-all + insert in one txn).
+
+        Kept atomic — a crash between delete and insert would leave the
+        version with zero files, breaking rendering.
+        """
+        with self._engine.begin() as conn:
+            conn.execute(
+                agent_version_files.delete().where(
+                    agent_version_files.c.version_id == version_id
+                )
+            )
+            _insert_files(conn, version_id, prepared)
+
+    def delete_for_version(self, version_id: int) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                agent_version_files.delete().where(
+                    agent_version_files.c.version_id == version_id
+                )
+            )
+
+    def delete_file(self, file_id: int) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                agent_version_files.delete().where(agent_version_files.c.id == file_id)
+            )
 
 
 class AgentVersionRatingManager(Manager[AgentVersionRating]):
-    """Manager for the ``agent_version_ratings`` table."""
+    """Manager for the ``agent_version_ratings`` table — pure row ops."""
     model = AgentVersionRating
+
+    def latest_for_version(self, version_id: int) -> dict | None:
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                agent_version_ratings.select().where(
+                    agent_version_ratings.c.version_id == version_id
+                )
+            ).first()
+            return dict(row._mapping) if row else None
+
+    def insert(self, **fields: object) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(agent_version_ratings.insert().values(**fields))
 
 
 class AgentVersionCommentManager(Manager[AgentVersionComment]):
-    """Manager for the ``agent_version_comments`` table."""
+    """Manager for the ``agent_version_comments`` table — pure row ops."""
     model = AgentVersionComment
+
+    def latest_for_version(self, version_id: int) -> dict | None:
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                agent_version_comments.select().where(
+                    agent_version_comments.c.version_id == version_id
+                )
+            ).first()
+            return dict(row._mapping) if row else None
+
+    def list_for_version(self, version_id: int) -> list[dict]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                agent_version_comments.select()
+                .where(agent_version_comments.c.version_id == version_id)
+                .order_by(agent_version_comments.c.created_at)
+            )
+            return [dict(r._mapping) for r in rows]
+
+    def insert(self, **fields: object) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(agent_version_comments.insert().values(**fields))

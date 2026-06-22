@@ -14,8 +14,7 @@ from pathlib import Path
 from fastmcp import FastMCP
 
 from agentbox.core.service import composition_preview as preview_composition
-from agentbox.core.service.agents import resolve_agent
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_agent_service, get_context
 from agentbox.mcp.schemas import clamp_limit
 
 
@@ -35,9 +34,9 @@ def _version_meta(version: dict) -> dict:
     }
 
 
-def _resolve_active(store, agent_id: str) -> dict | None:
+def _resolve_active(svc, agent_id: str) -> dict | None:
     """Active version with ``latest_version`` fallback (mirrors the API)."""
-    return store.get_active_version(agent_id) or store.latest_version(agent_id)
+    return svc.active_version(agent_id) or svc.latest_version(agent_id)
 
 
 def register(mcp: FastMCP) -> None:
@@ -51,19 +50,19 @@ def register(mcp: FastMCP) -> None:
         NOT include composition pieces (references, schemas, user
         template); for those use ``get_agent_prompt_fragments``. For the
         per-run captured fragments, use ``get_run_prompt_fragments``."""
-        ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store)
+        svc = get_agent_service()
+        agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if version is not None:
-            row = ctx.store.get_version(agent_id, version)
+            row = svc.get_version(agent_id, version)
             if row is None:
                 return {"error": "not_found", "agent_id": agent_id, "version": version}
             return {
                 "content": _version_prompt_content(row),
                 **_version_meta(row),
             }
-        active = _resolve_active(ctx.store, agent_id)
+        active = _resolve_active(svc, agent_id)
         if active is None:
             return {"error": "no_versions", "agent_id": agent_id}
         return {
@@ -83,12 +82,12 @@ def register(mcp: FastMCP) -> None:
         Reads from ``agent_versions``. Each row includes ``is_active`` so
         callers can identify which version is currently pinned."""
         limit = clamp_limit(limit)
-        store = get_context().store
-        rows = store.list_versions(agent_id)
+        svc = get_agent_service()
+        rows = svc.list_versions(agent_id)
         # ``include_drafts`` is retained for API compatibility but ignored —
         # the draft concept was removed from agent_versions.
         del include_drafts
-        active = store.get_active_version(agent_id)
+        active = svc.active_version(agent_id)
         active_id = active["id"] if active else None
         total = len(rows)
         page = rows[offset : offset + limit]
@@ -127,11 +126,11 @@ def register(mcp: FastMCP) -> None:
                 "error": "reason_required",
                 "detail": "reason must be at least 3 characters",
             }
-        ctx = get_context()
-        if resolve_agent(agent_id, store=ctx.store) is None:
+        svc = get_agent_service()
+        if svc.resolve_agent(agent_id) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
-            new_row = ctx.store.save_prompt_revision(
+            new_row = svc.save_prompt_revision(
                 agent_id,
                 prompt_content=content,
                 author=author,
@@ -154,7 +153,7 @@ def register(mcp: FastMCP) -> None:
     ) -> dict:
         """Rollback to a prior version — creates a NEW active version.
 
-        Calls ``store.rollback_to`` (the same path the UI/API uses), which
+        Calls ``AgentService.rollback_to`` (the same path the UI/API uses), which
         clones ``target_version``'s config + prompt into a new row and
         pins it active."""
         if not reason or len(reason.strip()) < 3:
@@ -162,11 +161,11 @@ def register(mcp: FastMCP) -> None:
                 "error": "reason_required",
                 "detail": "reason must be at least 3 characters",
             }
-        ctx = get_context()
-        if resolve_agent(agent_id, store=ctx.store) is None:
+        svc = get_agent_service()
+        if svc.resolve_agent(agent_id) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
-            new_row = ctx.store.rollback_to(
+            new_row = svc.rollback_to(
                 agent_id, target_version, reason.strip(), author=author
             )
         except ValueError as exc:
@@ -179,9 +178,9 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool
     def get_prompt_diff(agent_id: str, from_version: int, to_version: int) -> dict:
         """Unified diff of ``prompt_content`` between two agent versions."""
-        store = get_context().store
-        a = store.get_version(agent_id, from_version)
-        b = store.get_version(agent_id, to_version)
+        svc = get_agent_service()
+        a = svc.get_version(agent_id, from_version)
+        b = svc.get_version(agent_id, to_version)
         if a is None or b is None:
             return {
                 "error": "version_not_found",
@@ -213,7 +212,7 @@ def register(mcp: FastMCP) -> None:
         injection. For the run-time fragments (user input, MCP config,
         argv, claude_cli envelope), use ``get_run_prompt_fragments``."""
         ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store)
+        agent = get_agent_service().resolve_agent(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if agent.source_path is None:

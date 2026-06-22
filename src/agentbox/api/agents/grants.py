@@ -13,8 +13,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_mcp_registry, get_store
-from agentbox.core.service import SessionStore
+from agentbox.api.deps import get_agent_service, get_mcp_registry, get_store
+from agentbox.core.service import AgentService, SessionStore
 from agentbox.core.workspaces.catalog import resolve_host_env_callables
 from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
 from agentbox.core.workspaces.mcp.client.registry import McpRegistry
@@ -58,11 +58,9 @@ def _catalog_tool_names(
 def list_grants(
     agent_id: str,
     include_revoked: bool = False,
-    store: Annotated[SessionStore, Depends(get_store)] = ...,  # pyright: ignore[reportArgumentType]
+    svc: Annotated[AgentService, Depends(get_agent_service)] = ...,  # pyright: ignore[reportArgumentType]
 ):
-    return {
-        "items": store.list_agent_tool_grants(agent_id, include_revoked=include_revoked)
-    }
+    return {"items": svc.list_tool_grants(agent_id, include_revoked=include_revoked)}
 
 
 @router.post("/{agent_id}/tool_grants", status_code=201)
@@ -71,9 +69,10 @@ def grant_tool(
     body: GrantBody,
     store: Annotated[SessionStore, Depends(get_store)],
     mcp_registry: Annotated[McpRegistry, Depends(get_mcp_registry)],
+    svc: Annotated[AgentService, Depends(get_agent_service)] = ...,  # pyright: ignore[reportArgumentType]
 ):
     try:
-        result = store.grant_agent_tool(
+        result = svc.grant_tool(
             agent_id=agent_id,
             tool_name=body.tool_name,
             changelog=body.changelog,
@@ -99,10 +98,10 @@ def revoke_tool(
     agent_id: str,
     tool_name: str,
     body: RevokeBody,
-    store: Annotated[SessionStore, Depends(get_store)] = ...,  # pyright: ignore[reportArgumentType]
+    svc: Annotated[AgentService, Depends(get_agent_service)] = ...,  # pyright: ignore[reportArgumentType]
 ):
     try:
-        store.revoke_agent_tool(
+        svc.revoke_tool(
             agent_id=agent_id,
             tool_name=tool_name,
             changelog=body.changelog,

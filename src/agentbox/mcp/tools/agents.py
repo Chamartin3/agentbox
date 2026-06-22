@@ -7,8 +7,7 @@ from typing import Any, cast
 
 from fastmcp import FastMCP
 
-from agentbox.core.service.agents import list_all_agents, resolve_agent
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_agent_service, get_context
 from agentbox.mcp.schemas import clamp_limit
 
 
@@ -93,10 +92,11 @@ def register(mcp: FastMCP) -> None:
         with ``agent_disabled``)."""
         limit = clamp_limit(limit)
         ctx = get_context()
+        svc = get_agent_service()
 
         def _attach_disabled(d: dict) -> dict:
             agent_id = d.get("id")
-            meta = ctx.store.get_agent_meta(agent_id) if agent_id else None
+            meta = svc.get_meta(agent_id) if agent_id else None
             d["disabled_at"] = (meta or {}).get("disabled_at")
             return d
 
@@ -107,10 +107,7 @@ def register(mcp: FastMCP) -> None:
                     ctx.store,
                 )
             )
-            for a in list_all_agents(
-                store=ctx.store,
-                include_disabled=include_disabled,
-            )
+            for a in svc.list_all_agents(include_disabled=include_disabled)
         ]
         if tag:
             agents = [a for a in agents if tag in (a.get("tags") or [])]
@@ -130,7 +127,7 @@ def register(mcp: FastMCP) -> None:
         q = query.lower().strip()
         ctx = get_context()
         results = []
-        for a in list_all_agents(store=ctx.store):
+        for a in get_agent_service().list_all_agents():
             d = _agent_dict(a)
             hay = " ".join(
                 [
@@ -153,12 +150,11 @@ def register(mcp: FastMCP) -> None:
         DB-as-source-of-truth tables the UI uses). Falls back to
         ``latest_version`` when no active pointer is set."""
         ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store)
+        svc = get_agent_service()
+        agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "not_found", "agent_id": agent_id}
-        active = ctx.store.get_active_version(agent_id) or ctx.store.latest_version(
-            agent_id
-        )
+        active = svc.active_version(agent_id) or svc.latest_version(agent_id)
         prompt_meta = None
         if active:
             prompt_meta = {
@@ -171,16 +167,15 @@ def register(mcp: FastMCP) -> None:
         agent_payload = _inject_profile_model(
             _strip_legacy_runner_model(_agent_dict(agent)), ctx.store
         )
-        meta = ctx.store.get_agent_meta(agent_id) or {}
+        meta = svc.get_meta(agent_id) or {}
         agent_payload["disabled_at"] = meta.get("disabled_at")
         return {"agent": agent_payload, "prompt": prompt_meta}
 
     @mcp.tool
     def list_agent_tags() -> dict:
         """Distinct tags across all known agents (DB + manifest)."""
-        ctx = get_context()
         tags: set[str] = set()
-        for a in list_all_agents(store=ctx.store):
+        for a in get_agent_service().list_all_agents():
             tags.update(_agent_dict(a).get("tags") or [])
         return {"items": sorted(tags), "total": len(tags)}
 
@@ -198,12 +193,12 @@ def register(mcp: FastMCP) -> None:
         pass to ``promote_version``.
         """
         limit = clamp_limit(limit)
-        ctx = get_context()
-        rows = ctx.store.list_versions(agent_id)
+        svc = get_agent_service()
+        rows = svc.list_versions(agent_id)
         # ``include_drafts`` is retained for API compatibility but ignored —
         # the draft concept was removed from agent_versions.
         del include_drafts
-        active = ctx.store.get_active_version(agent_id)
+        active = svc.active_version(agent_id)
         active_id = active["id"] if active else None
         total = len(rows)
         page = rows[offset : offset + limit]
@@ -245,19 +240,19 @@ def register(mcp: FastMCP) -> None:
                 "error": "reason_required",
                 "detail": "reason must be at least 3 characters",
             }
-        ctx = get_context()
-        agent = resolve_agent(agent_id, store=ctx.store)
+        svc = get_agent_service()
+        agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
-        v = ctx.store.get_version(agent_id, version)
+        v = svc.get_version(agent_id, version)
         if v is None:
             return {
                 "error": "version_not_found",
                 "agent_id": agent_id,
                 "version": version,
             }
-        previous = ctx.store.get_active_version(agent_id)
-        ctx.store.activate_version(agent_id, v["id"])
+        previous = svc.active_version(agent_id)
+        svc.activate_version(agent_id, v["id"])
         return {
             "agent_id": agent_id,
             "activated_version": version,

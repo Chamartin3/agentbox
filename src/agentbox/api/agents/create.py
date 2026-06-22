@@ -12,9 +12,8 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_store
+from agentbox.api.deps import get_agent_service
 from agentbox.core.service import CompositionConfig, RunnerSpec, WorkspaceDef
-from agentbox.core.service import agents as agents_service
 from agentbox.core.service.agents import (
     AgentAlreadyExists,
     DuplicateVersionFile,
@@ -66,8 +65,7 @@ class FileUploadResponse(BaseModel):
 @router.post("", status_code=201)
 def create_agent(req: AgentCreateRequest) -> AgentCreateResponse:
     try:
-        version_record = agents_service.create_agent_record(
-            store=get_store(),
+        version_record = get_agent_service().create_agent_record(
             agent_id=req.id,
             description=req.description,
             runner=req.runner,
@@ -97,8 +95,7 @@ def upload_file(
     agent_id: str, version: int, req: FileUploadRequest
 ) -> FileUploadResponse:
     try:
-        result = agents_service.upload_version_file(
-            store=get_store(),
+        result = get_agent_service().upload_version_file(
             agent_id=agent_id,
             version=version,
             kind=req.kind,
@@ -125,8 +122,7 @@ def upload_file(
 @router.delete("/{agent_id}/versions/{version}/files/{file_id}", status_code=204)
 def delete_file(agent_id: str, version: int, file_id: int) -> None:
     try:
-        agents_service.delete_version_file(
-            store=get_store(),
+        get_agent_service().remove_version_file(
             agent_id=agent_id,
             version=version,
             file_id=file_id,

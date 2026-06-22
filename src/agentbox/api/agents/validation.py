@@ -18,14 +18,13 @@ or ``output_schema``.
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_settings, get_store
-from agentbox.core.service import SessionStore
-from agentbox.core.service import agents as svc
+from agentbox.api.deps import get_agent_service
+from agentbox.core.service.agents import AgentServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -67,17 +66,15 @@ class AgentValidationPut(BaseModel):
 @router.get("/api/agents/{agent_id}/validation")
 def get_agent_validation(
     agent_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
 ):
     """Return the active version's inline validators per direction."""
-    return svc.get_agent_validation(store, agent_id)
+    return get_agent_service().get_agent_validation(agent_id)
 
 
 @router.put("/api/agents/{agent_id}/validation")
 def put_agent_validation(
     agent_id: str,
     body: AgentValidationPut,
-    store: Annotated[SessionStore, Depends(get_store)],
 ):
     """Write inline validators by minting a new active version.
 
@@ -96,16 +93,14 @@ def put_agent_validation(
         else None
     )
     try:
-        return svc.put_agent_validation(
-            store=store,
-            settings=get_settings(),
-            agent_id=agent_id,
+        return get_agent_service().put_agent_validation(
+            agent_id,
             input_validators=input_validators,
             output_validators=output_validators,
             reason=body.reason,
             actor=body.actor,
         )
-    except svc.AgentServiceError as exc:
+    except AgentServiceError as exc:
         raise HTTPException(
             exc.status_code, {"code": exc.code, "detail": exc.detail}
         ) from exc
