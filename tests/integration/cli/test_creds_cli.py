@@ -33,7 +33,7 @@ def _clear_creds_registry() -> None:
 
 
 def test_creds_help() -> None:
-    result = runner.invoke(app, ["ops", "creds", "--help"])
+    result = runner.invoke(app, ["engine", "creds", "--help"])
     assert result.exit_code == 0
     assert "setup" in result.output
     assert "status" in result.output
@@ -42,7 +42,7 @@ def test_creds_help() -> None:
 
 
 def test_creds_status_output() -> None:
-    result = runner.invoke(app, ["ops", "creds", "status"])
+    result = runner.invoke(app, ["engine", "creds", "status"])
     assert result.exit_code == 0
     assert "Credential Status" in result.output
     # Should list all registered backends
@@ -51,7 +51,7 @@ def test_creds_status_output() -> None:
 
 
 def test_creds_setup_help() -> None:
-    result = runner.invoke(app, ["ops", "creds", "setup", "--help"])
+    result = runner.invoke(app, ["engine", "creds", "setup", "--help"])
     assert result.exit_code == 0
     assert "--all" in result.output
 
@@ -74,24 +74,24 @@ def test_creds_setup_all_exits_zero(monkeypatch: pytest.MonkeyPatch) -> None:
         return _Completed()
 
     monkeypatch.setattr(subprocess, "run", _fake_run)
-    result = runner.invoke(app, ["ops", "creds", "setup", "--all"])
+    result = runner.invoke(app, ["engine", "creds", "setup", "--all"])
     assert result.exit_code == 0
 
 
 def test_creds_setup_unknown_backend() -> None:
-    result = runner.invoke(app, ["ops", "creds", "setup", "nonexistent"])
+    result = runner.invoke(app, ["engine", "creds", "setup", "nonexistent"])
     assert result.exit_code == 1
     assert "Unknown backend" in result.output
 
 
 def test_creds_import_unknown_backend() -> None:
-    result = runner.invoke(app, ["ops", "creds", "import", "nonexistent"])
+    result = runner.invoke(app, ["engine", "creds", "import", "nonexistent"])
     assert result.exit_code == 1
     assert "Unknown backend" in result.output
 
 
 def test_creds_clear_unknown_backend() -> None:
-    result = runner.invoke(app, ["ops", "creds", "clear", "nonexistent"])
+    result = runner.invoke(app, ["engine", "creds", "clear", "nonexistent"])
     assert result.exit_code == 1
     assert "Unknown backend" in result.output
 
@@ -110,7 +110,7 @@ def test_doctor_includes_credentials(
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     _clear_deps_caches()
 
-    result = runner.invoke(app, ["doctor"])
+    result = runner.invoke(app, ["system", "doctor"])
     assert result.exit_code in (0, 1)
     assert "Credentials" in result.output
 

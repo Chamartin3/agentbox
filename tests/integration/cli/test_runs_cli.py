@@ -70,13 +70,13 @@ def _seed_agent(store, agent_id: str = "t1") -> str:
 
 
 def test_runs_ls_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "ls"])
+    result = runner.invoke(app, ["run", "runs", "ls"])
     assert result.exit_code == 0
     assert "No runs yet" in result.output
 
 
 def test_runs_ls_json_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "ls", "--json"])
+    result = runner.invoke(app, ["run", "runs", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert parsed == []
@@ -88,7 +88,7 @@ def test_runs_ls_json_empty(store_fixture) -> None:
 
 
 def test_runs_show_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "show", "nonexistent"])
+    result = runner.invoke(app, ["run", "runs", "show", "nonexistent"])
     assert result.exit_code != 0
     assert "no such run" in result.output.lower()
 
@@ -99,14 +99,14 @@ def test_runs_show_not_found(store_fixture) -> None:
 
 
 def test_runs_stats_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "stats"])
+    result = runner.invoke(app, ["run", "runs", "stats"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert "totals" in parsed
 
 
 def test_runs_facets_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "facets"])
+    result = runner.invoke(app, ["run", "runs", "facets"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert "agents" in parsed
@@ -118,7 +118,7 @@ def test_runs_facets_empty(store_fixture) -> None:
 
 
 def test_runs_cancel_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "cancel", "nonexistent"])
+    result = runner.invoke(app, ["run", "runs", "cancel", "nonexistent"])
     assert result.exit_code != 0
 
 
@@ -129,20 +129,20 @@ def test_runs_cancel_not_found(store_fixture) -> None:
 
 def test_runs_comments_not_found(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["runs", "comments", "run-999"])
+    result = runner.invoke(app, ["run", "runs", "comments", "run-999"])
     assert result.exit_code != 0
 
 
 def test_runs_prompt_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "prompt", "nonexistent"])
+    result = runner.invoke(app, ["run", "runs", "prompt", "nonexistent"])
     assert result.exit_code != 0
 
 
 def test_runs_transcript_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "transcript", "nonexistent"])
+    result = runner.invoke(app, ["run", "runs", "transcript", "nonexistent"])
     assert result.exit_code != 0
 
 
 def test_runs_post_outcome_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["runs", "post-outcome", "nonexistent", "deployed"])
+    result = runner.invoke(app, ["run", "runs", "post-outcome", "nonexistent", "deployed"])
     assert result.exit_code != 0

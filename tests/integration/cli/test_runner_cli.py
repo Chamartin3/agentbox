@@ -83,14 +83,14 @@ def _seed_profile(store, profile_id: str = "prof-1", **kw) -> None:
 
 
 def test_profiles_ls_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["runners", "profiles", "ls"])
+    result = runner.invoke(app, ["engine", "profiles", "ls"])
     assert result.exit_code == 0
     assert "No runner profiles found" in result.output
 
 
 def test_profiles_ls_shows_profile(store_fixture) -> None:
     _seed_profile(store_fixture)
-    result = runner.invoke(app, ["runners", "profiles", "ls"])
+    result = runner.invoke(app, ["engine", "profiles", "ls"])
     assert result.exit_code == 0
     assert "prof-1" in result.output
     assert "Test Profile" in result.output
@@ -98,7 +98,7 @@ def test_profiles_ls_shows_profile(store_fixture) -> None:
 
 def test_profiles_ls_json(store_fixture) -> None:
     _seed_profile(store_fixture)
-    result = runner.invoke(app, ["runners", "profiles", "ls", "--json"])
+    result = runner.invoke(app, ["engine", "profiles", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert len(parsed) == 1
@@ -107,7 +107,7 @@ def test_profiles_ls_json(store_fixture) -> None:
 
 def test_profiles_ls_filter_backend(store_fixture) -> None:
     _seed_profile(store_fixture, "prof-tok", backend="token")
-    result = runner.invoke(app, ["runners", "profiles", "ls", "--backend", "token"])
+    result = runner.invoke(app, ["engine", "profiles", "ls", "--backend", "token"])
     assert result.exit_code == 0
     assert "prof-tok" in result.output
 
@@ -118,13 +118,13 @@ def test_profiles_ls_filter_backend(store_fixture) -> None:
 
 
 def test_profiles_get_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["runners", "profiles", "get", "no-such"])
+    result = runner.invoke(app, ["engine", "profiles", "get", "no-such"])
     assert result.exit_code != 0
 
 
 def test_profiles_get_existing(store_fixture) -> None:
     _seed_profile(store_fixture)
-    result = runner.invoke(app, ["runners", "profiles", "get", "prof-1"])
+    result = runner.invoke(app, ["engine", "profiles", "get", "prof-1"])
     assert result.exit_code == 0
     assert "prof-1" in result.output
 
@@ -138,7 +138,7 @@ def test_profiles_create(store_fixture) -> None:
     result = runner.invoke(
         app,
         [
-            "runners",
+            "engine",
             "profiles",
             "create",
             "--id",
@@ -158,7 +158,7 @@ def test_profiles_create_duplicate(store_fixture) -> None:
     result = runner.invoke(
         app,
         [
-            "runners",
+            "engine",
             "profiles",
             "create",
             "--id",
@@ -184,12 +184,12 @@ def test_profiles_create_duplicate(store_fixture) -> None:
 
 def test_profiles_delete(store_fixture) -> None:
     _seed_profile(store_fixture, "to-delete")
-    result = runner.invoke(app, ["runners", "profiles", "delete", "to-delete", "--yes"])
+    result = runner.invoke(app, ["engine", "profiles", "delete", "to-delete", "--yes"])
     assert result.exit_code == 0
 
 
 def test_profiles_delete_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["runners", "profiles", "delete", "no-such", "--yes"])
+    result = runner.invoke(app, ["engine", "profiles", "delete", "no-such", "--yes"])
     assert result.exit_code != 0
 
 
@@ -199,13 +199,13 @@ def test_profiles_delete_not_found(store_fixture) -> None:
 
 
 def test_backends_ls(store_fixture) -> None:
-    result = runner.invoke(app, ["runners", "backends", "ls"])
+    result = runner.invoke(app, ["engine", "backends", "ls"])
     assert result.exit_code == 0
     assert "Runner Backends" in result.output
 
 
 def test_backends_ls_json(store_fixture) -> None:
-    result = runner.invoke(app, ["runners", "backends", "ls", "--json"])
+    result = runner.invoke(app, ["engine", "backends", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert isinstance(parsed, list)

@@ -1,16 +1,14 @@
 """End-to-end test fixtures.
 
 Tests under ``tests/e2e/`` exercise the full stack with real backends,
-live network connections, and persistent infrastructure. They are
-conditionally skipped when the required environment is not available.
-
-Set ``AGENTBOX_E2E=1`` to opt in to the e2e suite. Individual tests
-may impose additional requirements (e.g. ``OLLAMA_HOST``).
+live network connections, and persistent infrastructure. Everything
+here is auto-marked ``e2e``, which the default ``addopts`` deselects;
+opt in with ``-m e2e``. Some tests carry additional markers with their
+own infra needs (e.g. ``live_ollama``).
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -19,7 +17,7 @@ import pytest
 
 
 # --------------------------------------------------------------------------- #
-# Conditional skip — entire e2e suite
+# Auto-mark everything under tests/e2e/ as ``e2e`` (deselected by default)
 # --------------------------------------------------------------------------- #
 
 
@@ -27,11 +25,9 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    if not os.environ.get("AGENTBOX_E2E"):
-        skip_e2e = pytest.mark.skip(reason="AGENTBOX_E2E not set")
-        for item in items:
-            if "/tests/e2e/" in str(item.fspath):
-                item.add_marker(skip_e2e)
+    for item in items:
+        if "/tests/e2e/" in str(item.fspath):
+            item.add_marker(pytest.mark.e2e)
 
 
 # --------------------------------------------------------------------------- #

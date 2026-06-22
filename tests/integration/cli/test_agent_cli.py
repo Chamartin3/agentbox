@@ -1,4 +1,4 @@
-"""Smoke tests for agent CLI commands — happy paths against an in-memory store."""
+"""Smoke tests for agent CLI commands — updated for 6-subgroup branch."""
 
 from __future__ import annotations
 
@@ -72,27 +72,27 @@ def _seed_agent(store, agent_id: str = "t1", **kw) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# agents ls
+# agent def ls
 # ---------------------------------------------------------------------------
 
 
-def test_agents_ls_empty(store_fixture) -> None:
-    result = runner.invoke(app, ["agents", "ls"])
+def test_def_ls_empty(store_fixture) -> None:
+    result = runner.invoke(app, ["agent", "def", "ls"])
     assert result.exit_code == 0
     assert "No agents registered" in result.output
 
 
-def test_agents_ls_shows_agent(store_fixture) -> None:
+def test_def_ls_shows_agent(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "ls"])
+    result = runner.invoke(app, ["agent", "def", "ls"])
     assert result.exit_code == 0
     assert "t1" in result.output
     assert "token" in result.output
 
 
-def test_agents_ls_json(store_fixture) -> None:
+def test_def_ls_json(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "ls", "--json"])
+    result = runner.invoke(app, ["agent", "def", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert len(parsed) == 1
@@ -100,28 +100,28 @@ def test_agents_ls_json(store_fixture) -> None:
 
 
 # ---------------------------------------------------------------------------
-# agents show
+# agent def show
 # ---------------------------------------------------------------------------
 
 
-def test_agents_show_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["agents", "show", "no-such-agent"])
+def test_def_show_not_found(store_fixture) -> None:
+    result = runner.invoke(app, ["agent", "def", "show", "no-such-agent"])
     assert result.exit_code != 0
 
 
-def test_agents_show_existing(store_fixture) -> None:
+def test_def_show_existing(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "show", "t1"])
+    result = runner.invoke(app, ["agent", "def", "show", "t1"])
     assert result.exit_code == 0
     assert "t1" in result.output
 
 
 # ---------------------------------------------------------------------------
-# agents create
+# agent def new
 # ---------------------------------------------------------------------------
 
 
-def test_agents_create_from_config(store_fixture, tmp_path: Path) -> None:
+def test_def_new_from_config(store_fixture, tmp_path: Path) -> None:
     config_path = tmp_path / "agent.json"
     config_path.write_text(
         json.dumps(
@@ -133,14 +133,14 @@ def test_agents_create_from_config(store_fixture, tmp_path: Path) -> None:
         )
     )
     result = runner.invoke(
-        app, ["agents", "create", "--config", str(config_path), "--author", "test"]
+        app, ["agent", "def", "new", "--config", str(config_path), "--author", "test"]
     )
     assert result.exit_code == 0
     assert "cli-created" in result.output
     assert "created" in result.output
 
 
-def test_agents_create_duplicate(store_fixture, tmp_path: Path) -> None:
+def test_def_new_duplicate(store_fixture, tmp_path: Path) -> None:
     _seed_agent(store_fixture, "dup")
     config_path = tmp_path / "dup.json"
     config_path.write_text(
@@ -153,79 +153,79 @@ def test_agents_create_duplicate(store_fixture, tmp_path: Path) -> None:
         )
     )
     result = runner.invoke(
-        app, ["agents", "create", "--config", str(config_path), "--author", "test"]
+        app, ["agent", "def", "new", "--config", str(config_path), "--author", "test"]
     )
     assert result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------
-# agents delete
+# agent def rm
 # ---------------------------------------------------------------------------
 
 
-def test_agents_delete(store_fixture) -> None:
+def test_def_rm(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "delete", "t1", "--yes"])
+    result = runner.invoke(app, ["agent", "def", "rm", "t1", "--yes"])
     assert result.exit_code == 0
     assert "deleted" in result.output
 
 
-def test_agents_delete_not_found(store_fixture) -> None:
-    result = runner.invoke(app, ["agents", "delete", "no-such", "--yes"])
+def test_def_rm_not_found(store_fixture) -> None:
+    result = runner.invoke(app, ["agent", "def", "rm", "no-such", "--yes"])
     assert result.exit_code != 0
 
 
 # ---------------------------------------------------------------------------
-# agents grants
+# agent tool ls (grants)
 # ---------------------------------------------------------------------------
 
 
-def test_agents_grants_ls(store_fixture) -> None:
+def test_tool_grants_ls(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "grants", "ls", "t1"])
+    result = runner.invoke(app, ["agent", "tool", "ls", "--agent", "t1"])
     assert result.exit_code == 0
 
 
 # ---------------------------------------------------------------------------
-# agents tools
+# agent tool ls (global)
 # ---------------------------------------------------------------------------
 
 
-def test_agents_tools_ls(store_fixture) -> None:
-    result = runner.invoke(app, ["agents", "tools", "ls"])
+def test_tool_ls(store_fixture) -> None:
+    result = runner.invoke(app, ["agent", "tool", "ls"])
     assert result.exit_code == 0
 
 
 # ---------------------------------------------------------------------------
-# agents versions
+# agent version ls
 # ---------------------------------------------------------------------------
 
 
-def test_agents_versions_ls(store_fixture) -> None:
+def test_version_ls(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "versions", "ls", "t1"])
+    result = runner.invoke(app, ["agent", "version", "ls", "t1"])
     assert result.exit_code == 0
     assert "version" in result.output.lower() or result.exit_code == 0
 
 
 # ---------------------------------------------------------------------------
-# agents validation
+# agent check get
 # ---------------------------------------------------------------------------
 
 
-def test_agents_validation_get_empty(store_fixture) -> None:
+def test_check_get_empty(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "validation", "get", "t1"])
+    result = runner.invoke(app, ["agent", "check", "get", "t1"])
     assert result.exit_code == 0
 
 
 # ---------------------------------------------------------------------------
-# agents runner-profile
+# agent def edit --runner
 # ---------------------------------------------------------------------------
 
 
-def test_agents_runner_profile_get_none(store_fixture) -> None:
+def test_def_edit_runner_get_none(store_fixture) -> None:
     _seed_agent(store_fixture)
-    result = runner.invoke(app, ["agents", "runner-profile", "t1", "--get"])
+    result = runner.invoke(app, ["agent", "def", "edit", "t1", "--runner", "clear"])
     assert result.exit_code == 0
-    assert "no runner profile" in result.output.lower()
+    assert "cleared" in result.output.lower()

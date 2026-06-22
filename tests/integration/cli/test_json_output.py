@@ -39,34 +39,34 @@ def db_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_runs_ls_json_empty(db_env: Path) -> None:
-    result = runner.invoke(app, ["runs", "ls", "--json"])
+    result = runner.invoke(app, ["run", "runs", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert parsed == []
 
 
 def test_runs_show_json_nonexistent(db_env: Path) -> None:
-    result = runner.invoke(app, ["runs", "show", "nonexistent", "--json"])
+    result = runner.invoke(app, ["run", "runs", "show", "nonexistent", "--json"])
     assert result.exit_code != 0
     assert "no such run" in result.output.lower()
 
 
 def test_agents_ls_json_empty(db_env: Path) -> None:
-    result = runner.invoke(app, ["agents", "ls", "--json"])
+    result = runner.invoke(app, ["agent", "def", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert parsed == []
 
 
 def test_runners_profiles_ls_json_empty(db_env: Path) -> None:
-    result = runner.invoke(app, ["runners", "profiles", "ls", "--json"])
+    result = runner.invoke(app, ["engine", "profiles", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert parsed == []
 
 
 def test_runners_backends_ls_json() -> None:
-    result = runner.invoke(app, ["runners", "backends", "ls", "--json"])
+    result = runner.invoke(app, ["engine", "backends", "ls", "--json"])
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert isinstance(parsed, list)
@@ -76,24 +76,24 @@ def test_runners_backends_ls_json() -> None:
 
 
 def test_agents_ls_empty(db_env: Path) -> None:
-    result = runner.invoke(app, ["agents", "ls"])
+    result = runner.invoke(app, ["agent", "def", "ls"])
     assert result.exit_code == 0
     assert "No agents registered" in result.output
 
 
 def test_runs_ls_empty(db_env: Path) -> None:
-    result = runner.invoke(app, ["runs", "ls"])
+    result = runner.invoke(app, ["run", "runs", "ls"])
     assert result.exit_code == 0
     assert "No runs yet" in result.output
 
 
 def test_runners_profiles_ls_empty(db_env: Path) -> None:
-    result = runner.invoke(app, ["runners", "profiles", "ls"])
+    result = runner.invoke(app, ["engine", "profiles", "ls"])
     assert result.exit_code == 0
     assert "No runner profiles found" in result.output
 
 
 def test_runners_backends_ls() -> None:
-    result = runner.invoke(app, ["runners", "backends", "ls"])
+    result = runner.invoke(app, ["engine", "backends", "ls"])
     assert result.exit_code == 0
     assert "Runner Backends" in result.output
