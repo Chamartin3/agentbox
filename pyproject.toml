@@ -77,7 +77,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 timeout = 30
 timeout_method = "thread"
-addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib -m 'not live_ollama'"
 markers = [
   "unit: fast, isolated tests for a single module",
   "integration: cross-module / executor / API / store tests",

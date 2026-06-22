@@ -39,10 +39,6 @@ def pytest_collection_modifyitems(
 # --------------------------------------------------------------------------- #
 
 
-def _check_ollama() -> bool:
-    return bool(os.environ.get("OLLAMA_HOST"))
-
-
 def _check_backend_binary(name: str) -> bool:
     import shutil
 
@@ -125,12 +121,6 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
 # --------------------------------------------------------------------------- #
 # Live-backend skip helpers (use in individual test decorators)
 # --------------------------------------------------------------------------- #
-
-
-ollama_required = pytest.mark.skipif(
-    not _check_ollama(),
-    reason="OLLAMA_HOST not set",
-)
 
 
 def backend_required(name: str) -> pytest.MarkDecorator:

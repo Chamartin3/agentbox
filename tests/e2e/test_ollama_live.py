@@ -1,7 +1,8 @@
 """Live Ollama smoke tests for the token backend (Plan 16 Phase 1.3).
 
-Opt-in only. Skipped unless ``OLLAMA_HOST`` is set in the environment.
-Bring up the model server with::
+Opt-in only. Carry the ``live_ollama`` marker, which the default
+``addopts`` deselects; run explicitly with ``-m live_ollama`` and a
+reachable ``OLLAMA_HOST``. Bring up the model server with::
 
     docker compose --profile verify up -d ollama ollama-seed
     OLLAMA_HOST=http://localhost:11434 uv run pytest -m live_ollama -v
@@ -29,10 +30,6 @@ from agentbox.core.engines.backends.token import TokenBackend
 pytestmark = [
     pytest.mark.live_ollama,
     pytest.mark.asyncio,
-    pytest.mark.skipif(
-        "OLLAMA_HOST" not in os.environ,
-        reason="set OLLAMA_HOST to run live Ollama tests",
-    ),
 ]
 
 # Non-thinking, reliably tool-capable; override via env. Thinking models
