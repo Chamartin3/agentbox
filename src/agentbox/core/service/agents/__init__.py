@@ -28,6 +28,8 @@ from agentbox.core.agents.composition.drift import (
     _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
 )
 from agentbox.core.service.agents.crud import (
+    get_agent_detail as get_agent_detail,
+    list_agents_enriched as list_agents_enriched,
     list_all_agents as list_all_agents,
     resolve_agent as resolve_agent,
 )
