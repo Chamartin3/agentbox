@@ -1,39 +1,39 @@
-"""Shared agent-resolution service used by both REST and MCP surfaces.
+"""Agent service package.
 
-The DB (``agent_versions`` / ``active_agent_versions``) is the single
-source of truth. There is no manifest fallback.
+``AgentService`` (``.service``) is the public surface for the agent domain —
+import it from ``agentbox.core.service`` (the facade). The submodules here
+(``crud``, ``versions``, ``prompt``, ``lifecycle``, ``admin``) are internal
+implementation that ``AgentService`` delegates to during the migration off
+``SessionStore``; do not import their functions directly.
 
-Import from this package — the submodules are internal.
+The free-function re-exports below are all transitional — every one is a
+method on ``AgentService`` now, but these callers haven't moved yet:
 
-Submodule responsibilities (N9 note):
-- ``crud``: read-only resolution + listing (resolve_agent, list_all_agents).
-- ``lifecycle``: version lifecycle CRUD (create/publish/rollback/delete
-  agent versions, runner-profile binding, tool grants).
-  Original C10 plan named this ``sync.py``; the current name better
-  reflects that it's not filesystem-sync but DB-level lifecycle ops.
-- ``admin``: version config replacement and agent meta updates.
-  Original C10 plan named this ``grants.py``; the current file holds
-  admin/meta ops, not grant management. Tool grants live in ``lifecycle``.
-- ``prompt``: config patching and validator management.
-- ``versions``: version-file upload/delete and draft/publish workflows.
+- ``resolve_agent`` / ``list_all_agents`` — cli (deferred to the CLI
+  restructure) + not-yet-migrated service-layer modules (execution/workspaces).
+- ``get_agent_validation`` / ``put_agent_validation`` — cli ``agent check``.
+- ``upload_version_file`` / ``delete_version_file`` / ``require_agent_exists``
+  — cli ``agent files`` / ``agent version``.
+- ``build_agent_snapshot`` — re-exported through the facade; internal helper.
+- The agent-domain exceptions — part of the Service's error contract.
+
+Each collapses to AgentService-only as its caller migrates. The fully-dead
+re-exports (get_agent_detail, list_agents_enriched, create_agent_record,
+patch_agent_config, decode_config_json, normalize_validator_entries) were
+removed — api/mcp use the Service methods; the functions live on in their
+submodules only as AgentService's internal delegates.
 """
 
 from agentbox.core.agents.composition.drift import (
     _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
 )
-
 from agentbox.core.service.agents.crud import (
-    get_agent_detail as get_agent_detail,
-    list_agents_enriched as list_agents_enriched,
     list_all_agents as list_all_agents,
     resolve_agent as resolve_agent,
 )
 from agentbox.core.service.agents.prompt import (
     AgentServiceError as AgentServiceError,
-    decode_config_json as decode_config_json,
     get_agent_validation as get_agent_validation,
-    normalize_validator_entries as normalize_validator_entries,
-    patch_agent_config as patch_agent_config,
     put_agent_validation as put_agent_validation,
 )
 from agentbox.core.service.agents.versions import (
@@ -43,7 +43,6 @@ from agentbox.core.service.agents.versions import (
     VersionFileNotFound as VersionFileNotFound,
     VersionNotFound as VersionNotFound,
     VersionNotDraft as VersionNotDraft,
-    create_agent_record as create_agent_record,
     delete_version_file as delete_version_file,
     require_agent_exists as require_agent_exists,
     upload_version_file as upload_version_file,
