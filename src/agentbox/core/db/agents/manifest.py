@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from agentbox.core.constants import SessionMode
 from agentbox.core.db.engines.manifest import RunnerManifest, RunnerSpec
+from agentbox.core.db.row_types import AgentVersionRow
 
 
 class AgentSource(enum.StrEnum):
@@ -166,7 +167,7 @@ class AgentDef(BaseModel):
         return ""
 
     @classmethod
-    def from_db_row(cls, row: dict) -> AgentDef:
+    def from_db_row(cls, row: AgentVersionRow | dict) -> AgentDef:
         """Reconstruct an ``AgentDef`` from a stored ``agent_versions`` row.
 
         Prefers the ``config_json`` column (the DB-as-source-of-truth

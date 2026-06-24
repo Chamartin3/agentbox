@@ -13,7 +13,7 @@ from agentbox.core.db.workspaces import mcp_discovery as _mod
 
 @pytest.fixture()
 def store(tmp_path: Path):  # type: ignore[no-untyped-def]
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 class TestCacheTools:

@@ -9,8 +9,8 @@ import typer
 import websockets
 
 from agentbox.cli.shared import console, event_color, get_store
-from agentbox.core.service.execution import runs
-from agentbox.core.service.execution.runs import RunNotFound
+import agentbox.core.service.execution as runs
+from agentbox.core.service.execution import RunNotFound
 
 log_app = typer.Typer(
     name="log",

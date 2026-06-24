@@ -15,6 +15,8 @@ from typing import Any
 from agentbox.core.config import Settings
 from agentbox.core.db import SessionStore
 
+from agentbox.core.service.system.service import SystemService
+
 from .files import resolve_workspace_path
 
 __all__ = [
@@ -68,7 +70,7 @@ def _derive_allowed_tools(
     tool_manifest = _load_tool_manifest(settings.project_root, mcp_manifest)
     if not tool_manifest:
         return []
-    servers = store.get_project_mcp_servers()
+    servers = SystemService().get_project_mcp_servers()
     mcp_server_name = servers[0].name if servers else "mcp"
     claude_prefix = f"mcp__{mcp_server_name}__"
     discovered = {
@@ -102,7 +104,7 @@ def _apply_allowed_tools(
     tool_manifest = _load_tool_manifest(settings.project_root, mcp_manifest)
     if not tool_manifest:
         return
-    servers = store.get_project_mcp_servers()
+    servers = SystemService().get_project_mcp_servers()
     mcp_server_name = servers[0].name if servers else "mcp"
     claude_prefix = f"mcp__{mcp_server_name}__"
     allowed = set(allowed_tools)
@@ -252,7 +254,7 @@ def get_workspace_mcp_tools(
     settings: Settings,
     mcp_manifest: Any | None = None,
 ) -> dict:
-    servers = store.get_project_mcp_servers()
+    servers = SystemService().get_project_mcp_servers()
     mcp_server_name = servers[0].name if servers else "mcp"
     claude_prefix = f"mcp__{mcp_server_name}__"
     opencode_prefix = f"{mcp_server_name}_"

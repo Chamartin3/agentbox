@@ -8,14 +8,14 @@ from types import SimpleNamespace
 import typer
 from rich.table import Table
 
-from agentbox.cli.shared import console, get_store
+from agentbox.cli.shared import console
 from agentbox.core.engines import (
     get_provider,
     list_models as registry_list_models,
     list_providers,
     refresh_opencode_providers,
 )
-from agentbox.core.service import get_runner_profile
+from agentbox.core.service.engines.service import EngineService, ProfileNotFound
 
 app = typer.Typer(
     name="providers",
@@ -70,11 +70,11 @@ def provider_models(
     refresh: bool = typer.Option(False, help="Bypass cache and fetch fresh models"),
 ) -> None:
     """List available models for a provider."""
-    store = get_store()
 
     if profile_id:
-        profile = get_runner_profile(store, profile_id)
-        if not profile:
+        try:
+            profile = EngineService().get_profile(profile_id)
+        except ProfileNotFound:
             console.print(f"[red]Profile not found:[/red] {profile_id}")
             raise typer.Exit(1)
         config = SimpleNamespace(

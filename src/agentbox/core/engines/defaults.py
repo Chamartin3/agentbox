@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from agentbox.core.db import SessionStore
+from agentbox.core.db.system.config import load_settings_section
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def runtime_default_model(
     if store is None:
         return None
     try:
-        section = store.get_settings_section("runtime_defaults") or {}
+        section = load_settings_section("runtime_defaults") or {}
     except Exception:
         logger.debug("runtime_default_model: settings lookup failed", exc_info=True)
         return None

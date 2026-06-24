@@ -7,14 +7,9 @@ import json
 import typer
 from rich.table import Table
 
-from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.service import McpServerSpec
-from agentbox.core.service import (
-    delete_project_mcp_server,
-    get_project_mcp_servers,
-    set_project_mcp_server,
-)
+from agentbox.core.service.system.service import SystemService
 
 project_app = typer.Typer(
     name="project",
@@ -37,13 +32,10 @@ def project_mcp_servers(
 
     --set expects JSON: '{"url": "http://...", "transport": "http"}'
     """
-    store = get_store()
+    svc = SystemService()
 
     if rm is not None:
-        result = delete_project_mcp_server(store, rm)
-        if not result:
-            console.print(f"[red]server {rm!r} not found[/red]")
-            raise typer.Exit(1)
+        svc.delete_project_mcp_server(rm)
         console.print(f"[yellow]removed[/yellow] MCP server {rm!r}")
         return
 
@@ -60,11 +52,11 @@ def project_mcp_servers(
             transport=config.get("transport", "http"),
             command=config.get("command"),
         )
-        set_project_mcp_server(store, spec)
+        svc.set_project_mcp_server(spec)
         console.print(f"[green]saved[/green] MCP server {name!r}")
         return
 
-    servers = get_project_mcp_servers(store)
+    servers = svc.get_project_mcp_servers()
     if not servers:
         console.print("[dim]no project MCP servers configured[/dim]")
         return

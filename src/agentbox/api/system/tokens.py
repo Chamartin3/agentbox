@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_store
+from agentbox.core.service.system.service import SystemService
 
 router = APIRouter(prefix="/api/api-tokens", tags=["api-tokens"])
 
@@ -29,18 +29,20 @@ class RotateBody(BaseModel):
     secret: str = Field(..., min_length=4)
 
 
+def _svc() -> SystemService:
+    return SystemService()
+
+
 @router.get("")
 def list_tokens(environment: str | None = None) -> dict:
-    store = get_store()
-    items = store.list_api_tokens(environment=environment)
+    items = _svc().list_api_tokens(environment=environment)
     return {"items": items, "total": len(items)}
 
 
 @router.post("", status_code=201)
 def create_token(body: CreateBody) -> dict:
-    store = get_store()
     try:
-        return store.create_api_token(
+        return _svc().create_api_token(
             environment=body.environment, name=body.name, secret=body.secret
         )
     except ValueError as exc:
@@ -55,8 +57,7 @@ def create_token(body: CreateBody) -> dict:
 
 @router.patch("/{token_id}")
 def rename_token(token_id: str, body: RenameBody) -> dict:
-    store = get_store()
-    result = store.rename_api_token(token_id, body.name)
+    result = _svc().rename_api_token(token_id, body.name)
     if result is None:
         raise HTTPException(404, f"token {token_id!r} not found")
     return result
@@ -64,9 +65,8 @@ def rename_token(token_id: str, body: RenameBody) -> dict:
 
 @router.post("/{token_id}/rotate")
 def rotate_token(token_id: str, body: RotateBody) -> dict:
-    store = get_store()
     try:
-        result = store.rotate_api_token(token_id, secret=body.secret)
+        result = _svc().rotate_api_token(token_id, secret=body.secret)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     if result is None:
@@ -76,6 +76,5 @@ def rotate_token(token_id: str, body: RotateBody) -> dict:
 
 @router.delete("/{token_id}", status_code=204)
 def delete_token(token_id: str) -> None:
-    store = get_store()
-    if not store.delete_api_token(token_id):
+    if not _svc().delete_api_token(token_id):
         raise HTTPException(404, f"token {token_id!r} not found")

@@ -58,7 +58,7 @@ from agentbox.core.resources.skills import discover_skills as discover_skills
 from agentbox.core.resources.skills import find_skill as find_skill
 
 # ── Run execution ─────────────────────────────────────────────────────
-from agentbox.core.execution.orchestrate.executor import NoBackendAvailable as NoBackendAvailable
+from agentbox.core.execution.orchestrate.setup import NoBackendAvailable as NoBackendAvailable
 from agentbox.core.execution.orchestrate.executor import RunExecutor as RunExecutor
 from agentbox.core.execution.observability.conversation import get as get_conversation  # noqa: F401
 from agentbox.core.workspaces.prep import render_env_doc as render_env_doc
@@ -72,13 +72,11 @@ from agentbox.core.service.agents import list_all_agents as list_all_agents
 from agentbox.core.service.agents import resolve_agent as resolve_agent
 from agentbox.core.service.agents.lifecycle import add_comment as add_version_comment  # noqa: F401
 from agentbox.core.service.agents.lifecycle import branch_draft as branch_agent_draft  # noqa: F401
-from agentbox.core.service.agents.lifecycle import clear_agent_runner_profile as clear_agent_runner_profile
 from agentbox.core.service.agents.lifecycle import create_agent as create_agent
 from agentbox.core.service.agents.lifecycle import create_version as create_agent_version  # noqa: F401
 from agentbox.core.service.agents.lifecycle import diff_versions as diff_agent_versions  # noqa: F401
 from agentbox.core.service.agents.lifecycle import get_active_version as get_active_agent_version  # noqa: F401
 from agentbox.core.service.agents.lifecycle import get_agent_def as get_agent_def
-from agentbox.core.service.agents.lifecycle import get_agent_runner_profile as get_agent_runner_profile
 from agentbox.core.service.agents.lifecycle import get_prompt_version as get_prompt_version
 from agentbox.core.service.agents.lifecycle import get_rating as get_version_rating  # noqa: F401
 from agentbox.core.service.agents.lifecycle import get_version as get_agent_version  # noqa: F401
@@ -91,18 +89,17 @@ from agentbox.core.service.agents.lifecycle import publish_version as publish_ag
 from agentbox.core.service.agents.lifecycle import revoke_agent_tool as revoke_agent_tool
 from agentbox.core.service.agents.lifecycle import rollback_to as rollback_agent_to  # noqa: F401
 from agentbox.core.service.agents.lifecycle import save_prompt_revision as save_prompt_revision
-from agentbox.core.service.agents.lifecycle import set_agent_runner_profile as set_agent_runner_profile  # noqa: F401
 from agentbox.core.service.agents.lifecycle import set_rating as set_version_rating  # noqa: F401
 from agentbox.core.service.agents.lifecycle import soft_delete_agent as soft_delete_agent
 
-# ── Runner profiles service ────────────────────────────────────────────
-from agentbox.core.service.engines.profiles import create_runner_profile as create_runner_profile
-from agentbox.core.service.engines.profiles import delete_runner_profile as delete_runner_profile
-from agentbox.core.service.engines.profiles import get_runner_profile as get_runner_profile
-from agentbox.core.service.engines.profiles import list_runner_profile_stats as list_runner_profile_stats
-from agentbox.core.service.engines.profiles import list_runner_profiles as list_runner_profiles
-from agentbox.core.service.engines.profiles import runner_profile_stats as runner_profile_stats
-from agentbox.core.service.engines.profiles import set_agent_runner_profile as bind_runner_profile  # noqa: F401
+# ── Execution service (plan 088) ───────────────────────────────────────
+from agentbox.core.service.execution.service import ExecutionService as ExecutionService
+
+# ── Evaluation service (plan 093 — analytics) ──────────────────────────
+from agentbox.core.service.evaluation.service import EvaluationService as EvaluationService
+
+# ── Engines service (plan 091 — deferred, circular import with providers) ──
+# from agentbox.core.service.engines.service import EngineService as EngineService
 
 # ── Repo resources service ─────────────────────────────────────────────
 from agentbox.core.service.resources.repo import create_repo_resource as create_repo_resource
@@ -115,19 +112,8 @@ from agentbox.core.service.resources.repo import publish_repo_version as publish
 from agentbox.core.service.resources.repo import replace_prompt_bindings as replace_prompt_bindings
 from agentbox.core.service.resources.repo import rollback_repo_resource as rollback_repo_resource
 
-# ── System admin service ───────────────────────────────────────────────
-from agentbox.core.service.system_admin import create_api_token as create_api_token
-from agentbox.core.service.system_admin import delete_api_token as delete_api_token
-from agentbox.core.service.system_admin import delete_project_mcp_server as delete_project_mcp_server
-from agentbox.core.service.system_admin import get_project_mcp_servers as get_project_mcp_servers
-from agentbox.core.service.system_admin import get_settings_section as get_settings_section
-from agentbox.core.service.system_admin import list_api_tokens as list_api_tokens
-from agentbox.core.service.system_admin import list_settings_sections as list_settings_sections
-from agentbox.core.service.system_admin import rotate_api_token as rotate_api_token
-from agentbox.core.service.system_admin import set_project_mcp_server as set_project_mcp_server
-from agentbox.core.service.system_admin import set_project_shared_asset as set_project_shared_asset
-from agentbox.core.service.system_admin import set_setting as set_setting
-from agentbox.core.service.system_admin import update_settings_section as update_settings_section
+# ── System service ────────────────────────────────────────────────────
+from agentbox.core.service.system.service import SystemService as SystemService
 
 # ── Workspace admin service ────────────────────────────────────────────
 from agentbox.core.service.execution.feedback import aggregate_usage as aggregate_usage

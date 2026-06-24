@@ -8,7 +8,7 @@ from rich.table import Table
 
 from agentbox.cli.shared import console, get_mcp_registry, get_settings, get_store
 from agentbox.core.service import (
-    get_project_mcp_servers,
+    SystemService,
     get_workspace_mcp_policy,
     get_workspace_mcp_tools,
     list_workspace_mcp_server_overrides,
@@ -28,7 +28,7 @@ mcp_workspace_app = typer.Typer(
 def mcp_show(workspace_id: str) -> None:
     """Show MCP policy and server overrides for a workspace."""
     store = get_store()
-    servers = get_project_mcp_servers(store)
+    servers = SystemService().get_project_mcp_servers()
 
     policy = get_workspace_mcp_policy(store, workspace_id)
     server_overrides = list_workspace_mcp_server_overrides(store, workspace_id)
@@ -124,7 +124,7 @@ def mcp_refresh(workspace_id: str) -> None:
 
     overrides = list_workspace_mcp_server_overrides(store, workspace_id)
     server_names = {o["server_name"] for o in overrides}
-    for s in get_project_mcp_servers(store):
+    for s in SystemService().get_project_mcp_servers():
         server_names.add(s.name)
 
     if not server_names:

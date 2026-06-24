@@ -10,7 +10,7 @@ from agentbox.core.db import SessionStore
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 def _seed_resource(store: SessionStore, slug: str, rtype: str = "document") -> str:

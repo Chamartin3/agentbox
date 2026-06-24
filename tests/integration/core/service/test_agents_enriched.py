@@ -58,7 +58,7 @@ def _seed_agent(store: SessionStore, agent_id: str) -> None:
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture

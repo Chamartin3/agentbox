@@ -35,7 +35,7 @@ from agentbox.core.service.engines.profiles import (
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 # ── Fake plugin / provider surfaces ────────────────────────────────────

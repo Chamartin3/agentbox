@@ -9,6 +9,7 @@ concrete SessionStore.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from sqlalchemy.engine import Engine as _Engine
@@ -329,7 +330,7 @@ class RunSetupStore(Protocol):
 class SnapshotStore(Protocol):
     """Minimal store surface needed by the snapshot-writing layer."""
 
-    def get_runner_profile(self, profile_id: str) -> RunnerProfile | None: ...
+    db_path: Path
 
     def save_run_runner_snapshot(
         self, run_id: str, runner_snapshot: RunnerSnapshot

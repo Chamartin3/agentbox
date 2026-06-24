@@ -82,15 +82,16 @@ def grant_tool(
         raise HTTPException(400, str(exc)) from exc
 
     # Validate against workspace catalog (warn, not hard-fail).
+    response: dict = dict(result)
     if body.workspace_id:
         installed = _catalog_tool_names(body.workspace_id, store, mcp_registry)
         if body.tool_name not in installed:
-            result["warning"] = (
+            response["warning"] = (
                 f"Tool '{body.tool_name}' is not currently installed in "
                 f"workspace '{body.workspace_id}' — grant is unbacked."
             )
 
-    return result
+    return response
 
 
 @router.delete("/{agent_id}/tool_grants/{tool_name}", status_code=204)

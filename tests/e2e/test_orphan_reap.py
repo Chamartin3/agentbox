@@ -15,7 +15,7 @@ from agentbox.core.db import runs
 
 
 def test_reap_marks_orphaned_running_rows_as_incomplete(tmp_path: Path) -> None:
-    db = tmp_path / "db.sqlite"
+    db = tmp_path / "agentbox.sqlite"
     store = SessionStore(db)
     rid = store.create_run("draft_writer", "{}", "/tmp/wd", "/tmp/t.jsonl")
     # row is in 'running' — simulate process death by dropping the store
@@ -34,7 +34,7 @@ def test_reap_marks_orphaned_running_rows_as_incomplete(tmp_path: Path) -> None:
 
 
 def test_reap_leaves_finished_runs_alone(tmp_path: Path) -> None:
-    db = tmp_path / "db.sqlite"
+    db = tmp_path / "agentbox.sqlite"
     store = SessionStore(db)
     ok_id = store.create_run("a", "{}", "/tmp/wd", "/tmp/t.jsonl")
     err_id = store.create_run("a", "{}", "/tmp/wd", "/tmp/t.jsonl")
@@ -51,7 +51,7 @@ def test_reap_leaves_finished_runs_alone(tmp_path: Path) -> None:
 
 def test_reap_preserves_existing_error_text(tmp_path: Path) -> None:
     """If a 'running' row somehow has prior error text, reap appends, not replaces."""
-    db = tmp_path / "db.sqlite"
+    db = tmp_path / "agentbox.sqlite"
     store = SessionStore(db)
     rid = store.create_run("a", "{}", "/tmp/wd", "/tmp/t.jsonl")
     # Manually inject prior error text on a still-running row.

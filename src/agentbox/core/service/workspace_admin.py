@@ -7,6 +7,7 @@ of reaching into ``SessionStore`` directly.
 from __future__ import annotations
 
 from agentbox.core.db import EnvDocRow, SessionStore, WorkspaceRow
+from agentbox.core.service.system.service import SystemService
 
 
 # ── Workspace registry ──────────────────────────────────────────────────
@@ -109,7 +110,7 @@ def resolve_workspace_host_env(
 def list_host_env_calls_for_run(
     store: SessionStore, run_id: str
 ) -> list[dict]:
-    return store.list_host_env_calls_for_run(run_id)
+    return SystemService().list_host_env_calls_for_run(run_id)
 
 
 # ── Env docs ────────────────────────────────────────────────────────────

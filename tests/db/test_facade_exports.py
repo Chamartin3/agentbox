@@ -138,7 +138,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "PromptVersionsMixin",
         "ResourceBindingsMixin",
         "ResourcesMixin",
-        "RunnerProfilesMixin",
         "RuntimePermissionsMixin",
         "SettingsMixin",
         "SharedResourcesMixin",

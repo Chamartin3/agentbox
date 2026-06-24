@@ -156,18 +156,12 @@ from agentbox.core.db.agents.sync import AgentSyncMixin
 from agentbox.core.db.agents.grants import AgentToolGrantsMixin
 from agentbox.core.db.agents.versions import AgentVersionsMixin
 from agentbox.core.db.agents.prompts import PromptVersionsMixin
-from agentbox.core.db.feedback import ExecutionAnalyticsMixin
 from agentbox.core.db.resources.crud import ResourcesMixin
 from agentbox.core.db.resources.shared import SharedResourcesMixin
 from agentbox.core.db.resources.bindings import ResourceBindingsMixin
-from agentbox.core.db.engines.profiles import RunnerProfilesMixin
-from agentbox.core.db.system.api_tokens import ApiTokensMixin
-from agentbox.core.db.system.settings import SettingsMixin
-from agentbox.core.db.system.project_config import ProjectConfigMixin
 from agentbox.core.db.workspaces.crud import WorkspacesMixin
 from agentbox.core.db.workspaces.env_docs import EnvDocsMixin
 from agentbox.core.db.workspaces.host_env import HostEnvMixin
-from agentbox.core.db.system.host_env_calls import HostEnvCallLogMixin
 from agentbox.core.db.workspaces.mcp_discovery import McpDiscoveryMixin
 from agentbox.core.db.workspaces.mcp_overrides import McpOverridesMixin
 from agentbox.core.db.workspaces.runtime_permissions import RuntimePermissionsMixin
@@ -229,6 +223,7 @@ from agentbox.core.db.protocols import (
 # Row types (TypedDict query result shapes)
 # ---------------------------------------------------------------------------
 from agentbox.core.db.row_types import (
+    AgentVersionRow,
     EnvDocRow,
     PromptVersionRow,
     RepoResourceRow,
@@ -370,20 +365,14 @@ __all__ = [
     "AgentSyncMixin",
     "AgentToolGrantsMixin",
     "AgentVersionsMixin",
-    "ExecutionAnalyticsMixin",
-    "ApiTokensMixin",
     "EnvDocsMixin",
-    "HostEnvCallLogMixin",
     "HostEnvMixin",
     "McpDiscoveryMixin",
     "McpOverridesMixin",
-    "ProjectConfigMixin",
     "PromptVersionsMixin",
     "ResourceBindingsMixin",
     "ResourcesMixin",
-    "RunnerProfilesMixin",
     "RuntimePermissionsMixin",
-    "SettingsMixin",
     "SharedResourcesMixin",
     "WorkenvTemplatesMixin",
     "WorkspacesMixin",
@@ -421,6 +410,7 @@ __all__ = [
     "WorkspaceBuildStore",
     "WorkspaceLookupStore",
     # row types
+    "AgentVersionRow",
     "EnvDocRow",
     "PromptVersionRow",
     "RepoResourceRow",

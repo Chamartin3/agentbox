@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentbox.core.db import AgentDef, RunnerProfile, SessionStore
+from agentbox.core.db import AgentDef, SessionStore
 
 
 def soft_delete_agent(store: SessionStore, agent_id: str) -> dict | None:
@@ -25,21 +25,6 @@ def rollback_to(
 ) -> dict:
     """Roll back to a previous agent version (creates a new version)."""
     return store.rollback_to(agent_id, target_version, reason, author=author)
-
-
-def get_agent_runner_profile(store: SessionStore, agent_id: str) -> RunnerProfile | None:
-    """Get the runner profile bound to an agent."""
-    return store.get_agent_runner_profile(agent_id)
-
-
-def set_agent_runner_profile(store: SessionStore, agent_id: str, profile_id: str) -> RunnerProfile:
-    """Bind a runner profile to an agent."""
-    return store.set_agent_runner_profile(agent_id, profile_id)
-
-
-def clear_agent_runner_profile(store: SessionStore, agent_id: str) -> None:
-    """Remove the runner profile binding from an agent."""
-    store.clear_agent_runner_profile(agent_id)
 
 
 def get_agent_def(store: SessionStore, agent_id: str) -> AgentDef | None:

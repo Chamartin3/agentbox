@@ -1,7 +1,8 @@
 """/runner-profiles endpoints — CRUD, agent binding, stats.
 
 Transport-only: parses queries, calls
-:mod:`agentbox.core.service.engines.profiles`, maps domain errors to HTTP.
+:mod:`agentbox.core.service.engines.service.EngineService`, maps domain errors
+to HTTP.
 """
 
 from __future__ import annotations
@@ -9,17 +10,15 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from agentbox.api._pagination import PaginatedEnvelope, paginate_list
-from agentbox.api.deps import get_store
+from agentbox.api.deps import get_engine_service
 from agentbox.core.service import (
     RunnerProfile,
     RunnerProfileCreate,
     RunnerProfilePatch,
     RunnerProfileStats,
-    SessionStore,
 )
-from agentbox.core.service.engines import profiles as svc
 from agentbox.core.service.engines.profile_validation import InvalidProfile
-from agentbox.core.service.engines.profiles import ProfileNotFound
+from agentbox.core.service.engines.service import EngineService, ProfileNotFound
 
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
 
@@ -36,7 +35,7 @@ def list_runner_profiles(
     limit: int = 50,
     offset: int = 0,
     paginated: bool = False,
-    store: SessionStore = Depends(get_store),
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> list[RunnerProfile] | PaginatedEnvelope:
     """List runner profiles with optional filters.
 
@@ -44,8 +43,8 @@ def list_runner_profiles(
     envelope ``{items, total, offset, limit, has_more}``. Otherwise returns
     a plain list for backward compatibility.
     """
-    profiles = svc.list_profiles(
-        store=store, backend=backend, provider=provider, enabled=enabled
+    profiles = engine_svc.list_profiles(
+        backend=backend, provider=provider, enabled=enabled
     )
 
     if not paginated and not any([q, sort, offset]):
@@ -68,10 +67,10 @@ def list_runner_profiles(
 @router.post("", status_code=201)
 def create_runner_profile(
     data: RunnerProfileCreate,
-    store: SessionStore = Depends(get_store),
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> RunnerProfile:
     try:
-        return svc.create_profile(data, store=store)
+        return engine_svc.create_profile(data)
     except InvalidProfile as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -79,10 +78,10 @@ def create_runner_profile(
 @router.get("/{profile_id}")
 def get_runner_profile(
     profile_id: str,
-    store: SessionStore = Depends(get_store),
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> RunnerProfile:
     try:
-        return svc.get_profile(profile_id, store=store)
+        return engine_svc.get_profile(profile_id)
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -91,10 +90,10 @@ def get_runner_profile(
 def update_runner_profile(
     profile_id: str,
     patch: RunnerProfilePatch,
-    store: SessionStore = Depends(get_store),
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> RunnerProfile:
     try:
-        return svc.update_profile(profile_id, patch, store=store)
+        return engine_svc.update_profile(profile_id, patch)
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
     except InvalidProfile as exc:
@@ -104,10 +103,10 @@ def update_runner_profile(
 @router.delete("/{profile_id}")
 def delete_runner_profile(
     profile_id: str,
-    store: SessionStore = Depends(get_store),
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> None:
     try:
-        svc.delete_profile(profile_id, store=store)
+        engine_svc.delete_profile(profile_id)
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -117,9 +116,11 @@ def get_runner_profile_stats(
     profile_id: str,
     since: str | None = None,
     until: str | None = None,
-    store: SessionStore = Depends(get_store),
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> RunnerProfileStats:
     try:
-        return svc.get_profile_stats(profile_id, store=store, since=since, until=until)
+        return engine_svc.get_profile_stats(
+            profile_id, since=since, until=until
+        )
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc

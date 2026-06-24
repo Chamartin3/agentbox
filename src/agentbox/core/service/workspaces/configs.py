@@ -21,6 +21,7 @@ from typing import Any
 from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
 from agentbox.core.db import SessionStore
+from agentbox.core.service.system.service import SystemService
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
 from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
@@ -38,7 +39,7 @@ __all__ = [
 
 def _project_mcp_refs(store: SessionStore, servers: list[dict] | None) -> list[McpRef]:
     """Build ``McpRef``s from project (or override) MCP servers."""
-    specs = servers if servers is not None else store.get_project_mcp_servers()
+    specs = servers if servers is not None else SystemService().get_project_mcp_servers()
     refs: list[McpRef] = []
     for s in specs:
         name = s["name"] if isinstance(s, dict) else s.name

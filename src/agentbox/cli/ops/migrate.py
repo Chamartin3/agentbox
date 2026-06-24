@@ -10,11 +10,7 @@ from rich.text import Text
 from agentbox.cli._deps import get_settings, get_store
 from agentbox.cli._common import console
 from agentbox.core.constants import BackendName
-from agentbox.core.db.system.project_config import (
-    PROJECT_MCP_SERVERS,
-    PROJECT_RUNTIME,
-    PROJECT_SHARED_ASSETS,
-)
+from agentbox.core.service.system.service import SystemService
 from agentbox.core.db.system.seeds import backfill as _backfill_prompt_versions
 from agentbox.core.migrations import migrate_capabilities_to_manifest
 from agentbox.core.service import (
@@ -22,11 +18,7 @@ from agentbox.core.service import (
     build_config_json_str,
     get_active_agent_version,
     get_agent_def,
-    get_settings_section,
     replace_version_config,
-    set_project_mcp_server,
-    set_project_shared_asset,
-    set_setting,
     update_agent_meta,
 )
 
@@ -164,9 +156,11 @@ def import_manifest(
         data = tomllib.load(f)
     manifest = ProjectManifest.model_validate(data)
 
-    existing_servers = get_settings_section(store, PROJECT_MCP_SERVERS)
-    existing_assets = get_settings_section(store, PROJECT_SHARED_ASSETS)
-    existing_runtime = get_settings_section(store, PROJECT_RUNTIME)
+    svc = SystemService()
+
+    existing_servers = svc.get_settings_section(SystemService.PROJ_MCP_SERVERS)
+    existing_assets = svc.get_settings_section(SystemService.PROJ_SHARED_ASSETS)
+    existing_runtime = svc.get_settings_section(SystemService.PROJ_RUNTIME)
 
     table = Table(
         title=f"Importing {manifest_path}",
@@ -183,17 +177,17 @@ def import_manifest(
 
     for spec in manifest.mcp_servers or []:
         if not force and spec.name in existing_servers:
-            _row(PROJECT_MCP_SERVERS, spec.name, "skip", "dim")
+            _row(SystemService.PROJ_MCP_SERVERS, spec.name, "skip", "dim")
             continue
-        set_project_mcp_server(store, spec, author="migrate:import-manifest")
-        _row(PROJECT_MCP_SERVERS, spec.name, "write", "green")
+        svc.set_project_mcp_server(spec, author="migrate:import-manifest")
+        _row(SystemService.PROJ_MCP_SERVERS, spec.name, "write", "green")
 
     for name, path in (manifest.shared_assets or {}).items():
         if not force and name in existing_assets:
-            _row(PROJECT_SHARED_ASSETS, name, "skip", "dim")
+            _row(SystemService.PROJ_SHARED_ASSETS, name, "skip", "dim")
             continue
-        set_project_shared_asset(store, name, path, author="migrate:import-manifest")
-        _row(PROJECT_SHARED_ASSETS, name, "write", "green")
+        svc.set_project_shared_asset(name, path, author="migrate:import-manifest")
+        _row(SystemService.PROJ_SHARED_ASSETS, name, "write", "green")
 
     runtime_writes: list[tuple[str, object]] = []
     if manifest.backend_preference:
@@ -205,10 +199,10 @@ def import_manifest(
 
     for key, value in runtime_writes:
         if not force and key in existing_runtime:
-            _row(PROJECT_RUNTIME, key, "skip", "dim")
+            _row(SystemService.PROJ_RUNTIME, key, "skip", "dim")
             continue
-        set_setting(store, PROJECT_RUNTIME, key, value, author="migrate:import-manifest")
-        _row(PROJECT_RUNTIME, key, "write", "green")
+        svc.set_setting(SystemService.PROJ_RUNTIME, key, value, author="migrate:import-manifest")
+        _row(SystemService.PROJ_RUNTIME, key, "write", "green")
 
     console.print(table)
     console.print("[green]done.[/green] manifest file may now be removed.")

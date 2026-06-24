@@ -9,9 +9,8 @@ from rich.table import Table
 
 from agentbox.cli.shared import console, get_store
 from agentbox.core.service import (
-    create_api_token,
+    SystemService,
     delete_api_token,  # noqa: F401
-    list_api_tokens,
     rotate_api_token,  # noqa: F401
 )
 
@@ -30,7 +29,7 @@ def tokens_ls(
 ) -> None:
     """List API tokens."""
     store = get_store()
-    items = list_api_tokens(store, environment=environment)
+    items = SystemService().list_api_tokens(environment=environment)
     if not items:
         console.print("[dim]no tokens[/dim]")
         return
@@ -61,7 +60,7 @@ def tokens_create(
     """Create a new API token. Prints the secret once; store it securely."""
     secret = secrets.token_urlsafe(32)
     store = get_store()
-    result = create_api_token(store, name=name, environment=environment)
+    result = SystemService().create_api_token(name=name, environment=environment)
     console.print(
         f"[green]created[/green] token {result['id']!r} for environment {environment!r}"
     )
@@ -75,7 +74,7 @@ def tokens_rotate(
     """Rotate a token's secret. Prints the new secret once."""
     secret = secrets.token_urlsafe(32)
     store = get_store()
-    result = rotate_api_token(store, token_id, secret=secret)
+    result = SystemService().rotate_api_token(token_id, secret=secret)
     if result is None:
         console.print(f"[red]token {token_id!r} not found[/red]")
         raise typer.Exit(1)
@@ -94,7 +93,7 @@ def tokens_rm(
         if not confirm:
             raise typer.Exit(0)
     store = get_store()
-    result = delete_api_token(store, token_id)
+    result = SystemService().delete_api_token(token_id)
     if not result:
         console.print(f"[red]token {token_id!r} not found[/red]")
         raise typer.Exit(1)

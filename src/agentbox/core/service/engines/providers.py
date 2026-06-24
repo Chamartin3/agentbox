@@ -22,6 +22,9 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from agentbox.core.db import RunnerProfile
+from agentbox.core.db.database import get_database
+
 from agentbox.core.engines import (
     EffectiveRunnerConfig,
     ProviderDescriptor,
@@ -121,9 +124,10 @@ async def list_provider_models(
 
     config: EffectiveRunnerConfig
     if profile_id:
-        profile = store.get_runner_profile(profile_id)
-        if not profile:
+        row = get_database(str(store.db_path)).runner_profiles.get_by_id(profile_id)
+        if not row:
             raise InvalidProviderRequest(f"Runner profile not found: {profile_id}")
+        profile = RunnerProfile(**row)
         config = EffectiveRunnerConfig(
             backend=profile.backend,
             provider=profile.provider,

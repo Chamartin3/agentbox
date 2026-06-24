@@ -24,6 +24,7 @@ from agentbox.cli._common import console
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.constants import RunnerKind
 from agentbox.core.service import AgentDef
+from agentbox.core.service.system.service import SystemService
 from agentbox.core.service.workspaces import launch_runner_configs
 from agentbox.core.workspaces.build import build_workspace
 from agentbox.core.workspaces.mcp.client import McpRegistry
@@ -253,7 +254,7 @@ def _resolve_mcp_for_launch(
     workspace-filtered MCP server list (or None when there's no
     workspace_id).
     """
-    manifest_specs = list(get_store().get_project_mcp_servers())
+    manifest_specs = list(SystemService().get_project_mcp_servers())
 
     # Per-workspace MCP isolation: resolve overrides and only emit
     # enabled servers. Without a workspace_id we fall back to the

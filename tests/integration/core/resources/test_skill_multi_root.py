@@ -16,7 +16,7 @@ from agentbox.core.resources.boot import (
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 def _make_skill(root: Path, name: str, body: str = "skill body") -> Path:

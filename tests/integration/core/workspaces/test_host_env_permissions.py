@@ -395,7 +395,7 @@ class TestExecutorInjection:
             grants=grants,
             workspace_id="ws1",
             workdir=tmp_path / "work",
-            db_path=tmp_path / "db.sqlite",
+            db_path=tmp_path / "agentbox.sqlite",
         )
 
         updated = json.loads(mcp_path.read_text())
@@ -415,7 +415,7 @@ class TestExecutorInjection:
             grants=grants,
             workspace_id="ws2",
             workdir=tmp_path,
-            db_path=tmp_path / "db.sqlite",
+            db_path=tmp_path / "agentbox.sqlite",
         )
 
         updated = json.loads((tmp_path / ".mcp.json").read_text())

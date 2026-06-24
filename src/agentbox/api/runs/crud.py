@@ -22,13 +22,26 @@ from agentbox.api.runs.schemas import (
 )
 from agentbox.api.runs.webhooks import schedule_webhook
 from agentbox.core.service import read_transcript, NoBackendAvailable
-from agentbox.core.service.execution import runs
-from agentbox.core.service.execution.runs import (
+from agentbox.core.service.execution import (
+    add_comment as _svc_add_comment,
     AgentNotFound,
+    cancel_run as _svc_cancel_run,
+    complete_run as _svc_complete_run,
+    create_run as _svc_create_run,
+    get_run_detail as _svc_get_run_detail,
+    get_run_prompt as _svc_get_run_prompt,
+    get_transcript as _svc_get_transcript,
     InvalidRunInput,
-    RunNotFound,
+    list_comments as _svc_list_comments,
+    list_runs as _svc_list_runs,
+    no_backend_detail as _svc_no_backend_detail,
+    post_outcome as _svc_post_outcome,
+    rerun as _svc_rerun,
+    run_facets as _svc_run_facets,
+    run_stats as _svc_run_stats,
+    snapshot_run as _svc_snapshot_run,
 )
-from agentbox.core.service.execution.types import AgentDisabled
+from agentbox.core.service.execution.types import AgentDisabled, RunNotFound
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -36,7 +49,7 @@ router = APIRouter(prefix="/api/runs", tags=["runs"])
 @router.post("")
 async def create_run(body: CreateRunBody) -> dict:
     try:
-        return await runs.create_run(
+        return await _svc_create_run(
             body.agent,
             store=get_store(),
             executor=get_executor(),
@@ -67,7 +80,7 @@ async def create_run(body: CreateRunBody) -> dict:
     except InvalidRunInput as exc:
         raise HTTPException(422, str(exc)) from exc
     except NoBackendAvailable as exc:
-        raise HTTPException(503, runs.no_backend_detail(exc)) from exc
+        raise HTTPException(503, _svc_no_backend_detail(exc)) from exc
 
 
 @router.get("")
@@ -83,8 +96,8 @@ def list_runs(
     offset: int = 0,
     paginated: bool = False,
 ) -> list[dict] | dict:
-    """List runs. See ``core.service.runs.list_runs`` for the shape."""
-    return runs.list_runs(
+    """List runs. See ``core.service._svc_list_runs`` for the shape."""
+    return _svc_list_runs(
         store=get_store(),
         agent=agent,
         status=status,
@@ -110,7 +123,7 @@ def runs_stats(
     until: str | None = None,
 ) -> dict:
     """Aggregated stats for the run dashboard."""
-    return runs.run_stats(
+    return _svc_run_stats(
         store=get_store(),
         agent=agent,
         status=status,
@@ -125,7 +138,7 @@ def runs_stats(
 @router.post("/{run_id}/complete")
 async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
     try:
-        return runs.complete_run(
+        return _svc_complete_run(
             run_id,
             store=get_store(),
             ok=body.ok,
@@ -141,7 +154,7 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
 @router.post("/{run_id}/snapshot")
 async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
     try:
-        return runs.snapshot_run(
+        return _svc_snapshot_run(
             run_id,
             store=get_store(),
             rendered_prompt=body.rendered_prompt,
@@ -160,7 +173,7 @@ async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
 def post_outcome(run_id: str, body: PostOutcomeBody) -> dict:
     """Record downstream post-processing outcome for a completed run."""
     try:
-        return runs.post_outcome(
+        return _svc_post_outcome(
             run_id,
             store=get_store(),
             status=body.status,
@@ -175,7 +188,7 @@ def post_outcome(run_id: str, body: PostOutcomeBody) -> dict:
 async def rerun(run_id: str) -> dict:
     """Re-execute a finished run with the same agent + input/variables."""
     try:
-        return await runs.rerun(
+        return await _svc_rerun(
             run_id,
             store=get_store(),
             executor=get_executor(),
@@ -199,7 +212,7 @@ async def rerun(run_id: str) -> dict:
 @router.get("/{run_id}/comments")
 def list_comments(run_id: str) -> dict:
     try:
-        return runs.list_comments(run_id, store=get_store())
+        return _svc_list_comments(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
 
@@ -207,7 +220,7 @@ def list_comments(run_id: str) -> dict:
 @router.post("/{run_id}/comments")
 def add_comment(run_id: str, body: RunCommentBody) -> dict:
     try:
-        return runs.add_comment(
+        return _svc_add_comment(
             run_id, store=get_store(), author=body.author, body=body.body
         )
     except RunNotFound as exc:
@@ -218,7 +231,7 @@ def add_comment(run_id: str, body: RunCommentBody) -> dict:
 async def cancel_run(run_id: str) -> dict:
     """Cancel an in-progress run. Idempotent."""
     try:
-        return await runs.cancel_run(run_id, store=get_store(), executor=get_executor())
+        return await _svc_cancel_run(run_id, store=get_store(), executor=get_executor())
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
 
@@ -226,13 +239,13 @@ async def cancel_run(run_id: str) -> dict:
 @router.get("/_facets")
 def run_facets() -> dict:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""
-    return runs.run_facets(store=get_store())
+    return _svc_run_facets(store=get_store())
 
 
 @router.get("/{run_id}")
 def get_run(run_id: str) -> dict:
     try:
-        return runs.get_run_detail(run_id, store=get_store())
+        return _svc_get_run_detail(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404) from exc
 
@@ -240,7 +253,7 @@ def get_run(run_id: str) -> dict:
 @router.get("/{run_id}/prompt")
 def get_run_prompt(run_id: str) -> dict:
     try:
-        return runs.get_run_prompt(run_id, store=get_store())
+        return _svc_get_run_prompt(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404) from exc
 
@@ -248,7 +261,7 @@ def get_run_prompt(run_id: str) -> dict:
 @router.get("/{run_id}/transcript")
 def get_transcript(run_id: str) -> list[dict]:
     try:
-        return runs.get_transcript(run_id, store=get_store())
+        return _svc_get_transcript(run_id, store=get_store())
     except RunNotFound as exc:
         raise HTTPException(404) from exc
 

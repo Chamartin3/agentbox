@@ -34,7 +34,7 @@ def _seed_run(
 
 
 def test_list_runs_paged_includes_usage_fields(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     rid = _seed_run(store, "my_agent", "ok", "sonnet-4")
 
     rows, total = store.list_runs_paged(limit=50)
@@ -55,7 +55,7 @@ def test_list_runs_paged_includes_usage_fields(tmp_path: Path) -> None:
 
 def test_list_runs_paged_no_usage_shows_nulls(tmp_path: Path) -> None:
     """Runs without a usage record should have null usage fields."""
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     rid = store.create_run("no_usage_agent", "in", "/wd", "/t.jsonl")
     store.finish_run(rid, ok=True, output="out")
 
@@ -70,7 +70,7 @@ def test_list_runs_paged_no_usage_shows_nulls(tmp_path: Path) -> None:
 
 def test_list_runs_paged_duration_for_running(tmp_path: Path) -> None:
     """A running run has finished_at = None -> duration_ms is null."""
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     store.create_run("runner", "in", "/wd", "/t.jsonl")
 
     rows, total = store.list_runs_paged(limit=50)
@@ -79,7 +79,7 @@ def test_list_runs_paged_duration_for_running(tmp_path: Path) -> None:
 
 
 def test_list_runs_paged_respects_filters(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed_run(store, "a1", "ok", "haiku")
     _seed_run(store, "a2", "error", "sonnet")
 

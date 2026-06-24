@@ -15,12 +15,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
 from agentbox.core.agents.config import build_config_json_payload
+from agentbox.core.config import load_settings
 from agentbox.core.db import RunnerProfileCreate
+from agentbox.core.db.database import get_database
+from agentbox.core.db.utils import now_iso
 
 if TYPE_CHECKING:
     from agentbox.core.db import AgentVersionsMixin
     from agentbox.core.db import AgentDef
-    from agentbox.core.db import RunnerProfilesMixin
 
 
 class _PromptSyncStore(Protocol):
@@ -173,7 +175,6 @@ def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
 def _ingest_runner_profile(
     agent: AgentDef,
     agent_id: str,
-    store: RunnerProfilesMixin,
 ) -> None:
     """Create or reuse a runner profile for an agent with a [runner] block.
 
@@ -185,12 +186,14 @@ def _ingest_runner_profile(
 
     try:
         profile_id = f"legacy:{agent_id}"
+        mgr = get_database(str(load_settings().db_path)).runner_profiles
 
         # Check if profile already exists
-        existing = store.get_runner_profile(profile_id)
+        existing = mgr.get_by_id(profile_id)
         if existing is not None:
             # Update binding if needed
-            store.set_agent_runner_profile(agent_id, profile_id)
+            now = now_iso()
+            mgr.set_agent_profile(agent_id, profile_id, created_at=now, updated_at=now)
             logger.debug(
                 "versioning: reused runner profile %r for agent %r",
                 profile_id,
@@ -209,8 +212,26 @@ def _ingest_runner_profile(
             extra_args=runner_spec.extra_args or [],
         )
 
-        store.create_runner_profile(profile_create)
-        store.set_agent_runner_profile(agent_id, profile_id)
+        now = now_iso()
+        mgr.create_one(
+            id=profile_id,
+            name=profile_create.name,
+            description=profile_create.description,
+            backend=profile_create.backend,
+            provider=profile_create.provider,
+            model=profile_create.model,
+            base_url=profile_create.base_url,
+            api_key_env=profile_create.api_key_env,
+            output_mode=profile_create.output_mode,
+            params_json=json.dumps(profile_create.params),
+            headers_json=json.dumps(profile_create.headers),
+            extra_args_json=json.dumps(profile_create.extra_args),
+            is_enabled=int(profile_create.is_enabled),
+            is_system_default=int(profile_create.is_system_default),
+            created_at=now,
+            updated_at=now,
+        )
+        mgr.set_agent_profile(agent_id, profile_id, created_at=now, updated_at=now)
         logger.info(
             "versioning: created runner profile %r for agent %r",
             profile_id,
@@ -299,8 +320,7 @@ def startup_sweep(
                 )
                 logger.info("versioning: created v1 for new agent %r", agent.id)
                 # Import runner profile if agent has [runner] block
-                if hasattr(store, "create_runner_profile"):
-                    _ingest_runner_profile(agent, agent.id, store)  # type: ignore
+                _ingest_runner_profile(agent, agent.id)
             elif status == AgentDriftStatus.DRIFTED:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
                 store.create_version(
@@ -330,17 +350,17 @@ def startup_sweep(
     # Degraded-mode boot — warn (don't fail) for agents with no
     # runner profile binding. They remain non-runnable until bound; the
     # executor enforces this at dispatch time via `_fail_pre_run`.
-    if hasattr(store, "get_agent_runner_profile"):
-        for agent in agents:
-            try:
-                binding = store.get_agent_runner_profile(agent.id)  # type: ignore[attr-defined]
-                if binding is None:
-                    logger.warning(
-                        "versioning: agent %r has no runner profile bound — "
-                        "runs will fail until one is assigned via "
-                        "/api/agents/%s/runner-profile",
-                        agent.id,
-                        agent.id,
-                    )
-            except Exception:
-                pass
+    mgr = get_database(str(load_settings().db_path)).runner_profiles
+    for agent in agents:
+        try:
+            binding = mgr.get_agent_profile(agent.id)
+            if binding is None:
+                logger.warning(
+                    "versioning: agent %r has no runner profile bound — "
+                    "runs will fail until one is assigned via "
+                    "/api/agents/%s/runner-profile",
+                    agent.id,
+                    agent.id,
+                )
+        except Exception:
+            pass

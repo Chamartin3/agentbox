@@ -30,6 +30,30 @@ class PromptVersionRow(TypedDict):
     created_at: str
 
 
+class AgentVersionRow(TypedDict):
+    """A row from ``agent_versions`` as returned by the agent-version reads.
+
+    ``is_legacy`` is shaped to ``bool`` (the table stores 0/1).
+    """
+
+    id: int
+    agent_id: str
+    version: int
+    source_path: str
+    source_format: str
+    content_snapshot: str
+    prompt_snapshot: str
+    content_hash: str
+    author: str
+    changelog: str
+    is_legacy: bool
+    created_at: str
+    config_json: str | None
+    prompt_content: str | None
+    source: str
+    resolved_tool_grants: list[str] | None
+
+
 class RepoResourceRow(TypedDict):
     id: str
     slug: str

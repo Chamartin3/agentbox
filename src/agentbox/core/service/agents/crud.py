@@ -15,6 +15,7 @@ from agentbox.core.agents.composition.bundle import compose_from_source
 from agentbox.core.agents.composition.bundle.loader import load_bundle_from_bindings
 from agentbox.core.db import AgentDef, agent_runner_profiles
 from agentbox.core.db import runs as runs_table
+from agentbox.core.service.engines.service import EngineService
 
 if TYPE_CHECKING:
     from agentbox.core.config import Settings
@@ -114,7 +115,12 @@ def _enrich_agent(
     latest = store.latest_version(agent.id)
     dumped = _strip_legacy_runner_model(agent.model_dump())
     profile_id = profile_bindings.get(agent.id)
-    profile = store.get_runner_profile(profile_id) if profile_id else None
+    profile = None
+    if profile_id:
+        try:
+            profile = EngineService().get_profile(profile_id)
+        except Exception:
+            profile = None
     data = {
         **dumped,
         "resolved_workspace": workspace_str,
@@ -217,7 +223,7 @@ def get_agent_detail(
         )
 
     agent_dump = _strip_legacy_runner_model(agent.model_dump())
-    bound_profile = store.get_agent_runner_profile(agent_id)
+    bound_profile = EngineService().get_agent_runner_profile(agent_id)
     return {
         "agent": agent_dump,
         "prompt": prompt,

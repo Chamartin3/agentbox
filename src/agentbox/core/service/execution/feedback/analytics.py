@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from agentbox.core.service.evaluation.service import EvaluationService
 from agentbox.core.db import SessionStore
 from agentbox.core.db.feedback.snapshots import snapshot_fields
 from agentbox.core.db.feedback.types import ActivityRange, since_iso
@@ -30,7 +31,7 @@ def enrich_recent_runs(
     state: str | None = None,
     limit: int = 50,
 ) -> dict[str, Any]:
-    rows = store.list_runs_rich(
+    rows = EvaluationService().list_runs_rich(
         since_iso=since_iso(range_),
         agent=agent,
         status=state,
@@ -84,19 +85,19 @@ def summary(
     range_: ActivityRange = "30d",
     agent: str | None = None,
 ) -> dict[str, Any]:
-    return store.activity_summary(since_iso(range_), agent=agent)
+    return EvaluationService().activity_summary(since_iso(range_), agent=agent)
 
 
 def aggregate_usage(*, store: SessionStore) -> dict:
     """Total tokens + cost across all runs."""
-    return store.aggregate_usage()
+    return EvaluationService().aggregate_usage()
 
 
 def activity_summary(*, store: SessionStore, since: str, agent_id: str | None = None) -> dict:
     """Roll up runs since ``since`` (ISO-8601) into totals + breakdowns."""
-    return store.activity_summary(since, agent=agent_id)
+    return EvaluationService().activity_summary(since, agent=agent_id)
 
 
 def distinct_executors(*, store: SessionStore) -> list[str]:
     """Distinct executor/model names across all recorded runs."""
-    return store.distinct_executors()
+    return EvaluationService().distinct_executors()

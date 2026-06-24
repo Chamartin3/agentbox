@@ -8,13 +8,8 @@ import typer
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
-from agentbox.core.service import (
-    get_settings_section,
-    list_settings_sections,
-    update_settings_section,
-)
+from agentbox.core.service.system.service import SystemService
 
 settings_app = typer.Typer(
     name="settings",
@@ -26,8 +21,7 @@ settings_app = typer.Typer(
 @settings_app.command("ls")
 def settings_ls() -> None:
     """List all settings sections."""
-    store = get_store()
-    sections = list_settings_sections(store)
+    sections = SystemService().list_settings_sections()
     if not sections:
         console.print("[dim]no settings sections[/dim]")
         return
@@ -40,8 +34,7 @@ def settings_show(
     section: str = typer.Argument(..., help="Settings section name"),
 ) -> None:
     """Show settings for a section."""
-    store = get_store()
-    data = get_settings_section(store, section)
+    data = SystemService().get_settings_section(section)
     console.print(
         Panel(
             Syntax(json.dumps(data, indent=2, default=str), "json", theme="ansi_dark"),
@@ -69,6 +62,5 @@ def settings_patch(
         console.print(f"[red]invalid JSON: {exc}[/red]")
         raise typer.Exit(2)
 
-    store = get_store()
-    update_settings_section(store, section, patch)
+    SystemService().update_settings_section(section, patch)
     console.print(f"[green]patched[/green] section {section!r}")

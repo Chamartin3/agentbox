@@ -88,7 +88,8 @@ def doctor() -> None:
 
     # 3. DB reachable
     try:
-        store.list_runs(limit=1)
+        from agentbox.core.service.execution.service import ExecutionService
+        ExecutionService().list_runs(limit=1)
         _ok("Database", str(settings.db_path))
     except Exception as exc:
         _fail("Database", str(exc))

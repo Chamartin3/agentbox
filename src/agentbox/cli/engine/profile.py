@@ -8,17 +8,11 @@ import typer
 from rich.json import JSON
 from rich.table import Table
 
-from agentbox.cli.shared import console, get_store
+from agentbox.cli.shared import console
 from agentbox.core.service import (
-    list_runner_profiles,
-    get_runner_profile,
-    create_runner_profile,
-    bind_runner_profile,
-    runner_profile_stats,
-    list_runner_profile_stats,
-    delete_runner_profile,
     RunnerProfileCreate,
 )
+from agentbox.core.service.engines.service import EngineService, ProfileNotFound
 
 app = typer.Typer(
     name="profiles",
@@ -41,10 +35,8 @@ def profile_ls(
     ),
 ) -> None:
     """List runner profiles with optional filters."""
-    store = get_store()
-    profiles = list_runner_profiles(
-        store, backend=backend, provider=provider, enabled=enabled
-    )
+    svc = EngineService()
+    profiles = svc.list_profiles(backend=backend, provider=provider, enabled=enabled)
 
     if json_output:
         console.print(
@@ -90,10 +82,10 @@ def profile_ls(
 @app.command("show")
 def profile_get(profile_id: str) -> None:
     """Show runner profile details as JSON."""
-    store = get_store()
-    profile = get_runner_profile(store, profile_id)
-
-    if not profile:
+    svc = EngineService()
+    try:
+        profile = svc.get_profile(profile_id)
+    except ProfileNotFound:
         console.print(f"[red]Profile not found:[/red] {profile_id}")
         raise typer.Exit(1)
 
@@ -117,9 +109,8 @@ def profile_create(
     system_default: bool = typer.Option(False, help="Set as system default profile"),
 ) -> None:
     """Create a new runner profile."""
-    store = get_store()
-    profile = create_runner_profile(
-        store,
+    svc = EngineService()
+    profile = svc.create_profile(
         RunnerProfileCreate(
             id=id,
             name=name,
@@ -147,9 +138,9 @@ def profile_bind(
     ),
 ) -> None:
     """Bind a runner profile to an agent, or clear it with --clear."""
-    store = get_store()
+    svc = EngineService()
     if clear:
-        get_store().clear_agent_runner_profile(agent_id)
+        svc.clear_agent_runner_profile(agent_id)
         console.print(
             f"[green]Cleared profile binding for agent[/green] [bold]{agent_id}[/bold]"
         )
@@ -157,10 +148,11 @@ def profile_bind(
     if not profile_id:
         console.print("[red]Either provide a profile_id or use --clear[/red]")
         raise typer.Exit(2)
-    if not get_runner_profile(store, profile_id):
-        console.print(f"[red]Profile not found:[/red] {profile_id}")
+    try:
+        svc.set_agent_runner_profile(agent_id, profile_id)
+    except ProfileNotFound as exc:
+        console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1)
-    bind_runner_profile(store, agent_id, profile_id)
     console.print(
         f"[green]Bound agent[/green] [bold]{agent_id}[/bold] "
         f"[green]to profile[/green] [bold]{profile_id}[/bold]"
@@ -174,10 +166,10 @@ def profile_stats(
     ),
 ) -> None:
     """Show per-profile statistics."""
-    store = get_store()
+    svc = EngineService()
 
     if profile_id:
-        stats = runner_profile_stats(store, profile_id)
+        stats = svc.get_profile_stats(profile_id)
         table = Table(
             title=f"Stats for profile {profile_id}",
             title_style="bold",
@@ -202,7 +194,7 @@ def profile_stats(
         console.print(table)
         return
 
-    all_stats = list_runner_profile_stats(store)
+    all_stats = svc.list_profile_stats()
     if not all_stats:
         console.print("[yellow]No profile statistics found.[/yellow]")
         return
@@ -239,8 +231,10 @@ def profile_delete(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Delete a runner profile."""
-    store = get_store()
-    if not get_runner_profile(store, profile_id):
+    svc = EngineService()
+    try:
+        svc.get_profile(profile_id)  # check existence
+    except ProfileNotFound:
         console.print(f"[red]Profile not found:[/red] {profile_id}")
         raise typer.Exit(1)
     if not yes:
@@ -251,5 +245,5 @@ def profile_delete(
         if not typer.confirm("Continue?", default=False):
             console.print("[dim]Aborted.[/dim]")
             raise typer.Exit(0)
-    delete_runner_profile(store, profile_id)
+    svc.delete_profile(profile_id)
     console.print(f"[green]Deleted runner profile[/green] [bold]{profile_id}[/bold]")

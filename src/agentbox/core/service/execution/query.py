@@ -5,10 +5,16 @@ from __future__ import annotations
 import json as _json
 from typing import TYPE_CHECKING
 
+from agentbox.core.service.evaluation.service import EvaluationService
+from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
 
 if TYPE_CHECKING:
     from agentbox.core.db import SessionStore
+
+
+def _svc() -> ExecutionService:
+    return ExecutionService()
 
 
 def _enrich_with_version(store: SessionStore, d: dict) -> dict:
@@ -37,18 +43,19 @@ def list_runs(
     with_usage: bool = False,
 ) -> list[dict] | dict:
     """Backward-compatible run listing."""
+    svc = _svc()
     if not paginated and not any(
         [status, executor, q, since, until, offset, agent_version]
     ):
         result: list[dict] = [
-            _enrich_with_version(store, r.__dict__)
-            for r in store.list_runs(limit=limit, agent_id=agent)
+            _enrich_with_version(store, r)
+            for r in svc.list_runs(limit=limit, agent_id=agent)
         ]
         if with_usage:
             for d in result:
-                d["usage"] = store.get_usage(d["id"])
+                d["usage"] = svc.get_usage(d["id"])
         return result
-    items, total = store.list_runs_paged(
+    items, total = EvaluationService().list_runs_paged(
         agent_id=agent,
         status=status,
         executor=executor,
@@ -62,7 +69,7 @@ def list_runs(
     enriched = [_enrich_with_version(store, r) for r in items]
     if with_usage:
         for d in enriched:
-            d["usage"] = store.get_usage(d["id"])
+            d["usage"] = svc.get_usage(d["id"])
     return {
         "items": enriched,
         "total": total,
@@ -83,7 +90,7 @@ def run_stats(
     since: str | None = None,
     until: str | None = None,
 ) -> dict:
-    return store.stats_for_filters(
+    return EvaluationService().stats_for_filters(
         agent_id=agent,
         status=status,
         executor=executor,
@@ -96,18 +103,19 @@ def run_stats(
 
 def run_facets(*, store: SessionStore) -> dict:
     return {
-        "agents": store.distinct_agent_ids(),
-        "executors": store.distinct_executors(),
+        "agents": EvaluationService().distinct_agent_ids(),
+        "executors": EvaluationService().distinct_executors(),
         "statuses": ["ok", "error", "failed", "timeout", "incomplete", "running"],
     }
 
 
 def get_run_detail(run_id: str, *, store: SessionStore) -> dict:
-    rec = store.get_run(run_id)
+    svc = _svc()
+    rec = svc.get_run(run_id)
     if rec is None:
         raise RunNotFound(run_id)
-    usage = store.get_usage(run_id)
-    run_dict = dict(rec.__dict__)
+    usage = svc.get_usage(run_id)
+    run_dict = rec.model_dump() if hasattr(rec, "model_dump") else dict(rec.__dict__)
     if rec.agent_version_id is not None:
         ver = store.get_version_by_id(rec.agent_version_id)
         if ver is not None:
@@ -133,10 +141,11 @@ def get_run_detail(run_id: str, *, store: SessionStore) -> dict:
 
 
 def get_run_prompt(run_id: str, *, store: SessionStore) -> dict:
-    rec = store.get_run(run_id)
+    svc = _svc()
+    rec = svc.get_run(run_id)
     if rec is None:
         raise RunNotFound(run_id)
-    raw = store.get_run_prompt(run_id)
+    raw = svc.get_run_prompt(run_id)
     fragments = _json.loads(raw) if raw else []
     total = sum(int(f.get("size_bytes") or 0) for f in fragments)
     return {"run_id": run_id, "fragments": fragments, "total_bytes": total}

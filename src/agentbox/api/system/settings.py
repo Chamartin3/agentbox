@@ -1,7 +1,7 @@
 """/api/settings — DB-backed typed-section settings store.
 
 GET /api/settings                — list section names.
-GET /api/settings/{section}      — read one section (returns `{key: value}`).
+GET /api/settings/{section}      — read one section (returns ``{key: value}``).
 PATCH /api/settings/{section}    — partial patch; only listed keys change.
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_store
+from agentbox.core.service.system.service import SystemService
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -28,7 +28,7 @@ KNOWN_SECTIONS = (
 
 
 # Default seed values surfaced when a section has nothing in the DB yet.
-# Backends read these via `agentbox.core.engines.defaults.runtime_default_model`
+# Backends read these via ``agentbox.core.engines.defaults.runtime_default_model``
 # at runtime — editing them in the UI takes effect on the next run.
 SECTION_DEFAULTS: dict[str, dict] = {
     "runtime_defaults": {
@@ -46,12 +46,15 @@ class PatchBody(BaseModel):
     values: dict
 
 
+def _svc() -> SystemService:
+    return SystemService()
+
+
 @router.get("")
 def list_sections() -> dict:
-    store = get_store()
     return {
         "known": list(KNOWN_SECTIONS),
-        "present": store.list_settings_sections(),
+        "present": _svc().list_settings_sections(),
     }
 
 
@@ -60,8 +63,7 @@ def get_section(section: str) -> dict:
     """Return the section. Missing keys are filled from `SECTION_DEFAULTS`
     so the UI shows the active fallback values, not an empty object.
     """
-    store = get_store()
-    stored = store.get_settings_section(section)
+    stored = _svc().get_settings_section(section)
     seeded = dict(SECTION_DEFAULTS.get(section, {}))
     seeded.update(stored)
     return {
@@ -74,6 +76,5 @@ def get_section(section: str) -> dict:
 
 @router.patch("/{section}")
 def patch_section(section: str, body: PatchBody) -> dict:
-    store = get_store()
-    updated = store.update_settings_section(section, body.values)
+    updated = _svc().update_settings_section(section, body.values)
     return {"section": section, "values": updated}

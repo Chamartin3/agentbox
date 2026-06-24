@@ -25,7 +25,7 @@ def _seed(store: SessionStore, agent: str, status: str, model: str = "haiku") ->
 
 
 def test_activity_summary_basic(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "fill_job_post", "ok", "haiku")
     _seed(store, "fill_job_post", "error", "haiku")
     _seed(store, "extract_keywords", "ok", "sonnet")
@@ -50,7 +50,7 @@ def test_activity_summary_basic(tmp_path: Path) -> None:
 
 
 def test_activity_summary_agent_filter(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "fill_job_post", "ok")
     _seed(store, "extract_keywords", "ok")
     since = (datetime.now(UTC) - timedelta(days=1)).isoformat(timespec="seconds")
@@ -59,7 +59,7 @@ def test_activity_summary_agent_filter(tmp_path: Path) -> None:
 
 
 def test_list_runs_rich(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     rid = _seed(store, "fill_job_post", "ok", "haiku")
     since = (datetime.now(UTC) - timedelta(days=1)).isoformat(timespec="seconds")
     rows = store.list_runs_rich(since)

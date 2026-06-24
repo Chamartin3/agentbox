@@ -13,7 +13,7 @@ from agentbox.core.resources.boot import import_composition_references
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 def _seed_shared_file(root: Path, rel: str, body: str) -> Path:

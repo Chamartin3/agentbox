@@ -8,7 +8,8 @@ from agentbox.core.agents.resolve import (
     engine_load_failure as backend_load_failure,
     list_engines as backends,
 )
-from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
+# NoBackendAvailable imported lazily to avoid circular import.
+# executor → service.execution → types → setup (which re-exports from init_run → ExecutionService)
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class AgentDisabled(RuntimeError):
         )
 
 
-def no_backend_detail(exc: NoBackendAvailable) -> str:
+def no_backend_detail(exc: "NoBackendAvailable") -> str:
     """Compose an honest 'why is no backend available' message."""
     loaded = set(backends().keys())
     parts: list[str] = []

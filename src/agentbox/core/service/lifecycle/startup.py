@@ -15,9 +15,11 @@ from typing import Final
 from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.agents.composition.drift import startup_sweep
 from agentbox.core.db import ProjectManifest, SessionStore
+from agentbox.core.service.system.service import SystemService
 from agentbox.core.db.engines.seeds import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.service.agents import resolve_agent
+from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.tools import discover_tools
 from agentbox.core.workspaces.mcp.client import McpRegistry
 from agentbox.core.service.lifecycle._phases import (
@@ -59,7 +61,7 @@ def sync_project_mcp_servers(
 ) -> StartupReport:
     """Schedule async sync of any project-level MCP server specs."""
     try:
-        specs_models = store.get_project_mcp_servers()
+        specs_models = SystemService().get_project_mcp_servers()
     except Exception as exc:
         _log.exception("project mcp server lookup failed")
         return _error("sync_mcp_servers", exc)
@@ -94,7 +96,7 @@ def import_on_start_sweep(
         project_root = settings.project_root
         shared_roots = {
             k: (project_root / v).resolve()
-            for k, v in store.get_project_shared_assets().items()
+            for k, v in SystemService().get_project_shared_assets().items()
         }
         startup_sweep(
             manifest.agents,
@@ -169,7 +171,7 @@ def sync_workspace_registry(
 def reap_orphan_runs(store: SessionStore) -> StartupReport:
     """Mark any pre-existing 'running' rows as orphaned."""
     try:
-        reaped = store.reap_orphan_runs()
+        reaped = ExecutionService().reap_orphan_runs()
     except Exception as exc:
         _log.exception("orphan run sweep failed")
         return _error("reap_orphan_runs", exc)
@@ -188,7 +190,11 @@ def dispatch_orphan_webhooks(
     scheduled then. This phase runs once the loop is up.
     """
     try:
-        pending = store.list_orphaned_unnotified_runs()
+        svc = ExecutionService()
+        pending_raw = svc.list_orphaned_unnotified_runs()
+        # Convert dicts back to RunRecord-like objects for downstream use
+        from agentbox.core.db import RunRecord
+        pending = [RunRecord(**r) for r in pending_raw] if pending_raw else []
     except Exception as exc:
         _log.exception("orphan dispatch lookup failed")
         return _error("dispatch_orphan_webhooks", exc)
@@ -202,7 +208,7 @@ def dispatch_orphan_webhooks(
             dispatch_completion(
                 run=run,
                 agent=agent,
-                store=store,
+                svc=ExecutionService(),
                 settings=settings,
             )
             scheduled += 1

@@ -11,6 +11,7 @@ from agentbox.core.service import (
     build_workspace_by_name,
     resolve_workspace_resources,
 )
+from agentbox.core.service.system.service import SystemService
 from agentbox.core.service.env_doc import (
     env_doc_body,
     render_env_doc_preview,
@@ -134,7 +135,6 @@ def register_workspace(mcp: FastMCP) -> None:
         """List host-env capability calls recorded for a run.
 
         Returns audit log entries: capability, status, params, error, ts."""
-        ctx = get_context()
-        rows = ctx.store.list_host_env_calls_for_run(run_id)
+        rows = SystemService().list_host_env_calls_for_run(run_id)
         limit = clamp_limit(limit)
         return {"run_id": run_id, "calls": rows[:limit], "total": len(rows)}

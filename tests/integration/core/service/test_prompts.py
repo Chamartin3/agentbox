@@ -45,7 +45,7 @@ def _seed_agent_with_prompt(
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 def test_get_prompt_raises_when_unknown(store: SessionStore, tmp_path: Path) -> None:

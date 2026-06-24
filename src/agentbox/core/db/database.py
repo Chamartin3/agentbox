@@ -12,6 +12,7 @@ Usage::
 """
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from agentbox.core.db.base.engine import init_engine
@@ -148,3 +149,14 @@ class Database:
         self.host_env_profiles = HostEnvProfileManager(self._engine)
         self.host_env_call_log = HostEnvCallLogManager(self._engine)
         self.mcp_tool_discovery_cache = McpToolDiscoveryCacheManager(self._engine)
+
+
+@lru_cache(maxsize=None)
+def get_database(db_path: str) -> Database:
+    """Process-wide ``Database`` per *db_path*.
+
+    Alembic migrations run once per unique path; subsequent calls return
+    the same instance.  ``Service`` uses this, as do data-layer callers
+    that need manager access without crossing into ``core.service``.
+    """
+    return Database(Path(db_path))

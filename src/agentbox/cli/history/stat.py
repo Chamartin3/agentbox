@@ -9,8 +9,9 @@ import typer
 from rich.json import JSON
 from rich.table import Table
 
+from agentbox.core.service.evaluation.service import EvaluationService
 from agentbox.cli.shared import console, get_store
-from agentbox.core.service.execution import runs
+import agentbox.core.service.execution as runs
 from agentbox.core.service.execution.feedback import (
     ActivityRange,
     enrich_recent_runs,
@@ -27,7 +28,7 @@ stat_app = typer.Typer(
 @stat_app.command("usage")
 def stat_usage() -> None:
     """Print the aggregate usage rollup as JSON."""
-    data = get_store().aggregate_usage()
+    data = EvaluationService().aggregate_usage()
     console.print(JSON(json.dumps(data, indent=2, default=str)))
 
 

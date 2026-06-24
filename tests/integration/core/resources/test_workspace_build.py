@@ -13,7 +13,7 @@ from agentbox.core.workspaces.build import build_workspace, build_workspace_by_n
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture

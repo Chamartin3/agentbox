@@ -14,6 +14,8 @@ from pathlib import Path
 from fastmcp import FastMCP
 
 from agentbox.core.service import composition_preview as preview_composition
+from agentbox.core.service.execution.service import ExecutionService
+from agentbox.core.service.system.service import SystemService
 from agentbox.mcp.deps import get_agent_service, get_context
 from agentbox.mcp.schemas import clamp_limit
 
@@ -230,7 +232,7 @@ def register(mcp: FastMCP) -> None:
             }
         shared_roots: dict[str, Path] = {
             key: ctx.settings.project_root / rel
-            for key, rel in (ctx.store.get_project_shared_assets() or {}).items()
+            for key, rel in (SystemService().get_project_shared_assets() or {}).items()
         }
         try:
             prev = preview_composition(bundle_path, shared_roots)
@@ -266,7 +268,7 @@ def register(mcp: FastMCP) -> None:
         rec = ctx.db.runs.get(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
-        raw = ctx.store.get_run_prompt(run_id)
+        raw = ExecutionService().get_run_prompt(run_id)
         if raw is None:
             return {
                 "run_id": run_id,

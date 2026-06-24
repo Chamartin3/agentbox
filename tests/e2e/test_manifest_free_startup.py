@@ -63,7 +63,7 @@ def test_check_runtime_sources_allows_empty_db(
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
 
     settings = load_settings()
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
 
     # Should always return True
     assert settings.check_runtime_sources(store) is True
@@ -93,7 +93,7 @@ def test_check_runtime_sources_detects_db_agents(
     monkeypatch.setenv("AGENTBOX_MANIFEST", nonexistent)
 
     settings = load_settings()
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
 
     # Create a DB agent
     store.create_agent(

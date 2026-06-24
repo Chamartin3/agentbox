@@ -17,17 +17,15 @@ from agentbox.core.service import (
     AgentDef,
     build_agent_snapshot,
     build_config_json_payload,
-    clear_agent_runner_profile,
     create_agent,
     create_agent_version,
     get_agent_def,
-    get_agent_runner_profile,
-    get_runner_profile,
     latest_agent_version,
-    set_agent_runner_profile,
     soft_delete_agent,
 )
 from agentbox.core.service.agents import list_all_agents
+from agentbox.core.service.engines.service import EngineService, ProfileNotFound
+from agentbox.core.service.system.service import SystemService
 
 
 def _set_dotted(obj: dict[str, Any], dotted: str, value: object) -> None:
@@ -100,7 +98,7 @@ def def_ls(
             if a.workspace == "<ephemeral>"
             else (a.workspace or "[dim]auto[/dim]")
         )
-        profile = get_agent_runner_profile(store, a.id)
+        profile = EngineService().get_agent_runner_profile(a.id)
         model_display = (profile.model if profile else None) or "[dim]default[/dim]"
         table.add_row(
             a.id, a.runner.kind, model_display,
@@ -141,7 +139,7 @@ def def_show(agent_id: str) -> None:
     runner.add_row("mcp_config_path", a.runner.mcp_config_path or "\u2014")
     console.print(Panel(runner, title="Runner", border_style="green"))
 
-    profile = get_agent_runner_profile(get_store(), a.id)
+    profile = EngineService().get_agent_runner_profile(a.id)
     rp = Table.grid(padding=(0, 2))
     rp.add_column(style="dim", justify="right")
     rp.add_column()
@@ -164,7 +162,7 @@ def def_show(agent_id: str) -> None:
     ws.add_row("claude_agent", str(a.claude_agent))
     console.print(Panel(ws, title="Workspace", border_style="blue"))
 
-    servers = get_store().get_project_mcp_servers()
+    servers = SystemService().get_project_mcp_servers()
     if servers:
         mcp_list = Table.grid(padding=(0, 2))
         mcp_list.add_column(style="dim")
@@ -268,15 +266,17 @@ def def_edit(
     # -- runner profile binding
     if runner is not None:
         resolve_agent(agent_id)
+        engine_svc = EngineService()
         if runner == "clear":
-            clear_agent_runner_profile(store, agent_id)
+            engine_svc.clear_agent_runner_profile(agent_id)
             console.print(f"[yellow]cleared[/yellow] profile binding for {agent_id!r}")
         else:
-            profile = get_runner_profile(store, runner)
-            if profile is None:
+            try:
+                engine_svc.get_profile(runner)
+            except ProfileNotFound:
                 console.print(f"[red]runner profile {runner!r} not found[/red]")
                 raise typer.Exit(1)
-            set_agent_runner_profile(store, agent_id, runner)
+            engine_svc.set_agent_runner_profile(agent_id, runner)
             console.print(f"[green]bound[/green] profile {runner!r} to {agent_id!r}")
 
     # -- dotted field edits

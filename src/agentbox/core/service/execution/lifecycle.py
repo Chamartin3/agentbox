@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.service.agents import resolve_agent
+from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
 
 from agentbox.core.constants import RunStatus
@@ -15,6 +16,10 @@ if TYPE_CHECKING:
     from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)
+
+
+def _svc() -> ExecutionService:
+    return ExecutionService()
 
 
 def complete_run(
@@ -28,18 +33,19 @@ def complete_run(
     schedule_webhook_cb: Any = None,
 ) -> dict:
     """Finalize a run from an external worker."""
-    existing = store.get_run(run_id)
+    svc = _svc()
+    existing = svc.get_run(run_id)
     if existing is None:
         raise RunNotFound(run_id)
     if existing.status not in {"ok", "error"}:
-        store.finish_run(run_id, ok=ok, output=output, error=error)
+        svc.finish_run(run_id, ok=ok, output=output, error=error)
     if usage:
         try:
-            store.record_usage(run_id, usage)
+            svc.record_usage(run_id, usage)
         except Exception as exc:
             logger.warning("record_usage failed for %s: %s", run_id, exc)
 
-    refreshed = store.get_run(run_id) or existing
+    refreshed = svc.get_run(run_id) or existing
     if schedule_webhook_cb is not None:
         agent = resolve_agent(refreshed.agent_id, store=store)
         schedule_webhook_cb(agent, refreshed, store)
@@ -59,13 +65,14 @@ def snapshot_run(
     schedule_webhook_cb: Any = None,
 ) -> dict:
     """Store a snapshot for an embedded run; idempotent on terminal runs."""
-    existing = store.get_run(run_id)
+    svc = _svc()
+    existing = svc.get_run(run_id)
     if existing is None:
         raise RunNotFound(run_id)
     if existing.rendered_prompt is not None:
         logger.warning("snapshot_run: overwriting existing snapshot for %s", run_id)
 
-    store.save_run_snapshot(
+    svc.save_run_snapshot(
         run_id=run_id,
         rendered_prompt=rendered_prompt,
         variables=variables,
@@ -75,14 +82,14 @@ def snapshot_run(
     )
 
     if existing.status not in {"ok", "error"}:
-        store.finish_run(
+        svc.finish_run(
             run_id,
             ok=validation_status != "fail",
             output=response_raw,
             error=None if validation_status != "fail" else "validation failed",
         )
 
-    refreshed = store.get_run(run_id) or existing
+    refreshed = svc.get_run(run_id) or existing
     if schedule_webhook_cb is not None:
         agent = resolve_agent(refreshed.agent_id, store=store)
         if agent is not None:
@@ -98,13 +105,14 @@ def post_outcome(
     error_kind: str | None = None,
     errors: list[dict] | None = None,
 ) -> dict:
-    existing = store.get_run(run_id)
+    svc = _svc()
+    existing = svc.get_run(run_id)
     if existing is None:
         raise RunNotFound(run_id)
-    store.set_run_post_outcome(
+    svc.set_run_post_outcome(
         run_id, ok=(status == "ok"), error_kind=error_kind, errors=errors
     )
-    refreshed = store.get_run(run_id) or existing
+    refreshed = svc.get_run(run_id) or existing
     return {"ok": True, "run_id": run_id, "post_status": refreshed.post_status}
 
 
@@ -115,11 +123,12 @@ async def cancel_run(
     executor: RunExecutor,
 ) -> dict:
     """Cancel an in-progress run. Idempotent on terminal runs."""
-    existing = store.get_run(run_id)
+    svc = _svc()
+    existing = svc.get_run(run_id)
     if existing is None:
         raise RunNotFound(run_id)
     if not RunStatus(existing.status).is_running:
         return {"run_id": run_id, "cancelled": False, "status": existing.status}
     cancelled = await executor.cancel_run(run_id)
-    refreshed = store.get_run(run_id) or existing
+    refreshed = svc.get_run(run_id) or existing
     return {"run_id": run_id, "cancelled": cancelled, "status": refreshed.status}

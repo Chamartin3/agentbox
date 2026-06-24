@@ -12,8 +12,8 @@ from rich.text import Text
 
 from agentbox.cli.shared import console, get_executor, get_store
 from agentbox.core.service import aggregate_usage
-from agentbox.core.service.execution import runs
-from agentbox.core.service.execution.runs import RunNotFound
+import agentbox.core.service.execution as runs
+from agentbox.core.service.execution import RunNotFound
 
 # ---------------------------------------------------------------------------
 # ls

@@ -76,13 +76,13 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @pytest.fixture
 def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk SessionStore (sqlite) under ``tmp_path``."""
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
 def db(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk Database (sqlite) under ``tmp_path``."""
-    return Database(tmp_path / "db.sqlite")
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
@@ -119,3 +119,17 @@ def _scrub_agentbox_env(monkeypatch: pytest.MonkeyPatch) -> None:
         if key.startswith("AGENTBOX_") and key != "AGENTBOX_DEBUG":
             monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("AGENTBOX_IMPORT_ON_START", "1")
+
+
+@pytest.fixture(autouse=True)
+def _default_agentbox_data_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _scrub_agentbox_env: None
+) -> None:
+    """Point ``AGENTBOX_DATA_DIR`` at the per-test tmp dir (after the scrub).
+
+    Self-wiring services (``ExecutionService()``/``EvaluationService()``/…) resolve
+    their Database from ``load_settings().db_path`` = ``<tmp>/agentbox.sqlite``,
+    which is the same db the ``store``/``session_store``/``db`` fixtures build.
+    Tests that set their own ``AGENTBOX_DATA_DIR`` override this.
+    """
+    monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))

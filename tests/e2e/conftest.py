@@ -72,13 +72,13 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @pytest.fixture
 def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk SessionStore (sqlite) under ``tmp_path``."""
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
 def db(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh on-disk Database (sqlite) under ``tmp_path``."""
-    return Database(tmp_path / "db.sqlite")
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture

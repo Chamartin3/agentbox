@@ -3,6 +3,8 @@
 import json as _json
 from typing import Any
 
+from agentbox.core.db.database import get_database
+from agentbox.core.db.engines.profiles import RunnerProfile
 from agentbox.core.db.store import SessionStore
 
 
@@ -17,7 +19,11 @@ def _load_profile(store: SessionStore, cache: dict[str, Any], profile_id: str | 
     if profile_id in cache:
         return cache[profile_id]
     try:
-        profile = store.get_runner_profile(profile_id)
+        row = get_database(str(store.db_path)).runner_profiles.get_by_id(profile_id)
+        if row is None:
+            profile = None
+        else:
+            profile = RunnerProfile(**row)
     except Exception:
         profile = None
     cache[profile_id] = profile

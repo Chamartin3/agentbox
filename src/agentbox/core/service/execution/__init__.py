@@ -4,6 +4,8 @@ Public callers (api/, cli/, mcp/) MUST import from this facade. The
 submodules are private organisation.
 """
 
+import agentbox.core.service.execution.service  # noqa: F401 — register service submodule before dependent modules
+
 from agentbox.core.service.execution.create import create_run, rerun
 from agentbox.core.service.execution.feedback import (
     activity_summary,

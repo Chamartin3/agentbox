@@ -1,17 +1,16 @@
-"""Service layer for runner-profile CRUD.
+"""Transitional runner-profile free-functions — delegate to EngineService.
 
-Per-field validation lives in
-:mod:`agentbox.core.service.engines.profile_validation` — call it from
-there directly. This module raises :class:`ProfileNotFound` for lookup
-misses; validation rejections raise
-:class:`~.profile_validation.InvalidProfile`.
+The runner-profile logic now lives on ``EngineService`` (plan 091) over the
+``RunnerProfileManager``. These free-functions are thin shims kept until the
+remaining api/cli/test callers migrate to ``EngineService`` directly; the
+``store`` parameter is ignored (EngineService self-wires to the same settings db).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from agentbox.core.service.engines import profile_validation
+from agentbox.core.service.engines.service import EngineService, ProfileNotFound as _EngProfileNotFound
 
 if TYPE_CHECKING:
     from agentbox.core.db import (
@@ -22,16 +21,9 @@ if TYPE_CHECKING:
         SessionStore,
     )
 
-
-class ProfileNotFound(LookupError):
-    def __init__(self, profile_id: str) -> None:
-        super().__init__(f"runner profile not found: {profile_id!r}")
-        self.profile_id = profile_id
-
-
-# ---------------------------------------------------------------------------
-# CRUD
-# ---------------------------------------------------------------------------
+# Preserve the historical import location for callers doing
+# ``from ...engines.profiles import ProfileNotFound``.
+ProfileNotFound = _EngProfileNotFound
 
 
 def list_profiles(
@@ -41,37 +33,25 @@ def list_profiles(
     provider: str | None = None,
     enabled: bool | None = None,
 ) -> list[RunnerProfile]:
-    return store.list_runner_profiles(backend=backend, provider=provider, enabled=enabled)
+    return EngineService().list_profiles(backend=backend, provider=provider, enabled=enabled)
 
 
-def create_profile(
-    data: RunnerProfileCreate, *, store: SessionStore
-) -> RunnerProfile:
-    profile_validation.validate_create(data)
-    return store.create_runner_profile(data)
+def create_profile(data: RunnerProfileCreate, *, store: SessionStore) -> RunnerProfile:
+    return EngineService().create_profile(data)
 
 
 def get_profile(profile_id: str, *, store: SessionStore) -> RunnerProfile:
-    profile = store.get_runner_profile(profile_id)
-    if profile is None:
-        raise ProfileNotFound(profile_id)
-    return profile
+    return EngineService().get_profile(profile_id)
 
 
 def update_profile(
     profile_id: str, patch: RunnerProfilePatch, *, store: SessionStore
 ) -> RunnerProfile:
-    current = store.get_runner_profile(profile_id)
-    if current is None:
-        raise ProfileNotFound(profile_id)
-    profile_validation.validate_patch(patch, current_backend=current.backend)
-    return store.update_runner_profile(profile_id, patch)
+    return EngineService().update_profile(profile_id, patch)
 
 
 def delete_profile(profile_id: str, *, store: SessionStore) -> None:
-    if store.get_runner_profile(profile_id) is None:
-        raise ProfileNotFound(profile_id)
-    store.delete_runner_profile(profile_id)
+    EngineService().delete_profile(profile_id)
 
 
 def get_profile_stats(
@@ -81,16 +61,10 @@ def get_profile_stats(
     since: str | None = None,
     until: str | None = None,
 ) -> RunnerProfileStats:
-    if store.get_runner_profile(profile_id) is None:
-        raise ProfileNotFound(profile_id)
-    return store.runner_profile_stats(profile_id, since=since, until=until)
+    return EngineService().get_profile_stats(profile_id, since=since, until=until)
 
 
-# ---------------------------------------------------------------------------
-# Pass-through wrappers for CLI consumers
-# ---------------------------------------------------------------------------
-
-
+# ── pass-through wrappers for CLI consumers ────────────────────────────────
 def list_runner_profiles(
     store: SessionStore,
     *,
@@ -98,33 +72,32 @@ def list_runner_profiles(
     provider: str | None = None,
     enabled: bool | None = None,
 ) -> list[RunnerProfile]:
-    return store.list_runner_profiles(backend=backend, provider=provider, enabled=enabled)
+    return EngineService().list_profiles(backend=backend, provider=provider, enabled=enabled)
 
 
 def get_runner_profile(store: SessionStore, profile_id: str) -> RunnerProfile | None:
-    return store.get_runner_profile(profile_id)
+    try:
+        return EngineService().get_profile(profile_id)
+    except ProfileNotFound:
+        return None
 
 
-def create_runner_profile(
-    store: SessionStore, profile: RunnerProfileCreate
-) -> RunnerProfile:
-    return store.create_runner_profile(profile)
+def create_runner_profile(store: SessionStore, profile: RunnerProfileCreate) -> RunnerProfile:
+    return EngineService().create_profile(profile)
 
 
 def delete_runner_profile(store: SessionStore, profile_id: str) -> None:
-    store.delete_runner_profile(profile_id)
+    EngineService().delete_profile(profile_id)
 
 
 def set_agent_runner_profile(
     store: SessionStore, agent_id: str, profile_id: str
 ) -> RunnerProfile:
-    return store.set_agent_runner_profile(agent_id, profile_id)
+    return EngineService().set_agent_runner_profile(agent_id, profile_id)
 
 
-def get_agent_runner_profile(
-    store: SessionStore, agent_id: str
-) -> RunnerProfile | None:
-    return store.get_agent_runner_profile(agent_id)
+def get_agent_runner_profile(store: SessionStore, agent_id: str) -> RunnerProfile | None:
+    return EngineService().get_agent_runner_profile(agent_id)
 
 
 def runner_profile_stats(
@@ -134,7 +107,7 @@ def runner_profile_stats(
     since: str | None = None,
     until: str | None = None,
 ) -> RunnerProfileStats:
-    return store.runner_profile_stats(profile_id, since=since, until=until)
+    return EngineService().get_profile_stats(profile_id, since=since, until=until)
 
 
 def list_runner_profile_stats(
@@ -143,4 +116,4 @@ def list_runner_profile_stats(
     since: str | None = None,
     until: str | None = None,
 ) -> list[RunnerProfileStats]:
-    return store.list_runner_profile_stats(since=since, until=until)
+    return EngineService().list_profile_stats(since=since, until=until)

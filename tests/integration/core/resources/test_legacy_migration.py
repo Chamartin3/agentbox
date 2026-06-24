@@ -14,7 +14,7 @@ from agentbox.core.resources.migration import (
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 def _seed(store: SessionStore, *, kind: str, name: str, content: str = "x") -> None:

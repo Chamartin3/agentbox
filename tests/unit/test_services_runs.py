@@ -21,8 +21,8 @@ from typing import Any
 import pytest
 from agentbox.core.db import AgentDef, SessionStore
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
-from agentbox.core.service.execution import runs as runs_service
-from agentbox.core.service.execution.runs import (
+import agentbox.core.service.execution as runs_service
+from agentbox.core.service.execution import (
     AgentNotFound,
     InvalidRunInput,
     RunNotFound,
@@ -83,7 +83,7 @@ def _seed_run(
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 # ---------------------------------------------------------------------------

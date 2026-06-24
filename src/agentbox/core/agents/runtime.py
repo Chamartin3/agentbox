@@ -47,6 +47,7 @@ from agentbox.core.agents.config import (
     resolve_output_config as _resolve_output_config,
 )
 from agentbox.core.db import AgentDef, RunStore, SessionStore
+from agentbox.core.db.system.config import load_project_shared_assets
 from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
@@ -168,7 +169,7 @@ def compose_prompt(
     if agent.composition is not None and variables is not None:
         shared_roots = {
             k: settings.project_root / v
-            for k, v in store.get_project_shared_assets().items()
+            for k, v in load_project_shared_assets().items()
         }
 
         bundle = load_bundle_from_bindings(agent_id=agent.id, store=store)

@@ -5,9 +5,9 @@ import json
 import typer
 from rich.table import Table
 
-from agentbox.cli._deps import get_store
 from agentbox.cli._common import console
 from agentbox.core.config import load_settings
+from agentbox.core.service.system.service import SystemService
 
 mcp_app = typer.Typer(
     name="mcp",
@@ -20,7 +20,7 @@ mcp_app = typer.Typer(
 def mcp_ls() -> None:
     """List MCP servers declared in the manifest with cached health."""
     settings = load_settings()
-    servers = get_store().get_project_mcp_servers()
+    servers = SystemService().get_project_mcp_servers()
 
     if not servers:
         console.print("[yellow]No MCP servers configured.[/yellow]")

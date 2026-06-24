@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_agent_service, get_store
+from agentbox.api.deps import get_agent_service, get_engine_service
 from agentbox.api.runs.webhooks import schedule_agent_event_webhook
 from agentbox.core.service import RunnerProfile
+from agentbox.core.service.engines.service import EngineService, ProfileNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -162,10 +163,10 @@ class SetAgentRunnerProfileBody(BaseModel):
 @router.get("/{agent_id}/runner-profile")
 def get_agent_runner_profile(
     agent_id: str,
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> RunnerProfile:
     """Get the runner profile bound to an agent."""
-    store = get_store()
-    profile = store.get_agent_runner_profile(agent_id)
+    profile = engine_svc.get_agent_runner_profile(agent_id)
     if profile is None:
         raise HTTPException(404, f"no runner profile bound to agent {agent_id!r}")
     return profile
@@ -175,24 +176,22 @@ def get_agent_runner_profile(
 def set_agent_runner_profile(
     agent_id: str,
     body: SetAgentRunnerProfileBody,
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> RunnerProfile:
     """Bind a runner profile to an agent."""
-    store = get_store()
-    profile = store.get_runner_profile(body.runner_profile_id)
-    if profile is None:
-        raise HTTPException(
-            404, f"runner profile not found: {body.runner_profile_id!r}"
-        )
-    return store.set_agent_runner_profile(agent_id, body.runner_profile_id)
+    try:
+        return engine_svc.set_agent_runner_profile(agent_id, body.runner_profile_id)
+    except ProfileNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @router.delete("/{agent_id}/runner-profile")
 def clear_agent_runner_profile(
     agent_id: str,
+    engine_svc: EngineService = Depends(get_engine_service),
 ) -> None:
     """Remove the runner profile binding from an agent."""
-    store = get_store()
-    store.clear_agent_runner_profile(agent_id)
+    engine_svc.clear_agent_runner_profile(agent_id)
 
 
 @router.delete("/{agent_id}", status_code=204)

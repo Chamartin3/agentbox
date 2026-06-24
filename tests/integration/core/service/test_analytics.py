@@ -21,7 +21,7 @@ from agentbox.core.service.execution.feedback import (
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 # ── since_iso ───────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from agentbox.core.db import AgentDef, RunnerSnapshot, SnapshotStore, now_iso
+from agentbox.core.db.database import get_database
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,11 @@ def build_runner_snapshot(
     profile_name: str | None = None
     if effective.profile_id:
         try:
-            profile = store.get_runner_profile(effective.profile_id)
-            if profile is not None:
-                profile_name = profile.name
+            row = get_database(str(store.db_path)).runner_profiles.get_by_id(
+                effective.profile_id
+            )
+            if row is not None:
+                profile_name = row.get("name")
         except Exception:
             logger.debug(
                 "could not resolve profile name for %s", effective.profile_id

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from agentbox.core.db import SessionStore
 from agentbox.core.db import Database
+from agentbox.core.db.system.config import record_host_env_call
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ class AgentToolsContext:
         error: str | None = None,
     ) -> None:
         with contextlib.suppress(Exception):
-            self.store.record_host_env_call(
+            record_host_env_call(
                 run_id=self.run_id,
                 workspace_id=self.agent_id,  # reuse workspace_id column for agent_id
                 capability=tool_name,

@@ -14,32 +14,36 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from agentbox.api.deps import get_store
 from agentbox.core.service import McpServerSpec
+from agentbox.core.service.system.service import SystemService
 
 router = APIRouter(prefix="/api/project", tags=["project"])
 
 
+def _svc_dep():
+    return SystemService()
+
+
 @router.get("/mcp-servers")
-def list_project_mcp_servers(store=Depends(get_store)) -> dict:
-    servers = store.get_project_mcp_servers()
+def list_project_mcp_servers(svc=Depends(_svc_dep)) -> dict:
+    servers = svc.get_project_mcp_servers()
     return {"servers": [s.model_dump(mode="json") for s in servers]}
 
 
 @router.put("/mcp-servers/{name}")
 def upsert_project_mcp_server(
-    name: str, spec: McpServerSpec, store=Depends(get_store)
+    name: str, spec: McpServerSpec, svc=Depends(_svc_dep)
 ) -> dict:
     if spec.name != name:
         spec = spec.model_copy(update={"name": name})
-    store.set_project_mcp_server(spec)
+    svc.set_project_mcp_server(spec)
     return spec.model_dump(mode="json")
 
 
 @router.delete("/mcp-servers/{name}")
-def delete_project_mcp_server(name: str, store=Depends(get_store)) -> dict:
-    existing = {s.name for s in store.get_project_mcp_servers()}
+def delete_project_mcp_server(name: str, svc=Depends(_svc_dep)) -> dict:
+    existing = {s.name for s in svc.get_project_mcp_servers()}
     if name not in existing:
         raise HTTPException(status_code=404, detail=f"unknown mcp server: {name!r}")
-    store.delete_project_mcp_server(name)
+    svc.delete_project_mcp_server(name)
     return {"deleted": name}

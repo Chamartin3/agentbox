@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_store
 from agentbox.core.service import SessionStore
+from agentbox.core.service.system.service import SystemService
 from agentbox.core.tools import CAPABILITIES
 
 router = APIRouter(tags=["host-env-provisioning"])
@@ -124,5 +125,5 @@ def set_workspace_host_env(
 
 
 @router.get("/api/runs/{run_id}/host-env-calls")
-def list_run_calls(run_id: str, store: Annotated[SessionStore, Depends(get_store)]):
-    return {"items": store.list_host_env_calls_for_run(run_id)}
+def list_run_calls(run_id: str) -> dict:
+    return {"items": SystemService().list_host_env_calls_for_run(run_id)}

@@ -23,7 +23,7 @@ from agentbox.core.service.engines.providers import (
 
 @pytest.fixture
 def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "db.sqlite")
+    return SessionStore(tmp_path / "agentbox.sqlite")
 
 
 class _FakeProvider:

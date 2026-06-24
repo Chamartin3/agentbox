@@ -4,7 +4,7 @@ from agentbox.core.db import SessionStore, agents, now_iso
 
 @pytest.fixture
 def store(tmp_path):
-    s = SessionStore(tmp_path / "db.sqlite")
+    s = SessionStore(tmp_path / "agentbox.sqlite")
     with s.engine.begin() as conn:
         conn.execute(
             agents.insert().values(

@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.db import RunStore
+from agentbox.core.db.system.config import load_project_mcp_servers
 from agentbox.core.workspaces.generation.config import (
     AgentRef,
     McpRef,
@@ -80,7 +81,7 @@ def load_workenv(
         resources.append(ResourceRef(id=b["resource_id"]))
 
     # MCP servers (project-level + workspace overrides)
-    project_servers = store.get_project_mcp_servers()
+    project_servers = load_project_mcp_servers()
     server_overrides = {
         o["server_name"]: o
         for o in store.list_workspace_mcp_server_overrides(workspace_id)

@@ -9,9 +9,11 @@ from typing import Any
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
+from agentbox.core.service.evaluation.service import EvaluationService
 from agentbox.core.service import read_transcript
 from agentbox.core.execution.observability.conversation import get as get_conversation_source
 from agentbox.core.execution.observability.conversation.transcript import TranscriptSource
+from agentbox.core.service.execution.service import ExecutionService
 from agentbox.mcp.deps import get_context
 from agentbox.mcp.schemas import clamp_limit
 
@@ -81,7 +83,7 @@ def register(mcp: FastMCP) -> None:
         rec = ctx.db.runs.get(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
-        usage = ctx.store.get_usage(run_id)
+        usage = ExecutionService().get_usage(run_id)
         return {"run": _serialize(rec), "usage": usage}
 
     @mcp.tool
@@ -102,7 +104,7 @@ def register(mcp: FastMCP) -> None:
         ISO-8601 timestamps."""
         limit = clamp_limit(limit)
         store = get_context().store
-        rows, total = store.list_runs_paged(
+        rows, total = EvaluationService().list_runs_paged(
             agent_id=agent_id,
             status=status,
             executor=model,
@@ -293,13 +295,13 @@ def register(mcp: FastMCP) -> None:
         rec = ctx.db.runs.get(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
-        items = ctx.store.list_webhook_deliveries(run_id)
+        items = ExecutionService().list_webhook_deliveries(run_id)
         return {"run_id": run_id, "items": items, "total": len(items)}
 
     @mcp.tool
     def get_run_usage(run_id: str) -> dict:
         """Token + cost breakdown for a single run."""
-        usage = get_context().store.get_usage(run_id)
+        usage = ExecutionService().get_usage(run_id)
         return usage or {"error": "not_found", "run_id": run_id}
 
     @mcp.tool

@@ -82,7 +82,7 @@ def test_context_from_env(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_AGENT_ID", "agent-abc")
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_RUN_ID", "run-xyz")
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_WORKDIR", str(tmp_path))
-    monkeypatch.setenv("AGENTBOX_DB_PATH", str(tmp_path / "db.sqlite"))
+    monkeypatch.setenv("AGENTBOX_DB_PATH", str(tmp_path / "agentbox.sqlite"))
     ctx = AgentToolsContext.from_env()
     assert ctx.grants == frozenset(["cv.score"])
     assert ctx.agent_id == "agent-abc"
@@ -105,7 +105,7 @@ def test_build_server_resolves_context_from_env(echo_tool, monkeypatch, tmp_path
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_AGENT_ID", "agent-1")
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_RUN_ID", "run-1")
     monkeypatch.setenv("AGENTBOX_AGENT_TOOLS_WORKDIR", str(tmp_path))
-    monkeypatch.setenv("AGENTBOX_DB_PATH", str(tmp_path / "db.sqlite"))
+    monkeypatch.setenv("AGENTBOX_DB_PATH", str(tmp_path / "agentbox.sqlite"))
 
     server = build_server()
 

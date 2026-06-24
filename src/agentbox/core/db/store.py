@@ -35,20 +35,12 @@ from agentbox.core.db.agents.sync import AgentSyncMixin
 from agentbox.core.db.agents.grants import AgentToolGrantsMixin
 from agentbox.core.db.agents.versions import AgentVersionsMixin
 from agentbox.core.db.agents.prompts import PromptVersionsMixin
-from agentbox.core.db.feedback import ExecutionAnalyticsMixin
 from agentbox.core.db.resources.crud import ResourcesMixin
 from agentbox.core.db.resources.shared import SharedResourcesMixin
 from agentbox.core.db.resources.bindings import ResourceBindingsMixin
-from agentbox.core.db.engines.profiles import RunnerProfilesMixin
-from agentbox.core.db.system.api_tokens import ApiTokensMixin
-from agentbox.core.db.system.project_config import ProjectConfigMixin
-from agentbox.core.db.execution.runs import RunsMixin
-from agentbox.core.db.execution.sessions import SessionsMixin
-from agentbox.core.db.execution.comments import RunCommentsMixin
-from agentbox.core.db.execution.usage import UsageMixin
-from agentbox.core.db.execution.webhooks import WebhooksMixin
-from agentbox.core.db.execution.run_prompts import RunPromptsMixin
-from agentbox.core.db.execution.run_snapshots import RunSnapshotsMixin
+# Execution mixins retired in plan 088 — ExecutionService now owns the run lifecycle.
+# RunsMixin, SessionsMixin, RunCommentsMixin, UsageMixin, WebhooksMixin,
+# RunPromptsMixin, RunSnapshotsMixin removed.
 from agentbox.core.db.schema import (
     metadata,
     runs,
@@ -57,7 +49,6 @@ from agentbox.core.db.utils import now_iso
 from agentbox.core.db.workspaces.crud import WorkspacesMixin
 from agentbox.core.db.workspaces.env_docs import EnvDocsMixin
 from agentbox.core.db.workspaces.host_env import HostEnvMixin
-from agentbox.core.db.system.host_env_calls import HostEnvCallLogMixin
 from agentbox.core.db.workspaces.mcp_discovery import McpDiscoveryMixin
 from agentbox.core.db.workspaces.mcp_overrides import McpOverridesMixin
 from agentbox.core.db.workspaces.runtime_permissions import RuntimePermissionsMixin
@@ -187,21 +178,10 @@ class SessionStore(
     McpOverridesMixin,
     RuntimePermissionsMixin,
     McpDiscoveryMixin,
-    HostEnvCallLogMixin,
     HostEnvMixin,
-    RunnerProfilesMixin,
-    # SettingsMixin is inherited transitively through ProjectConfigMixin;
-    # listing it directly here causes an MRO conflict.
-    ProjectConfigMixin,
-    ApiTokensMixin,
-    ExecutionAnalyticsMixin,
-    RunsMixin,
-    SessionsMixin,
-    RunCommentsMixin,
-    UsageMixin,
-    WebhooksMixin,
-    RunPromptsMixin,
-    RunSnapshotsMixin,
+    # System mixins retired in plan 092 — SystemService now owns this domain.
+    # HostEnvCallLogMixin, ProjectConfigMixin, ApiTokensMixin removed.
+    # RunnerProfilesMixin removed — EngineService (091) owns this domain.
     _CoreStore,
 ):
     """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + shared resources + runner profiles + sync."""

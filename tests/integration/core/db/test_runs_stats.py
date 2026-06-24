@@ -29,7 +29,7 @@ def _seed(
 
 
 def test_stats_totals(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "agent_a", "ok", "haiku")
     _seed(store, "agent_a", "error", "haiku")
     _seed(store, "agent_b", "ok", "sonnet")
@@ -44,7 +44,7 @@ def test_stats_totals(tmp_path: Path) -> None:
 
 
 def test_stats_by_agent(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "agent_a", "ok", "haiku")
     _seed(store, "agent_b", "ok", "sonnet")
     _seed(store, "agent_b", "error", "sonnet")
@@ -56,7 +56,7 @@ def test_stats_by_agent(tmp_path: Path) -> None:
 
 
 def test_stats_by_model(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "a1", "ok", "haiku")
     _seed(store, "a2", "ok", "sonnet")
     _seed(store, "a3", "ok", "sonnet")
@@ -68,7 +68,7 @@ def test_stats_by_model(tmp_path: Path) -> None:
 
 
 def test_stats_by_status(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "a1", "ok")
     _seed(store, "a2", "error")
     _seed(store, "a3", "ok")
@@ -80,7 +80,7 @@ def test_stats_by_status(tmp_path: Path) -> None:
 
 
 def test_stats_timeseries(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "a1", "ok", "haiku")
 
     stats = store.stats_for_filters()
@@ -91,7 +91,7 @@ def test_stats_timeseries(tmp_path: Path) -> None:
 
 
 def test_stats_respects_agent_filter(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "agent_a", "ok", "haiku")
     _seed(store, "agent_b", "ok", "sonnet")
 
@@ -101,7 +101,7 @@ def test_stats_respects_agent_filter(tmp_path: Path) -> None:
 
 
 def test_stats_respects_status_filter(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     _seed(store, "a1", "ok")
     _seed(store, "a2", "error")
 
@@ -113,7 +113,7 @@ def test_stats_respects_status_filter(tmp_path: Path) -> None:
 
 def test_stats_unknown_model_bucketing(tmp_path: Path) -> None:
     """Runs without usage records get 'unknown' model."""
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     rid = store.create_run("a1", "in", "/wd", "/t.jsonl")
     store.finish_run(rid, ok=True, output="out")
 

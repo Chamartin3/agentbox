@@ -7,12 +7,17 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.service.agents import resolve_agent
+from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import (
     AgentDisabled,
     InvalidRunInput,
     RunNotFound,
 )
 from agentbox.core.service.prompts import AgentNotFound
+
+
+def _svc() -> ExecutionService:
+    return ExecutionService()
 
 
 def _assert_enabled(store: "SessionStore", agent_id: str) -> None:
@@ -103,7 +108,7 @@ async def rerun(
     executor: RunExecutor,
 ) -> dict:
     """Re-execute a finished run with the same agent + input/variables."""
-    rec = store.get_run(run_id)
+    rec = _svc().get_run(run_id)
     if rec is None:
         raise RunNotFound(run_id)
     agent = resolve_agent(rec.agent_id, store=store)

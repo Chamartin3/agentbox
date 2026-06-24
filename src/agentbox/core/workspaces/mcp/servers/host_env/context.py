@@ -13,6 +13,7 @@ from pathlib import Path
 
 from agentbox.core.db import SessionStore
 from agentbox.core.db import Database
+from agentbox.core.db.system.config import record_host_env_call
 
 
 @dataclass
@@ -77,11 +78,8 @@ class HostEnvContext:
         outcome: str,
         error: str | None = None,
     ) -> None:
-        s = self.store
-        if s is None:
-            return
         with contextlib.suppress(Exception):
-            s.record_host_env_call(
+            record_host_env_call(
                 run_id=self.run_id,
                 workspace_id=self.workspace_id,
                 capability=capability,

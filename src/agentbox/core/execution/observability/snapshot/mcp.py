@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from agentbox.core.db import McpSnapshot, SnapshotStore
+from agentbox.core.db.system.config import load_project_mcp_servers
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ def build_mcp_snapshot(
                 "name": s.name,
                 "config": {"url": s.url, "transport": str(s.transport)},
             }
-            for s in store.get_project_mcp_servers()
+            for s in load_project_mcp_servers()
         ]
         snapshot = store.resolve_workspace_mcp(
             workspace_id, manifest_servers

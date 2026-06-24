@@ -1,7 +1,7 @@
 """AgentVersion, AgentVersionFile, AgentVersionRating, AgentVersionComment managers."""
 from __future__ import annotations
 
-from sqlalchemy import func, select, update as sa_update
+from sqlalchemy import Row, func, select, update as sa_update
 
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.base.manager import Manager
@@ -11,6 +11,7 @@ from agentbox.core.db.models.agents.version import (
     AgentVersionFile,
     AgentVersionRating,
 )
+from agentbox.core.db.row_types import AgentVersionRow
 from agentbox.core.db.schema import (
     active_agent_versions,
     agent_version_comments,
@@ -21,11 +22,31 @@ from agentbox.core.db.schema import (
 from agentbox.core.db.utils import now_iso as _now_iso
 
 
-def _row_dict(row: object) -> dict:
-    """Shape a version row into a dict (int→bool for ``is_legacy``)."""
-    d = dict(row._mapping)  # type: ignore[attr-defined]
-    d["is_legacy"] = bool(d.get("is_legacy", False))
-    return d
+def _version_row(row: Row) -> AgentVersionRow:
+    """Shape an ``agent_versions`` row into the ``AgentVersionRow`` contract.
+
+    Built field-by-field from the row mapping (the SELECT projects exactly the
+    ``agent_versions`` columns), so no cast or type-ignore is needed.
+    """
+    m = row._mapping
+    return AgentVersionRow(
+        id=m["id"],
+        agent_id=m["agent_id"],
+        version=m["version"],
+        source_path=m["source_path"],
+        source_format=m["source_format"],
+        content_snapshot=m["content_snapshot"],
+        prompt_snapshot=m["prompt_snapshot"],
+        content_hash=m["content_hash"],
+        author=m["author"],
+        changelog=m["changelog"],
+        is_legacy=bool(m["is_legacy"]),
+        created_at=m["created_at"],
+        config_json=m["config_json"],
+        prompt_content=m["prompt_content"],
+        source=m["source"],
+        resolved_tool_grants=m["resolved_tool_grants"],
+    )
 
 
 def _insert_files(conn: object, version_id: int, prepared: list[dict]) -> None:
@@ -99,7 +120,7 @@ class AgentVersionManager(Manager[AgentVersion]):
                 is not None
             )
 
-    def get_latest(self, agent_id: str) -> dict | None:
+    def get_latest(self, agent_id: str) -> AgentVersionRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 agent_versions.select()
@@ -107,9 +128,9 @@ class AgentVersionManager(Manager[AgentVersion]):
                 .order_by(agent_versions.c.version.desc())
                 .limit(1)
             ).first()
-            return _row_dict(row) if row else None
+            return _version_row(row) if row else None
 
-    def get_active(self, agent_id: str) -> dict | None:
+    def get_active(self, agent_id: str) -> AgentVersionRow | None:
         """Row pointed at by ``active_agent_versions``, or None if unset."""
         with self._engine.connect() as conn:
             pointer = conn.execute(
@@ -124,16 +145,16 @@ class AgentVersionManager(Manager[AgentVersion]):
                     agent_versions.c.id == pointer._mapping["version_id"]
                 )
             ).first()
-            return _row_dict(row) if row else None
+            return _version_row(row) if row else None
 
-    def get_by_id(self, version_id: int) -> dict | None:
+    def get_by_id(self, version_id: int) -> AgentVersionRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 agent_versions.select().where(agent_versions.c.id == version_id)
             ).first()
-            return _row_dict(row) if row else None
+            return _version_row(row) if row else None
 
-    def get_by_number(self, agent_id: str, version: int) -> dict | None:
+    def get_by_number(self, agent_id: str, version: int) -> AgentVersionRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 agent_versions.select().where(
@@ -141,16 +162,16 @@ class AgentVersionManager(Manager[AgentVersion]):
                     agent_versions.c.version == version,
                 )
             ).first()
-            return _row_dict(row) if row else None
+            return _version_row(row) if row else None
 
-    def list_for_agent(self, agent_id: str) -> list[dict]:
+    def list_for_agent(self, agent_id: str) -> list[AgentVersionRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 agent_versions.select()
                 .where(agent_versions.c.agent_id == agent_id)
                 .order_by(agent_versions.c.version.desc())
             )
-            return [_row_dict(r) for r in rows]
+            return [_version_row(r) for r in rows]
 
     def set_active(self, agent_id: str, version_id: int) -> None:
         """Set a version as the active version for an agent."""
@@ -171,7 +192,7 @@ class AgentVersionManager(Manager[AgentVersion]):
             ).first()
             return int(row[0]) + 1 if row else 1
 
-    def list_latest_per_agent(self) -> list[dict]:
+    def list_latest_per_agent(self) -> list[AgentVersionRow]:
         """One row per agent_id — its highest-numbered version snapshot.
 
         No hidden-agent filtering here; the deleted/disabled policy lives in
@@ -195,7 +216,7 @@ class AgentVersionManager(Manager[AgentVersion]):
                 )
                 .order_by(agent_versions.c.created_at.desc())
             )
-            return [_row_dict(r) for r in conn.execute(q)]
+            return [_version_row(r) for r in conn.execute(q)]
 
     def insert_version(
         self,

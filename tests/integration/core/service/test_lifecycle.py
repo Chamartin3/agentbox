@@ -28,7 +28,7 @@ def lifecycle_env(
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     monkeypatch.setenv("AGENTBOX_SKIP_RESOURCE_IMPORT", "1")
     settings = load_settings()
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
     return store, settings
 
 
@@ -76,7 +76,7 @@ def test_run_startup_tasks_handles_seed_profiles_flag(
     monkeypatch.setenv("AGENTBOX_SKIP_RESOURCE_IMPORT", "1")
     monkeypatch.delenv("AGENTBOX_SKIP_DEFAULT_PROFILES", raising=False)
     settings = load_settings()
-    store = SessionStore(tmp_path / "db.sqlite")
+    store = SessionStore(tmp_path / "agentbox.sqlite")
 
     # Act
     report = run_startup_tasks(store, settings, manifest=None)

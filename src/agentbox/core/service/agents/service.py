@@ -26,7 +26,7 @@ from agentbox.core.agents.composition.drift import _build_config_json, _build_sn
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.config import load_settings
 from agentbox.core.constants import SessionMode
-from agentbox.core.db import AgentDef, SessionStore, now_iso
+from agentbox.core.db import AgentDef, AgentVersionRow, SessionStore, now_iso
 from agentbox.core.service.agents.crud import (
     get_agent_detail as _get_agent_detail_free,
     list_agents_enriched as _list_agents_enriched_free,
@@ -165,19 +165,19 @@ class AgentService(Service):
         return bool(meta and meta.get("disabled_at"))
 
     # ── version reads ──────────────────────────────────────────────────
-    def latest_version(self, agent_id: str) -> dict | None:
+    def latest_version(self, agent_id: str) -> AgentVersionRow | None:
         return self._versions.get_latest(agent_id)
 
-    def active_version(self, agent_id: str) -> dict | None:
+    def active_version(self, agent_id: str) -> AgentVersionRow | None:
         return self._versions.get_active(agent_id)
 
-    def get_version(self, agent_id: str, version: int) -> dict | None:
+    def get_version(self, agent_id: str, version: int) -> AgentVersionRow | None:
         return self._versions.get_by_number(agent_id, version)
 
-    def get_version_by_id(self, version_id: int) -> dict | None:
+    def get_version_by_id(self, version_id: int) -> AgentVersionRow | None:
         return self._versions.get_by_id(version_id)
 
-    def list_versions(self, agent_id: str) -> list[dict]:
+    def list_versions(self, agent_id: str) -> list[AgentVersionRow]:
         return self._versions.list_for_agent(agent_id)
 
     def diff_versions(self, agent_id: str, a: int, b: int) -> dict:

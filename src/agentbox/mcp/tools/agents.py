@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from fastmcp import FastMCP
 
+from agentbox.core.service.engines.service import EngineService
 from agentbox.mcp.deps import get_agent_service, get_context
 from agentbox.mcp.schemas import clamp_limit
 
@@ -49,7 +50,7 @@ def _inject_profile_model(d: dict, store: Any) -> dict:
     if not agent_id:
         return d
     try:
-        profile = store.get_agent_runner_profile(agent_id)
+        profile = EngineService().get_agent_runner_profile(agent_id)
     except Exception:
         profile = None
     if profile is not None:

@@ -7,10 +7,14 @@ the unified ``token`` backend.
 
 from __future__ import annotations
 
+import json as _json
 import logging
 
+from agentbox.core.config import load_settings
 from agentbox.core.constants import BackendName
+from agentbox.core.db.database import get_database
 from agentbox.core.db.engines.profiles import RunnerProfileCreate
+from agentbox.core.db.utils import now_iso
 
 _log = logging.getLogger(__name__)
 
@@ -81,19 +85,39 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
 ]
 
 
-def seed_default_runner_profiles(store) -> int:
+def seed_default_runner_profiles(store=None) -> int:  # store param kept for backward compat
     """Insert default runner profiles that don't already exist.
 
     Returns the number of profiles inserted. Errors on a single profile
     are logged and skipped so a malformed default never blocks startup.
     """
+    db = get_database(str(load_settings().db_path))
+    mgr = db.runner_profiles
     created = 0
     for spec in DEFAULT_PROFILES:
         assert spec.id is not None  # all defaults declare an id
         try:
-            if store.get_runner_profile(spec.id) is not None:
-                continue
-            store.create_runner_profile(spec)
+            if mgr.get_by_id(spec.id) is not None:
+                continue  # already exists
+            now = now_iso()
+            mgr.create_one(
+                id=spec.id,
+                name=spec.name,
+                description=spec.description,
+                backend=spec.backend,
+                provider=spec.provider,
+                model=spec.model,
+                base_url=spec.base_url,
+                api_key_env=spec.api_key_env,
+                output_mode=spec.output_mode,
+                params_json=_json.dumps(spec.params),
+                headers_json=_json.dumps(spec.headers),
+                extra_args_json=_json.dumps(spec.extra_args),
+                is_enabled=int(spec.is_enabled),
+                is_system_default=int(spec.is_system_default),
+                created_at=now,
+                updated_at=now,
+            )
             created += 1
             _log.info("seeded default runner profile: %s", spec.id)
         except Exception as exc:
