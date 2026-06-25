@@ -17,6 +17,7 @@ from agentbox.cli.shared import (
 )
 from agentbox.cli.shared import get_store as _get_store
 from agentbox.core.db import AgentDef, RunnerProfileCreate
+from agentbox.core.service.engines.service import EngineService
 
 runner = CliRunner()
 
@@ -69,7 +70,7 @@ def _seed_profile(store, profile_id: str = "prof-1", **kw) -> None:
         model=kw.get("model", "gpt-4o"),
         system_prompt=kw.get("system_prompt", "You are a helpful assistant."),
     )
-    store.create_runner_profile(profile)
+    EngineService().create_profile(profile)
 
 
 # ---------------------------------------------------------------------------

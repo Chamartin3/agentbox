@@ -18,7 +18,7 @@ import os
 import subprocess
 from pathlib import Path
 from pathlib import Path as _Path
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 from agentbox.core.workspaces.generation.inject import inject_host_env_mcp
@@ -348,15 +348,17 @@ class TestAuditLog:
     def test_audit_recorded_on_success(self, tmp_path: Path):
         target = tmp_path / "file.txt"
         target.write_text("data")
-        store = MagicMock()
         grants = _make_grants(**{"fs.read": {"allowed_paths": [str(tmp_path)]}})
-        ctx = _make_ctx(grants, tmp_path, store=store)
+        ctx = _make_ctx(grants, tmp_path)
         fs_read, _, _ = _make_fs_fns(lambda: ctx)
 
-        fs_read(str(target))
+        with patch(
+            "agentbox.core.workspaces.mcp.servers.host_env.context.record_host_env_call"
+        ) as rec:
+            fs_read(str(target))
 
-        store.record_host_env_call.assert_called_once()
-        kwargs = store.record_host_env_call.call_args.kwargs
+        rec.assert_called_once()
+        kwargs = rec.call_args.kwargs
         assert kwargs["capability"] == "fs.read"
         assert kwargs["status"] == "ok"
         assert kwargs["run_id"] == "run1"
@@ -364,16 +366,18 @@ class TestAuditLog:
     def test_audit_recorded_on_denial(self, tmp_path: Path):
 
 
-        store = MagicMock()
         grants = _make_grants()  # no fs.read grant
-        ctx = _make_ctx(grants, tmp_path, store=store)
+        ctx = _make_ctx(grants, tmp_path)
         fs_read, _, _ = _make_fs_fns(lambda: ctx)
 
-        with pytest.raises(GrantViolation):
-            fs_read(str(tmp_path / "any.txt"))
+        with patch(
+            "agentbox.core.workspaces.mcp.servers.host_env.context.record_host_env_call"
+        ) as rec:
+            with pytest.raises(GrantViolation):
+                fs_read(str(tmp_path / "any.txt"))
 
-        store.record_host_env_call.assert_called_once()
-        kwargs = store.record_host_env_call.call_args.kwargs
+        rec.assert_called_once()
+        kwargs = rec.call_args.kwargs
         assert kwargs["status"] == "denied"
         assert kwargs["error"] is not None
 

@@ -194,10 +194,13 @@ class TestSetHostEnvGrants:
 class TestListHostEnvCalls:
     def test_returns_calls(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
-        ctx.store.list_host_env_calls_for_run.return_value = [
+        svc = MagicMock()
+        svc.list_host_env_calls_for_run.return_value = [
             {"capability": "fs.read", "status": "ok"}
         ] * 3
-        with patch("agentbox.mcp.tools.resources.workspace.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.workspace.get_context", return_value=ctx), patch(
+            "agentbox.mcp.tools.resources.workspace.SystemService", return_value=svc
+        ):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "list_host_env_calls")
             result = fn("run1")
