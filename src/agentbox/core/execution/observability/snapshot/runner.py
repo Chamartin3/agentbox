@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from agentbox.core.db import AgentDef, RunnerSnapshot, SnapshotStore, now_iso
-from agentbox.core.db.database import get_database
+from agentbox.core.db import get_database
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 
 logger = logging.getLogger(__name__)

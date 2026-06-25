@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from agentbox.core.db import RunnerProfile
-from agentbox.core.db.database import get_database
+from agentbox.core.db import get_database
 
 from agentbox.core.engines import (
     EffectiveRunnerConfig,

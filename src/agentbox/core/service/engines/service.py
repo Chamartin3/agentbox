@@ -41,7 +41,15 @@ from agentbox.core.service.engines import profile_validation
 # a dedicated providers service reclaim these.
 from agentbox.core.db import SessionStore  # noqa: E402  (ponytail bridge)
 from agentbox.core.config import load_settings  # noqa: E402  (ponytail bridge)
+from agentbox.core.db.feedback.profile_stats import RunnerStatsMixin  # noqa: E402  (ponytail bridge)
 from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
+
+
+class _RunnerStats(RunnerStatsMixin):
+    """ponytail: binds the stats mixin to the Database engine until plan 093."""
+
+    def __init__(self, engine) -> None:
+        self.engine = engine
 
 
 class ProfileNotFound(LookupError):
@@ -246,8 +254,9 @@ class EngineService(Service):
         """
         if self._db.runner_profiles.get_by_id(profile_id) is None:
             raise ProfileNotFound(profile_id)
-        store = SessionStore(load_settings().db_path)
-        return store.runner_profile_stats(profile_id, since=since, until=until)
+        return _RunnerStats(self._db.engine).runner_profile_stats(
+            profile_id, since=since, until=until
+        )
 
     def list_profile_stats(
         self,
@@ -258,8 +267,9 @@ class EngineService(Service):
 
         ponytail: moves to ``EvaluationService`` in plan 093.
         """
-        store = SessionStore(load_settings().db_path)
-        return store.list_runner_profile_stats(since=since, until=until)
+        return _RunnerStats(self._db.engine).list_runner_profile_stats(
+            since=since, until=until
+        )
 
     # ------------------------------------------------------------------
     # Provider / backend passthrough

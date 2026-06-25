@@ -65,7 +65,7 @@ from agentbox.core.db.models import (
 # ---------------------------------------------------------------------------
 # Database access point
 # ---------------------------------------------------------------------------
-from agentbox.core.db.database import Database
+from agentbox.core.db.database import Database, get_database
 
 # ---------------------------------------------------------------------------
 # Records & mappers
@@ -293,6 +293,7 @@ __all__ = [
     "Setting",
     # Database
     "Database",
+    "get_database",
     # records
     "RunStatus",
     "HostEnvGrant",

@@ -94,6 +94,11 @@ class Database:
             db.mcp_tool_discovery_cache
     """
 
+    @property
+    def engine(self):
+        """The shared SQLAlchemy engine (read-only access for stats bridges)."""
+        return self._engine
+
     def __init__(self, db_path: Path) -> None:
         self._engine = init_engine(db_path)
 

@@ -17,8 +17,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.config import load_settings
 from agentbox.core.db import RunnerProfileCreate
-from agentbox.core.db.database import get_database
-from agentbox.core.db.utils import now_iso
+from agentbox.core.db import get_database, now_iso
 
 if TYPE_CHECKING:
     from agentbox.core.db import AgentVersionsMixin

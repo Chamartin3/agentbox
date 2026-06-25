@@ -15,7 +15,7 @@ common operation ever emerges.
 from __future__ import annotations
 
 from agentbox.core.config import load_settings
-from agentbox.core.db.database import get_database
+from agentbox.core.db import get_database
 
 
 class Service:
