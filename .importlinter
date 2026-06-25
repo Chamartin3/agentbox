@@ -45,7 +45,6 @@ forbidden_modules =
     agentbox.core.agents
     agentbox.core.engines
     agentbox.core.execution
-    agentbox.core.feedback
     agentbox.core.resources
     agentbox.core.workspaces
 allow_indirect_imports = True
@@ -57,22 +56,25 @@ ignore_imports =
     agentbox.api.engines.backends -> agentbox.core.engines
     agentbox.api.engines.providers -> agentbox.core.engines
     # api → core.workspaces
-    agentbox.api.system.env -> agentbox.core.workspaces.env_doc.schema
+    agentbox.api.agents.grants -> agentbox.core.workspaces.catalog
+    agentbox.api.workspaces.catalog -> agentbox.core.workspaces.catalog
     agentbox.api.workspaces.crud -> agentbox.core.workspaces.build
     # api → core.execution
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.payload
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.policy
     # cli → core.agents
-    agentbox.cli.engines.backends -> agentbox.core.agents.resolve
+    agentbox.cli.engine.backend -> agentbox.core.agents.resolve
     # cli → core.engines
-    agentbox.cli.engines.backends -> agentbox.core.engines
-    agentbox.cli.engines.credentials -> agentbox.core.engines.credentials
-    agentbox.cli.engines.credentials -> agentbox.core.engines.credentials.builtin
-    agentbox.cli.engines.providers -> agentbox.core.engines
+    agentbox.cli.engine.backend -> agentbox.core.engines
+    agentbox.cli.engine.cred -> agentbox.core.engines.credentials
+    agentbox.cli.engine.cred -> agentbox.core.engines.credentials.builtin
+    agentbox.cli.engine.provider -> agentbox.core.engines
+    agentbox.cli.system.doctor -> agentbox.core.engines
     agentbox.cli.root -> agentbox.core.engines
     # cli → core.resources
-    agentbox.cli.resources.repo.manage -> agentbox.core.resources.composition_to_bindings
+    agentbox.cli.ops.resource.repo -> agentbox.core.resources.legacy_composition
+    agentbox.cli.resources.repo.manage -> agentbox.core.resources.legacy_composition
     # cli → core.workspaces
     agentbox.cli.ops.cfg -> agentbox.core.workspaces
     agentbox.cli.ops.shell -> agentbox.core.workspaces.prep
@@ -85,8 +87,8 @@ ignore_imports =
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.recipe
     agentbox.cli.ops.launch -> agentbox.core.workspaces.build
     agentbox.cli.root -> agentbox.core.workspaces
-    agentbox.cli.workspaces.crud._app -> agentbox.core.workspaces
-    agentbox.cli.workspaces.crud.core -> agentbox.core.workspaces
+    agentbox.cli.system.doctor -> agentbox.core.workspaces
+    agentbox.cli.work.ws -> agentbox.core.workspaces
     # mcp → core.execution
     agentbox.mcp.tools.runs -> agentbox.core.execution.observability.conversation
     agentbox.mcp.tools.runs -> agentbox.core.execution.observability.conversation.transcript
@@ -105,7 +107,6 @@ forbidden_modules =
     agentbox.core.agents
     agentbox.core.engines
     agentbox.core.execution
-    agentbox.core.feedback
     agentbox.core.workspaces
 allow_indirect_imports = True
 
@@ -127,7 +128,6 @@ source_modules =
 forbidden_modules =
     agentbox.core.agents
     agentbox.core.execution
-    agentbox.core.feedback
     agentbox.core.workspaces
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
@@ -144,6 +144,19 @@ ignore_imports =
     agentbox.core.engines.backends.token.conversation -> agentbox.core.execution.observability.conversation.base
     agentbox.core.engines.backends.token.conversation -> agentbox.core.execution.observability.conversation.transcript
     agentbox.core.engines.backends.token.conversation -> agentbox.core.execution.observability.conversation.types
+    # engines → workspaces (backend renderers consume WorkenvConfig/payload
+    # from workspaces.generation; real fix: move those value types to a
+    # neutral layer below both domains)
+    agentbox.core.engines.backends.codex.render -> agentbox.core.workspaces.generation.config
+    agentbox.core.engines.backends.codex.render -> agentbox.core.workspaces.generation.payload
+    agentbox.core.engines.backends.opencode.adapter -> agentbox.core.workspaces.generation.config
+    agentbox.core.engines.backends.opencode.adapter -> agentbox.core.workspaces.generation.payload
+    agentbox.core.engines.backends.opencode.render -> agentbox.core.workspaces.generation.config
+    agentbox.core.engines.backends.opencode.render -> agentbox.core.workspaces.generation.payload
+    agentbox.core.engines.backends.token.tools -> agentbox.core.workspaces.generation.inject
+    agentbox.core.engines.backends.token.tools -> agentbox.core.workspaces.permissions
+    agentbox.core.engines.contracts.base -> agentbox.core.workspaces.generation.config
+    agentbox.core.engines.contracts.base -> agentbox.core.workspaces.generation.payload
 
 
 # ─── Agents ⟂ Workspace (peer rule) ──────────────────────────────────────
@@ -173,7 +186,83 @@ source_modules =
 forbidden_modules =
     agentbox.core.agents
     agentbox.core.execution
-    agentbox.core.feedback
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
+
+
+# ─── Data layer purity (CORE_ARCHITECTURE §1) ────────────────────────────
+# Managers translate requests into SQL and nothing else. core.db must
+# never reach up into domain packages or the service layer — if a manager
+# needs domain logic, the logic is in the wrong layer.
+[importlinter:contract:data-layer-purity]
+name = Data layer imports no domain or service code
+type = forbidden
+source_modules =
+    agentbox.core.db
+forbidden_modules =
+    agentbox.core.service
+    agentbox.core.agents
+    agentbox.core.engines
+    agentbox.core.execution
+    agentbox.core.resources
+    agentbox.core.tools
+    agentbox.core.workspaces
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # db → workspaces (host-env grant resolution reaches into the
+    # permissions artifact; real fix: move the shared permission types
+    # down, or resolve grants in the workspaces domain instead)
+    agentbox.core.db.workspaces.host_env -> agentbox.core.workspaces.permissions
+
+
+# ─── Domains never import Services (CORE_ARCHITECTURE §2) ────────────────
+# The dependency arrow points down: Services orchestrate domains, never
+# the reverse. A domain importing core.service is a layering inversion.
+[importlinter:contract:domains-below-services]
+name = Domain packages never import the service layer
+type = forbidden
+source_modules =
+    agentbox.core.agents
+    agentbox.core.db
+    agentbox.core.engines
+    agentbox.core.execution
+    agentbox.core.resources
+    agentbox.core.tools
+    agentbox.core.workspaces
+forbidden_modules =
+    agentbox.core.service
+allow_indirect_imports = True
+
+
+# ─── Interface layers stay out of core.db (CORE_ARCHITECTURE §3) ─────────
+# api/cli/mcp get their data through core.service; handing them Database /
+# SessionStore / managers couples the interface to the persistence layout.
+# The ignore_imports block is the known-debt registry — pay it down by
+# routing the caller through a Service.
+[importlinter:contract:interface-no-db]
+name = Interface layers do not import core.db
+type = forbidden
+source_modules =
+    agentbox.api
+    agentbox.cli
+    agentbox.mcp
+forbidden_modules =
+    agentbox.core.db
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # DI wiring still constructs Database/SessionStore directly; goes
+    # away when deps modules resolve Services instead
+    agentbox.api.deps -> agentbox.core.db
+    agentbox.cli._deps -> agentbox.core.db
+    agentbox.cli.shared.deps -> agentbox.core.db
+    agentbox.mcp.deps -> agentbox.core.db
+    # remaining direct store/row consumers
+    agentbox.api.workspaces.catalog -> agentbox.core.db
+    agentbox.api.workspaces.crud -> agentbox.core.db
+    agentbox.cli.agent.definition -> agentbox.core.db
+    agentbox.cli.ops.migrate -> agentbox.core.db.system.seeds
+    agentbox.cli.ops.shell -> agentbox.core.db
+    agentbox.cli.ops.workenv -> agentbox.core.db
