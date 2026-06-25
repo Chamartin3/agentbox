@@ -12,12 +12,19 @@ from __future__ import annotations
 import json as _json
 from typing import Any
 
-from sqlalchemy import select, update as sa_update, delete as sa_delete
+from sqlalchemy import Integer, cast, func, select, update as sa_update, delete as sa_delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.engines.runner_profile import RunnerProfile
-from agentbox.core.db.schema import agent_runner_profiles, runner_profiles
+from agentbox.core.db.schema import agent_runner_profiles, runner_profiles, runs, usage
+
+
+def _duration_ms_expr(c_started: object, c_finished: object) -> object:
+    """SQLAlchemy expression: elapsed milliseconds between two timestamp columns."""
+    epoch_finished = cast(func.strftime("%s", c_finished), Integer)
+    epoch_started = cast(func.strftime("%s", c_started), Integer)
+    return (epoch_finished - epoch_started) * 1000
 
 
 class RunnerProfileManager(Manager[RunnerProfile]):
@@ -207,6 +214,110 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
             return self._row_to_dict(row) if row else None
+
+    # ------------------------------------------------------------------
+    # Aggregate stats — read-only cross-table queries (plan 093)
+    # ------------------------------------------------------------------
+
+    def stats_for_profile(
+        self,
+        profile_id: str,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> dict[str, Any]:
+        """Aggregate run statistics for a single runner profile.
+
+        Returns a plain dict with keys: profile_id, runs, succeeded, failed,
+        input_tokens, output_tokens, cost_usd, avg_duration_ms, last_run_at.
+        """
+        duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
+        conds = [runs.c.runner_profile_id == profile_id]
+        if since:
+            conds.append(runs.c.created_at >= since)
+        if until:
+            conds.append(runs.c.created_at <= until)
+
+        _fail = runs.c.status.in_(("error", "failed", "timeout", "incomplete"))
+        stmt = (
+            select(
+                func.count().label("runs"),
+                func.sum(func.cast(runs.c.status == "ok", type_=Integer)).label("succeeded"),
+                func.sum(func.cast(_fail, type_=Integer)).label("failed"),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
+                func.coalesce(func.sum(usage.c.output_tokens), 0).label("output_tokens"),
+                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
+                func.avg(duration_ms).label("avg_duration_ms"),
+                func.max(runs.c.created_at).label("last_run_at"),
+            )
+            .select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
+            .where(*conds)
+        )
+        with self._engine.connect() as conn:
+            row = conn.execute(stmt).first()
+        m = row._mapping if row else {}
+        return {
+            "profile_id": profile_id,
+            "runs": int(m.get("runs") or 0),
+            "succeeded": int(m.get("succeeded") or 0),
+            "failed": int(m.get("failed") or 0),
+            "input_tokens": int(m.get("input_tokens") or 0),
+            "output_tokens": int(m.get("output_tokens") or 0),
+            "cost_usd": float(m.get("cost_usd") or 0.0) or None,
+            "avg_duration_ms": float(m.get("avg_duration_ms") or 0.0) if m.get("avg_duration_ms") else None,
+            "last_run_at": m.get("last_run_at"),
+        }
+
+    def stats_all_profiles(
+        self,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Aggregate run statistics for every runner profile that has runs.
+
+        Returns a list of plain dicts; profiles without any runs are excluded.
+        """
+        duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
+        conds = [runs.c.runner_profile_id.isnot(None)]
+        if since:
+            conds.append(runs.c.created_at >= since)
+        if until:
+            conds.append(runs.c.created_at <= until)
+
+        _fail = runs.c.status.in_(("error", "failed", "timeout", "incomplete"))
+        stmt = (
+            select(
+                runs.c.runner_profile_id.label("profile_id"),
+                func.count().label("runs"),
+                func.sum(func.cast(runs.c.status == "ok", type_=Integer)).label("succeeded"),
+                func.sum(func.cast(_fail, type_=Integer)).label("failed"),
+                func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
+                func.coalesce(func.sum(usage.c.output_tokens), 0).label("output_tokens"),
+                func.coalesce(func.sum(usage.c.cost_usd), 0).label("cost_usd"),
+                func.avg(duration_ms).label("avg_duration_ms"),
+                func.max(runs.c.created_at).label("last_run_at"),
+            )
+            .select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
+            .where(*conds)
+            .group_by(runs.c.runner_profile_id)
+            .order_by(runs.c.runner_profile_id)
+        )
+        with self._engine.connect() as conn:
+            rows = list(conn.execute(stmt))
+        result = []
+        for row in rows:
+            m = row._mapping
+            result.append({
+                "profile_id": m.get("profile_id") or "unknown",
+                "runs": int(m.get("runs") or 0),
+                "succeeded": int(m.get("succeeded") or 0),
+                "failed": int(m.get("failed") or 0),
+                "input_tokens": int(m.get("input_tokens") or 0),
+                "output_tokens": int(m.get("output_tokens") or 0),
+                "cost_usd": float(m.get("cost_usd") or 0.0) or None,
+                "avg_duration_ms": float(m.get("avg_duration_ms") or 0.0) if m.get("avg_duration_ms") else None,
+                "last_run_at": m.get("last_run_at"),
+            })
+        return result
 
     # ------------------------------------------------------------------
     # Agent ↔ profile binding — agent_runner_profiles

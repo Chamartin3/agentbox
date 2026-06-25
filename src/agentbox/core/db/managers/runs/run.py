@@ -1,6 +1,7 @@
 """RunManager — run lifecycle operations."""
 from __future__ import annotations
 
+import json as _json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -52,6 +53,164 @@ class RunManager(Manager[Run]):
         stmt = sa_update(Run).where(getattr(Run, "id") == run_id).values(**values)
         self._query(stmt)
         return self.get(run_id)
+
+    def finish_full(
+        self,
+        run_id: str,
+        ok: bool,
+        output: str | None = None,
+        error: str | None = None,
+        status: str | None = None,
+        validation_status: str | None = None,
+        validation_errors: list[str] | None = None,
+        schema_validated_via: str | None = None,
+    ) -> None:
+        """Mark a running run finished with optional validation fields.
+
+        Only transitions rows still in ``running`` (idempotent on terminal).
+        """
+        values: dict[str, Any] = {
+            "status": status
+            if status
+            else (RS.OK.value if ok else RS.ERROR.value),
+            "output": output,
+            "error": error,
+            "finished_at": now_iso(),
+        }
+        if validation_status is not None:
+            values["validation_status"] = validation_status
+        if validation_errors is not None:
+            values["validation_errors"] = _json.dumps(validation_errors)
+        if schema_validated_via is not None:
+            values["schema_validated_via"] = schema_validated_via
+        stmt = (
+            sa_update(Run)
+            .where(getattr(Run, "id") == run_id, getattr(Run, "status") == RS.RUNNING.value)
+            .values(**values)
+        )
+        self._query(stmt)
+
+    def set_conversation(
+        self,
+        run_id: str,
+        conversation_format: str | None,
+        conversation_uri: str | None = None,
+    ) -> None:
+        """Set the conversation format and optional URI columns on a run."""
+        values: dict[str, Any] = {}
+        if conversation_format is not None:
+            values["conversation_format"] = conversation_format
+        if conversation_uri is not None:
+            values["conversation_uri"] = conversation_uri
+        if values:
+            self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(**values))
+
+    def set_post_outcome(
+        self,
+        run_id: str,
+        ok: bool,
+        error_kind: str | None = None,
+        errors: list[dict] | None = None,
+    ) -> None:
+        """Set post-run outcome status (and optional error payload) on a run."""
+        values: dict[str, Any] = {"post_status": "ok" if ok else "fail"}
+        if errors is not None:
+            values["post_errors"] = _json.dumps(
+                {"error_kind": error_kind, "errors": errors}
+            )
+        self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(**values))
+
+    def set_status(self, run_id: str, status: str) -> None:
+        """Directly set the status column on a run."""
+        self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(status=status))
+
+    def list_runs_by_agent(
+        self, limit: int = 50, agent_id: str | None = None
+    ) -> list[Run]:
+        """Recent runs (newest first), optionally filtered by agent_id."""
+        stmt = select(Run).order_by(getattr(Run, "created_at").desc()).limit(limit)
+        if agent_id:
+            stmt = stmt.where(getattr(Run, "agent_id") == agent_id)
+        return self._list(stmt)
+
+    # ── snapshot writes (post-run capture onto the run row) ─────────────
+    def save_snapshot(
+        self,
+        run_id: str,
+        rendered_prompt: dict,
+        variables: dict,
+        validation_status: str,
+        validation_errors: list[str],
+        composition_snapshot: dict | None = None,
+    ) -> None:
+        """Persist the full post-run snapshot onto the run row."""
+        values: dict[str, Any] = {
+            "rendered_prompt": _json.dumps(rendered_prompt),
+            "variables": _json.dumps(variables),
+            "validation_status": validation_status,
+            "validation_errors": _json.dumps(validation_errors),
+        }
+        if composition_snapshot is not None:
+            values["composition_snapshot"] = _json.dumps(composition_snapshot)
+        self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(**values))
+
+    def save_composition(
+        self,
+        run_id: str,
+        composition_snapshot: dict | None,
+        rendered_prompt: dict | None,
+        variables: dict | None,
+    ) -> None:
+        """Persist only composition/prompt/variables fields (partial update)."""
+        values: dict[str, Any] = {}
+        if composition_snapshot is not None:
+            values["composition_snapshot"] = _json.dumps(composition_snapshot)
+        if rendered_prompt is not None:
+            values["rendered_prompt"] = _json.dumps(rendered_prompt)
+        if variables is not None:
+            values["variables"] = _json.dumps(variables)
+        if values:
+            self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(**values))
+
+    def save_resource_snapshots(
+        self,
+        run_id: str,
+        *,
+        resource_snapshot: list[dict] | None = None,
+        mcp_snapshot: dict | None = None,
+    ) -> None:
+        """Persist resource snapshot and/or MCP snapshot JSON onto the run row."""
+        values: dict[str, Any] = {}
+        if resource_snapshot is not None:
+            values["resource_snapshot"] = _json.dumps(resource_snapshot)
+        if mcp_snapshot is not None:
+            values["mcp_snapshot"] = _json.dumps(mcp_snapshot)
+        if values:
+            self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(**values))
+
+    def save_runner_snapshot(self, run_id: str, runner_snapshot: dict) -> None:
+        """Persist the runner config snapshot; append-only (writes only if null)."""
+        stmt = (
+            sa_update(Run)
+            .where(
+                getattr(Run, "id") == run_id,
+                getattr(Run, "runner_snapshot").is_(None),
+            )
+            .values(runner_snapshot=_json.dumps(runner_snapshot))
+        )
+        self._query(stmt)
+
+    def list_orphaned_unnotified(self) -> list[Run]:
+        """Runs whose error mentions 'orphaned' and have no post_status yet."""
+        stmt = (
+            select(Run)
+            .where(
+                getattr(Run, "error").like("%orphaned%"),
+                getattr(Run, "post_status").is_(None),
+            )
+            .order_by(getattr(Run, "finished_at").asc())
+        )
+        return self._list(stmt)
 
     def reap_orphans(
         self,

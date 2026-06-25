@@ -8,11 +8,7 @@ from rich.text import Text
 from agentbox.cli.shared import console, get_store
 from agentbox.core.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
-from agentbox.core.engines import (
-    CredentialState,
-    list_backends,
-    list_credentials as _creds_list,
-)
+from agentbox.core.service.engines import CredentialState, EngineService
 
 app = typer.Typer(
     name="agentbox",
@@ -95,8 +91,9 @@ def doctor() -> None:
         _fail("Database", str(exc))
 
     # 4. Plugins loadable
+    engines = EngineService()
     try:
-        backend_count = len(list_backends())
+        backend_count = len(engines.list_backend_names())
         _ok(
             "Plugins",
             f"{backend_count} backend(s)",
@@ -106,7 +103,7 @@ def doctor() -> None:
 
     # 5. Credentials
     try:
-        rows = _creds_list()
+        rows = engines.list_credentials()
         if not rows:
             _ok("Credentials", "no backends registered")
         else:

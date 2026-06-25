@@ -9,14 +9,10 @@ import typer
 from rich.json import JSON
 from rich.table import Table
 
+from agentbox.core.service.evaluation import ActivityRange, since_iso
 from agentbox.core.service.evaluation.service import EvaluationService
 from agentbox.cli.shared import console, get_store
 import agentbox.core.service.execution as runs
-from agentbox.core.service.execution.feedback import (
-    ActivityRange,
-    enrich_recent_runs,
-    summary,
-)
 
 stat_app = typer.Typer(
     name="stat",
@@ -38,7 +34,7 @@ def stat_activity(
     agent: str | None = typer.Option(None, help="Filter by agent id."),
 ) -> None:
     """Print the activity summary as JSON."""
-    data = summary(get_store(), range_=range_, agent=agent)
+    data = EvaluationService().activity_summary(since_iso(range_), agent=agent)
     console.print(JSON(json.dumps(data, indent=2, default=str)))
 
 
@@ -53,8 +49,7 @@ def stat_runs(
     limit: int = typer.Option(50, help="Max rows to return."),
 ) -> None:
     """List enriched recent runs."""
-    data = enrich_recent_runs(
-        get_store(),
+    data = EvaluationService().list_runs_enriched(
         range_=range_,
         agent=agent,
         executor=executor,

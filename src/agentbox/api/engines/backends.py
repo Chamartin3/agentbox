@@ -13,9 +13,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from agentbox.core.agents.resolve import list_engines as registered_backends
 from agentbox.core.constants import BackendName
-from agentbox.core.engines import list_providers
+from agentbox.core.service.engines import EngineService
 
 router = APIRouter(prefix="/api/runner-backends", tags=["runner-backends"])
 
@@ -44,9 +43,10 @@ _LABELS: dict[str, str] = {
 @router.get("")
 def list_runner_backends() -> list[BackendDescriptor]:
     """List every registered backend along with the providers it accepts."""
-    providers = list_providers()
+    svc = EngineService()
+    providers = svc.list_providers()
     out: list[BackendDescriptor] = []
-    for name, cls in sorted(registered_backends().items()):
+    for name, cls in sorted(svc.backends().items()):
         compatible = [p.id for p in providers if name in (p.compatible_backends or [])]
         out.append(
             BackendDescriptor(

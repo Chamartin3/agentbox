@@ -9,11 +9,8 @@ from rich.text import Text
 from agentbox.cli.shared import console, get_store
 from agentbox.core.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
-from agentbox.core.engines import (
-    CredentialState,
-    list_backends,
-    list_credentials as _creds_list,
-)
+from agentbox.core.service.engines import CredentialState, EngineService
+from agentbox.core.service.execution.service import ExecutionService
 
 
 def doctor() -> None:
@@ -28,7 +25,6 @@ def doctor() -> None:
     table.add_column("Detail")
 
     failures = 0
-    store = get_store()
 
     def _ok(check: str, detail: str = "") -> None:
         table.add_row(Text("OK", style="bold green"), check, detail)
@@ -60,20 +56,20 @@ def doctor() -> None:
         _fail("Workspaces", str(exc))
 
     try:
-        from agentbox.core.service.execution.service import ExecutionService
         ExecutionService().list_runs(limit=1)
         _ok("Database", str(settings.db_path))
     except Exception as exc:
         _fail("Database", str(exc))
 
+    engines = EngineService()
     try:
-        backend_count = len(list_backends())
+        backend_count = len(engines.list_backend_names())
         _ok("Plugins", f"{backend_count} backend(s)")
     except Exception as exc:
         _fail("Plugins", str(exc))
 
     try:
-        rows = _creds_list()
+        rows = engines.list_credentials()
         if not rows:
             _ok("Credentials", "no backends registered")
         else:

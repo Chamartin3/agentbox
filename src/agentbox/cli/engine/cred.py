@@ -12,15 +12,12 @@ from rich.text import Text
 
 from agentbox.cli.shared import console
 from agentbox.core.config import SETTINGS
-from agentbox.core.engines.credentials import (
+from agentbox.core.service.engines import (
     CredentialMethod,
     CredentialState,
+    EngineService,
     Method,
-    get as creds_get,
-    list_all as creds_list_all,
 )
-
-from agentbox.core.engines.credentials import builtin  # noqa: F401
 
 creds_app = typer.Typer(
     name="creds",
@@ -45,12 +42,12 @@ def setup(
     ),
 ) -> None:
     """Interactive credential setup walkthrough."""
-    all_items = creds_list_all()
+    all_items = EngineService().list_credentials()
     if not all_items:
         console.print("[dim]No credential backends registered.[/dim]")
         return
     if name:
-        cm = creds_get(name)
+        cm = EngineService().get_credential(name)
         if cm is None:
             console.print(f"[red]Unknown backend:[/red] {name!r}")
             raise typer.Exit(1)
@@ -137,7 +134,7 @@ def status(
     ),
 ) -> None:
     """Show credential status for every registered backend."""
-    all_items = creds_list_all()
+    all_items = EngineService().list_credentials()
     if not all_items:
         console.print("[dim]No credential backends registered.[/dim]")
         return
@@ -156,7 +153,7 @@ def import_cmd(
     name: str = typer.Argument(..., help="Backend name to import credentials for (e.g. claude)."),
 ) -> None:
     """Non-interactive host credential import for a backend."""
-    cm = creds_get(name)
+    cm = EngineService().get_credential(name)
     if cm is None:
         console.print(f"[red]Unknown backend:[/red] {name!r}")
         raise typer.Exit(1)
@@ -173,7 +170,7 @@ def clear_cmd(
     name: str = typer.Argument(..., help="Backend name to clear credentials for."),
 ) -> None:
     """Remove stored credentials for one backend."""
-    cm = creds_get(name)
+    cm = EngineService().get_credential(name)
     if cm is None:
         console.print(f"[red]Unknown backend:[/red] {name!r}")
         raise typer.Exit(1)

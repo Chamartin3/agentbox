@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db import Database
-from agentbox.core.service import AgentService, EvaluationService, ExecutionService, SessionStore
+from agentbox.core.service import AgentService, EvaluationService, ExecutionService, SessionStore, SystemService
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
@@ -42,6 +42,11 @@ def get_execution_service() -> ExecutionService:
 def get_evaluation_service() -> EvaluationService:
     """Evaluation/analytics service. Uncached — self-wires from settings."""
     return EvaluationService()
+
+
+def get_system_service() -> SystemService:
+    """System/config service. Uncached — self-wires from settings."""
+    return SystemService()
 
 
 # ── Stubs for services not yet migrated (plans 089–092) ──────────────────

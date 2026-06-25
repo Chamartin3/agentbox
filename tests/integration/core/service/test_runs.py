@@ -11,6 +11,7 @@ import pytest
 from agentbox.core.db import AgentDef, SessionStore
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
 import agentbox.core.service.execution as runs_service
+from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution import (
     AgentNotFound,
     InvalidRunInput,
@@ -57,12 +58,17 @@ def _seed_agent(store: SessionStore, agent_id: str = "alpha") -> None:
     store.activate_version(agent_id, row["id"])
 
 
+def _svc() -> ExecutionService:
+    """ExecutionService self-wires to settings.db_path == the test's sqlite."""
+    return ExecutionService()
+
+
 def _seed_run(
     store: SessionStore,
     agent_id: str = "alpha",
     workdir: str = "/tmp/wd",
 ) -> str:
-    return store.create_run(
+    return _svc().create_run(
         agent_id=agent_id,
         input_="hello",
         workdir=workdir,
@@ -77,9 +83,10 @@ def _seed_run_with_usage(
     model: str | None = "haiku",
     tokens: tuple[int, int] = (10, 20),
 ) -> str:
-    rid = store.create_run(agent, "input text", "/tmp/wd", "/tmp/t.jsonl")
+    svc = _svc()
+    rid = svc.create_run(agent, "input text", "/tmp/wd", "/tmp/t.jsonl")
     if model:
-        store.record_usage(
+        svc.record_usage(
             rid,
             {
                 "model": model,
@@ -90,7 +97,7 @@ def _seed_run_with_usage(
         )
     if status != "running":
         ok = status == "ok"
-        store.finish_run(
+        svc.finish_run(
             rid, ok=ok, output="out" if ok else None, error=None if ok else "err"
         )
     return rid
@@ -181,7 +188,7 @@ def test_complete_run_marks_terminal_and_fires_callback(
         schedule_webhook_cb=cb,
     )
     assert result["ok"] is True
-    rec = store.get_run(run_id)
+    rec = _svc().get_run(run_id)
     assert rec.status == "ok"
     assert calls and calls[0][0] == "alpha"
 
@@ -204,7 +211,7 @@ def test_post_outcome_raises_when_unknown(store: SessionStore) -> None:
 async def test_cancel_run_idempotent_on_terminal(store: SessionStore) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
-    store.finish_run(run_id, ok=True, output="done")
+    _svc().finish_run(run_id, ok=True, output="done")
     ex = _FakeExecutor()
     result = await runs_service.cancel_run(run_id, store=store, executor=ex)
     assert result["cancelled"] is False
@@ -279,7 +286,7 @@ def test_list_runs_paged_includes_usage_fields(tmp_path: Path) -> None:
     store = SessionStore(tmp_path / "agentbox.sqlite")
     rid = _seed_run_with_usage(store, "my_agent", "ok", "sonnet-4")
 
-    rows, total = store.list_runs_paged(limit=50)
+    rows, total = _svc()._db.runs.list_runs_paged(limit=50)
 
     assert total == 1
     assert len(rows) == 1
@@ -297,11 +304,10 @@ def test_list_runs_paged_includes_usage_fields(tmp_path: Path) -> None:
 
 def test_list_runs_paged_no_usage_shows_nulls(tmp_path: Path) -> None:
     """Runs without a usage record should have null usage fields."""
-    store = SessionStore(tmp_path / "agentbox.sqlite")
-    rid = store.create_run("no_usage_agent", "in", "/wd", "/t.jsonl")
-    store.finish_run(rid, ok=True, output="out")
+    rid = _svc().create_run("no_usage_agent", "in", "/wd", "/t.jsonl")
+    _svc().finish_run(rid, ok=True, output="out")
 
-    rows, total = store.list_runs_paged(limit=50)
+    rows, total = _svc()._db.runs.list_runs_paged(limit=50)
     assert total == 1
     row = rows[0]
     assert row["id"] == rid
@@ -312,10 +318,9 @@ def test_list_runs_paged_no_usage_shows_nulls(tmp_path: Path) -> None:
 
 def test_list_runs_paged_duration_for_running(tmp_path: Path) -> None:
     """A running run has finished_at = None -> duration_ms is null."""
-    store = SessionStore(tmp_path / "agentbox.sqlite")
-    store.create_run("runner", "in", "/wd", "/t.jsonl")
+    _svc().create_run("runner", "in", "/wd", "/t.jsonl")
 
-    rows, total = store.list_runs_paged(limit=50)
+    rows, total = _svc()._db.runs.list_runs_paged(limit=50)
     assert total == 1
     assert rows[0]["duration_ms"] is None
 
@@ -325,15 +330,15 @@ def test_list_runs_paged_respects_filters(tmp_path: Path) -> None:
     _seed_run_with_usage(store, "a1", "ok", "haiku")
     _seed_run_with_usage(store, "a2", "error", "sonnet")
 
-    rows, total = store.list_runs_paged(agent_id="a1")
+    rows, total = _svc()._db.runs.list_runs_paged(agent_id="a1")
     assert total == 1
     assert rows[0]["agent_id"] == "a1"
 
-    rows, total = store.list_runs_paged(status="error")
+    rows, total = _svc()._db.runs.list_runs_paged(status="error")
     assert total == 1
     assert rows[0]["status"] == "error"
 
-    rows, total = store.list_runs_paged(executor="sonnet")
+    rows, total = _svc()._db.runs.list_runs_paged(executor="sonnet")
     assert total == 1
     assert rows[0]["model"] == "sonnet"
 

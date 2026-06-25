@@ -31,25 +31,23 @@ from agentbox.core.db.engines.profiles import _derive_profile_id
 from agentbox.core.engines import (
     ProviderDescriptor,
     ProviderModel,
+    get_credential,
     get_provider,
+    list_backends,
+    list_credentials,
+    list_models,
     list_providers,
+    refresh_opencode_providers,
 )
+from agentbox.core.engines.credentials import CredentialMethod
+from agentbox.core.engines.credentials import builtin as _cred_builtin  # noqa: F401 (registers credential methods on import)
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines import profile_validation
 
-# ponytail bridges — temporary until EvaluationService (093) and
-# a dedicated providers service reclaim these.
+# ponytail bridges — temporary until a dedicated providers service emerges.
 from agentbox.core.db import SessionStore  # noqa: E402  (ponytail bridge)
 from agentbox.core.config import load_settings  # noqa: E402  (ponytail bridge)
-from agentbox.core.db.feedback.profile_stats import RunnerStatsMixin  # noqa: E402  (ponytail bridge)
 from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
-
-
-class _RunnerStats(RunnerStatsMixin):
-    """ponytail: binds the stats mixin to the Database engine until plan 093."""
-
-    def __init__(self, engine) -> None:
-        self.engine = engine
 
 
 class ProfileNotFound(LookupError):
@@ -236,7 +234,7 @@ class EngineService(Service):
         self._db.runner_profiles.clear_agent_profile(agent_id)
 
     # ------------------------------------------------------------------
-    # Profile stats (pass-through — owned by EvaluationService in 093)
+    # Profile stats (delegates to EvaluationService — plan 093)
     # ------------------------------------------------------------------
 
     def get_profile_stats(
@@ -245,31 +243,25 @@ class EngineService(Service):
         since: str | None = None,
         until: str | None = None,
     ) -> RunnerProfileStats:
-        """Aggregate stats for a single runner profile (temporary bridge).
+        """Aggregate stats for a single runner profile.
 
         Raises ``ProfileNotFound`` if the profile does not exist.
-
-        ponytail: this query lives in ``core/db/feedback/profile_stats.py``
-        and will move to ``EvaluationService`` in plan 093.
         """
+        from agentbox.core.service.evaluation.service import EvaluationService  # noqa: PLC0415
+
         if self._db.runner_profiles.get_by_id(profile_id) is None:
             raise ProfileNotFound(profile_id)
-        return _RunnerStats(self._db.engine).runner_profile_stats(
-            profile_id, since=since, until=until
-        )
+        return EvaluationService().runner_profile_stats(profile_id, since=since, until=until)
 
     def list_profile_stats(
         self,
         since: str | None = None,
         until: str | None = None,
     ) -> list[RunnerProfileStats]:
-        """Aggregate stats for all runner profiles (temporary bridge).
+        """Aggregate stats for all runner profiles."""
+        from agentbox.core.service.evaluation.service import EvaluationService  # noqa: PLC0415
 
-        ponytail: moves to ``EvaluationService`` in plan 093.
-        """
-        return _RunnerStats(self._db.engine).list_runner_profile_stats(
-            since=since, until=until
-        )
+        return EvaluationService().list_runner_profile_stats(since=since, until=until)
 
     # ------------------------------------------------------------------
     # Provider / backend passthrough
@@ -320,3 +312,35 @@ class EngineService(Service):
     def get_backend(self, name: str):
         """Resolve a backend by name."""
         return resolve_engine_by_name(name)
+
+    def list_backend_names(self) -> list[str]:
+        """Sorted names of registered backend adapters."""
+        return list_backends()
+
+    # ── Providers (registry passthrough) ──────────────────────────────
+    def list_providers(self) -> list[ProviderDescriptor]:
+        """All runner provider descriptors."""
+        return list_providers()
+
+    def get_provider(self, provider_id: str):
+        """Return the provider adapter for *provider_id*, or ``None``."""
+        return get_provider(provider_id)
+
+    async def list_provider_models_raw(
+        self, provider_id: str, config: Any, refresh: bool = False
+    ) -> list[ProviderModel]:
+        """List a provider's models via the registry with a resolved config."""
+        return await list_models(provider_id, config, refresh=refresh)
+
+    def refresh_opencode_providers(self):
+        """Re-discover opencode providers; returns the discovered descriptors."""
+        return refresh_opencode_providers()
+
+    # ── Credentials (registry passthrough) ────────────────────────────
+    def list_credentials(self) -> list[CredentialMethod]:
+        """All registered credential methods with resolved state."""
+        return list_credentials()
+
+    def get_credential(self, name: str) -> CredentialMethod | None:
+        """Resolve a single credential method by name, or ``None``."""
+        return get_credential(name)

@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 from agentbox.core.db import AgentDef, SessionStore
+from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
 import agentbox.core.service.execution as runs_service
 from agentbox.core.service.execution import (
@@ -73,7 +74,7 @@ def _seed_run(
     agent_id: str = "alpha",
     workdir: str = "/tmp/wd",
 ) -> str:
-    return store.create_run(
+    return ExecutionService().create_run(
         agent_id=agent_id,
         input_="hello",
         workdir=workdir,
@@ -166,7 +167,7 @@ def test_complete_run_marks_terminal_and_fires_callback(
         schedule_webhook_cb=cb,
     )
     assert result["ok"] is True
-    rec = store.get_run(run_id)
+    rec = ExecutionService().get_run(run_id)
     assert rec.status == "ok"
     assert calls and calls[0][0] == "alpha"
 
@@ -189,7 +190,7 @@ def test_post_outcome_raises_when_unknown(store: SessionStore) -> None:
 async def test_cancel_run_idempotent_on_terminal(store: SessionStore) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
-    store.finish_run(run_id, ok=True, output="done")
+    ExecutionService().finish_run(run_id, ok=True, output="done")
     ex = _FakeExecutor()
     result = await runs_service.cancel_run(run_id, store=store, executor=ex)
     assert result["cancelled"] is False

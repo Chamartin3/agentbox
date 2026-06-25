@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from agentbox.api.deps import get_store
 from agentbox.core.constants import ActivityStateFilter
-from agentbox.core.service.execution.feedback import ActivityRange, enrich_recent_runs, summary
+from agentbox.core.service.evaluation import ActivityRange, since_iso
+from agentbox.core.service.evaluation.service import EvaluationService
 
 router = APIRouter(prefix="/api/activity", tags=["activity"])
 
@@ -17,7 +17,7 @@ def get_summary(
     action: str | None = Query(default=None),
     executor: str | None = Query(default=None),
 ) -> dict:
-    return summary(get_store(), range_=range, agent=action)
+    return EvaluationService().activity_summary(since_iso(range), agent=action)
 
 
 @router.get("/runs")
@@ -28,8 +28,7 @@ def recent_runs(
     state: ActivityStateFilter | None = Query(default=None),
     limit: int = Query(default=50, le=200),
 ) -> dict:
-    return enrich_recent_runs(
-        get_store(),
+    return EvaluationService().list_runs_enriched(
         range_=range,
         agent=action,
         executor=executor,

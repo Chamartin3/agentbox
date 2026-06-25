@@ -13,9 +13,12 @@ unfinished runs). Only accept this as long as we're single-process SQLite.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from agentbox.core.constants import RunStatus
 from agentbox.core.db import now_iso, RunnerSnapshot
+from agentbox.core.execution.observability.conversation import get as _get_conversation_source
+from agentbox.core.execution.observability.conversation.transcript import TranscriptSource
 from agentbox.core.service.base import Service
 
 
@@ -283,3 +286,48 @@ class ExecutionService(Service):
     ) -> None:
         """Persist the runner config snapshot (append-only, writes only if null)."""
         self._runs.save_runner_snapshot(run_id, runner_snapshot)
+
+    # ══════════════════════════════════════════════════════════════════
+    # Conversation
+    # ══════════════════════════════════════════════════════════════════
+
+    def load_conversation(
+        self,
+        run: Any,
+        conversation_format: str | None,
+        *,
+        include_bodies: bool,
+        offset: int,
+        limit: int,
+    ) -> tuple[Any | None, str | None]:
+        """Load a run's runner-native conversation, falling back to the JSONL transcript.
+
+        Returns ``(view, fallback_reason)``. ``fallback_reason`` is None when
+        the runner-native source produced turns, otherwise the reason the
+        fallback fired (``"no_native_source"`` / ``"native_empty"``). When the
+        JSONL transcript itself is missing, returns ``(None, None)`` so the
+        caller can surface ``no_conversation``.
+        """
+        native_view = None
+        if conversation_format is not None:
+            try:
+                src_cls = _get_conversation_source(conversation_format)
+            except KeyError:
+                src_cls = None
+            if src_cls is not None:
+                src = src_cls.for_run(run)
+                if src is not None:
+                    native_view = src.load(
+                        include_bodies=include_bodies, offset=offset, limit=limit
+                    )
+                    if native_view.turns:
+                        return native_view, None
+
+        fb_src = TranscriptSource.for_run(run)
+        if fb_src is None:
+            return native_view, None
+        fb_view = fb_src.load(
+            include_bodies=include_bodies, offset=offset, limit=limit
+        )
+        reason = "native_empty" if native_view is not None else "no_native_source"
+        return fb_view, reason

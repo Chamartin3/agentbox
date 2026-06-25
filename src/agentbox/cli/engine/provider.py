@@ -9,12 +9,6 @@ import typer
 from rich.table import Table
 
 from agentbox.cli.shared import console
-from agentbox.core.engines import (
-    get_provider,
-    list_models as registry_list_models,
-    list_providers,
-    refresh_opencode_providers,
-)
 from agentbox.core.service.engines.service import EngineService, ProfileNotFound
 
 app = typer.Typer(
@@ -27,7 +21,7 @@ app = typer.Typer(
 @app.command("ls")
 def provider_ls() -> None:
     """List available provider descriptors."""
-    descriptors = list_providers()
+    descriptors = EngineService().list_providers()
 
     if not descriptors:
         console.print("[yellow]No providers found.[/yellow]")
@@ -89,7 +83,8 @@ def provider_models(
             backend=None,
         )
 
-    provider = get_provider(provider_id)
+    svc = EngineService()
+    provider = svc.get_provider(provider_id)
     if not provider:
         console.print(f"[red]Provider not found:[/red] {provider_id}")
         raise typer.Exit(1)
@@ -102,7 +97,7 @@ def provider_models(
 
     try:
         models = asyncio.run(
-            registry_list_models(provider_id, config, refresh=refresh)
+            svc.list_provider_models_raw(provider_id, config, refresh=refresh)
         )
     except Exception as e:
         console.print(f"[red]Error fetching models:[/red] {e}")
@@ -133,7 +128,7 @@ def provider_models(
 @app.command("refresh")
 def provider_refresh() -> None:
     """Re-discover dynamic providers (currently: opencode CLI)."""
-    discovered = refresh_opencode_providers()
+    discovered = EngineService().refresh_opencode_providers()
     if not discovered:
         console.print(
             "[yellow]No opencode providers discovered "

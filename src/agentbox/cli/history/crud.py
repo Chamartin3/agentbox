@@ -11,7 +11,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agentbox.cli.shared import console, get_executor, get_store
-from agentbox.core.service import aggregate_usage
+from agentbox.core.service.evaluation.service import EvaluationService
 import agentbox.core.service.execution as runs
 from agentbox.core.service.execution import RunNotFound
 
@@ -77,8 +77,7 @@ def register_ls(parent: typer.Typer) -> None:
             )
         console.print(table)
 
-        store = get_store()
-        agg = aggregate_usage(store=store)
+        agg = EvaluationService().aggregate_usage()
         console.print(
             f"[dim]totals:[/dim] "
             f"[cyan]{agg['input_tokens']}[/cyan] in · "

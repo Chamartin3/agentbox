@@ -8,9 +8,8 @@ import typer
 from rich.table import Table
 
 from agentbox.cli.shared import console
-from agentbox.core.agents.resolve import list_engines as registered_backends
 from agentbox.core.constants import BackendName
-from agentbox.core.engines import list_providers
+from agentbox.core.service.engines import EngineService
 
 app = typer.Typer(
     name="backends",
@@ -34,8 +33,9 @@ def backend_ls(
     ),
 ) -> None:
     """List every registered backend along with compatible providers."""
-    providers = list_providers()
-    rows = sorted(registered_backends().items())
+    svc = EngineService()
+    providers = svc.list_providers()
+    rows = sorted(svc.backends().items())
     if not rows:
         console.print("[yellow]No backends registered.[/yellow]")
         return

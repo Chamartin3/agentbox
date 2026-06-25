@@ -137,7 +137,6 @@ def import_manifest(
       section ``project_runtime``
     """
     settings = get_settings()
-    store = get_store()
 
     if from_path:
         manifest_path = Path(from_path).expanduser()

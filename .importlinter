@@ -50,11 +50,6 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # api → core.agents
-    agentbox.api.engines.backends -> agentbox.core.agents.resolve
-    # api → core.engines
-    agentbox.api.engines.backends -> agentbox.core.engines
-    agentbox.api.engines.providers -> agentbox.core.engines
     # api → core.workspaces
     agentbox.api.agents.grants -> agentbox.core.workspaces.catalog
     agentbox.api.workspaces.catalog -> agentbox.core.workspaces.catalog
@@ -63,15 +58,6 @@ ignore_imports =
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.payload
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.policy
-    # cli → core.agents
-    agentbox.cli.engine.backend -> agentbox.core.agents.resolve
-    # cli → core.engines
-    agentbox.cli.engine.backend -> agentbox.core.engines
-    agentbox.cli.engine.cred -> agentbox.core.engines.credentials
-    agentbox.cli.engine.cred -> agentbox.core.engines.credentials.builtin
-    agentbox.cli.engine.provider -> agentbox.core.engines
-    agentbox.cli.system.doctor -> agentbox.core.engines
-    agentbox.cli.root -> agentbox.core.engines
     # cli → core.resources
     agentbox.cli.ops.resource.repo -> agentbox.core.resources.legacy_composition
     agentbox.cli.resources.repo.manage -> agentbox.core.resources.legacy_composition
@@ -89,9 +75,6 @@ ignore_imports =
     agentbox.cli.root -> agentbox.core.workspaces
     agentbox.cli.system.doctor -> agentbox.core.workspaces
     agentbox.cli.work.ws -> agentbox.core.workspaces
-    # mcp → core.execution
-    agentbox.mcp.tools.runs -> agentbox.core.execution.observability.conversation
-    agentbox.mcp.tools.runs -> agentbox.core.execution.observability.conversation.transcript
 
 
 # ─── Resources is the foundation ─────────────────────────────────────────
