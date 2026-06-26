@@ -1,0 +1,980 @@
+"""ResourceService — the resource-domain public service object.
+
+All repo-resource CRUD, version lifecycle, import dispatch, blob reads,
+materialization, shared resource CRUD, and prompt/workspace bindings live here.
+
+Callers construct with no arguments:  ``ResourceService()``
+The Database is resolved internally from settings.
+
+Import constraints (resources-foundation):
+  ``core.resources`` (the domain) must not import agents/workspaces/execution.
+  This *service* module (``core.service.resources``) is not subject to that rule
+  and may freely import from other service layers and domain helpers.
+"""
+from __future__ import annotations
+
+import io
+import json
+import zipfile
+from pathlib import Path
+from typing import Any, Literal
+
+from jsonschema import Draft202012Validator
+
+from agentbox.core.agents.composition.preview import render_agent_prompt_preview
+from agentbox.core.agents.composition.rendering import render_for_type
+from agentbox.core.constants import ResourceType
+from agentbox.core.db import SessionStore
+from agentbox.core.db.resources.shared._models import SharedResourceRecord
+from agentbox.core.resources.importers.base import ImporterContext
+from agentbox.core.resources.importers.host_path import HostPathImporter
+from agentbox.core.resources.importers.schema import SchemaImporter
+from agentbox.core.resources.importers.script import ScriptImporter
+from agentbox.core.resources.importers.skill import SkillImporter
+from agentbox.core.resources.importers.upload import UploadImporter
+from agentbox.core.resources.importers.zip import ZipUploadImporter
+from agentbox.core.resources.pydantic_export import schema_to_pydantic
+from agentbox.core.service.base import Service
+
+
+class ResourceNotFound(LookupError):
+    def __init__(self, resource_id: str) -> None:
+        super().__init__(f"resource {resource_id!r} not found")
+        self.resource_id = resource_id
+
+
+class InvalidResource(ValueError):
+    """Resource exists but the requested operation is invalid for it."""
+
+
+class NoActiveVersion(LookupError):
+    def __init__(self, resource_id: str) -> None:
+        super().__init__(f"no active version for resource {resource_id!r}")
+        self.resource_id = resource_id
+
+
+class BindingError(ValueError):
+    """Binding validation rejection."""
+
+
+class AgentVersionMissing(LookupError):
+    def __init__(self, agent_id: str) -> None:
+        super().__init__(f"no agent version found for {agent_id!r}")
+        self.agent_id = agent_id
+
+
+class ResourceService(Service):
+    """Resource domain: shared resources, repo resources, version lifecycle,
+    blob storage, import dispatch, materialization, and bindings.
+
+    ponytail: cross-domain reach — uses self._db.workspace_subagents for subagent
+    operations until WorkspaceService (plan 089) is ready to own that surface.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._resources = self._db.resources
+        self._resource_versions = self._db.resource_versions
+        self._resource_blobs = self._db.resource_blobs
+        self._active_resource_versions = self._db.active_resource_versions
+        self._shared_resources = self._db.shared_resources
+        self._prompt_bindings = self._db.agent_prompt_resource_bindings
+        self._file_bindings = self._db.workspace_file_resource_bindings
+        # ponytail: cross-domain manager reach (see class docstring)
+        self._subagents = self._db.workspace_subagents
+
+    # -----------------------------------------------------------------------
+    # Internal helpers
+    # -----------------------------------------------------------------------
+
+    def _resolve_or_raise(self, id_or_slug: str) -> str:
+        rid = self.resolve_resource_id(id_or_slug)
+        if rid is None:
+            raise ResourceNotFound(id_or_slug)
+        return rid
+
+    def _active_version_or_raise(self, resource_id: str) -> dict:
+        active = self._resource_versions.get_active_version(resource_id)
+        if not active:
+            raise NoActiveVersion(resource_id)
+        return active
+
+    def _require_resource(self, resource_id: str) -> dict:
+        r = self._resources.get_resource(resource_id)
+        if not r:
+            raise ResourceNotFound(resource_id)
+        return r
+
+    def _import_with(
+        self,
+        resource_id: str,
+        importer: Any,
+        *,
+        changelog: str,
+        draft: bool,
+        actor: str | None,
+    ) -> dict:
+        try:
+            result = importer.run(ImporterContext(actor=actor, changelog=changelog))
+        except (FileNotFoundError, ValueError) as exc:
+            raise InvalidResource(str(exc)) from exc
+        try:
+            return self._resource_versions.import_version(
+                resource_id,
+                result.blobs,
+                import_source=result.import_source,
+                changelog=changelog,
+                source_metadata=result.source_metadata,
+                metadata=result.metadata,
+                draft=draft,
+                created_by=actor,
+            )
+        except ValueError as exc:
+            raise InvalidResource(str(exc)) from exc
+
+    # -----------------------------------------------------------------------
+    # Repo resource ID resolution
+    # -----------------------------------------------------------------------
+
+    def resolve_resource_id(self, id_or_slug: str) -> str | None:
+        """Return the resource id for a given id or slug, or None if not found."""
+        if not id_or_slug:
+            return None
+        r = self._resources.get_resource(id_or_slug)
+        if r:
+            return r["id"]
+        r = self._resources.get_by_slug(id_or_slug)
+        if r:
+            return r["id"]
+        if "." in id_or_slug and "/" not in id_or_slug:
+            candidate = id_or_slug.replace(".", "/")
+            r = self._resources.get_by_slug(candidate)
+            if r:
+                return r["id"]
+        return None
+
+    # -----------------------------------------------------------------------
+    # Repo resource CRUD
+    # -----------------------------------------------------------------------
+
+    def list_resources(
+        self,
+        *,
+        type: ResourceType | None = None,
+        query: str | None = None,
+        include_deleted: bool = False,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """Paginated list of repo resources."""
+        type_str = type.value if isinstance(type, ResourceType) else type
+        items = self._resources.list_resources(
+            type=type_str,
+            query=query,
+            include_deleted=include_deleted,
+            limit=limit,
+            offset=offset,
+        )
+        total = self._resources.count_resources(
+            type=type_str, query=query, include_deleted=include_deleted
+        )
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    def create_resource(
+        self,
+        *,
+        slug: str,
+        type: ResourceType | str,
+        display_name: str,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        created_by: str | None = None,
+    ) -> dict:
+        """Create a new repo resource."""
+        type_str = type.value if isinstance(type, ResourceType) else type
+        try:
+            return self._resources.create_resource(
+                slug=slug,
+                type=type_str,
+                display_name=display_name,
+                description=description,
+                tags=tags or [],
+                created_by=created_by,
+            )
+        except ValueError as exc:
+            raise InvalidResource(str(exc)) from exc
+
+    def get_resource(self, resource_id: str) -> dict:
+        """Return {resource, active_version} for a repo resource."""
+        rid = self._resolve_or_raise(resource_id)
+        r = self._resources.get_resource(rid)
+        active = (
+            self._resource_versions.get_active_version(rid)
+            if r and r.get("active_version_id")
+            else None
+        )
+        return {"resource": r, "active_version": active}
+
+    def get_resource_row(self, resource_id: str) -> dict | None:
+        """Return the raw resource row dict by id, or None."""
+        return self._resources.get_resource(resource_id)
+
+    def get_by_slug(self, slug: str) -> dict | None:
+        """Return the raw resource row dict by slug, or None."""
+        return self._resources.get_by_slug(slug)
+
+    def update_resource(
+        self,
+        resource_id: str,
+        *,
+        display_name: str | None = None,
+        description: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict:
+        """Update resource metadata and return updated row."""
+        rid = self._resolve_or_raise(resource_id)
+        updated = self._resources.update_resource(
+            rid, display_name=display_name, description=description, tags=tags
+        )
+        if updated is None:
+            raise ResourceNotFound(resource_id)
+        return updated
+
+    def list_versions(self, resource_id: str) -> dict:
+        """Return {items: [...]} of all versions for a repo resource."""
+        rid = self._resolve_or_raise(resource_id)
+        return {"items": self._resource_versions.list_versions(rid)}
+
+    def publish_version(
+        self,
+        resource_id: str,
+        version_id: str,
+        *,
+        reason: str,
+        actor: str | None = None,
+    ) -> dict:
+        """Promote a draft version to active."""
+        v = self._resource_versions.get_version(version_id)
+        if not v or v["resource_id"] != resource_id:
+            raise ResourceNotFound(version_id)
+        try:
+            return self._resource_versions.publish_version(
+                version_id, reason=reason, activated_by=actor
+            )
+        except ValueError as exc:
+            raise InvalidResource(str(exc)) from exc
+
+    def rollback_resource(
+        self,
+        resource_id: str,
+        *,
+        target_version: int,
+        reason: str,
+        actor: str | None = None,
+    ) -> dict:
+        """Create a new version copying blobs from ``target_version``."""
+        self._require_resource(resource_id)
+        try:
+            return self._resource_versions.rollback_resource(
+                resource_id, target_version, reason=reason, activated_by=actor
+            )
+        except ValueError as exc:
+            raise InvalidResource(str(exc)) from exc
+
+    def soft_delete_resource(self, resource_id: str, *, reason: str) -> None:
+        """Soft-delete a repo resource."""
+        self._require_resource(resource_id)
+        self._resources.soft_delete(resource_id, reason=reason)
+
+    # -----------------------------------------------------------------------
+    # Version import operations
+    # -----------------------------------------------------------------------
+
+    def import_upload_version(
+        self,
+        resource_id: str,
+        *,
+        filename: str,
+        content: bytes,
+        mime_type: str | None,
+        changelog: str,
+        draft: bool = False,
+        actor: str | None = None,
+    ) -> dict:
+        """Import a single-file upload as a new version."""
+        self._require_resource(resource_id)
+        importer = UploadImporter(
+            filename=filename or "upload.bin", content=content, mime_type=mime_type
+        )
+        return self._import_with(
+            resource_id, importer, changelog=changelog, draft=draft, actor=actor
+        )
+
+    def import_host_path_version(
+        self,
+        resource_id: str,
+        *,
+        path: str,
+        include: list[str],
+        exclude: list[str],
+        changelog: str,
+        draft: bool = False,
+        actor: str | None = None,
+    ) -> dict:
+        """Import from a host filesystem path as a new version."""
+        resource = self._require_resource(resource_id)
+        importer_cls = (
+            SkillImporter if resource["type"] == "skill" else HostPathImporter
+        )
+        default_exclude = importer_cls.__dataclass_fields__["exclude"].default_factory()
+        importer = importer_cls(
+            root=Path(path),
+            include=tuple(include),
+            exclude=tuple(exclude) or default_exclude,
+        )
+        return self._import_with(
+            resource_id, importer, changelog=changelog, draft=draft, actor=actor
+        )
+
+    def import_zip_version(
+        self,
+        resource_id: str,
+        *,
+        filename: str,
+        content: bytes,
+        changelog: str,
+        draft: bool = False,
+        actor: str | None = None,
+    ) -> dict:
+        """Import a ZIP archive as a new version (folder/skill only)."""
+        resource = self._require_resource(resource_id)
+        if resource["type"] not in ("folder", "skill"):
+            raise InvalidResource(
+                f"zip upload only valid for folder/skill (got {resource['type']!r})"
+            )
+        importer = ZipUploadImporter(
+            filename=filename or "upload.zip",
+            content=content,
+            as_skill=resource["type"] == "skill",
+        )
+        return self._import_with(
+            resource_id, importer, changelog=changelog, draft=draft, actor=actor
+        )
+
+    def import_schema_version(
+        self,
+        resource_id: str,
+        *,
+        filename: str,
+        content: bytes,
+        changelog: str,
+        draft: bool = False,
+        actor: str | None = None,
+    ) -> dict:
+        """Import a JSON schema file as a new version (schema resources only)."""
+        resource = self._require_resource(resource_id)
+        if resource["type"] != "schema":
+            raise InvalidResource("resource is not of type 'schema'")
+        importer = SchemaImporter(filename=filename or "schema.json", content=content)
+        return self._import_with(
+            resource_id, importer, changelog=changelog, draft=draft, actor=actor
+        )
+
+    def import_script_version(
+        self,
+        resource_id: str,
+        *,
+        filename: str,
+        content: bytes,
+        changelog: str,
+        language: str | None = None,
+        input_schema_resource_id: str | None = None,
+        output_schema_resource_id: str | None = None,
+        draft: bool = False,
+        actor: str | None = None,
+    ) -> dict:
+        """Import a script file as a new version (script resources only)."""
+        resource = self._require_resource(resource_id)
+        if resource["type"] != "script":
+            raise InvalidResource("resource is not of type 'script'")
+        importer = ScriptImporter(
+            filename=filename or "script",
+            content=content,
+            language=language,
+            input_schema_resource_id=input_schema_resource_id,
+            output_schema_resource_id=output_schema_resource_id,
+        )
+        return self._import_with(
+            resource_id, importer, changelog=changelog, draft=draft, actor=actor
+        )
+
+    # -----------------------------------------------------------------------
+    # Materialization & rendering
+    # -----------------------------------------------------------------------
+
+    def get_blob(
+        self,
+        resource_id: str,
+        *,
+        path: str = "",
+        version_id: str | None = None,
+    ) -> dict:
+        """Return a blob dict for the given resource and path."""
+        rid = self._resolve_or_raise(resource_id)
+        vid: str = version_id or self._active_version_or_raise(rid)["id"]
+        blob = self._resource_blobs.get_blob(vid, path)
+        if not blob:
+            raise ResourceNotFound(f"blob @ {path!r}")
+        return blob
+
+    def render_resource(
+        self, resource_id: str, *, version_id: str | None = None
+    ) -> dict:
+        """Render a resource as text (inline / manifest / skill_primer)."""
+        rid = self._resolve_or_raise(resource_id)
+        resource = self._require_resource(rid)
+        vid: str = version_id or self._active_version_or_raise(rid)["id"]
+        blobs = list(self._resource_blobs.iter_blobs(vid))
+        return {"resource_id": rid, "version_id": vid, **render_for_type(resource["type"], blobs)}
+
+    def get_tree(self, resource_id: str, *, version_id: str | None = None) -> dict:
+        """Return the file tree for a versioned resource."""
+        rid = self._resolve_or_raise(resource_id)
+        vid: str = version_id or self._active_version_or_raise(rid)["id"]
+        entries = [
+            {
+                "relative_path": b.get("relative_path") or "",
+                "size_bytes": b.get("size_bytes"),
+                "mime_type": b.get("mime_type"),
+            }
+            for b in self._resource_blobs.iter_blobs(vid)
+        ]
+        return {"version_id": vid, "entries": entries}
+
+    def export_pydantic(
+        self,
+        resource_id: str,
+        *,
+        class_name: str = "Model",
+        version_id: str | None = None,
+    ) -> str:
+        """Export a schema resource as Python Pydantic model source."""
+        resource = self._require_resource(resource_id)
+        if resource["type"] != "schema":
+            raise InvalidResource("resource is not of type 'schema'")
+        vid: str = version_id or self._active_version_or_raise(resource_id)["id"]
+        blob = self._resource_blobs.get_blob(vid, "")
+        if not blob:
+            raise ResourceNotFound("schema blob")
+        schema_text = blob.get("content_text") or blob["content"].decode("utf-8")
+        try:
+            return schema_to_pydantic(schema_text, class_name=class_name)
+        except Exception as exc:
+            raise InvalidResource(f"export failed: {exc}") from exc
+
+    def validate_script_sample(
+        self,
+        resource_id: str,
+        *,
+        sample: Any,
+        direction: Literal["input", "output"] = "input",
+    ) -> dict:
+        """Validate a sample against the script's bound schema."""
+        resource = self._require_resource(resource_id)
+        if resource["type"] != "script":
+            raise InvalidResource("resource is not of type 'script'")
+        active = self._active_version_or_raise(resource_id)
+        raw_meta = active.get("metadata_json")
+        metadata = json.loads(raw_meta) if raw_meta else {}
+        key = "input_schema_resource_id" if direction == "input" else "output_schema_resource_id"
+        schema_id = metadata.get(key)
+        if not schema_id:
+            raise InvalidResource(f"script has no bound {direction} schema")
+        schema_active = self._resource_versions.get_active_version(schema_id)
+        if not schema_active:
+            raise InvalidResource("bound schema has no active version")
+        schema_blob = self._resource_blobs.get_blob(schema_active["id"], "")
+        if not schema_blob:
+            raise InvalidResource("schema blob missing")
+        schema_doc = json.loads(schema_blob.get("content_text") or schema_blob["content"])
+        validator = Draft202012Validator(schema_doc)
+        errors = [
+            {"path": list(e.absolute_path), "message": e.message}
+            for e in validator.iter_errors(sample)
+        ]
+        return {"valid": not errors, "errors": errors, "schema_resource_id": schema_id}
+
+    def export_zip(
+        self, resource_id: str, *, version_id: str | None = None
+    ) -> tuple[bytes, str]:
+        """Export a folder/skill resource as a ZIP archive."""
+        resource = self._require_resource(resource_id)
+        if resource["type"] not in ("folder", "skill"):
+            raise InvalidResource("zip export only supported for folder/skill")
+        vid: str = version_id or self._active_version_or_raise(resource_id)["id"]
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for blob in self._resource_blobs.iter_blobs(vid):
+                rel = blob.get("relative_path") or ""
+                if not rel:
+                    continue
+                zf.writestr(rel, blob["content"])
+        filename = f"{resource['slug'].replace(':', '_')}.zip"
+        return buf.getvalue(), filename
+
+    def preview_modes(self, resource_id: str) -> dict:
+        """Return available preview modes for a resource."""
+        resource = self._resources.get_resource(resource_id)
+        if not resource:
+            raise ResourceNotFound(resource_id)
+        active = self._resource_versions.get_active_version(resource_id)
+        if not active:
+            return {"modes": []}
+        blobs = list(self._resource_blobs.iter_blobs(active["id"]))
+        rtype = resource["type"]
+        modes: list[dict] = []
+        if rtype == "document":
+            modes.append({"mode": "inline", **render_for_type("document", blobs)})
+        if rtype == "folder":
+            modes.append({"mode": "manifest", **render_for_type("folder", blobs)})
+        if rtype == "skill":
+            modes.append({"mode": "skill_primer", **render_for_type("skill", blobs)})
+            modes.append(
+                {"mode": "name_only", "text": f"- {resource['display_name']}", "metadata": {"role": "name_only"}}
+            )
+        return {"modes": modes}
+
+    # -----------------------------------------------------------------------
+    # Prompt (agent) resource bindings
+    # -----------------------------------------------------------------------
+
+    def list_prompt_resources(self, agent_id: str) -> dict:
+        """Return enriched prompt bindings for an agent."""
+        bindings = self._prompt_bindings.list_for_agent(agent_id)
+        enriched = []
+        for b in bindings:
+            resource = self._resources.get_resource(b["resource_id"])
+            active = (
+                self._resource_versions.get_active_version(b["resource_id"])
+                if resource
+                else None
+            )
+            enriched.append(
+                {
+                    **b,
+                    "attach_as_reference": bool(b.get("attach_as_reference")),
+                    "resource_slug": resource["slug"] if resource else None,
+                    "resource_type": resource["type"] if resource else None,
+                    "resource_display_name": resource["display_name"] if resource else None,
+                    "active_version_id": active["id"] if active else None,
+                }
+            )
+        return {"items": enriched}
+
+    def replace_prompt_resources(
+        self,
+        agent_id: str,
+        bindings: list[dict],
+        *,
+        reason: str,
+        actor: str | None = None,
+    ) -> dict:
+        """Atomically replace all prompt bindings for an agent."""
+        try:
+            return {"items": self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)}
+        except ValueError as exc:
+            raise BindingError(str(exc)) from exc
+
+    def preview_prompt(
+        self,
+        agent_id: str,
+        *,
+        store: SessionStore,
+        template: str | None = None,
+        bindings_override: list[dict] | None = None,
+    ) -> dict:
+        """Render a preview of the agent prompt with resource bindings resolved.
+
+        ponytail: accepts store for the agent-domain operations (get_active_version,
+        latest_version). This coupling is removed when AgentService exposes these
+        methods and callers switch to passing an AgentService instead.
+        """
+        if template is None:
+            active = store.get_active_version(agent_id) or store.latest_version(agent_id)
+            if active is None:
+                raise AgentVersionMissing(agent_id)
+            template = active.get("prompt_content") or ""
+        return render_agent_prompt_preview(
+            store, agent_id=agent_id, template=template, bindings_override=bindings_override
+        )
+
+    def list_prompt_bindings_raw(self, agent_id: str) -> list[dict]:
+        """Return raw (unenriched) prompt binding rows for an agent."""
+        return self._prompt_bindings.list_for_agent(agent_id)
+
+    def replace_prompt_bindings_raw(
+        self,
+        agent_id: str,
+        bindings: list[dict],
+        *,
+        reason: str,
+        actor: str | None = None,
+    ) -> list[dict]:
+        """Replace prompt bindings and return raw rows."""
+        return self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)
+
+    # -----------------------------------------------------------------------
+    # Workspace file resource bindings
+    # -----------------------------------------------------------------------
+
+    def list_workspace_resources(self, workspace_id: str) -> dict:
+        """Return enriched workspace file bindings."""
+        bindings = self._file_bindings.list_for_workspace(workspace_id)
+        enriched = []
+        for b in bindings:
+            resource = self._resources.get_resource(b["resource_id"])
+            active = (
+                self._resource_versions.get_active_version(b["resource_id"])
+                if resource
+                else None
+            )
+            enriched.append(
+                {
+                    **b,
+                    "resource_slug": resource["slug"] if resource else None,
+                    "resource_type": resource["type"] if resource else None,
+                    "active_version_id": active["id"] if active else None,
+                }
+            )
+        return {"items": enriched}
+
+    def replace_workspace_resources(
+        self,
+        workspace_id: str,
+        bindings: list[dict],
+        *,
+        reason: str,
+        actor: str | None = None,
+    ) -> dict:
+        """Atomically replace workspace file bindings."""
+        try:
+            items = self._file_bindings.replace_for_workspace(
+                workspace_id, bindings, reason=reason, actor=actor
+            )
+        except ValueError as exc:
+            raise BindingError(str(exc)) from exc
+        return {"items": items}
+
+    def dry_run_workspace_resources(self, workspace_id: str) -> dict:
+        """Compute the materialization plan without writing anything."""
+        bindings = self._file_bindings.list_for_workspace(workspace_id)
+        entries: list[dict] = []
+        seen_paths: dict[str, str] = {}
+        conflicts: list[dict] = []
+        for b in bindings:
+            resource = self._resources.get_resource(b["resource_id"])
+            if not resource:
+                conflicts.append(
+                    {"binding_id": b["id"], "issue": f"resource {b['resource_id']!r} not found"}
+                )
+                continue
+            version_id = b.get("pinned_version_id")
+            if not version_id:
+                active = self._resource_versions.get_active_version(b["resource_id"])
+                if not active:
+                    conflicts.append(
+                        {"binding_id": b["id"], "issue": f"resource {resource['slug']} has no active version"}
+                    )
+                    continue
+                version_id = active["id"]
+            blobs = list(self._resource_blobs.iter_blobs(version_id))
+            target_path = b.get("target_path") or resource["display_name"]
+            entries.append(
+                {
+                    "binding_id": b["id"],
+                    "resource_id": b["resource_id"],
+                    "resource_slug": resource["slug"],
+                    "resource_type": resource["type"],
+                    "version_id": version_id,
+                    "target_path": target_path,
+                    "file_count": len(blobs),
+                    "materialize_mode": b["materialize_mode"],
+                    "on_conflict": b["on_conflict"],
+                }
+            )
+            if target_path in seen_paths:
+                conflicts.append(
+                    {"binding_id": b["id"], "issue": f"target_path {target_path!r} also used by binding {seen_paths[target_path]}"}
+                )
+            else:
+                seen_paths[target_path] = b["id"]
+        return {"entries": entries, "conflicts": conflicts}
+
+    def list_workspace_file_bindings_raw(self, workspace_id: str) -> list[dict]:
+        """Return raw (unenriched) workspace file binding rows."""
+        return self._file_bindings.list_for_workspace(workspace_id)
+
+    def replace_workspace_file_bindings_raw(
+        self,
+        workspace_id: str,
+        bindings: list[dict],
+        *,
+        reason: str,
+        actor: str | None = None,
+    ) -> list[dict]:
+        """Replace workspace file bindings and return raw rows."""
+        return self._file_bindings.replace_for_workspace(
+            workspace_id, bindings, reason=reason, actor=actor
+        )
+
+    # -----------------------------------------------------------------------
+    # Workspace skill bindings
+    # -----------------------------------------------------------------------
+
+    def list_workspace_skill_bindings(self, workspace_id: str) -> dict:
+        """Return all skill resources with a 'bound' flag for the workspace."""
+        catalog = self._resources.list_resources(type="skill", limit=500)
+        current = self._file_bindings.list_for_workspace(workspace_id)
+        bound_ids: set[str] = set()
+        for b in current:
+            resource = self._resources.get_resource(b["resource_id"])
+            if resource and resource.get("type") == "skill":
+                bound_ids.add(b["resource_id"])
+        items = [{**r, "bound": r["id"] in bound_ids} for r in catalog]
+        return {"items": items}
+
+    def replace_workspace_skill_bindings(
+        self,
+        workspace_id: str,
+        skill_resource_ids: list[str],
+        *,
+        reason: str = "skill bindings update",
+        actor: str | None = None,
+    ) -> dict:
+        """Replace only the skill-type bindings for a workspace."""
+        try:
+            items = self._file_bindings.replace_skill_bindings(
+                workspace_id, skill_resource_ids, reason=reason, actor=actor
+            )
+        except ValueError as exc:
+            raise BindingError(str(exc)) from exc
+        return {"items": items}
+
+    # -----------------------------------------------------------------------
+    # Workspace subagents (ponytail: will move to WorkspaceService plan 089)
+    # -----------------------------------------------------------------------
+
+    def list_workspace_subagents_raw(self, workspace_id: str) -> list[dict]:
+        """Return raw subagent rows for a workspace."""
+        return self._subagents.list_for_workspace(workspace_id)
+
+    def replace_workspace_subagents(
+        self,
+        workspace_id: str,
+        subagents: list[dict],
+        *,
+        actor: str | None = None,
+    ) -> list[dict]:
+        """Atomically replace workspace subagents and return rows."""
+        return self._subagents.replace_for_workspace(workspace_id, subagents, actor=actor)
+
+    # -----------------------------------------------------------------------
+    # Shared resources (legacy cross-consumer API; will outlive the repo API)
+    # -----------------------------------------------------------------------
+
+    def get_shared_resource(self, id: str, version: int) -> SharedResourceRecord | None:
+        return self._shared_resources.get_versioned(id, version)
+
+    def get_active_shared_resource(self, id: str) -> SharedResourceRecord | None:
+        return self._shared_resources.get_active(id)
+
+    def list_shared_resources(
+        self,
+        *,
+        kind: str | None = None,
+        q: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[SharedResourceRecord]:
+        return self._shared_resources.list_active(kind=kind, q=q, limit=limit, offset=offset)
+
+    def count_shared_resources(self, *, kind: str | None = None, q: str | None = None) -> int:
+        return self._shared_resources.count_active(kind=kind, q=q)
+
+    def list_shared_resource_versions(
+        self, id: str, *, limit: int = 50, offset: int = 0
+    ) -> list[SharedResourceRecord]:
+        return self._shared_resources.list_versions(id, limit=limit, offset=offset)
+
+    def create_shared_resource(
+        self,
+        id: str,
+        kind: str,
+        name: str,
+        *,
+        description: str | None = None,
+        content: str | None = None,
+        config_json: str | None = None,
+        author: str | None = None,
+        changelog: str | None = None,
+        tags: list[str] | None = None,
+        activate: bool = True,
+    ) -> SharedResourceRecord:
+        return self._shared_resources.create(
+            id, kind, name,
+            description=description,
+            content=content,
+            config_json=config_json,
+            author=author,
+            changelog=changelog,
+            tags=tags,
+            activate=activate,
+        )
+
+    def create_shared_resource_version(
+        self,
+        id: str,
+        *,
+        content: str | None = None,
+        config_json: str | None = None,
+        author: str | None = None,
+        changelog: str | None = None,
+        activate: bool = False,
+        **fields_to_update,
+    ) -> SharedResourceRecord:
+        return self._shared_resources.create_version(
+            id,
+            content=content,
+            config_json=config_json,
+            author=author,
+            changelog=changelog,
+            activate=activate,
+            **fields_to_update,
+        )
+
+    def activate_shared_resource(self, id: str, version: int) -> SharedResourceRecord:
+        return self._shared_resources.activate_version(id, version)
+
+    # -----------------------------------------------------------------------
+    # Transitional helpers: thin wrappers for callers using old store.* names
+    # These keep existing import-compatible aliases alive during migration.
+    # -----------------------------------------------------------------------
+
+    def list_repo_resources(self, *, type: str | None = None, limit: int = 50) -> list[dict]:
+        """Thin alias: list repo resources (returns plain list, not paginated dict)."""
+        return self._resources.list_resources(type=type, limit=limit)
+
+    def get_repo_resource(self, resource_id: str) -> dict | None:
+        """Thin alias: fetch raw resource row by id."""
+        return self._resources.get_resource(resource_id)
+
+    def get_repo_resource_by_slug(self, slug: str) -> dict | None:
+        """Thin alias: fetch raw resource row by slug."""
+        return self._resources.get_by_slug(slug)
+
+    def create_repo_resource(
+        self,
+        slug: str,
+        type: str,
+        display_name: str,
+        *,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        created_by: str | None = None,
+    ) -> dict:
+        """Thin alias: create a resource (positional slug/type/display_name)."""
+        return self.create_resource(
+            slug=slug, type=type, display_name=display_name,
+            description=description, tags=tags, created_by=created_by,
+        )
+
+    def import_version_blobs(
+        self,
+        resource_id: str,
+        blobs: list[tuple[str, bytes, str | None, str | None]],
+        *,
+        import_source: str,
+        changelog: str,
+        source_metadata: dict | None = None,
+        metadata: dict | None = None,
+        draft: bool = False,
+        created_by: str | None = None,
+        activate: bool = True,
+    ) -> dict:
+        """Thin alias: import a version from pre-built blobs (used by MCP/CLI)."""
+        return self._resource_versions.import_version(
+            resource_id, blobs,
+            import_source=import_source,
+            changelog=changelog,
+            source_metadata=source_metadata,
+            metadata=metadata,
+            draft=draft,
+            created_by=created_by,
+            activate=activate,
+        )
+
+    def list_repo_versions(self, resource_id: str) -> list[dict]:
+        """Thin alias: list versions for a resource (returns plain list)."""
+        return self._resource_versions.list_versions(resource_id)
+
+    def publish_repo_version(
+        self, version_id: str, *, reason: str, activated_by: str | None = None
+    ) -> dict:
+        """Thin alias: publish a draft version by id (not requiring resource_id guard)."""
+        try:
+            return self._resource_versions.publish_version(version_id, reason=reason, activated_by=activated_by)
+        except ValueError as exc:
+            raise InvalidResource(str(exc)) from exc
+
+    def rollback_repo_resource(
+        self, resource_id: str, target_version: int, *, reason: str, activated_by: str | None = None
+    ) -> dict:
+        """Thin alias: rollback without requiring prior resource existence check."""
+        try:
+            return self._resource_versions.rollback_resource(
+                resource_id, target_version, reason=reason, activated_by=activated_by
+            )
+        except ValueError as exc:
+            raise InvalidResource(str(exc)) from exc
+
+    def get_active_repo_version(self, resource_id: str) -> dict | None:
+        """Thin alias: return the active version row for a resource, or None."""
+        return self._resource_versions.get_active_version(resource_id)
+
+    def iter_repo_blobs(self, version_id: str):
+        """Thin alias: yield blob dicts for a version."""
+        return self._resource_blobs.iter_blobs(version_id)
+
+    def read_repo_blob(self, version_id: str, relative_path: str = "") -> dict | None:
+        """Thin alias: fetch a single blob row."""
+        return self._resource_blobs.get_blob(version_id, relative_path)
+
+    def list_prompt_bindings(self, agent_id: str) -> list[dict]:
+        """Thin alias: raw prompt bindings list."""
+        return self._prompt_bindings.list_for_agent(agent_id)
+
+    def replace_prompt_bindings(
+        self, agent_id: str, bindings: list[dict], *, reason: str, actor: str | None = None
+    ) -> list[dict]:
+        """Thin alias: replace prompt bindings, return raw rows."""
+        return self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)
+
+    def list_workspace_file_bindings(self, workspace_id: str) -> list[dict]:
+        """Thin alias: raw workspace file bindings list."""
+        return self._file_bindings.list_for_workspace(workspace_id)
+
+    def replace_workspace_file_bindings(
+        self, workspace_id: str, bindings: list[dict], *, reason: str, actor: str | None = None
+    ) -> list[dict]:
+        """Thin alias: replace workspace file bindings, return raw rows."""
+        return self._file_bindings.replace_for_workspace(
+            workspace_id, bindings, reason=reason, actor=actor
+        )
+
+    def replace_workspace_skill_bindings_raw(
+        self, workspace_id: str, skill_resource_ids, *, reason: str = "skill bindings update", actor: str | None = None
+    ) -> list[dict]:
+        """Thin alias: replace skill bindings, return raw rows."""
+        return self._file_bindings.replace_skill_bindings(
+            workspace_id, skill_resource_ids, reason=reason, actor=actor
+        )
