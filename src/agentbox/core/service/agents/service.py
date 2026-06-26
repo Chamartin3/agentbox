@@ -20,13 +20,27 @@ import hashlib
 import json
 import logging
 import uuid
-from typing import Any, cast
+from typing import Any
 
 from agentbox.core.agents.composition.drift import _build_config_json, _build_snapshot
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.config import load_settings
 from agentbox.core.constants import SessionMode
-from agentbox.core.db import AgentDef, AgentVersionRow, SessionStore, now_iso
+from agentbox.core.db import (
+    AgentConfigEventRow,
+    AgentDef,
+    AgentMetaRow,
+    AgentSyncRow,
+    AgentToolGrantRow,
+    AgentVersionCommentRow,
+    AgentVersionFileRow,
+    AgentVersionRatingRow,
+    AgentVersionRow,
+    PromptVersionRow,
+    SessionStore,
+    VersionFileUploadRow,
+    now_iso,
+)
 from agentbox.core.service.agents.crud import (
     get_agent_detail as _get_agent_detail_free,
     list_agents_enriched as _list_agents_enriched_free,
@@ -153,7 +167,7 @@ class AgentService(Service):
         self._events = self._db.agent_config_events
 
     # ── lifecycle ──────────────────────────────────────────────────────
-    def get_meta(self, agent_id: str) -> dict | None:
+    def get_meta(self, agent_id: str) -> AgentMetaRow | None:
         return self._meta.get_meta(agent_id)
 
     def is_deleted(self, agent_id: str) -> bool:
@@ -193,7 +207,7 @@ class AgentService(Service):
             "content_diff": _json_diff(va["content_snapshot"], vb["content_snapshot"]),
         }
 
-    def _stamp(self, agent_id: str, column: str) -> dict | None:
+    def _stamp(self, agent_id: str, column: str) -> AgentMetaRow | None:
         """Set a timestamp column, inserting the meta row if absent.
 
         None when the agent has no version history. Backs ``soft_delete``
@@ -219,26 +233,26 @@ class AgentService(Service):
             self._active.delete_for_agent(agent_id)
         return self._meta.get_meta(agent_id)
 
-    def _clear(self, agent_id: str, column: str) -> dict | None:
+    def _clear(self, agent_id: str, column: str) -> AgentMetaRow | None:
         """Clear a timestamp column (restore/enable). None if no meta row."""
         if self._meta.get_meta(agent_id) is None:
             return None
         self._meta.patch(agent_id, **{column: None, "updated_at": now_iso()})
         return self._meta.get_meta(agent_id)
 
-    def soft_delete(self, agent_id: str) -> dict | None:
+    def soft_delete(self, agent_id: str) -> AgentMetaRow | None:
         """Mark deleted (stamp deleted_at, clear active pointer). Idempotent."""
         return self._stamp(agent_id, "deleted_at")
 
-    def restore(self, agent_id: str) -> dict | None:
+    def restore(self, agent_id: str) -> AgentMetaRow | None:
         """Clear deleted_at. Active pointer must be re-set separately."""
         return self._clear(agent_id, "deleted_at")
 
-    def disable(self, agent_id: str) -> dict | None:
+    def disable(self, agent_id: str) -> AgentMetaRow | None:
         """Stamp disabled_at — visible but un-invokable. Keeps active pointer."""
         return self._stamp(agent_id, "disabled_at")
 
-    def enable(self, agent_id: str) -> dict | None:
+    def enable(self, agent_id: str) -> AgentMetaRow | None:
         """Clear disabled_at."""
         return self._clear(agent_id, "disabled_at")
 
@@ -250,7 +264,7 @@ class AgentService(Service):
         export_to_disk: bool | None = None,
         source_path: str | None = None,
         source_format: str | None = None,
-    ) -> dict | None:
+    ) -> AgentMetaRow | None:
         """Patch supplied meta fields. None if the agent has no meta row."""
         if self._meta.get_meta(agent_id) is None:
             return None
@@ -267,7 +281,7 @@ class AgentService(Service):
         return self._meta.get_meta(agent_id)
 
     # ── feedback ───────────────────────────────────────────────────────
-    def add_comment(self, version_id: int, author: str, body: str) -> dict:
+    def add_comment(self, version_id: int, author: str, body: str) -> AgentVersionCommentRow:
         self._comments.insert(
             version_id=version_id, author=author, body=body, created_at=now_iso()
         )
@@ -275,18 +289,20 @@ class AgentService(Service):
         assert comment is not None
         return comment
 
-    def list_comments(self, version_id: int) -> list[dict]:
+    def list_comments(self, version_id: int) -> list[AgentVersionCommentRow]:
         return self._comments.list_for_version(version_id)
 
-    def set_rating(self, version_id: int, rating: int, rater: str) -> dict:
+    def set_rating(self, version_id: int, rating: int, rater: str) -> AgentVersionRatingRow:
         if not (1 <= rating <= 5):
             raise ValueError(f"rating must be 1-5, got {rating}")
         self._ratings.insert(
             version_id=version_id, rating=rating, rater=rater, rated_at=now_iso()
         )
-        return self._ratings.latest_for_version(version_id) or {}
+        result = self._ratings.latest_for_version(version_id)
+        assert result is not None
+        return result
 
-    def get_rating(self, version_id: int) -> dict | None:
+    def get_rating(self, version_id: int) -> AgentVersionRatingRow | None:
         return self._ratings.latest_for_version(version_id)
 
     # ── version writes ─────────────────────────────────────────────────
@@ -343,7 +359,7 @@ class AgentService(Service):
         source_format: str | None = None,
         sync_mode: str = "off",
         export_to_disk: bool = False,
-    ) -> dict:
+    ) -> AgentVersionRow:
         """Create a new agent with its v1 draft + agent_meta row."""
         if self._versions.exists_for_agent(agent_id):
             raise ValueError(f"Agent {agent_id!r} already exists")
@@ -371,7 +387,9 @@ class AgentService(Service):
             source_format=source_format,
             clear_deleted=False,
         )
-        return self._versions.get_by_id(vid) or {}
+        result = self._versions.get_by_id(vid)
+        assert result is not None, f"version {vid} not found after insert for agent {agent_id!r}"
+        return result
 
     def add_agent_version(
         self,
@@ -386,7 +404,7 @@ class AgentService(Service):
         source_format: str | None = None,
         sync_mode: str = "off",
         export_to_disk: bool = False,
-    ) -> dict:
+    ) -> AgentVersionRow:
         """Append a new draft version. No existence check; clears deleted_at."""
         latest = self._versions.get_latest(agent_id)
         next_version = (latest.get("version") or 0) + 1 if latest else 1
@@ -414,9 +432,11 @@ class AgentService(Service):
             source_format=source_format,
             clear_deleted=True,
         )
-        return self._versions.get_by_id(vid) or {}
+        result = self._versions.get_by_id(vid)
+        assert result is not None, f"version {vid} not found after insert for agent {agent_id!r}"
+        return result
 
-    def publish_version(self, agent_id: str, version: int, reason: str) -> dict:
+    def publish_version(self, agent_id: str, version: int, reason: str) -> AgentVersionRow:
         """Activate a version; append reason to changelog, snapshot grants."""
         if not reason or len(reason) < 3:
             raise ValueError("reason must be at least 3 characters")
@@ -439,11 +459,13 @@ class AgentService(Service):
             )
         self._versions.patch(version_id, **values)
         self._active.set_pointer(agent_id, version_id, now_iso())
-        return self._versions.get_by_number(agent_id, version) or {}
+        result = self._versions.get_by_number(agent_id, version)
+        assert result is not None, f"version {version} not found after publish for agent {agent_id!r}"
+        return result
 
     def rollback_to(
         self, agent_id: str, target_version: int, reason: str, *, author: str
-    ) -> dict:
+    ) -> AgentVersionRow:
         """Create + activate a new version cloned from ``target_version``."""
         if not reason or len(reason) < 3:
             raise ValueError("reason must be at least 3 characters")
@@ -472,17 +494,19 @@ class AgentService(Service):
             source=target.get("source", "ui"),
         )
         self._active.set_pointer(agent_id, new_vid, now_iso())
-        return self._versions.get_by_id(new_vid) or {}
+        result = self._versions.get_by_id(new_vid)
+        assert result is not None, f"version {new_vid} not found after rollback for agent {agent_id!r}"
+        return result
 
     # ── tool grants ────────────────────────────────────────────────────
     def grant_tool(
         self, agent_id: str, tool_name: str, changelog: str, actor: str | None = None
-    ) -> dict:
+    ) -> AgentToolGrantRow:
         """Grant a tool, reactivating a previously-revoked grant if present."""
         if len(changelog.strip()) < 3:
             raise ValueError("changelog must be at least 3 characters")
         now = now_iso()
-        fields = {
+        fields: dict[str, object] = {
             "changelog": changelog,
             "granted_at": now,
             "granted_by": actor,
@@ -513,7 +537,7 @@ class AgentService(Service):
         if affected == 0:
             raise ValueError(f"No active grant for agent {agent_id!r} / tool {tool_name!r}")
 
-    def list_tool_grants(self, agent_id: str, include_revoked: bool = False) -> list[dict]:
+    def list_tool_grants(self, agent_id: str, include_revoked: bool = False) -> list[AgentToolGrantRow]:
         return self._grants.list_for_agent(agent_id, include_revoked=include_revoked)
 
     def active_grants(self, agent_id: str) -> set[str]:
@@ -521,21 +545,21 @@ class AgentService(Service):
         return {r["tool_name"] for r in self._grants.list_for_agent(agent_id)}
 
     # ── prompts ────────────────────────────────────────────────────────
-    def list_prompt_versions(self, agent_id: str) -> list[dict]:
+    def list_prompt_versions(self, agent_id: str) -> list[PromptVersionRow]:
         return self._prompts.list_for_agent(agent_id)
 
-    def get_prompt_version(self, agent_id: str, version: int) -> dict | None:
+    def get_prompt_version(self, agent_id: str, version: int) -> PromptVersionRow | None:
         return self._prompts.get_by_number(agent_id, version)
 
-    def get_latest_committed_prompt(self, agent_id: str) -> dict | None:
+    def get_latest_committed_prompt(self, agent_id: str) -> PromptVersionRow | None:
         return self._prompts.get_latest_committed(agent_id)
 
-    def get_prompt_draft(self, agent_id: str) -> dict | None:
+    def get_prompt_draft(self, agent_id: str) -> PromptVersionRow | None:
         return self._prompts.get_draft(agent_id)
 
     def save_prompt_draft(
         self, agent_id: str, content: str, author: str = "system"
-    ) -> dict:
+    ) -> PromptVersionRow:
         """Save or replace the agent's single prompt draft."""
         return self._prompts.replace_draft(
             agent_id,
@@ -548,7 +572,7 @@ class AgentService(Service):
 
     def publish_prompt(
         self, agent_id: str, changelog: str = "", author: str = "system"
-    ) -> dict:
+    ) -> PromptVersionRow:
         """Commit the current draft as a published version. Raises if none."""
         draft = self._prompts.get_draft(agent_id)
         if not draft:
@@ -556,11 +580,13 @@ class AgentService(Service):
         self._prompts.patch(
             draft["id"], is_draft=0, changelog=changelog, created_at=now_iso()
         )
-        return self._prompts.get_by_number(agent_id, draft["version"]) or {}
+        result = self._prompts.get_by_number(agent_id, draft["version"])
+        assert result is not None, f"prompt version {draft['version']} not found after publish for agent {agent_id!r}"
+        return result
 
     def rollback_prompt(
         self, agent_id: str, target_version: int, author: str = "system"
-    ) -> dict:
+    ) -> PromptVersionRow:
         """Commit a new version copying ``target_version``'s content."""
         target = self._prompts.get_by_number(agent_id, target_version)
         if not target:
@@ -585,7 +611,7 @@ class AgentService(Service):
         content: str,
         author: str = "filesystem",
         changelog: str | None = None,
-    ) -> dict | None:
+    ) -> PromptVersionRow | None:
         """Capture an on-disk prompt as a committed version if it changed.
 
         Returns ``None`` (leaving the DB untouched) when the content matches
@@ -613,7 +639,7 @@ class AgentService(Service):
         )
 
     # ── sync metadata ──────────────────────────────────────────────────
-    def get_agent_sync(self, agent_id: str) -> dict | None:
+    def get_agent_sync(self, agent_id: str) -> AgentSyncRow | None:
         return self._sync.get_row(agent_id)
 
     def upsert_agent_sync(
@@ -624,7 +650,7 @@ class AgentService(Service):
         sync_policy: str | None = None,
         last_file_hash: str | None = None,
         last_file_mtime: str | None = None,
-    ) -> dict:
+    ) -> AgentSyncRow:
         """Insert or patch the sync row. Only supplied fields are updated.
 
         ponytail: read-then-insert/patch is not one transaction — a race
@@ -655,7 +681,9 @@ class AgentService(Service):
             if last_file_mtime is not None:
                 values["last_file_mtime"] = last_file_mtime
             self._sync.patch(agent_id, **values)
-        return self._sync.get_row(agent_id) or {}
+        result = self._sync.get_row(agent_id)
+        assert result is not None, f"sync row not found after upsert for agent {agent_id!r}"
+        return result
 
     def delete_agent_sync(self, agent_id: str) -> None:
         self._sync.delete_for_agent(agent_id)
@@ -669,21 +697,22 @@ class AgentService(Service):
         to_value: object,
         author: str = "api",
         source: str = "api:patch",
-    ) -> dict:
+    ) -> AgentConfigEventRow:
         """Append a non-versioned config-change audit row."""
-        row = {
-            "agent_id": agent_id,
-            "field": field,
-            "from_value": json.dumps(from_value) if from_value is not None else None,
-            "to_value": json.dumps(to_value) if to_value is not None else None,
-            "author": author,
-            "source": source,
-            "created_at": now_iso(),
-        }
-        self._events.insert(**row)
-        return row
+        event_id = self._events.insert(
+            agent_id=agent_id,
+            field=field,
+            from_value=json.dumps(from_value) if from_value is not None else None,
+            to_value=json.dumps(to_value) if to_value is not None else None,
+            author=author,
+            source=source,
+            created_at=now_iso(),
+        )
+        result = self._events.get_by_id(event_id)
+        assert result is not None, f"config event {event_id} not found after insert for agent {agent_id!r}"
+        return result
 
-    def list_config_events(self, agent_id: str, limit: int = 50) -> list[dict]:
+    def list_config_events(self, agent_id: str, limit: int = 50) -> list[AgentConfigEventRow]:
         return self._events.list_for_agent(agent_id, limit=limit)
 
     # ── version files ──────────────────────────────────────────────────
@@ -702,7 +731,7 @@ class AgentService(Service):
         config_json: str | None = None,
         prompt_content: str | None = None,
         source: str = "manifest",
-    ) -> dict:
+    ) -> AgentVersionRow:
         """Insert a fully-specified version (+ its files) atomically."""
         prepared = _prepare_files(files) if files else []
         vid = self._versions.insert_version(
@@ -722,9 +751,11 @@ class AgentService(Service):
             prompt_content=prompt_content,
             source=source,
         )
-        return self._versions.get_by_id(vid) or {}
+        result = self._versions.get_by_id(vid)
+        assert result is not None, f"version {vid} not found after insert for agent {agent_id!r}"
+        return result
 
-    def list_version_files(self, version_id: int) -> list[dict]:
+    def list_version_files(self, version_id: int) -> list[AgentVersionFileRow]:
         return self._files.list_for_version(version_id)
 
     def insert_version_files(self, version_id: int, files: list[dict]) -> None:
@@ -750,7 +781,7 @@ class AgentService(Service):
         self._active.set_pointer(agent_id, version_id, now_iso())
 
     # ── revisions (clone-from-active writes) ───────────────────────────
-    def branch_draft(self, agent_id: str, *, author: str) -> dict:
+    def branch_draft(self, agent_id: str, *, author: str) -> AgentVersionRow:
         """Clone the active version into a new (inactive) version."""
         active = self.active_version(agent_id)
         if active is None:
@@ -772,7 +803,9 @@ class AgentService(Service):
             prompt_content=active.get("prompt_content"),
             source=active.get("source", "ui"),
         )
-        return self._versions.get_by_id(vid) or {}
+        result = self._versions.get_by_id(vid)
+        assert result is not None, f"version {vid} not found after branch_draft for agent {agent_id!r}"
+        return result
 
     def save_prompt_revision(
         self,
@@ -782,7 +815,7 @@ class AgentService(Service):
         author: str,
         changelog: str = "",
         activate: bool = False,
-    ) -> dict:
+    ) -> AgentVersionRow:
         """New version cloning active config but with a fresh prompt."""
         active = self.active_version(agent_id) or self.latest_version(agent_id)
         if active is None:
@@ -818,7 +851,9 @@ class AgentService(Service):
             prompt_content=prompt_content,
             source=active.get("source", "ui"),
         )
-        return self._versions.get_by_id(vid) or {}
+        result = self._versions.get_by_id(vid)
+        assert result is not None, f"version {vid} not found after save_prompt_revision for agent {agent_id!r}"
+        return result
 
     def save_config_revision(
         self,
@@ -828,7 +863,7 @@ class AgentService(Service):
         author: str,
         changelog: str = "",
         activate: bool = True,
-    ) -> dict:
+    ) -> AgentVersionRow:
         """New version with config_json shallow-merged from ``config_patch``."""
         active = self.active_version(agent_id) or self.latest_version(agent_id)
         if active is None:
@@ -863,14 +898,16 @@ class AgentService(Service):
             prompt_content=active.get("prompt_content"),
             source=active.get("source", "ui"),
         )
-        return self._versions.get_by_id(vid) or {}
+        result = self._versions.get_by_id(vid)
+        assert result is not None, f"version {vid} not found after save_config_revision for agent {agent_id!r}"
+        return result
 
     # ── resolution reads ───────────────────────────────────────────────
     def list_agents_with_latest(
         self,
         include_deleted: bool = False,
         include_disabled: bool = False,
-    ) -> list[dict]:
+    ) -> list[AgentVersionRow]:
         """Latest-version snapshot per agent, honoring deleted/disabled flags."""
         rows = self._versions.list_latest_per_agent()
         if include_deleted and include_disabled:
@@ -950,7 +987,7 @@ class AgentService(Service):
         webhook_url: str | None,
         author: str,
         changelog: str,
-    ) -> dict:
+    ) -> AgentVersionRow:
         """Create (or, if soft-deleted, re-version) an agent from a request.
 
         Raises ``AgentAlreadyExists`` when a live agent with this id exists.
@@ -964,7 +1001,7 @@ class AgentService(Service):
             tools=tools or [],
             tags=tags or [],
             workspace=workspace,
-            session_mode=cast(SessionMode, session_mode or "headless"),
+            session_mode=session_mode or SessionMode.HEADLESS,
             webhook_url=webhook_url,
             source_path=None,
             source_format=None,
@@ -973,22 +1010,32 @@ class AgentService(Service):
             **agent_def.model_dump(mode="json", exclude_none=True),
             **build_config_json_payload(agent_def),
         }
-        common_kwargs: dict[str, Any] = dict(
-            agent_id=agent_id,
-            config_json=config_payload,
-            prompt_content=prompt,
-            author=author,
-            changelog=changelog,
-            source="ui",
-            source_path=None,
-            source_format=None,
-            sync_mode="off",
-            export_to_disk=False,
-        )
         if self.is_deleted(agent_id):
-            return self.add_agent_version(**common_kwargs)
+            return self.add_agent_version(
+                agent_id=agent_id,
+                config_json=config_payload,
+                prompt_content=prompt,
+                author=author,
+                changelog=changelog,
+                source="ui",
+                source_path=None,
+                source_format=None,
+                sync_mode="off",
+                export_to_disk=False,
+            )
         try:
-            return self.create_agent(**common_kwargs)
+            return self.create_agent(
+                agent_id=agent_id,
+                config_json=config_payload,
+                prompt_content=prompt,
+                author=author,
+                changelog=changelog,
+                source="ui",
+                source_path=None,
+                source_format=None,
+                sync_mode="off",
+                export_to_disk=False,
+            )
         except ValueError as exc:
             raise AgentAlreadyExists(str(exc)) from exc
 
@@ -1000,7 +1047,7 @@ class AgentService(Service):
         kind: str,
         name: str,
         content: str,
-    ) -> dict:
+    ) -> VersionFileUploadRow:
         """Attach a file to a draft (non-active) version. Guards + dedupes."""
         version_record = self.get_version(agent_id, version)
         if version_record is None:
@@ -1032,7 +1079,7 @@ class AgentService(Service):
         inserted = next((f for f in files if f.get("sha256") == sha256_hash), None)
         if inserted is None:
             raise RuntimeError("file_insert_failed")
-        return {"file": inserted, "sha256": sha256_hash, "size": len(content)}
+        return VersionFileUploadRow(file=inserted, sha256=sha256_hash, size=len(content))
 
     def remove_version_file(
         self,
@@ -1065,7 +1112,7 @@ class AgentService(Service):
         export_to_disk: bool | None = None,
         source_path: str | None = None,
         source_format: str | None = None,
-    ) -> dict | None:
+    ) -> AgentMetaRow | None:
         """Update agent metadata fields (alias of ``update_meta``)."""
         return self.update_meta(
             agent_id,
@@ -1284,7 +1331,7 @@ class AgentService(Service):
         return self.get_agent_validation(agent_id)
 
     # ── enriched read views (cross-domain) ─────────────────────────────
-    def _session_store(self) -> Any:
+    def _session_store(self) -> SessionStore:
         """Lazy ``SessionStore`` for cross-domain enrichment reads.
 
         The enriched views below need runs (run counts), workspaces
@@ -1293,7 +1340,7 @@ class AgentService(Service):
         policy stays on this object; the store is only the cross-domain
         reach. Documented in the migration report.
         """
-        store = getattr(self, "_store_cache", None)
+        store: SessionStore | None = getattr(self, "_store_cache", None)
         if store is None:
             store = SessionStore(load_settings().db_path)
             self._store_cache = store

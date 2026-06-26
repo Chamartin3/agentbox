@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.service.resources.bindings import BindingError
+from agentbox.core.service.resources.service import BindingError, ResourceService
 
 if TYPE_CHECKING:
     from agentbox.core.db import SessionStore
@@ -24,7 +24,8 @@ __all__ = [
 
 
 def list_workspace_subagents(workspace_id: str, *, store: SessionStore) -> dict:
-    items = store.list_workspace_subagents(workspace_id)
+    svc = ResourceService()
+    items = svc.list_workspace_subagents_raw(workspace_id)
     enriched = []
     for s in items:
         agent = store.get_agent_def(s["agent_id"])
@@ -49,8 +50,9 @@ def replace_workspace_subagents(
     settings: Any = None,
     sync_cb: Any = None,
 ) -> dict:
+    svc = ResourceService()
     try:
-        items = store.replace_workspace_subagents(workspace_id, subagents, actor=actor)
+        items = svc.replace_workspace_subagents(workspace_id, subagents, actor=actor)
     except ValueError as exc:
         raise BindingError(str(exc)) from exc
     if sync_cb is not None and settings is not None:
@@ -64,16 +66,8 @@ def replace_workspace_subagents(
 # ---------------------------------------------------------------------------
 
 
-def list_workspace_skill_bindings(workspace_id: str, *, store: SessionStore) -> dict:
-    catalog = store.list_repo_resources(type="skill", limit=500)
-    current = store.list_workspace_file_bindings(workspace_id)
-    bound_ids: set[str] = set()
-    for b in current:
-        resource = store.get_repo_resource(b["resource_id"])
-        if resource and resource.get("type") == "skill":
-            bound_ids.add(b["resource_id"])
-    items = [{**r, "bound": r["id"] in bound_ids} for r in catalog]
-    return {"items": items}
+def list_workspace_skill_bindings(workspace_id: str, *, store: SessionStore) -> dict:  # noqa: ARG001
+    return ResourceService().list_workspace_skill_bindings(workspace_id)
 
 
 def replace_workspace_skill_bindings(
@@ -86,8 +80,9 @@ def replace_workspace_skill_bindings(
     settings: Any = None,
     sync_cb: Any = None,
 ) -> dict:
+    svc = ResourceService()
     try:
-        items = store.replace_workspace_skill_bindings(
+        result = svc.replace_workspace_skill_bindings(
             workspace_id, skill_resource_ids, reason=reason, actor=actor
         )
     except ValueError as exc:
@@ -95,4 +90,4 @@ def replace_workspace_skill_bindings(
     if sync_cb is not None and settings is not None:
         with contextlib.suppress(Exception):
             sync_cb(store, settings, workspace_id)
-    return {"items": items}
+    return result
