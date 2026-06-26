@@ -223,11 +223,19 @@ from agentbox.core.db.protocols import (
 # Row types (TypedDict query result shapes)
 # ---------------------------------------------------------------------------
 from agentbox.core.db.row_types import (
+    AgentConfigEventRow,
+    AgentMetaRow,
+    AgentSyncRow,
+    AgentToolGrantRow,
+    AgentVersionCommentRow,
+    AgentVersionFileRow,
+    AgentVersionRatingRow,
     AgentVersionRow,
     EnvDocRow,
     PromptVersionRow,
     RepoResourceRow,
     ResourceStatus,
+    VersionFileUploadRow,
     WorkspaceRow,
     WorkspaceSource,
 )
@@ -411,11 +419,19 @@ __all__ = [
     "WorkspaceBuildStore",
     "WorkspaceLookupStore",
     # row types
+    "AgentConfigEventRow",
+    "AgentMetaRow",
+    "AgentSyncRow",
+    "AgentToolGrantRow",
+    "AgentVersionCommentRow",
+    "AgentVersionFileRow",
+    "AgentVersionRatingRow",
     "AgentVersionRow",
     "EnvDocRow",
     "PromptVersionRow",
     "RepoResourceRow",
     "ResourceStatus",
+    "VersionFileUploadRow",
     "WorkspaceRow",
     "WorkspaceSource",
 ]

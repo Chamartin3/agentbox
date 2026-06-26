@@ -78,6 +78,103 @@ class WorkspaceRow(TypedDict):
     updated_at: str
 
 
+class AgentMetaRow(TypedDict):
+    """A row from ``agent_meta`` as returned by agent-meta reads.
+
+    ``export_to_disk`` is stored as 0/1 (int) — the table value, not a bool.
+    """
+
+    agent_id: str
+    sync_mode: str
+    export_to_disk: int
+    source_path: str | None
+    source_format: str | None
+    created_at: str
+    updated_at: str
+    deleted_at: str | None
+    disabled_at: str | None
+
+
+class AgentToolGrantRow(TypedDict):
+    """A row from ``agent_tool_grants``."""
+
+    id: str
+    agent_id: str
+    tool_name: str
+    changelog: str
+    granted_at: str
+    granted_by: str | None
+    revoked_at: str | None
+    revoked_by: str | None
+    revoke_changelog: str | None
+
+
+class AgentVersionCommentRow(TypedDict):
+    """A row from ``agent_version_comments``."""
+
+    id: int
+    version_id: int
+    author: str
+    body: str
+    created_at: str
+
+
+class AgentVersionRatingRow(TypedDict):
+    """A row from ``agent_version_ratings``."""
+
+    version_id: int
+    rating: int
+    rater: str
+    rated_at: str
+
+
+class AgentVersionFileRow(TypedDict):
+    """A row from ``agent_version_files``."""
+
+    id: int
+    version_id: int
+    relative_path: str
+    kind: str
+    content: str
+    sha256: str
+    source_uri: str | None
+    position: int
+    created_at: str
+
+
+class AgentSyncRow(TypedDict):
+    """A row from ``agent_sync``."""
+
+    agent_id: str
+    proxy_path: str | None
+    sync_mode: str
+    sync_policy: str
+    last_file_hash: str | None
+    last_file_mtime: str | None
+    last_sync_at: str | None
+
+
+class AgentConfigEventRow(TypedDict):
+    """A row from ``agent_config_events``."""
+
+    id: int
+    agent_id: str
+    field: str
+    from_value: str | None
+    to_value: str | None
+    author: str
+    source: str
+    created_at: str
+
+
+class VersionFileUploadRow(TypedDict):
+    """Result from :py:meth:`AgentService.upload_version_file`."""
+
+    file: "AgentVersionFileRow"
+    sha256: str
+    size: int
+
+
 class ResourceStatus(StrEnum):
     ACTIVE = "active"
     DELETED = "deleted"
