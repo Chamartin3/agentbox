@@ -2,16 +2,17 @@
 
 Public callers (api/, cli/, mcp/) MUST import from this facade. The
 submodules are private organisation.
+
+Analytics (aggregate_usage, activity_summary, distinct_executors) have
+moved to EvaluationService (plan 093) — import from
+``agentbox.core.service.evaluation`` instead.
 """
 
 import agentbox.core.service.execution.service  # noqa: F401 — register service submodule before dependent modules
 
 from agentbox.core.service.execution.create import create_run, rerun
 from agentbox.core.service.execution.feedback import (
-    activity_summary,
     add_comment,
-    aggregate_usage,
-    distinct_executors,
     list_comments,
 )
 from agentbox.core.service.execution.lifecycle import (
@@ -32,14 +33,11 @@ from agentbox.core.service.execution.types import InvalidRunInput, RunNotFound, 
 from agentbox.core.service.prompts import AgentNotFound
 
 __all__ = [
-    "activity_summary",
     "add_comment",
-    "aggregate_usage",
     "AgentNotFound",
     "cancel_run",
     "complete_run",
     "create_run",
-    "distinct_executors",
     "get_run_detail",
     "get_run_prompt",
     "get_transcript",

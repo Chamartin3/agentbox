@@ -116,7 +116,6 @@ from agentbox.core.service.resources.repo import rollback_repo_resource as rollb
 from agentbox.core.service.system.service import SystemService as SystemService
 
 # ── Workspace admin service ────────────────────────────────────────────
-from agentbox.core.service.execution.feedback import aggregate_usage as aggregate_usage
 from agentbox.core.service.workspace_admin import get_active_env_doc as get_active_env_doc
 from agentbox.core.service.workspace_admin import get_workspace as get_workspace
 from agentbox.core.service.workspace_admin import get_workspace_host_env as get_workspace_host_env

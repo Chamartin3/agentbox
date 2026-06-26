@@ -14,7 +14,7 @@ from typing import Final
 
 from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.agents.composition.drift import startup_sweep
-from agentbox.core.db import ProjectManifest, SessionStore
+from agentbox.core.db import ProjectManifest, RunRecord, SessionStore
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.db.engines.seeds import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
@@ -193,7 +193,6 @@ def dispatch_orphan_webhooks(
         svc = ExecutionService()
         pending_raw = svc.list_orphaned_unnotified_runs()
         # Convert dicts back to RunRecord-like objects for downstream use
-        from agentbox.core.db import RunRecord
         pending = [RunRecord(**r) for r in pending_raw] if pending_raw else []
     except Exception as exc:
         _log.exception("orphan dispatch lookup failed")

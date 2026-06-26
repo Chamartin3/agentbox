@@ -9,6 +9,7 @@ from agentbox.cli.shared import console, get_store
 from agentbox.core.config import load_settings
 from agentbox.core import workspaces as ws_workspaces
 from agentbox.core.service.engines import CredentialState, EngineService
+from agentbox.core.service.execution.service import ExecutionService
 
 app = typer.Typer(
     name="agentbox",
@@ -49,7 +50,6 @@ def doctor() -> None:
     table.add_column("Detail")
 
     failures = 0
-    store = get_store()
 
     def _ok(check: str, detail: str = "") -> None:
         table.add_row(Text("OK", style="bold green"), check, detail)
@@ -84,7 +84,6 @@ def doctor() -> None:
 
     # 3. DB reachable
     try:
-        from agentbox.core.service.execution.service import ExecutionService
         ExecutionService().list_runs(limit=1)
         _ok("Database", str(settings.db_path))
     except Exception as exc:

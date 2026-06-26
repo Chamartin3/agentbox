@@ -52,7 +52,6 @@ def register(mcp: FastMCP) -> None:
         match against input/output/error/id. ``since``/``until`` are
         ISO-8601 timestamps."""
         limit = clamp_limit(limit)
-        store = get_context().store
         rows, total = EvaluationService().list_runs_paged(
             agent_id=agent_id,
             status=status,

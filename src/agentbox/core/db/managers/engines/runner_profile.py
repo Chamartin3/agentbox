@@ -231,7 +231,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         input_tokens, output_tokens, cost_usd, avg_duration_ms, last_run_at.
         """
         duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
-        conds = [runs.c.runner_profile_id == profile_id]
+        conds: list[Any] = [runs.c.runner_profile_id == profile_id]
         if since:
             conds.append(runs.c.created_at >= since)
         if until:
@@ -277,7 +277,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         Returns a list of plain dicts; profiles without any runs are excluded.
         """
         duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
-        conds = [runs.c.runner_profile_id.isnot(None)]
+        conds: list[Any] = [runs.c.runner_profile_id.isnot(None)]
         if since:
             conds.append(runs.c.created_at >= since)
         if until:

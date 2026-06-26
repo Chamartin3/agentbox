@@ -1,27 +1,19 @@
-"""Tests for ``core.service.execution.feedback`` — enrichment + rollups over run rows."""
+"""Tests for ``EvaluationService`` — run/agent analytics (plan 093).
+
+Migrated from ``core.service.execution.feedback``; analytics now lives on
+``EvaluationService``.  Tests that need a DB use ``isolated_data_dir`` so
+``EvaluationService()`` resolves to an isolated per-test SQLite file.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
-from agentbox.core.service import SessionStore
-from agentbox.core.service.execution.feedback import (
-    activity_summary,
-    add_comment,
-    aggregate_usage,
-    distinct_executors,
-    enrich_recent_runs,
-    list_comments,
-    since_iso,
-    success_rate,
-    summary,
-)
 
-
-@pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+from agentbox.core.service.evaluation import since_iso
+from agentbox.core.service.evaluation.service import EvaluationService
+from agentbox.core.service.execution.feedback import add_comment, list_comments
 
 
 # ── since_iso ───────────────────────────────────────────────────────────
@@ -38,48 +30,62 @@ def test_since_iso_all_ranges_are_valid() -> None:
         assert "T" in since_iso(r)
 
 
-# ── enrich_recent_runs ──────────────────────────────────────────────────
+# ── EvaluationService — empty-store behaviour ───────────────────────────
 
 
-def test_enrich_recent_runs_empty_store(store: SessionStore) -> None:
-    result = enrich_recent_runs(store, range_="30d")
+def test_list_runs_enriched_empty_store(isolated_data_dir: Path) -> None:
+    result = EvaluationService().list_runs_enriched(range_="30d")
     assert result == {"results": [], "total": 0}
 
 
-def test_enrich_recent_runs_shapes_correctly(store: SessionStore) -> None:
+def test_list_runs_enriched_shapes_correctly(isolated_data_dir: Path) -> None:
     """Verify envelope shape is correct even with empty data."""
-    result = enrich_recent_runs(store, range_="7d")
+    result = EvaluationService().list_runs_enriched(range_="7d")
     assert "results" in result
     assert "total" in result
     assert isinstance(result["results"], list)
 
 
-# ── summary ─────────────────────────────────────────────────────────────
-
-
-def test_summary_empty_store(store: SessionStore) -> None:
-    result = summary(store, range_="30d")
+def test_activity_summary_empty_store(isolated_data_dir: Path) -> None:
+    result = EvaluationService().activity_summary(since_iso("30d"))
     assert isinstance(result, dict)
 
 
-def test_summary_shapes_correctly(store: SessionStore) -> None:
-    """Verify summary returns a dict-shaped response."""
-    result = summary(store, range_="7d")
+def test_activity_summary_shapes_correctly(isolated_data_dir: Path) -> None:
+    """Verify activity_summary returns a dict-shaped response."""
+    result = EvaluationService().activity_summary(since_iso("7d"))
     assert isinstance(result, dict)
+
+
+def test_aggregate_usage_empty_store(isolated_data_dir: Path) -> None:
+    result = EvaluationService().aggregate_usage()
+    assert isinstance(result, dict)
+
+
+def test_distinct_executors_empty_store(isolated_data_dir: Path) -> None:
+    result = EvaluationService().distinct_executors()
+    assert isinstance(result, list)
 
 
 # ── facade contract ─────────────────────────────────────────────────────
 
 
-def test_feedback_facade_exports_required_functions() -> None:
-    assert callable(activity_summary)
+def test_evaluation_service_has_required_methods() -> None:
+    assert callable(EvaluationService.activity_summary)
+    assert callable(EvaluationService.aggregate_usage)
+    assert callable(EvaluationService.distinct_executors)
+    assert callable(EvaluationService.list_runs_enriched)
+    assert callable(EvaluationService.list_runs_paged)
+    assert callable(EvaluationService.list_runs_rich)
+    assert callable(EvaluationService.stats_for_filters)
+    assert callable(EvaluationService.runner_profile_stats)
+    assert callable(EvaluationService.list_runner_profile_stats)
+
+
+def test_execution_feedback_still_has_comment_functions() -> None:
+    """Comments (add/list) remain on execution.feedback, not evaluation."""
     assert callable(add_comment)
-    assert callable(aggregate_usage)
-    assert callable(distinct_executors)
-    assert callable(enrich_recent_runs)
     assert callable(list_comments)
-    assert callable(success_rate)
-    assert callable(summary)
 
 
 def test_old_feedback_package_is_gone() -> None:

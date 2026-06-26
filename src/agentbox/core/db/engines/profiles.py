@@ -19,7 +19,6 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from agentbox.core.db.engines.models import RunnerProfileStats, _row_to_profile
-from agentbox.core.db.feedback.profile_stats import RunnerStatsMixin
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.schema import agent_runner_profiles, runner_profiles
 
@@ -110,8 +109,8 @@ def _derive_profile_id(name: str, existing_ids: set[str]) -> str:
     return f"{base}-{uuid.uuid4().hex[:8]}"
 
 
-class RunnerProfilesMixin(RunnerStatsMixin):
-    """Runner profile CRUD and stats queries. Requires ``self.engine: Engine``."""
+class RunnerProfilesMixin:
+    """Runner profile CRUD (deprecated wrappers). Requires ``self.engine: Engine``."""
 
     engine: Engine
 

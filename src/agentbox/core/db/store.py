@@ -14,7 +14,6 @@ that read more clearly as SQL expressions than as ORM relationships.
 - ``RunSnapshotsMixin``    — composition, resource, and runner snapshots
 - ``RunsMixin``            — run lifecycle CRUD
 - ``AgentToolGrantsMixin`` — agent-scoped tool grant/revoke CRUD
-- ``ExecutionAnalyticsMixin`` — read-only rollups and time-series
 - ``PromptVersionsMixin``  — draft/publish/rollback for prompt history
 """
 
