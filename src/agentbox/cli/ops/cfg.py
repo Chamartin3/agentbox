@@ -8,8 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
 
-from agentbox.cli._deps import get_store
-from agentbox.cli._common import console
+from agentbox.cli.shared import console, get_store
 from agentbox.core.config import load_settings
 from agentbox.core import workspaces as ws_mod
 from agentbox.core.service.agents import list_all_agents

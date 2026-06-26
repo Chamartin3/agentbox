@@ -18,8 +18,7 @@ from typing import TYPE_CHECKING
 import typer
 from rich.syntax import Syntax
 
-from agentbox.cli._common import console
-from agentbox.cli._deps import get_settings, get_store
+from agentbox.cli.shared import console, get_settings, get_store
 from agentbox.core.constants import BackendName
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv

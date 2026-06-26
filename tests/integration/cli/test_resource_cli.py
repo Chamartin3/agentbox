@@ -21,11 +21,10 @@ runner = CliRunner()
 def _clear_shared_deps_caches() -> None:
     """Clear agentbox.cli.shared.deps lru_caches.
 
-    The autouse conftest only clears ``agentbox.cli._deps``. Commands in
+    The autouse conftest clears ``agentbox.cli.shared.deps``. Commands in
     ``ops resource`` and ``ops resource bind`` import ``get_store`` from
-    ``agentbox.cli.shared``, which is a separate lru_cache module and must
-    be cleared independently so each test gets a fresh store pointed at its
-    own tmp_path.
+    ``agentbox.cli.shared``, which must be cleared independently so each
+    test gets a fresh store pointed at its own tmp_path.
     """
     for fn in (get_settings, get_store, get_executor, get_mcp_registry):
         fn.cache_clear()
@@ -38,7 +37,7 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     Relies on the autouse ``_reset_agentbox_deps_caches`` fixture in
     ``tests/integration/conftest.py`` to clear caches between tests.
     Also clears ``agentbox.cli.shared.deps`` caches explicitly since
-    commands under ``ops resource`` use that module, not ``cli._deps``.
+    commands under ``ops resource`` import from ``agentbox.cli.shared``.
     """
     manifest = tmp_path / "agentbox.toml"
     manifest.write_text("# test manifest\n")

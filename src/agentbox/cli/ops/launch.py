@@ -19,8 +19,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli._deps import get_store
-from agentbox.cli._common import console
+from agentbox.cli.shared import console, get_store
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.constants import RunnerKind
 from agentbox.core.service import AgentDef

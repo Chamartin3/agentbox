@@ -10,17 +10,9 @@ from rich.panel import Panel
 from rich.table import Table
 
 from agentbox.cli.shared import console, get_settings, get_store
+from agentbox.cli.shared.deps import get_resource_service
 from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings
-from agentbox.core.service import (
-    create_repo_resource,
-    get_repo_resource_by_slug,
-    import_repo_version,
-    list_repo_resources,
-    list_repo_versions,
-    publish_repo_version,
-    rollback_repo_resource,
-)
-from agentbox.core.service.bindings import preview_modes
+from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound
 
 repo_app = typer.Typer(
     name="repo",
@@ -36,8 +28,8 @@ def repo_ls(
     limit: int = typer.Option(50, "--limit", help="Max rows to return"),
 ) -> None:
     """List resources in the repository."""
-    store = get_store()
-    rows = list_repo_resources(store, type=type, limit=limit)
+    svc = get_resource_service()
+    rows = svc.list_resources(type=type, limit=limit)["items"]
     if tag:
         rows = [r for r in rows if tag in (r.get("tags") or "")]
     if not rows:
@@ -67,8 +59,8 @@ def repo_ls(
 @repo_app.command("show")
 def repo_show(slug: str) -> None:
     """Show a resource and its version history."""
-    store = get_store()
-    resource = get_repo_resource_by_slug(store, slug)
+    svc = get_resource_service()
+    resource = svc.get_by_slug(slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
@@ -81,7 +73,7 @@ def repo_show(slug: str) -> None:
     meta.add_row("name", resource.get("display_name") or "---")
     meta.add_row("description", resource.get("description") or "---")
     console.print(Panel(meta, title=f"Resource: {slug}", border_style="cyan"))
-    versions = list_repo_versions(store, resource["id"])
+    versions = svc.list_versions(resource["id"])["items"]
     if not versions:
         console.print("[dim]No versions.[/dim]")
         return
@@ -124,23 +116,19 @@ def repo_upload(
         console.print(f"[red]File not found:[/red] {file_path}")
         raise typer.Exit(2)
     content = path.read_bytes()
-    content_text = None
-    with contextlib.suppress(UnicodeDecodeError):
-        content_text = content.decode("utf-8")
-    store = get_store()
-    resource = get_repo_resource_by_slug(store, slug)
+    svc = get_resource_service()
+    resource = svc.get_by_slug(slug)
     if not resource:
         console.print(
             f"[yellow]Resource {slug!r} not found --- creating it as 'document'.[/yellow]"
         )
-        resource = create_repo_resource(store, slug, "document", slug)
-    version = import_repo_version(
-        store,
+        resource = svc.create_resource(slug=slug, type="document", display_name=slug)
+    version = svc.import_upload_version(
         resource["id"],
-        [("", content, None, content_text)],
-        import_source="upload",
+        filename=path.name,
+        content=content,
+        mime_type=None,
         changelog=changelog,
-        activate=True,
     )
     console.print(
         f"[green]uploaded[/green] version [bold]{version['version_number']}[/bold] for [bold]{slug}[/bold]"
@@ -150,12 +138,12 @@ def repo_upload(
 @repo_app.command("log")
 def repo_log(slug: str) -> None:
     """List versions for a resource."""
-    store = get_store()
-    resource = get_repo_resource_by_slug(store, slug)
+    svc = get_resource_service()
+    resource = svc.get_by_slug(slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
-    versions = list_repo_versions(store, resource["id"])
+    versions = svc.list_versions(resource["id"])["items"]
     if not versions:
         console.print("[dim]No versions.[/dim]")
         return
@@ -193,12 +181,16 @@ def repo_publish(
     if len(changelog.strip()) < 3:
         console.print("[red]--changelog must be at least 3 characters[/red]")
         raise typer.Exit(1)
-    store = get_store()
-    resource = get_repo_resource_by_slug(store, slug)
+    svc = get_resource_service()
+    resource = svc.get_by_slug(slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
-    version = publish_repo_version(store, version_id, reason=changelog)
+    try:
+        version = svc.publish_version(resource["id"], version_id, reason=changelog)
+    except (ResourceNotFound, InvalidResource) as exc:
+        console.print(f"[red]Publish failed:[/red] {exc}")
+        raise typer.Exit(2)
     console.print(
         f"[green]published[/green] version [bold]{version['version_number']}[/bold] for [bold]{slug}[/bold]"
     )
@@ -214,14 +206,18 @@ def repo_rollback(
     if len(changelog.strip()) < 3:
         console.print("[red]--changelog must be at least 3 characters[/red]")
         raise typer.Exit(1)
-    store = get_store()
-    resource = get_repo_resource_by_slug(store, slug)
+    svc = get_resource_service()
+    resource = svc.get_by_slug(slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {slug!r}")
         raise typer.Exit(2)
-    version = rollback_repo_resource(
-        store, resource["id"], version_number, reason=changelog
-    )
+    try:
+        version = svc.rollback_resource(
+            resource["id"], target_version=version_number, reason=changelog
+        )
+    except (ResourceNotFound, InvalidResource) as exc:
+        console.print(f"[red]Rollback failed:[/red] {exc}")
+        raise typer.Exit(2)
     console.print(
         f"[green]rolled back[/green] to v{version_number} --- new v{version['version_number']} for [bold]{slug}[/bold]"
     )
@@ -232,10 +228,10 @@ def repo_preview_modes(
     resource_id: str = typer.Argument(..., help="Resource ID"),
 ) -> None:
     """List available preview modes."""
-    store = get_store()
+    svc = get_resource_service()
     try:
-        result = preview_modes(resource_id, store=store)
-    except Exception:
+        result = svc.preview_modes(resource_id)
+    except ResourceNotFound:
         console.print(f"[red]resource {resource_id!r} not found[/red]")
         raise typer.Exit(1)
     modes = result.get("modes", [])

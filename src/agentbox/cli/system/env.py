@@ -11,8 +11,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.cli._deps import get_store
-from agentbox.cli._common import console
+from agentbox.cli.shared import console, get_store
 from agentbox.core.service import (
     get_active_env_doc,
     list_env_doc_versions,

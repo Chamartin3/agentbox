@@ -7,8 +7,7 @@ import typer
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.cli._deps import get_settings, get_store
-from agentbox.cli._common import console
+from agentbox.cli.shared import console, get_settings, get_store
 from agentbox.core.constants import BackendName
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.db.system.seeds import backfill as _backfill_prompt_versions

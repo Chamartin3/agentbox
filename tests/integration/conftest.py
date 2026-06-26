@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import agentbox.api.deps as api_deps
-import agentbox.cli._deps as cli_deps
+import agentbox.cli.shared.deps as cli_deps
 import pytest
 from agentbox.api.app import create_app
 from agentbox.core.db import Database, SessionStore
@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture(autouse=True)
 def _reset_agentbox_deps_caches() -> Iterator[None]:
-    """Clear every lru_cache in agentbox.api.deps and agentbox.cli._deps
+    """Clear every lru_cache in agentbox.api.deps and agentbox.cli.shared.deps
     before AND after each integration test so cached singletons don't leak."""
     for deps in (api_deps, cli_deps):
         for fn in (

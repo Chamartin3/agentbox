@@ -18,7 +18,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli._common import console
+from agentbox.cli.shared import console
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
 from agentbox.core.config import load_settings
 from agentbox.core.db import Database

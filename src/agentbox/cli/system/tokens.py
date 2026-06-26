@@ -7,7 +7,7 @@ import secrets
 import typer
 from rich.table import Table
 
-from agentbox.cli._common import console
+from agentbox.cli.shared import console
 from agentbox.core.service.system.service import SystemService
 
 tokens_app = typer.Typer(

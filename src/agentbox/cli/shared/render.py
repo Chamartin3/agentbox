@@ -3,21 +3,43 @@
 Every command accesses a shared ``Renderer`` via ``ctx.obj.render``.
 Common output operations (success/error/warn/dim messages, tables, KV
 panels) live here so command bodies can stop writing inline Rich markup
-and magic strings. The single ``Console`` instance in ``common.py`` is
-reused — no second console is created.
+and magic strings. The single ``Console`` instance here is the module-
+level singleton reused by all commands — no second console is created.
 """
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Sequence
 
+from rich.console import Console, RenderableType
+from rich.json import JSON
 from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.table import Table
-from rich.console import Console
 from rich.text import Text
 
-from agentbox.cli.shared.common import console
-from agentbox.cli.shared.constants import NA, EVENT_STYLES, Style
+from agentbox.cli.shared.constants import EVENT_STYLES, NA, Style, JsonValue
+
+# ---------------------------------------------------------------------------
+# Module-level console singleton — the single Rich output stream for all CLI.
+# Import as ``from agentbox.cli.shared import console`` via __init__.py.
+# ---------------------------------------------------------------------------
+
+console = Console()
+
+# ---------------------------------------------------------------------------
+# Back-compat module-level helpers (moved from deps.py; same bodies).
+# ---------------------------------------------------------------------------
+
+
+def checkmark(b: bool) -> Text:
+    """Return a green checkmark for True, a dim dot for False."""
+    return Text("✓", style="green") if b else Text("·", style="dim")
+
+
+def event_color(event_type: str) -> str:
+    """Resolve an ``EventType`` string to a Rich style."""
+    return EVENT_STYLES.get(event_type, "white")
 
 
 class Renderer:
@@ -51,16 +73,16 @@ class Renderer:
     def dim(self, message: str) -> None:
         self.con.print(f"[{Style.DIM}]{message}[/{Style.DIM}]")
 
-    def print(self, *args: Any, **kwargs: Any) -> None:
+    def print(self, *args: RenderableType) -> None:
         """Pass-through to ``con.print`` for escape-hatch / structured output."""
-        self.con.print(*args, **kwargs)
+        self.con.print(*args)
 
     # ------------------------------------------------------------------
     # value helpers — replace magic strings
     # ------------------------------------------------------------------
 
     @staticmethod
-    def na(value: object) -> str:
+    def na(value: JsonValue) -> str:
         """Return *NA* placeholder when *value* is None / empty."""
         return str(value) if value not in (None, "", []) else NA
 
@@ -111,3 +133,28 @@ class Renderer:
         for k, v in pairs:
             grid.add_row(k, v)
         self.con.print(Panel(grid, title=title, border_style=border))
+
+    def syntax(
+        self,
+        code: str,
+        lexer: str,
+        *,
+        theme: str = "monokai",
+        line_numbers: bool = False,
+    ) -> None:
+        """Print syntax-highlighted code."""
+        self.con.print(Syntax(code, lexer, theme=theme, line_numbers=line_numbers))
+
+    def json(self, data: str | JsonValue) -> None:
+        """Print pretty JSON (accepts a str of JSON or any dumpable object)."""
+        self.con.print(JSON(data) if isinstance(data, str) else JSON.from_data(data))
+
+    def panel(
+        self,
+        body: RenderableType,
+        *,
+        title: str | None = None,
+        border: str = Style.INFO,
+    ) -> None:
+        """Print a Rich Panel with optional title and border style."""
+        self.con.print(Panel(body, title=title, border_style=border))

@@ -8,11 +8,9 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli.shared import console, get_store
+from agentbox.cli.shared.deps import get_resource_service
 from agentbox.core.service import (
     get_active_agent_version,
-    get_repo_resource_by_slug,
-    list_prompt_bindings,
-    replace_prompt_bindings,
     resolve_agent_prompt_bindings,
     resolve_prompt,
 )
@@ -27,8 +25,8 @@ prompt_bindings_app = typer.Typer(
 @prompt_bindings_app.command("list")
 def pb_list(agent_id: str) -> None:
     """List all prompt bindings for an agent."""
-    store = get_store()
-    rows = list_prompt_bindings(store, agent_id)
+    svc = get_resource_service()
+    rows = svc.list_prompt_bindings_raw(agent_id)
     if not rows:
         console.print(f"[yellow]No prompt bindings for agent {agent_id!r}.[/yellow]")
         return
@@ -79,13 +77,13 @@ def pb_set(
         console.print("[red]--reason must be at least 3 characters[/red]")
         raise typer.Exit(1)
 
-    store = get_store()
-    resource = get_repo_resource_by_slug(store, resource_slug)
+    svc = get_resource_service()
+    resource = svc.get_by_slug(resource_slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {resource_slug!r}")
         raise typer.Exit(2)
 
-    existing = list_prompt_bindings(store, agent_id)
+    existing = svc.list_prompt_bindings_raw(agent_id)
     # Upsert: remove any existing binding for this marker, append new one.
     kept = [b for b in existing if b["marker"] != marker]
     new_binding = {
@@ -97,7 +95,7 @@ def pb_set(
     }
     kept.append(new_binding)
 
-    replace_prompt_bindings(store, agent_id, kept, reason=reason)
+    svc.replace_prompt_bindings_raw(agent_id, kept, reason=reason)
     console.print(
         f"[green]✓[/green] binding set: agent=[bold]{agent_id}[/bold] "
         f"marker=[bold]{marker}[/bold] → {resource_slug} (mode={mode})"

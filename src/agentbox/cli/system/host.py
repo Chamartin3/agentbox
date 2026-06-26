@@ -6,8 +6,7 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from agentbox.cli._deps import get_store
-from agentbox.cli._common import console
+from agentbox.cli.shared import console, get_store
 from agentbox.core.service import (
     get_workspace_host_env,
     list_host_env_calls_for_run,

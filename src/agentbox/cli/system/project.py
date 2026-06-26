@@ -7,7 +7,7 @@ import json
 import typer
 from rich.table import Table
 
-from agentbox.cli._common import console
+from agentbox.cli.shared import console
 from agentbox.core.service import McpServerSpec
 from agentbox.core.service.system.service import SystemService
 

@@ -5,13 +5,8 @@ from __future__ import annotations
 import typer
 from rich.table import Table
 
-from agentbox.cli.shared import console, get_store
-from agentbox.core.service import (
-    get_repo_resource_by_slug,
-    list_workspace_file_bindings,
-    replace_workspace_file_bindings,
-    resolve_workspace_resources,
-)
+from agentbox.cli.shared import console
+from agentbox.cli.shared.deps import get_resource_service
 
 workspace_resources_app = typer.Typer(
     name="workspace-resources",
@@ -23,8 +18,8 @@ workspace_resources_app = typer.Typer(
 @workspace_resources_app.command("ls")
 def wr_list(workspace_id: str) -> None:
     """List all file bindings for a workspace."""
-    store = get_store()
-    rows = list_workspace_file_bindings(store, workspace_id)
+    svc = get_resource_service()
+    rows = svc.list_workspace_file_bindings_raw(workspace_id)
     if not rows:
         console.print(
             f"[yellow]No file bindings for workspace {workspace_id!r}.[/yellow]"
@@ -75,13 +70,13 @@ def wr_set(
         console.print("[red]--reason must be at least 3 characters[/red]")
         raise typer.Exit(1)
 
-    store = get_store()
-    resource = get_repo_resource_by_slug(store, resource_slug)
+    svc = get_resource_service()
+    resource = svc.get_by_slug(resource_slug)
     if not resource:
         console.print(f"[red]Resource not found:[/red] {resource_slug!r}")
         raise typer.Exit(2)
 
-    existing = list_workspace_file_bindings(store, workspace_id)
+    existing = svc.list_workspace_file_bindings_raw(workspace_id)
     kept = [b for b in existing if b.get("target_path") != dest_path]
     new_binding = {
         "resource_id": resource["id"],
@@ -92,7 +87,7 @@ def wr_set(
     }
     kept.append(new_binding)
 
-    replace_workspace_file_bindings(store, workspace_id, kept, reason=reason)
+    svc.replace_workspace_file_bindings_raw(workspace_id, kept, reason=reason)
     console.print(
         f"[green]✓[/green] binding set: workspace=[bold]{workspace_id}[/bold] "
         f"path=[bold]{dest_path}[/bold] → {resource_slug} (mode={mode})"
@@ -102,9 +97,10 @@ def wr_set(
 @workspace_resources_app.command("check")
 def wr_dry_run(workspace_id: str) -> None:
     """Preview what would be materialized for a workspace (no writes)."""
-    store = get_store()
-    resolved = resolve_workspace_resources(store, workspace_id)
-    if not resolved:
+    svc = get_resource_service()
+    result = svc.dry_run_workspace_resources(workspace_id)
+    entries = result.get("entries", [])
+    if not entries:
         console.print(
             f"[yellow]No workspace resource bindings for {workspace_id!r}.[/yellow]"
         )
@@ -120,16 +116,19 @@ def wr_dry_run(workspace_id: str) -> None:
     table.add_column("Resource ID", style="dim")
     table.add_column("Version ID", style="dim")
     table.add_column("Mode", style="cyan")
-    table.add_column("Blobs", justify="right", style="magenta")
-    table.add_column("Content hash", style="dim")
-    for r in resolved:
+    table.add_column("Files", justify="right", style="magenta")
+    for r in entries:
         table.add_row(
             r.get("target_path") or "—",
             r["resource_id"],
             r["version_id"],
             r.get("materialize_mode") or "copy",
-            str(len(r.get("blobs") or [])),
-            (r.get("content_hash") or "")[:12] + "…",
+            str(r.get("file_count", 0)),
         )
     console.print(table)
-    console.print(f"[dim]{len(resolved)} binding(s) would be materialized.[/dim]")
+    console.print(f"[dim]{len(entries)} binding(s) would be materialized.[/dim]")
+    conflicts = result.get("conflicts", [])
+    if conflicts:
+        console.print(f"[yellow]{len(conflicts)} conflict(s) detected:[/yellow]")
+        for c in conflicts:
+            console.print(f"  [yellow]{c.get('issue', c)}[/yellow]")

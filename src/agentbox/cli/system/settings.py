@@ -8,7 +8,7 @@ import typer
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from agentbox.cli._common import console
+from agentbox.cli.shared import console
 from agentbox.core.service.system.service import SystemService
 
 settings_app = typer.Typer(

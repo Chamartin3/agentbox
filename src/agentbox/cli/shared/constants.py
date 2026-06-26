@@ -13,10 +13,18 @@ from typing import Final
 
 from agentbox.core.constants import EventType
 
+# ---------------------------------------------------------------------------
+# Canonical recursive JSON value alias.
+# Covers every value that json.dumps / json.loads can produce.
+# ---------------------------------------------------------------------------
+
+type JsonValue = str | int | float | bool | None | dict[str, JsonValue] | list[JsonValue]
+
 # Sentinel value accepted by workspace resolution to request a fresh tmp dir.
 EPHEMERAL_WORKSPACE: Final[str] = "<ephemeral>"
 
 __all__ = [
+    "JsonValue",
     "Style",
     "NA",
     "CLI_AUTHOR",
