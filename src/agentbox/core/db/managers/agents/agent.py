@@ -1,6 +1,8 @@
 """Agent, ActiveAgentVersion, AgentMeta and AgentRunnerProfile managers."""
 from __future__ import annotations
 
+from sqlalchemy import Row
+
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.agent import (
     ActiveAgentVersion,
@@ -8,7 +10,24 @@ from agentbox.core.db.models.agents.agent import (
     AgentMeta,
     AgentRunnerProfile,
 )
+from agentbox.core.db.row_types import AgentMetaRow
 from agentbox.core.db.schema import active_agent_versions, agent_meta
+
+
+def _meta_row(row: Row) -> AgentMetaRow:
+    """Shape an ``agent_meta`` row into the ``AgentMetaRow`` contract."""
+    m = row._mapping
+    return AgentMetaRow(
+        agent_id=m["agent_id"],
+        sync_mode=m["sync_mode"],
+        export_to_disk=m["export_to_disk"],
+        source_path=m["source_path"],
+        source_format=m["source_format"],
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
+        deleted_at=m["deleted_at"],
+        disabled_at=m["disabled_at"],
+    )
 
 
 class AgentManager(Manager[Agent]):
@@ -54,12 +73,12 @@ class AgentMetaManager(Manager[AgentMeta]):
     """
     model = AgentMeta
 
-    def get_meta(self, agent_id: str) -> dict | None:
+    def get_meta(self, agent_id: str) -> AgentMetaRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 agent_meta.select().where(agent_meta.c.agent_id == agent_id)
             ).first()
-            return dict(row._mapping) if row else None
+            return _meta_row(row) if row else None
 
     def insert(self, **fields: object) -> None:
         with self._engine.begin() as conn:

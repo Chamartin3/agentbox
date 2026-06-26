@@ -9,11 +9,29 @@ number by computing max *after* the delete).
 """
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import Row, func, select
+from sqlalchemy.engine import Connection
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.prompt import PromptVersion
+from agentbox.core.db.row_types import PromptVersionRow
 from agentbox.core.db.schema import prompt_versions
+
+
+def _prompt_row(row: Row) -> PromptVersionRow:
+    """Shape a ``prompt_versions`` row into the ``PromptVersionRow`` contract."""
+    m = row._mapping
+    return PromptVersionRow(
+        id=m["id"],
+        agent_id=m["agent_id"],
+        version=m["version"],
+        content=m["content"],
+        author=m["author"],
+        changelog=m["changelog"],
+        is_draft=m["is_draft"],
+        content_hash=m["content_hash"],
+        created_at=m["created_at"],
+    )
 
 
 class PromptVersionManager(Manager[PromptVersion]):
@@ -21,16 +39,16 @@ class PromptVersionManager(Manager[PromptVersion]):
     model = PromptVersion
 
     # ── reads ──────────────────────────────────────────────────────────
-    def list_for_agent(self, agent_id: str) -> list[dict]:
+    def list_for_agent(self, agent_id: str) -> list[PromptVersionRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 prompt_versions.select()
                 .where(prompt_versions.c.agent_id == agent_id)
                 .order_by(prompt_versions.c.version.desc())
             )
-            return [dict(r._mapping) for r in rows]
+            return [_prompt_row(r) for r in rows.fetchall()]
 
-    def get_by_number(self, agent_id: str, version: int) -> dict | None:
+    def get_by_number(self, agent_id: str, version: int) -> PromptVersionRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 prompt_versions.select().where(
@@ -38,9 +56,9 @@ class PromptVersionManager(Manager[PromptVersion]):
                     prompt_versions.c.version == version,
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return _prompt_row(row) if row else None
 
-    def get_latest_committed(self, agent_id: str) -> dict | None:
+    def get_latest_committed(self, agent_id: str) -> PromptVersionRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 prompt_versions.select()
@@ -51,9 +69,9 @@ class PromptVersionManager(Manager[PromptVersion]):
                 .order_by(prompt_versions.c.version.desc())
                 .limit(1)
             ).first()
-            return dict(row._mapping) if row else None
+            return _prompt_row(row) if row else None
 
-    def get_draft(self, agent_id: str) -> dict | None:
+    def get_draft(self, agent_id: str) -> PromptVersionRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 prompt_versions.select()
@@ -64,7 +82,7 @@ class PromptVersionManager(Manager[PromptVersion]):
                 .order_by(prompt_versions.c.version.desc())
                 .limit(1)
             ).first()
-            return dict(row._mapping) if row else None
+            return _prompt_row(row) if row else None
 
     # ── writes ─────────────────────────────────────────────────────────
     def replace_draft(
@@ -76,7 +94,7 @@ class PromptVersionManager(Manager[PromptVersion]):
         author: str,
         changelog: str,
         created_at: str,
-    ) -> dict:
+    ) -> PromptVersionRow:
         """Atomically drop the agent's draft and insert a fresh one.
 
         Next version is computed *after* the delete (in-txn) so the freed
@@ -108,7 +126,8 @@ class PromptVersionManager(Manager[PromptVersion]):
                     prompt_versions.c.version == version,
                 )
             ).first()
-            return dict(row._mapping) if row else {}
+            assert row is not None, f"prompt draft not found after insert for agent {agent_id!r}"
+            return _prompt_row(row)
 
     def insert_committed(
         self,
@@ -120,7 +139,7 @@ class PromptVersionManager(Manager[PromptVersion]):
         changelog: str,
         created_at: str,
         delete_drafts: bool = False,
-    ) -> dict:
+    ) -> PromptVersionRow:
         """Insert a committed (non-draft) version, computing the next number
         in-txn. Optionally drops any existing draft first (rollback path)."""
         with self._engine.begin() as conn:
@@ -150,7 +169,8 @@ class PromptVersionManager(Manager[PromptVersion]):
                     prompt_versions.c.version == version,
                 )
             ).first()
-            return dict(row._mapping) if row else {}
+            assert row is not None, f"committed prompt not found after insert for agent {agent_id!r}"
+            return _prompt_row(row)
 
     def patch(self, version_id: int, **values: object) -> None:
         """Update the supplied columns on one prompt-version row."""
@@ -162,9 +182,9 @@ class PromptVersionManager(Manager[PromptVersion]):
             )
 
 
-def _next_version(conn: object, agent_id: str) -> int:
+def _next_version(conn: Connection, agent_id: str) -> int:
     """Max(version)+1 for an agent, evaluated on the given connection."""
-    row = conn.execute(  # type: ignore[attr-defined]
+    row = conn.execute(
         select(func.coalesce(func.max(prompt_versions.c.version), 0)).where(
             prompt_versions.c.agent_id == agent_id
         )

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Row, func, select, update as sa_update
+from sqlalchemy.engine import Connection
 
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.base.manager import Manager
@@ -11,7 +12,12 @@ from agentbox.core.db.models.agents.version import (
     AgentVersionFile,
     AgentVersionRating,
 )
-from agentbox.core.db.row_types import AgentVersionRow
+from agentbox.core.db.row_types import (
+    AgentVersionCommentRow,
+    AgentVersionFileRow,
+    AgentVersionRatingRow,
+    AgentVersionRow,
+)
 from agentbox.core.db.schema import (
     active_agent_versions,
     agent_version_comments,
@@ -49,11 +55,50 @@ def _version_row(row: Row) -> AgentVersionRow:
     )
 
 
-def _insert_files(conn: object, version_id: int, prepared: list[dict]) -> None:
+def _file_row(row: Row) -> AgentVersionFileRow:
+    """Shape an ``agent_version_files`` row into the ``AgentVersionFileRow`` contract."""
+    m = row._mapping
+    return AgentVersionFileRow(
+        id=m["id"],
+        version_id=m["version_id"],
+        relative_path=m["relative_path"],
+        kind=m["kind"],
+        content=m["content"],
+        sha256=m["sha256"],
+        source_uri=m["source_uri"],
+        position=m["position"],
+        created_at=m["created_at"],
+    )
+
+
+def _comment_row(row: Row) -> AgentVersionCommentRow:
+    """Shape an ``agent_version_comments`` row into the typed contract."""
+    m = row._mapping
+    return AgentVersionCommentRow(
+        id=m["id"],
+        version_id=m["version_id"],
+        author=m["author"],
+        body=m["body"],
+        created_at=m["created_at"],
+    )
+
+
+def _rating_row(row: Row) -> AgentVersionRatingRow:
+    """Shape an ``agent_version_ratings`` row into the typed contract."""
+    m = row._mapping
+    return AgentVersionRatingRow(
+        version_id=m["version_id"],
+        rating=m["rating"],
+        rater=m["rater"],
+        rated_at=m["rated_at"],
+    )
+
+
+def _insert_files(conn: Connection, version_id: int, prepared: list[dict]) -> None:
     """Bulk-insert prepared file rows for ``version_id`` (adds created_at)."""
     if not prepared:
         return
-    conn.execute(  # type: ignore[attr-defined]
+    conn.execute(
         agent_version_files.insert(),
         [
             {**row, "version_id": version_id, "created_at": _now_iso()}
@@ -62,16 +107,16 @@ def _insert_files(conn: object, version_id: int, prepared: list[dict]) -> None:
     )
 
 
-def _copy_files(conn: object, src_version_id: int, dst_version_id: int) -> None:
+def _copy_files(conn: Connection, src_version_id: int, dst_version_id: int) -> None:
     """Copy all ``agent_version_files`` rows from ``src`` to ``dst``."""
-    files = conn.execute(  # type: ignore[attr-defined]
+    files = conn.execute(
         agent_version_files.select().where(
             agent_version_files.c.version_id == src_version_id
         )
     ).fetchall()
     if not files:
         return
-    conn.execute(  # type: ignore[attr-defined]
+    conn.execute(
         agent_version_files.insert(),
         [
             {
@@ -277,14 +322,14 @@ class AgentVersionFileManager(Manager[AgentVersionFile]):
     """
     model = AgentVersionFile
 
-    def list_for_version(self, version_id: int) -> list[dict]:
+    def list_for_version(self, version_id: int) -> list[AgentVersionFileRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 agent_version_files.select()
                 .where(agent_version_files.c.version_id == version_id)
                 .order_by(agent_version_files.c.position, agent_version_files.c.id)
             )
-            return [dict(r._mapping) for r in rows]
+            return [_file_row(r) for r in rows.fetchall()]
 
     def insert_files(self, version_id: int, prepared: list[dict]) -> None:
         with self._engine.begin() as conn:
@@ -323,14 +368,14 @@ class AgentVersionRatingManager(Manager[AgentVersionRating]):
     """Manager for the ``agent_version_ratings`` table — pure row ops."""
     model = AgentVersionRating
 
-    def latest_for_version(self, version_id: int) -> dict | None:
+    def latest_for_version(self, version_id: int) -> AgentVersionRatingRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 agent_version_ratings.select().where(
                     agent_version_ratings.c.version_id == version_id
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return _rating_row(row) if row else None
 
     def insert(self, **fields: object) -> None:
         with self._engine.begin() as conn:
@@ -341,23 +386,23 @@ class AgentVersionCommentManager(Manager[AgentVersionComment]):
     """Manager for the ``agent_version_comments`` table — pure row ops."""
     model = AgentVersionComment
 
-    def latest_for_version(self, version_id: int) -> dict | None:
+    def latest_for_version(self, version_id: int) -> AgentVersionCommentRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 agent_version_comments.select().where(
                     agent_version_comments.c.version_id == version_id
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return _comment_row(row) if row else None
 
-    def list_for_version(self, version_id: int) -> list[dict]:
+    def list_for_version(self, version_id: int) -> list[AgentVersionCommentRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 agent_version_comments.select()
                 .where(agent_version_comments.c.version_id == version_id)
                 .order_by(agent_version_comments.c.created_at)
             )
-            return [dict(r._mapping) for r in rows]
+            return [_comment_row(r) for r in rows.fetchall()]
 
     def insert(self, **fields: object) -> None:
         with self._engine.begin() as conn:
