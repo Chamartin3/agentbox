@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import json as _json
-
 import typer
-from rich.json import JSON
-from rich.table import Table
 
-from agentbox.cli.shared import console
-from agentbox.core.service import (
-    RunnerProfileCreate,
-)
-from agentbox.core.service.engines.service import EngineService, ProfileNotFound
+from agentbox.cli.shared import CliCtx
+from agentbox.core.service import RunnerProfileCreate
+from agentbox.core.service.engines.service import ProfileNotFound  # TODO(cli-arch): move to facade export
 
 app = typer.Typer(
     name="profiles",
@@ -23,6 +17,7 @@ app = typer.Typer(
 
 @app.command("ls")
 def profile_ls(
+    ctx: typer.Context,
     backend: str | None = typer.Option(
         None, help="Filter by backend (e.g. 'claude_code', 'token')"
     ),
@@ -35,65 +30,34 @@ def profile_ls(
     ),
 ) -> None:
     """List runner profiles with optional filters."""
-    svc = EngineService()
-    profiles = svc.list_profiles(backend=backend, provider=provider, enabled=enabled)
+    obj: CliCtx = ctx.obj
+    profiles = obj.engines.list_profiles(backend=backend, provider=provider, enabled=enabled)
 
     if json_output:
-        console.print(
-            _json.dumps([p.model_dump() for p in profiles], indent=2)
-        )
-        return
-
-    if not profiles:
-        console.print("[yellow]No runner profiles found.[/yellow]")
-        return
-
-    table = Table(
-        title="Runner Profiles",
-        title_style="bold",
-        header_style="bold cyan",
-        show_lines=False,
-        padding=(0, 1),
-    )
-    table.add_column("ID", style="bold")
-    table.add_column("Name", style="cyan")
-    table.add_column("Backend", style="dim")
-    table.add_column("Provider", style="dim")
-    table.add_column("Model", style="dim")
-    table.add_column("Enabled", justify="center")
-    table.add_column("System Default", justify="center")
-
-    for p in profiles:
-        enabled_str = "[green]✓[/green]" if p.is_enabled else "[dim]·[/dim]"
-        default_str = "[green]✓[/green]" if p.is_system_default else "[dim]·[/dim]"
-        table.add_row(
-            p.id,
-            p.name,
-            p.backend,
-            p.provider or "—",
-            p.model or "—",
-            enabled_str,
-            default_str,
-        )
-
-    console.print(table)
+        obj.render.engine.profiles_json(profiles)
+    else:
+        obj.render.engine.profiles_table(profiles)
 
 
 @app.command("show")
-def profile_get(profile_id: str) -> None:
+def profile_get(
+    ctx: typer.Context,
+    profile_id: str,
+) -> None:
     """Show runner profile details as JSON."""
-    svc = EngineService()
+    obj: CliCtx = ctx.obj
     try:
-        profile = svc.get_profile(profile_id)
+        profile = obj.engines.get_profile(profile_id)
     except ProfileNotFound:
-        console.print(f"[red]Profile not found:[/red] {profile_id}")
+        obj.render.engine.profile_not_found(profile_id)
         raise typer.Exit(1)
 
-    console.print(JSON(_json.dumps(profile.model_dump(), indent=2)))
+    obj.render.engine.profile_detail_json(profile)
 
 
 @app.command("new")
 def profile_create(
+    ctx: typer.Context,
     id: str = typer.Option(..., help="Unique profile ID"),
     name: str = typer.Option(..., help="Human-readable name"),
     backend: str = typer.Option(
@@ -109,8 +73,8 @@ def profile_create(
     system_default: bool = typer.Option(False, help="Set as system default profile"),
 ) -> None:
     """Create a new runner profile."""
-    svc = EngineService()
-    profile = svc.create_profile(
+    obj: CliCtx = ctx.obj
+    profile = obj.engines.create_profile(
         RunnerProfileCreate(
             id=id,
             name=name,
@@ -123,12 +87,12 @@ def profile_create(
             is_system_default=system_default,
         )
     )
-    console.print(f"[green]Created runner profile[/green] [bold]{profile.id}[/bold]")
-    console.print(JSON(_json.dumps(profile.model_dump(), indent=2)))
+    obj.render.engine.profile_created(profile)
 
 
 @app.command("bind")
 def profile_bind(
+    ctx: typer.Context,
     agent_id: str = typer.Argument(..., help="Agent ID"),
     profile_id: str = typer.Argument(
         None, help="Runner profile ID (omit with --clear to unbind)"
@@ -138,112 +102,61 @@ def profile_bind(
     ),
 ) -> None:
     """Bind a runner profile to an agent, or clear it with --clear."""
-    svc = EngineService()
+    obj: CliCtx = ctx.obj
     if clear:
-        svc.clear_agent_runner_profile(agent_id)
-        console.print(
-            f"[green]Cleared profile binding for agent[/green] [bold]{agent_id}[/bold]"
-        )
+        obj.engines.clear_agent_runner_profile(agent_id)
+        obj.render.engine.profile_cleared(agent_id)
         return
     if not profile_id:
-        console.print("[red]Either provide a profile_id or use --clear[/red]")
+        obj.render.engine.error("Either provide a profile_id or use --clear")
         raise typer.Exit(2)
     try:
-        svc.set_agent_runner_profile(agent_id, profile_id)
+        obj.engines.set_agent_runner_profile(agent_id, profile_id)
     except ProfileNotFound as exc:
-        console.print(f"[red]{exc}[/red]")
+        obj.render.engine.error(str(exc))
         raise typer.Exit(1)
-    console.print(
-        f"[green]Bound agent[/green] [bold]{agent_id}[/bold] "
-        f"[green]to profile[/green] [bold]{profile_id}[/bold]"
-    )
+    obj.render.engine.profile_bound(agent_id, profile_id)
 
 
 @app.command("stats")
 def profile_stats(
+    ctx: typer.Context,
     profile_id: str | None = typer.Argument(
         None, help="Profile ID (optional; if omitted, lists all)"
     ),
 ) -> None:
     """Show per-profile statistics."""
-    svc = EngineService()
+    obj: CliCtx = ctx.obj
 
     if profile_id:
-        stats = svc.get_profile_stats(profile_id)
-        table = Table(
-            title=f"Stats for profile {profile_id}",
-            title_style="bold",
-            header_style="bold cyan",
-            padding=(0, 1),
-        )
-        table.add_column("Metric", style="dim")
-        table.add_column("Value")
-        table.add_row("Runs", str(stats.runs))
-        table.add_row("Succeeded", str(stats.succeeded))
-        table.add_row("Failed", str(stats.failed))
-        table.add_row("Input Tokens", str(stats.input_tokens))
-        table.add_row("Output Tokens", str(stats.output_tokens))
-        table.add_row(
-            "Cost (USD)", f"${stats.cost_usd:.4f}" if stats.cost_usd else "—"
-        )
-        table.add_row(
-            "Avg Duration (ms)",
-            f"{stats.avg_duration_ms:.1f}" if stats.avg_duration_ms else "—",
-        )
-        table.add_row("Last Run", stats.last_run_at or "—")
-        console.print(table)
+        stats = obj.engines.get_profile_stats(profile_id)
+        obj.render.engine.profile_stats_detail(profile_id, stats)
         return
 
-    all_stats = svc.list_profile_stats()
-    if not all_stats:
-        console.print("[yellow]No profile statistics found.[/yellow]")
-        return
-
-    table = Table(
-        title="All Runner Profile Stats",
-        title_style="bold",
-        header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("Profile ID", style="bold")
-    table.add_column("Runs", justify="right")
-    table.add_column("Succeeded", justify="right")
-    table.add_column("Failed", justify="right")
-    table.add_column("Input Tokens", justify="right")
-    table.add_column("Output Tokens", justify="right")
-    table.add_column("Cost (USD)", justify="right")
-    for stats in all_stats:
-        table.add_row(
-            stats.profile_id,
-            str(stats.runs),
-            str(stats.succeeded),
-            str(stats.failed),
-            str(stats.input_tokens),
-            str(stats.output_tokens),
-            f"${stats.cost_usd:.4f}" if stats.cost_usd else "—",
-        )
-    console.print(table)
+    all_stats = obj.engines.list_profile_stats()
+    obj.render.engine.all_profile_stats_table(all_stats)
 
 
 @app.command("rm")
 def profile_delete(
+    ctx: typer.Context,
     profile_id: str = typer.Argument(..., help="Profile ID to delete"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Delete a runner profile."""
-    svc = EngineService()
+    obj: CliCtx = ctx.obj
     try:
-        svc.get_profile(profile_id)  # check existence
+        obj.engines.get_profile(profile_id)  # check existence
     except ProfileNotFound:
-        console.print(f"[red]Profile not found:[/red] {profile_id}")
+        obj.render.engine.profile_not_found(profile_id)
         raise typer.Exit(1)
     if not yes:
-        console.print(
-            f"[yellow]Delete profile[/yellow] [bold]{profile_id}[/bold]? "
+        obj.render.engine.warn(
+            f"Delete profile [bold]{profile_id}[/bold]? "
             "[dim](use --yes to skip confirmation)[/dim]"
         )
         if not typer.confirm("Continue?", default=False):
-            console.print("[dim]Aborted.[/dim]")
+            obj.render.engine.dim("Aborted.")
             raise typer.Exit(0)
-    svc.delete_profile(profile_id)
-    console.print(f"[green]Deleted runner profile[/green] [bold]{profile_id}[/bold]")
+    obj.engines.delete_profile(profile_id)
+    obj.render.engine.profile_deleted(profile_id)

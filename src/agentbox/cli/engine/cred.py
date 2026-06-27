@@ -1,4 +1,4 @@
-"""Unified credential bootstrap — ``agentbox ops creds``."""
+"""Unified credential bootstrap — ``agentbox engine cred``."""
 
 from __future__ import annotations
 
@@ -7,17 +7,15 @@ import shutil
 from pathlib import Path
 
 import typer
-from rich.table import Table
-from rich.text import Text
 
-from agentbox.cli.shared import console
-from agentbox.core.config import SETTINGS
+from agentbox.cli.shared import CliCtx, EngineRenderer  # TODO(cli-arch): transitional renderer import — plan 095
+from agentbox.core.config import Settings
 from agentbox.core.service.engines import (
     CredentialMethod,
     CredentialState,
-    EngineService,
     Method,
 )
+from agentbox.core.service.engines.service import EngineService
 
 creds_app = typer.Typer(
     name="creds",
@@ -25,12 +23,10 @@ creds_app = typer.Typer(
     no_args_is_help=True,
 )
 
-_CREDS_BASE = SETTINGS.creds_dir
-_ENV_FILE = SETTINGS.creds_env_file
-
 
 @creds_app.command()
 def setup(
+    ctx: typer.Context,
     name: str | None = typer.Argument(
         None,
         help="Backend name to set up (e.g. claude, opencode, openai). Omit for interactive walkthrough.",
@@ -42,171 +38,186 @@ def setup(
     ),
 ) -> None:
     """Interactive credential setup walkthrough."""
-    all_items = EngineService().list_credentials()
+    obj: CliCtx = ctx.obj
+    engines = obj.engines
+    render = obj.render.engine
+    settings = obj.settings
+    all_items = engines.list_credentials()
     if not all_items:
-        console.print("[dim]No credential backends registered.[/dim]")
+        render.credential_no_backends_registered()
         return
     if name:
-        cm = EngineService().get_credential(name)
+        cm = engines.get_credential(name)
         if cm is None:
-            console.print(f"[red]Unknown backend:[/red] {name!r}")
+            render.credential_unknown_backend(name)
             raise typer.Exit(1)
-        _setup_one(cm, skip_choice=all)
+        _setup_one(cm, engines, render, settings, skip_choice=all)
         return
     if all:
         for cm in all_items:
-            _setup_one(cm, skip_choice=True)
+            _setup_one(cm, engines, render, settings, skip_choice=True)
         return
-    _interactive_setup(all_items)
+    _interactive_setup(all_items, engines, render, settings)
 
 
-def _interactive_setup(items: list[CredentialMethod]) -> None:
-    console.print("\n[bold]Agentbox Credential Setup[/bold]\n")
+def _interactive_setup(
+    items: list[CredentialMethod],
+    engines: EngineService,
+    render: EngineRenderer,
+    settings: Settings,
+) -> None:
+    render.credential_setup_header()
     for cm in items:
-        _setup_one_interactive(cm)
+        _setup_one_interactive(cm, engines, render, settings)
 
 
-def _setup_one_interactive(cm: CredentialMethod) -> None:
+def _setup_one_interactive(
+    cm: CredentialMethod,
+    engines: EngineService,
+    render: EngineRenderer,
+    settings: Settings,
+) -> None:
     state = cm.detect()
-    state_icon = _state_icon(state)
-    console.print(f"\n[{state_icon}]{cm.label}[/{state_icon}] ({cm.backend})")
+    state_icon = render._state_name_to_style(state)
+    render.print(f"\n[{state_icon}]{cm.label}[/{state_icon}] ({cm.backend})")
     if state == CredentialState.PRESENT:
-        console.print("  [dim]Credentials detected — skipping. Use `agentbox ops creds clear ...` to reset.[/dim]")
+        render.credential_skip_detected()
         return
     methods = cm.methods
     if not methods:
-        console.print("  [dim]No credential methods available.[/dim]")
+        render.credential_no_methods()
         return
-    console.print("  Choose method:")
+    render.print("  Choose method:")
     for i, m in enumerate(methods):
-        console.print(f"    {i + 1}) {m.label}")
+        render.print(f"    {i + 1}) {m.label}")
     choice = typer.prompt("  >", default="s", show_default=False)
     if choice.lower() in ("s", "skip", ""):
-        console.print("  [dim]Skipped.[/dim]")
+        render.credential_skipped()
         return
     try:
         idx = int(choice) - 1
         if 0 <= idx < len(methods):
-            _apply_method(cm, methods[idx])
+            _apply_method(cm, methods[idx], render, settings)
         else:
-            console.print("  [red]Invalid choice.[/red]")
+            render.credential_invalid_choice()
     except ValueError:
-        console.print("  [red]Invalid input — enter a number, or 's' to skip.[/red]")
+        render.credential_invalid_input()
 
 
-def _setup_one(cm: CredentialMethod, skip_choice: bool = False) -> None:
+def _setup_one(
+    cm: CredentialMethod,
+    engines: EngineService,
+    render: EngineRenderer,
+    settings: Settings,
+    skip_choice: bool = False,
+) -> None:
     state = cm.detect()
-    state_icon = _state_icon(state)
-    console.print(f"[{state_icon}]{cm.label}[/{state_icon}] ({cm.backend})")
+    state_icon = render._state_name_to_style(state)
+    render.print(f"[{state_icon}]{cm.label}[/{state_icon}] ({cm.backend})")
     if state == CredentialState.PRESENT:
-        console.print("  [dim]Already configured.[/dim]")
+        render.credential_already_configured()
         return
     methods = cm.methods
     if not methods:
-        console.print("  [dim]No credential methods available.[/dim]")
+        render.credential_no_methods()
         return
     if skip_choice:
-        _apply_method(cm, methods[0])
+        _apply_method(cm, methods[0], render, settings)
         return
     if len(methods) == 1:
-        _apply_method(cm, methods[0])
+        _apply_method(cm, methods[0], render, settings)
     else:
-        console.print("  [dim]Multiple methods available; use interactive mode.[/dim]")
+        render.credential_multiple_methods_hint()
 
 
-def _apply_method(cm: CredentialMethod, method: Method) -> None:
+def _apply_method(
+    cm: CredentialMethod,
+    method: Method,
+    render: EngineRenderer,
+    settings: Settings,
+) -> None:
+    ctx = {
+        "creds_base": str(settings.creds_dir),
+        "env_file": str(settings.creds_env_file),
+    }
     try:
-        ctx: dict = {"creds_base": str(_CREDS_BASE), "env_file": str(_ENV_FILE)}
         method.apply(ctx)
         new_state = cm.detect()
         if new_state == CredentialState.PRESENT:
-            console.print(f"  [green]✓[/green] Credential configured via {method.label}")
+            render.credential_configured(method.label)
         else:
-            console.print("  [yellow]⚠[/yellow] Method ran but credential not detected. Check manually.")
+            render.credential_method_warning()
     except Exception as exc:
-        console.print(f"  [red]✗[/red] Failed: {exc}")
+        render.credential_method_failed(exc)
 
 
 @creds_app.command()
 def status(
+    ctx: typer.Context,
     probe: bool = typer.Option(
         False, "--probe", help="Probe credentials with a lightweight API call."
     ),
 ) -> None:
     """Show credential status for every registered backend."""
-    all_items = EngineService().list_credentials()
-    if not all_items:
-        console.print("[dim]No credential backends registered.[/dim]")
-        return
-    table = Table(title="Credential Status", title_style="bold", header_style="bold cyan", padding=(0, 2))
-    table.add_column("Status", justify="center", width=10)
-    table.add_column("Backend", style="bold")
-    table.add_column("Detail")
-    for cm in all_items:
-        state = cm.detect()
-        table.add_row(_state_label(state), cm.label, cm.backend)
-    console.print(table)
+    obj: CliCtx = ctx.obj
+    all_items = obj.engines.list_credentials()
+    obj.render.engine.credential_status_table(all_items)
 
 
 @creds_app.command(name="import")
 def import_cmd(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Backend name to import credentials for (e.g. claude)."),
 ) -> None:
     """Non-interactive host credential import for a backend."""
-    cm = EngineService().get_credential(name)
+    obj: CliCtx = ctx.obj
+    render = obj.render.engine
+    cm = obj.engines.get_credential(name)
     if cm is None:
-        console.print(f"[red]Unknown backend:[/red] {name!r}")
+        render.credential_unknown_backend(name)
         raise typer.Exit(1)
     for m in cm.methods:
         if m.key == "import_host":
-            _apply_method(cm, m)
+            _apply_method(cm, m, render, obj.settings)
             return
-    console.print(f"[red]No import method available for {name!r}.[/red]")
+    render.credential_no_import_method(name)
     raise typer.Exit(1)
 
 
 @creds_app.command(name="clear")
 def clear_cmd(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Backend name to clear credentials for."),
 ) -> None:
     """Remove stored credentials for one backend."""
-    cm = EngineService().get_credential(name)
+    obj: CliCtx = ctx.obj
+    render = obj.render.engine
+    settings = obj.settings
+    cm = obj.engines.get_credential(name)
     if cm is None:
-        console.print(f"[red]Unknown backend:[/red] {name!r}")
+        render.credential_unknown_backend(name)
         raise typer.Exit(1)
     cleared = False
-    oauth_dir = _CREDS_BASE / name
+    oauth_dir = settings.creds_dir / name
     if oauth_dir.exists():
         shutil.rmtree(oauth_dir)
-        console.print(f"[green]Removed:[/green] {oauth_dir}")
+        render.credential_dir_removed(str(oauth_dir))
         cleared = True
-    for child in _CREDS_BASE.iterdir():
+    for child in settings.creds_dir.iterdir():
         if child.is_dir() and child.name.startswith(f"{name}-"):
             shutil.rmtree(child)
-            console.print(f"[green]Removed:[/green] {child}")
+            render.credential_dir_removed(str(child))
             cleared = True
-    if _ENV_FILE.exists():
+    if settings.creds_env_file.exists():
         env_vars = [m.env_var for m in cm.methods if m.env_var]
         if env_vars:
-            _remove_env_lines(_ENV_FILE, env_vars)
-            console.print(f"[green]Removed env vars from:[/green] {_ENV_FILE}")
+            _remove_env_lines(settings.creds_env_file, env_vars)
+            render.credential_env_removed(str(settings.creds_env_file))
             cleared = True
     if not cleared:
-        console.print(f"[dim]No credentials found for {name!r}.[/dim]")
+        render.credential_none_found(name)
     else:
-        console.print("[green]Credentials cleared.[/green]")
-
-
-def _state_icon(state: CredentialState) -> str:
-    return {CredentialState.PRESENT: "green", CredentialState.MISSING: "dim", CredentialState.INVALID: "yellow"}.get(state, "dim")
-
-
-def _state_label(state: CredentialState) -> Text:
-    return {
-        CredentialState.PRESENT: Text("PRESENT", style="bold green"),
-        CredentialState.MISSING: Text("MISSING", style="dim"),
-        CredentialState.INVALID: Text("INVALID", style="bold yellow"),
-    }.get(state, Text("UNKNOWN", style="dim"))
+        render.credential_cleared()
 
 
 def _remove_env_lines(env_path: Path, keys: list[str]) -> None:
