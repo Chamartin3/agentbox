@@ -6,10 +6,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 
-from agentbox.api.deps import get_store
-from agentbox.core.service import SessionStore
-from agentbox.core.service import resources as resources_service
-from agentbox.core.service.resources import InvalidResource, ResourceNotFound
+from agentbox.api.deps import get_resource_service
+from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound, ResourceService
 from agentbox.api.resources.repo._models import (
     CreateResourceBody,
     HostPathImportBody,
@@ -22,11 +20,10 @@ create_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])
 @create_router.post("", status_code=201)
 def create_resource(
     body: CreateResourceBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.create_resource(
-            store=store,
+        return svc.create_resource(
             slug=body.slug,
             type=body.type,
             display_name=body.display_name,
@@ -40,7 +37,7 @@ def create_resource(
 @create_router.post("/{resource_id}/versions/upload", status_code=201)
 async def upload_version(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     file: UploadFile,
     changelog: Annotated[str, Query(min_length=3)],
     draft: bool = False,
@@ -48,9 +45,8 @@ async def upload_version(
 ):
     content = await file.read()
     try:
-        return resources_service.import_upload_version(
+        return svc.import_upload_version(
             resource_id,
-            store=store,
             filename=file.filename or "upload.bin",
             content=content,
             mime_type=file.content_type,
@@ -68,12 +64,11 @@ async def upload_version(
 def host_path_version(
     resource_id: str,
     body: HostPathImportBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.import_host_path_version(
+        return svc.import_host_path_version(
             resource_id,
-            store=store,
             path=body.path,
             include=body.include,
             exclude=body.exclude,
@@ -90,7 +85,7 @@ def host_path_version(
 @create_router.post("/{resource_id}/versions/upload-zip", status_code=201)
 async def upload_zip_version(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     file: UploadFile,
     changelog: Annotated[str, Query(min_length=3)],
     draft: bool = False,
@@ -98,9 +93,8 @@ async def upload_zip_version(
 ):
     content = await file.read()
     try:
-        return resources_service.import_zip_version(
+        return svc.import_zip_version(
             resource_id,
-            store=store,
             filename=file.filename or "upload.zip",
             content=content,
             changelog=changelog,
@@ -116,7 +110,7 @@ async def upload_zip_version(
 @create_router.post("/{resource_id}/versions/upload-schema", status_code=201)
 async def upload_schema_version(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     file: UploadFile,
     changelog: Annotated[str, Query(min_length=3)],
     draft: bool = False,
@@ -124,9 +118,8 @@ async def upload_schema_version(
 ):
     content = await file.read()
     try:
-        return resources_service.import_schema_version(
+        return svc.import_schema_version(
             resource_id,
-            store=store,
             filename=file.filename or "schema.json",
             content=content,
             changelog=changelog,
@@ -142,7 +135,7 @@ async def upload_schema_version(
 @create_router.post("/{resource_id}/versions/upload-script", status_code=201)
 async def upload_script_version(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     file: UploadFile,
     changelog: Annotated[str, Query(min_length=3)],
     language: str | None = None,
@@ -153,9 +146,8 @@ async def upload_script_version(
 ):
     content = await file.read()
     try:
-        return resources_service.import_script_version(
+        return svc.import_script_version(
             resource_id,
-            store=store,
             filename=file.filename or "script",
             content=content,
             changelog=changelog,

@@ -7,13 +7,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
-from agentbox.api.deps import get_store
-from agentbox.core.service import SessionStore
-from agentbox.core.service import resources as resources_service
-from agentbox.core.service.resources import (
+from agentbox.api.deps import get_resource_service
+from agentbox.core.service.resources.service import (
     InvalidResource,
     NoActiveVersion,
     ResourceNotFound,
+    ResourceService,
 )
 from agentbox.api.resources.repo._models import (
     PublishBody,
@@ -29,10 +28,10 @@ inspect_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"]
 @inspect_router.get("/{resource_id}")
 def get_resource(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.get_resource(resource_id, store=store)
+        return svc.get_resource(resource_id)
     except ResourceNotFound:
         _raise_not_found()
 
@@ -41,12 +40,11 @@ def get_resource(
 def update_resource(
     resource_id: str,
     body: UpdateResourceBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.update_resource(
+        return svc.update_resource(
             resource_id,
-            store=store,
             display_name=body.display_name,
             description=body.description,
             tags=body.tags,
@@ -58,10 +56,10 @@ def update_resource(
 @inspect_router.get("/{resource_id}/versions")
 def list_versions(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.list_versions(resource_id, store=store)
+        return svc.list_versions(resource_id)
     except ResourceNotFound:
         _raise_not_found()
 
@@ -71,13 +69,12 @@ def publish_version(
     resource_id: str,
     version_id: str,
     body: PublishBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.publish_version(
+        return svc.publish_version(
             resource_id,
             version_id,
-            store=store,
             reason=body.reason,
             actor=body.actor,
         )
@@ -91,12 +88,11 @@ def publish_version(
 def rollback_resource(
     resource_id: str,
     body: RollbackBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.rollback_resource(
+        return svc.rollback_resource(
             resource_id,
-            store=store,
             target_version=body.target_version,
             reason=body.reason,
             actor=body.actor,
@@ -104,20 +100,18 @@ def rollback_resource(
     except ResourceNotFound:
         _raise_not_found()
     except InvalidResource as exc:
-        raise __import__("fastapi").HTTPException(400, str(exc)) from exc
+        raise HTTPException(400, str(exc)) from exc
 
 
 @inspect_router.get("/{resource_id}/blobs")
 def get_blob(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     path: str = "",
     version_id: str | None = None,
 ):
     try:
-        blob = resources_service.get_blob(
-            resource_id, store=store, path=path, version_id=version_id
-        )
+        blob = svc.get_blob(resource_id, path=path, version_id=version_id)
     except ResourceNotFound as exc:
         _raise_not_found(str(exc))
     except NoActiveVersion:
@@ -131,13 +125,11 @@ def get_blob(
 @inspect_router.get("/{resource_id}/render")
 def render_resource(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
 ):
     try:
-        return resources_service.render_resource(
-            resource_id, store=store, version_id=version_id
-        )
+        return svc.render_resource(resource_id, version_id=version_id)
     except ResourceNotFound:
         _raise_not_found()
     except NoActiveVersion:
@@ -147,13 +139,11 @@ def render_resource(
 @inspect_router.get("/{resource_id}/tree")
 def get_tree(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
 ):
     try:
-        return resources_service.get_tree(
-            resource_id, store=store, version_id=version_id
-        )
+        return svc.get_tree(resource_id, version_id=version_id)
     except ResourceNotFound:
         _raise_not_found()
     except NoActiveVersion:
@@ -163,17 +153,12 @@ def get_tree(
 @inspect_router.get("/{resource_id}/export/pydantic")
 def export_pydantic(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     class_name: str = "Model",
     version_id: str | None = None,
 ):
     try:
-        code = resources_service.export_pydantic(
-            resource_id,
-            store=store,
-            class_name=class_name,
-            version_id=version_id,
-        )
+        code = svc.export_pydantic(resource_id, class_name=class_name, version_id=version_id)
     except ResourceNotFound as exc:
         _raise_not_found(str(exc))
     except NoActiveVersion:
@@ -187,12 +172,11 @@ def export_pydantic(
 def validate_script_sample(
     resource_id: str,
     body: ValidateBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return resources_service.validate_script_sample(
+        return svc.validate_script_sample(
             resource_id,
-            store=store,
             sample=body.sample,
             direction=body.direction,
         )
@@ -207,19 +191,17 @@ def validate_script_sample(
 @inspect_router.get("/{resource_id}/export/zip")
 def export_zip(
     resource_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
 ):
     try:
-        content, filename = resources_service.export_zip(
-            resource_id, store=store, version_id=version_id
-        )
+        content, filename = svc.export_zip(resource_id, version_id=version_id)
     except ResourceNotFound:
         _raise_not_found()
     except NoActiveVersion:
         _raise_not_found("no active version")
     except InvalidResource as exc:
-        raise __import__("fastapi").HTTPException(400, str(exc)) from exc
+        raise HTTPException(400, str(exc)) from exc
     return Response(
         content=content,
         media_type="application/zip",

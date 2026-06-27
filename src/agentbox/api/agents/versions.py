@@ -11,6 +11,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from agentbox.api.deps import get_agent_service
+from agentbox.core.db import (
+    AgentVersionCommentRow,
+    AgentVersionRatingRow,
+    AgentVersionRow,
+)
 from agentbox.core.service.agents import AgentNotFound
 
 router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
@@ -108,7 +113,7 @@ class CommentBody(BaseModel):
 
 
 @router.post("/{version}/comments")
-def add_comment(agent_id: str, version: int, body: CommentBody) -> dict:
+def add_comment(agent_id: str, version: int, body: CommentBody) -> AgentVersionCommentRow:
     _require_agent(agent_id)
     svc = get_agent_service()
     v = svc.get_version(agent_id, version)
@@ -128,7 +133,7 @@ class RatingBody(BaseModel):
 
 
 @router.put("/{version}/rating")
-def set_rating(agent_id: str, version: int, body: RatingBody) -> dict:
+def set_rating(agent_id: str, version: int, body: RatingBody) -> AgentVersionRatingRow:
     _require_agent(agent_id)
     svc = get_agent_service()
     v = svc.get_version(agent_id, version)
@@ -153,7 +158,7 @@ class NewVersionBody(BaseModel):
 
 
 @router.post("")
-def create_agent_version(agent_id: str, body: NewVersionBody) -> dict:
+def create_agent_version(agent_id: str, body: NewVersionBody) -> AgentVersionRow:
     """Create a new version from a full agent definition snapshot."""
     svc = get_agent_service()
     agent = svc.get_agent_def(agent_id)
@@ -179,7 +184,7 @@ class PromptRevisionBody(BaseModel):
 
 
 @router.post("/prompt-revision", status_code=201)
-def save_prompt_revision(agent_id: str, body: PromptRevisionBody) -> dict:
+def save_prompt_revision(agent_id: str, body: PromptRevisionBody) -> AgentVersionRow:
     """Create a new agent_version with edited prompt_content.
 
     Every call creates a new row — the "draft slot" reuse pattern of the

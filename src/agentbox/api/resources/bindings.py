@@ -1,29 +1,27 @@
 """Agent + workspace resource binding routes (Plans 02 + 03).
 
-Thin HTTP layer: parses requests, delegates to
-``core.service.bindings``, maps domain errors. Workspace mutations
-inject ``build_workspace_by_name`` as the sync callback so the
-service stays transport-agnostic.
+Thin HTTP layer: parses requests, delegates to ResourceService, maps domain errors.
+Workspace mutations trigger ``build_workspace_by_name`` as a side-effect after the
+binding write so the service stays transport-agnostic.
 """
 
 from __future__ import annotations
 
+import contextlib
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_settings, get_store
+from agentbox.api.deps import get_resource_service, get_settings, get_store
 from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
-from agentbox.core.service import SessionStore
-from agentbox.core.service import bindings as bindings_service
-from agentbox.core.service.bindings import (
+from agentbox.core.service.resources.service import (
     AgentVersionMissing,
     BindingError,
-    PreviewError,
+    ResourceNotFound,
+    ResourceService,
 )
-from agentbox.core.service.resources import ResourceNotFound
-from agentbox.core.service import build_workspace_by_name
+from agentbox.core.service import build_workspace_by_name, PreviewError, SessionStore
 
 router = APIRouter(tags=["resource-bindings"])
 
@@ -91,22 +89,21 @@ class ReplaceSkillBindings(BaseModel):
 @router.get("/api/agents/{agent_id}/prompt-resources")
 def list_prompt_resources(
     agent_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
-    return bindings_service.list_prompt_resources(agent_id, store=store)
+    return svc.list_prompt_resources(agent_id)
 
 
 @router.put("/api/agents/{agent_id}/prompt-resources")
 def replace_prompt_resources(
     agent_id: str,
     body: ReplacePromptBindings,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
     try:
-        return bindings_service.replace_prompt_resources(
+        return svc.replace_prompt_resources(
             agent_id,
             [b.model_dump() for b in body.bindings],
-            store=store,
             reason=body.reason,
             actor=body.actor,
         )
@@ -118,13 +115,14 @@ def replace_prompt_resources(
 def preview_prompt(
     agent_id: str,
     body: PreviewPromptBody,
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     override = (
         [b.model_dump() for b in body.bindings] if body.bindings is not None else None
     )
     try:
-        return bindings_service.preview_prompt(
+        return svc.preview_prompt(
             agent_id,
             store=store,
             template=body.template,
@@ -142,46 +140,51 @@ def preview_prompt(
 @router.get("/api/workspaces/{workspace_id}/resources")
 def list_workspace_resources(
     workspace_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
-    return bindings_service.list_workspace_resources(workspace_id, store=store)
+    return svc.list_workspace_resources(workspace_id)
 
 
 @router.put("/api/workspaces/{workspace_id}/resources")
 def replace_workspace_resources(
     workspace_id: str,
     body: ReplaceWorkspaceBindings,
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     try:
-        return bindings_service.replace_workspace_resources(
+        result = svc.replace_workspace_resources(
             workspace_id,
             [b.model_dump() for b in body.bindings],
-            store=store,
             reason=body.reason,
             actor=body.actor,
-            settings=get_settings(),
-            sync_cb=build_workspace_by_name,
         )
     except BindingError as exc:
         raise HTTPException(400, str(exc)) from exc
+    # Trigger workspace build as a best-effort side effect
+    with contextlib.suppress(Exception):
+        build_workspace_by_name(store, get_settings(), workspace_id)
+    return result
 
 
 @router.post("/api/workspaces/{workspace_id}/resources/dry-run")
 def dry_run_workspace_resources(
     workspace_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
-    return bindings_service.dry_run_workspace_resources(workspace_id, store=store)
+    return svc.dry_run_workspace_resources(workspace_id)
 
 
 # --- preview rendering (no bindings, just a single resource preview) ---
 
 
 @router.get("/api/repo-resources/{resource_id}/preview-modes")
-def preview_modes(resource_id: str, store: Annotated[SessionStore, Depends(get_store)]):
+def preview_modes(
+    resource_id: str,
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
+):
     try:
-        return bindings_service.preview_modes(resource_id, store=store)
+        return svc.preview_modes(resource_id)
     except ResourceNotFound as exc:
         raise HTTPException(404, "resource not found") from exc
 
@@ -192,28 +195,43 @@ def preview_modes(resource_id: str, store: Annotated[SessionStore, Depends(get_s
 @router.get("/api/workspaces/{workspace_id}/subagents")
 def list_workspace_subagents(
     workspace_id: str,
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     store: Annotated[SessionStore, Depends(get_store)],
 ):
-    return bindings_service.list_workspace_subagents(workspace_id, store=store)
+    # Enrichment with agent info is done here at the API layer
+    items = svc.list_workspace_subagents_raw(workspace_id)
+    enriched = []
+    for s in items:
+        agent = store.get_agent_def(s["agent_id"])
+        enriched.append(
+            {
+                **s,
+                "agent_name": getattr(agent, "name", None) if agent else None,
+                "agent_description": getattr(agent, "description", None) if agent else None,
+            }
+        )
+    return {"items": enriched}
 
 
 @router.put("/api/workspaces/{workspace_id}/subagents")
 def replace_workspace_subagents(
     workspace_id: str,
     body: ReplaceSubagents,
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     try:
-        return bindings_service.replace_workspace_subagents(
+        items = svc.replace_workspace_subagents(
             workspace_id,
             [s.model_dump() for s in body.subagents],
-            store=store,
             actor=body.actor,
-            settings=get_settings(),
-            sync_cb=build_workspace_by_name,
         )
-    except BindingError as exc:
+    except (ValueError, BindingError) as exc:
         raise HTTPException(400, str(exc)) from exc
+    # Trigger workspace build as a best-effort side effect
+    with contextlib.suppress(Exception):
+        build_workspace_by_name(store, get_settings(), workspace_id)
+    return {"items": items}
 
 
 # --- workspace skill bindings ---
@@ -222,26 +240,28 @@ def replace_workspace_subagents(
 @router.get("/api/workspaces/{workspace_id}/skill-bindings")
 def list_workspace_skill_bindings(
     workspace_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
 ):
-    return bindings_service.list_workspace_skill_bindings(workspace_id, store=store)
+    return svc.list_workspace_skill_bindings(workspace_id)
 
 
 @router.put("/api/workspaces/{workspace_id}/skill-bindings")
 def replace_workspace_skill_bindings(
     workspace_id: str,
     body: ReplaceSkillBindings,
+    svc: Annotated[ResourceService, Depends(get_resource_service)],
     store: Annotated[SessionStore, Depends(get_store)],
 ):
     try:
-        return bindings_service.replace_workspace_skill_bindings(
+        result = svc.replace_workspace_skill_bindings(
             workspace_id,
             body.skill_resource_ids,
-            store=store,
             reason=body.reason,
             actor=body.actor,
-            settings=get_settings(),
-            sync_cb=build_workspace_by_name,
         )
     except BindingError as exc:
         raise HTTPException(400, str(exc)) from exc
+    # Trigger workspace build as a best-effort side effect
+    with contextlib.suppress(Exception):
+        build_workspace_by_name(store, get_settings(), workspace_id)
+    return result
