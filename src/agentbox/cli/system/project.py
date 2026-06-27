@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 
 import typer
-from rich.table import Table
 
-from agentbox.cli.shared import console
+from agentbox.cli.shared import CliCtx
+
+# TODO(cli-arch): move to facade export (plan 095 Phase A)
 from agentbox.core.service import McpServerSpec
-from agentbox.core.service.system.service import SystemService
 
 project_app = typer.Typer(
     name="project",
@@ -20,6 +20,7 @@ project_app = typer.Typer(
 
 @project_app.command("mcp-servers")
 def project_mcp_servers(
+    ctx: typer.Context,
     ls: bool = typer.Option(True, "--ls", help="List MCP servers (default)"),
     set_: str | None = typer.Option(
         None, "--set", help="Add or update an MCP server (JSON config)"
@@ -32,18 +33,18 @@ def project_mcp_servers(
 
     --set expects JSON: '{"url": "http://...", "transport": "http"}'
     """
-    svc = SystemService()
+    obj: CliCtx = ctx.obj
 
     if rm is not None:
-        svc.delete_project_mcp_server(rm)
-        console.print(f"[yellow]removed[/yellow] MCP server {rm!r}")
+        obj.system.delete_project_mcp_server(rm)
+        obj.render.system.project_mcp_removed(rm)
         return
 
     if set_ is not None:
         try:
             config = json.loads(set_)
         except json.JSONDecodeError as exc:
-            console.print(f"[red]invalid JSON: {exc}[/red]")
+            obj.render.system.error(f"invalid JSON: {exc}")
             raise typer.Exit(2)
         name = config.pop("name", None) or "mcp"
         spec = McpServerSpec(
@@ -52,28 +53,9 @@ def project_mcp_servers(
             transport=config.get("transport", "http"),
             command=config.get("command"),
         )
-        svc.set_project_mcp_server(spec)
-        console.print(f"[green]saved[/green] MCP server {name!r}")
+        obj.system.set_project_mcp_server(spec)
+        obj.render.system.project_mcp_saved(name)
         return
 
-    servers = svc.get_project_mcp_servers()
-    if not servers:
-        console.print("[dim]no project MCP servers configured[/dim]")
-        return
-
-    table = Table(title="Project MCP Servers", header_style="bold cyan")
-    table.add_column("Name", style="bold")
-    table.add_column("URL")
-    table.add_column("Transport")
-    table.add_column("Command")
-    for s in servers:
-        url = s.url or s.command
-        if url and isinstance(url, list):
-            url = " ".join(url)
-        table.add_row(
-            s.name,
-            str(url or "—"),
-            s.transport or "http",
-            " ".join(s.command) if s.command else "—",
-        )
-    console.print(table)
+    servers = obj.system.get_project_mcp_servers()
+    obj.render.system.project_mcp_table(servers)

@@ -1,13 +1,12 @@
+"""system mcp — show declared MCP servers and cached health."""
+
 from __future__ import annotations
 
 import json
 
 import typer
-from rich.table import Table
 
-from agentbox.cli.shared import console
-from agentbox.core.config import load_settings
-from agentbox.core.service.system.service import SystemService
+from agentbox.cli.shared import CliCtx
 
 mcp_app = typer.Typer(
     name="mcp",
@@ -17,28 +16,16 @@ mcp_app = typer.Typer(
 
 
 @mcp_app.command("ls")
-def mcp_ls() -> None:
+def mcp_ls(ctx: typer.Context) -> None:
     """List MCP servers declared in the manifest with cached health."""
-    settings = load_settings()
-    servers = SystemService().get_project_mcp_servers()
+    obj: CliCtx = ctx.obj
+    servers = obj.system.get_project_mcp_servers()
 
     if not servers:
-        console.print("[yellow]No MCP servers configured.[/yellow]")
+        obj.render.system.mcp_servers_table([])
         return
 
-    table = Table(
-        title="MCP Servers",
-        title_style="bold",
-        header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("Server")
-    table.add_column("Transport")
-    table.add_column("Endpoint / Command")
-    table.add_column("Tools", justify="right")
-    table.add_column("Status")
-    table.add_column("Last sync")
-
+    rows: list[tuple[str, str, str, str | None, bool, str | None]] = []
     for s in servers:
         if s.url:
             transport = s.transport or "http"
@@ -50,25 +37,22 @@ def mcp_ls() -> None:
             transport = "unknown"
             endpoint = "—"
 
-        # Try to read cache for health info
-        cache_path = settings.mcp_cache_dir / f"{s.name}.json"
-        status_str = "[dim]unknown[/dim]"
-        tool_count = "?"
-        last_sync = "—"
+        cache_path = obj.settings.mcp_cache_dir / f"{s.name}.json"
+        tool_count: str | None = None
+        is_cached: bool = False
+        last_sync: str | None = None
         if cache_path.exists():
             try:
                 data = json.loads(cache_path.read_text(encoding="utf-8"))
                 tools = data.get("tools", [])
                 tool_count = str(len(tools))
-                cached_at = data.get("cached_at", "")
-                if cached_at:
-                    last_sync = cached_at
-                status_str = "[green]ok[/green]"
+                last_sync = data.get("cached_at", "") or None
+                is_cached = True
             except (json.JSONDecodeError, OSError):
-                status_str = "[red]unavailable[/red]"
+                pass
         else:
-            status_str = "[dim]unknown[/dim]"
+            is_cached = False
 
-        table.add_row(s.name, transport, endpoint, tool_count, status_str, last_sync)
+        rows.append((s.name, transport, endpoint, tool_count, is_cached, last_sync))
 
-    console.print(table)
+    obj.render.system.mcp_servers_table(rows)

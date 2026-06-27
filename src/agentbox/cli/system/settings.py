@@ -5,11 +5,8 @@ from __future__ import annotations
 import json
 
 import typer
-from rich.panel import Panel
-from rich.syntax import Syntax
 
-from agentbox.cli.shared import console
-from agentbox.core.service.system.service import SystemService
+from agentbox.cli.shared import CliCtx
 
 settings_app = typer.Typer(
     name="settings",
@@ -19,32 +16,27 @@ settings_app = typer.Typer(
 
 
 @settings_app.command("ls")
-def settings_ls() -> None:
+def settings_ls(ctx: typer.Context) -> None:
     """List all settings sections."""
-    sections = SystemService().list_settings_sections()
-    if not sections:
-        console.print("[dim]no settings sections[/dim]")
-        return
-    for s in sections:
-        console.print(f"[bold]{s}[/bold]")
+    obj: CliCtx = ctx.obj
+    sections = obj.system.list_settings_sections()
+    obj.render.system.settings_sections_list(sections)
 
 
 @settings_app.command("show")
 def settings_show(
+    ctx: typer.Context,
     section: str = typer.Argument(..., help="Settings section name"),
 ) -> None:
     """Show settings for a section."""
-    data = SystemService().get_settings_section(section)
-    console.print(
-        Panel(
-            Syntax(json.dumps(data, indent=2, default=str), "json", theme="ansi_dark"),
-            title=f"Settings — {section}",
-        )
-    )
+    obj: CliCtx = ctx.obj
+    data = obj.system.get_settings_section(section)
+    obj.render.system.settings_section_view(section, data)
 
 
 @settings_app.command("patch")
 def settings_patch(
+    ctx: typer.Context,
     section: str = typer.Argument(..., help="Settings section name"),
     patch_json: str = typer.Argument(..., help="JSON object with key=value overrides"),
 ) -> None:
@@ -53,14 +45,15 @@ def settings_patch(
     Example:
         system settings patch general '{"log_level": "debug"}'
     """
+    obj: CliCtx = ctx.obj
     try:
         patch = json.loads(patch_json)
         if not isinstance(patch, dict):
-            console.print("[red]patch must be a JSON object[/red]")
+            obj.render.system.error("patch must be a JSON object")
             raise typer.Exit(2)
     except json.JSONDecodeError as exc:
-        console.print(f"[red]invalid JSON: {exc}[/red]")
+        obj.render.system.error(f"invalid JSON: {exc}")
         raise typer.Exit(2)
 
-    SystemService().update_settings_section(section, patch)
-    console.print(f"[green]patched[/green] section {section!r}")
+    obj.system.update_settings_section(section, patch)
+    obj.render.system.settings_patched(section)
