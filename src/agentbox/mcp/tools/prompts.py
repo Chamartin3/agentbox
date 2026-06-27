@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
+from agentbox.core.db import AgentVersionRow
 from agentbox.core.service import composition_preview as preview_composition
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.system.service import SystemService
@@ -20,12 +21,12 @@ from agentbox.mcp.deps import get_agent_service, get_context
 from agentbox.mcp.schemas import clamp_limit
 
 
-def _version_prompt_content(version: dict) -> str:
+def _version_prompt_content(version: AgentVersionRow) -> str:
     """Return the prompt body stored on an ``agent_versions`` row."""
     return version.get("prompt_content") or version.get("prompt_snapshot") or ""
 
 
-def _version_meta(version: dict) -> dict:
+def _version_meta(version: AgentVersionRow) -> dict:
     """Slim metadata dict for an ``agent_versions`` row."""
     return {
         "version": version.get("version"),
@@ -36,7 +37,7 @@ def _version_meta(version: dict) -> dict:
     }
 
 
-def _resolve_active(svc, agent_id: str) -> dict | None:
+def _resolve_active(svc, agent_id: str) -> AgentVersionRow | None:
     """Active version with ``latest_version`` fallback (mirrors the API)."""
     return svc.active_version(agent_id) or svc.latest_version(agent_id)
 

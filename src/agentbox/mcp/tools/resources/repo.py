@@ -8,12 +8,7 @@ import binascii
 from fastmcp import FastMCP
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.service import (
-    ImporterContext,
-    UploadImporter,
-    ZipUploadImporter,
-)
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_context, get_resource_service
 
 
 def _require_reason(reason: str) -> dict | None:
@@ -45,7 +40,7 @@ def register_repo(mcp: FastMCP) -> None:
     ) -> dict:
         """Create a new shared resource, optionally with an initial version.
 
-        Calls the same ``SessionStore`` methods used by ``POST /api/repo-resources``
+        Calls the same service methods used by ``POST /api/repo-resources``
         and ``POST /api/repo-resources/{id}/versions/upload``.
 
         ``type`` is one of: document, folder, skill, schema, script.
@@ -54,7 +49,7 @@ def register_repo(mcp: FastMCP) -> None:
         in that case.
 
         For folder/skill resources, ``content_base64`` must be a ZIP archive
-        (auto-detected by magic bytes); it is dispatched to ``ZipUploadImporter``
+        (auto-detected by magic bytes); it is dispatched to ``import_zip_version``
         with ``as_skill=(type=="skill")``. To upload a multi-file skill without
         building a zip yourself, use ``create_repo_resource_from_files`` instead.
         """
@@ -66,9 +61,9 @@ def register_repo(mcp: FastMCP) -> None:
                 "detail": f"type must be one of {[t.value for t in ResourceType]}",
             }
 
-        ctx = get_context()
+        svc = get_resource_service()
         try:
-            resource = ctx.store.create_repo_resource(
+            resource = svc.create_resource(
                 slug=slug,
                 type=rtype.value,
                 display_name=display_name,
@@ -103,46 +98,44 @@ def register_repo(mcp: FastMCP) -> None:
             raw = (content or "").encode("utf-8")
 
         is_zip = raw[:4] == _ZIP_MAGIC
-        if rtype.is_multi_file:
-            if not is_zip:
-                return {
-                    "error": "invalid_payload",
-                    "detail": (
-                        f"resource type {rtype.value!r} requires a ZIP archive in "
-                        "`content_base64` (or use create_repo_resource_from_files)"
-                    ),
-                    "resource": resource,
-                }
-            importer = ZipUploadImporter(
-                filename=filename or f"{slug.replace('/', '_')}.zip",
-                content=raw,
-                as_skill=(rtype.value == "skill"),
-            )
-        else:
-            if is_zip:
-                return {
-                    "error": "invalid_payload",
-                    "detail": (
-                        f"ZIP archive given for resource type {rtype.value!r}; "
-                        "ZIP uploads are only valid for type=folder or type=skill"
-                    ),
-                    "resource": resource,
-                }
-            fname = filename or f"{slug.replace('/', '_')}.md"
-            importer = UploadImporter(filename=fname, content=raw, mime_type=mime_type)
         try:
-            imported = importer.run(
-                ImporterContext(actor=None, changelog=changelog or "")
-            )
-            version = ctx.store.import_repo_version(
-                resource["id"],
-                imported.blobs,
-                import_source=imported.import_source,
-                changelog=changelog or "",
-                source_metadata=imported.source_metadata,
-                metadata=imported.metadata,
-                draft=draft,
-            )
+            if rtype.is_multi_file:
+                if not is_zip:
+                    return {
+                        "error": "invalid_payload",
+                        "detail": (
+                            f"resource type {rtype.value!r} requires a ZIP archive in "
+                            "`content_base64` (or use create_repo_resource_from_files)"
+                        ),
+                        "resource": resource,
+                    }
+                fname = filename or f"{slug.replace('/', '_')}.zip"
+                version = svc.import_zip_version(
+                    resource["id"],
+                    filename=fname,
+                    content=raw,
+                    changelog=changelog or "",
+                    draft=draft,
+                )
+            else:
+                if is_zip:
+                    return {
+                        "error": "invalid_payload",
+                        "detail": (
+                            f"ZIP archive given for resource type {rtype.value!r}; "
+                            "ZIP uploads are only valid for type=folder or type=skill"
+                        ),
+                        "resource": resource,
+                    }
+                fname = filename or f"{slug.replace('/', '_')}.md"
+                version = svc.import_upload_version(
+                    resource["id"],
+                    filename=fname,
+                    content=raw,
+                    mime_type=mime_type,
+                    changelog=changelog or "",
+                    draft=draft,
+                )
         except ValueError as exc:
             return {"error": "import_failed", "detail": str(exc), "resource": resource}
         result["version"] = version

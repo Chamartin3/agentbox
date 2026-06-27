@@ -12,6 +12,7 @@ from functools import lru_cache
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db import Database
 from agentbox.core.service import AgentService, SessionStore
+from agentbox.core.service.resources.service import ResourceService
 
 
 @dataclass(frozen=True)
@@ -33,3 +34,8 @@ def get_agent_service() -> AgentService:
     """Agent-domain service. Uncached — self-wires from settings and holds a
     path-cached Database, so a fresh instance per call stays correct."""
     return AgentService()
+
+
+def get_resource_service() -> ResourceService:
+    """Resource-domain service. Uncached — Database is lru_cache'd per path."""
+    return ResourceService()

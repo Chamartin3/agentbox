@@ -7,6 +7,7 @@ from functools import lru_cache
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db import Database
 from agentbox.core.service import AgentService, EvaluationService, ExecutionService, SessionStore, SystemService
+from agentbox.core.service.resources.service import ResourceService
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
@@ -57,9 +58,8 @@ def get_engine_service():
     return EngineService()
 
 
-def get_resource_service():
-    """TODO: plan 090 — ResourceService. Lazy import to avoid circular import."""
-    from agentbox.core.service.resources.service import ResourceService  # noqa: PLC0415
+def get_resource_service() -> ResourceService:
+    """Resource-domain service. Uncached — self-wires from settings and is cheap."""
     return ResourceService()
 
 

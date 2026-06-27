@@ -10,11 +10,7 @@ import zipfile
 from fastmcp import FastMCP
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.service import (
-    ImporterContext,
-    ZipUploadImporter,
-)
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_resource_service
 
 
 def _require_reason(reason: str) -> dict | None:
@@ -114,9 +110,9 @@ def register_importers(mcp: FastMCP) -> None:
                 zf.writestr(path, raw)
         zip_bytes = buf.getvalue()
 
-        ctx = get_context()
+        svc = get_resource_service()
         try:
-            resource = ctx.store.create_repo_resource(
+            resource = svc.create_resource(
                 slug=slug,
                 type=rtype.value,
                 display_name=display_name,
@@ -126,22 +122,12 @@ def register_importers(mcp: FastMCP) -> None:
         except ValueError as exc:
             return {"error": "invalid_request", "detail": str(exc)}
 
-        importer = ZipUploadImporter(
-            filename=f"{slug.replace('/', '_')}.zip",
-            content=zip_bytes,
-            as_skill=(rtype is ResourceType.SKILL),
-        )
         try:
-            imported = importer.run(
-                ImporterContext(actor=None, changelog=changelog or "")
-            )
-            version = ctx.store.import_repo_version(
+            version = svc.import_zip_version(
                 resource["id"],
-                imported.blobs,
-                import_source=imported.import_source,
+                filename=f"{slug.replace('/', '_')}.zip",
+                content=zip_bytes,
                 changelog=changelog,
-                source_metadata=imported.source_metadata,
-                metadata=imported.metadata,
                 draft=draft,
             )
         except ValueError as exc:

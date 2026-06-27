@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_resource_service
 
 
 def _require_reason(reason: str) -> dict | None:
@@ -25,28 +25,8 @@ def register_bindings(mcp: FastMCP) -> None:
         marker, mode, slot, ``attach_as_reference`` flag, pinned version, and
         enriched resource metadata (slug, type, display_name, active_version_id).
         Mirrors ``GET /api/agents/{agent_id}/prompt-resources``."""
-        ctx = get_context()
-        rows = ctx.store.list_prompt_bindings(agent_id)
-        enriched: list[dict] = []
-        for b in rows:
-            resource = ctx.store.get_repo_resource(b["resource_id"])
-            active = (
-                ctx.store.get_active_repo_version(b["resource_id"])
-                if resource
-                else None
-            )
-            enriched.append(
-                {
-                    **b,
-                    "attach_as_reference": bool(b.get("attach_as_reference")),
-                    "resource_slug": resource["slug"] if resource else None,
-                    "resource_type": resource["type"] if resource else None,
-                    "resource_display_name": resource["display_name"]
-                    if resource
-                    else None,
-                    "active_version_id": active["id"] if active else None,
-                }
-            )
+        svc = get_resource_service()
+        enriched = svc.list_prompt_resources(agent_id)["items"]
         return {"agent_id": agent_id, "items": enriched, "count": len(enriched)}
 
     @mcp.tool
@@ -66,9 +46,9 @@ def register_bindings(mcp: FastMCP) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        ctx = get_context()
+        svc = get_resource_service()
         try:
-            rows = ctx.store.replace_prompt_bindings(agent_id, bindings, reason=reason)
+            rows = svc.replace_prompt_bindings_raw(agent_id, bindings, reason=reason)
         except ValueError as exc:
             return {"error": "invalid_binding", "detail": str(exc)}
         return {"agent_id": agent_id, "bindings": rows, "count": len(rows)}
@@ -98,8 +78,8 @@ def register_bindings(mcp: FastMCP) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        ctx = get_context()
-        current = ctx.store.list_prompt_bindings(agent_id)
+        svc = get_resource_service()
+        current = svc.list_prompt_bindings_raw(agent_id)
         existing = [
             {
                 "resource_id": b["resource_id"],
@@ -129,7 +109,7 @@ def register_bindings(mcp: FastMCP) -> None:
             "display_order": next_order,
         }
         try:
-            rows = ctx.store.replace_prompt_bindings(
+            rows = svc.replace_prompt_bindings_raw(
                 agent_id, [*existing, new_binding], reason=reason
             )
         except ValueError as exc:
@@ -175,8 +155,8 @@ def register_bindings(mcp: FastMCP) -> None:
                 "error": "invalid_request",
                 "detail": "provide binding_id, or any of resource_id/marker/slot",
             }
-        ctx = get_context()
-        current = ctx.store.list_prompt_bindings(agent_id)
+        svc = get_resource_service()
+        current = svc.list_prompt_bindings_raw(agent_id)
 
         def _matches(b: dict) -> bool:
             if binding_id is not None:
@@ -206,7 +186,7 @@ def register_bindings(mcp: FastMCP) -> None:
             if not _matches(b)
         ]
         try:
-            rows = ctx.store.replace_prompt_bindings(agent_id, keep, reason=reason)
+            rows = svc.replace_prompt_bindings_raw(agent_id, keep, reason=reason)
         except ValueError as exc:
             return {"error": "invalid_binding", "detail": str(exc)}
         return {

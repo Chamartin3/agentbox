@@ -7,16 +7,13 @@ import logging
 from fastmcp import FastMCP
 
 from agentbox.api.deps import get_settings
-from agentbox.core.service import (
-    build_workspace_by_name,
-    resolve_workspace_resources,
-)
+from agentbox.core.service import build_workspace_by_name
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.service.env_doc import (
     env_doc_body,
     render_env_doc_preview,
 )
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.deps import get_context, get_resource_service
 from agentbox.mcp.schemas import clamp_limit
 
 
@@ -39,14 +36,28 @@ def register_workspace(mcp: FastMCP) -> None:
         """Replace all workspace file bindings for a workspace.
 
         Each binding: {dest_path: str, resource_id: str, mode: 'symlink'|'copy'}
+        or {target_path: str, resource_id: str, materialize_mode: str}.
         ``reason`` is stored as changelog; must be ≥ 3 chars."""
         err = _require_reason(reason)
         if err:
             return err
-        ctx = get_context()
-        rows = ctx.store.replace_workspace_file_bindings(
-            workspace_id, bindings, reason=reason
-        )
+        # Normalize loose field names from MCP callers to canonical schema.
+        normalized = [
+            {
+                "resource_id": b["resource_id"],
+                "target_path": b.get("target_path") or b.get("dest_path"),
+                "materialize_mode": b.get("materialize_mode") or b.get("mode", "copy"),
+                "on_conflict": b.get("on_conflict", "error"),
+                "pinned_version_id": b.get("pinned_version_id"),
+                "display_order": b.get("display_order", 0),
+            }
+            for b in bindings
+        ]
+        svc = get_resource_service()
+        try:
+            rows = svc.replace_workspace_resources(workspace_id, normalized, reason=reason)["items"]
+        except ValueError as exc:
+            return {"error": "invalid_binding", "detail": str(exc)}
         return {"workspace_id": workspace_id, "bindings": rows}
 
     @mcp.tool
@@ -54,12 +65,13 @@ def register_workspace(mcp: FastMCP) -> None:
         """Return what would be materialized for the workspace without writing files.
 
         Lists each binding with its resolved resource version and target path."""
-        ctx = get_context()
-        bindings = resolve_workspace_resources(ctx.store, workspace_id)
+        svc = get_resource_service()
+        result = svc.dry_run_workspace_resources(workspace_id)
         return {
             "workspace_id": workspace_id,
-            "bindings": bindings,
-            "count": len(bindings),
+            "bindings": result["entries"],
+            "conflicts": result["conflicts"],
+            "count": len(result["entries"]),
         }
 
     @mcp.tool

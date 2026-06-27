@@ -37,6 +37,7 @@ from agentbox.cli.shared.deps import (
     get_db,
     get_executor,
     get_mcp_registry,
+    get_resource_service,
     get_settings,
     get_store,
     get_agent_service,
@@ -60,6 +61,7 @@ __all__ = [
     "get_db",
     "get_executor",
     "get_mcp_registry",
+    "get_resource_service",
     "get_settings",
     "get_store",
     # deps — service factories
