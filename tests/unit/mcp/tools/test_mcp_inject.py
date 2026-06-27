@@ -66,22 +66,22 @@ class TestRequireReason:
 
 class TestSetPromptResources:
     def test_short_reason_returns_error(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.bindings.get_context", return_value=ctx):
+        svc = MagicMock()
+        with patch("agentbox.mcp.tools.resources.bindings.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_prompt_resources")
             result = fn("ag1", [], "xy")
         assert result["error"] == "reason_too_short"
 
     def test_calls_store(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        ctx.store.replace_prompt_bindings.return_value = []
-        with patch("agentbox.mcp.tools.resources.bindings.get_context", return_value=ctx):
+        svc = MagicMock()
+        svc.replace_prompt_bindings_raw.return_value = []
+        with patch("agentbox.mcp.tools.resources.bindings.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_prompt_resources")
             result = fn("ag1", [], "add first binding")
         assert result == {"agent_id": "ag1", "bindings": [], "count": 0}
-        ctx.store.replace_prompt_bindings.assert_called_once_with(
+        svc.replace_prompt_bindings_raw.assert_called_once_with(
             "ag1", [], reason="add first binding"
         )
 
@@ -142,20 +142,21 @@ class TestPreviewPrompt:
 
 class TestDryRunWorkspaceResources:
     def test_returns_binding_count(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        fake = [{"dest_path": "docs/ref.md", "resource_id": "r1"}]
-        with (
-            patch("agentbox.mcp.tools.resources.workspace.get_context", return_value=ctx),
-            patch(
-                "agentbox.mcp.tools.resources.workspace.resolve_workspace_resources",
-                return_value=fake,
-            ),
+        svc = MagicMock()
+        fake_entries = [{"dest_path": "docs/ref.md", "resource_id": "r1"}]
+        svc.dry_run_workspace_resources.return_value = {
+            "entries": fake_entries,
+            "conflicts": [],
+        }
+        with patch(
+            "agentbox.mcp.tools.resources.workspace.get_resource_service",
+            return_value=svc,
         ):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "dry_run_workspace_resources")
             result = fn("ws1")
         assert result["count"] == 1
-        assert result["bindings"] == fake
+        assert result["bindings"] == fake_entries
 
 
 # ---------------------------------------------------------------------------
@@ -223,9 +224,9 @@ def _make_zip_bytes(files: dict[str, bytes]) -> bytes:
 
 class TestCreateRepoResourceZipRouting:
     def test_skill_requires_zip_bytes(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
-        with patch("agentbox.mcp.tools.resources.repo.get_context", return_value=ctx):
+        svc = MagicMock()
+        svc.create_resource.return_value = {"id": "r1", "type": "skill"}
+        with patch("agentbox.mcp.tools.resources.repo.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource")
             result = fn(
@@ -238,10 +239,10 @@ class TestCreateRepoResourceZipRouting:
         assert result["error"] == "invalid_payload"
 
     def test_document_rejects_zip_bytes(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "document"}
+        svc = MagicMock()
+        svc.create_resource.return_value = {"id": "r1", "type": "document"}
         zip_b64 = base64.b64encode(_make_zip_bytes({"a.md": b"hi"})).decode()
-        with patch("agentbox.mcp.tools.resources.repo.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.repo.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource")
             result = fn(
@@ -254,9 +255,9 @@ class TestCreateRepoResourceZipRouting:
         assert result["error"] == "invalid_payload"
 
     def test_skill_with_zip_routes_to_zip_importer(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
-        ctx.store.import_repo_version.return_value = {"id": "v1"}
+        svc = MagicMock()
+        svc.create_resource.return_value = {"id": "r1", "type": "skill"}
+        svc.import_zip_version.return_value = {"id": "v1"}
         zip_b64 = base64.b64encode(
             _make_zip_bytes(
                 {
@@ -265,7 +266,7 @@ class TestCreateRepoResourceZipRouting:
                 }
             )
         ).decode()
-        with patch("agentbox.mcp.tools.resources.repo.get_context", return_value=ctx):
+        with patch("agentbox.mcp.tools.resources.repo.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource")
             result = fn(
@@ -278,7 +279,7 @@ class TestCreateRepoResourceZipRouting:
         assert "error" not in result
         assert result["resource"]["id"] == "r1"
         assert result["version"]["id"] == "v1"
-        ctx.store.import_repo_version.assert_called_once()
+        svc.import_zip_version.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -288,8 +289,8 @@ class TestCreateRepoResourceZipRouting:
 
 class TestCreateRepoResourceFromFiles:
     def test_rejects_non_skill_or_folder(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
+        svc = MagicMock()
+        with patch("agentbox.mcp.tools.resources.importers.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -302,8 +303,8 @@ class TestCreateRepoResourceFromFiles:
         assert result["error"] == "invalid_type"
 
     def test_rejects_short_changelog(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
+        svc = MagicMock()
+        with patch("agentbox.mcp.tools.resources.importers.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -316,8 +317,8 @@ class TestCreateRepoResourceFromFiles:
         assert result["error"] == "reason_too_short"
 
     def test_rejects_empty_files(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
+        svc = MagicMock()
+        with patch("agentbox.mcp.tools.resources.importers.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -330,8 +331,8 @@ class TestCreateRepoResourceFromFiles:
         assert result["error"] == "invalid_request"
 
     def test_rejects_unsafe_path(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
+        svc = MagicMock()
+        with patch("agentbox.mcp.tools.resources.importers.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -345,8 +346,8 @@ class TestCreateRepoResourceFromFiles:
         assert "unsafe" in result["detail"]
 
     def test_rejects_duplicate_path(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
+        svc = MagicMock()
+        with patch("agentbox.mcp.tools.resources.importers.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -363,8 +364,8 @@ class TestCreateRepoResourceFromFiles:
         assert "duplicate" in result["detail"]
 
     def test_skill_requires_skill_md(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
+        svc = MagicMock()
+        with patch("agentbox.mcp.tools.resources.importers.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -378,10 +379,13 @@ class TestCreateRepoResourceFromFiles:
         assert "SKILL.md" in result["detail"]
 
     def test_happy_path_creates_resource_and_version(self, tmp_path: Path):
-        ctx = _make_ctx(tmp_path)
-        ctx.store.create_repo_resource.return_value = {"id": "r1", "type": "skill"}
-        ctx.store.import_repo_version.return_value = {"id": "v1"}
-        with patch("agentbox.mcp.tools.resources.importers.get_context", return_value=ctx):
+        svc = MagicMock()
+        svc.create_resource.return_value = {"id": "r1", "type": "skill"}
+        svc.import_zip_version.return_value = {"id": "v1"}
+        with patch(
+            "agentbox.mcp.tools.resources.importers.get_resource_service",
+            return_value=svc,
+        ):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "create_repo_resource_from_files")
             result = fn(
@@ -401,4 +405,4 @@ class TestCreateRepoResourceFromFiles:
         assert result["resource"]["id"] == "r1"
         assert result["version"]["id"] == "v1"
         assert result["file_count"] == 2
-        ctx.store.import_repo_version.assert_called_once()
+        svc.import_zip_version.assert_called_once()

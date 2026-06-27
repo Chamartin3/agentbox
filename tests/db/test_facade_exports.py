@@ -174,10 +174,18 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "WorkspaceBuildStore",
         "WorkspaceLookupStore",
         # row types
+        "AgentConfigEventRow",
+        "AgentMetaRow",
+        "AgentSyncRow",
+        "AgentToolGrantRow",
+        "AgentVersionCommentRow",
+        "AgentVersionFileRow",
+        "AgentVersionRatingRow",
         "EnvDocRow",
         "PromptVersionRow",
         "RepoResourceRow",
         "ResourceStatus",
+        "VersionFileUploadRow",
         "WorkspaceRow",
         "WorkspaceSource",
     }

@@ -10,6 +10,7 @@ from agentbox.cli import app
 from agentbox.cli.shared import (
     get_executor,
     get_mcp_registry,
+    get_resource_service,
     get_settings,
     get_store,
 )
@@ -26,7 +27,7 @@ def _clear_shared_deps_caches() -> None:
     ``agentbox.cli.shared``, which must be cleared independently so each
     test gets a fresh store pointed at its own tmp_path.
     """
-    for fn in (get_settings, get_store, get_executor, get_mcp_registry):
+    for fn in (get_settings, get_store, get_executor, get_mcp_registry, get_resource_service):
         fn.cache_clear()
 
 

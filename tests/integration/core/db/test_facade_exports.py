@@ -172,12 +172,20 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "StartupStore",
         "WorkspaceBuildStore",
         "WorkspaceLookupStore",
-        # row TypedDicts (Plan 06)
+        # row TypedDicts (Plan 06 + 094)
+        "AgentConfigEventRow",
+        "AgentMetaRow",
+        "AgentSyncRow",
+        "AgentToolGrantRow",
+        "AgentVersionCommentRow",
+        "AgentVersionFileRow",
+        "AgentVersionRatingRow",
         "EnvDocRow",
         "PromptVersionRow",
         "RepoResourceRow",
-        "WorkspaceRow",
         "ResourceStatus",
+        "VersionFileUploadRow",
+        "WorkspaceRow",
         "WorkspaceSource",
         # misc
         "hash_blobs",

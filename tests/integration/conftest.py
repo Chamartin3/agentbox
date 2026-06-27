@@ -35,6 +35,9 @@ def _reset_agentbox_deps_caches() -> Iterator[None]:
             deps.get_mcp_registry,
         ):
             fn.cache_clear()
+        rsvc = getattr(deps, "get_resource_service", None)
+        if rsvc is not None and hasattr(rsvc, "cache_clear"):
+            rsvc.cache_clear()
     yield
     for deps in (api_deps, cli_deps):
         for fn in (
@@ -44,6 +47,9 @@ def _reset_agentbox_deps_caches() -> Iterator[None]:
             deps.get_mcp_registry,
         ):
             fn.cache_clear()
+        rsvc = getattr(deps, "get_resource_service", None)
+        if rsvc is not None and hasattr(rsvc, "cache_clear"):
+            rsvc.cache_clear()
 
 
 # --------------------------------------------------------------------------- #
