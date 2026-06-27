@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from agentbox.cli import app
 from agentbox.cli.shared import (
+    get_engine_service,
     get_executor,
     get_mcp_registry,
     get_settings,
@@ -23,7 +24,7 @@ runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    for fn in (get_settings, get_store, get_executor, get_mcp_registry):
+    for fn in (get_settings, get_store, get_executor, get_mcp_registry, get_engine_service):
         fn.cache_clear()
 
 

@@ -119,6 +119,7 @@ def _clear_deps_caches() -> None:
         deps.get_store,
         deps.get_executor,
         deps.get_mcp_registry,
+        deps.get_engine_service,
     ):
         if hasattr(fn, "cache_clear"):
             fn.cache_clear()
