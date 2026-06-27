@@ -5,15 +5,9 @@ from __future__ import annotations
 import json
 
 import typer
-from rich.panel import Panel
-from rich.syntax import Syntax
 
-from agentbox.cli.shared import console, resolve_agent, get_settings, get_store
-from agentbox.core.service.agents import (
-    AgentServiceError,
-    get_agent_validation,
-    put_agent_validation,
-)
+from agentbox.cli.shared import CliCtx, resolve_agent
+from agentbox.core.service.agents import AgentServiceError
 
 check_app = typer.Typer(
     name="check",
@@ -24,33 +18,19 @@ check_app = typer.Typer(
 
 @check_app.command("get")
 def check_get(
+    ctx: typer.Context,
     agent_id: str = typer.Argument(..., help="Agent ID"),
 ) -> None:
     """Show validation config for an agent (input + output directions)."""
+    obj: CliCtx = ctx.obj
     resolve_agent(agent_id)
-    store = get_store()
-    result = get_agent_validation(store, agent_id)
-
-    for direction in ("input", "output"):
-        section = result.get(direction) or {}
-        validators = section.get("validators", [])
-        if validators:
-            console.print(
-                Panel(
-                    Syntax(
-                        json.dumps(validators, indent=2),
-                        "json",
-                        theme="ansi_dark",
-                    ),
-                    title=f"[bold]{direction}[/bold] validators",
-                )
-            )
-        else:
-            console.print(f"[dim]{direction}: no validators[/dim]")
+    result = obj.agents.get_agent_validation(agent_id)
+    obj.render.agent.validation_report(result)
 
 
 @check_app.command("set")
 def check_set(
+    ctx: typer.Context,
     agent_id: str = typer.Argument(..., help="Agent ID"),
     direction: str = typer.Argument(..., help="Direction: input or output"),
     validators_json: str = typer.Argument(..., help="JSON array of validators"),
@@ -61,8 +41,10 @@ def check_set(
 
     Example: agent check set my-agent output '[{"kind":"http","endpoint":"https://..."}]'
     """
+    obj: CliCtx = ctx.obj
+
     if direction not in ("input", "output"):
-        console.print("[red]direction must be 'input' or 'output'[/red]")
+        obj.render.agent.error("direction must be 'input' or 'output'")
         raise typer.Exit(2)
 
     resolve_agent(agent_id)
@@ -70,24 +52,23 @@ def check_set(
     try:
         validators = json.loads(validators_json)
     except json.JSONDecodeError as exc:
-        console.print(f"[red]invalid JSON: {exc}[/red]")
+        obj.render.agent.error(f"invalid JSON: {exc}")
         raise typer.Exit(2)
 
     input_validators = validators if direction == "input" else None
     output_validators = validators if direction == "output" else None
 
     try:
-        result = put_agent_validation(
-            store=get_store(),
-            settings=get_settings(),
+        result = obj.agents.put_agent_validation(
             agent_id=agent_id,
             input_validators=input_validators,
             output_validators=output_validators,
             reason=reason,
             actor=actor,
+            settings=obj.settings,
         )
     except AgentServiceError as exc:
-        console.print(f"[red]{exc.code}: {exc.detail}[/red]")
+        obj.render.agent.error(f"{exc.code}: {exc.detail}")
         raise typer.Exit(1)
 
-    console.print(f"[green]updated[/green] {direction} validators — v{result.get('version', '?')}")
+    obj.render.agent.validation_updated(direction, result.get("agent_version_id", "?"))

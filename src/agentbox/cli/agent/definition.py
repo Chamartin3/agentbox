@@ -4,31 +4,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 import tomlkit
 import typer
-from rich.panel import Panel
-from rich.table import Table
 
-from agentbox.cli.shared import console, resolve_agent, get_settings, get_store
-from agentbox.core.db import SessionStore
-from agentbox.core.service import (
-    AgentDef,
-    build_agent_snapshot,
-    build_config_json_payload,
-    create_agent,
-    create_agent_version,
-    get_agent_def,
-    latest_agent_version,
-    soft_delete_agent,
-)
+from agentbox.cli.shared import CliCtx, resolve_agent
+# TODO(cli-arch): build_* free-fns — candidate AgentService create_version helpers
+from agentbox.core.service import AgentDef, build_agent_snapshot, build_config_json_payload
+from agentbox.core.service.engines.service import ProfileNotFound
+
+# TODO(cli-arch): AgentService.list_all
 from agentbox.core.service.agents import list_all_agents
-from agentbox.core.service.engines.service import EngineService, ProfileNotFound
-from agentbox.core.service.system.service import SystemService
 
 
-def _set_dotted(obj: dict[str, Any], dotted: str, value: object) -> None:
+# TODO(cli-arch): candidate AgentService export/import methods
+def _set_dotted(obj: dict[str, object], dotted: str, value: object) -> None:
     """Set a nested key using dot notation on a dict."""
     parts = dotted.split(".")
     cur = obj
@@ -49,6 +39,35 @@ def _coerce(value: str) -> object:
         return value
 
 
+def _list_agent_ids(obj: CliCtx) -> list[str]:
+    # TODO(cli-arch): AgentService.list_all ids
+    rows = obj.store.list_agents_with_latest()
+    return [r["agent_id"] for r in rows]
+
+
+# TODO(cli-arch): candidate AgentService export/import methods
+def _export_one(agent: AgentDef, base: Path, obj: CliCtx) -> None:
+    base.mkdir(parents=True, exist_ok=True)
+    prompt = agent.prompt
+    agent_dump = agent.model_dump(mode="json", exclude_none=True)
+    agent_dump.pop("prompt", None)
+    agent_dump.pop("headless", None)
+    agent_dump.pop("claude_agent", None)
+
+    toml_path = base / f"{agent.id}.toml"
+    doc = tomlkit.document()
+    doc.add(tomlkit.comment(f" Exported from agentbox \u2014 {agent.id}"))
+    for key, value in agent_dump.items():
+        doc[key] = value
+    toml_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    obj.render.agent.dim(f"  {toml_path}")
+
+    if prompt:
+        prompt_path = base / f"{agent.id}.prompt.md"
+        prompt_path.write_text(prompt, encoding="utf-8")
+        obj.render.agent.dim(f"  {prompt_path}")
+
+
 definition_app = typer.Typer(
     name="def",
     help="List, show, create, edit, delete, and export agents.",
@@ -63,48 +82,41 @@ definition_app = typer.Typer(
 
 @definition_app.command("ls")
 def def_ls(
+    ctx: typer.Context,
     json_output: bool = typer.Option(
         False, "--json", help="Output as JSON instead of a table"
     ),
 ) -> None:
     """List agents registered in the DB."""
-    store = get_store()
-    rows = list_all_agents(store=store)
+    obj: CliCtx = ctx.obj
+    rows = list_all_agents(store=obj.store)  # TODO(cli-arch): AgentService.list_all
 
     if json_output:
-        console.print(
-            json.dumps([a.model_dump(mode="json") for a in rows], indent=2)
+        obj.render.agent.agents_json(
+            [a.model_dump(mode="json") for a in rows]
         )
         return
 
-    if not rows:
-        console.print("[yellow]No agents registered.[/yellow]")
-        return
-
-    table = Table(
-        title="Agents", title_style="bold", header_style="bold cyan",
-        show_lines=False, padding=(0, 1),
-    )
-    table.add_column("ID", style="bold")
-    table.add_column("Runner", style="cyan")
-    table.add_column("Model", style="dim")
-    table.add_column("Session", style="dim")
-    table.add_column("Workspace", style="dim")
-    table.add_column("Description")
-
+    table_rows: list[dict[str, object]] = []
     for a in rows:
         ws_display = (
             "[yellow]<ephemeral>[/yellow]"
             if a.workspace == "<ephemeral>"
             else (a.workspace or "[dim]auto[/dim]")
         )
-        profile = EngineService().get_agent_runner_profile(a.id)
-        model_display = (profile.model if profile else None) or "[dim]default[/dim]"
-        table.add_row(
-            a.id, a.runner.kind, model_display,
-            a.session_mode, ws_display, a.description or "",
+        profile = obj.engines.get_agent_runner_profile(a.id)
+        model_display = (
+            (profile.model if profile else None) or "[dim]default[/dim]"
         )
-    console.print(table)
+        table_rows.append({
+            "id": a.id,
+            "runner_kind": a.runner.kind,
+            "model": model_display,
+            "session_mode": a.session_mode,
+            "workspace": ws_display,
+            "description": a.description or "",
+        })
+    obj.render.agent.agents_table(table_rows)
 
 
 # ---------------------------------------------------------------------------
@@ -113,63 +125,31 @@ def def_ls(
 
 
 @definition_app.command("show")
-def def_show(agent_id: str) -> None:
+def def_show(ctx: typer.Context, agent_id: str) -> None:
     """Show the full resolved AgentDef for an agent."""
+    obj: CliCtx = ctx.obj
     a = resolve_agent(agent_id)
 
-    meta = Table.grid(padding=(0, 2))
-    meta.add_column(style="dim", justify="right")
-    meta.add_column()
-    meta.add_row("id", a.id)
-    meta.add_row("description", a.description or "\u2014")
-    meta.add_row("source_format", a.source_format.value if a.source_format else "\u2014")
-    meta.add_row("source_path", str(a.source_path) if a.source_path else "\u2014")
-    meta.add_row("tags", ", ".join(a.tags) if a.tags else "\u2014")
-    console.print(Panel(meta, title="Meta", border_style="cyan"))
+    obj.render.agent.agent_meta_panel(a)
+    obj.render.agent.agent_runner_panel(a)
 
-    runner = Table.grid(padding=(0, 2))
-    runner.add_column(style="dim", justify="right")
-    runner.add_column()
-    runner.add_row("kind", a.runner.kind)
-    runner.add_row("timeout", f"{a.runner.timeout_seconds}s")
-    runner.add_row(
-        "allowed_tools",
-        ", ".join(a.runner.allowed_tools) if a.runner.allowed_tools else "\u2014",
-    )
-    runner.add_row("mcp_config_path", a.runner.mcp_config_path or "\u2014")
-    console.print(Panel(runner, title="Runner", border_style="green"))
-
-    profile = EngineService().get_agent_runner_profile(a.id)
-    rp = Table.grid(padding=(0, 2))
-    rp.add_column(style="dim", justify="right")
-    rp.add_column()
+    profile = obj.engines.get_agent_runner_profile(a.id)
+    profile_dict: dict[str, object] | None
     if profile is None:
-        rp.add_row("bound profile", "[dim](none \u2014 system default)[/dim]")
+        profile_dict = None
     else:
-        rp.add_row("id", profile.id)
-        rp.add_row("name", profile.name)
-        rp.add_row("backend", profile.backend)
-        rp.add_row("provider", profile.provider or "\u2014")
-        rp.add_row("model", profile.model or "\u2014")
-    console.print(Panel(rp, title="Runner profile", border_style="green"))
+        profile_dict = {
+            "id": profile.id,
+            "name": profile.name,
+            "backend": profile.backend,
+            "provider": profile.provider or None,
+            "model": profile.model or None,
+        }
+    obj.render.agent.agent_profile_panel(profile_dict)
+    obj.render.agent.agent_workspace_panel(a)
 
-    ws = Table.grid(padding=(0, 2))
-    ws.add_column(style="dim", justify="right")
-    ws.add_column()
-    ws.add_row("workspace", a.workspace or "[dim]auto[/dim]")
-    ws.add_row("session_mode", a.session_mode)
-    ws.add_row("headless", str(a.headless))
-    ws.add_row("claude_agent", str(a.claude_agent))
-    console.print(Panel(ws, title="Workspace", border_style="blue"))
-
-    servers = SystemService().get_project_mcp_servers()
-    if servers:
-        mcp_list = Table.grid(padding=(0, 2))
-        mcp_list.add_column(style="dim")
-        mcp_list.add_column()
-        for s in servers:
-            mcp_list.add_row(s.name, s.url or " ".join(s.command or []))
-        console.print(Panel(mcp_list, title="MCP Servers", border_style="yellow"))
+    servers = obj.system.get_project_mcp_servers()
+    obj.render.agent.agent_mcp_servers_panel(servers)
 
 
 # ---------------------------------------------------------------------------
@@ -179,14 +159,19 @@ def def_show(agent_id: str) -> None:
 
 @definition_app.command("new")
 def def_new(
+    ctx: typer.Context,
     name: str = typer.Option(
         "",
-        "--name", "-n",
+        "--name",
+        "-n",
         help="Agent id + display name. Creates a minimal agent with sensible defaults.",
     ),
     config: Path | None = typer.Option(
-        None, "--config", "-c",
-        exists=True, readable=True,
+        None,
+        "--config",
+        "-c",
+        exists=True,
+        readable=True,
         help="Path to inline JSON config (full AgentDef shape).",
     ),
     author: str = typer.Option("cli", "--author", help="Author identifier."),
@@ -199,26 +184,26 @@ def def_new(
     Use ``--config`` to load a full AgentDef JSON file, or ``--name``
     to create a minimal agent with sensible defaults.
     """
+    obj: CliCtx = ctx.obj
+
     if config is not None:
         data = json.loads(config.read_text(encoding="utf-8"))
         try:
             agent_def = AgentDef.model_validate(data)
         except Exception as exc:
-            console.print(f"[red]invalid AgentDef:[/red] {exc}")
+            obj.render.agent.error(f"invalid AgentDef: {exc}")
             raise typer.Exit(2) from exc
     elif name:
         agent_def = AgentDef(id=name, description=name)
     else:
-        console.print("[red]either --config or --name is required[/red]")
+        obj.render.agent.error("either --config or --name is required")
         raise typer.Exit(2)
 
-    store = get_store()
-    if latest_agent_version(store, agent_def.id) is not None:
-        console.print(f"[red]agent {agent_def.id!r} already exists[/red]")
+    if obj.agents.latest_version(agent_def.id) is not None:
+        obj.render.agent.error(f"agent {agent_def.id!r} already exists")
         raise typer.Exit(1)
 
-    rec = create_agent(
-        store,
+    rec = obj.agents.create_agent(
         agent_id=agent_def.id,
         config_json={
             **agent_def.model_dump(mode="json", exclude_none=True),
@@ -231,10 +216,7 @@ def def_new(
         sync_mode="off",
         export_to_disk=False,
     )
-    console.print(
-        f"[green]created[/green] {agent_def.id!r} v{rec['version']} "
-        f"(draft, version_id={rec['id']})"
-    )
+    obj.render.agent.agent_created(agent_def.id, rec["version"], rec["id"])
 
 
 # ---------------------------------------------------------------------------
@@ -244,13 +226,17 @@ def def_new(
 
 @definition_app.command("edit")
 def def_edit(
+    ctx: typer.Context,
     agent_id: str,
     set_: list[str] = typer.Option(
-        [], "--set", "-s",
+        [],
+        "--set",
+        "-s",
         help="dotted=value pairs, e.g. runner.kind=token. Repeatable.",
     ),
     runner: str | None = typer.Option(
-        None, "--runner",
+        None,
+        "--runner",
         help="Runner profile ID to bind (set). Use 'clear' to unbind.",
     ),
     author: str = typer.Option("cli", "--author"),
@@ -261,42 +247,40 @@ def def_edit(
     Use ``--runner <profile_id>`` to bind a runner profile, or
     ``--runner clear`` to unbind.
     """
-    store = get_store()
+    obj: CliCtx = ctx.obj
 
     # -- runner profile binding
     if runner is not None:
         resolve_agent(agent_id)
-        engine_svc = EngineService()
         if runner == "clear":
-            engine_svc.clear_agent_runner_profile(agent_id)
-            console.print(f"[yellow]cleared[/yellow] profile binding for {agent_id!r}")
+            obj.engines.clear_agent_runner_profile(agent_id)
+            obj.render.agent.profile_cleared(agent_id)
         else:
             try:
-                engine_svc.get_profile(runner)
+                obj.engines.get_profile(runner)
             except ProfileNotFound:
-                console.print(f"[red]runner profile {runner!r} not found[/red]")
+                obj.render.agent.error(f"runner profile {runner!r} not found")
                 raise typer.Exit(1)
-            engine_svc.set_agent_runner_profile(agent_id, runner)
-            console.print(f"[green]bound[/green] profile {runner!r} to {agent_id!r}")
+            obj.engines.set_agent_runner_profile(agent_id, runner)
+            obj.render.agent.profile_bound(runner, agent_id)
 
     # -- dotted field edits
     if not set_ and runner is None:
-        console.print("[red]nothing to set; pass --set k=v or --runner[/red]")
+        obj.render.agent.error("nothing to set; pass --set k=v or --runner")
         raise typer.Exit(2)
 
     if not set_:
         return
 
-    settings = get_settings()
-    current = get_agent_def(store, agent_id)
+    current = obj.agents.get_agent_def(agent_id)
     if current is None:
-        console.print(f"[red]agent {agent_id!r} not found[/red]")
+        obj.render.agent.error(f"agent {agent_id!r} not found")
         raise typer.Exit(1)
 
     merged = current.model_dump(mode="python")
     for pair in set_:
         if "=" not in pair:
-            console.print(f"[red]bad --set pair: {pair!r}[/red]")
+            obj.render.agent.error(f"bad --set pair: {pair!r}")
             raise typer.Exit(2)
         k, v = pair.split("=", 1)
         _set_dotted(merged, k.strip(), _coerce(v.strip()))
@@ -304,7 +288,7 @@ def def_edit(
     try:
         updated = AgentDef.model_validate(merged)
     except Exception as exc:
-        console.print(f"[red]validation failed:[/red] {exc}")
+        obj.render.agent.error(f"validation failed: {exc}")
         raise typer.Exit(2) from exc
 
     updated.source_path = current.source_path
@@ -313,12 +297,11 @@ def def_edit(
     prompt_text = ""
     if updated.prompt_path:
         try:
-            prompt_text = updated.load_prompt(settings.project_root)
+            prompt_text = updated.load_prompt(obj.settings.project_root)
         except FileNotFoundError:
             prompt_text = ""
 
-    rec = create_agent_version(
-        store,
+    rec = obj.agents.create_version(
         agent_id=updated.id,
         source_path=str(updated.source_path) if updated.source_path else "",
         source_format=(
@@ -331,10 +314,7 @@ def def_edit(
         changelog=changelog,
         files=None,
     )
-    console.print(
-        f"[green]new version[/green] {updated.id!r} v{rec['version']} "
-        "\u2014 publish with `agent version publish`"
-    )
+    obj.render.agent.version_edit_new(updated.id, rec["version"])
 
 
 # ---------------------------------------------------------------------------
@@ -344,20 +324,23 @@ def def_edit(
 
 @definition_app.command("rm")
 def def_rm(
+    ctx: typer.Context,
     agent_id: str,
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
 ) -> None:
     """Soft-delete an agent. Version history is retained."""
+    obj: CliCtx = ctx.obj
     if not yes:
-        confirm = typer.confirm(f"Soft-delete agent {agent_id!r}? (history retained)")
+        confirm = typer.confirm(
+            f"Soft-delete agent {agent_id!r}? (history retained)"
+        )
         if not confirm:
             raise typer.Exit(0)
-    store = get_store()
-    result = soft_delete_agent(store, agent_id)
+    result = obj.agents.soft_delete(agent_id)
     if result is None:
-        console.print(f"[red]agent {agent_id!r} not found[/red]")
+        obj.render.agent.agent_not_found(agent_id)
         raise typer.Exit(1)
-    console.print(f"[green]deleted[/green] {agent_id!r}")
+    obj.render.agent.agent_deleted(agent_id)
 
 
 # ---------------------------------------------------------------------------
@@ -365,35 +348,9 @@ def def_rm(
 # ---------------------------------------------------------------------------
 
 
-def _list_agent_ids(store: SessionStore) -> list[str]:
-    rows = store.list_agents_with_latest()
-    return [r["agent_id"] for r in rows]
-
-
-def _export_one(agent: AgentDef, base: Path) -> None:
-    base.mkdir(parents=True, exist_ok=True)
-    prompt = agent.prompt
-    agent_dump = agent.model_dump(mode="json", exclude_none=True)
-    agent_dump.pop("prompt", None)
-    agent_dump.pop("headless", None)
-    agent_dump.pop("claude_agent", None)
-
-    toml_path = base / f"{agent.id}.toml"
-    doc = tomlkit.document()
-    doc.add(tomlkit.comment(f" Exported from agentbox \u2014 {agent.id}"))
-    for key, value in agent_dump.items():
-        doc[key] = value
-    toml_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    console.print(f"  [dim]{toml_path}[/dim]")
-
-    if prompt:
-        prompt_path = base / f"{agent.id}.prompt.md"
-        prompt_path.write_text(prompt, encoding="utf-8")
-        console.print(f"  [dim]{prompt_path}[/dim]")
-
-
 @definition_app.command("export")
 def def_export(
+    ctx: typer.Context,
     agent_id: str | None = typer.Option(
         None, "--agent", "-a", help="Export a single agent. Omit to export all."
     ),
@@ -406,23 +363,23 @@ def def_export(
     Writes ``<agent_id>.toml`` and (if the agent has a prompt)
     ``<agent_id>.prompt.md`` into ``--out``. Idempotent.
     """
-    store = get_store()
+    obj: CliCtx = ctx.obj
     base = Path(out_dir).expanduser()
 
     if agent_id:
-        agent = get_agent_def(store, agent_id)
+        agent = obj.agents.get_agent_def(agent_id)
         if agent is None:
-            console.print(f"[red]agent {agent_id!r} not found[/red]")
+            obj.render.agent.agent_not_found(agent_id)
             raise typer.Exit(1)
-        _export_one(agent, base)
+        _export_one(agent, base, obj)
     else:
-        agents = _list_agent_ids(store)
+        agents = _list_agent_ids(obj)
         if not agents:
-            console.print("[yellow]no agents found[/yellow]")
+            obj.render.agent.warn("no agents found")
             return
         for aid in agents:
-            agent = get_agent_def(store, aid)
+            agent = obj.agents.get_agent_def(aid)
             if agent is None:
                 continue
-            _export_one(agent, base)
-    console.print(f"[green]done[/green] \u2192 {base.resolve()}")
+            _export_one(agent, base, obj)
+    obj.render.agent.agent_exported(str(base.resolve()))
