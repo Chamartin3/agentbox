@@ -1,4 +1,4 @@
-"""History CRUD — ls, show, cancel."""
+"""History CRUD -- ls, show, cancel."""
 
 from __future__ import annotations
 
@@ -6,14 +6,10 @@ import asyncio
 import json
 
 import typer
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
 
-from agentbox.cli.shared import console, get_executor, get_store
-from agentbox.core.service.evaluation.service import EvaluationService
-import agentbox.core.service.execution as runs
+from agentbox.cli.shared import CliCtx, get_executor
 from agentbox.core.service.execution import RunNotFound
+
 
 # ---------------------------------------------------------------------------
 # ls
@@ -23,6 +19,7 @@ from agentbox.core.service.execution import RunNotFound
 def register_ls(parent: typer.Typer) -> None:
     @parent.command("ls")
     def runs_list(
+        ctx: typer.Context,
         agent: str | None = typer.Option(None, "--agent", help="Filter by agent id"),
         limit: int = typer.Option(20, "--limit", help="Max rows"),
         json_output: bool = typer.Option(
@@ -30,61 +27,22 @@ def register_ls(parent: typer.Typer) -> None:
         ),
     ) -> None:
         """Show recent runs with status, tokens, and cost."""
-        rows = runs.list_runs(
-            store=get_store(), agent=agent, limit=limit, with_usage=True
-        )
+        obj: CliCtx = ctx.obj
+
+        rows = obj.execution.list_runs(limit=limit, agent_id=agent)
         assert isinstance(rows, list)
+        # Enrich with usage (mirrors the old free-function behaviour)
+        for r in rows:
+            r["usage"] = obj.execution.get_usage(r["id"])
 
         if json_output:
-            console.print(json.dumps(rows, indent=2, default=str))
+            obj.render.run.print(json.dumps(rows, indent=2, default=str))
             return
 
-        if not rows:
-            console.print("[yellow]No runs yet.[/yellow]")
-            return
+        obj.render.run.runs_table(rows)
 
-        table = Table(
-            title=f"Runs (latest {len(rows)})",
-            title_style="bold",
-            header_style="bold cyan",
-            padding=(0, 1),
-        )
-        table.add_column("Run", style="dim")
-        table.add_column("Agent", style="bold")
-        table.add_column("Status", justify="center")
-        table.add_column("In", justify="right", style="cyan")
-        table.add_column("Out", justify="right", style="cyan")
-        table.add_column("Cost $", justify="right", style="yellow")
-        table.add_column("Started", style="dim")
-        table.add_column("Finished", style="dim")
-
-        for r in rows:
-            usage = r.get("usage") or {}
-            status_style = {
-                "ok": "green", "running": "blue", "error": "red",
-            }.get(r.get("status", ""), "white")
-            status = Text(r.get("status", ""), style=f"bold {status_style}")
-            cost = usage.get("cost_usd")
-            table.add_row(
-                (r.get("id") or "")[:12],
-                r.get("agent_id", ""),
-                status,
-                str(usage.get("input_tokens") or "·"),
-                str(usage.get("output_tokens") or "·"),
-                f"{cost:.4f}" if cost else "[dim]·[/dim]",
-                r.get("created_at", ""),
-                r.get("finished_at") or "[dim]…[/dim]",
-            )
-        console.print(table)
-
-        agg = EvaluationService().aggregate_usage()
-        console.print(
-            f"[dim]totals:[/dim] "
-            f"[cyan]{agg['input_tokens']}[/cyan] in · "
-            f"[cyan]{agg['output_tokens']}[/cyan] out · "
-            f"[yellow]${agg['cost_usd']:.4f}[/yellow] across "
-            f"{agg['runs']} run(s)"
-        )
+        agg = obj.evaluation.aggregate_usage()
+        obj.render.run.usage_summary(agg)
 
 
 # ---------------------------------------------------------------------------
@@ -95,49 +53,30 @@ def register_ls(parent: typer.Typer) -> None:
 def register_show(parent: typer.Typer) -> None:
     @parent.command("show")
     def runs_show(
+        ctx: typer.Context,
         run_id: str,
         json_output: bool = typer.Option(
             False, "--json", help="Output as JSON instead of formatted panels"
         ),
     ) -> None:
         """Show metadata and usage for a single run."""
-        try:
-            detail = runs.get_run_detail(run_id, store=get_store())
-        except RunNotFound:
-            console.print(f"[red]no such run[/red] {run_id!r}")
+        obj: CliCtx = ctx.obj
+
+        rec = obj.execution.get_run(run_id)
+        if rec is None:
+            obj.render.run.error(f"no such run {run_id!r}")
             raise typer.Exit(2)
 
+        usage = obj.execution.get_usage(run_id)
+        run_dict = rec.model_dump() if hasattr(rec, "model_dump") else dict(rec.__dict__)
+
+        detail = {"run": run_dict, "usage": usage}
+
         if json_output:
-            console.print(json.dumps(detail, indent=2, default=str))
+            obj.render.run.print(json.dumps(detail, indent=2, default=str))
             return
 
-        run_dict = detail["run"]
-        usage = detail.get("usage") or {}
-
-        meta = Table.grid(padding=(0, 2))
-        meta.add_column(style="dim", justify="right")
-        meta.add_column()
-        meta.add_row("run id", run_dict.get("id"))
-        meta.add_row("agent", run_dict.get("agent_id"))
-        meta.add_row("status", run_dict.get("status"))
-        meta.add_row("started", run_dict.get("created_at"))
-        meta.add_row("finished", run_dict.get("finished_at") or "—")
-        if run_dict.get("error"):
-            meta.add_row("error", f"[red]{run_dict['error']}[/red]")
-        console.print(Panel(meta, title="run", border_style="cyan"))
-
-        if usage:
-            u = Table.grid(padding=(0, 2))
-            u.add_column(style="dim", justify="right")
-            u.add_column()
-            u.add_row("model", str(usage.get("model") or "—"))
-            u.add_row("input tokens", str(usage.get("input_tokens", 0)))
-            u.add_row("output tokens", str(usage.get("output_tokens", 0)))
-            u.add_row("cache read", str(usage.get("cache_read_tokens", 0)))
-            u.add_row("cache write", str(usage.get("cache_write_tokens", 0)))
-            cost = usage.get("cost_usd")
-            u.add_row("cost", f"${cost:.4f}" if cost else "—")
-            console.print(Panel(u, title="usage", border_style="yellow"))
+        obj.render.run.run_detail(run_dict, usage)
 
 
 # ---------------------------------------------------------------------------
@@ -148,17 +87,22 @@ def register_show(parent: typer.Typer) -> None:
 def register_cancel(parent: typer.Typer) -> None:
     @parent.command("cancel")
     def runs_cancel(
+        ctx: typer.Context,
         run_id: str = typer.Argument(..., help="Run ID"),
     ) -> None:
         """Cancel an in-progress run. Idempotent."""
-        async def _cancel() -> None:
-            try:
-                await runs.cancel_run(
-                    run_id, store=get_store(), executor=get_executor()
-                )
-            except RunNotFound:
-                console.print(f"[red]run {run_id!r} not found[/red]")
-                raise typer.Exit(1)
+        obj: CliCtx = ctx.obj
 
-        asyncio.run(_cancel())
-        console.print(f"[yellow]cancelled[/yellow] {run_id!r}")
+        async def _cancel() -> None:
+            existing = obj.execution.get_run(run_id)
+            if existing is None:
+                raise RunNotFound(run_id)
+            # TODO(cli-arch): cancel belongs on ExecutionService (plan 095 territory)
+            await get_executor().cancel_run(run_id)
+
+        try:
+            asyncio.run(_cancel())
+        except RunNotFound:
+            obj.render.run.error(f"run {run_id!r} not found")
+            raise typer.Exit(1)
+        obj.render.run.warn(f"cancelled {run_id!r}")

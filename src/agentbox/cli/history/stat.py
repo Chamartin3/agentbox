@@ -6,13 +6,11 @@ import json
 from typing import Literal
 
 import typer
-from rich.json import JSON
-from rich.table import Table
 
+# TODO(cli-arch): absorb into EvaluationService
 from agentbox.core.service.evaluation import ActivityRange, since_iso
-from agentbox.core.service.evaluation.service import EvaluationService
-from agentbox.cli.shared import console, get_store
-import agentbox.core.service.execution as runs
+
+from agentbox.cli.shared import CliCtx
 
 stat_app = typer.Typer(
     name="stat",
@@ -22,24 +20,28 @@ stat_app = typer.Typer(
 
 
 @stat_app.command("usage")
-def stat_usage() -> None:
+def stat_usage(ctx: typer.Context) -> None:
     """Print the aggregate usage rollup as JSON."""
-    data = EvaluationService().aggregate_usage()
-    console.print(JSON(json.dumps(data, indent=2, default=str)))
+    obj: CliCtx = ctx.obj
+    data = obj.evaluation.aggregate_usage()
+    obj.render.run.print(json.dumps(data, indent=2, default=str))
 
 
 @stat_app.command("activity")
 def stat_activity(
+    ctx: typer.Context,
     range_: ActivityRange = typer.Option("30d", "--range", help="Time range."),
     agent: str | None = typer.Option(None, help="Filter by agent id."),
 ) -> None:
     """Print the activity summary as JSON."""
-    data = EvaluationService().activity_summary(since_iso(range_), agent=agent)
-    console.print(JSON(json.dumps(data, indent=2, default=str)))
+    obj: CliCtx = ctx.obj
+    data = obj.evaluation.activity_summary(since_iso(range_), agent=agent)
+    obj.render.run.print(json.dumps(data, indent=2, default=str))
 
 
 @stat_app.command("runs")
 def stat_runs(
+    ctx: typer.Context,
     range_: ActivityRange = typer.Option("30d", "--range", help="Time range."),
     agent: str | None = typer.Option(None, help="Filter by agent id."),
     executor: str | None = typer.Option(None, help="Filter by executor."),
@@ -49,7 +51,8 @@ def stat_runs(
     limit: int = typer.Option(50, help="Max rows to return."),
 ) -> None:
     """List enriched recent runs."""
-    data = EvaluationService().list_runs_enriched(
+    obj: CliCtx = ctx.obj
+    data = obj.evaluation.list_runs_enriched(
         range_=range_,
         agent=agent,
         executor=executor,
@@ -58,42 +61,34 @@ def stat_runs(
     )
     results = data.get("results", [])
     if not results:
-        console.print("[yellow]No runs found.[/yellow]")
+        obj.render.run.warn("No runs found.")
         return
-    table = Table(title="Recent Runs", header_style="bold cyan", padding=(0, 1))
-    table.add_column("Run ID", style="bold")
-    table.add_column("Agent", style="cyan")
-    table.add_column("Status", justify="center")
-    table.add_column("Started", style="dim")
-    table.add_column("Duration (ms)", justify="right", style="dim")
-    for r in results:
-        table.add_row(
-            str(r.get("id", "")),
-            str(r.get("action_name", "")),
-            str(r.get("state", "")),
-            str(r.get("started_at", "")),
-            str(r.get("duration_ms", "") or "—"),
-        )
-    console.print(table)
+    obj.render.run.stats_table(results)
 
 
 @stat_app.command("facets")
-def stat_facets() -> None:
+def stat_facets(ctx: typer.Context) -> None:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""
-    result = runs.run_facets(store=get_store())
-    console.print(json.dumps(result, indent=2, default=str))
+    obj: CliCtx = ctx.obj
+    result = {
+        "agents": obj.evaluation.distinct_agent_ids(),
+        "executors": obj.evaluation.distinct_executors(),
+        "statuses": ["ok", "error", "failed", "timeout", "incomplete", "running"],
+    }
+    obj.render.run.print(json.dumps(result, indent=2, default=str))
 
 
 @stat_app.command("stats")
 def stat_stats(
+    ctx: typer.Context,
     agent: str | None = typer.Option(None, "--agent", help="Filter by agent id"),
     status: str | None = typer.Option(None, "--status", help="Filter by status"),
     since: str | None = typer.Option(None, "--since", help="ISO start date"),
     until: str | None = typer.Option(None, "--until", help="ISO end date"),
 ) -> None:
     """Aggregated run statistics (alias for runs)."""
-    result = runs.run_stats(
-        store=get_store(),
-        agent=agent, status=status, since=since, until=until,
+    obj: CliCtx = ctx.obj
+    result = obj.evaluation.stats_for_filters(
+        agent_id=agent, status=status, since_iso=since, until_iso=until,
     )
-    console.print(json.dumps(result, indent=2, default=str))
+    obj.render.run.print(json.dumps(result, indent=2, default=str))

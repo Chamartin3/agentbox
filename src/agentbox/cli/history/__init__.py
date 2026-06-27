@@ -16,6 +16,7 @@ import typer
 from agentbox.cli.history.crud import register_cancel, register_ls, register_show
 from agentbox.cli.history.log import log_app
 from agentbox.cli.history.stat import stat_app
+from agentbox.cli.shared import group_callback
 
 app = typer.Typer(
     name="history",
@@ -23,11 +24,15 @@ app = typer.Typer(
     rich_markup_mode="rich",
     no_args_is_help=True,
 )
+app.callback()(group_callback)
 
 register_ls(app)
 register_show(app)
 register_cancel(app)
 app.add_typer(log_app, name="log")
+log_app.callback()(group_callback)
+
 app.add_typer(stat_app, name="stat")
+stat_app.callback()(group_callback)
 
 __all__ = ["app"]
