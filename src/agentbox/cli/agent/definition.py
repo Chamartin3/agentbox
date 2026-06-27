@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -309,7 +310,7 @@ def def_edit(
         ),
         content_snapshot=snapshot,
         prompt_snapshot=prompt_text,
-        content_hash=__import__("hashlib").sha256(snapshot.encode("utf-8")).hexdigest(),
+        content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
         author=author,
         changelog=changelog,
         files=None,

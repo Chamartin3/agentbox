@@ -10,8 +10,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli.shared.render import Renderer
-
-# TODO(cli-arch): move to facade export (plan 095 Phase A)
+from agentbox.core.db.row_types import EnvDocRow
 from agentbox.core.db.workspaces.manifest import McpServerSpec
 
 
@@ -152,7 +151,7 @@ class SystemRenderer(Renderer):
         self.warn(f"No active env doc for workspace {workspace_id!r}.")
 
     def env_doc_show_view(
-        self, doc: dict, workspace_id: str, content_json: str
+        self, doc: EnvDocRow, workspace_id: str, content_json: str
     ) -> None:
         """Render the full env doc with metadata and content panels."""
         meta = Table.grid(padding=(0, 2))
@@ -176,7 +175,7 @@ class SystemRenderer(Renderer):
             )
         )
 
-    def env_doc_versions_table(self, rows: list[dict], workspace_id: str) -> None:
+    def env_doc_versions_table(self, rows: list[dict[str, object]], workspace_id: str) -> None:
         """Render a table of env doc versions."""
         if not rows:
             self.warn(f"No env doc versions for workspace {workspace_id!r}.")
@@ -238,7 +237,7 @@ class SystemRenderer(Renderer):
     # Host env
     # ------------------------------------------------------------------
 
-    def host_env_profiles_table(self, rows: list[dict]) -> None:
+    def host_env_profiles_table(self, rows: list[dict[str, object]]) -> None:
         """Render a table of host-env profiles."""
         if not rows:
             self.warn("No host-env profiles defined.")
@@ -258,7 +257,7 @@ class SystemRenderer(Renderer):
         self.print(table)
 
     def host_env_grants_view(
-        self, workspace_id: str, row: dict, resolved: dict
+        self, workspace_id: str, row: dict[str, object], resolved: dict[str, object]
     ) -> None:
         """Render host-env grants for a workspace."""
         meta = Table.grid(padding=(0, 2))
@@ -288,7 +287,7 @@ class SystemRenderer(Renderer):
         """Print warning when no host-env grant exists for a workspace."""
         self.warn(f"No host-env grant for workspace {workspace_id!r}.")
 
-    def host_env_audit_table(self, rows: list[dict], run_id: str) -> None:
+    def host_env_audit_table(self, rows: list[dict[str, object]], run_id: str) -> None:
         """Render a table of host-env call audit log for a run."""
         if not rows:
             self.warn(f"No host-env calls recorded for run {run_id!r}.")
@@ -326,9 +325,9 @@ class SystemRenderer(Renderer):
         table = self.table("Agentbox Doctor", "Status", "Check", "Detail")
         for name, passed, detail in checks:
             status = (
-                f"[green]OK[/green]"
+                "[green]OK[/green]"
                 if passed
-                else f"[red]FAIL[/red]"
+                else "[red]FAIL[/red]"
             )
             table.add_row(status, name, detail)
         self.print(table)
@@ -345,11 +344,11 @@ class SystemRenderer(Renderer):
         """Print a generic health check error."""
         self.error(f"health check failed: {message}")
 
-    def health_status_json(self, data: dict) -> None:
+    def health_status_json(self, data: dict[str, object]) -> None:
         """Print health check response as JSON."""
         self.con.print(_json.dumps(data, indent=2, default=str))
 
-    def health_status_view(self, data: dict) -> None:
+    def health_status_view(self, data: dict[str, object]) -> None:
         """Print health check response as formatted lines."""
         status = data.get("status", "unknown")
         color = "green" if status == "ok" else "red"
