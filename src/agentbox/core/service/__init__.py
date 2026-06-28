@@ -101,17 +101,6 @@ from agentbox.core.service.evaluation.service import EvaluationService as Evalua
 # ── Engines service (plan 091 — deferred, circular import with providers) ──
 # from agentbox.core.service.engines.service import EngineService as EngineService
 
-# ── Repo resources service ─────────────────────────────────────────────
-from agentbox.core.service.resources.repo import create_repo_resource as create_repo_resource
-from agentbox.core.service.resources.repo import get_repo_resource_by_slug as get_repo_resource_by_slug
-from agentbox.core.service.resources.repo import import_repo_version as import_repo_version
-from agentbox.core.service.resources.repo import list_prompt_bindings as list_prompt_bindings
-from agentbox.core.service.resources.repo import list_repo_resources as list_repo_resources
-from agentbox.core.service.resources.repo import list_repo_versions as list_repo_versions
-from agentbox.core.service.resources.repo import publish_repo_version as publish_repo_version
-from agentbox.core.service.resources.repo import replace_prompt_bindings as replace_prompt_bindings
-from agentbox.core.service.resources.repo import rollback_repo_resource as rollback_repo_resource
-
 # ── System service ────────────────────────────────────────────────────
 from agentbox.core.service.system.service import SystemService as SystemService
 
