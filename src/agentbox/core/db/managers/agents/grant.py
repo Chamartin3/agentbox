@@ -65,7 +65,7 @@ class AgentToolGrantManager(Manager[AgentToolGrant]):
                 .values(**values)
             )
 
-    def revoke_active(self, agent_id: str, tool_name: str, **values: Unpack[_AgentToolGrantFields]) -> int:
+    def revoke_active(self, agent_id: str, tool_name: str, **values: Unpack[_AgentToolGrantPatchFields]) -> int:
         """Soft-revoke the active grant; returns rows affected (0 if none)."""
         with self._engine.begin() as conn:
             result = conn.execute(
