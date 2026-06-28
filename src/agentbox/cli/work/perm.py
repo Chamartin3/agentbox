@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 
 import typer
-from rich.panel import Panel
-from rich.syntax import Syntax
 
-from agentbox.cli.shared import console, get_settings, get_store
+from agentbox.cli.shared import CliCtx
+# TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
+# TODO(cli-arch): move to facade export
 from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 permissions_app = typer.Typer(
@@ -21,32 +21,25 @@ permissions_app = typer.Typer(
 
 @permissions_app.command("get")
 def permissions_get(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name"),
 ) -> None:
     """Show current permissions for a workspace."""
-    store = get_store()
+    obj: CliCtx = ctx.obj
     try:
         result = workspaces_service.get_permissions(
-            name, store=store, settings=get_settings()
+            name, store=obj.store, settings=obj.settings,
         )
     except WorkspaceNotFound:
-        console.print(f"[red]workspace {name!r} not found[/red]")
+        obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
 
-    console.print(
-        Panel(
-            Syntax(
-                json.dumps(result, indent=2, default=str),
-                "json",
-                theme="ansi_dark",
-            ),
-            title=f"Permissions — {name}",
-        )
-    )
+    obj.render.workspace.permissions_view(result, name)
 
 
 @permissions_app.command("set")
 def permissions_put(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name"),
     permissions_json: str = typer.Argument(
         ..., help="JSON permissions payload"
@@ -57,18 +50,18 @@ def permissions_put(
     Example:
         workspaces permissions put my-ws '{"allow": ["read"], "deny": []}'
     """
+    obj: CliCtx = ctx.obj
     try:
         permissions = json.loads(permissions_json)
     except json.JSONDecodeError as exc:
-        console.print(f"[red]invalid JSON: {exc}[/red]")
+        obj.render.workspace.invalid_json(str(exc))
         raise typer.Exit(2)
 
-    store = get_store()
     try:
         workspaces_service.set_permissions(
-            name, permissions, store=store, settings=get_settings()
+            name, permissions, store=obj.store, settings=obj.settings,
         )
     except WorkspaceNotFound:
-        console.print(f"[red]workspace {name!r} not found[/red]")
+        obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
-    console.print(f"[green]permissions updated[/green] for {name!r}")
+    obj.render.workspace.permissions_set(name)

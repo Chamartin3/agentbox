@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import typer
 
+from agentbox.cli.shared import group_callback
 
 from agentbox.cli.work.file import file_app
 from agentbox.cli.work.mcp import mcp_workspace_app
@@ -25,14 +26,25 @@ from agentbox.cli.work.ws import ws_app
 app = typer.Typer(
     name="work",
     help="Manage workspaces: ws, file, mcp, perm, res, skill.",
-    no_args_is_help=True
+    no_args_is_help=True,
 )
 
 app.add_typer(ws_app, name="ws")
+ws_app.callback()(group_callback)
+
 app.add_typer(file_app, name="file")
+file_app.callback()(group_callback)
+
 app.add_typer(mcp_workspace_app, name="mcp")
+mcp_workspace_app.callback()(group_callback)
+
 app.add_typer(permissions_app, name="perm")
+permissions_app.callback()(group_callback)
+
 app.add_typer(workspace_resources_app, name="res")
+workspace_resources_app.callback()(group_callback)
+
 app.add_typer(skills_app, name="skill")
+skills_app.callback()(group_callback)
 
 __all__ = ["app"]

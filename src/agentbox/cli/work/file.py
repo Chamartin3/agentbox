@@ -6,8 +6,10 @@ import sys
 
 import typer
 
-from agentbox.cli.shared import console, get_settings, get_store
+from agentbox.cli.shared import CliCtx
+# TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
+# TODO(cli-arch): move to facade export
 from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 file_app = typer.Typer(
@@ -19,42 +21,41 @@ file_app = typer.Typer(
 
 @file_app.command("gen")
 def file_gen(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
 ) -> None:
     """Generate runner configs into a workspace."""
+    obj: CliCtx = ctx.obj
     try:
         result = workspaces_service.generate_configs_by_name(
-            name, store=get_store(), settings=get_settings(),
+            name, store=obj.store, settings=obj.settings,
         )
     except WorkspaceNotFound:
-        console.print(f"[red]workspace {name!r} not found[/red]")
+        obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
-    console.print(
-        f"[green]configs generated[/green] → {result.get('target_dir', '?')} "
-        f"({result.get('files_written', 0)} files)"
-    )
+    obj.render.workspace.configs_generated(result)
 
 
 @file_app.command("skills")
 def file_skills(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
 ) -> None:
     """Generate skill shell scripts into a workspace."""
+    obj: CliCtx = ctx.obj
     try:
         result = workspaces_service.generate_skills_by_name(
-            name, store=get_store(), settings=get_settings(),
+            name, store=obj.store, settings=obj.settings,
         )
     except WorkspaceNotFound:
-        console.print(f"[red]workspace {name!r} not found[/red]")
+        obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
-    console.print(
-        f"[green]skills generated[/green] → {result.get('target_dir', '?')} "
-        f"({result.get('skills_written', 0)} skills)"
-    )
+    obj.render.workspace.skills_generated(result)
 
 
 @file_app.command("edit")
 def file_edit(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
     read: bool = typer.Option(False, "--read", help="Read file content"),
     write: str | None = typer.Option(
@@ -70,39 +71,39 @@ def file_edit(
         work file edit my-ws --read --path CLAUDE.md
         work file edit my-ws --write "new content" --path AGENTS.md
     """
+    obj: CliCtx = ctx.obj
+
     if read and write is not None:
-        console.print("[red]use --read or --write, not both[/red]")
+        obj.render.workspace.file_edit_mutual_exclusive()
         raise typer.Exit(2)
     if not read and write is None:
-        console.print("[red]use --read or --write[/red]")
+        obj.render.workspace.file_edit_no_action()
         raise typer.Exit(2)
-
-    store = get_store()
 
     if read:
         try:
             result = workspaces_service.read_file_by_name(
-                name, file_path, store=store, settings=get_settings(),
+                name, file_path, store=obj.store, settings=obj.settings,
             )
         except WorkspaceNotFound:
-            console.print(f"[red]workspace {name!r} not found[/red]")
+            obj.render.workspace.workspace_not_found(name)
             raise typer.Exit(1)
         except Exception as exc:
-            console.print(f"[red]{exc}[/red]")
+            obj.render.workspace.error(str(exc))
             raise typer.Exit(1)
-        console.print(result.get("content", "") if result else "")
+        obj.render.workspace.file_content(str(result.get("content", "")) if result else "")
     elif write is not None:
         content = write
         if write == "-":
             content = sys.stdin.read()
         try:
             result = workspaces_service.write_file_by_name(
-                name, file_path, content, store=store, settings=get_settings(),
+                name, file_path, content, store=obj.store, settings=obj.settings,
             )
         except WorkspaceNotFound:
-            console.print(f"[red]workspace {name!r} not found[/red]")
+            obj.render.workspace.workspace_not_found(name)
             raise typer.Exit(1)
         except Exception as exc:
-            console.print(f"[red]{exc}[/red]")
+            obj.render.workspace.error(str(exc))
             raise typer.Exit(1)
-        console.print(f"[green]written[/green] {file_path!r} ({result.get('bytes', 0)} bytes)")
+        obj.render.workspace.file_written(file_path, int(result.get("bytes", 0)))

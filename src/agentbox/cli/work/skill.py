@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import typer
-from rich.syntax import Syntax
 
-from agentbox.cli.shared import console, get_settings, get_store
+from agentbox.cli.shared import CliCtx
+# TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
+# TODO(cli-arch): move to facade export
 from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 skills_app = typer.Typer(
@@ -18,56 +19,41 @@ skills_app = typer.Typer(
 
 @skills_app.command("ls")
 def skills_ls(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
 ) -> None:
     """List skills for a workspace."""
-    store = get_store()
+    obj: CliCtx = ctx.obj
     try:
         result = workspaces_service.list_skills_by_name(
-            name,
-            store=store,
-            settings=get_settings(),
+            name, store=obj.store, settings=obj.settings,
         )
     except WorkspaceNotFound:
-        console.print(f"[red]workspace {name!r} not found[/red]")
+        obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
 
     items = result.get("skills", [])
-    if not items:
-        console.print("[dim]no skills[/dim]")
-        return
-
-    for s in items:
-        console.print(
-            f"[bold]{s.get('name', '?')}[/bold]"
-            + (f"  [dim]{s.get('description', '')}[/dim]" if s.get("description") else "")
-        )
+    obj.render.workspace.skills_list(items)
 
 
 @skills_app.command("show")
 def skills_show(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
     skill_name: str = typer.Argument(..., help="Skill name"),
 ) -> None:
     """Show full skill content."""
-    store = get_store()
+    obj: CliCtx = ctx.obj
     try:
         result = workspaces_service.get_skill_content_by_name(
-            name,
-            skill_name,
-            store=store,
-            settings=get_settings(),
+            name, skill_name, store=obj.store, settings=obj.settings,
         )
     except WorkspaceNotFound:
-        console.print(f"[red]workspace {name!r} not found[/red]")
+        obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
 
     if result is None:
-        console.print(f"[red]skill {skill_name!r} not found[/red]")
+        obj.render.workspace.skill_not_found(skill_name)
         raise typer.Exit(1)
 
-    content = result.get("content", "")
-    if content:
-        console.print(Syntax(content, "markdown", theme="ansi_dark"))
-    else:
-        console.print("[dim]empty skill[/dim]")
+    obj.render.workspace.skill_content(str(result.get("content", "")))
