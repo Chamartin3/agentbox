@@ -63,6 +63,12 @@ def get_resource_service() -> ResourceService:
     return ResourceService()
 
 
+def get_workspace_service():
+    """Workspace-domain service. Uncached — self-wires from settings."""
+    from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
+    return WorkspaceService()
+
+
 @lru_cache(maxsize=1)
 def get_executor() -> RunExecutor:
     return RunExecutor(get_store(), get_settings(), get_mcp_registry(), db=get_db())

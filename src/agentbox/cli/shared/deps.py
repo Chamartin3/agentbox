@@ -92,3 +92,10 @@ def get_system_service() -> SystemService:
 @lru_cache(maxsize=1)
 def get_resource_service() -> ResourceService:
     return ResourceService()
+
+
+@lru_cache(maxsize=1)
+def get_workspace_service():
+    """Workspace-domain service. Cached — self-wires from settings."""
+    from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
+    return WorkspaceService()

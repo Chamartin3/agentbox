@@ -1,14 +1,15 @@
-"""Workspace skill discovery, materialization, and content access."""
+"""Workspace skill discovery, materialization, and content access.
+
+Delegates to ``WorkspaceService``. The ``store`` parameter is retained
+for backward compatibility.
+"""
 
 from __future__ import annotations
-
-import shutil
-from pathlib import Path
 
 from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
 from agentbox.core.db import SessionStore
-from agentbox.core.resources.skills import discover_skills, find_skill
+from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .files import _resolve_agent_or_raise, resolve_workspace_path
 
@@ -20,16 +21,8 @@ __all__ = [
 ]
 
 
-def _generate_skills_dir(skills: list, ws_path: Path, subdir: str) -> Path:
-    out_dir = ws_path / subdir / "skills"
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for skill in skills:
-        skill_dir = out_dir / skill.name
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(skill.content, encoding="utf-8")
-    return out_dir
+def _ws() -> WorkspaceService:
+    return WorkspaceService()
 
 
 def generate_skills_by_name(
@@ -38,18 +31,7 @@ def generate_skills_by_name(
     store: SessionStore,
     settings: Settings,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
-    skills = discover_skills(ws_path)
-    claude_dir = _generate_skills_dir(skills, ws_path, ".claude")
-    opencode_dir = _generate_skills_dir(skills, ws_path, ".opencode")
-    return {
-        "workspace": name,
-        "skills_count": len(skills),
-        "generated": {
-            "claude_skills": str(claude_dir),
-            "opencode_skills": str(opencode_dir),
-        },
-    }
+    return _ws().generate_skills(name, settings=settings)
 
 
 def list_skills_by_name(
@@ -58,20 +40,7 @@ def list_skills_by_name(
     store: SessionStore,
     settings: Settings,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
-    skills = discover_skills(ws_path)
-    return {
-        "workspace": name,
-        "workspace_path": str(ws_path),
-        "skills": [
-            {
-                "name": s.name,
-                "path": str(s.path.relative_to(ws_path)),
-                "size": len(s.content.encode("utf-8")),
-            }
-            for s in skills
-        ],
-    }
+    return _ws().list_skills(name, settings=settings)
 
 
 def get_skill_content_by_name(
@@ -81,16 +50,7 @@ def get_skill_content_by_name(
     store: SessionStore,
     settings: Settings,
 ) -> dict | None:
-    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
-    skill_md = find_skill(ws_path, skill_name)
-    if skill_md is None:
-        return None
-    return {
-        "workspace": name,
-        "skill": skill_name,
-        "path": str(skill_md.relative_to(ws_path)),
-        "content": skill_md.read_text(encoding="utf-8"),
-    }
+    return _ws().get_skill_content(name, skill_name, settings=settings)
 
 
 def list_skills_for_agent(
@@ -101,16 +61,14 @@ def list_skills_for_agent(
 ) -> dict:
     agent = _resolve_agent_or_raise(agent_id, store=store)
     workspace_path, _ = ws.resolve_path(agent, settings, store)
-    skills = discover_skills(workspace_path)
+    workspace_name = (
+        agent.workspace
+        if agent.workspace and agent.workspace != "<ephemeral>"
+        else agent_id
+    )
+    skills_result = _ws().list_skills(workspace_name, settings=settings)
     return {
         "agent_id": agent_id,
         "workspace": str(workspace_path),
-        "skills": [
-            {
-                "name": s.name,
-                "path": str(s.path.relative_to(workspace_path)),
-                "size": len(s.content.encode("utf-8")),
-            }
-            for s in skills
-        ],
+        "skills": skills_result.get("skills", []),
     }

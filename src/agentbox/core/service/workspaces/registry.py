@@ -1,4 +1,8 @@
-"""Workspace registry CRUD: list / get / create / delete by name."""
+"""Workspace registry CRUD: list / get / create / delete by name.
+
+Delegates to ``WorkspaceService``. The ``store`` parameter is retained
+for backward compatibility but workspace methods go through the service.
+"""
 
 from __future__ import annotations
 
@@ -8,8 +12,7 @@ from pathlib import Path
 from agentbox.core.config import Settings
 from agentbox.core.db import SessionStore, WorkspaceRow
 from agentbox.core.resources.skills import discover_skills
-from agentbox.core.service.agents import list_all_agents
-from agentbox.core.workspaces.crud import info as _workspace_info
+from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .errors import WorkspaceExists, WorkspaceNotFound
 from .files import is_user_file, resolve_workspace_path
@@ -23,35 +26,24 @@ __all__ = [
 ]
 
 
+def _ws() -> WorkspaceService:
+    return WorkspaceService()
+
+
 def list_workspaces_enriched(
     *,
     store: SessionStore,
     settings: Settings,
 ) -> list[dict]:
     """Return all named workspaces with agent assignments + summary stats."""
-    registry = store.list_workspaces()
-    ws_root = settings.workspaces_root
-    disk_ids: set[str] = set()
-    if ws_root.exists():
-        disk_ids = {
-            p.name
-            for p in ws_root.iterdir()
-            if p.is_dir() and not p.name.startswith(".")
-        }
-
-    workspace_agents: dict[str, list[str]] = {}
-
-    try:
-        resource_counts = store.count_workspace_file_bindings_by_workspace()
-    except Exception:
-        resource_counts = {}
+    svc = _ws()
+    registry = svc.list_workspaces(settings=settings)
 
     result: list[dict] = []
     for ws_row in registry:
         name = ws_row["name"]
-        rel_path = ws_row.get("path")
-        ws_path = settings.project_root / rel_path if rel_path else ws_root / name
-        agents = workspace_agents.get(name, [])
+        ws_path = Path(ws_row["path"])
+        agents = []
         file_count = 0
         skill_count = 0
         if ws_path.exists():
@@ -70,9 +62,9 @@ def list_workspaces_enriched(
                 "agent_count": len(agents),
                 "file_count": file_count,
                 "skill_count": skill_count,
-                "resource_count": resource_counts.get(name, 0),
+                "resource_count": ws_row.get("resource_count", 0),
                 "exists": ws_path.exists(),
-                "on_disk": name in disk_ids,
+                "on_disk": ws_row.get("on_disk", False),
                 "created_at": ws_row.get("created_at"),
                 "updated_at": ws_row.get("updated_at"),
             }
@@ -124,7 +116,8 @@ def get_workspace_by_name(
     store: SessionStore,
     settings: Settings,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
+    svc = _ws()
+    ws_path, _ = svc.resolve_workspace_path(name, settings=settings)
     files: list[dict] = []
     if ws_path.exists():
         for p in sorted(ws_path.rglob("*")):
@@ -147,10 +140,7 @@ def list_all_workspaces(
     store: SessionStore,
     settings: Settings,
 ) -> list:
-    """Return a WorkspaceInfo for every agent known to the DB.
-
-    This was moved from ``core.workspaces.manager.list_all`` to the
-    service layer to fix the R4 violation (domain importing upward
-    into service).
-    """
+    """Return a WorkspaceInfo for every agent known to the DB."""
+    from agentbox.core.workspaces.crud import info as _workspace_info
+    from agentbox.core.service.agents import list_all_agents
     return [_workspace_info(a, settings, store) for a in list_all_agents(store=store)]

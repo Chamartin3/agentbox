@@ -1,8 +1,8 @@
 """Workspace file IO, path resolution, and the ``is_user_file`` filter.
 
-This module owns the low-level path helpers (``resolve_workspace_path``,
-``_safe_resolve``) because every other submodule needs them and keeping
-them here avoids circular imports across the package.
+Delegates path resolution to ``WorkspaceService``. File read/write
+operations still go through the store for now (they may route through
+ResourceService in Plan 090).
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
 from agentbox.core.db import SessionStore
 from agentbox.core.service.prompts import AgentNotFound
+from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .errors import WorkspaceNotFound, WorkspacePathEscape
 
@@ -27,6 +28,10 @@ __all__ = [
     "read_file_for_agent",
     "write_file_for_agent",
 ]
+
+
+def _ws() -> WorkspaceService:
+    return WorkspaceService()
 
 
 def _resolve_agent_or_raise(agent_id: str, *, store: SessionStore):
@@ -48,9 +53,6 @@ _RENDERED_ARTIFACT_FILES = frozenset({"CLAUDE.md", "AGENTS.md"})
 
 
 def is_user_file(rel_path: str) -> bool:
-    """User files are anything outside generated/permissions/skill dirs and
-    not a render artifact at the workspace root.
-    """
     if rel_path in _RENDERED_ARTIFACT_FILES:
         return False
     return not any(
@@ -64,22 +66,7 @@ def resolve_workspace_path(
     store: SessionStore,
     settings: Settings,
 ) -> tuple[Path, Path]:
-    """Return ``(workspace_path, project_root)`` for a named workspace.
-
-    Registry-first: the canonical ``workspaces`` table is the source of
-    truth for existence. Raises :class:`WorkspaceNotFound` when the name
-    is unknown.
-    """
-    row = store.get_workspace(name)
-    if row is None:
-        raise WorkspaceNotFound(name)
-    rel_path = row.get("path")
-    ws_path = (
-        settings.project_root / rel_path
-        if rel_path
-        else settings.workspaces_root / name
-    )
-    return ws_path, settings.project_root
+    return _ws().resolve_workspace_path(name, settings=settings)
 
 
 def _safe_resolve(ws_path: Path, rel: str) -> Path:
@@ -96,11 +83,7 @@ def read_file_by_name(
     store: SessionStore,
     settings: Settings,
 ) -> dict | None:
-    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
-    target = _safe_resolve(ws_path, path)
-    if not target.is_file():
-        return None
-    return {"path": path, "content": target.read_text(encoding="utf-8")}
+    return _ws().read_workspace_file(name, path, settings=settings)
 
 
 def write_file_by_name(
@@ -111,11 +94,7 @@ def write_file_by_name(
     store: SessionStore,
     settings: Settings,
 ) -> dict:
-    ws_path, _ = resolve_workspace_path(name, store=store, settings=settings)
-    target = _safe_resolve(ws_path, path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content, encoding="utf-8")
-    return {"path": path, "bytes": len(content)}
+    return _ws().write_workspace_file(name, path, content, settings=settings)
 
 
 # ---------------------------------------------------------------------------
