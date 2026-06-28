@@ -175,7 +175,7 @@ class SystemRenderer(Renderer):
             )
         )
 
-    def env_doc_versions_table(self, rows: list[dict[str, object]], workspace_id: str) -> None:
+    def env_doc_versions_table(self, rows: list[dict], workspace_id: str) -> None:
         """Render a table of env doc versions."""
         if not rows:
             self.warn(f"No env doc versions for workspace {workspace_id!r}.")
@@ -237,7 +237,7 @@ class SystemRenderer(Renderer):
     # Host env
     # ------------------------------------------------------------------
 
-    def host_env_profiles_table(self, rows: list[dict[str, object]]) -> None:
+    def host_env_profiles_table(self, rows: list[dict]) -> None:
         """Render a table of host-env profiles."""
         if not rows:
             self.warn("No host-env profiles defined.")
@@ -257,7 +257,7 @@ class SystemRenderer(Renderer):
         self.print(table)
 
     def host_env_grants_view(
-        self, workspace_id: str, row: dict[str, object], resolved: dict[str, object]
+        self, workspace_id: str, row: dict, resolved: dict
     ) -> None:
         """Render host-env grants for a workspace."""
         meta = Table.grid(padding=(0, 2))
