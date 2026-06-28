@@ -10,7 +10,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli.shared.render import Renderer
-from agentbox.core.db.row_types import EnvDocRow
+from agentbox.core.db import EnvDocRow
 from agentbox.core.db.workspaces.manifest import McpServerSpec
 
 
@@ -287,7 +287,7 @@ class SystemRenderer(Renderer):
         """Print warning when no host-env grant exists for a workspace."""
         self.warn(f"No host-env grant for workspace {workspace_id!r}.")
 
-    def host_env_audit_table(self, rows: list[dict[str, object]], run_id: str) -> None:
+    def host_env_audit_table(self, rows: list[dict], run_id: str) -> None:
         """Render a table of host-env call audit log for a run."""
         if not rows:
             self.warn(f"No host-env calls recorded for run {run_id!r}.")
@@ -344,11 +344,11 @@ class SystemRenderer(Renderer):
         """Print a generic health check error."""
         self.error(f"health check failed: {message}")
 
-    def health_status_json(self, data: dict[str, object]) -> None:
+    def health_status_json(self, data: dict) -> None:
         """Print health check response as JSON."""
         self.con.print(_json.dumps(data, indent=2, default=str))
 
-    def health_status_view(self, data: dict[str, object]) -> None:
+    def health_status_view(self, data: dict) -> None:
         """Print health check response as formatted lines."""
         status = data.get("status", "unknown")
         color = "green" if status == "ok" else "red"
