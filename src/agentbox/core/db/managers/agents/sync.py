@@ -6,11 +6,13 @@ only read/insert/patch/delete the ``agent_sync`` row.
 """
 from __future__ import annotations
 
+from typing import Unpack
+
 from sqlalchemy import Row
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.sync import AgentSync
-from agentbox.core.db.row_types import AgentSyncRow
+from agentbox.core.db.row_types import AgentSyncRow, _AgentSyncFields, _AgentSyncPatchFields
 from agentbox.core.db.schema import agent_sync
 
 
@@ -39,11 +41,11 @@ class AgentSyncManager(Manager[AgentSync]):
             ).first()
             return _sync_row(row) if row else None
 
-    def insert(self, **fields: object) -> None:
+    def insert(self, **fields: Unpack[_AgentSyncFields]) -> None:
         with self._engine.begin() as conn:
             conn.execute(agent_sync.insert().values(**fields))
 
-    def patch(self, agent_id: str, **values: object) -> None:
+    def patch(self, agent_id: str, **values: Unpack[_AgentSyncPatchFields]) -> None:
         with self._engine.begin() as conn:
             conn.execute(
                 agent_sync.update()

@@ -5,11 +5,13 @@ are policy → ``AgentService``; these methods only insert/read rows.
 """
 from __future__ import annotations
 
+from typing import Unpack
+
 from sqlalchemy import Row
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.config_event import AgentConfigEvent
-from agentbox.core.db.row_types import AgentConfigEventRow
+from agentbox.core.db.row_types import AgentConfigEventRow, _AgentConfigEventFields
 from agentbox.core.db.schema import agent_config_events
 
 
@@ -32,7 +34,7 @@ class AgentConfigEventManager(Manager[AgentConfigEvent]):
     """Manager for the ``agent_config_events`` table — pure row ops."""
     model = AgentConfigEvent
 
-    def insert(self, **fields: object) -> int:
+    def insert(self, **fields: Unpack[_AgentConfigEventFields]) -> int:
         """Insert a config event row and return the new auto-incremented id."""
         with self._engine.begin() as conn:
             result = conn.execute(agent_config_events.insert().values(**fields))

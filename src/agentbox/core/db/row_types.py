@@ -4,7 +4,7 @@ These are the row-level contracts for query results, not SQLAlchemy models.
 """
 
 from enum import StrEnum
-from typing import TypedDict
+from typing import TypedDict, Unpack
 
 
 class EnvDocRow(TypedDict):
@@ -173,6 +173,133 @@ class VersionFileUploadRow(TypedDict):
     file: "AgentVersionFileRow"
     sha256: str
     size: int
+
+
+# ── Manager insert / patch parameter shapes ──────────────────────────
+# total=False — callers can pass any subset of columns (insert: all,
+# patch: only the fields being updated).
+
+
+class _AgentMetaFields(TypedDict, total=False):
+    agent_id: str
+    sync_mode: str
+    export_to_disk: int
+    source_path: str | None
+    source_format: str | None
+    created_at: str
+    updated_at: str
+    deleted_at: str | None
+    disabled_at: str | None
+
+
+class _AgentMetaPatchFields(TypedDict, total=False):
+    """Fields patchable via AgentMetaManager.patch (agent_id is a WHERE param)."""
+
+    sync_mode: str
+    export_to_disk: int
+    source_path: str | None
+    source_format: str | None
+    updated_at: str
+    deleted_at: str | None
+    disabled_at: str | None
+
+
+class _AgentSyncFields(TypedDict, total=False):
+    agent_id: str
+    proxy_path: str | None
+    sync_mode: str
+    sync_policy: str
+    last_file_hash: str | None
+    last_file_mtime: str | None
+    last_sync_at: str | None
+
+
+class _AgentSyncPatchFields(TypedDict, total=False):
+    """Fields patchable via AgentSyncManager.patch (agent_id is a WHERE param)."""
+
+    proxy_path: str | None
+    sync_mode: str
+    sync_policy: str
+    last_file_hash: str | None
+    last_file_mtime: str | None
+    last_sync_at: str | None
+
+
+class _AgentConfigEventFields(TypedDict, total=False):
+    agent_id: str
+    field: str
+    from_value: str | None
+    to_value: str | None
+    author: str
+    source: str
+    created_at: str
+
+
+class _AgentVersionFields(TypedDict, total=False):
+    agent_id: str
+    version: int
+    source_path: str
+    source_format: str
+    content_snapshot: str
+    prompt_snapshot: str
+    content_hash: str
+    author: str
+    changelog: str
+    is_legacy: int
+    created_at: str
+    config_json: str | None
+    prompt_content: str | None
+    source: str
+    resolved_tool_grants: list[str] | None
+
+
+class _AgentVersionRatingFields(TypedDict, total=False):
+    version_id: int
+    rating: int
+    rater: str
+    rated_at: str
+
+
+class _AgentVersionCommentFields(TypedDict, total=False):
+    version_id: int
+    author: str
+    body: str
+    created_at: str
+
+
+class _PromptVersionFields(TypedDict, total=False):
+    agent_id: str
+    version: int
+    content: str
+    author: str
+    changelog: str
+    is_draft: int
+    content_hash: str | None
+    created_at: str
+
+
+class _AgentToolGrantFields(TypedDict, total=False):
+    id: str
+    agent_id: str
+    tool_name: str
+    changelog: str
+    granted_at: str
+    granted_by: str | None
+    revoked_at: str | None
+    revoked_by: str | None
+    revoke_changelog: str | None
+
+
+class _AgentToolGrantPatchFields(TypedDict, total=False):
+    """Fields patchable via AgentToolGrantManager.update_by_id (id is WHERE param)
+    or revoke_active (agent_id, tool_name are WHERE params)."""
+
+    changelog: str
+    granted_at: str
+    granted_by: str | None
+    revoked_at: str | None
+    revoked_by: str | None
+    revoke_changelog: str | None
 
 
 class ResourceStatus(StrEnum):

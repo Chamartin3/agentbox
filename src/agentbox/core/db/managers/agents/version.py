@@ -1,6 +1,8 @@
 """AgentVersion, AgentVersionFile, AgentVersionRating, AgentVersionComment managers."""
 from __future__ import annotations
 
+from typing import Unpack
+
 from sqlalchemy import Row, func, select, update as sa_update
 from sqlalchemy.engine import Connection
 
@@ -17,6 +19,9 @@ from agentbox.core.db.row_types import (
     AgentVersionFileRow,
     AgentVersionRatingRow,
     AgentVersionRow,
+    _AgentVersionCommentFields,
+    _AgentVersionFields,
+    _AgentVersionRatingFields,
 )
 from agentbox.core.db.schema import (
     active_agent_versions,
@@ -270,7 +275,7 @@ class AgentVersionManager(Manager[AgentVersion]):
         files: list[dict] | None = None,
         activate_for: str | None = None,
         activated_at: str | None = None,
-        **fields: object,
+        **fields: Unpack[_AgentVersionFields],
     ) -> int:
         """Insert one version row and return the new id.
 
@@ -304,7 +309,7 @@ class AgentVersionManager(Manager[AgentVersion]):
                 )
             return version_id
 
-    def patch(self, version_id: int, **values: object) -> None:
+    def patch(self, version_id: int, **values: Unpack[_AgentVersionFields]) -> None:
         """Update the supplied columns on one version row."""
         with self._engine.begin() as conn:
             conn.execute(
@@ -377,7 +382,7 @@ class AgentVersionRatingManager(Manager[AgentVersionRating]):
             ).first()
             return _rating_row(row) if row else None
 
-    def insert(self, **fields: object) -> None:
+    def insert(self, **fields: Unpack[_AgentVersionRatingFields]) -> None:
         with self._engine.begin() as conn:
             conn.execute(agent_version_ratings.insert().values(**fields))
 
@@ -404,6 +409,6 @@ class AgentVersionCommentManager(Manager[AgentVersionComment]):
             )
             return [_comment_row(r) for r in rows.fetchall()]
 
-    def insert(self, **fields: object) -> None:
+    def insert(self, **fields: Unpack[_AgentVersionCommentFields]) -> None:
         with self._engine.begin() as conn:
             conn.execute(agent_version_comments.insert().values(**fields))

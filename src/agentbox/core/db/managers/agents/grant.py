@@ -1,11 +1,13 @@
 """AgentToolGrantManager — tool permission grant CRUD."""
 from __future__ import annotations
 
+from typing import Unpack
+
 from sqlalchemy import Row, select, update as sa_update
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.grant import AgentToolGrant
-from agentbox.core.db.row_types import AgentToolGrantRow
+from agentbox.core.db.row_types import AgentToolGrantRow, _AgentToolGrantFields, _AgentToolGrantPatchFields
 from agentbox.core.db.schema import agent_tool_grants
 
 
@@ -51,11 +53,11 @@ class AgentToolGrantManager(Manager[AgentToolGrant]):
             q = q.order_by(agent_tool_grants.c.granted_at.desc())
             return [_grant_row(r) for r in conn.execute(q).fetchall()]
 
-    def insert(self, **fields: object) -> None:
+    def insert(self, **fields: Unpack[_AgentToolGrantFields]) -> None:
         with self._engine.begin() as conn:
             conn.execute(agent_tool_grants.insert().values(**fields))
 
-    def update_by_id(self, row_id: str, **values: object) -> None:
+    def update_by_id(self, row_id: str, **values: Unpack[_AgentToolGrantPatchFields]) -> None:
         with self._engine.begin() as conn:
             conn.execute(
                 sa_update(agent_tool_grants)
@@ -63,7 +65,7 @@ class AgentToolGrantManager(Manager[AgentToolGrant]):
                 .values(**values)
             )
 
-    def revoke_active(self, agent_id: str, tool_name: str, **values: object) -> int:
+    def revoke_active(self, agent_id: str, tool_name: str, **values: Unpack[_AgentToolGrantFields]) -> int:
         """Soft-revoke the active grant; returns rows affected (0 if none)."""
         with self._engine.begin() as conn:
             result = conn.execute(

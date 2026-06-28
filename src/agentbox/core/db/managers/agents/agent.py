@@ -1,6 +1,8 @@
 """Agent, ActiveAgentVersion, AgentMeta and AgentRunnerProfile managers."""
 from __future__ import annotations
 
+from typing import Unpack
+
 from sqlalchemy import Row
 
 from agentbox.core.db.base.manager import Manager
@@ -10,7 +12,7 @@ from agentbox.core.db.models.agents.agent import (
     AgentMeta,
     AgentRunnerProfile,
 )
-from agentbox.core.db.row_types import AgentMetaRow
+from agentbox.core.db.row_types import AgentMetaRow, _AgentMetaFields, _AgentMetaPatchFields
 from agentbox.core.db.schema import active_agent_versions, agent_meta
 
 
@@ -80,11 +82,11 @@ class AgentMetaManager(Manager[AgentMeta]):
             ).first()
             return _meta_row(row) if row else None
 
-    def insert(self, **fields: object) -> None:
+    def insert(self, **fields: Unpack[_AgentMetaFields]) -> None:
         with self._engine.begin() as conn:
             conn.execute(agent_meta.insert().values(**fields))
 
-    def patch(self, agent_id: str, **values: object) -> None:
+    def patch(self, agent_id: str, **values: Unpack[_AgentMetaPatchFields]) -> None:
         """Update the supplied columns on an existing meta row."""
         with self._engine.begin() as conn:
             conn.execute(

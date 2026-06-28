@@ -9,12 +9,14 @@ number by computing max *after* the delete).
 """
 from __future__ import annotations
 
+from typing import Unpack
+
 from sqlalchemy import Row, func, select
 from sqlalchemy.engine import Connection
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.prompt import PromptVersion
-from agentbox.core.db.row_types import PromptVersionRow
+from agentbox.core.db.row_types import PromptVersionRow, _PromptVersionFields
 from agentbox.core.db.schema import prompt_versions
 
 
@@ -172,7 +174,7 @@ class PromptVersionManager(Manager[PromptVersion]):
             assert row is not None, f"committed prompt not found after insert for agent {agent_id!r}"
             return _prompt_row(row)
 
-    def patch(self, version_id: int, **values: object) -> None:
+    def patch(self, version_id: int, **values: Unpack[_PromptVersionFields]) -> None:
         """Update the supplied columns on one prompt-version row."""
         with self._engine.begin() as conn:
             conn.execute(
