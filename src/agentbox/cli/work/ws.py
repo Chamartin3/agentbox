@@ -7,40 +7,47 @@ import subprocess
 from pathlib import Path
 
 import typer
-from rich.table import Table
-from rich.text import Text
 
-from agentbox.cli.shared import checkmark, console, resolve_agent, get_settings, get_store
+from agentbox.cli.shared import CliCtx, resolve_agent
+# TODO(cli-arch): launch orchestration → Service (plans 089/101)
 from agentbox.cli.ops.launch import _launch_session
+# TODO(cli-arch): workspace CRUD → WorkspaceService (plan 089)
 from agentbox.core import workspaces as ws_core
+# TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
-from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 from agentbox.core.service import get_workspace as service_get_workspace
+# TODO(cli-arch): move to facade export
+from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 
-def _resolve_workspace(name: str) -> tuple[Path, str]:
+def _resolve_workspace(obj: CliCtx, name: str) -> tuple[Path, str]:
     """Resolve a workspace path from name or agent ID."""
-    settings = get_settings()
-    store = get_store()
-    row = service_get_workspace(store, name) if hasattr(store, "get_workspace") else None
+    row = (
+        service_get_workspace(obj.store, name)
+        if hasattr(obj.store, "get_workspace")
+        else None
+    )
     if row:
         rel = row.get("path")
         if rel:
-            path = settings.project_root / rel
+            path = obj.settings.project_root / rel
             path.mkdir(parents=True, exist_ok=True)
             return path, name
     a = resolve_agent(name)
-    ws_path = ws_core.ensure(a, settings, store, scaffold=True)
+    ws_path = ws_core.ensure(a, obj.settings, obj.store, scaffold=True)
     return ws_path, name
 
 
-def _delegate_shell(name: str | None, generate: bool) -> int:
+def _delegate_shell(obj: CliCtx, name: str | None, *, generate: bool) -> int:
     """Resolve name and delegate to launch."""
-    store = get_store()
     workspace_arg: str | None = None
     agent_arg: str | None = None
     if name and name != "default":
-        row = service_get_workspace(store, name) if hasattr(store, "get_workspace") else None
+        row = (
+            service_get_workspace(obj.store, name)
+            if hasattr(obj.store, "get_workspace")
+            else None
+        )
         if row:
             workspace_arg = name
         else:
@@ -54,6 +61,7 @@ def _delegate_shell(name: str | None, generate: bool) -> int:
         keep_configs=generate,
     )
 
+
 ws_app = typer.Typer(
     name="ws",
     help="Manage workspaces: ls, new, edit, rm, shell, explore.",
@@ -62,57 +70,28 @@ ws_app = typer.Typer(
 
 
 @ws_app.command("ls")
-def ws_ls() -> None:
+def ws_ls(ctx: typer.Context) -> None:
     """List all configured agents and their workspaces."""
-    settings = get_settings()
-    rows = ws_core.list_all(get_store(), settings)
-    if not rows:
-        console.print("[yellow]No agents declared.[/yellow]")
-        return
-
-    table = Table(
-        title="Workspaces", title_style="bold", header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("State", justify="center", width=7)
-    table.add_column("Agent", style="bold")
-    table.add_column("Path", style="dim")
-    table.add_column("CLAUDE.md", justify="center")
-    table.add_column("Skills", justify="right", style="magenta")
-
-    for w in rows:
-        if w.ephemeral:
-            state = Text("EPH", style="bold yellow")
-        elif w.exists:
-            state = Text("OK", style="bold green")
-        else:
-            state = Text("NEW", style="bold blue")
-        table.add_row(
-            state, w.agent_id, str(w.path),
-            checkmark(w.has_claude_md),
-            str(w.skill_count) if w.skill_count else "[dim]\u00b7[/dim]",
-        )
-    console.print(table)
-    console.print(
-        "[dim]Legend:[/dim] "
-        "[bold green]OK[/bold green]=exists  "
-        "[bold blue]NEW[/bold blue]=not created yet  "
-        "[bold yellow]EPH[/bold yellow]=ephemeral (tmp per run)"
-    )
+    obj: CliCtx = ctx.obj
+    rows = ws_core.list_all(obj.store, obj.settings)
+    obj.render.workspace.workspaces_table(rows)
 
 
 @ws_app.command("show")
 def ws_show(
+    ctx: typer.Context,
     name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
 ) -> None:
     """Print the absolute path of a workspace."""
+    obj: CliCtx = ctx.obj
     target = name or "default"
-    path, _ = _resolve_workspace(target)
-    typer.echo(str(path))
+    path, _ = _resolve_workspace(obj, target)
+    obj.render.workspace.workspace_path(path)
 
 
 @ws_app.command("new")
 def ws_new(
+    ctx: typer.Context,
     agent: str,
     scaffold: bool = True,
     reset: bool = typer.Option(False, "--reset", help="Delete and recreate"),
@@ -121,31 +100,35 @@ def ws_new(
     ),
 ) -> None:
     """Create or recreate the workspace directory."""
+    obj: CliCtx = ctx.obj
     if reset:
         a = resolve_agent(agent)
-        path = ws_core.reset(a, get_settings(), get_store())
-        console.print(f"[yellow]\u21bb[/yellow] reset: [bold]{path}[/bold]")
+        path = ws_core.reset(a, obj.settings, obj.store)
+        obj.render.workspace.workspace_reset(path)
         return
 
     a = resolve_agent(agent)
-    path = ws_core.ensure(a, get_settings(), get_store(), scaffold=scaffold)
-    console.print(f"[green]\u2713[/green] workspace ready: [bold]{path}[/bold]")
+    path = ws_core.ensure(a, obj.settings, obj.store, scaffold=scaffold)
+    obj.render.workspace.workspace_ready(path)
 
 
 @ws_app.command("edit")
 def ws_edit(
+    ctx: typer.Context,
     agent: str,
     file: str = typer.Option("CLAUDE.md", help="File within workspace to open"),
 ) -> None:
     """Open a workspace file in $EDITOR (falls back to vi)."""
+    obj: CliCtx = ctx.obj
     a = resolve_agent(agent)
-    path = ws_core.ensure(a, get_settings(), get_store(), scaffold=True)
+    path = ws_core.ensure(a, obj.settings, obj.store, scaffold=True)
     editor = os.environ.get("EDITOR", "vi")
     subprocess.call([editor, str(path / file)])
 
 
 @ws_app.command("rm")
 def ws_rm(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Workspace name to delete"),
     purge_disk: bool = typer.Option(
         False, "--purge-disk", help="Also delete the workspace directory on disk"
@@ -153,41 +136,45 @@ def ws_rm(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
     """Delete a named workspace from the DB registry."""
+    obj: CliCtx = ctx.obj
     if not yes:
         confirm = typer.confirm(
             f"Delete workspace {name!r}? This cannot be undone."
         )
         if not confirm:
             raise typer.Exit(0)
-    store = get_store()
     try:
         result = workspaces_service.delete_workspace_registry(
             name,
-            store=store,
-            settings=get_settings(),
+            store=obj.store,
+            settings=obj.settings,
             purge_disk=purge_disk,
         )
     except WorkspaceNotFound:
-        console.print(f"[red]workspace {name!r} not found[/red]")
+        obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
-    console.print(f"[yellow]deleted[/yellow] workspace {result['name']!r}")
+    obj.render.workspace.workspace_deleted(str(result["name"]))
 
 
 @ws_app.command("shell")
 def ws_shell(
+    ctx: typer.Context,
     name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
     generate: bool = typer.Option(
         False, "--generate", help="Keep generated config files"
     ),
 ) -> None:
     """Open an interactive shell in a fully-built workspace."""
-    _delegate_shell(name, generate=generate)
+    obj: CliCtx = ctx.obj
+    _delegate_shell(obj, name, generate=generate)
 
 
 @ws_app.command("explore")
 def ws_explore(
+    ctx: typer.Context,
     name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
 ) -> None:
     """Open a shell in a workspace with a yazi tip."""
-    path, _ = _resolve_workspace(name or "default")
-    typer.echo(f"  [bold cyan]yazi[/bold cyan] [dim]{path}[/dim]")
+    obj: CliCtx = ctx.obj
+    path, _ = _resolve_workspace(obj, name or "default")
+    obj.render.workspace.dim(f"  [bold cyan]yazi[/bold cyan] [dim]{path}[/dim]")

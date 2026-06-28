@@ -214,8 +214,8 @@ class WorkspaceRenderer(Renderer):
             self.no_mcp_tools(workspace_id)
             return
 
-        groups: list[dict[str, object]] = result.get("groups", [])  # type: ignore[assignment]
-        if not groups:
+        groups_raw = result.get("groups")
+        if not groups_raw or not isinstance(groups_raw, list):
             self.no_mcp_tools(workspace_id)
             return
 
@@ -224,14 +224,15 @@ class WorkspaceRenderer(Renderer):
         table.add_column("Tools", style="cyan")
         table.add_column("Kind")
         table.add_column("Active", justify="center")
-        for g in groups:
-            tool_names = g.get("tools", [])
-            table.add_row(
-                str(g.get("name", "")),
-                ", ".join(str(t) for t in tool_names),
-                str(g.get("kind", "")),
-                self.check(bool(g.get("active"))),
-            )
+        for g in groups_raw:
+            if isinstance(g, dict):
+                tool_names = g.get("tools", [])
+                table.add_row(
+                    str(g.get("name", "")),
+                    ", ".join(str(t) for t in tool_names),
+                    str(g.get("kind", "")),
+                    self.check(bool(g.get("active"))),
+                )
         self.print(table)
 
     # ------------------------------------------------------------------
