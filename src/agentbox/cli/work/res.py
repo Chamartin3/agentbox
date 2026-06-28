@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import typer
-from rich.table import Table
 
-from agentbox.cli.shared import console
-from agentbox.cli.shared.deps import get_resource_service
+from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared.deps import get_resource_service  # TODO(cli-arch): workspace resource surface → WorkspaceService (plan 089)
 
 workspace_resources_app = typer.Typer(
     name="workspace-resources",
@@ -16,42 +15,20 @@ workspace_resources_app = typer.Typer(
 
 
 @workspace_resources_app.command("ls")
-def wr_list(workspace_id: str) -> None:
+def wr_list(
+    ctx: typer.Context,
+    workspace_id: str,
+) -> None:
     """List all file bindings for a workspace."""
+    obj: CliCtx = ctx.obj
     svc = get_resource_service()
     rows = svc.list_workspace_file_bindings_raw(workspace_id)
-    if not rows:
-        console.print(
-            f"[yellow]No file bindings for workspace {workspace_id!r}.[/yellow]"
-        )
-        return
-
-    table = Table(
-        title=f"Workspace file bindings — {workspace_id}",
-        title_style="bold",
-        header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("Order", style="dim")
-    table.add_column("Target path", style="bold")
-    table.add_column("Resource ID", style="dim")
-    table.add_column("Mode", style="cyan")
-    table.add_column("On conflict", style="dim")
-    table.add_column("Pinned version", style="dim")
-    for r in rows:
-        table.add_row(
-            str(r.get("display_order", 0)),
-            r.get("target_path") or "—",
-            r["resource_id"],
-            r.get("materialize_mode") or "copy",
-            r.get("on_conflict") or "error",
-            r.get("pinned_version_id") or "—",
-        )
-    console.print(table)
+    obj.render.workspace.file_bindings_table(rows, workspace_id)
 
 
 @workspace_resources_app.command("set")
 def wr_set(
+    ctx: typer.Context,
     workspace_id: str,
     dest_path: str,
     resource_slug: str,
@@ -66,19 +43,20 @@ def wr_set(
 
     Existing bindings are preserved; this target_path is upserted.
     """
+    obj: CliCtx = ctx.obj
     if len(reason.strip()) < 3:
-        console.print("[red]--reason must be at least 3 characters[/red]")
+        obj.render.workspace.reason_required()
         raise typer.Exit(1)
 
     svc = get_resource_service()
     resource = svc.get_by_slug(resource_slug)
     if not resource:
-        console.print(f"[red]Resource not found:[/red] {resource_slug!r}")
+        obj.render.workspace.resource_not_found(resource_slug)
         raise typer.Exit(2)
 
     existing = svc.list_workspace_file_bindings_raw(workspace_id)
     kept = [b for b in existing if b.get("target_path") != dest_path]
-    new_binding = {
+    new_binding: dict[str, object] = {
         "resource_id": resource["id"],
         "target_path": dest_path,
         "materialize_mode": mode,
@@ -88,47 +66,20 @@ def wr_set(
     kept.append(new_binding)
 
     svc.replace_workspace_file_bindings_raw(workspace_id, kept, reason=reason)
-    console.print(
-        f"[green]✓[/green] binding set: workspace=[bold]{workspace_id}[/bold] "
-        f"path=[bold]{dest_path}[/bold] → {resource_slug} (mode={mode})"
-    )
+    obj.render.workspace.file_binding_set(workspace_id, dest_path, resource_slug, mode)
 
 
 @workspace_resources_app.command("check")
-def wr_dry_run(workspace_id: str) -> None:
+def wr_dry_run(
+    ctx: typer.Context,
+    workspace_id: str,
+) -> None:
     """Preview what would be materialized for a workspace (no writes)."""
+    obj: CliCtx = ctx.obj
     svc = get_resource_service()
     result = svc.dry_run_workspace_resources(workspace_id)
     entries = result.get("entries", [])
-    if not entries:
-        console.print(
-            f"[yellow]No workspace resource bindings for {workspace_id!r}.[/yellow]"
-        )
-        return
-
-    table = Table(
-        title=f"Dry run — {workspace_id}",
-        title_style="bold",
-        header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("Target path", style="bold")
-    table.add_column("Resource ID", style="dim")
-    table.add_column("Version ID", style="dim")
-    table.add_column("Mode", style="cyan")
-    table.add_column("Files", justify="right", style="magenta")
-    for r in entries:
-        table.add_row(
-            r.get("target_path") or "—",
-            r["resource_id"],
-            r["version_id"],
-            r.get("materialize_mode") or "copy",
-            str(r.get("file_count", 0)),
-        )
-    console.print(table)
-    console.print(f"[dim]{len(entries)} binding(s) would be materialized.[/dim]")
     conflicts = result.get("conflicts", [])
-    if conflicts:
-        console.print(f"[yellow]{len(conflicts)} conflict(s) detected:[/yellow]")
-        for c in conflicts:
-            console.print(f"  [yellow]{c.get('issue', c)}[/yellow]")
+    obj.render.workspace.resources_resolution_table(
+        entries, workspace_id, conflicts=conflicts,
+    )

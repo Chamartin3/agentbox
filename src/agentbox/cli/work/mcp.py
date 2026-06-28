@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import typer
-from rich.panel import Panel
-from rich.table import Table
 
-from agentbox.cli.shared import console, get_mcp_registry, get_settings, get_store
+from agentbox.cli.shared import CliCtx
+# TODO(cli-arch): workspace MCP surface belongs on WorkspaceService (plan 089)
+from agentbox.cli.shared import get_mcp_registry
+# TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import (
     SystemService,
     get_workspace_mcp_policy,
@@ -25,54 +26,27 @@ mcp_workspace_app = typer.Typer(
 
 
 @mcp_workspace_app.command("show")
-def mcp_show(workspace_id: str) -> None:
+def mcp_show(
+    ctx: typer.Context,
+    workspace_id: str,
+) -> None:
     """Show MCP policy and server overrides for a workspace."""
-    store = get_store()
+    obj: CliCtx = ctx.obj
     servers = SystemService().get_project_mcp_servers()
 
-    policy = get_workspace_mcp_policy(store, workspace_id)
-    server_overrides = list_workspace_mcp_server_overrides(store, workspace_id)
-    tool_overrides = list_workspace_mcp_tool_overrides(store, workspace_id)
+    policy = get_workspace_mcp_policy(obj.store, workspace_id)
+    server_overrides = list_workspace_mcp_server_overrides(obj.store, workspace_id)
+    tool_overrides = list_workspace_mcp_tool_overrides(obj.store, workspace_id)
 
-    meta = Table.grid(padding=(0, 2))
-    meta.add_column(style="dim", justify="right")
-    meta.add_column()
-    meta.add_row("workspace_id", workspace_id)
-    meta.add_row("policy", f"[bold]{policy}[/bold]")
-    meta.add_row("project_servers", str(len(servers)))
-    console.print(Panel(meta, title="MCP workspace config", border_style="cyan"))
-
-    if server_overrides:
-        stable = Table(header_style="bold green", padding=(0, 1))
-        stable.add_column("Server", style="bold")
-        stable.add_column("Enabled", justify="center")
-        stable.add_column("Changelog", style="dim")
-        stable.add_column("Updated at", style="dim")
-        for o in server_overrides:
-            enabled = "[green]✓[/green]" if o.get("enabled") else "[red]✗[/red]"
-            stable.add_row(
-                o["server_name"],
-                enabled,
-                o.get("changelog") or "",
-                o.get("created_at") or "",
-            )
-        console.print(Panel(stable, title="Server overrides", border_style="green"))
-    else:
-        console.print("[dim]No server overrides.[/dim]")
-
+    obj.render.workspace.mcp_config_panel(workspace_id, policy, len(servers))
+    obj.render.workspace.mcp_server_overrides_table(server_overrides)
     if tool_overrides:
-        ttable = Table(header_style="bold magenta", padding=(0, 1))
-        ttable.add_column("Server", style="bold")
-        ttable.add_column("Tool")
-        ttable.add_column("Enabled", justify="center")
-        for o in tool_overrides:
-            enabled = "[green]✓[/green]" if o.get("enabled") else "[red]✗[/red]"
-            ttable.add_row(o["server_name"], o["tool_name"], enabled)
-        console.print(Panel(ttable, title="Tool overrides", border_style="magenta"))
+        obj.render.workspace.mcp_tool_overrides_table(tool_overrides)
 
 
 @mcp_workspace_app.command("policy")
 def mcp_policy(
+    ctx: typer.Context,
     workspace_id: str,
     policy_name: str,
     reason: str | None = typer.Option(
@@ -80,19 +54,18 @@ def mcp_policy(
     ),
 ) -> None:
     """Set the default MCP policy for a workspace."""
-    store = get_store()
+    obj: CliCtx = ctx.obj
     try:
-        result = set_workspace_mcp_policy(store, workspace_id, policy_name)
+        result = set_workspace_mcp_policy(obj.store, workspace_id, policy_name)
     except ValueError as exc:
-        console.print(f"[red]Invalid policy.[/red] {exc}")
+        obj.render.workspace.invalid_policy(str(exc))
         raise typer.Exit(1) from exc
-    console.print(
-        f"[green]✓[/green] policy set to [bold]{result}[/bold] for workspace {workspace_id!r}"
-    )
+    obj.render.workspace.mcp_policy_set(result, workspace_id)
 
 
 @mcp_workspace_app.command("toggle")
 def mcp_toggle(
+    ctx: typer.Context,
     workspace_id: str,
     server_name: str,
     on: bool = typer.Option(
@@ -103,67 +76,53 @@ def mcp_toggle(
     ),
 ) -> None:
     """Enable or disable a specific MCP server for a workspace."""
+    obj: CliCtx = ctx.obj
     if len(reason.strip()) < 3:
-        console.print("[red]--reason must be at least 3 characters[/red]")
+        obj.render.workspace.error("--reason must be at least 3 characters")
         raise typer.Exit(1)
 
-    store = get_store()
     set_workspace_mcp_server_override(
-        store, workspace_id, server_name, enabled=on, changelog=reason
+        obj.store, workspace_id, server_name, enabled=on, changelog=reason
     )
     action = "enabled" if on else "disabled"
-    console.print(
-        f"[green]✓[/green] server [bold]{server_name}[/bold] {action} for workspace {workspace_id!r}"
-    )
+    obj.render.workspace.mcp_toggle(action, server_name, workspace_id)
 
 
 @mcp_workspace_app.command("refresh")
-def mcp_refresh(workspace_id: str) -> None:
+def mcp_refresh(
+    ctx: typer.Context,
+    workspace_id: str,
+) -> None:
     """Invalidate the MCP server cache for all servers in this workspace."""
-    store = get_store()
-
-    overrides = list_workspace_mcp_server_overrides(store, workspace_id)
+    obj: CliCtx = ctx.obj
+    overrides = list_workspace_mcp_server_overrides(obj.store, workspace_id)
     server_names = {o["server_name"] for o in overrides}
     for s in SystemService().get_project_mcp_servers():
         server_names.add(s.name)
 
     if not server_names:
-        console.print(
-            f"[yellow]No servers to refresh for workspace {workspace_id!r}.[/yellow]"
-        )
+        obj.render.workspace.no_mcp_servers(workspace_id)
         return
 
     registry = get_mcp_registry()
-    settings = get_settings()
-    cache_dir = settings.mcp_cache_dir
+    cache_dir = obj.settings.mcp_cache_dir
     for name in sorted(server_names):
         cache_file = cache_dir / f"{name}.json"
         if cache_file.exists():
             cache_file.unlink()
-            console.print(f"[green]✓[/green] cache invalidated: {name}")
+            obj.render.workspace.mcp_cache_invalidated(name)
         else:
-            console.print(f"[dim]no cache for: {name}[/dim]")
+            obj.render.workspace.no_mcp_cache(name)
     # Force registry to re-discover on next request by resetting health map
     registry.reset_health()
 
 
 @mcp_workspace_app.command("tools")
-def mcp_tools(workspace_id: str) -> None:
+def mcp_tools(
+    ctx: typer.Context,
+    workspace_id: str,
+) -> None:
     """List MCP tools available to a workspace."""
-    store = get_store()
-    result = get_workspace_mcp_tools(workspace_id, store=store, settings=get_settings())
-    if not result:
-        console.print(f"[dim]no MCP tools for workspace {workspace_id!r}[/dim]")
-        return
-
-    table = Table(title=f"MCP Tools — {workspace_id}", header_style="bold cyan")
-    table.add_column("Server", style="bold")
-    table.add_column("Tool", style="cyan")
-    table.add_column("Description")
-    for item in result:
-        table.add_row(
-            item.get("server_name", ""),
-            item.get("tool_name", ""),
-            (item.get("description") or "")[:80],
-        )
-    console.print(table)
+    obj: CliCtx = ctx.obj
+    result = get_workspace_mcp_tools(workspace_id, store=obj.store, settings=obj.settings)
+    obj.render.workspace.mcp_tools_table(result, workspace_id)
