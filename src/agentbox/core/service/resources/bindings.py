@@ -17,7 +17,6 @@ from agentbox.core.db import SessionStore
 from agentbox.core.service.resources.service import (
     AgentVersionMissing,
     BindingError,
-    ResourceNotFound,
     ResourceService,
 )
 

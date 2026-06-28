@@ -46,7 +46,7 @@ def _tags_to_db(tags: list[str] | None) -> str | None:
 
 
 def _hash_blobs(blobs: list[tuple[str, bytes]]) -> str:
-    import hashlib
+    import hashlib  # noqa: PLC0415
     h = hashlib.sha256()
     for rel_path, content in sorted(blobs, key=lambda b: b[0]):
         h.update(rel_path.encode("utf-8"))

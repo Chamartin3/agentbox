@@ -208,21 +208,29 @@ class WorkspaceRenderer(Renderer):
         """Print empty-state for no MCP tools in workspace."""
         self.dim(f"no MCP tools for workspace {workspace_id!r}")
 
-    def mcp_tools_table(self, result: Sequence[dict[str, object]], workspace_id: str) -> None:
+    def mcp_tools_table(self, result: dict[str, object], workspace_id: str) -> None:
         """Render the available MCP tools table for a workspace."""
         if not result:
             self.no_mcp_tools(workspace_id)
             return
 
+        groups: list[dict[str, object]] = result.get("groups", [])  # type: ignore[assignment]
+        if not groups:
+            self.no_mcp_tools(workspace_id)
+            return
+
         table = Table(title=f"MCP Tools — {workspace_id}", header_style="bold cyan")
-        table.add_column("Server", style="bold")
-        table.add_column("Tool", style="cyan")
-        table.add_column("Description")
-        for item in result:
+        table.add_column("Group", style="bold")
+        table.add_column("Tools", style="cyan")
+        table.add_column("Kind")
+        table.add_column("Active", justify="center")
+        for g in groups:
+            tool_names = g.get("tools", [])
             table.add_row(
-                str(item.get("server_name", "")),
-                str(item.get("tool_name", "")),
-                (str(item.get("description") or ""))[:80],
+                str(g.get("name", "")),
+                ", ".join(str(t) for t in tool_names),
+                str(g.get("kind", "")),
+                self.check(bool(g.get("active"))),
             )
         self.print(table)
 
