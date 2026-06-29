@@ -20,7 +20,7 @@ import hashlib
 import json
 import logging
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from agentbox.core.agents.composition.drift import _build_config_json, _build_snapshot
 from agentbox.core.agents.config import build_config_json_payload
@@ -39,6 +39,10 @@ from agentbox.core.db import (
     PromptVersionRow,
     SessionStore,
     VersionFileUploadRow,
+    _AgentMetaPatchFields,
+    _AgentSyncPatchFields,
+    _AgentToolGrantPatchFields,
+    _AgentVersionFields,
     now_iso,
 )
 from agentbox.core.service.agents.crud import (
@@ -217,7 +221,7 @@ class AgentService(Service):
             return None
         now = now_iso()
         if self._meta.get_meta(agent_id) is not None:
-            self._meta.patch(agent_id, **{column: now, "updated_at": now})
+            self._meta.patch(agent_id, **cast(_AgentMetaPatchFields, {column: now, "updated_at": now}))
         else:
             self._meta.insert(
                 agent_id=agent_id,
@@ -227,7 +231,7 @@ class AgentService(Service):
                 source_format=None,
                 created_at=now,
                 updated_at=now,
-                **{column: now},
+                **cast(Any, {column: now}),  # type: ignore[reportCallIssue] — dynamic column name
             )
         if column == "deleted_at":
             self._active.delete_for_agent(agent_id)
@@ -237,7 +241,7 @@ class AgentService(Service):
         """Clear a timestamp column (restore/enable). None if no meta row."""
         if self._meta.get_meta(agent_id) is None:
             return None
-        self._meta.patch(agent_id, **{column: None, "updated_at": now_iso()})
+        self._meta.patch(agent_id, **cast(_AgentMetaPatchFields, {column: None, "updated_at": now_iso()}))
         return self._meta.get_meta(agent_id)
 
     def soft_delete(self, agent_id: str) -> AgentMetaRow | None:
@@ -268,7 +272,7 @@ class AgentService(Service):
         """Patch supplied meta fields. None if the agent has no meta row."""
         if self._meta.get_meta(agent_id) is None:
             return None
-        values: dict[str, object] = {"updated_at": now_iso()}
+        values: _AgentMetaPatchFields = {"updated_at": now_iso()}
         if sync_mode is not None:
             values["sync_mode"] = sync_mode
         if export_to_disk is not None:
@@ -325,7 +329,7 @@ class AgentService(Service):
         """
         now = now_iso()
         if self._meta.get_meta(agent_id) is not None:
-            values: dict[str, object] = {
+            values: _AgentMetaPatchFields = {
                 "sync_mode": sync_mode,
                 "export_to_disk": int(export_to_disk),
                 "source_path": source_path,
@@ -445,7 +449,7 @@ class AgentService(Service):
             raise ValueError(f"version {version} not found for agent {agent_id}")
         version_id = row["id"]
         old = row.get("changelog") or ""
-        values: dict[str, object] = {
+        values: _AgentVersionFields = {
             "changelog": f"{old}\n\npublish: {reason}" if old else reason
         }
         try:
@@ -506,7 +510,7 @@ class AgentService(Service):
         if len(changelog.strip()) < 3:
             raise ValueError("changelog must be at least 3 characters")
         now = now_iso()
-        fields: dict[str, object] = {
+        fields: _AgentToolGrantPatchFields = {
             "changelog": changelog,
             "granted_at": now,
             "granted_by": actor,
@@ -669,7 +673,7 @@ class AgentService(Service):
                 last_sync_at=now,
             )
         else:
-            values: dict[str, object] = {"last_sync_at": now}
+            values: _AgentSyncPatchFields = {"last_sync_at": now}
             if proxy_path is not None:
                 values["proxy_path"] = proxy_path
             if sync_mode is not None:

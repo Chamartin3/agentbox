@@ -12,14 +12,16 @@ of this registry. ``delete_workspace_cascade`` purges all of them.
 """
 
 from __future__ import annotations
+import uuid
 import warnings
+from typing import Iterable
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.row_types import WorkspaceRow
-from agentbox.core.db.schema import workspaces
+from agentbox.core.db.schema import workspaces, workspace_subagents
 
 # Satellite tables whose rows belong to a workspace. Listed here so
 # delete_workspace_cascade and the boot backfill stay in sync.
@@ -269,3 +271,58 @@ class WorkspacesMixin:
                 )
                 deleted.append(name)
         return deleted
+
+    # --- workspace subagents (formerly on ResourceBindingsMixin) ---
+
+    def list_workspace_subagents(self, workspace_id: str) -> list[dict]:
+        """Return all subagents for a workspace ordered by display_order."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                workspace_subagents.select()
+                .where(workspace_subagents.c.workspace_id == workspace_id)
+                .order_by(workspace_subagents.c.display_order)
+            )
+            return [dict(r._mapping) for r in rows]
+
+    def replace_workspace_subagents(
+        self,
+        workspace_id: str,
+        subagents: Iterable[dict],
+        *,
+        actor: str | None = None,
+    ) -> list[dict]:
+        """Atomically replace all subagents for a workspace.
+
+        Validates: unique aliases, non-empty agent_id, non-empty alias.
+        """
+        now = now_iso()
+        rows: list[dict] = []
+        seen: set[str] = set()
+        for idx, s in enumerate(subagents):
+            agent_id = (s.get("agent_id") or "").strip()
+            alias = (s.get("alias") or "").strip()
+            if not agent_id:
+                raise ValueError("agent_id is required for subagent bindings")
+            if not alias:
+                raise ValueError("alias is required for subagent bindings")
+            if alias in seen:
+                raise ValueError(f"Duplicate alias {alias!r} in subagent list")
+            seen.add(alias)
+            rows.append({
+                "id": uuid.uuid4().hex,
+                "workspace_id": workspace_id,
+                "agent_id": agent_id,
+                "alias": alias,
+                "display_order": s.get("display_order", idx),
+                "created_at": now,
+                "created_by": actor,
+            })
+        with self.engine.begin() as conn:
+            conn.execute(
+                workspace_subagents.delete().where(
+                    workspace_subagents.c.workspace_id == workspace_id
+                )
+            )
+            if rows:
+                conn.execute(workspace_subagents.insert(), rows)
+        return self.list_workspace_subagents(workspace_id)

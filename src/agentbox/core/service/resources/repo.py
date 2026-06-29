@@ -84,10 +84,10 @@ def create_resource(
     description: str | None = None,
     tags: list[str] | None = None,
 ) -> RepoResourceRow:
-    return _svc().create_resource(
+    return cast(RepoResourceRow, _svc().create_resource(
         slug=slug, type=type, display_name=display_name,
         description=description, tags=tags,
-    )
+    ))
 
 
 def get_resource(resource_id: str, *, store: SessionStore) -> dict:  # noqa: ARG001
@@ -95,10 +95,10 @@ def get_resource(resource_id: str, *, store: SessionStore) -> dict:  # noqa: ARG
 
 
 def update_resource(resource_id: str, *, store: SessionStore, display_name: str | None = None, description: str | None = None, tags: list[str] | None = None) -> RepoResourceRow:  # noqa: ARG001
-    return _svc().update_resource(
+    return cast(RepoResourceRow, _svc().update_resource(
         resource_id,
         display_name=display_name, description=description, tags=tags,
-    )
+    ))
 
 
 def list_versions(resource_id: str, *, store: SessionStore) -> dict:  # noqa: ARG001
@@ -122,7 +122,7 @@ def _require_resource(store: SessionStore, resource_id: str) -> RepoResourceRow:
 
 
 def list_repo_resources(store: SessionStore, *, type: str | None = None, limit: int = 50) -> list[dict]:  # noqa: ARG001
-    return _svc().list_resources(type=type, limit=limit)["items"]
+    return _svc().list_resources(type=cast("ResourceType | None", type), limit=limit)["items"]
 
 
 def get_repo_resource_by_slug(store: SessionStore, slug: str) -> RepoResourceRow | None:  # noqa: ARG001
@@ -131,10 +131,10 @@ def get_repo_resource_by_slug(store: SessionStore, slug: str) -> RepoResourceRow
 
 
 def create_repo_resource(store: SessionStore, slug: str, type: str, display_name: str, *, description: str | None = None, tags: list[str] | None = None, created_by: str | None = None) -> RepoResourceRow:  # noqa: ARG001
-    return _svc().create_resource(
-        slug=slug, type=type, display_name=display_name,
+    return cast(RepoResourceRow, _svc().create_resource(
+        slug=slug, type=cast(ResourceType, type), display_name=display_name,
         description=description, tags=tags,
-    )
+    ))
 
 
 def list_repo_versions(store: SessionStore, resource_id: str) -> list[dict]:  # noqa: ARG001
