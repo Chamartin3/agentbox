@@ -3,6 +3,8 @@
 The env-doc is plain markdown text, stored as ``content_json = {"body": ...}``
 and placed verbatim into each engine's instruction file (CLAUDE.md / AGENTS.md)
 by the recipe generator.
+
+Now delegates to ``WorkspaceService``.
 """
 
 from __future__ import annotations
@@ -18,19 +20,13 @@ _log = logging.getLogger(__name__)
 
 
 def env_doc_body(content: Any) -> str:
-    """Extract the markdown body from a raw string or a ``{"body": ...}`` dict."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, dict):
-        body = content.get("body") or content.get("content") or ""
-        return body if isinstance(body, str) else str(body)
-    return ""
+    from agentbox.core.service.workspaces.service import env_doc_body as _body
+    return _body(content)
 
 
 def render_env_doc_preview(content: Any) -> dict[str, str]:
-    """Preview the instruction files. Identical body for every engine."""
-    body = env_doc_body(content)
-    return {"claude_md": body, "agents_md": body}
+    from agentbox.core.service.workspaces.service import render_env_doc_preview as _preview
+    return _preview(content)
 
 
 def save_and_sync_env_doc(
@@ -42,12 +38,10 @@ def save_and_sync_env_doc(
     reason: str = "edit",
     actor: str | None = None,
 ) -> dict[str, Any]:
-    """Persist env-doc as live version, then sync CLAUDE.md/AGENTS.md on disk.
-
-    Sync failures are logged but not raised — the save succeeded and the
-    on-disk render is regenerated on every run anyway.
-    """
-    result = store.save_env_doc(
+    """Persist env-doc as live version, then sync CLAUDE.md/AGENTS.md on disk."""
+    from agentbox.core.service.workspaces.service import WorkspaceService
+    svc = WorkspaceService()
+    result = svc.save_env_doc(
         workspace_id,
         {"body": env_doc_body(content)},
         changelog=reason,

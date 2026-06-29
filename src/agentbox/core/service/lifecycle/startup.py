@@ -152,10 +152,11 @@ def sync_workspace_registry(
 ) -> StartupReport:
     """Prune phantom workspace rows that no real subsystem references."""
     try:
+        from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
         keep: set[str] = {"default"}
         if manifest is not None:
             keep |= {a.workspace or "default" for a in manifest.agents}
-        pruned = store.prune_phantom_workspaces(keep=keep)
+        pruned = WorkspaceService().prune_phantoms(keep=keep)
     except Exception as exc:
         _log.exception("workspaces registry sync failed")
         return _error("sync_workspace_registry", exc)

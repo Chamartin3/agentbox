@@ -144,3 +144,8 @@ from agentbox.core.workspaces.manager import resolve_path as resolve_path
 from agentbox.core.workspaces.mcp.client import McpRegistry as McpRegistry
 from agentbox.core.workspaces.build import build_workspace as build_workspace
 from agentbox.core.workspaces.build import build_workspace_by_name as build_workspace_by_name
+
+# ── WorkspaceService (Plan 089) ────────────────────────────────────────
+from agentbox.core.service.workspaces.service import WorkspaceService as WorkspaceService
+from agentbox.core.service.workspaces.service import env_doc_body as env_doc_body
+from agentbox.core.service.workspaces.service import render_env_doc_preview as render_env_doc_preview

@@ -39,3 +39,9 @@ def get_agent_service() -> AgentService:
 def get_resource_service() -> ResourceService:
     """Resource-domain service. Uncached — Database is lru_cache'd per path."""
     return ResourceService()
+
+
+def get_workspace_service():
+    """Workspace-domain service. Uncached — self-wires from settings."""
+    from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
+    return WorkspaceService()

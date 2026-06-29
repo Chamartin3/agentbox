@@ -1,13 +1,22 @@
 """Workspace administration service — MCP overrides, host env, env docs, usage.
 
-Pass-through functions over ``SessionStore``. UI layers call these instead
-of reaching into ``SessionStore`` directly.
+Pass-through functions that delegate to ``WorkspaceService``. UI layers call
+these instead of reaching into ``SessionStore`` directly. 
+
+The ``store`` parameter is retained for backward compatibility but
+ignored for workspace methods (which now go through ``WorkspaceService``).
+Non-workspace methods (agent versions) still use ``store``.
 """
 
 from __future__ import annotations
 
 from agentbox.core.db import EnvDocRow, SessionStore, WorkspaceRow
 from agentbox.core.service.system.service import SystemService
+from agentbox.core.service.workspaces.service import WorkspaceService
+
+
+def _ws() -> WorkspaceService:
+    return WorkspaceService()
 
 
 # ── Workspace registry ──────────────────────────────────────────────────
@@ -21,13 +30,13 @@ def get_workspace(store: SessionStore, name: str) -> WorkspaceRow | None:
 
 
 def get_workspace_mcp_policy(store: SessionStore, workspace_id: str) -> str:
-    return store.get_workspace_mcp_policy(workspace_id)
+    return _ws().get_mcp_policy(workspace_id)
 
 
 def set_workspace_mcp_policy(
     store: SessionStore, workspace_id: str, policy: str
 ) -> str:
-    return store.set_workspace_mcp_policy(workspace_id, policy)
+    return _ws().set_mcp_policy(workspace_id, policy)
 
 
 # ── Workspace MCP server overrides ──────────────────────────────────────
@@ -36,7 +45,7 @@ def set_workspace_mcp_policy(
 def list_workspace_mcp_server_overrides(
     store: SessionStore, workspace_id: str
 ) -> list[dict]:
-    return store.list_workspace_mcp_server_overrides(workspace_id)
+    return _ws().list_mcp_server_overrides(workspace_id)
 
 
 def set_workspace_mcp_server_override(
@@ -48,7 +57,7 @@ def set_workspace_mcp_server_override(
     changelog: str = "set via service",
     actor: str | None = None,
 ) -> dict:
-    return store.set_workspace_mcp_server_override(
+    return _ws().set_mcp_server_override(
         workspace_id,
         server_name,
         enabled=enabled,
@@ -63,10 +72,12 @@ def set_workspace_mcp_server_override(
 def list_workspace_mcp_tool_overrides(
     store: SessionStore, workspace_id: str
 ) -> list[dict]:
-    return store.list_workspace_mcp_tool_overrides(workspace_id)
+    return _ws().list_mcp_tool_overrides(workspace_id)
 
 
 # ── Workspace file bindings ─────────────────────────────────────────────
+# Note: file bindings are part of ResourceService (Plan 090). These remain
+# on SessionStore until ResourceService exposes a manager-level interface.
 
 
 def list_workspace_file_bindings(
@@ -92,19 +103,19 @@ def replace_workspace_file_bindings(
 
 
 def list_host_env_profiles(store: SessionStore) -> list[dict]:
-    return store.list_host_env_profiles()
+    return _ws().list_host_env_profiles()
 
 
 def get_workspace_host_env(
     store: SessionStore, workspace_id: str
 ) -> dict | None:
-    return store.get_workspace_host_env(workspace_id)
+    return _ws().get_workspace_host_env(workspace_id)
 
 
 def resolve_workspace_host_env(
     store: SessionStore, workspace_id: str
 ) -> dict:
-    return store.resolve_workspace_host_env(workspace_id)
+    return _ws().resolve_workspace_host_env(workspace_id)
 
 
 def list_host_env_calls_for_run(
@@ -116,12 +127,12 @@ def list_host_env_calls_for_run(
 # ── Env docs ────────────────────────────────────────────────────────────
 
 
-def get_active_env_doc(store: SessionStore, workspace_id: str) -> EnvDocRow | None:
-    return store.get_active_env_doc(workspace_id)
+def get_active_env_doc(store: SessionStore, workspace_id: str) -> dict | None:
+    return _ws().get_active_env_doc(workspace_id)
 
 
 def list_env_doc_versions(store: SessionStore, workspace_id: str) -> list[dict]:
-    return store.list_env_doc_versions(workspace_id)
+    return _ws().list_env_doc_versions(workspace_id)
 
 
 def save_env_doc(
@@ -133,7 +144,7 @@ def save_env_doc(
     publish: bool = True,
     actor: str | None = None,
 ) -> dict:
-    return store.save_env_doc(
+    return _ws().save_env_doc(
         workspace_id, content, changelog=changelog, publish=publish, actor=actor
     )
 
@@ -141,7 +152,7 @@ def save_env_doc(
 def publish_env_doc(
     store: SessionStore, workspace_id: str, version_id: str
 ) -> dict:
-    return store.publish_env_doc(workspace_id, version_id)
+    return _ws().publish_env_doc(workspace_id, version_id)
 
 
 def rollback_env_doc(
@@ -152,12 +163,12 @@ def rollback_env_doc(
     changelog: str,
     actor: str | None = None,
 ) -> dict:
-    return store.rollback_env_doc(
+    return _ws().rollback_env_doc(
         workspace_id, version_id, changelog=changelog, actor=actor
     )
 
 
-# ── Agent versions ──────────────────────────────────────────────────────
+# ── Agent versions (not workspace-specific — remain on SessionStore) ────
 
 
 def replace_version_config(
