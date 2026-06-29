@@ -19,14 +19,24 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import console, get_store
-from agentbox.core.config import Settings, load_settings
-from agentbox.core.constants import RunnerKind
-from agentbox.core.service import AgentDef
+from rich.console import Console as _RichConsole
+
+from agentbox.cli.shared import get_store
+from agentbox.core.config import Settings, load_settings  # TODO(cli-arch): Settings (plan 095)
+from agentbox.core.constants import RunnerKind  # TODO(cli-arch): RunnerKind export (plan 095)
+from agentbox.core.service import AgentDef  # TODO(cli-arch): facade export (plan 095)
+# TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.system.service import SystemService
+# TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.workspaces import launch_runner_configs
+# TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.build import build_workspace
+# TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.mcp.client import McpRegistry
+
+# Module-level console for launch orchestration — will be replaced by renderer
+# injection when orchestration moves to core (plans 089/095).
+_print = _RichConsole().print
 
 # Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
 # ``$SHELL`` (falling back to /bin/bash) and never needs a runner binary.
@@ -49,7 +59,7 @@ def _require_binary(runner: str) -> None:
     if binary is None:
         return
     if shutil.which(binary) is None:
-        console.print(
+        _print(
             f"[red]The {binary!r} CLI is not installed in this container.[/red]\n"
             f"Add it to [bold]libs/agentbox/Dockerfile[/bold] (or install it "
             f"into the running container) and try again."
@@ -68,7 +78,7 @@ def _launch_session(
 ) -> int:
     """Core launch logic — callable from other CLI commands (e.g. ``ws shell``)."""
     if runner == "token":
-        console.print(
+        _print(
             "[red]The 'token' backend runs in-process via pydantic-ai and has "
             "no interactive CLI.[/red]\nUse [bold]agentbox run[/bold] or the HTTP API."
         )
@@ -76,7 +86,7 @@ def _launch_session(
     try:
         RunnerKind.coerce(runner, label="runner")
     except ValueError:
-        console.print(
+        _print(
             f"[red]Unknown runner:[/red] {runner!r}. "
             f"Expected one of: {', '.join(RunnerKind.values())}."
         )
@@ -90,7 +100,7 @@ def _launch_session(
     if agent:
         agent_def = get_store().get_agent_def(agent)
         if agent_def is None:
-            console.print(f"[red]Unknown agent:[/red] {agent!r}")
+            _print(f"[red]Unknown agent:[/red] {agent!r}")
             raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, workspace_name = _resolve_workspace(
@@ -112,9 +122,9 @@ def _launch_session(
             )
             if sync_result.errors:
                 for err in sync_result.errors:
-                    console.print(f"[yellow]sync warning:[/yellow] {err}")
+                    _print(f"[yellow]sync warning:[/yellow] {err}")
         except Exception as e:
-            console.print(f"[yellow]workspace sync failed:[/yellow] {e}")
+            _print(f"[yellow]workspace sync failed:[/yellow] {e}")
 
     # shell mode also needs configs now — we materialize a workspace
     # `.mcp.json` from the resolved per-workspace MCP set so an
@@ -208,7 +218,7 @@ def _resolve_workspace(
             path.mkdir(parents=True, exist_ok=True)
             return path, False, None, None
 
-    console.print(
+    _print(
         "[red]No workspace specified and no 'default' workspace defined.[/red]\n"
         "Run [bold]agentbox ws ls[/bold] to see available workspaces, "
         "or pass [bold]--workspace NAME[/bold] / [bold]--ephemeral[/bold]."
@@ -231,7 +241,7 @@ def _apply_creds(creds: str | None, settings: Settings) -> None:
         os.environ.pop("CLAUDE_CONFIG_DIR", None)
         api_key = os.environ.get(var)
         if not api_key:
-            console.print(f"[red]creds env var {var!r} is not set[/red]")
+            _print(f"[red]creds env var {var!r} is not set[/red]")
             raise typer.Exit(1)
         os.environ["ANTHROPIC_API_KEY"] = api_key
     else:
@@ -364,11 +374,11 @@ def _print_banner(
     creds: str | None,
 ) -> None:
     mode = "ephemeral (tmp)" if is_ephemeral else f"workspace ({workspace_path})"
-    console.print("━" * 50)
+    _print("━" * 50)
     label = f"[cyan]{agent}[/cyan]" if agent else "[dim]<no agent>[/dim]"
-    console.print(f"[bold]agentbox launch[/bold] ({runner}) — {label}")
-    console.print("━" * 50)
-    console.print(f"  model:  {model or '<runner default>'}")
-    console.print(f"  mode:   {mode}")
-    console.print(f"  creds:  {creds or 'default'}")
-    console.print()
+    _print(f"[bold]agentbox launch[/bold] ({runner}) — {label}")
+    _print("━" * 50)
+    _print(f"  model:  {model or '<runner default>'}")
+    _print(f"  mode:   {mode}")
+    _print(f"  creds:  {creds or 'default'}")
+    _print()

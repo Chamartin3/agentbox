@@ -20,12 +20,12 @@ import typer
 
 from agentbox.cli.shared import CliCtx
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.core.config import load_settings  # TODO(cli-arch): settings via ctx
-from agentbox.core.db import Database  # TODO(cli-arch): db via ctx
-from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.service import SessionStore  # TODO(cli-arch): store via ctx
-from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.service import get_agent_def, get_workspace  # TODO(cli-arch): AgentService (plan 094)
+from agentbox.core.config import load_settings
+from agentbox.core.db import Database
+from agentbox.core.service.workspaces import launch_runner_configs
+from agentbox.core.service import SessionStore
+from agentbox.core.workspaces.prep import render_env_doc
+from agentbox.core.service import get_agent_def, get_workspace
 
 
 def shell_cmd(
@@ -49,7 +49,7 @@ def shell_cmd(
     ``<workspace>/.agentbox/generated/`` and are overwritten each invocation.
     """
     obj: CliCtx = ctx.obj
-    settings = load_settings()
+    settings = obj.settings
     _db = Database(settings.db_path)
     store = SessionStore(settings.db_path)
 
@@ -72,9 +72,9 @@ def shell_cmd(
     )
     launch_cm.__enter__()
 
-    env_doc_rendered = _render_env_doc(obj, settings, workspace, agent_def, workspace_path)
+    env_doc_rendered = _render_env_doc(settings, workspace, agent_def, workspace_path)
 
-    _print_banner(obj, agent, workspace_path, is_ephemeral, creds, env_doc_rendered)
+    obj.render.ops.shell_banner(agent, workspace_path, is_ephemeral, creds, env_doc_rendered)
 
     if yazi:
         bin_path = shutil.which("yazi")
@@ -91,7 +91,6 @@ def shell_cmd(
 
 
 def _render_env_doc(
-    obj: CliCtx,
     settings,
     workspace_override: str | None,
     agent_def,
@@ -110,29 +109,7 @@ def _render_env_doc(
         entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)
         return bool(entries)
     except Exception as exc:
-        obj.render.ops.warn(f"env-doc render skipped: {exc}")
+        # Use local Rich instance since this is a private helper
+        from rich.console import Console
+        Console().print(f"[yellow]env-doc render skipped:[/yellow] {exc}")
         return False
-
-
-def _print_banner(
-    obj: CliCtx,
-    agent: str,
-    workspace_path: Path,
-    is_ephemeral: bool,
-    creds: str | None,
-    env_doc_rendered: bool,
-) -> None:
-    obj.render.ops.con.print("\u2501" * 60)
-    obj.render.ops.con.print(f"[bold]agentbox shell[/bold] \u2014 [cyan]{agent}[/cyan]")
-    obj.render.ops.con.print("\u2501" * 60)
-    obj.render.ops.con.print(
-        f"  workdir:   {workspace_path}{'  (ephemeral)' if is_ephemeral else ''}"
-    )
-    obj.render.ops.con.print(
-        f"  env-doc:   {'rendered (CLAUDE.md / AGENTS.md)' if env_doc_rendered else 'none'}"
-    )
-    obj.render.ops.con.print(f"  creds:     {creds or 'default'}")
-    obj.render.ops.con.print()
-    obj.render.ops.con.print("  Native config (.mcp.json / .claude / opencode.json) is in cwd.")
-    obj.render.ops.con.print("  Exit the shell to return.")
-    obj.render.ops.con.print()
