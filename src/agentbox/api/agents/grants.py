@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_agent_service, get_mcp_registry, get_store
+from agentbox.api.deps import get_agent_service, get_mcp_registry, get_resource_service, get_store
 from agentbox.core.service import AgentService, SessionStore
 from agentbox.core.workspaces.catalog import resolve_host_env_callables
 from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
@@ -48,7 +48,8 @@ def _catalog_tool_names(
         names.add(t.name)
 
     # Resource bindings are included but only by resource_id / target_path.
-    for b in store.list_workspace_file_bindings(workspace_id):
+    rsvc = get_resource_service()
+    for b in rsvc._file_bindings.list_for_workspace(workspace_id):
         names.add(b.get("target_path", b.get("resource_id", "")))
 
     return names

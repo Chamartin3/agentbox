@@ -34,9 +34,8 @@ from agentbox.core.db.agents.sync import AgentSyncMixin
 from agentbox.core.db.agents.grants import AgentToolGrantsMixin
 from agentbox.core.db.agents.versions import AgentVersionsMixin
 from agentbox.core.db.agents.prompts import PromptVersionsMixin
-from agentbox.core.db.resources.crud import ResourcesMixin
-from agentbox.core.db.resources.shared import SharedResourcesMixin
-from agentbox.core.db.resources.bindings import ResourceBindingsMixin
+# ResourcesMixin, SharedResourcesMixin, ResourceBindingsMixin replaced by SessionStore-level
+# backward-compat redirect methods delegating to ResourceService. See _rsvc() helpers below.
 # Execution mixins retired in plan 088 — ExecutionService now owns the run lifecycle.
 # RunsMixin, SessionsMixin, RunCommentsMixin, UsageMixin, WebhooksMixin,
 # RunPromptsMixin, RunSnapshotsMixin removed.
@@ -168,9 +167,6 @@ class SessionStore(
     AgentSyncMixin,
     AgentConfigEventsMixin,
     AgentToolGrantsMixin,
-    SharedResourcesMixin,
-    ResourcesMixin,
-    ResourceBindingsMixin,
     WorkenvTemplatesMixin,
     WorkspacesMixin,
     EnvDocsMixin,
@@ -184,3 +180,130 @@ class SessionStore(
     _CoreStore,
 ):
     """Public store façade. Composes core CRUD + analytics + agent versions + prompt versions + shared resources + runner profiles + sync."""
+
+    # ------------------------------------------------------------------
+    # Resource-domain backward-compat redirects → ResourceService
+    # ------------------------------------------------------------------
+    def _rsvc(self):
+        from agentbox.core.service.resources.service import ResourceService
+        return ResourceService()
+
+    def get_repo_resource(self, resource_id: str):
+        return self._rsvc()._resources.get_resource(resource_id)
+
+    def get_repo_resource_by_slug(self, slug: str):
+        return self._rsvc()._resources.get_by_slug(slug)
+
+    def list_repo_resources(self, *, type: str | None = None, query: str | None = None, include_deleted: bool = False, limit: int = 50, offset: int = 0):
+        return self._rsvc()._resources.list_resources(type=type, query=query, include_deleted=include_deleted, limit=limit, offset=offset)
+
+    def count_repo_resources(self, *, type: str | None = None, query: str | None = None, include_deleted: bool = False):
+        return self._rsvc()._resources.count_resources(type=type, query=query, include_deleted=include_deleted)
+
+    def create_repo_resource(self, slug: str, type: str, display_name: str, *, description: str | None = None, tags: list[str] | None = None, created_by: str | None = None):
+        return self._rsvc()._resources.create_resource(slug=slug, type=type, display_name=display_name, description=description, tags=tags, created_by=created_by)
+
+    def update_repo_resource(self, resource_id: str, *, type: str | None = None, display_name: str | None = None, description: str | None = None, tags: list[str] | None = None):
+        return self._rsvc()._resources.update_resource(resource_id, type=type, display_name=display_name, description=description, tags=tags)
+
+    def soft_delete_repo_resource(self, resource_id: str, *, reason: str = "deleted via SessionStore"):
+        self._rsvc()._resources.soft_delete(resource_id, reason=reason)
+
+    def get_repo_version(self, version_id: str):
+        return self._rsvc()._resource_versions.get_version(version_id)
+
+    def list_repo_versions(self, resource_id: str):
+        return self._rsvc()._resource_versions.list_versions(resource_id)
+
+    def get_active_repo_version(self, resource_id: str):
+        return self._rsvc()._resource_versions.get_active_version(resource_id)
+
+    def publish_repo_version(self, version_id: str, *, reason: str, activated_by: str | None = None):
+        return self._rsvc()._resource_versions.publish_version(version_id, reason=reason, activated_by=activated_by)
+
+    def rollback_repo_resource(self, resource_id: str, target_version: int, *, reason: str, activated_by: str | None = None):
+        return self._rsvc()._resource_versions.rollback_resource(resource_id, target_version, reason=reason, activated_by=activated_by)
+
+    def import_repo_version(self, resource_id: str, blobs, *, import_source: str, changelog: str, source_metadata: dict | None = None, metadata: dict | None = None, draft: bool = False, created_by: str | None = None, activate: bool = True):
+        return self._rsvc()._resource_versions.import_version(resource_id, blobs, import_source=import_source, changelog=changelog, source_metadata=source_metadata, metadata=metadata, draft=draft, created_by=created_by, activate=activate)
+
+    def read_repo_blob(self, version_id: str, relative_path: str = ""):
+        return self._rsvc()._resource_blobs.get_blob(version_id, relative_path)
+
+    def iter_repo_blobs(self, version_id: str):
+        return self._rsvc()._resource_blobs.iter_blobs(version_id)
+
+    # Shared resources (legacy names — no "shared_" prefix)
+    def get_resource(self, id: str, version: int):
+        return self._rsvc()._shared_resources.get_versioned(id, version)
+
+    def get_active_resource(self, id: str):
+        return self._rsvc()._shared_resources.get_active(id)
+
+    def list_resources(self, *, kind: str | None = None, q: str | None = None, limit: int = 50, offset: int = 0):
+        return self._rsvc()._shared_resources.list_active(kind=kind, q=q, limit=limit, offset=offset)
+
+    def count_active_resources(self, *, kind: str | None = None, q: str | None = None):
+        return self._rsvc()._shared_resources.count_active(kind=kind, q=q)
+
+    def list_resource_versions(self, id: str, *, limit: int = 50, offset: int = 0):
+        return self._rsvc()._shared_resources.list_versions(id, limit=limit, offset=offset)
+
+    def create_resource(self, id: str, kind: str, name: str, *, description: str | None = None, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, tags: list[str] | None = None, activate: bool = True):
+        return self._rsvc()._shared_resources.create(id, kind, name, description=description, content=content, config_json=config_json, author=author, changelog=changelog, tags=tags, activate=activate)
+
+    def create_resource_version(self, id: str, *, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, activate: bool = False, **fields_to_update):
+        return self._rsvc()._shared_resources.create_version(id, content=content, config_json=config_json, author=author, changelog=changelog, activate=activate, **fields_to_update)
+
+    def activate_resource(self, id: str, version: int):
+        return self._rsvc()._shared_resources.activate_version(id, version)
+
+    # Shared resources (new names — with "shared_" prefix, for ResourceService callers)
+    def get_shared_resource(self, id: str, version: int):
+        return self._rsvc()._shared_resources.get_versioned(id, version)
+
+    def get_active_shared_resource(self, id: str):
+        return self._rsvc()._shared_resources.get_active(id)
+
+    def list_shared_resources(self, *, kind: str | None = None, q: str | None = None, limit: int = 50, offset: int = 0):
+        return self._rsvc()._shared_resources.list_active(kind=kind, q=q, limit=limit, offset=offset)
+
+    def count_shared_resources(self, *, kind: str | None = None, q: str | None = None):
+        return self._rsvc()._shared_resources.count_active(kind=kind, q=q)
+
+    def list_shared_resource_versions(self, id: str, *, limit: int = 50, offset: int = 0):
+        return self._rsvc()._shared_resources.list_versions(id, limit=limit, offset=offset)
+
+    def create_shared_resource(self, id: str, kind: str, name: str, *, description: str | None = None, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, tags: list[str] | None = None, activate: bool = True):
+        return self._rsvc()._shared_resources.create(id, kind, name, description=description, content=content, config_json=config_json, author=author, changelog=changelog, tags=tags, activate=activate)
+
+    def create_shared_resource_version(self, id: str, *, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, activate: bool = False, **fields_to_update):
+        return self._rsvc()._shared_resources.create_version(id, content=content, config_json=config_json, author=author, changelog=changelog, activate=activate, **fields_to_update)
+
+    def activate_shared_resource(self, id: str, version: int):
+        return self._rsvc()._shared_resources.activate_version(id, version)
+
+    # Prompt / workspace bindings (from ResourceBindingsMixin)
+    def list_prompt_bindings(self, agent_id: str):
+        return self._rsvc()._prompt_bindings.list_for_agent(agent_id)
+
+    def replace_prompt_bindings(self, agent_id: str, bindings, *, reason: str, actor: str | None = None):
+        return self._rsvc()._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)
+
+    def list_workspace_file_bindings(self, workspace_id: str):
+        return self._rsvc()._file_bindings.list_for_workspace(workspace_id)
+
+    def replace_workspace_file_bindings(self, workspace_id: str, bindings, *, reason: str, actor: str | None = None):
+        return self._rsvc()._file_bindings.replace_for_workspace(workspace_id, bindings, reason=reason, actor=actor)
+
+    def count_workspace_file_bindings_by_workspace(self):
+        return self._rsvc()._file_bindings.count_by_workspace()
+
+    def replace_workspace_skill_bindings(self, workspace_id: str, skill_resource_ids, *, reason: str = "skill bindings update", actor: str | None = None):
+        return self._rsvc()._file_bindings.replace_skill_bindings(workspace_id, skill_resource_ids, reason=reason, actor=actor)
+
+    def list_workspace_subagents(self, workspace_id: str):
+        return self._rsvc()._subagents.list_for_workspace(workspace_id)
+
+    def replace_workspace_subagents(self, workspace_id: str, subagents, *, actor: str | None = None):
+        return self._rsvc()._subagents.replace_for_workspace(workspace_id, subagents, actor=actor)
