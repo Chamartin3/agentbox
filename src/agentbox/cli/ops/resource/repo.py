@@ -9,8 +9,8 @@ import typer
 from agentbox.cli.shared import CliCtx
 from agentbox.cli.shared.deps import get_resource_service
 # TODO(cli-arch): ResourceService (plan 090)
-from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings
-from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound
+from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings  # TODO(cli-arch)
+from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound  # TODO(cli-arch)
 
 repo_app = typer.Typer(
     name="repo",
@@ -32,6 +32,9 @@ def repo_ls(
     rows = svc.list_resources(type=type, limit=limit)["items"]
     if tag:
         rows = [r for r in rows if tag in (r.get("tags") or "")]
+    if not rows:
+        obj.render.ops.warn("No resources found.")
+        return
     obj.render.ops.resource_table(rows)
 
 
@@ -44,15 +47,8 @@ def repo_show(ctx: typer.Context, slug: str) -> None:
     if not resource:
         obj.render.ops.error(f"Resource not found: {slug!r}")
         raise typer.Exit(2)
-    meta_pairs = [
-        ("id", resource["id"]),
-        ("slug", resource["slug"]),
-        ("type", resource["type"]),
-        ("name", resource.get("display_name") or "---"),
-        ("description", resource.get("description") or "---"),
-    ]
     versions = svc.list_versions(resource["id"])["items"]
-    obj.render.ops.resource_detail(slug, meta_pairs, versions)
+    obj.render.ops.resource_detail(slug, resource, versions)
 
 
 @repo_app.command("upload")
@@ -86,7 +82,9 @@ def repo_upload(
         mime_type=None,
         changelog=changelog,
     )
-    obj.render.ops.resource_uploaded(slug, version["version_number"])
+    obj.render.ops.success(
+        f"uploaded version {version['version_number']} for {slug}"
+    )
 
 
 @repo_app.command("log")
@@ -99,7 +97,10 @@ def repo_log(ctx: typer.Context, slug: str) -> None:
         obj.render.ops.error(f"Resource not found: {slug!r}")
         raise typer.Exit(2)
     versions = svc.list_versions(resource["id"])["items"]
-    obj.render.ops.versions_table(versions)
+    if not versions:
+        obj.render.ops.dim("No versions.")
+        return
+    obj.render.ops.version_table(versions)
 
 
 @repo_app.command("publish")
@@ -124,7 +125,9 @@ def repo_publish(
     except (ResourceNotFound, InvalidResource) as exc:
         obj.render.ops.error(f"Publish failed: {exc}")
         raise typer.Exit(2)
-    obj.render.ops.resource_published(slug, version["version_number"])
+    obj.render.ops.success(
+        f"published version {version['version_number']} for {slug}"
+    )
 
 
 @repo_app.command("rollback")
@@ -151,7 +154,9 @@ def repo_rollback(
     except (ResourceNotFound, InvalidResource) as exc:
         obj.render.ops.error(f"Rollback failed: {exc}")
         raise typer.Exit(2)
-    obj.render.ops.resource_rolled_back(version_number, version["version_number"], slug)
+    obj.render.ops.success(
+        f"rolled back to v{version_number} --- new v{version['version_number']} for {slug}"
+    )
 
 
 @repo_app.command("preview-modes")
@@ -168,7 +173,13 @@ def repo_preview_modes(
         obj.render.ops.error(f"resource {resource_id!r} not found")
         raise typer.Exit(1)
     modes = result.get("modes", [])
-    obj.render.ops.preview_modes_list(resource_id, modes)
+    if not modes:
+        obj.render.ops.dim(f"No preview modes for resource {resource_id!r}")
+        return
+    for m in modes:
+        obj.render.ops.dim(
+            f"{m.get('mode', '?')}: {m.get('text', m.get('description', ''))[:80]}"
+        )
 
 
 @repo_app.command("migrate-composition")
@@ -188,7 +199,11 @@ def repo_migrate_composition(
     report = migrate_composition_to_bindings(
         store, only_agent_id=agent, project_root=settings.project_root
     )
-    summary = report.summary()
-    obj.render.ops.migration_composition_report(summary, report.agents_migrated, report.failed)
+    obj.render.ops.migration_composition_table(report.summary())
+    if report.agents_migrated:
+        obj.render.ops.success(f"migrated: {', '.join(report.agents_migrated)}")
     if report.failed:
+        obj.render.ops.error("failed:")
+        for agent_id, err in report.failed:
+            obj.render.ops.error(f"  {agent_id}: {err}")
         raise typer.Exit(1)

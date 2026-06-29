@@ -22,7 +22,7 @@ def cfg_show(ctx: typer.Context) -> None:
     obj: CliCtx = ctx.obj
     settings = obj.settings
 
-    s_table = obj.render.ops._grid()
+    s_table = obj.render.ops.grid()
     for field in (
         "manifest_path",
         "data_dir",
@@ -45,7 +45,7 @@ def cfg_show(ctx: typer.Context) -> None:
 
     obj.render.ops.panel(s_table, title="Settings", border="cyan")
 
-    env_table = obj.render.ops._env_grid()
+    env_table = obj.render.ops.grid()
     for key in sorted(os.environ):
         if key.startswith("AGENTBOX_"):
             env_table.add_row(key, os.environ[key])
@@ -56,4 +56,9 @@ def cfg_show(ctx: typer.Context) -> None:
 def cfg_paths(ctx: typer.Context) -> None:
     """Show all important paths as a tree."""
     obj: CliCtx = ctx.obj
-    obj.render.ops.cfg_tree(obj.settings, ws_mod, list_all_agents, obj.store)
+    obj.render.ops.cfg_tree(
+        obj.settings,
+        ws_mod.resolve_path,
+        list_all_agents,
+        obj.store,
+    )

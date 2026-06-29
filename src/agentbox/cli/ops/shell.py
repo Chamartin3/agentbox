@@ -18,15 +18,13 @@ from pathlib import Path
 
 import typer
 
-from rich.console import Console as _RichConsole
-
 from agentbox.cli.shared import CliCtx
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.core.db import Database
-from agentbox.core.service.workspaces import launch_runner_configs
-from agentbox.core.service import SessionStore
-from agentbox.core.workspaces.prep import render_env_doc
-from agentbox.core.service import get_agent_def, get_workspace
+from agentbox.core.db import Database  # TODO(cli-arch): db via ctx
+from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
+from agentbox.core.service import SessionStore  # TODO(cli-arch): store via ctx
+from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
+from agentbox.core.service import get_agent_def, get_workspace  # TODO(cli-arch): AgentService (plan 094)
 
 
 def shell_cmd(
@@ -73,7 +71,7 @@ def shell_cmd(
     )
     launch_cm.__enter__()
 
-    env_doc_rendered = _render_env_doc(settings, workspace, agent_def, workspace_path)
+    env_doc_rendered = _render_env_doc(obj, settings, workspace, agent_def, workspace_path)
 
     obj.render.ops.shell_banner(agent, workspace_path, is_ephemeral, creds, env_doc_rendered)
 
@@ -92,6 +90,7 @@ def shell_cmd(
 
 
 def _render_env_doc(
+    obj: CliCtx,
     settings,
     workspace_override: str | None,
     agent_def,
@@ -110,5 +109,5 @@ def _render_env_doc(
         entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)
         return bool(entries)
     except Exception as exc:
-        _RichConsole().print(f"[yellow]env-doc render skipped:[/yellow] {exc}")
+        obj.render.ops.warn(f"env-doc render skipped: {exc}")
         return False

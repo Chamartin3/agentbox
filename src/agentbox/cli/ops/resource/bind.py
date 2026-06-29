@@ -23,10 +23,14 @@ prompt_bindings_app = typer.Typer(
 @prompt_bindings_app.command("list")
 def pb_list(ctx: typer.Context, agent_id: str) -> None:
     """List all prompt bindings for an agent."""
+    obj: CliCtx = ctx.obj
     svc = get_resource_service()
     rows = svc.list_prompt_bindings_raw(agent_id)
-    obj: CliCtx = ctx.obj
-    obj.render.ops.bindings_table(rows, agent_id)
+    if not rows:
+        obj.render.ops.warn(f"No prompt bindings for agent {agent_id!r}.")
+        return
+
+    obj.render.ops.bindings_table(agent_id, rows)
 
 
 @prompt_bindings_app.command("set")
@@ -71,7 +75,9 @@ def pb_set(
     kept.append(new_binding)
 
     svc.replace_prompt_bindings_raw(agent_id, kept, reason=reason)
-    obj.render.ops.binding_set_success(agent_id, marker, resource_slug, mode)
+    obj.render.ops.success(
+        f"binding set: agent={agent_id} marker={marker} → {resource_slug} (mode={mode})"
+    )
 
 
 @prompt_bindings_app.command("preview")
@@ -92,12 +98,18 @@ def pb_preview(ctx: typer.Context, agent_id: str) -> None:
     resolved_bindings = resolve_agent_prompt_bindings(store, agent_id)
     resolution = resolve_prompt(prompt_content, resolved_bindings)
 
-    obj.render.ops.resolved_prompt(
-        resolution.rendered_prompt,
-        agent_id,
-        warnings=resolution.warnings if resolution.warnings else None,
-        unresolved=list(resolution.unresolved_markers) if resolution.unresolved_markers else None,
-    )
-
+    # Decompose resolution object for the renderer
+    snapshot_rows: list[tuple[str, str, str, str]] | None = None
     if resolution.snapshot:
-        obj.render.ops.binding_snapshot_table(list(resolution.snapshot))
+        snapshot_rows = [
+            (rb.marker, rb.resource_id, rb.mode, rb.version_id)
+            for rb in resolution.snapshot
+        ]
+
+    obj.render.ops.prompt_preview(
+        agent_id,
+        resolution.rendered_prompt,
+        list(resolution.warnings),
+        list(resolution.unresolved_markers),
+        snapshot_rows,
+    )

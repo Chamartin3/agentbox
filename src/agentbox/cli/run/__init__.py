@@ -42,13 +42,21 @@ _BACKEND_NAME_TO_RUNNER: dict[str, str] = {
 }
 
 
-async def _stream(api: str, run_id: str, run_renderer) -> None:
+async def _stream(renderers, api: str, run_id: str) -> None:
     ws_url = api.replace("http", "ws") + f"/api/runs/{run_id}/stream"
     async with websockets.connect(ws_url) as ws:
         async for msg in ws:
             ev = json.loads(msg)
             t = ev.get("type", "?")
-            run_renderer.event_line(t, ev)
+            renderers.run.event_line(t, ev)
+
+
+def _resolve_obj(ctx: typer.Context) -> CliCtx:
+    """Resolve CliCtx from typer context, falling back to build_ctx()."""
+    if isinstance(ctx.obj, CliCtx):
+        return ctx.obj
+    from agentbox.cli.shared.context import build_ctx  # noqa: PLC0415
+    return build_ctx()
 
 
 def run_cmd(
@@ -109,22 +117,30 @@ def run_cmd(
     Headless:
         agentbox run my-agent -p "Summarise the codebase"
     """
-    obj: CliCtx = ctx.obj
-    render = obj.render
+    obj = _resolve_obj(ctx)
+    renders = obj.render
 
     is_headless = bool(prompt) or headless
 
     # --- Validation -------------------------------------------------------
     if backend and is_headless:
-        render.error("--backend is for interactive sessions only. Headless runs require an AGENT id, not a --backend.")
+        renders.ops.error(
+            "--backend is for interactive sessions only. "
+            "Headless runs require an AGENT id, not a --backend."
+        )
         raise typer.Exit(2)
 
     if is_headless and not agent:
-        render.error("Headless mode requires an AGENT id. Pass an agent id as the first argument.")
+        renders.ops.error(
+            "Headless mode requires an AGENT id. "
+            "Pass an agent id as the first argument."
+        )
         raise typer.Exit(2)
 
     if is_headless and not prompt:
-        render.error("--headless requires a prompt. Pass -p/--prompt TEXT.")
+        renders.ops.error(
+            "--headless requires a prompt. Pass -p/--prompt TEXT."
+        )
         raise typer.Exit(2)
 
     # --- Headless path ----------------------------------------------------
@@ -137,12 +153,13 @@ def run_cmd(
         resp = httpx.post(f"{api}/api/runs", json=body, timeout=30)
         resp.raise_for_status()
         run_id = resp.json()["run_id"]
-        render.dim(f"run_id={run_id}")
-        render.panel(
+        renders.ops.dim(f"run_id={run_id}")
+        renders.ops.panel(
             f"View: [link={api}/runs/{run_id}]{api}/runs/{run_id}[/link]",
+            title="run",
             border="cyan",
         )
-        asyncio.run(_stream(api, run_id, render.run))
+        asyncio.run(_stream(renders, api, run_id))
         return
 
     # --- Interactive path -------------------------------------------------
@@ -153,12 +170,12 @@ def run_cmd(
     elif agent:
         agent_def = obj.store.get_agent_def(agent)
         if agent_def is None:
-            render.error(f"Unknown agent: {agent!r}")
+            renders.ops.error(f"Unknown agent: {agent!r}")
             raise typer.Exit(1)
         raw_kind = agent_def.runner.kind
         runner = _BACKEND_NAME_TO_RUNNER.get(raw_kind, raw_kind)
     else:
-        render.error(
+        renders.ops.error(
             "No agent or --backend specified. "
             "Pass an AGENT id or --backend {claude|opencode|codex|pi}."
         )

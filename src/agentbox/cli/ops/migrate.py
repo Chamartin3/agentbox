@@ -5,11 +5,10 @@ import tomllib
 from pathlib import Path
 
 import typer
-from rich.table import Table
-from rich.text import Text
 
 from agentbox.cli.shared import CliCtx
 from agentbox.core.constants import BackendName
+from agentbox.core.service.system.service import SystemService  # TODO(cli-arch): SystemService → facade (plan 095)
 # TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
 from agentbox.core.db.system.seeds import backfill as _backfill_prompt_versions
 # TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
@@ -45,26 +44,8 @@ def migrate_ws_perms(ctx: typer.Context) -> None:
         obj.render.ops.warn("No workspaces found or no migration needed.")
         return
 
-    table = Table(
-        title="Workspace Permissions Migration",
-        title_style="bold",
-        header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("Workspace", style="bold")
-    table.add_column("Migrated", justify="center")
-    table.add_column("Backup", justify="center")
+    obj.render.ops.migration_table("Workspace Permissions Migration", results)
 
-    for ws_name, result in results.items():
-        migrated = (
-            Text("✓", style="green") if result["migrated"] else Text("·", style="dim")
-        )
-        backed_up = (
-            Text("✓", style="green") if result["backed_up"] else Text("·", style="dim")
-        )
-        table.add_row(ws_name, migrated, backed_up)
-
-    obj.render.ops.print(table)
     migrated_count = sum(1 for r in results.values() if r["migrated"])
     obj.render.ops.success(f"migrated [bold]{migrated_count}[/bold] workspace(s)")
 
@@ -144,9 +125,7 @@ def import_manifest(
         manifest_path = candidate_new if candidate_new.exists() else candidate_old
 
     if not manifest_path.exists():
-        obj.render.ops.warn(
-            f"no manifest at {manifest_path}; nothing to import"
-        )
+        obj.render.ops.warn(f"no manifest at {manifest_path}; nothing to import")
         return
 
     with manifest_path.open("rb") as f:
@@ -155,36 +134,37 @@ def import_manifest(
 
     svc = obj.system
 
-    existing_servers = svc.get_settings_section(obj.system.PROJ_MCP_SERVERS)
-    existing_assets = svc.get_settings_section(obj.system.PROJ_SHARED_ASSETS)
-    existing_runtime = svc.get_settings_section(obj.system.PROJ_RUNTIME)
+    existing_servers = svc.get_settings_section(SystemService.PROJ_MCP_SERVERS)
+    existing_assets = svc.get_settings_section(SystemService.PROJ_SHARED_ASSETS)
+    existing_runtime = svc.get_settings_section(SystemService.PROJ_RUNTIME)
 
-    table = Table(
-        title=f"Importing {manifest_path}",
-        title_style="bold",
-        header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("Section")
-    table.add_column("Key", style="bold")
-    table.add_column("Action", justify="center")
-
-    def _row(section: str, key: str, action: str, style: str) -> None:
-        table.add_row(section, key, Text(action, style=style))
+    table = obj.render.ops.migration_import_table(str(manifest_path))
 
     for spec in manifest.mcp_servers or []:
         if not force and spec.name in existing_servers:
-            _row(obj.system.PROJ_MCP_SERVERS, spec.name, "skip", "dim")
+            table.add_row(
+                SystemService.PROJ_MCP_SERVERS, spec.name,
+                obj.render.ops.action_text("skip", "dim"),
+            )
             continue
         svc.set_project_mcp_server(spec, author="migrate:import-manifest")
-        _row(obj.system.PROJ_MCP_SERVERS, spec.name, "write", "green")
+        table.add_row(
+            SystemService.PROJ_MCP_SERVERS, spec.name,
+            obj.render.ops.action_text("write", "green"),
+        )
 
     for name, path in (manifest.shared_assets or {}).items():
         if not force and name in existing_assets:
-            _row(obj.system.PROJ_SHARED_ASSETS, name, "skip", "dim")
+            table.add_row(
+                SystemService.PROJ_SHARED_ASSETS, name,
+                obj.render.ops.action_text("skip", "dim"),
+            )
             continue
         svc.set_project_shared_asset(name, path, author="migrate:import-manifest")
-        _row(obj.system.PROJ_SHARED_ASSETS, name, "write", "green")
+        table.add_row(
+            SystemService.PROJ_SHARED_ASSETS, name,
+            obj.render.ops.action_text("write", "green"),
+        )
 
     runtime_writes: list[tuple[str, object]] = []
     if manifest.backend_preference:
@@ -196,13 +176,19 @@ def import_manifest(
 
     for key, value in runtime_writes:
         if not force and key in existing_runtime:
-            _row(obj.system.PROJ_RUNTIME, key, "skip", "dim")
+            table.add_row(
+                SystemService.PROJ_RUNTIME, key,
+                obj.render.ops.action_text("skip", "dim"),
+            )
             continue
-        svc.set_setting(obj.system.PROJ_RUNTIME, key, value, author="migrate:import-manifest")
-        _row(obj.system.PROJ_RUNTIME, key, "write", "green")
+        svc.set_setting(SystemService.PROJ_RUNTIME, key, value, author="migrate:import-manifest")
+        table.add_row(
+            SystemService.PROJ_RUNTIME, key,
+            obj.render.ops.action_text("write", "green"),
+        )
 
     obj.render.ops.print(table)
-    obj.render.ops.print("done. manifest file may now be removed.")
+    obj.render.ops.dim("done. manifest file may now be removed.")
 
 
 @migrate_app.command("prompt-versions")

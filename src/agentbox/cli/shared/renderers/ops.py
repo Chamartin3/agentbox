@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tempfile as _tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from rich.panel import Panel
@@ -14,8 +14,15 @@ from rich.tree import Tree
 
 from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
+
 # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
+from agentbox.core.workspaces.generation.config import WorkenvConfig  # TODO(cli-arch)
+from agentbox.core.workspaces.generation.recipe import Recipe  # TODO(cli-arch)
 from agentbox.core.workspaces.generation.generator import render  # TODO(cli-arch)
+
+# TODO(cli-arch): Settings / agent types (plan 095 / 094)
+from agentbox.core.config import Settings  # TODO(cli-arch)
+from agentbox.core.db import SessionStore, AgentDef  # TODO(cli-arch)
 
 
 class OpsRenderer(Renderer):
@@ -25,20 +32,20 @@ class OpsRenderer(Renderer):
     # Structural helpers (used by multiple commands)
     # ------------------------------------------------------------------
 
-    def _grid(self) -> RichTable:
+    def grid(self) -> RichTable:
         """Return a two-column right-aligned grid for key-value layouts."""
         t = RichTable.grid(padding=(0, 2))
         t.add_column(style="dim", justify="right")
         t.add_column()
         return t
 
-    def panel(self, renderable: object, *, title: str | None = None, border: str = "cyan") -> None:
-        """Wrap a renderable in a Rich Panel."""
-        self.con.print(Panel(renderable, title=title, border_style=border))
-
-    def _action_text(self, action: str, style: str) -> Text:
+    def action_text(self, action: str, style: str) -> Text:
         """Return a styled Text for table action cells."""
         return Text(action, style=style)
+
+    def tree(self, tree: Tree) -> None:
+        """Print a Rich Tree (built by the command)."""
+        self.con.print(tree)
 
     # ------------------------------------------------------------------
     # cfg
@@ -46,13 +53,13 @@ class OpsRenderer(Renderer):
 
     def cfg_tree(
         self,
-        settings: object,
-        ws_mod: object,
-        list_all_agents: object,
-        store: object,
+        settings: Settings,
+        ws_resolve: Callable[[AgentDef, Settings, SessionStore], tuple[Path, bool]],
+        list_all_agents: Callable[..., Sequence[AgentDef]],
+        store: SessionStore,
     ) -> None:
         """Show all important paths as a Rich tree."""
-        tree = Tree(f"[bold]{settings.project_root}[/bold]")  # type: ignore[attr-defined]
+        tree = Tree(f"[bold]{settings.project_root}[/bold]")
 
         def _add(p: Path, parent: Tree, label: str | None = None) -> None:
             lbl = label or p.name
@@ -63,26 +70,26 @@ class OpsRenderer(Renderer):
             else:
                 parent.add(f"[dim]{lbl}[/dim] · missing")
 
-        _add(settings.manifest_path, tree, "manifest.toml")  # type: ignore[attr-defined]
-        if settings.agents_dir:  # type: ignore[attr-defined]
-            _add(settings.agents_dir, tree, "agents.d/")  # type: ignore[attr-defined]
-        if settings.prompts_dir:  # type: ignore[attr-defined]
-            _add(settings.prompts_dir, tree, "prompts.d/")  # type: ignore[attr-defined]
-        if settings.skills_dir:  # type: ignore[attr-defined]
-            _add(settings.skills_dir, tree, "skills.d/")  # type: ignore[attr-defined]
-        if settings.outputs_dir:  # type: ignore[attr-defined]
-            _add(settings.outputs_dir, tree, "outputs/")  # type: ignore[attr-defined]
+        _add(settings.manifest_path, tree, "manifest.toml")
+        if settings.agents_dir:
+            _add(settings.agents_dir, tree, "agents.d/")
+        if settings.prompts_dir:
+            _add(settings.prompts_dir, tree, "prompts.d/")
+        if settings.skills_dir:
+            _add(settings.skills_dir, tree, "skills.d/")
+        if settings.outputs_dir:
+            _add(settings.outputs_dir, tree, "outputs/")
 
         ws_branch = tree.add("[bold]workspaces/[/bold]")
         for a in list_all_agents(store=store):
-            path, _eph = ws_mod.resolve_path(a, settings, store)  # type: ignore[attr-defined]
+            path, _eph = ws_resolve(a, settings, store)
             _add(path, ws_branch, a.id + (" [yellow](ephemeral)[/yellow]" if _eph else ""))
 
         data = tree.add("[bold]/data[/bold]")
-        _add(settings.db_path, data, "agentbox.sqlite")  # type: ignore[attr-defined]
-        _add(settings.runs_dir, data, "runs/")  # type: ignore[attr-defined]
-        _add(settings.sessions_dir, data, "sessions/")  # type: ignore[attr-defined]
-        _add(settings.mcp_cache_dir, data, "mcp_cache/")  # type: ignore[attr-defined]
+        _add(settings.db_path, data, "agentbox.sqlite")
+        _add(settings.runs_dir, data, "runs/")
+        _add(settings.sessions_dir, data, "sessions/")
+        _add(settings.mcp_cache_dir, data, "mcp_cache/")
 
         self.con.print(tree)
 
@@ -119,7 +126,7 @@ class OpsRenderer(Renderer):
 
         self.con.print(table)
 
-    def _migration_table(self, title: str) -> RichTable:
+    def migration_import_table(self, title: str) -> RichTable:
         """Create a table structure for import-manifest results."""
         table = RichTable(
             title=title,
@@ -132,9 +139,8 @@ class OpsRenderer(Renderer):
         table.add_column("Action", justify="center")
         return table
 
-    def migration_composition_table(self, report: object) -> None:
+    def migration_composition_table(self, summary: Mapping[str, int]) -> None:
         """Render a composition migration summary table."""
-        summary = report.summary()  # type: ignore[attr-defined]
         table = RichTable(
             title="Composition Migration", header_style="bold cyan", padding=(0, 2)
         )
@@ -177,7 +183,7 @@ class OpsRenderer(Renderer):
         versions: Sequence[Mapping[str, JsonValue]],
     ) -> None:
         """Render resource metadata + version history."""
-        meta = self._grid()
+        meta = self.grid()
         meta.add_row("id", str(resource["id"]))
         meta.add_row("slug", str(resource["slug"]))
         meta.add_row("type", str(resource["type"]))
@@ -188,31 +194,10 @@ class OpsRenderer(Renderer):
         if not versions:
             self.dim("No versions.")
             return
-        vtable = RichTable(header_style="bold green", padding=(0, 1))
-        vtable.add_column("#", style="dim")
-        vtable.add_column("ID", style="dim")
-        vtable.add_column("Draft", justify="center")
-        vtable.add_column("Source")
-        vtable.add_column("Changelog")
-        vtable.add_column("Created at", style="dim")
-        for v in versions:
-            draft = (
-                "[yellow]draft[/yellow]"
-                if v.get("is_draft")
-                else "[green]published[/green]"
-            )
-            vtable.add_row(
-                str(v["version_number"]),
-                str(v["id"]),
-                draft,
-                str(v.get("import_source") or ""),
-                str(v.get("changelog") or ""),
-                str(v.get("created_at") or ""),
-            )
-        self.con.print(Panel(vtable, title="Versions", border_style="green"))
+        self.version_table(versions)
 
     def version_table(self, versions: Sequence[Mapping[str, JsonValue]]) -> None:
-        """Render a standalone version list table."""
+        """Render a version list table."""
         vtable = RichTable(header_style="bold green", padding=(0, 1))
         vtable.add_column("#", style="dim")
         vtable.add_column("ID", style="dim")
@@ -268,24 +253,36 @@ class OpsRenderer(Renderer):
             )
         self.con.print(table)
 
-    def prompt_preview(self, agent_id: str, resolution: object) -> None:
+    def prompt_preview(
+        self,
+        agent_id: str,
+        rendered_prompt: str,
+        warnings: Sequence[str],
+        unresolved_markers: Sequence[str],
+        snapshot_rows: Sequence[tuple[str, str, str, str]] | None,
+    ) -> None:
         """Render a resolved prompt preview with syntax highlighting and binding snapshot."""
         self.con.print(
             Panel(
-                Syntax(resolution.rendered_prompt, "markdown", theme="ansi_dark"),  # type: ignore[attr-defined]
+                Syntax(rendered_prompt, "markdown", theme="ansi_dark"),
                 title=f"Resolved prompt — {agent_id}",
                 border_style="cyan",
             )
         )
 
-        if resolution.snapshot:  # type: ignore[attr-defined]
+        for w in warnings:
+            self.warn(f"warning: {w}")
+        if unresolved_markers:
+            self.warn(f"unresolved markers: {', '.join(unresolved_markers)}")
+
+        if snapshot_rows:
             snap_table = RichTable(header_style="bold magenta", padding=(0, 1))
             snap_table.add_column("Marker")
             snap_table.add_column("Resource ID", style="dim")
             snap_table.add_column("Mode")
             snap_table.add_column("Version", style="dim")
-            for rb in resolution.snapshot:  # type: ignore[attr-defined]
-                snap_table.add_row(rb.marker, rb.resource_id, rb.mode, rb.version_id)
+            for marker, resource_id, mode, version_id in snapshot_rows:
+                snap_table.add_row(marker, resource_id, mode, version_id)
             self.con.print(Panel(snap_table, title="Binding snapshot", border_style="green"))
 
     # ------------------------------------------------------------------
@@ -326,7 +323,8 @@ class OpsRenderer(Renderer):
         creds: str | None,
     ) -> None:
         """Print the launch banner."""
-        mode = "ephemeral (tmp)" if is_ephemeral else f"workspace ({workspace_path})"
+        mode = ("ephemeral (tmp)" if is_ephemeral
+                else f"workspace ({workspace_path})")
         self.con.print("━" * 50)
         label = f"[cyan]{agent}[/cyan]" if agent else "[dim]<no agent>[/dim]"
         self.con.print(f"[bold]agentbox launch[/bold] ({runner}) — {label}")
@@ -340,11 +338,11 @@ class OpsRenderer(Renderer):
     # workenv
     # ------------------------------------------------------------------
 
-    def workenv_preview(self, config: object, recipe: object) -> None:
+    def workenv_preview(self, config: WorkenvConfig, recipe: Recipe) -> None:
         """Print rendered workenv output to stdout instead of writing to disk."""
         with _tempfile.TemporaryDirectory() as td:
             dir_path = Path(td)
-            result = render(dir_path, config, recipe)  # type: ignore[arg-type]
+            result = render(dir_path, config=config, recipe=recipe)
             for p in result.written_paths:
                 rel = p.relative_to(dir_path)
                 content = p.read_text(encoding="utf-8")
@@ -364,6 +362,6 @@ class OpsRenderer(Renderer):
     # run
     # ------------------------------------------------------------------
 
-    def _run_url_text(self, api: str, run_id: str) -> str:
+    def run_url_text(self, api: str, run_id: str) -> str:
         """Return a Rich-compatible URL text for a run view link."""
         return f"View: [link={api}/runs/{run_id}]{api}/runs/{run_id}[/link]"

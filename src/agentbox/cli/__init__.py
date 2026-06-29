@@ -15,7 +15,6 @@ from agentbox.cli.engine import app as engine_app
 from agentbox.cli.history import app as history_app
 from agentbox.cli.ops import app as ops_app
 from agentbox.cli.run import run_cmd
-from agentbox.cli.shared import group_callback
 from agentbox.cli.system import app as system_app
 from agentbox.cli.work import app as work_app
 
@@ -29,7 +28,6 @@ app = typer.Typer(
     rich_markup_mode="rich",
     no_args_is_help=True,
 )
-app.callback()(group_callback)
 
 app.add_typer(agent_app, name="agent")
 app.command("run")(run_cmd)
