@@ -188,6 +188,10 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "VersionFileUploadRow",
         "WorkspaceRow",
         "WorkspaceSource",
+        "_AgentMetaPatchFields",
+        "_AgentSyncPatchFields",
+        "_AgentToolGrantPatchFields",
+        "_AgentVersionFields",
     }
 )
 

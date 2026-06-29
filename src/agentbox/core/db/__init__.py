@@ -238,6 +238,10 @@ from agentbox.core.db.row_types import (
     VersionFileUploadRow,
     WorkspaceRow,
     WorkspaceSource,
+    _AgentMetaPatchFields,
+    _AgentSyncPatchFields,
+    _AgentToolGrantPatchFields,
+    _AgentVersionFields,
 )
 
 # Re-bind schema table names that collide with submodule names.
@@ -434,4 +438,8 @@ __all__ = [
     "VersionFileUploadRow",
     "WorkspaceRow",
     "WorkspaceSource",
+    "_AgentMetaPatchFields",
+    "_AgentSyncPatchFields",
+    "_AgentToolGrantPatchFields",
+    "_AgentVersionFields",
 ]

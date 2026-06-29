@@ -4,7 +4,7 @@ These are the row-level contracts for query results, not SQLAlchemy models.
 """
 
 from enum import StrEnum
-from typing import TypedDict, Unpack
+from typing import TypedDict
 
 
 class EnvDocRow(TypedDict):
