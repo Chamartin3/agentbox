@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 
 from agentbox.core.config import SETTINGS
 from agentbox.core.tools import discover_tools
+from agentbox.mcp.context import get_mcp_context
 from agentbox.mcp.tools import (
     agent_tools,
     agents,
@@ -18,6 +19,8 @@ from agentbox.mcp.tools import (
 
 
 def build_server() -> FastMCP:
+    ctx = get_mcp_context()
+
     # Populate the shared agent_tools registry so list_agent_tools sees
     # consumer-registered entry points.
     try:
@@ -33,13 +36,13 @@ def build_server() -> FastMCP:
             "`reason` (stored as the version's changelog)."
         ),
     )
-    runs.register(mcp)
-    prompts.register(mcp)
-    agents.register(mcp)
-    feedback.register(mcp)
-    time.register(mcp)
-    resources.register(mcp)
-    agent_tools.register(mcp)
+    runs.register(mcp, ctx)
+    prompts.register(mcp, ctx)
+    agents.register(mcp, ctx)
+    feedback.register(mcp, ctx)
+    time.register(mcp, ctx)
+    resources.register(mcp, ctx)
+    agent_tools.register(mcp, ctx)
     return mcp
 
 

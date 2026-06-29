@@ -20,10 +20,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from agentbox.api.deps import get_mcp_registry, get_store
-from agentbox.core.db import SessionStore
+from agentbox.api.deps import get_mcp_registry, get_workspace_service
+from agentbox.core.service.workspaces.service import WorkspaceService
 from agentbox.core.tools.catalog import CallableItem
-from agentbox.core.workspaces.catalog import resolve_workspace_callables
 from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 
 router = APIRouter(tags=["workspace-catalog"])
@@ -58,7 +57,7 @@ def _item_as_dict(item: CallableItem) -> dict:
 @router.get("/api/workspaces/{workspace_id}/available_tools")
 def list_available_tools(
     workspace_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     mcp_registry: Annotated[McpRegistry, Depends(get_mcp_registry)],
 ):
     """Return every tool, capability, and resource *installed* in this workspace.
@@ -66,5 +65,5 @@ def list_available_tools(
     The agent's authorization pick-list is drawn from this catalog.
     ``/api/agent_tools`` remains the global taxonomy reference.
     """
-    items = resolve_workspace_callables(workspace_id, store, mcp_registry)
+    items = svc.installed_callables(workspace_id, mcp_registry=mcp_registry)
     return {"items": [_item_as_dict(i) for i in items]}

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.core.constants import BackendName
 
 app = typer.Typer(
@@ -30,7 +30,7 @@ def backend_ls(
     ),
 ) -> None:
     """List every registered backend along with compatible providers."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     providers = obj.engines.list_providers()
     backends = sorted(obj.engines.backends().items())
     rows: list[tuple[str, str, str | None, str | None]] = []

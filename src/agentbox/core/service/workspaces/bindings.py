@@ -6,6 +6,7 @@ import contextlib
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.service.resources.service import BindingError, ResourceService
+from agentbox.core.service.workspaces.service import WorkspaceService
 
 if TYPE_CHECKING:
     from agentbox.core.db import SessionStore
@@ -24,7 +25,7 @@ __all__ = [
 
 
 def list_workspace_subagents(workspace_id: str, *, store: SessionStore) -> dict:
-    svc = ResourceService()
+    svc = WorkspaceService()
     items = svc.list_workspace_subagents_raw(workspace_id)
     enriched = []
     for s in items:
@@ -50,7 +51,7 @@ def replace_workspace_subagents(
     settings: Any = None,
     sync_cb: Any = None,
 ) -> dict:
-    svc = ResourceService()
+    svc = WorkspaceService()
     try:
         items = svc.replace_workspace_subagents(workspace_id, subagents, actor=actor)
     except ValueError as exc:

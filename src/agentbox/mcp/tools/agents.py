@@ -7,8 +7,7 @@ from typing import Any, cast
 
 from fastmcp import FastMCP
 
-from agentbox.core.service.engines.service import EngineService
-from agentbox.mcp.deps import get_agent_service, get_context
+from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
 
@@ -50,7 +49,7 @@ def _inject_profile_model(d: dict, store: Any) -> dict:
     if not agent_id:
         return d
     try:
-        profile = EngineService().get_agent_runner_profile(agent_id)
+        profile = ctx.engines().get_agent_runner_profile(agent_id)
     except Exception:
         profile = None
     if profile is not None:
@@ -76,7 +75,7 @@ def _paginate(items: list, limit: int, offset: int) -> dict:
     }
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def list_agents(
         tag: str | None = None,
@@ -92,8 +91,7 @@ def register(mcp: FastMCP) -> None:
         carries a ``disabled_at`` timestamp; invoking one would fail
         with ``agent_disabled``)."""
         limit = clamp_limit(limit)
-        ctx = get_context()
-        svc = get_agent_service()
+        svc = ctx.agents()
 
         def _attach_disabled(d: dict) -> dict:
             agent_id = d.get("id")
@@ -126,9 +124,8 @@ def register(mcp: FastMCP) -> None:
         """Substring search across agent id, description, and tags."""
         limit = clamp_limit(limit)
         q = query.lower().strip()
-        ctx = get_context()
         results = []
-        for a in get_agent_service().list_all_agents():
+        for a in ctx.agents().list_all_agents():
             d = _agent_dict(a)
             hay = " ".join(
                 [
@@ -150,8 +147,7 @@ def register(mcp: FastMCP) -> None:
         Reads from ``agent_versions`` / ``active_agent_versions`` (the
         DB-as-source-of-truth tables the UI uses). Falls back to
         ``latest_version`` when no active pointer is set."""
-        ctx = get_context()
-        svc = get_agent_service()
+        svc = ctx.agents()
         agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "not_found", "agent_id": agent_id}
@@ -176,7 +172,7 @@ def register(mcp: FastMCP) -> None:
     def list_agent_tags() -> dict:
         """Distinct tags across all known agents (DB + manifest)."""
         tags: set[str] = set()
-        for a in get_agent_service().list_all_agents():
+        for a in ctx.agents().list_all_agents():
             tags.update(_agent_dict(a).get("tags") or [])
         return {"items": sorted(tags), "total": len(tags)}
 
@@ -194,7 +190,7 @@ def register(mcp: FastMCP) -> None:
         pass to ``promote_version``.
         """
         limit = clamp_limit(limit)
-        svc = get_agent_service()
+        svc = ctx.agents()
         rows = svc.list_versions(agent_id)
         # ``include_drafts`` is retained for API compatibility but ignored —
         # the draft concept was removed from agent_versions.
@@ -241,7 +237,7 @@ def register(mcp: FastMCP) -> None:
                 "error": "reason_required",
                 "detail": "reason must be at least 3 characters",
             }
-        svc = get_agent_service()
+        svc = ctx.agents()
         agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}

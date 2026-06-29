@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from agentbox.api._pagination import PaginatedEnvelope, paginate_list
 from agentbox.api.deps import get_mcp_registry, get_settings, get_store
-from agentbox.core.db import WorkspaceRow
+from agentbox.core.data import WorkspaceRow
 from agentbox.core.service import workspaces as workspaces_service
 from agentbox.core.workspaces.build import build_workspace_by_name
 from agentbox.core.service.prompts import AgentNotFound

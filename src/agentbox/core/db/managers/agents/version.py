@@ -14,7 +14,7 @@ from agentbox.core.db.models.agents.version import (
     AgentVersionFile,
     AgentVersionRating,
 )
-from agentbox.core.db.row_types import (
+from agentbox.core.data.rows import (
     AgentVersionCommentRow,
     AgentVersionFileRow,
     AgentVersionRatingRow,

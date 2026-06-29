@@ -1,6 +1,7 @@
 """Row-conversion helpers for the Resources data layer.
 
-Public-domain helpers — shared between ``crud``, ``shared``, and ``bindings``.
+Public-domain helpers — shared between ``core.db.managers.resources``,
+``core.service.resources``, and ``core.resources``.
 """
 
 from __future__ import annotations
@@ -31,16 +32,6 @@ def compute_sha256(content: str | None, config_json: str | None) -> str:
 def hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
-
-def hash_blobs(blobs: Iterable[tuple[str, bytes]]) -> str:
-    """Deterministic hash over a (relative_path, content) sequence."""
-    h = hashlib.sha256()
-    for rel_path, content in sorted(blobs, key=lambda b: b[0]):
-        h.update(rel_path.encode("utf-8"))
-        h.update(b"\x00")
-        h.update(hashlib.sha256(content).digest())
-        h.update(b"\x00")
-    return h.hexdigest()
 
 
 def validate_changelog(changelog: str) -> str:

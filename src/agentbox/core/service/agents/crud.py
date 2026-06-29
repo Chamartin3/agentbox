@@ -13,7 +13,8 @@ from sqlalchemy import func, select
 from agentbox.core import workspaces as ws
 from agentbox.core.agents.composition.bundle import compose_from_source
 from agentbox.core.agents.composition.bundle.loader import load_bundle_from_bindings
-from agentbox.core.db import AgentDef, agent_runner_profiles
+from agentbox.core.data import AgentDef
+from agentbox.core.db import agent_runner_profiles
 from agentbox.core.db import runs as runs_table
 from agentbox.core.service.engines.service import EngineService
 

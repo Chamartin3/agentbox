@@ -6,8 +6,8 @@ import warnings
 
 from pydantic import BaseModel, Field, model_validator
 
-from agentbox.core.db.agents.manifest import AgentDef
-from agentbox.core.db.workspaces.manifest import McpServerSpec, McpTransport, WorkspaceDef
+from agentbox.core.data.manifests.agents import AgentDef
+from agentbox.core.data.manifests.workspaces import McpServerSpec, McpTransport, WorkspaceDef
 
 
 class ProjectManifest(BaseModel):

@@ -6,7 +6,7 @@ import json
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 mcp_app = typer.Typer(
     name="mcp",
@@ -18,7 +18,7 @@ mcp_app = typer.Typer(
 @mcp_app.command("ls")
 def mcp_ls(ctx: typer.Context) -> None:
     """List MCP servers declared in the manifest with cached health."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     servers = obj.system.get_project_mcp_servers()
 
     if not servers:

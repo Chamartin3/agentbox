@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.core.config import SETTINGS
 from agentbox.core.constants import LogLevel, MessageRole, RunStatus
-from agentbox.core.db import (
+from agentbox.core.events import (
     DoneEvent,
     LogEvent,
     RunEvent,

@@ -7,10 +7,11 @@ PATCH /api/settings/{section}    — partial patch; only listed keys change.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from agentbox.core.service.system.service import SystemService
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -46,24 +47,25 @@ class PatchBody(BaseModel):
     values: dict
 
 
-def _svc() -> SystemService:
-    return SystemService()
-
-
 @router.get("")
-def list_sections() -> dict:
+def list_sections(
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
     return {
         "known": list(KNOWN_SECTIONS),
-        "present": _svc().list_settings_sections(),
+        "present": ctx.system.list_settings_sections(),
     }
 
 
 @router.get("/{section}")
-def get_section(section: str) -> dict:
+def get_section(
+    section: str,
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
     """Return the section. Missing keys are filled from `SECTION_DEFAULTS`
     so the UI shows the active fallback values, not an empty object.
     """
-    stored = _svc().get_settings_section(section)
+    stored = ctx.system.get_settings_section(section)
     seeded = dict(SECTION_DEFAULTS.get(section, {}))
     seeded.update(stored)
     return {
@@ -75,6 +77,10 @@ def get_section(section: str) -> dict:
 
 
 @router.patch("/{section}")
-def patch_section(section: str, body: PatchBody) -> dict:
-    updated = _svc().update_settings_section(section, body.values)
+def patch_section(
+    section: str,
+    body: PatchBody,
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
+    updated = ctx.system.update_settings_section(section, body.values)
     return {"section": section, "values": updated}

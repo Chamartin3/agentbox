@@ -10,8 +10,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli.shared.render import Renderer
-from agentbox.core.db import EnvDocRow
-from agentbox.core.db.workspaces.manifest import McpServerSpec
+from agentbox.core.service import EnvDocRow, McpServerSpec
 
 
 class SystemRenderer(Renderer):

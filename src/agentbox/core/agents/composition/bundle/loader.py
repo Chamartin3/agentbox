@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.db import CompositionConfig
+from agentbox.core.data import CompositionConfig
 from agentbox.core.agents.composition.bundle import (
     ComposeResult,
     compose_from_source,

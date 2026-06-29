@@ -5,29 +5,13 @@ from __future__ import annotations
 import json as _json
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
-
 if TYPE_CHECKING:
-    from agentbox.core.db.engines.profiles import RunnerProfile
-
-
-class RunnerProfileStats(BaseModel):
-    """Statistics for a runner profile."""
-
-    profile_id: str
-    runs: int
-    succeeded: int
-    failed: int
-    input_tokens: int
-    output_tokens: int
-    cost_usd: float | None = None
-    avg_duration_ms: float | None = None
-    last_run_at: str | None = None
+    from agentbox.core.data.profiles import RunnerProfile
 
 
 def _row_to_profile(row) -> RunnerProfile:
     """Convert a database row to a RunnerProfile model."""
-    from agentbox.core.db.engines.profiles import RunnerProfile  # noqa: PLC0415
+    from agentbox.core.data.profiles import RunnerProfile  # noqa: PLC0415
 
     m = row._mapping
     return RunnerProfile(

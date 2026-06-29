@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.constants import ResourceType
-from agentbox.core.db.resources._rows import hash_blobs
+from agentbox.core.data import hash_blobs
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.skill import SkillImporter
 

@@ -14,9 +14,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_store
+from agentbox.api.deps import get_workspace_service
 from agentbox.core.constants import McpPolicy
-from agentbox.core.service import SessionStore
+from agentbox.core.service import WorkspaceService
 from agentbox.core.service import workspaces as ws_service
 
 router = APIRouter(tags=["workspace-mcp-provisioning"])
@@ -39,34 +39,32 @@ class PolicyBody(BaseModel):
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp")
-def get_effective_mcp(
-    workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
-):
-    return ws_service.resolve_workspace_mcp(workspace_id, store=store)
+def get_effective_mcp(workspace_id: str):
+    return ws_service.resolve_workspace_mcp(workspace_id)
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp/servers")
-def get_effective_servers(
-    workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
-):
+def get_effective_servers(workspace_id: str):
     """Effective per-workspace MCP servers — union of manifest + overrides."""
-    return ws_service.resolve_workspace_mcp(workspace_id, store=store)
+    return ws_service.resolve_workspace_mcp(workspace_id)
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp/policy")
-def get_policy(workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]):
-    return {"policy": store.get_workspace_mcp_policy(workspace_id)}
+def get_policy(
+    workspace_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
+):
+    return {"policy": ws.get_mcp_policy(workspace_id)}
 
 
 @router.put("/api/workspaces/{workspace_id}/mcp/policy")
 def set_policy(
     workspace_id: str,
     body: PolicyBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
     try:
         return {
-            "policy": store.set_workspace_mcp_policy(workspace_id, body.default_policy)
+            "policy": ws.set_mcp_policy(workspace_id, body.default_policy)
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -77,10 +75,10 @@ def set_server_override(
     workspace_id: str,
     server_name: str,
     body: ServerOverrideBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
     try:
-        return store.set_workspace_mcp_server_override(
+        return ws.set_mcp_server_override(
             workspace_id,
             server_name,
             enabled=body.enabled,
@@ -100,9 +98,9 @@ def set_tool_override(
     server_name: str,
     tool_name: str,
     body: ToolOverrideBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
-    return store.set_workspace_mcp_tool_override(
+    return ws.set_mcp_tool_override(
         workspace_id,
         server_name,
         tool_name,
@@ -112,12 +110,9 @@ def set_tool_override(
 
 
 @router.post("/api/workspaces/{workspace_id}/mcp/refresh", status_code=200)
-def refresh_workspace_mcp_discovery(
-    workspace_id: str,
-    store: Annotated[SessionStore, Depends(get_store)],
-):
+def refresh_workspace_mcp_discovery(workspace_id: str):
     """Invalidate the MCP tool discovery cache for this workspace's servers.
 
     Returns count of cache entries removed.
     """
-    return ws_service.refresh_workspace_mcp_discovery(workspace_id, store=store)
+    return ws_service.refresh_workspace_mcp_discovery(workspace_id)

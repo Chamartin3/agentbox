@@ -10,12 +10,13 @@ import shutil
 from pathlib import Path
 
 from agentbox.core.config import Settings
-from agentbox.core.db import SessionStore, WorkspaceRow
+from agentbox.core.data import WorkspaceRow
+from agentbox.core.db import SessionStore
 from agentbox.core.resources.skills import discover_skills
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .errors import WorkspaceExists, WorkspaceNotFound
-from .files import is_user_file, resolve_workspace_path
+from .files import is_user_file
 
 __all__ = [
     "list_workspaces_enriched",
@@ -141,6 +142,6 @@ def list_all_workspaces(
     settings: Settings,
 ) -> list:
     """Return a WorkspaceInfo for every agent known to the DB."""
-    from agentbox.core.workspaces.crud import info as _workspace_info
-    from agentbox.core.service.agents import list_all_agents
+    from agentbox.core.workspaces.crud import info as _workspace_info  # noqa: PLC0415
+    from agentbox.core.service.agents import list_all_agents  # noqa: PLC0415
     return [_workspace_info(a, settings, store) for a in list_all_agents(store=store)]

@@ -9,10 +9,11 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_agent_service
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 from agentbox.core.service import CompositionConfig, RunnerSpec, WorkspaceDef
 from agentbox.core.service.agents import (
     AgentAlreadyExists,
@@ -63,9 +64,12 @@ class FileUploadResponse(BaseModel):
 
 
 @router.post("", status_code=201)
-def create_agent(req: AgentCreateRequest) -> AgentCreateResponse:
+def create_agent(
+    req: AgentCreateRequest,
+    ctx: APIContext = Depends(get_api_context),
+) -> AgentCreateResponse:
     try:
-        version_record = get_agent_service().create_agent_record(
+        version_record = ctx.agents.create_agent_record(
             agent_id=req.id,
             description=req.description,
             runner=req.runner,
@@ -92,10 +96,13 @@ def create_agent(req: AgentCreateRequest) -> AgentCreateResponse:
 
 @router.post("/{agent_id}/versions/{version}/files", status_code=201)
 def upload_file(
-    agent_id: str, version: int, req: FileUploadRequest
+    agent_id: str,
+    version: int,
+    req: FileUploadRequest,
+    ctx: APIContext = Depends(get_api_context),
 ) -> FileUploadResponse:
     try:
-        result = get_agent_service().upload_version_file(
+        result = ctx.agents.upload_version_file(
             agent_id=agent_id,
             version=version,
             kind=req.kind,
@@ -120,9 +127,14 @@ def upload_file(
 
 
 @router.delete("/{agent_id}/versions/{version}/files/{file_id}", status_code=204)
-def delete_file(agent_id: str, version: int, file_id: int) -> None:
+def delete_file(
+    agent_id: str,
+    version: int,
+    file_id: int,
+    ctx: APIContext = Depends(get_api_context),
+) -> None:
     try:
-        get_agent_service().remove_version_file(
+        ctx.agents.remove_version_file(
             agent_id=agent_id,
             version=version,
             file_id=file_id,

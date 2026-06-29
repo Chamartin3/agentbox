@@ -6,7 +6,7 @@ import secrets
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 tokens_app = typer.Typer(
     name="tokens",
@@ -23,7 +23,7 @@ def tokens_ls(
     ),
 ) -> None:
     """List API tokens."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     items = obj.system.list_api_tokens(environment=environment)
     obj.render.system.tokens_table(items)
 
@@ -37,7 +37,7 @@ def tokens_create(
     ),
 ) -> None:
     """Create a new API token. Prints the secret once; store it securely."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     secret = secrets.token_urlsafe(32)
     result = obj.system.create_api_token(
         name=name, environment=environment, secret=secret
@@ -51,7 +51,7 @@ def tokens_rotate(
     token_id: str = typer.Argument(..., help="Token ID"),
 ) -> None:
     """Rotate a token's secret. Prints the new secret once."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     secret = secrets.token_urlsafe(32)
     result = obj.system.rotate_api_token(token_id, secret=secret)
     if result is None:
@@ -67,7 +67,7 @@ def tokens_rm(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
     """Delete an API token. This action is irreversible."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if not yes:
         confirm = typer.confirm(f"Delete token {token_id!r}? This is irreversible.")
         if not confirm:

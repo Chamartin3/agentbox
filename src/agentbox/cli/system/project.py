@@ -6,7 +6,7 @@ import json
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 # TODO(cli-arch): move to facade export (plan 095 Phase A)
 from agentbox.core.service import McpServerSpec
@@ -33,7 +33,7 @@ def project_mcp_servers(
 
     --set expects JSON: '{"url": "http://...", "transport": "http"}'
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if rm is not None:
         obj.system.delete_project_mcp_server(rm)

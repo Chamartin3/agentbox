@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentbox.core.db import AgentDef
+from agentbox.core.data import AgentDef
 
 if TYPE_CHECKING:
     from agentbox.core.db import SessionStore

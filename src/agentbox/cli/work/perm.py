@@ -6,7 +6,7 @@ import json
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
 # TODO(cli-arch): move to facade export
@@ -25,7 +25,7 @@ def permissions_get(
     name: str = typer.Argument(..., help="Workspace name"),
 ) -> None:
     """Show current permissions for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         result = workspaces_service.get_permissions(
             name, store=obj.store, settings=obj.settings,
@@ -50,7 +50,7 @@ def permissions_put(
     Example:
         workspaces permissions put my-ws '{"allow": ["read"], "deny": []}'
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         permissions = json.loads(permissions_json)
     except json.JSONDecodeError as exc:

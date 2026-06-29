@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from agentbox.api.deps import get_agent_service
-from agentbox.core.db import (
+from agentbox.core.service import (
     AgentVersionCommentRow,
     AgentVersionRatingRow,
     AgentVersionRow,

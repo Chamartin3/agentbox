@@ -16,6 +16,7 @@ from __future__ import annotations
 import io
 import json
 import zipfile
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -23,6 +24,7 @@ from jsonschema import Draft202012Validator
 
 from agentbox.core.agents.composition.preview import render_agent_prompt_preview
 from agentbox.core.agents.composition.rendering import render_for_type
+from agentbox.core.config import load_settings
 from agentbox.core.constants import ResourceType
 from agentbox.core.db import SessionStore
 from agentbox.core.db.resources.shared._models import SharedResourceRecord
@@ -66,9 +68,6 @@ class AgentVersionMissing(LookupError):
 class ResourceService(Service):
     """Resource domain: shared resources, repo resources, version lifecycle,
     blob storage, import dispatch, materialization, and bindings.
-
-    ponytail: cross-domain reach — uses self._db.workspace_subagents for subagent
-    operations until WorkspaceService (plan 089) is ready to own that surface.
     """
 
     def __init__(self) -> None:
@@ -80,8 +79,15 @@ class ResourceService(Service):
         self._shared_resources = self._db.shared_resources
         self._prompt_bindings = self._db.agent_prompt_resource_bindings
         self._file_bindings = self._db.workspace_file_resource_bindings
-        # ponytail: cross-domain manager reach (see class docstring)
-        self._subagents = self._db.workspace_subagents
+
+    @lru_cache(maxsize=1)
+    def _session_store(self) -> SessionStore:
+        """Temporary bridge for methods that still need SessionStore.
+
+        Used only by ``preview_prompt`` (via ``render_agent_prompt_preview``)
+        until that helper is migrated to managers (Phase C). Delete when done.
+        """
+        return SessionStore(load_settings().db_path)
 
     # -----------------------------------------------------------------------
     # Internal helpers
@@ -548,6 +554,22 @@ class ResourceService(Service):
     # Prompt (agent) resource bindings
     # -----------------------------------------------------------------------
 
+    def list_prompt_bindings(self, agent_id: str) -> list[dict]:
+        return self._prompt_bindings.list_for_agent(agent_id)
+
+    def replace_prompt_bindings(
+        self, agent_id: str, bindings: list[dict], *, reason: str, actor: str | None = None
+    ) -> list[dict]:
+        return self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)
+
+    def list_workspace_file_bindings(self, workspace_id: str) -> list[dict]:
+        return self._file_bindings.list_for_workspace(workspace_id)
+
+    def replace_workspace_file_bindings(
+        self, workspace_id: str, bindings: list[dict], *, reason: str, actor: str | None = None
+    ) -> list[dict]:
+        return self._file_bindings.replace_for_workspace(workspace_id, bindings, reason=reason, actor=actor)
+
     def list_prompt_resources(self, agent_id: str) -> dict:
         """Return enriched prompt bindings for an agent."""
         bindings = self._prompt_bindings.list_for_agent(agent_id)
@@ -589,39 +611,28 @@ class ResourceService(Service):
         self,
         agent_id: str,
         *,
-        store: SessionStore,
         template: str | None = None,
         bindings_override: list[dict] | None = None,
     ) -> dict:
         """Render a preview of the agent prompt with resource bindings resolved.
 
-        ponytail: accepts store for the agent-domain operations (get_active_version,
-        latest_version). This coupling is removed when AgentService exposes these
-        methods and callers switch to passing an AgentService instead.
+        Uses ``AgentService`` for agent-version reads and ``_session_store()``
+        for the binding-resolution helper until ``render_agent_prompt_preview``
+        is migrated to managers (Phase C).
         """
         if template is None:
-            active = store.get_active_version(agent_id) or store.latest_version(agent_id)
+            from agentbox.core.service.agents.service import AgentService  # noqa: PLC0415
+            agent_svc = AgentService()
+            active = agent_svc.active_version(agent_id) or agent_svc.latest_version(agent_id)
             if active is None:
                 raise AgentVersionMissing(agent_id)
             template = active.get("prompt_content") or ""
         return render_agent_prompt_preview(
-            store, agent_id=agent_id, template=template, bindings_override=bindings_override
+            self._session_store(),
+            agent_id=agent_id,
+            template=template,
+            bindings_override=bindings_override,
         )
-
-    def list_prompt_bindings_raw(self, agent_id: str) -> list[dict]:
-        """Return raw (unenriched) prompt binding rows for an agent."""
-        return self._prompt_bindings.list_for_agent(agent_id)
-
-    def replace_prompt_bindings_raw(
-        self,
-        agent_id: str,
-        bindings: list[dict],
-        *,
-        reason: str,
-        actor: str | None = None,
-    ) -> list[dict]:
-        """Replace prompt bindings and return raw rows."""
-        return self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)
 
     # -----------------------------------------------------------------------
     # Workspace file resource bindings
@@ -710,23 +721,6 @@ class ResourceService(Service):
                 seen_paths[target_path] = b["id"]
         return {"entries": entries, "conflicts": conflicts}
 
-    def list_workspace_file_bindings_raw(self, workspace_id: str) -> list[dict]:
-        """Return raw (unenriched) workspace file binding rows."""
-        return self._file_bindings.list_for_workspace(workspace_id)
-
-    def replace_workspace_file_bindings_raw(
-        self,
-        workspace_id: str,
-        bindings: list[dict],
-        *,
-        reason: str,
-        actor: str | None = None,
-    ) -> list[dict]:
-        """Replace workspace file bindings and return raw rows."""
-        return self._file_bindings.replace_for_workspace(
-            workspace_id, bindings, reason=reason, actor=actor
-        )
-
     # -----------------------------------------------------------------------
     # Workspace skill bindings
     # -----------------------------------------------------------------------
@@ -759,24 +753,6 @@ class ResourceService(Service):
         except ValueError as exc:
             raise BindingError(str(exc)) from exc
         return {"items": items}
-
-    # -----------------------------------------------------------------------
-    # Workspace subagents (ponytail: will move to WorkspaceService plan 089)
-    # -----------------------------------------------------------------------
-
-    def list_workspace_subagents_raw(self, workspace_id: str) -> list[dict]:
-        """Return raw subagent rows for a workspace."""
-        return self._subagents.list_for_workspace(workspace_id)
-
-    def replace_workspace_subagents(
-        self,
-        workspace_id: str,
-        subagents: list[dict],
-        *,
-        actor: str | None = None,
-    ) -> list[dict]:
-        """Atomically replace workspace subagents and return rows."""
-        return self._subagents.replace_for_workspace(workspace_id, subagents, actor=actor)
 
     # -----------------------------------------------------------------------
     # Shared resources (legacy cross-consumer API; will outlive the repo API)

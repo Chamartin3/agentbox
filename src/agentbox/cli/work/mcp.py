@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): workspace MCP surface belongs on WorkspaceService (plan 089)
 from agentbox.cli.shared import get_mcp_registry
 # TODO(cli-arch): WorkspaceService (plan 089)
@@ -31,7 +31,7 @@ def mcp_show(
     workspace_id: str,
 ) -> None:
     """Show MCP policy and server overrides for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     servers = SystemService().get_project_mcp_servers()
 
     policy = get_workspace_mcp_policy(obj.store, workspace_id)
@@ -54,7 +54,7 @@ def mcp_policy(
     ),
 ) -> None:
     """Set the default MCP policy for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         result = set_workspace_mcp_policy(obj.store, workspace_id, policy_name)
     except ValueError as exc:
@@ -76,7 +76,7 @@ def mcp_toggle(
     ),
 ) -> None:
     """Enable or disable a specific MCP server for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(reason.strip()) < 3:
         obj.render.workspace.error("--reason must be at least 3 characters")
         raise typer.Exit(1)
@@ -94,7 +94,7 @@ def mcp_refresh(
     workspace_id: str,
 ) -> None:
     """Invalidate the MCP server cache for all servers in this workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     overrides = list_workspace_mcp_server_overrides(obj.store, workspace_id)
     server_names = {o["server_name"] for o in overrides}
     for s in SystemService().get_project_mcp_servers():
@@ -123,6 +123,6 @@ def mcp_tools(
     workspace_id: str,
 ) -> None:
     """List MCP tools available to a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     result = get_workspace_mcp_tools(workspace_id, store=obj.store, settings=obj.settings)
     obj.render.workspace.mcp_tools_table(result, workspace_id)

@@ -10,7 +10,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from agentbox.api._pagination import PaginatedEnvelope, paginate_list
-from agentbox.api.deps import get_engine_service
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 from agentbox.core.service import (
     RunnerProfile,
     RunnerProfileCreate,
@@ -18,7 +19,7 @@ from agentbox.core.service import (
     RunnerProfileStats,
 )
 from agentbox.core.service.engines.profile_validation import InvalidProfile
-from agentbox.core.service.engines.service import EngineService, ProfileNotFound
+from agentbox.core.service.engines.service import ProfileNotFound
 
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
 
@@ -35,7 +36,7 @@ def list_runner_profiles(
     limit: int = 50,
     offset: int = 0,
     paginated: bool = False,
-    engine_svc: EngineService = Depends(get_engine_service),
+    ctx: APIContext = Depends(get_api_context),
 ) -> list[RunnerProfile] | PaginatedEnvelope:
     """List runner profiles with optional filters.
 
@@ -43,6 +44,7 @@ def list_runner_profiles(
     envelope ``{items, total, offset, limit, has_more}``. Otherwise returns
     a plain list for backward compatibility.
     """
+    engine_svc = ctx.engines
     profiles = engine_svc.list_profiles(
         backend=backend, provider=provider, enabled=enabled
     )
@@ -67,10 +69,10 @@ def list_runner_profiles(
 @router.post("", status_code=201)
 def create_runner_profile(
     data: RunnerProfileCreate,
-    engine_svc: EngineService = Depends(get_engine_service),
+    ctx: APIContext = Depends(get_api_context),
 ) -> RunnerProfile:
     try:
-        return engine_svc.create_profile(data)
+        return ctx.engines.create_profile(data)
     except InvalidProfile as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -78,10 +80,10 @@ def create_runner_profile(
 @router.get("/{profile_id}")
 def get_runner_profile(
     profile_id: str,
-    engine_svc: EngineService = Depends(get_engine_service),
+    ctx: APIContext = Depends(get_api_context),
 ) -> RunnerProfile:
     try:
-        return engine_svc.get_profile(profile_id)
+        return ctx.engines.get_profile(profile_id)
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -90,10 +92,10 @@ def get_runner_profile(
 def update_runner_profile(
     profile_id: str,
     patch: RunnerProfilePatch,
-    engine_svc: EngineService = Depends(get_engine_service),
+    ctx: APIContext = Depends(get_api_context),
 ) -> RunnerProfile:
     try:
-        return engine_svc.update_profile(profile_id, patch)
+        return ctx.engines.update_profile(profile_id, patch)
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
     except InvalidProfile as exc:
@@ -103,10 +105,10 @@ def update_runner_profile(
 @router.delete("/{profile_id}")
 def delete_runner_profile(
     profile_id: str,
-    engine_svc: EngineService = Depends(get_engine_service),
+    ctx: APIContext = Depends(get_api_context),
 ) -> None:
     try:
-        engine_svc.delete_profile(profile_id)
+        ctx.engines.delete_profile(profile_id)
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
 
@@ -116,10 +118,10 @@ def get_runner_profile_stats(
     profile_id: str,
     since: str | None = None,
     until: str | None = None,
-    engine_svc: EngineService = Depends(get_engine_service),
+    ctx: APIContext = Depends(get_api_context),
 ) -> RunnerProfileStats:
     try:
-        return engine_svc.get_profile_stats(
+        return ctx.engines.get_profile_stats(
             profile_id, since=since, until=until
         )
     except ProfileNotFound as exc:

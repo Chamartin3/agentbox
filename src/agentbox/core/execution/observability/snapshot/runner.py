@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agentbox.core.db import AgentDef, RunnerSnapshot, SnapshotStore, now_iso
+from agentbox.core.data import AgentDef, RunnerSnapshot, now_iso
+from agentbox.core.protocols import SnapshotStore
 from agentbox.core.db import get_database
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 

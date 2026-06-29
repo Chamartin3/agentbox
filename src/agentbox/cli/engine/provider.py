@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.core.service.engines.service import ProfileNotFound  # TODO(cli-arch): move to facade export
 
 app = typer.Typer(
@@ -20,7 +20,7 @@ app = typer.Typer(
 @app.command("ls")
 def provider_ls(ctx: typer.Context) -> None:
     """List available provider descriptors."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     descriptors = obj.engines.list_providers()
     obj.render.engine.providers_table(descriptors)
 
@@ -39,7 +39,7 @@ def provider_models(
     refresh: bool = typer.Option(False, help="Bypass cache and fetch fresh models"),
 ) -> None:
     """List available models for a provider."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if profile_id:
         try:
@@ -82,7 +82,7 @@ def provider_models(
 @app.command("refresh")
 def provider_refresh(ctx: typer.Context) -> None:
     """Re-discover dynamic providers (currently: opencode CLI)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     discovered = obj.engines.refresh_opencode_providers()
     if not discovered:
         obj.render.engine.provider_refresh_none()

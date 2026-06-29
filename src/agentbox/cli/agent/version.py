@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx, handle_cli_errors, resolve_agent
+from agentbox.cli.shared import CLIContext, handle_cli_errors, resolve_agent
 from agentbox.core.service.agents import AgentNotFound as ServiceAgentNotFound
 
 # TODO(cli-arch): remaining free-fns used in version_new direct-create path
@@ -28,7 +28,7 @@ def version_ls(
     agent_id: str = typer.Argument(..., help="Agent ID"),
 ) -> None:
     """List all versions for an agent."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         obj.agents.require_agent_exists(agent_id)
     except ServiceAgentNotFound:
@@ -68,7 +68,7 @@ def version_show(
     ),
 ) -> None:
     """Show a version's details, or diff two versions when a second arg is given."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         obj.agents.require_agent_exists(agent_id)
     except ServiceAgentNotFound:
@@ -138,7 +138,7 @@ def version_new(
     3. Draft clone: ``--draft`` clones the active version.
        ``agent version new <agent> --draft``
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if draft:
         # Clone active version as draft
@@ -215,7 +215,7 @@ def version_note(
     author: str = typer.Option("cli", "--author", help="Author identifier"),
 ) -> None:
     """Add a comment and/or star rating to a version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if comment is None and stars is None:
         obj.render.agent.error("pass --comment and/or --stars")
@@ -260,7 +260,7 @@ def version_publish(
     reason: str = typer.Option("cli publish", "--reason", help="Publish reason"),
 ) -> None:
     """Publish a draft version (set as active)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     resolve_agent(agent_id)
     with handle_cli_errors():
         result = obj.agents.publish_version(agent_id, version, reason)
@@ -281,7 +281,7 @@ def version_rollback(
     author: str = typer.Option("cli", "--author", help="Author identifier"),
 ) -> None:
     """Roll back to a previous agent version (creates a new version)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     resolve_agent(agent_id)
     with handle_cli_errors():
         result = obj.agents.rollback_to(agent_id, version, reason, author=author)

@@ -16,7 +16,8 @@ from agentbox.core.agents.composition.drift import (
 )
 from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure
 from agentbox.core.agents.resolve import list_engines
-from agentbox.core.db import AgentDef, SessionStore
+from agentbox.core.data import AgentDef
+from agentbox.core.db import SessionStore
 from agentbox.core.service.agents.crud import resolve_agent
 
 logger = logging.getLogger(__name__)

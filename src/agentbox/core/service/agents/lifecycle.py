@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentbox.core.db import AgentDef, SessionStore
+from agentbox.core.data import AgentDef
+from agentbox.core.db import SessionStore
 
 
 def soft_delete_agent(store: SessionStore, agent_id: str) -> dict | None:

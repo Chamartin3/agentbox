@@ -19,7 +19,7 @@ import json as _json
 from datetime import datetime
 from typing import Any
 
-from agentbox.core.db.engines.models import RunnerProfileStats
+from agentbox.core.data.profiles import RunnerProfileStats
 from agentbox.core.db.feedback.types import ActivityRange, since_iso
 from agentbox.core.service.base import Service
 

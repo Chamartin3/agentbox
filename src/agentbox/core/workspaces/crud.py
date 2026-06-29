@@ -15,7 +15,9 @@ from agentbox.core.config import Settings
 from agentbox.core.resources.skills import discover_skills
 
 if TYPE_CHECKING:
-    from agentbox.core.db import AgentDef, SessionStore, WorkspaceLookupStore
+    from agentbox.core.data import AgentDef
+    from agentbox.core.protocols import WorkspaceLookupStore
+    from agentbox.core.db import SessionStore
 
 
 @dataclass(frozen=True)

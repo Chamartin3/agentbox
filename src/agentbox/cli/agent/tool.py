@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx, handle_cli_errors, resolve_agent
+from agentbox.cli.shared import CLIContext, handle_cli_errors, resolve_agent
 
 # TODO(cli-arch): AgentService.list_tool_catalog (core gap)
 from agentbox.core.tools import SharedToolRegistry
@@ -28,7 +28,7 @@ def tool_ls(
     ),
 ) -> None:
     """List registered agent tools.  Use --agent <id> to see grants."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if agent_id is not None:
         resolve_agent(agent_id)
@@ -49,7 +49,7 @@ def tool_show(
     tool_name: str = typer.Argument(..., help="Tool name"),
 ) -> None:
     """Show full details for a registered tool."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     spec = SharedToolRegistry.get(tool_name)
     if spec is None:
         obj.render.agent.error(f"Tool {tool_name!r} not found.")
@@ -67,7 +67,7 @@ def tool_grant(
     actor: str | None = typer.Option(None, "--actor", help="Actor identifier"),
 ) -> None:
     """Grant a tool to an agent."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     resolve_agent(agent_id)
     with handle_cli_errors():
         obj.agents.grant_tool(
@@ -88,7 +88,7 @@ def tool_revoke(
     actor: str | None = typer.Option(None, "--actor", help="Actor identifier"),
 ) -> None:
     """Revoke a tool grant from an agent."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     resolve_agent(agent_id)
     with handle_cli_errors():
         obj.agents.revoke_tool(

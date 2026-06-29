@@ -11,7 +11,7 @@ from sqlalchemy import Row
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.config_event import AgentConfigEvent
-from agentbox.core.db.row_types import AgentConfigEventRow, _AgentConfigEventFields
+from agentbox.core.data.rows import AgentConfigEventRow, _AgentConfigEventFields
 from agentbox.core.db.schema import agent_config_events
 
 

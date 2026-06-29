@@ -111,7 +111,7 @@ def build_workspace(
     previous_paths: set[str] = set(previous_meta.get("materialized_paths") or [])
 
     try:
-        ws_bindings = resolve_workspace_resources(store, workspace_id)
+        ws_bindings = resolve_workspace_resources(store, workspace_id)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements WorkspaceBuildStore at runtime; Phase C of resource service migration
         if ws_bindings:
             # Sync runs on every launch + every save against a persistent
             # workspace, so the per-binding ``on_conflict`` semantics
@@ -144,7 +144,7 @@ def build_workspace(
         result.errors.append(f"resources: {e}")
 
     try:
-        env_entries = render_env_doc(store, workspace_id, workdir)
+        env_entries = render_env_doc(store, workspace_id, workdir)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements WorkspaceBuildStore at runtime; Phase C of resource service migration
         result.env_doc_files = [e["file"] for e in env_entries]
     except Exception as e:
         logger.exception(
@@ -157,7 +157,7 @@ def build_workspace(
         # copy only the per-engine agents files into the workspace (env-doc
         # and runner config are handled elsewhere; the DB is source of truth
         # so overwriting is fine).
-        config = load_workenv(store, workspace_id, settings=settings)
+        config = load_workenv(store, workspace_id, settings=settings)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements RunStore at runtime; Phase C of resource service migration
         subagents = [a for a in config.agents if a.role != "main"]
         with tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)

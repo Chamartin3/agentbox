@@ -16,7 +16,7 @@ import uuid
 from typing import Any
 
 from agentbox.core.constants import RunStatus
-from agentbox.core.db import now_iso, RunnerSnapshot
+from agentbox.core.data import now_iso, RunnerSnapshot
 from agentbox.core.execution.observability.conversation import get as _get_conversation_source
 from agentbox.core.execution.observability.conversation.transcript import TranscriptSource
 from agentbox.core.service.base import Service

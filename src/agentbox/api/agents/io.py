@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_agent_service
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 from agentbox.core.service.agents import AgentServiceError
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,11 @@ class AgentPatch(BaseModel):
 
 
 @router.patch("/{agent_id}")
-def patch_agent(agent_id: str, body: AgentPatch) -> dict:
+def patch_agent(
+    agent_id: str,
+    body: AgentPatch,
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
     """DB-first config save. Creates a new ``agent_versions`` row.
 
     On-disk files are not written by this endpoint — use
@@ -67,7 +72,7 @@ def patch_agent(agent_id: str, body: AgentPatch) -> dict:
     """
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
     try:
-        updated = get_agent_service().patch_agent_config(agent_id, patch)
+        updated = ctx.agents.patch_agent_config(agent_id, patch)
     except AgentServiceError as exc:
         detail: object = (
             exc.detail if exc.code == "empty_patch" else {"code": exc.code, "detail": exc.detail}

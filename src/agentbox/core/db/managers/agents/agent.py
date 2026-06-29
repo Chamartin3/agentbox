@@ -12,7 +12,7 @@ from agentbox.core.db.models.agents.agent import (
     AgentMeta,
     AgentRunnerProfile,
 )
-from agentbox.core.db.row_types import AgentMetaRow, _AgentMetaFields, _AgentMetaPatchFields
+from agentbox.core.data.rows import AgentMetaRow, _AgentMetaFields, _AgentMetaPatchFields
 from agentbox.core.db.schema import active_agent_versions, agent_meta
 
 

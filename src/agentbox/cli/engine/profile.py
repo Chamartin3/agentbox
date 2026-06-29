@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.core.service import RunnerProfileCreate
 from agentbox.core.service.engines.service import ProfileNotFound  # TODO(cli-arch): move to facade export
 
@@ -30,7 +30,7 @@ def profile_ls(
     ),
 ) -> None:
     """List runner profiles with optional filters."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     profiles = obj.engines.list_profiles(backend=backend, provider=provider, enabled=enabled)
 
     if json_output:
@@ -45,7 +45,7 @@ def profile_get(
     profile_id: str,
 ) -> None:
     """Show runner profile details as JSON."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         profile = obj.engines.get_profile(profile_id)
     except ProfileNotFound:
@@ -73,7 +73,7 @@ def profile_create(
     system_default: bool = typer.Option(False, help="Set as system default profile"),
 ) -> None:
     """Create a new runner profile."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     profile = obj.engines.create_profile(
         RunnerProfileCreate(
             id=id,
@@ -102,7 +102,7 @@ def profile_bind(
     ),
 ) -> None:
     """Bind a runner profile to an agent, or clear it with --clear."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if clear:
         obj.engines.clear_agent_runner_profile(agent_id)
         obj.render.engine.profile_cleared(agent_id)
@@ -126,7 +126,7 @@ def profile_stats(
     ),
 ) -> None:
     """Show per-profile statistics."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if profile_id:
         stats = obj.engines.get_profile_stats(profile_id)
@@ -144,7 +144,7 @@ def profile_delete(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Delete a runner profile."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         obj.engines.get_profile(profile_id)  # check existence
     except ProfileNotFound:

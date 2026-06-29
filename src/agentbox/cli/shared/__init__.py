@@ -1,15 +1,15 @@
 """Shared CLI infrastructure — single import surface for all command modules.
 
 Re-exports the public names from the sub-modules so callers can do
-``from agentbox.cli.shared import console, get_store, group_callback, ...``
+``from agentbox.cli.shared import CLIContext, group_callback, ...``
 without knowing which sub-module owns each name.
 
 Sub-modules
 -----------
-deps        singleton factories (get_settings, get_store, service factories)
-context     CliCtx dataclass + Renderers registry + group_callback DI helper + error contract
+deps        singleton factories (get_executor, get_mcp_registry — internal to context)
+context     CLIContext dataclass + Renderers registry + group_callback DI helper + error contract
 constants   Style enum, NA, CLI_AUTHOR, EVENT_STYLES, JsonValue, …
-render      Renderer — Rich output layer (console, checkmark, event_color)
+render      Renderer — Rich output layer (console internal, commands use ctx.obj.render)
 renderers   Per-domain renderer components (AgentRenderer, EngineRenderer, …)
 """
 
@@ -26,7 +26,7 @@ from agentbox.cli.shared.constants import (
     Style,
 )
 from agentbox.cli.shared.context import (
-    CliCtx,
+    CLIContext,
     Renderers,
     build_ctx,
     group_callback,
@@ -34,19 +34,10 @@ from agentbox.cli.shared.context import (
     resolve_agent,
 )
 from agentbox.cli.shared.deps import (
-    get_db,
     get_executor,
     get_mcp_registry,
-    get_resource_service,
-    get_settings,
-    get_store,
-    get_agent_service,
-    get_execution_service,
-    get_engine_service,
-    get_evaluation_service,
-    get_system_service,
 )
-from agentbox.cli.shared.render import Renderer, checkmark, console, event_color
+from agentbox.cli.shared.render import Renderer
 from agentbox.cli.shared.renderers import (
     AgentRenderer,
     EngineRenderer,
@@ -57,21 +48,8 @@ from agentbox.cli.shared.renderers import (
 )
 
 __all__ = [
-    # deps — core factories
-    "get_db",
-    "get_executor",
-    "get_mcp_registry",
-    "get_resource_service",
-    "get_settings",
-    "get_store",
-    # deps — service factories
-    "get_agent_service",
-    "get_execution_service",
-    "get_engine_service",
-    "get_evaluation_service",
-    "get_system_service",
     # context — DI + error contract
-    "CliCtx",
+    "CLIContext",
     "Renderers",
     "build_ctx",
     "group_callback",
@@ -86,11 +64,8 @@ __all__ = [
     "NA",
     "RUNNER_CLEAR",
     "Style",
-    # render — base class + module-level helpers
+    # render — base class
     "Renderer",
-    "checkmark",
-    "console",
-    "event_color",
     # renderers — per-domain components
     "AgentRenderer",
     "EngineRenderer",
@@ -98,4 +73,7 @@ __all__ = [
     "RunRenderer",
     "SystemRenderer",
     "WorkspaceRenderer",
+    # deps — documented exceptions (consumers not yet migrated to ctx.obj)
+    "get_executor",
+    "get_mcp_registry",
 ]

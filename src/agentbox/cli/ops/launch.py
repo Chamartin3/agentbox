@@ -19,24 +19,19 @@ from pathlib import Path
 
 import typer
 
-from rich.console import Console as _RichConsole
-
-from agentbox.cli.shared import get_store
-from agentbox.core.config import Settings, load_settings  # TODO(cli-arch): Settings (plan 095)
+from agentbox.cli.shared import CLIContext
+from agentbox.cli.shared.renderers.ops import OpsRenderer
+from agentbox.core.config import Settings  # TODO(cli-arch): Settings (plan 095)
 from agentbox.core.constants import RunnerKind  # TODO(cli-arch): RunnerKind export (plan 095)
-from agentbox.core.service import AgentDef  # TODO(cli-arch): facade export (plan 095)
+from agentbox.core.service import AgentDef, WorkspaceService  # TODO(cli-arch): facade export (plan 095)
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.system.service import SystemService
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.workspaces import launch_runner_configs
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.workspaces.build import build_workspace
+from agentbox.core.service import build_workspace
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.mcp.client import McpRegistry
-
-# Module-level console for launch orchestration — will be replaced by renderer
-# injection when orchestration moves to core (plans 089/095).
-_print = _RichConsole().print
 
 # Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
 # ``$SHELL`` (falling back to /bin/bash) and never needs a runner binary.
@@ -53,21 +48,22 @@ _RUNNER_BINARIES = {
 _RUNNERS_NEEDING_CONFIG = {RunnerKind.CLAUDE, RunnerKind.OPENCODE}
 
 
-def _require_binary(runner: str) -> None:
+def _require_binary(runner: str, ops: OpsRenderer) -> None:
     """Fail fast if the runner's CLI is not on PATH."""
     binary = _RUNNER_BINARIES.get(runner)
     if binary is None:
         return
     if shutil.which(binary) is None:
-        _print(
-            f"[red]The {binary!r} CLI is not installed in this container.[/red]\n"
-            f"Add it to [bold]libs/agentbox/Dockerfile[/bold] (or install it "
+        ops.error(
+            f"The {binary!r} CLI is not installed in this container.\n"
+            f"Add it to libs/agentbox/Dockerfile (or install it "
             f"into the running container) and try again."
         )
         raise typer.Exit(127)
 
 
 def _launch_session(
+    obj: CLIContext,
     *,
     runner: str,
     agent: str | None,
@@ -77,37 +73,38 @@ def _launch_session(
     keep_configs: bool,
 ) -> int:
     """Core launch logic — callable from other CLI commands (e.g. ``ws shell``)."""
+    ops = obj.render.ops
+    settings = obj.settings
+
     if runner == "token":
-        _print(
-            "[red]The 'token' backend runs in-process via pydantic-ai and has "
-            "no interactive CLI.[/red]\nUse [bold]agentbox run[/bold] or the HTTP API."
+        ops.error(
+            "The 'token' backend runs in-process via pydantic-ai and has "
+            "no interactive CLI.\nUse agentbox run or the HTTP API."
         )
         raise typer.Exit(2)
     try:
         RunnerKind.coerce(runner, label="runner")
     except ValueError:
-        _print(
-            f"[red]Unknown runner:[/red] {runner!r}. "
+        ops.error(
+            f"Unknown runner: {runner!r}. "
             f"Expected one of: {', '.join(RunnerKind.values())}."
         )
         raise typer.Exit(2)
 
-    _require_binary(runner)
-
-    settings = load_settings()
+    _require_binary(runner, ops)
 
     agent_def: AgentDef | None = None
     if agent:
-        agent_def = get_store().get_agent_def(agent)
+        agent_def = obj.agents.resolve_agent(agent)
         if agent_def is None:
-            _print(f"[red]Unknown agent:[/red] {agent!r}")
+            ops.error(f"Unknown agent: {agent!r}")
             raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, workspace_name = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings
+        agent_def, workspace, ephemeral, settings, ops
     )
 
-    _apply_creds(creds, settings)
+    _apply_creds(creds, settings, ops)
 
     # Sync env-doc, subagents, and resource bindings into the
     # workspace before the runner starts. Skipped for ephemeral/unnamed
@@ -115,16 +112,16 @@ def _launch_session(
     if workspace_name and not is_ephemeral:
         try:
             sync_result = build_workspace(
-                store=get_store(),
+                store=obj.store,
                 settings=settings,
                 workspace_id=workspace_name,
                 workdir=workspace_path,
             )
             if sync_result.errors:
                 for err in sync_result.errors:
-                    _print(f"[yellow]sync warning:[/yellow] {err}")
+                    ops.warn(f"sync warning: {err}")
         except Exception as e:
-            _print(f"[yellow]workspace sync failed:[/yellow] {e}")
+            ops.warn(f"workspace sync failed: {e}")
 
     # shell mode also needs configs now — we materialize a workspace
     # `.mcp.json` from the resolved per-workspace MCP set so an
@@ -138,14 +135,13 @@ def _launch_session(
         # cwd (where the engine discovers it) and cleaning up what it wrote.
         config_cm = launch_runner_configs(
             workspace_path,
-            store=get_store(),
             settings=settings,
             servers=servers,
             keep=keep_configs,
         )
     try:
         with config_cm:
-            _print_banner(agent, runner, model, workspace_path, is_ephemeral, creds)
+            ops.launch_banner(agent, runner, model, workspace_path, is_ephemeral, creds)
             if runner == RunnerKind.CLAUDE:
                 rc = _run_claude(agent, model, workspace_path, agent_def)
             elif runner == RunnerKind.OPENCODE:
@@ -175,6 +171,7 @@ def _resolve_workspace(
     workspace_override: str | None,
     force_ephemeral: bool,
     settings: Settings,
+    ops: OpsRenderer,
 ) -> tuple[Path, bool, str | None, str | None]:
     """Return (workspace_path, is_ephemeral, creds, workspace_name).
 
@@ -202,7 +199,7 @@ def _resolve_workspace(
         # Look up the DB registry (workspaces created via the API/UI).
         # Returning the name lets build_workspace materialize env-doc +
         # resource bindings.
-        db_row = get_store().get_workspace(ws_name)
+        db_row = WorkspaceService().get_workspace(ws_name)
         if db_row is not None:
             rel_path = db_row.get("path")
             path = (
@@ -218,15 +215,15 @@ def _resolve_workspace(
             path.mkdir(parents=True, exist_ok=True)
             return path, False, None, None
 
-    _print(
-        "[red]No workspace specified and no 'default' workspace defined.[/red]\n"
-        "Run [bold]agentbox ws ls[/bold] to see available workspaces, "
-        "or pass [bold]--workspace NAME[/bold] / [bold]--ephemeral[/bold]."
+    ops.error(
+        "No workspace specified and no 'default' workspace defined.\n"
+        "Run agentbox ws ls to see available workspaces, "
+        "or pass --workspace NAME / --ephemeral."
     )
     raise typer.Exit(1)
 
 
-def _apply_creds(creds: str | None, settings: Settings) -> None:
+def _apply_creds(creds: str | None, settings: Settings, ops: OpsRenderer) -> None:
     """Set CLAUDE_CONFIG_DIR or ANTHROPIC_API_KEY based on the creds profile.
 
     Credential profiles live under ``SETTINGS.creds_dir``. Today only
@@ -241,7 +238,7 @@ def _apply_creds(creds: str | None, settings: Settings) -> None:
         os.environ.pop("CLAUDE_CONFIG_DIR", None)
         api_key = os.environ.get(var)
         if not api_key:
-            _print(f"[red]creds env var {var!r} is not set[/red]")
+            ops.error(f"creds env var {var!r} is not set")
             raise typer.Exit(1)
         os.environ["ANTHROPIC_API_KEY"] = api_key
     else:
@@ -274,7 +271,7 @@ def _resolve_mcp_for_launch(
             {"name": s.name, "config": s.model_dump(exclude={"name"})}
             for s in manifest_specs
         ]
-        resolved = get_store().resolve_workspace_mcp(workspace_id, manifest_dicts)
+        resolved = WorkspaceService().resolve_workspace_mcp(workspace_id, manifest_dicts)
         servers = []
         for entry in resolved.get("servers", []):
             if not entry.get("enabled"):
@@ -360,25 +357,4 @@ def _run_shell(workspace_path: Path) -> int:
     return result.returncode
 
 
-# ---------------------------------------------------------------------------
-# Banner
-# ---------------------------------------------------------------------------
 
-
-def _print_banner(
-    agent: str | None,
-    runner: str,
-    model: str | None,
-    workspace_path: Path,
-    is_ephemeral: bool,
-    creds: str | None,
-) -> None:
-    mode = "ephemeral (tmp)" if is_ephemeral else f"workspace ({workspace_path})"
-    _print("━" * 50)
-    label = f"[cyan]{agent}[/cyan]" if agent else "[dim]<no agent>[/dim]"
-    _print(f"[bold]agentbox launch[/bold] ({runner}) — {label}")
-    _print("━" * 50)
-    _print(f"  model:  {model or '<runner default>'}")
-    _print(f"  mode:   {mode}")
-    _print(f"  creds:  {creds or 'default'}")
-    _print()

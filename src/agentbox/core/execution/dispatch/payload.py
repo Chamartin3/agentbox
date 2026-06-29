@@ -12,7 +12,8 @@ from datetime import datetime
 from typing import Any, NotRequired, TypedDict
 
 from agentbox.core.agents.validation import extract_json
-from agentbox.core.db import RunRecord, RunStore
+from agentbox.core.data import RunRecord
+from agentbox.core.execution.dispatch.policy import DispatchStore
 
 
 class CompletionPayload(TypedDict):
@@ -73,7 +74,7 @@ def completion_payload(
     }
 
 
-def build_completion_payload(run: RunRecord, store: RunStore) -> CompletionPayload:
+def build_completion_payload(run: RunRecord, store: DispatchStore) -> CompletionPayload:
     """Build a completion payload with usage and duration populated."""
     usage = store.get_usage(run.id)
     duration_ms: int | None = None

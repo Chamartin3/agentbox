@@ -11,24 +11,54 @@ from functools import lru_cache
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db import Database
-from agentbox.core.service import AgentService, SessionStore
-from agentbox.core.service.resources.service import ResourceService
+from agentbox.core.service import (
+    AgentService,
+    ResourceService,
+    SessionStore,
+    WorkspaceService,
+)
 
+
+# ── Private helpers (internal — context.py constructs from these) ────────
+
+@lru_cache(maxsize=1)
+def _get_settings() -> Settings:
+    return load_settings()
+
+
+@lru_cache(maxsize=1)
+def _get_store() -> SessionStore:
+    return SessionStore(_get_settings().db_path)
+
+
+@lru_cache(maxsize=1)
+def _get_db() -> Database:
+    return Database(_get_settings().db_path)
+
+
+# ── Legacy context (kept temporarily for backward compat during migration) ──
 
 @dataclass(frozen=True)
-class Context:
+class _LegacyContext:
     settings: Settings
     store: SessionStore
     db: Database
 
 
 @lru_cache(maxsize=1)
-def get_context() -> Context:
-    settings = load_settings()
-    store = SessionStore(settings.db_path)
-    db = Database(settings.db_path)
-    return Context(settings=settings, store=store, db=db)
+def _get_context() -> _LegacyContext:
+    settings = _get_settings()
+    store = _get_store()
+    db = _get_db()
+    return _LegacyContext(settings=settings, store=store, db=db)
 
+
+# Public alias for backward compat during migration
+get_context = _get_context
+Context = _LegacyContext
+
+
+# ── Service factories (kept temporarily for backward compat) ─────────────
 
 def get_agent_service() -> AgentService:
     """Agent-domain service. Uncached — self-wires from settings and holds a
@@ -43,5 +73,4 @@ def get_resource_service() -> ResourceService:
 
 def get_workspace_service():
     """Workspace-domain service. Uncached — self-wires from settings."""
-    from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
     return WorkspaceService()

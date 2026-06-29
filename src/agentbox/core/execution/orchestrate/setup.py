@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.core.agents.resolve import resolve_engine
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.db import AgentDef, RunSetupStore
+from agentbox.core.data import AgentDef
+from agentbox.core.protocols import RunSetupStore
 from agentbox.core.config import Settings
 from agentbox.core.engines.contracts.base import (
     RenderedConfig,

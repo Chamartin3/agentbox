@@ -14,24 +14,15 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.core.config import Settings
 from agentbox.core.constants import BackendName
-from agentbox.core.db import SessionStore
-from agentbox.core.workspaces.generation.config import WorkenvConfig  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core.workspaces.generation.builders.from_db import load_workenv  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core.workspaces.generation.generator import render  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core.workspaces.generation.builders.interactive import build_interactive  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core.workspaces.generation.presets import (  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-    from_preset,
-    list_presets,
-    save_as_preset,
-    seed_presets,
-)
-from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core.service.workspaces.files import resolve_workspace_path
-from agentbox.core.service.workspaces.permissions import load_effective_permissions
+from agentbox.core.service import WorkspaceService
+from agentbox.core.workspaces.generation.config import WorkenvConfig
+from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
+from agentbox.core.workspaces.generation.generator import render
+from agentbox.core.workspaces.generation.builders.interactive import build_interactive
+from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
 
 workenv_app = typer.Typer(
     name="workenv",
@@ -102,9 +93,9 @@ def workenv_generate(
     (--config-file), from a preset (--preset), or interactively
     (no arguments or --interactive).
     """
-    obj: CliCtx = ctx.obj
-    store = obj.store
+    obj: CLIContext = ctx.obj
     settings = obj.settings
+    svc = WorkspaceService()
 
     try:
         source = _resolve_source(
@@ -114,7 +105,7 @@ def workenv_generate(
             config_file=config_file,
             preset=preset,
             interactive=interactive,
-            store=store,
+            svc=svc,
             settings=settings,
         )
     except ValueError as exc:
@@ -124,7 +115,7 @@ def workenv_generate(
     available = list_recipes()
     if source.engine not in available:
         obj.render.ops.error(
-            f"unknown engine {source.engine!r} \u2014 "
+            f"unknown engine {source.engine!r} — "
             f"available: {', '.join(available)}"
         )
         raise typer.Exit(1)
@@ -133,8 +124,7 @@ def workenv_generate(
     source.target_dir.mkdir(parents=True, exist_ok=True)
 
     if save is not None:
-        save_as_preset(
-            store,
+        svc.save_workenv_as_preset(
             save,
             source.config,
             engine=source.engine,
@@ -168,7 +158,7 @@ def _resolve_source(
     config_file: str | None,
     preset: str | None,
     interactive: bool,
-    store: SessionStore,
+    svc: WorkspaceService,
     settings: Settings,
 ) -> _ResolvedSource:
     """Resolve config, engine, and target dir from CLI inputs.
@@ -176,10 +166,10 @@ def _resolve_source(
     Raises ``ValueError`` on user-facing errors; caller prints and exits.
     """
     if preset is not None:
-        config = from_preset(store, preset)
+        config = svc.workenv_from_preset(preset)
         if config is None:
             raise ValueError(f"preset not found: {preset}")
-        out_dir = _resolve_target_dir(target_dir, name, store, settings)
+        out_dir = _resolve_target_dir(target_dir, name, svc, settings)
         return _ResolvedSource(config, engine, out_dir, "preset")
 
     if config_file is not None:
@@ -187,36 +177,29 @@ def _resolve_source(
         if not config_path.is_file():
             raise ValueError(f"config file not found: {config_file}")
         config = load_from_yaml(config_path)
-        out_dir = _resolve_target_dir(target_dir, name, store, settings)
+        out_dir = _resolve_target_dir(target_dir, name, svc, settings)
         return _ResolvedSource(config, engine, out_dir, "yaml")
 
     if interactive or name is None:
         config, chosen_engine, chosen_dir = build_interactive()
         return _ResolvedSource(config, chosen_engine, chosen_dir, "interactive")
 
-    perms = load_effective_permissions(
-        name,
-        store=store,
-        settings=settings,
-        mcp_manifest=None,
-    )
-    config = load_workenv(store, name, settings=settings, permissions=perms)
-    out_dir = _resolve_target_dir(target_dir, name, store, settings)
+    perms = svc.load_effective_permissions(name)
+    config = svc.load_workenv(name, settings=settings, permissions=perms)
+    out_dir = _resolve_target_dir(target_dir, name, svc, settings)
     return _ResolvedSource(config, engine, out_dir, "db")
 
 
 def _resolve_target_dir(
     target_dir: str | None,
     name: str | None,
-    store: SessionStore,
+    svc: WorkspaceService,
     settings: Settings,
 ) -> Path:
     if target_dir is not None:
         return Path(target_dir)
     if name is not None:
-        ws_path, _project_root = resolve_workspace_path(
-            name, store=store, settings=settings
-        )
+        ws_path, _project_root = svc.resolve_workspace_path(name, settings=settings)
         return ws_path
     return Path.cwd() / "out"
 
@@ -224,16 +207,16 @@ def _resolve_target_dir(
 @workenv_app.command("seed-presets")
 def workenv_seed_presets(ctx: typer.Context) -> None:
     """Load built-in presets into the DB (idempotent)."""
-    obj: CliCtx = ctx.obj
-    count = seed_presets(obj.store)
+    obj: CLIContext = ctx.obj
+    count = WorkspaceService().seed_presets()
     obj.render.ops.success(f"seeded {count} preset(s)")
 
 
 @workenv_app.command("list-presets")
 def workenv_list_presets(ctx: typer.Context) -> None:
     """List saved presets in the DB."""
-    obj: CliCtx = ctx.obj
-    presets = list_presets(obj.store)
+    obj: CLIContext = ctx.obj
+    presets = WorkspaceService().list_presets()
     if not presets:
         obj.render.ops.warn("No presets saved")
         return
@@ -247,7 +230,7 @@ def workenv_list_presets(ctx: typer.Context) -> None:
 @workenv_app.command("list-engines")
 def workenv_list_engines(ctx: typer.Context) -> None:
     """List available recipe engines."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     available = list_recipes()
     if not available:
         obj.render.ops.warn("No recipes found")

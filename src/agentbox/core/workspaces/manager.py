@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import cast
 
 from agentbox.core.config import Settings
-from agentbox.core.db import AgentDef, SessionStore
+from agentbox.core.data import AgentDef
+from agentbox.core.db import SessionStore
 from agentbox.core.workspaces.crud import WorkspaceInfo, info, resolve_path
 
 __all__ = [

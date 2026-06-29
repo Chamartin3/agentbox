@@ -19,7 +19,7 @@ import uuid
 from sqlalchemy.engine import Engine
 
 from agentbox.core.constants import McpPolicy
-from agentbox.core.db.execution.snapshots import McpSnapshot
+from agentbox.core.data.snapshots import McpSnapshot
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.schema import (
     workspace_mcp_overrides,

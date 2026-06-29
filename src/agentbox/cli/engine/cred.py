@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import CliCtx, EngineRenderer  # TODO(cli-arch): transitional renderer import — plan 095
+from agentbox.cli.shared import CLIContext, EngineRenderer  # TODO(cli-arch): transitional renderer import — plan 095
 from agentbox.core.config import Settings
 from agentbox.core.service.engines import (
     CredentialMethod,
@@ -38,7 +38,7 @@ def setup(
     ),
 ) -> None:
     """Interactive credential setup walkthrough."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     engines = obj.engines
     render = obj.render.engine
     settings = obj.settings
@@ -159,7 +159,7 @@ def status(
     ),
 ) -> None:
     """Show credential status for every registered backend."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     all_items = obj.engines.list_credentials()
     obj.render.engine.credential_status_table(all_items)
 
@@ -170,7 +170,7 @@ def import_cmd(
     name: str = typer.Argument(..., help="Backend name to import credentials for (e.g. claude)."),
 ) -> None:
     """Non-interactive host credential import for a backend."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     render = obj.render.engine
     cm = obj.engines.get_credential(name)
     if cm is None:
@@ -190,7 +190,7 @@ def clear_cmd(
     name: str = typer.Argument(..., help="Backend name to clear credentials for."),
 ) -> None:
     """Remove stored credentials for one backend."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     render = obj.render.engine
     settings = obj.settings
     cm = obj.engines.get_credential(name)

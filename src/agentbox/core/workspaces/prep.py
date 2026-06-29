@@ -27,7 +27,8 @@ from agentbox.core.workspaces.generation.workspace_files import (
 
 if TYPE_CHECKING:
     from agentbox.core.config import Settings
-    from agentbox.core.db import AgentDef, RunStore, WorkspaceBuildStore
+    from agentbox.core.data import AgentDef
+    from agentbox.core.protocols import RunStore, WorkspaceBuildStore
 
 logger = logging.getLogger(__name__)
 

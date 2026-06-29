@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 import websockets
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.core.service.execution import RunNotFound
 
 log_app = typer.Typer(
@@ -57,7 +57,7 @@ def log_tail(
     ),
 ) -> None:
     """Replay a completed run's transcript, or tail in-progress."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if follow:
         _tail_follow(obj, run_id)
@@ -78,7 +78,7 @@ def log_tail(
         obj.render.run.event_line(t, ev)
 
 
-def _tail_follow(obj: CliCtx, run_id: str) -> None:
+def _tail_follow(obj: CLIContext, run_id: str) -> None:
     api = "http://localhost:8765"
     ws_url = api.replace("http", "ws") + f"/api/runs/{run_id}/stream"
 
@@ -103,7 +103,7 @@ def log_transcript(
     run_id: str = typer.Argument(..., help="Run ID"),
 ) -> None:
     """Show the transcript for a run."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     rec = obj.execution.get_run(run_id)
     if rec is None:
@@ -131,7 +131,7 @@ def log_prompt(
     run_id: str = typer.Argument(..., help="Run ID"),
 ) -> None:
     """Show the rendered prompt for a completed run."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     rec = obj.execution.get_run(run_id)
     if rec is None:
@@ -158,7 +158,7 @@ def log_comments(
     author: str = typer.Option("cli", "--author", help="Comment author"),
 ) -> None:
     """List or add comments for a run."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if add:
         if obj.execution.get_run(run_id) is None:
@@ -187,7 +187,7 @@ def log_outcome(
     ),
 ) -> None:
     """Record downstream post-processing outcome for a completed run."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     rec = obj.execution.get_run(run_id)
     if rec is None:

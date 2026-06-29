@@ -10,8 +10,8 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentbox.core.constants import SessionMode
-from agentbox.core.db.engines.manifest import RunnerManifest, RunnerSpec
-from agentbox.core.db.row_types import AgentVersionRow
+from agentbox.core.data.manifests.engines import RunnerManifest, RunnerSpec
+from agentbox.core.data.rows import AgentVersionRow
 
 
 class AgentSource(enum.StrEnum):

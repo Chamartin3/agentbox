@@ -16,7 +16,7 @@ from sqlalchemy.engine import Connection
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.prompt import PromptVersion
-from agentbox.core.db.row_types import PromptVersionRow, _PromptVersionFields
+from agentbox.core.data.rows import PromptVersionRow, _PromptVersionFields
 from agentbox.core.db.schema import prompt_versions
 
 

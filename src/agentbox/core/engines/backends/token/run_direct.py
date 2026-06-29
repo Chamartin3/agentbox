@@ -28,7 +28,7 @@ from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from agentbox.core.constants import LogLevel, MessageRole, RunStatus
-from agentbox.core.db import (
+from agentbox.core.events import (
     DoneEvent,
     LogEvent,
     RunEvent,

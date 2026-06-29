@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_settings, get_store
-from agentbox.core.service import SessionStore
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 from agentbox.core.service import env_doc as svc
 
 router = APIRouter(tags=["env-doc"])
@@ -28,8 +26,11 @@ class PreviewEnvDocBody(BaseModel):
 
 
 @router.get("/api/workspaces/{workspace_id}/env-doc")
-def get_env_doc(workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]):
-    active = store.get_active_env_doc(workspace_id)
+def get_env_doc(
+    workspace_id: str,
+    ctx: APIContext = Depends(get_api_context),
+):
+    active = ctx.workspaces.get_active_env_doc(workspace_id)
     if not active:
         return {"active": None}
     return {"active": active}
@@ -39,13 +40,11 @@ def get_env_doc(workspace_id: str, store: Annotated[SessionStore, Depends(get_st
 def save_env_doc(
     workspace_id: str,
     body: SaveEnvDocBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ctx: APIContext = Depends(get_api_context),
 ):
     """Save and publish the workspace env-doc, then re-sync on-disk renders."""
     try:
-        return svc.save_and_sync_env_doc(
-            store,
-            get_settings(),
+        return ctx.workspaces.save_and_sync_env_doc(
             workspace_id,
             content=body.content,
             reason=body.reason,
@@ -59,12 +58,12 @@ def save_env_doc(
 def preview_env_doc(
     workspace_id: str,
     body: PreviewEnvDocBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ctx: APIContext = Depends(get_api_context),
 ):
     if body.content is not None:
         content: object = body.content
     else:
-        active = store.get_active_env_doc(workspace_id)
+        active = ctx.workspaces.get_active_env_doc(workspace_id)
         if not active:
             raise HTTPException(status_code=404, detail="no env doc for workspace")
         content = active["content_json"]

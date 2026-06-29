@@ -22,7 +22,7 @@ from agentbox.core.agents.composition.prompts import PromptDoc, PromptError
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from agentbox.core.db import AgentDef
+    from agentbox.core.data import AgentDef
     from agentbox.core.db import SessionStore
 
 __all__ = [

@@ -13,10 +13,11 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from agentbox.core.db import AgentVersionRow
+from agentbox.core.service import AgentVersionRow
 from agentbox.core.service import composition_preview as preview_composition
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.system.service import SystemService
+from agentbox.mcp.context import MCPContext
 from agentbox.mcp.deps import get_agent_service, get_context
 from agentbox.mcp.schemas import clamp_limit
 
@@ -42,7 +43,7 @@ def _resolve_active(svc, agent_id: str) -> AgentVersionRow | None:
     return svc.active_version(agent_id) or svc.latest_version(agent_id)
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_prompt(agent_id: str, version: int | None = None) -> dict:
         """Return the published system prompt body for an agent.

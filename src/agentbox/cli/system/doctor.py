@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 # TODO(cli-arch): SystemService.doctor_checks (core gap)
 from agentbox.core import workspaces as ws_workspaces
@@ -15,7 +15,7 @@ from agentbox.core.service.engines import CredentialState
 # for compatibility with the generic callers below.
 def doctor(ctx: typer.Context) -> None:
     """Run a suite of diagnostic checks and print the results."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     checks: list[tuple[str, bool, str]] = []
     failures = 0

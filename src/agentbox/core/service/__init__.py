@@ -19,24 +19,35 @@ from agentbox.core.engines import list_providers as list_providers
 from agentbox.core.constants import EventType as EventType
 from agentbox.core.constants import ResourceType as ResourceType
 from agentbox.core.constants import RunStatus as RunStatus
-from agentbox.core.db import read_transcript as read_transcript
-from agentbox.core.db import AgentDef as AgentDef
-from agentbox.core.db import AgentSource as AgentSource
-from agentbox.core.db import CompositionConfig as CompositionConfig
-from agentbox.core.db import McpServerSpec as McpServerSpec
-from agentbox.core.db import ProjectManifest as ProjectManifest
-from agentbox.core.db import RunnerSpec as RunnerSpec
-from agentbox.core.db import RunnerProfile as RunnerProfile
-from agentbox.core.db import RunnerProfileCreate as RunnerProfileCreate
-from agentbox.core.db import RunnerProfilePatch as RunnerProfilePatch
-from agentbox.core.db import RunnerProfileStats as RunnerProfileStats
-from agentbox.core.db import RunRecord as RunRecord
+from agentbox.core.data import read_transcript as read_transcript
+from agentbox.core.data import AgentDef as AgentDef
+from agentbox.core.data import AgentSource as AgentSource
+from agentbox.core.data import CompositionConfig as CompositionConfig
+from agentbox.core.data import McpServerSpec as McpServerSpec
+from agentbox.core.data import ProjectManifest as ProjectManifest
+from agentbox.core.data import RunnerSpec as RunnerSpec
+from agentbox.core.data import RunnerProfile as RunnerProfile
+from agentbox.core.data import RunnerProfileCreate as RunnerProfileCreate
+from agentbox.core.data import RunnerProfilePatch as RunnerProfilePatch
+from agentbox.core.data import RunnerProfileStats as RunnerProfileStats
+from agentbox.core.data import RunRecord as RunRecord
+from agentbox.core.data import WorkspaceDef as WorkspaceDef
+from agentbox.core.data import AgentVersionRow as AgentVersionRow
+from agentbox.core.data import AgentVersionCommentRow as AgentVersionCommentRow
+from agentbox.core.data import AgentVersionRatingRow as AgentVersionRatingRow
+from agentbox.core.data import EnvDocRow as EnvDocRow
 from agentbox.core.db import SessionStore as SessionStore
 from agentbox.core.db import SharedResourceRecord as SharedResourceRecord
-from agentbox.core.db import WorkspaceDef as WorkspaceDef
+from agentbox.core.engines.providers.base import ProviderDescriptor as ProviderDescriptor
+from agentbox.core.engines.providers.base import ProviderModel as ProviderModel
+from agentbox.core.engines.credentials.registry import CredentialMethod as CredentialMethod
+from agentbox.core.engines.credentials.state import CredentialState as CredentialState
+from agentbox.core.workspaces.generation.config import WorkenvConfig as WorkenvConfig
+from agentbox.core.workspaces.generation.recipe import Recipe as Recipe
 
 # ── Infra ─────────────────────────────────────────────────────────────
 from agentbox.core.tools import CAPABILITIES as CAPABILITIES  # noqa: F401
+from agentbox.core.tools import ToolSpec as ToolSpec
 
 # ── Prompt / composition ──────────────────────────────────────────────
 from agentbox.core.agents.composition.bundle import compose_from_source as compose_from_source
@@ -98,11 +109,14 @@ from agentbox.core.service.execution.service import ExecutionService as Executio
 # ── Evaluation service (plan 093 — analytics) ──────────────────────────
 from agentbox.core.service.evaluation.service import EvaluationService as EvaluationService
 
-# ── Engines service (plan 091 — deferred, circular import with providers) ──
-# from agentbox.core.service.engines.service import EngineService as EngineService
+# ── Engines service (plan 091) ─────────────────────────────────────────
+from agentbox.core.service.engines.service import EngineService as EngineService
 
 # ── System service ────────────────────────────────────────────────────
 from agentbox.core.service.system.service import SystemService as SystemService
+
+# ── Resources service (plan 090) ────────────────────────────────────────
+from agentbox.core.service.resources.service import ResourceService as ResourceService
 
 # ── Workspace admin service ────────────────────────────────────────────
 from agentbox.core.service.workspace_admin import get_active_env_doc as get_active_env_doc

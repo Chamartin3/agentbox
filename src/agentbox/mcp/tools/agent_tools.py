@@ -5,10 +5,10 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from agentbox.core.tools import SharedToolRegistry
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.context import MCPContext
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool(
         name="list_agent_tools",
         description="List all consumer-registered shared agent tools discovered at startup.",
@@ -34,7 +34,6 @@ def register(mcp: FastMCP) -> None:
         description="List tool grants for an agent.",
     )
     def list_agent_tool_grants(agent_id: str, include_revoked: bool = False) -> dict:
-        ctx = get_context()
         return {"items": ctx.store.list_agent_tool_grants(agent_id, include_revoked)}
 
     @mcp.tool(
@@ -53,7 +52,6 @@ def register(mcp: FastMCP) -> None:
         if len(reason.strip()) < 3:
             return {"error": "reason must be at least 3 characters"}
         try:
-            ctx = get_context()
             return ctx.store.grant_agent_tool(agent_id, tool_name, reason, actor)
         except ValueError as exc:
             return {"error": str(exc)}
@@ -71,7 +69,6 @@ def register(mcp: FastMCP) -> None:
         if len(reason.strip()) < 3:
             return {"error": "reason must be at least 3 characters"}
         try:
-            ctx = get_context()
             ctx.store.revoke_agent_tool(agent_id, tool_name, reason, actor)
             return {"revoked": True}
         except ValueError as exc:

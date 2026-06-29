@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 # TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import (
@@ -27,7 +27,7 @@ env_doc_app = typer.Typer(
 )
 
 
-def _load_content(content_or_file: str, obj: CliCtx) -> dict:
+def _load_content(content_or_file: str, obj: CLIContext) -> dict:
     """Treat the arg as a file path first, then as raw JSON."""
     path = Path(content_or_file)
     text = path.read_text(encoding="utf-8") if path.exists() else content_or_file
@@ -41,7 +41,7 @@ def _load_content(content_or_file: str, obj: CliCtx) -> dict:
 @env_doc_app.command("show")
 def env_doc_show(ctx: typer.Context, workspace_id: str) -> None:
     """Show the active env doc for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     doc = get_active_env_doc(obj.store, workspace_id)
     if not doc:
         obj.render.system.env_doc_no_doc(workspace_id)
@@ -59,7 +59,7 @@ def env_doc_show(ctx: typer.Context, workspace_id: str) -> None:
 @env_doc_app.command("versions")
 def env_doc_versions(ctx: typer.Context, workspace_id: str) -> None:
     """List all env doc versions for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     rows = list_env_doc_versions(obj.store, workspace_id)
     obj.render.system.env_doc_versions_table(rows, workspace_id)
 
@@ -74,7 +74,7 @@ def env_doc_edit(
     ),
 ) -> None:
     """Save a new env doc version (JSON content or path to a JSON file)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(changelog.strip()) < 3:
         obj.render.system.env_doc_invalid_changelog()
         raise typer.Exit(1)
@@ -87,7 +87,7 @@ def env_doc_edit(
 @env_doc_app.command("publish")
 def env_doc_publish(ctx: typer.Context, workspace_id: str, version_id: str) -> None:
     """Publish (activate) a specific env doc version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     doc = publish_env_doc(obj.store, workspace_id, version_id)
     obj.render.system.env_doc_published(doc["version_number"], workspace_id)
 
@@ -102,7 +102,7 @@ def env_doc_rollback(
     ),
 ) -> None:
     """Roll back to a previous env doc version (creates new version with old content)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(changelog.strip()) < 3:
         obj.render.system.env_doc_invalid_changelog()
         raise typer.Exit(1)
@@ -120,7 +120,7 @@ def env_doc_preview(
 
     Renders the active env doc for this workspace.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     doc = get_active_env_doc(obj.store, workspace_id)
     if not doc:
         obj.render.system.env_doc_no_doc(workspace_id)

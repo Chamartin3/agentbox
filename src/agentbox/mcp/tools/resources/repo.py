@@ -8,7 +8,7 @@ import binascii
 from fastmcp import FastMCP
 
 from agentbox.core.constants import ResourceType
-from agentbox.mcp.deps import get_context, get_resource_service
+from agentbox.mcp.context import MCPContext
 
 
 def _require_reason(reason: str) -> dict | None:
@@ -23,7 +23,7 @@ def _require_reason(reason: str) -> dict | None:
 _ZIP_MAGIC = b"PK\x03\x04"
 
 
-def register_repo(mcp: FastMCP) -> None:
+def register_repo(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def create_repo_resource(
         slug: str,
@@ -61,7 +61,7 @@ def register_repo(mcp: FastMCP) -> None:
                 "detail": f"type must be one of {[t.value for t in ResourceType]}",
             }
 
-        svc = get_resource_service()
+        svc = ctx.resources()
         try:
             resource = svc.create_resource(
                 slug=slug,
@@ -150,7 +150,6 @@ def register_repo(mcp: FastMCP) -> None:
         """Set the MCP server policy for a workspace.
 
         policy: 'allow_all_unless_disabled' | 'deny_all_unless_enabled'"""
-        ctx = get_context()
         result = ctx.store.set_workspace_mcp_policy(workspace_id, policy)
         return {"workspace_id": workspace_id, "policy": str(result)}
 
@@ -167,7 +166,6 @@ def register_repo(mcp: FastMCP) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        ctx = get_context()
         row = ctx.store.set_workspace_mcp_server_override(
             workspace_id, server_name, enabled=enabled, changelog=reason
         )
@@ -187,7 +185,6 @@ def register_repo(mcp: FastMCP) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        ctx = get_context()
         row = ctx.store.set_workspace_mcp_tool_override(
             workspace_id, server_name, tool_name, enabled=enabled
         )

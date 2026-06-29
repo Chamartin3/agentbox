@@ -10,7 +10,8 @@ Non-workspace methods (agent versions) still use ``store``.
 
 from __future__ import annotations
 
-from agentbox.core.db import EnvDocRow, SessionStore, WorkspaceRow
+from agentbox.core.data import EnvDocRow, WorkspaceRow
+from agentbox.core.db import SessionStore
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.service.workspaces.service import WorkspaceService
 
@@ -83,7 +84,7 @@ def list_workspace_mcp_tool_overrides(
 def list_workspace_file_bindings(
     store: SessionStore, workspace_id: str
 ) -> list[dict]:
-    from agentbox.core.service.resources.service import ResourceService
+    from agentbox.core.service.resources.service import ResourceService  # noqa: PLC0415
     return ResourceService()._file_bindings.list_for_workspace(workspace_id)
 
 
@@ -95,7 +96,7 @@ def replace_workspace_file_bindings(
     reason: str,
     actor: str | None = None,
 ) -> list[dict]:
-    from agentbox.core.service.resources.service import ResourceService
+    from agentbox.core.service.resources.service import ResourceService  # noqa: PLC0415
     return ResourceService()._file_bindings.replace_for_workspace(
         workspace_id, bindings, reason=reason, actor=actor
     )
@@ -129,7 +130,7 @@ def list_host_env_calls_for_run(
 # ── Env docs ────────────────────────────────────────────────────────────
 
 
-def get_active_env_doc(store: SessionStore, workspace_id: str) -> dict | None:
+def get_active_env_doc(store: SessionStore, workspace_id: str) -> EnvDocRow | None:
     return _ws().get_active_env_doc(workspace_id)
 
 

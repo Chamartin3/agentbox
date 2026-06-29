@@ -9,7 +9,7 @@ from pathlib import Path
 import tomlkit
 import typer
 
-from agentbox.cli.shared import CliCtx, resolve_agent
+from agentbox.cli.shared import CLIContext, resolve_agent
 # TODO(cli-arch): build_* free-fns — candidate AgentService create_version helpers
 from agentbox.core.service import AgentDef, build_agent_snapshot, build_config_json_payload
 from agentbox.core.service.engines.service import ProfileNotFound
@@ -40,14 +40,14 @@ def _coerce(value: str) -> object:
         return value
 
 
-def _list_agent_ids(obj: CliCtx) -> list[str]:
+def _list_agent_ids(obj: CLIContext) -> list[str]:
     # TODO(cli-arch): AgentService.list_all ids
     rows = obj.store.list_agents_with_latest()
     return [r["agent_id"] for r in rows]
 
 
 # TODO(cli-arch): candidate AgentService export/import methods
-def _export_one(agent: AgentDef, base: Path, obj: CliCtx) -> None:
+def _export_one(agent: AgentDef, base: Path, obj: CLIContext) -> None:
     base.mkdir(parents=True, exist_ok=True)
     prompt = agent.prompt
     agent_dump = agent.model_dump(mode="json", exclude_none=True)
@@ -89,7 +89,7 @@ def def_ls(
     ),
 ) -> None:
     """List agents registered in the DB."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     rows = list_all_agents(store=obj.store)  # TODO(cli-arch): AgentService.list_all
 
     if json_output:
@@ -128,7 +128,7 @@ def def_ls(
 @definition_app.command("show")
 def def_show(ctx: typer.Context, agent_id: str) -> None:
     """Show the full resolved AgentDef for an agent."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     a = resolve_agent(agent_id)
 
     obj.render.agent.agent_meta_panel(a)
@@ -185,7 +185,7 @@ def def_new(
     Use ``--config`` to load a full AgentDef JSON file, or ``--name``
     to create a minimal agent with sensible defaults.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if config is not None:
         data = json.loads(config.read_text(encoding="utf-8"))
@@ -248,7 +248,7 @@ def def_edit(
     Use ``--runner <profile_id>`` to bind a runner profile, or
     ``--runner clear`` to unbind.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     # -- runner profile binding
     if runner is not None:
@@ -330,7 +330,7 @@ def def_rm(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
 ) -> None:
     """Soft-delete an agent. Version history is retained."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if not yes:
         confirm = typer.confirm(
             f"Soft-delete agent {agent_id!r}? (history retained)"
@@ -364,7 +364,7 @@ def def_export(
     Writes ``<agent_id>.toml`` and (if the agent has a prompt)
     ``<agent_id>.prompt.md`` into ``--out``. Idempotent.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     base = Path(out_dir).expanduser()
 
     if agent_id:

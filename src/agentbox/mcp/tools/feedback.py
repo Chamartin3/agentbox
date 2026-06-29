@@ -9,6 +9,7 @@ from agentbox.core.service.execution.feedback import (
     add_comment as _add_run_comment,
     list_comments as _list_run_comments,
 )
+from agentbox.mcp.context import MCPContext
 from agentbox.mcp.deps import get_agent_service, get_context
 
 
@@ -16,7 +17,7 @@ def _success_rate(total: int, failures: int) -> float:
     return ((total - failures) / total) if total else 0.0
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def aggregate_usage() -> dict:
         """Total tokens + cost across all runs."""

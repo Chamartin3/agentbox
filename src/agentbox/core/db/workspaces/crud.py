@@ -20,7 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from agentbox.core.db.utils import now_iso
-from agentbox.core.db.row_types import WorkspaceRow
+from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.db.schema import workspaces, workspace_subagents
 
 # Satellite tables whose rows belong to a workspace. Listed here so

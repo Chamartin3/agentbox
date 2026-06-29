@@ -6,7 +6,7 @@ import json
 
 import typer
 
-from agentbox.cli.shared import CliCtx, resolve_agent
+from agentbox.cli.shared import CLIContext, resolve_agent
 from agentbox.core.service.agents import AgentServiceError
 
 check_app = typer.Typer(
@@ -22,7 +22,7 @@ def check_get(
     agent_id: str = typer.Argument(..., help="Agent ID"),
 ) -> None:
     """Show validation config for an agent (input + output directions)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     resolve_agent(agent_id)
     result = obj.agents.get_agent_validation(agent_id)
     obj.render.agent.validation_report(result)
@@ -41,7 +41,7 @@ def check_set(
 
     Example: agent check set my-agent output '[{"kind":"http","endpoint":"https://..."}]'
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if direction not in ("input", "output"):
         obj.render.agent.error("direction must be 'input' or 'output'")

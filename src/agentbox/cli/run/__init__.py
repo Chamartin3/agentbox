@@ -29,7 +29,7 @@ import typer
 import websockets
 
 from agentbox.cli.ops.launch import _launch_session
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 # Mapping from BackendName values to RunnerKind strings used by _launch_session.
 # "token" passes through and is rejected by _launch_session with a clear message.
@@ -51,9 +51,9 @@ async def _stream(renderers, api: str, run_id: str) -> None:
             renderers.run.event_line(t, ev)
 
 
-def _resolve_obj(ctx: typer.Context) -> CliCtx:
-    """Resolve CliCtx from typer context, falling back to build_ctx()."""
-    if isinstance(ctx.obj, CliCtx):
+def _resolve_obj(ctx: typer.Context) -> CLIContext:
+    """Resolve CLIContext from typer context, falling back to build_ctx()."""
+    if isinstance(ctx.obj, CLIContext):
         return ctx.obj
     from agentbox.cli.shared.context import build_ctx  # noqa: PLC0415
     return build_ctx()
@@ -183,6 +183,7 @@ def run_cmd(
 
     sys.exit(
         _launch_session(
+            obj=obj,
             runner=runner,
             agent=agent,
             workspace=workspace,

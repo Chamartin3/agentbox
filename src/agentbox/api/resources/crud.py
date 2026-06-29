@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_resource_service
 from agentbox.core.service.resources.service import ResourceService
-from agentbox.core.db.resources.shared._models import SharedResourceRecord
+from agentbox.core.service import SharedResourceRecord
 
 
 def _mark_deprecated(response: Response) -> None:

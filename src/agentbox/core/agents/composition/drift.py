@@ -16,12 +16,13 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.config import load_settings
-from agentbox.core.db import RunnerProfileCreate
-from agentbox.core.db import get_database, now_iso
+from agentbox.core.data import RunnerProfileCreate
+from agentbox.core.data._util import now_iso
+from agentbox.core.db import get_database
 
 if TYPE_CHECKING:
     from agentbox.core.db import AgentVersionsMixin
-    from agentbox.core.db import AgentDef
+    from agentbox.core.data import AgentDef
 
 
 class _PromptSyncStore(Protocol):

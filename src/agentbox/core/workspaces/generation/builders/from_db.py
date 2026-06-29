@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.db import RunStore
+from agentbox.core.protocols import RunStore
 from agentbox.core.db.system.config import load_project_mcp_servers
 from agentbox.core.workspaces.generation.config import (
     AgentRef,

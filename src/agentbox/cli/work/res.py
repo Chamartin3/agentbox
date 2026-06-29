@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_resource_service  # TODO(cli-arch): workspace resource surface → WorkspaceService (plan 089)
+from agentbox.core.service import (  # TODO(cli-arch): workspace resource surface → WorkspaceService (plan 089)
+    list_workspace_file_bindings,
+    replace_workspace_file_bindings,
+)
 
 workspace_resources_app = typer.Typer(
     name="workspace-resources",
@@ -20,9 +24,8 @@ def wr_list(
     workspace_id: str,
 ) -> None:
     """List all file bindings for a workspace."""
-    obj: CliCtx = ctx.obj
-    svc = get_resource_service()
-    rows = svc.list_workspace_file_bindings_raw(workspace_id)
+    obj: CLIContext = ctx.obj
+    rows = list_workspace_file_bindings(obj.store, workspace_id)
     obj.render.workspace.file_bindings_table(rows, workspace_id)
 
 
@@ -43,7 +46,7 @@ def wr_set(
 
     Existing bindings are preserved; this target_path is upserted.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(reason.strip()) < 3:
         obj.render.workspace.reason_required()
         raise typer.Exit(1)
@@ -54,7 +57,7 @@ def wr_set(
         obj.render.workspace.resource_not_found(resource_slug)
         raise typer.Exit(2)
 
-    existing = svc.list_workspace_file_bindings_raw(workspace_id)
+    existing = list_workspace_file_bindings(obj.store, workspace_id)
     kept = [b for b in existing if b.get("target_path") != dest_path]
     new_binding: dict[str, object] = {
         "resource_id": resource["id"],
@@ -65,7 +68,7 @@ def wr_set(
     }
     kept.append(new_binding)
 
-    svc.replace_workspace_file_bindings_raw(workspace_id, kept, reason=reason)
+    replace_workspace_file_bindings(obj.store, workspace_id, kept, reason=reason)
     obj.render.workspace.file_binding_set(workspace_id, dest_path, resource_slug, mode)
 
 
@@ -75,7 +78,7 @@ def wr_dry_run(
     workspace_id: str,
 ) -> None:
     """Preview what would be materialized for a workspace (no writes)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     svc = get_resource_service()
     result = svc.dry_run_workspace_resources(workspace_id)
     entries = result.get("entries", [])

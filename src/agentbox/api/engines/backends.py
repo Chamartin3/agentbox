@@ -10,11 +10,12 @@ Endpoint:
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 from agentbox.core.constants import BackendName
-from agentbox.core.service.engines import EngineService
 
 router = APIRouter(prefix="/api/runner-backends", tags=["runner-backends"])
 
@@ -41,12 +42,13 @@ _LABELS: dict[str, str] = {
 
 
 @router.get("")
-def list_runner_backends() -> list[BackendDescriptor]:
+def list_runner_backends(
+    ctx: APIContext = Depends(get_api_context),
+) -> list[BackendDescriptor]:
     """List every registered backend along with the providers it accepts."""
-    svc = EngineService()
-    providers = svc.list_providers()
+    providers = ctx.engines.list_providers()
     out: list[BackendDescriptor] = []
-    for name, cls in sorted(svc.backends().items()):
+    for name, cls in sorted(ctx.engines.backends().items()):
         compatible = [p.id for p in providers if name in (p.compatible_backends or [])]
         out.append(
             BackendDescriptor(

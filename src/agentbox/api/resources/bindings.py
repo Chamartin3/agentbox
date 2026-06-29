@@ -1,8 +1,8 @@
 """Agent + workspace resource binding routes (Plans 02 + 03).
 
 Thin HTTP layer: parses requests, delegates to ResourceService, maps domain errors.
-Workspace mutations trigger ``build_workspace_by_name`` as a side-effect after the
-binding write so the service stays transport-agnostic.
+Workspace mutations trigger ``WorkspaceService.build_workspace`` as a best-effort
+side-effect after the binding write so the service stays transport-agnostic.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_resource_service, get_settings, get_store
+from agentbox.api.deps import get_agent_service, get_resource_service, get_workspace_service
 from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
 from agentbox.core.service.resources.service import (
     AgentVersionMissing,
@@ -21,7 +21,8 @@ from agentbox.core.service.resources.service import (
     ResourceNotFound,
     ResourceService,
 )
-from agentbox.core.service import build_workspace_by_name, PreviewError, SessionStore
+from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.service import AgentService, PreviewError
 
 router = APIRouter(tags=["resource-bindings"])
 
@@ -116,7 +117,6 @@ def preview_prompt(
     agent_id: str,
     body: PreviewPromptBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-    store: Annotated[SessionStore, Depends(get_store)],
 ):
     override = (
         [b.model_dump() for b in body.bindings] if body.bindings is not None else None
@@ -124,7 +124,6 @@ def preview_prompt(
     try:
         return svc.preview_prompt(
             agent_id,
-            store=store,
             template=body.template,
             bindings_override=override,
         )
@@ -150,7 +149,7 @@ def replace_workspace_resources(
     workspace_id: str,
     body: ReplaceWorkspaceBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
     try:
         result = svc.replace_workspace_resources(
@@ -163,7 +162,7 @@ def replace_workspace_resources(
         raise HTTPException(400, str(exc)) from exc
     # Trigger workspace build as a best-effort side effect
     with contextlib.suppress(Exception):
-        build_workspace_by_name(store, get_settings(), workspace_id)
+        ws.build_workspace(workspace_id)
     return result
 
 
@@ -195,14 +194,14 @@ def preview_modes(
 @router.get("/api/workspaces/{workspace_id}/subagents")
 def list_workspace_subagents(
     workspace_id: str,
-    svc: Annotated[ResourceService, Depends(get_resource_service)],
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    agent_svc: Annotated[AgentService, Depends(get_agent_service)],
 ):
     # Enrichment with agent info is done here at the API layer
     items = svc.list_workspace_subagents_raw(workspace_id)
     enriched = []
     for s in items:
-        agent = store.get_agent_def(s["agent_id"])
+        agent = agent_svc.get_agent_def(s["agent_id"])
         enriched.append(
             {
                 **s,
@@ -217,8 +216,7 @@ def list_workspace_subagents(
 def replace_workspace_subagents(
     workspace_id: str,
     body: ReplaceSubagents,
-    svc: Annotated[ResourceService, Depends(get_resource_service)],
-    store: Annotated[SessionStore, Depends(get_store)],
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
     try:
         items = svc.replace_workspace_subagents(
@@ -230,7 +228,7 @@ def replace_workspace_subagents(
         raise HTTPException(400, str(exc)) from exc
     # Trigger workspace build as a best-effort side effect
     with contextlib.suppress(Exception):
-        build_workspace_by_name(store, get_settings(), workspace_id)
+        svc.build_workspace(workspace_id)
     return {"items": items}
 
 
@@ -250,7 +248,7 @@ def replace_workspace_skill_bindings(
     workspace_id: str,
     body: ReplaceSkillBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
     try:
         result = svc.replace_workspace_skill_bindings(
@@ -263,5 +261,5 @@ def replace_workspace_skill_bindings(
         raise HTTPException(400, str(exc)) from exc
     # Trigger workspace build as a best-effort side effect
     with contextlib.suppress(Exception):
-        build_workspace_by_name(store, get_settings(), workspace_id)
+        ws.build_workspace(workspace_id)
     return result

@@ -6,7 +6,7 @@ import asyncio
 import logging
 from dataclasses import replace
 
-from agentbox.core.db.workspaces.manifest import McpServerSpec
+from agentbox.core.data.manifests.workspaces import McpServerSpec
 from agentbox.core.service.lifecycle.report import StartupReport
 from agentbox.core.workspaces.mcp.client.registry import McpServerConfig
 

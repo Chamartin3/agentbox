@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
 # TODO(cli-arch): move to facade export
@@ -23,7 +23,7 @@ def skills_ls(
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
 ) -> None:
     """List skills for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         result = workspaces_service.list_skills_by_name(
             name, store=obj.store, settings=obj.settings,
@@ -43,7 +43,7 @@ def skills_show(
     skill_name: str = typer.Argument(..., help="Skill name"),
 ) -> None:
     """Show full skill content."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         result = workspaces_service.get_skill_content_by_name(
             name, skill_name, store=obj.store, settings=obj.settings,

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.db import McpSnapshot, SnapshotStore
+from agentbox.core.data import McpSnapshot
+from agentbox.core.protocols import SnapshotStore
 from agentbox.core.db.system.config import load_project_mcp_servers
 
 logger = logging.getLogger(__name__)

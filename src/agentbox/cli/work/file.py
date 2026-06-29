@@ -6,7 +6,7 @@ import sys
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
 # TODO(cli-arch): move to facade export
@@ -25,7 +25,7 @@ def file_gen(
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
 ) -> None:
     """Generate runner configs into a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         result = workspaces_service.generate_configs_by_name(
             name, store=obj.store, settings=obj.settings,
@@ -42,7 +42,7 @@ def file_skills(
     name: str = typer.Argument(..., help="Workspace name or agent ID"),
 ) -> None:
     """Generate skill shell scripts into a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         result = workspaces_service.generate_skills_by_name(
             name, store=obj.store, settings=obj.settings,
@@ -71,7 +71,7 @@ def file_edit(
         work file edit my-ws --read --path CLAUDE.md
         work file edit my-ws --write "new content" --path AGENTS.md
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if read and write is not None:
         obj.render.workspace.file_edit_mutual_exclusive()

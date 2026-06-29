@@ -1,7 +1,6 @@
 """Per-workspace runner config generation (Claude / OpenCode).
 
-Delegates to ``WorkspaceService`` for config generation. The ``store``
-parameter is retained for backward compatibility.
+Delegates to ``WorkspaceService`` for config generation.
 """
 
 from __future__ import annotations
@@ -11,10 +10,10 @@ from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
-from agentbox.core.db import SessionStore
+from agentbox.core.service.agents.service import AgentService
 from agentbox.core.service.workspaces.service import WorkspaceService
 
-from .files import _resolve_agent_or_raise
+from agentbox.core.service.agents.versions import AgentNotFound
 
 __all__ = [
     "generate_configs_by_name",
@@ -30,7 +29,6 @@ def _ws() -> WorkspaceService:
 def launch_runner_configs(
     workspace_path: Path,
     *,
-    store: SessionStore,
     settings: Settings,
     servers: list[dict] | None = None,
     keep: bool = False,
@@ -44,7 +42,6 @@ def launch_runner_configs(
 def generate_configs_by_name(
     name: str,
     *,
-    store: SessionStore,
     settings: Settings,
     mcp_manifest: Any | None = None,
 ) -> dict:
@@ -54,12 +51,13 @@ def generate_configs_by_name(
 def generate_configs_for_agent(
     agent_id: str,
     *,
-    store: SessionStore,
     settings: Settings,
     mcp_manifest: Any | None = None,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, store=store)
-    workspace_path, _ = ws.resolve_path(agent, settings, store)
+    agent = AgentService().get_agent_def(agent_id)
+    if agent is None:
+        raise AgentNotFound(agent_id)
+    workspace_path, _ = ws.resolve_path(agent, settings)
     workspace_id = (
         agent.workspace
         if agent.workspace and agent.workspace != "<ephemeral>"

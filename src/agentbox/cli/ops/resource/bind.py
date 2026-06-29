@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_resource_service
 # TODO(cli-arch): ResourceService (plan 090)
 from agentbox.core.service import (
@@ -23,9 +23,9 @@ prompt_bindings_app = typer.Typer(
 @prompt_bindings_app.command("list")
 def pb_list(ctx: typer.Context, agent_id: str) -> None:
     """List all prompt bindings for an agent."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     svc = get_resource_service()
-    rows = svc.list_prompt_bindings_raw(agent_id)
+    rows = svc.list_prompt_resources(agent_id).get("items", [])
     if not rows:
         obj.render.ops.warn(f"No prompt bindings for agent {agent_id!r}.")
         return
@@ -51,7 +51,7 @@ def pb_set(
     The full binding list is replaced atomically: existing bindings are kept,
     this marker is upserted at the end.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(reason.strip()) < 3:
         obj.render.ops.error("--reason must be at least 3 characters")
         raise typer.Exit(1)
@@ -62,7 +62,7 @@ def pb_set(
         obj.render.ops.error(f"Resource not found: {resource_slug!r}")
         raise typer.Exit(2)
 
-    existing = svc.list_prompt_bindings_raw(agent_id)
+    existing = svc.list_prompt_resources(agent_id).get("items", [])
     # Upsert: remove any existing binding for this marker, append new one.
     kept = [b for b in existing if b["marker"] != marker]
     new_binding = {
@@ -74,7 +74,7 @@ def pb_set(
     }
     kept.append(new_binding)
 
-    svc.replace_prompt_bindings_raw(agent_id, kept, reason=reason)
+    svc.replace_prompt_resources(agent_id, kept, reason=reason)
     obj.render.ops.success(
         f"binding set: agent={agent_id} marker={marker} → {resource_slug} (mode={mode})"
     )
@@ -83,7 +83,7 @@ def pb_set(
 @prompt_bindings_app.command("preview")
 def pb_preview(ctx: typer.Context, agent_id: str) -> None:
     """Preview the resolved prompt for an agent with all bindings applied."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     store = obj.store
     active = get_active_agent_version(store, agent_id)
     if not active:

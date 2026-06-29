@@ -7,7 +7,7 @@ from sqlalchemy import Row, select, update as sa_update
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.grant import AgentToolGrant
-from agentbox.core.db.row_types import AgentToolGrantRow, _AgentToolGrantFields, _AgentToolGrantPatchFields
+from agentbox.core.data.rows import AgentToolGrantRow, _AgentToolGrantFields, _AgentToolGrantPatchFields
 from agentbox.core.db.schema import agent_tool_grants
 
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import CliCtx, resolve_agent
+from agentbox.cli.shared import CLIContext, resolve_agent
 # TODO(cli-arch): launch orchestration → Service (plans 089/101)
 from agentbox.cli.ops.launch import _launch_session
 # TODO(cli-arch): workspace CRUD → WorkspaceService (plan 089)
@@ -20,7 +20,7 @@ from agentbox.core.service import get_workspace as service_get_workspace
 from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 
-def _resolve_workspace(obj: CliCtx, name: str) -> tuple[Path, str]:
+def _resolve_workspace(obj: CLIContext, name: str) -> tuple[Path, str]:
     """Resolve a workspace path from name or agent ID."""
     row = (
         service_get_workspace(obj.store, name)
@@ -38,7 +38,7 @@ def _resolve_workspace(obj: CliCtx, name: str) -> tuple[Path, str]:
     return ws_path, name
 
 
-def _delegate_shell(obj: CliCtx, name: str | None, *, generate: bool) -> int:
+def _delegate_shell(obj: CLIContext, name: str | None, *, generate: bool) -> int:
     """Resolve name and delegate to launch."""
     workspace_arg: str | None = None
     agent_arg: str | None = None
@@ -53,6 +53,7 @@ def _delegate_shell(obj: CliCtx, name: str | None, *, generate: bool) -> int:
         else:
             agent_arg = name
     return _launch_session(
+        obj=obj,
         runner="shell",
         agent=agent_arg,
         workspace=workspace_arg,
@@ -72,7 +73,7 @@ ws_app = typer.Typer(
 @ws_app.command("ls")
 def ws_ls(ctx: typer.Context) -> None:
     """List all configured agents and their workspaces."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     rows = ws_core.list_all(obj.store, obj.settings)
     obj.render.workspace.workspaces_table(rows)
 
@@ -83,7 +84,7 @@ def ws_show(
     name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
 ) -> None:
     """Print the absolute path of a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     target = name or "default"
     path, _ = _resolve_workspace(obj, target)
     obj.render.workspace.workspace_path(path)
@@ -100,7 +101,7 @@ def ws_new(
     ),
 ) -> None:
     """Create or recreate the workspace directory."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if reset:
         a = resolve_agent(agent)
         path = ws_core.reset(a, obj.settings, obj.store)
@@ -119,7 +120,7 @@ def ws_edit(
     file: str = typer.Option("CLAUDE.md", help="File within workspace to open"),
 ) -> None:
     """Open a workspace file in $EDITOR (falls back to vi)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     a = resolve_agent(agent)
     path = ws_core.ensure(a, obj.settings, obj.store, scaffold=True)
     editor = os.environ.get("EDITOR", "vi")
@@ -136,7 +137,7 @@ def ws_rm(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
     """Delete a named workspace from the DB registry."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if not yes:
         confirm = typer.confirm(
             f"Delete workspace {name!r}? This cannot be undone."
@@ -165,7 +166,7 @@ def ws_shell(
     ),
 ) -> None:
     """Open an interactive shell in a fully-built workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     _delegate_shell(obj, name, generate=generate)
 
 
@@ -175,6 +176,6 @@ def ws_explore(
     name: str | None = typer.Argument(None, help="Workspace name or agent ID"),
 ) -> None:
     """Open a shell in a workspace with a yazi tip."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     path, _ = _resolve_workspace(obj, name or "default")
     obj.render.workspace.dim(f"  [bold cyan]yazi[/bold cyan] [dim]{path}[/dim]")

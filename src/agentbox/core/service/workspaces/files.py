@@ -15,7 +15,7 @@ from agentbox.core.db import SessionStore
 from agentbox.core.service.prompts import AgentNotFound
 from agentbox.core.service.workspaces.service import WorkspaceService
 
-from .errors import WorkspaceNotFound, WorkspacePathEscape
+from .errors import WorkspacePathEscape
 
 __all__ = [
     "is_user_file",

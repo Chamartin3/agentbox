@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 
 import yaml
 
-from agentbox.core.db import RunEvent
+from agentbox.core.events import RunEvent
 from ._mcp_types import McpToolSpec
 from .rendered import RenderedConfig
 from .views import ComposedView, RuntimeConfigView

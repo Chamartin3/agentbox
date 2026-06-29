@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
 from agentbox.core.db.utils import now_iso
-from agentbox.core.db.row_types import EnvDocRow  # noqa: F401
+from agentbox.core.data.rows import EnvDocRow  # noqa: F401
 from agentbox.core.db.schema import workspace_env_doc_versions, workspace_env_docs
 
 

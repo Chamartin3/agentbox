@@ -22,7 +22,7 @@ import uuid
 from cryptography.fernet import Fernet, InvalidToken
 
 from agentbox.core.config import SETTINGS
-from agentbox.core.db import McpServerSpec, now_iso
+from agentbox.core.data import McpServerSpec, now_iso
 from agentbox.core.service.base import Service
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.core.service.agents import (
     VersionFileNotFound,
     VersionNotDraft,
@@ -28,7 +28,7 @@ def files_add(
     content: str = typer.Option(..., "--content", help="File content"),
 ) -> None:
     """Add a file to a version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         result = obj.agents.upload_version_file(
             agent_id=agent_id,
@@ -57,7 +57,7 @@ def files_rm(
     file_id: int = typer.Argument(..., help="File ID to remove"),
 ) -> None:
     """Remove a file from a version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         obj.agents.remove_version_file(
             agent_id=agent_id,

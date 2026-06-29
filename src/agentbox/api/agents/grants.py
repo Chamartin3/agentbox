@@ -13,10 +13,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_agent_service, get_mcp_registry, get_resource_service, get_store
-from agentbox.core.service import AgentService, SessionStore
-from agentbox.core.workspaces.catalog import resolve_host_env_callables
-from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
+from agentbox.api.deps import get_agent_service, get_mcp_registry, get_resource_service, get_workspace_service
+from agentbox.core.service import AgentService
+from agentbox.core.service.workspaces.service import WorkspaceService
 from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 
 router = APIRouter(prefix="/api/agents", tags=["agent-tool-grants"])
@@ -36,20 +35,20 @@ class RevokeBody(BaseModel):
 
 def _catalog_tool_names(
     workspace_id: str,
-    store: SessionStore,
+    svc: WorkspaceService,
     mcp_registry: McpRegistry,
 ) -> set[str]:
     """Return the set of tool/resource names installed in *workspace_id*."""
     names: set[str] = set()
 
-    for t in resolve_mcp_callables(workspace_id, store, mcp_registry):
+    for t in svc.mcp_callables(workspace_id, mcp_registry):
         names.add(t.name)
-    for t in resolve_host_env_callables(workspace_id, store):
+    for t in svc.host_env_callables(workspace_id):
         names.add(t.name)
 
     # Resource bindings are included but only by resource_id / target_path.
     rsvc = get_resource_service()
-    for b in rsvc._file_bindings.list_for_workspace(workspace_id):
+    for b in rsvc.list_workspace_resources(workspace_id).get("items", []):
         names.add(b.get("target_path", b.get("resource_id", "")))
 
     return names
@@ -68,7 +67,7 @@ def list_grants(
 def grant_tool(
     agent_id: str,
     body: GrantBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws_svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     mcp_registry: Annotated[McpRegistry, Depends(get_mcp_registry)],
     svc: Annotated[AgentService, Depends(get_agent_service)] = ...,  # pyright: ignore[reportArgumentType]
 ):
@@ -85,7 +84,7 @@ def grant_tool(
     # Validate against workspace catalog (warn, not hard-fail).
     response: dict = dict(result)
     if body.workspace_id:
-        installed = _catalog_tool_names(body.workspace_id, store, mcp_registry)
+        installed = _catalog_tool_names(body.workspace_id, ws_svc, mcp_registry)
         if body.tool_name not in installed:
             response["warning"] = (
                 f"Tool '{body.tool_name}' is not currently installed in "

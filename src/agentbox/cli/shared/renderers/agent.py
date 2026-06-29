@@ -15,11 +15,7 @@ from rich.table import Table
 
 from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
-from agentbox.core.db import AgentDef
-from agentbox.core.db.workspaces.manifest import McpServerSpec
-
-# TODO(cli-arch): ToolSpec import — core gap, not exported from facade
-from agentbox.core.tools.registry import ToolSpec
+from agentbox.core.service import AgentDef, McpServerSpec, ToolSpec
 
 
 class AgentRenderer(Renderer):

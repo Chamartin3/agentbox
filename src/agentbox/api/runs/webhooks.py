@@ -18,7 +18,7 @@ from agentbox.core.config import Settings
 from agentbox.core.execution.dispatch import deliver_webhook, dispatch_completion
 from agentbox.core.execution.dispatch.payload import build_completion_payload
 from agentbox.core.execution.dispatch.policy import apply_delivery_outcome
-from agentbox.core.service import AgentDef, RunRecord, SessionStore
+from agentbox.core.service import AgentDef, ExecutionService, RunRecord
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def _resolve_webhook_url(agent: AgentDef | None) -> str | None:
 def schedule_webhook(
     agent: AgentDef | None,
     run: RunRecord,
-    store: SessionStore,
+    store: Any | None = None,
     broadcaster: Any | None = None,
     transcript_path: Path | None = None,
 ) -> None:
@@ -45,13 +45,18 @@ def schedule_webhook(
 
     Thin wrapper around :func:`dispatch_completion` that preserves the
     historical callback signature used by ``api/runs/crud.py`` and the
-    lifecycle service.
+    lifecycle service. The ``store`` parameter is accepted for backward
+    compatibility with callers that still pass a ``SessionStore``; it is
+    not forwarded to dispatch — an :class:`ExecutionService` is constructed
+    internally instead, since the run-lifecycle methods required by dispatch
+    were removed from ``SessionStore`` in plan 088.
     """
     settings = get_settings()
+    exec_svc = ExecutionService()
     dispatch_completion(
         run=run,
         agent=agent,
-        store=store,
+        store=exec_svc,
         broadcaster=broadcaster,
         transcript_path=transcript_path,
         settings=settings if isinstance(settings, Settings) else None,
@@ -61,15 +66,15 @@ def schedule_webhook(
 async def resend_webhook(
     agent: AgentDef | None,
     run: RunRecord,
-    store: SessionStore,
 ) -> tuple[bool, str | None]:
     """Synchronously re-deliver the webhook for ``run``."""
     url = _resolve_webhook_url(agent)
     if not url:
         return False, "no webhook_url configured"
-    payload = build_completion_payload(run, store)
+    exec_svc = ExecutionService()
+    payload = build_completion_payload(run, exec_svc)
     delivered = await deliver_webhook(url, dict(payload))
-    apply_delivery_outcome(store, run.id, delivered)
+    apply_delivery_outcome(exec_svc, run.id, delivered)
     return delivered, None if delivered else "delivery failed; see server logs"
 
 

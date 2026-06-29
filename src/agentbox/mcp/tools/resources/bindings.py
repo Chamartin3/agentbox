@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from agentbox.mcp.deps import get_resource_service
+from agentbox.mcp.context import MCPContext
 
 
 def _require_reason(reason: str) -> dict | None:
@@ -16,7 +16,7 @@ def _require_reason(reason: str) -> dict | None:
     return None
 
 
-def register_bindings(mcp: FastMCP) -> None:
+def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_prompt_resources(agent_id: str) -> dict:
         """List the prompt resource bindings currently attached to an agent.
@@ -25,7 +25,7 @@ def register_bindings(mcp: FastMCP) -> None:
         marker, mode, slot, ``attach_as_reference`` flag, pinned version, and
         enriched resource metadata (slug, type, display_name, active_version_id).
         Mirrors ``GET /api/agents/{agent_id}/prompt-resources``."""
-        svc = get_resource_service()
+        svc = ctx.resources()
         enriched = svc.list_prompt_resources(agent_id)["items"]
         return {"agent_id": agent_id, "items": enriched, "count": len(enriched)}
 
@@ -46,7 +46,7 @@ def register_bindings(mcp: FastMCP) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        svc = get_resource_service()
+        svc = ctx.resources()
         try:
             rows = svc.replace_prompt_bindings_raw(agent_id, bindings, reason=reason)
         except ValueError as exc:
@@ -78,7 +78,7 @@ def register_bindings(mcp: FastMCP) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        svc = get_resource_service()
+        svc = ctx.resources()
         current = svc.list_prompt_bindings_raw(agent_id)
         existing = [
             {
@@ -155,7 +155,7 @@ def register_bindings(mcp: FastMCP) -> None:
                 "error": "invalid_request",
                 "detail": "provide binding_id, or any of resource_id/marker/slot",
             }
-        svc = get_resource_service()
+        svc = ctx.resources()
         current = svc.list_prompt_bindings_raw(agent_id)
 
         def _matches(b: dict) -> bool:

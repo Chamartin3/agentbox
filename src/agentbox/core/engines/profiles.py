@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from agentbox.core.engines.backends.registry import get_backend as resolve_engine_by_name
 from agentbox.core.engines.providers import get_provider
 from agentbox.core.db import get_database
-from agentbox.core.db.engines.profiles import RunnerProfile
+from agentbox.core.data.profiles import RunnerProfile
 
 SourceType = Literal[
     "run_override",

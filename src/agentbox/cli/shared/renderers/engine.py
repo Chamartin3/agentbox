@@ -9,14 +9,7 @@ from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.service import RunnerProfile, RunnerProfileStats
 
-# TODO(cli-arch): move to facade export (plan 095 Phase A)
-from agentbox.core.engines.providers.base import ProviderDescriptor, ProviderModel
-
-# TODO(cli-arch): move to facade export (plan 095 Phase A)
-from agentbox.core.engines.credentials.registry import CredentialMethod
-
-# TODO(cli-arch): move to facade export (plan 095 Phase A)
-from agentbox.core.engines.credentials.state import CredentialState
+from agentbox.core.service import CredentialMethod, CredentialState, ProviderDescriptor, ProviderModel
 
 
 class EngineRenderer(Renderer):

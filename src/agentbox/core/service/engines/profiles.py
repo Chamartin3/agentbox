@@ -13,11 +13,13 @@ from typing import TYPE_CHECKING
 from agentbox.core.service.engines.service import EngineService, ProfileNotFound as _EngProfileNotFound
 
 if TYPE_CHECKING:
-    from agentbox.core.db import (
+    from agentbox.core.data import (
         RunnerProfile,
         RunnerProfileCreate,
         RunnerProfilePatch,
         RunnerProfileStats,
+    )
+    from agentbox.core.db import (
         SessionStore,
     )
 

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
 from agentbox.core.db import Database  # TODO(cli-arch): db via ctx
 from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
@@ -47,7 +47,7 @@ def shell_cmd(
     shell at the workspace root. Configs land under
     ``<workspace>/.agentbox/generated/`` and are overwritten each invocation.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     settings = obj.settings
     _db = Database(settings.db_path)
     store = SessionStore(settings.db_path)
@@ -58,16 +58,16 @@ def shell_cmd(
         raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, _ = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings
+        agent_def, workspace, ephemeral, settings, obj.render.ops
     )
 
-    _apply_creds(creds, settings)
+    _apply_creds(creds, settings, obj.render.ops)
 
     # Place native runner config in the workspace cwd for the interactive
     # session. ``keep=True`` — the exec'd shell needs it to persist; the
     # service never clobbers the user's own config files.
     launch_cm = launch_runner_configs(
-        workspace_path, store=store, settings=settings, keep=True
+        workspace_path, settings=settings, keep=True
     )
     launch_cm.__enter__()
 
@@ -90,7 +90,7 @@ def shell_cmd(
 
 
 def _render_env_doc(
-    obj: CliCtx,
+    obj: CLIContext,
     settings,
     workspace_override: str | None,
     agent_def,
@@ -106,7 +106,7 @@ def _render_env_doc(
         ws = get_workspace(store, ws_name)
         if not ws:
             return False
-        entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)
+        entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)  # type: ignore[arg-type]  # TODO(cli-arch): store protocol → plan 095
         return bool(entries)
     except Exception as exc:
         obj.render.ops.warn(f"env-doc render skipped: {exc}")

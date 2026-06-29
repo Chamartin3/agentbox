@@ -11,13 +11,47 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Any, Protocol, runtime_checkable
 
 from agentbox.core.constants import RunStatus
-from agentbox.core.db import RunStore
 
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class DispatchStore(Protocol):
+    """Minimal store surface needed by the dispatch layer.
+
+    Narrower than ``RunStore`` — only the four methods actually invoked
+    during completion dispatch. ``ExecutionService`` satisfies this
+    protocol structurally; the gutted ``SessionStore`` does not (those
+    methods were removed in plan 088).
+
+    The domain must NOT import ``agentbox.core.service``, so this
+    protocol is defined here rather than referencing ``ExecutionService``
+    directly. Structural typing makes the boundary explicit without
+    coupling the dispatch layer to the service layer.
+    """
+
+    def get_run(self, run_id: str) -> Any: ...
+
+    def set_run_status(self, run_id: str, status: str) -> None: ...
+
+    def get_usage(self, run_id: str) -> dict | None: ...
+
+    def record_webhook_delivery(
+        self,
+        run_id: str,
+        attempt: int,
+        url: str,
+        payload: dict | None = None,
+        response_status: int | None = None,
+        response_body: str | None = None,
+        latency_ms: int | None = None,
+        error: str | None = None,
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -28,7 +62,7 @@ class DispatchPolicy:
     request_timeout_s: float = 10.0
 
 
-def apply_delivery_outcome(store: RunStore, run_id: str, delivered: bool) -> None:
+def apply_delivery_outcome(store: DispatchStore, run_id: str, delivered: bool) -> None:
     """Update the run row based on whether the dispatch succeeded.
 
     Matches the historical webhook behavior: a delivery failure on an
@@ -57,7 +91,7 @@ def apply_delivery_outcome(store: RunStore, run_id: str, delivered: bool) -> Non
 
 
 def on_delivery_done(
-    task: asyncio.Task[DeliveryResult], run_id: str, store: RunStore
+    task: asyncio.Task[DeliveryResult], run_id: str, store: DispatchStore
 ) -> None:
     """Callback for dispatch task completion."""
     if task.cancelled():
@@ -72,6 +106,7 @@ def on_delivery_done(
 
 __all__ = [
     "DispatchPolicy",
+    "DispatchStore",
     "apply_delivery_outcome",
     "on_delivery_done",
 ]

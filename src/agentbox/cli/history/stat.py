@@ -10,7 +10,7 @@ import typer
 # TODO(cli-arch): absorb into EvaluationService
 from agentbox.core.service.evaluation import ActivityRange, since_iso
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 stat_app = typer.Typer(
     name="stat",
@@ -22,7 +22,7 @@ stat_app = typer.Typer(
 @stat_app.command("usage")
 def stat_usage(ctx: typer.Context) -> None:
     """Print the aggregate usage rollup as JSON."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     data = obj.evaluation.aggregate_usage()
     obj.render.run.print(json.dumps(data, indent=2, default=str))
 
@@ -34,7 +34,7 @@ def stat_activity(
     agent: str | None = typer.Option(None, help="Filter by agent id."),
 ) -> None:
     """Print the activity summary as JSON."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     data = obj.evaluation.activity_summary(since_iso(range_), agent=agent)
     obj.render.run.print(json.dumps(data, indent=2, default=str))
 
@@ -51,7 +51,7 @@ def stat_runs(
     limit: int = typer.Option(50, help="Max rows to return."),
 ) -> None:
     """List enriched recent runs."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     data = obj.evaluation.list_runs_enriched(
         range_=range_,
         agent=agent,
@@ -69,7 +69,7 @@ def stat_runs(
 @stat_app.command("facets")
 def stat_facets(ctx: typer.Context) -> None:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     result = {
         "agents": obj.evaluation.distinct_agent_ids(),
         "executors": obj.evaluation.distinct_executors(),
@@ -87,7 +87,7 @@ def stat_stats(
     until: str | None = typer.Option(None, "--until", help="ISO end date"),
 ) -> None:
     """Aggregated run statistics (alias for runs)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     result = obj.evaluation.stats_for_filters(
         agent_id=agent, status=status, since_iso=since, until_iso=until,
     )

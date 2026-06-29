@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.core.constants import BackendName
 from agentbox.core.service.system.service import SystemService  # TODO(cli-arch): SystemService → facade (plan 095)
 # TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
@@ -37,7 +37,7 @@ def migrate_ws_perms(ctx: typer.Context) -> None:
     corresponding [[workspaces]] block in the manifest. Original JSON files
     are backed up with a timestamp.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     results = migrate_capabilities_to_manifest(obj.settings.project_root)
 
     if not results:
@@ -60,7 +60,7 @@ def migrate_to_db_only(ctx: typer.Context, agent_id: str) -> None:
 
     Idempotent: running twice will not create duplicate versions.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     store = obj.store
 
     # Get active version
@@ -114,7 +114,7 @@ def import_manifest(
     - ``backend_preference``/``tool_manifest_path``/``project`` →
       section ``project_runtime``
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     settings = obj.settings
 
     if from_path:
@@ -197,7 +197,7 @@ def migrate_prompt_versions(ctx: typer.Context) -> None:
 
     See ``agentbox.core.db.backfill_prompt_versions``.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     n = _backfill_prompt_versions(obj.store)
     obj.render.ops.success(f"backfilled {n} run(s) with prompt_version_id")
 
@@ -210,7 +210,7 @@ def migrate_workenv_engine(ctx: typer.Context) -> None:
     seeded before the rename still carry ``engine='claude'``; this updates
     them in place. Idempotent.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     store = obj.store
     renamed = 0
     for tmpl in store.list_workenv_templates():

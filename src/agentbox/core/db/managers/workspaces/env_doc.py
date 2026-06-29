@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 
 from sqlalchemy import func, select
 
 from agentbox.core.db.base.manager import Manager
+from agentbox.core.data.rows import EnvDocRow
 from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
 from agentbox.core.db.schema import workspace_env_doc_versions, workspace_env_docs
 from agentbox.core.db.utils import now_iso
@@ -33,7 +35,7 @@ class WorkspaceEnvDocVersionManager(Manager[WorkspaceEnvDocVersion]):
 
     # ── pure-DB primitives (ported from EnvDocsMixin) ───────────────────
 
-    def get_active(self, workspace_id: str) -> dict | None:
+    def get_active(self, workspace_id: str) -> EnvDocRow | None:
         with self._engine.connect() as conn:
             ptr = conn.execute(
                 workspace_env_docs.select().where(
@@ -47,7 +49,7 @@ class WorkspaceEnvDocVersionManager(Manager[WorkspaceEnvDocVersion]):
                     workspace_env_doc_versions.c.id == ptr.active_version_id
                 )
             ).first()
-            return dict(ver._mapping) if ver else None
+            return cast(EnvDocRow, dict(ver._mapping)) if ver else None
 
     def list_for_workspace(self, workspace_id: str) -> list[dict]:
         with self._engine.connect() as conn:

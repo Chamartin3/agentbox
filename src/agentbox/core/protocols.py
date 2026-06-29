@@ -14,16 +14,16 @@ from typing import Protocol, runtime_checkable
 
 from sqlalchemy.engine import Engine as _Engine
 
-from agentbox.core.db.agents.manifest import AgentDef
-from agentbox.core.db.engines.profiles import RunnerProfile
-from agentbox.core.db.execution.records import RunRecord
-from agentbox.core.db.execution.snapshots import (
+from agentbox.core.data.manifests.agents import AgentDef
+from agentbox.core.data.profiles import RunnerProfile
+from agentbox.core.data.records import RunRecord
+from agentbox.core.data.snapshots import (
     McpSnapshot,
     ResourceSnapshotEntry,
     RunnerSnapshot,
 )
-from agentbox.core.db.row_types import EnvDocRow, RepoResourceRow, WorkspaceRow
-from agentbox.core.db.workspaces.manifest import McpServerSpec
+from agentbox.core.data.rows import EnvDocRow, RepoResourceRow, WorkspaceRow
+from agentbox.core.data.manifests.workspaces import McpServerSpec
 
 
 @runtime_checkable

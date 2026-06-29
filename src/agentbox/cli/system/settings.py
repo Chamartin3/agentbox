@@ -6,7 +6,7 @@ import json
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 settings_app = typer.Typer(
     name="settings",
@@ -18,7 +18,7 @@ settings_app = typer.Typer(
 @settings_app.command("ls")
 def settings_ls(ctx: typer.Context) -> None:
     """List all settings sections."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     sections = obj.system.list_settings_sections()
     obj.render.system.settings_sections_list(sections)
 
@@ -29,7 +29,7 @@ def settings_show(
     section: str = typer.Argument(..., help="Settings section name"),
 ) -> None:
     """Show settings for a section."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     data = obj.system.get_settings_section(section)
     obj.render.system.settings_section_view(section, data)
 
@@ -45,7 +45,7 @@ def settings_patch(
     Example:
         system settings patch general '{"log_level": "debug"}'
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         patch = json.loads(patch_json)
         if not isinstance(patch, dict):

@@ -46,7 +46,9 @@ from agentbox.core.agents.config import (
     ValidatorConfig,
     resolve_output_config as _resolve_output_config,
 )
-from agentbox.core.db import AgentDef, RunStore, SessionStore
+from agentbox.core.data import AgentDef
+from agentbox.core.protocols import RunStore
+from agentbox.core.db import SessionStore
 from agentbox.core.db.system.config import load_project_shared_assets
 from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,

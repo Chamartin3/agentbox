@@ -7,7 +7,7 @@ import json
 
 import typer
 
-from agentbox.cli.shared import CliCtx, get_executor
+from agentbox.cli.shared import CLIContext, get_executor
 from agentbox.core.service.execution import RunNotFound
 
 
@@ -27,7 +27,7 @@ def register_ls(parent: typer.Typer) -> None:
         ),
     ) -> None:
         """Show recent runs with status, tokens, and cost."""
-        obj: CliCtx = ctx.obj
+        obj: CLIContext = ctx.obj
 
         rows = obj.execution.list_runs(limit=limit, agent_id=agent)
         assert isinstance(rows, list)
@@ -60,7 +60,7 @@ def register_show(parent: typer.Typer) -> None:
         ),
     ) -> None:
         """Show metadata and usage for a single run."""
-        obj: CliCtx = ctx.obj
+        obj: CLIContext = ctx.obj
 
         rec = obj.execution.get_run(run_id)
         if rec is None:
@@ -91,7 +91,7 @@ def register_cancel(parent: typer.Typer) -> None:
         run_id: str = typer.Argument(..., help="Run ID"),
     ) -> None:
         """Cancel an in-progress run. Idempotent."""
-        obj: CliCtx = ctx.obj
+        obj: CLIContext = ctx.obj
 
         async def _cancel() -> None:
             existing = obj.execution.get_run(run_id)

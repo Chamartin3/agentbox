@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 # TODO(cli-arch): migrate remaining PromptError handling to AgentService errors
 from agentbox.core.service.prompts import (
@@ -32,7 +32,7 @@ def prompt_show(
     ),
 ) -> None:
     """Show the active system prompt for an agent (or a specific version)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     if version is not None:
         committed = obj.agents.get_prompt_version(agent_id, version)
@@ -68,7 +68,7 @@ def prompt_edit(
     content: str = typer.Argument(..., help="New prompt content"),
 ) -> None:
     """Write a prompt to disk and create a new committed version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         # TODO(cli-arch): free-fn put_prompt has no AgentService equivalent yet
         _put_prompt(
@@ -95,7 +95,7 @@ def prompt_log(
     ),
 ) -> None:
     """List prompt versions, or show a specific version with --version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         # TODO(cli-arch): free-fn list_versions has no AgentService equivalent yet
         payload = _list_versions(agent_id, store=obj.store)
@@ -138,7 +138,7 @@ def prompt_draft(
     author: str = typer.Option("cli", "--author", help="Author identifier"),
 ) -> None:
     """Save a draft prompt (not published until publish is called)."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         obj.agents.save_prompt_draft(agent_id, content, author=author)
     except AgentNotFound:
@@ -155,7 +155,7 @@ def prompt_publish(
     author: str = typer.Option("cli", "--author", help="Author identifier"),
 ) -> None:
     """Publish the current draft as the active prompt."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         obj.agents.publish_prompt(agent_id, changelog=changelog, author=author)
     except AgentNotFound:
@@ -178,7 +178,7 @@ def prompt_rollback(
     author: str = typer.Option("cli", "--author", help="Author identifier"),
 ) -> None:
     """Roll back to a previous prompt version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     try:
         obj.agents.rollback_prompt(agent_id, target_version, author=author)
     except AgentNotFound:

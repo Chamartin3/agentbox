@@ -10,12 +10,13 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.core.config import Settings
 from agentbox.core.constants import LogLevel, RunStatus
-from agentbox.core.db import AgentDef, DoneEvent, LogEvent
+from agentbox.core.events import DoneEvent, LogEvent
+from agentbox.core.data import AgentDef
 from agentbox.core.execution.dispatch import dispatch_completion
 
 if TYPE_CHECKING:
     from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
-    from agentbox.core.db import RunStore
+    from agentbox.core.protocols import RunStore
 
 logger = logging.getLogger(__name__)
 

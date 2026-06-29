@@ -4,10 +4,19 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from agentbox.api.context import APIContext
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db import Database
-from agentbox.core.service import AgentService, EvaluationService, ExecutionService, SessionStore, SystemService
-from agentbox.core.service.resources.service import ResourceService
+from agentbox.core.service import (
+    AgentService,
+    EngineService,
+    EvaluationService,
+    ExecutionService,
+    ResourceService,
+    SessionStore,
+    SystemService,
+    WorkspaceService,
+)
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
@@ -78,3 +87,23 @@ def get_executor() -> RunExecutor:
 def get_mcp_registry() -> McpRegistry:
     settings = get_settings()
     return McpRegistry(settings.mcp_cache_dir)
+
+
+# ── API context — the single Depends for all routes ─────────────────────
+
+def get_api_context() -> APIContext:
+    """Build and return the ``APIContext`` carrying all seven service objects.
+
+    Uncached: service constructors are cheap and self-wire from settings,
+    so a fresh instance per request stays correct under per-test
+    ``AGENTBOX_DATA_DIR`` overrides.
+    """
+    return APIContext(
+        agents=AgentService(),
+        workspaces=WorkspaceService(),
+        resources=ResourceService(),
+        execution=ExecutionService(),
+        engines=EngineService(),
+        evaluation=EvaluationService(),
+        system=SystemService(),
+    )

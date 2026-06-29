@@ -33,16 +33,22 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings, load_settings
-from agentbox.core.constants import McpPolicy
+from agentbox.core.constants import BackendName, McpPolicy
+from agentbox.core.data import EnvDocRow
 from agentbox.core.db import SessionStore
+from agentbox.core.tools.catalog import CallableItem
+from agentbox.core.workspaces.catalog import resolve_host_env_callables, resolve_workspace_callables
+from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
 from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
 from agentbox.core.service.system.service import SystemService
-from agentbox.core.workspaces.build import build_workspace_by_name
-from agentbox.core.workspaces.generation.builders.from_db import load_workenv
+from agentbox.core.workspaces.build import build_workspace_by_name, WorkspaceSyncResult
+from agentbox.core.workspaces.generation.builders.from_db import load_workenv as _load_workenv_from_db
+from agentbox.core.workspaces.generation.presets import load_seed_templates
 from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
+from agentbox.core.workspaces.generation.payload import RenderedDir
+from agentbox.core.workspaces.generation.recipe import Recipe, list_recipes, load_recipe
 from agentbox.core.workspaces.permissions import resolve_grants
 
 from .errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
@@ -118,6 +124,7 @@ class WorkspaceService(Service):
         self._mcp_tool_overrides = self._db.workspace_mcp_tool_overrides
         self._runtime_permissions = self._db.workspace_runtime_permissions
         self._host_env_grants = self._db.workspace_host_env_grants
+        self._subagents = self._db.workspace_subagents
         self._templates = self._db.workenv_templates
         self._discovery_cache = self._db.mcp_tool_discovery_cache
         self._subagents = self._db.workspace_subagents
@@ -273,7 +280,7 @@ class WorkspaceService(Service):
     # Env docs (from EnvDocsMixin + env_doc.py)
     # ═══════════════════════════════════════════════════════════════════
 
-    def get_active_env_doc(self, workspace_id: str) -> dict | None:
+    def get_active_env_doc(self, workspace_id: str) -> EnvDocRow | None:
         return self._env_doc_versions.get_active(workspace_id)
 
     def list_env_doc_versions(self, workspace_id: str) -> list[dict]:
@@ -347,6 +354,14 @@ class WorkspaceService(Service):
                 "env_doc save: build_workspace_by_name failed for %s", workspace_id
             )
         return result
+
+    def build_workspace(self, workspace_id: str) -> WorkspaceSyncResult | None:
+        """Trigger a workspace build. Thin wrapper over ``build_workspace_by_name``.
+
+        Returns ``None`` when the workspace has no resolvable workdir
+        (unknown name, ephemeral, or path missing on disk).
+        """
+        return build_workspace_by_name(self._session_store(), self._settings, workspace_id)
 
     # ═══════════════════════════════════════════════════════════════════
     # Workenv templates (from WorkenvTemplatesMixin)
@@ -623,6 +638,33 @@ class WorkspaceService(Service):
         }
 
     # ═══════════════════════════════════════════════════════════════════
+    # Callable catalog (host-env + MCP + resources)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def installed_callables(
+        self,
+        workspace_id: str,
+        *,
+        mcp_registry: Any = None,
+    ) -> list[CallableItem]:
+        """Return every callable item (MCP, host-env, resource) installed in *workspace_id*."""
+        return resolve_workspace_callables(
+            workspace_id, self._session_store(), mcp_registry
+        )
+
+    def mcp_callables(
+        self,
+        workspace_id: str,
+        mcp_registry: Any,
+    ) -> list[CallableItem]:
+        """Return MCP-source CallableItems for *workspace_id*."""
+        return resolve_mcp_callables(workspace_id, self._session_store(), mcp_registry)
+
+    def host_env_callables(self, workspace_id: str) -> list[CallableItem]:
+        """Return host-env CallableItems for *workspace_id*."""
+        return resolve_host_env_callables(workspace_id, self._session_store())
+
+    # ═══════════════════════════════════════════════════════════════════
     # Subagent bindings (from bindings.py)
     # ═══════════════════════════════════════════════════════════════════
 
@@ -773,7 +815,7 @@ class WorkspaceService(Service):
     ) -> dict:
         store = self._session_store()
         perms = self.load_effective_permissions(workspace_id)
-        config = load_workenv(store, workspace_id, settings=self._settings, permissions=perms)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements RunStore at runtime; Phase C will switch to managers
+        config = _load_workenv_from_db(store, workspace_id, settings=self._settings, permissions=perms)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements RunStore at runtime; Phase C will switch to managers
         paths: dict[str, str] = {}
         for engine in list_recipes():
             recipe = load_recipe(engine)
@@ -795,6 +837,64 @@ class WorkspaceService(Service):
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
         paths = self._generate_into(ws_path, name)
         return {"workspace": str(ws_path), "generated": paths}
+
+    def render_workenv(
+        self,
+        dir_path: Path,
+        *,
+        config: WorkenvConfig,
+        recipe: Recipe,
+    ) -> RenderedDir:
+        """Render a WorkenvConfig to disk against a Recipe. Thin wrapper over ``render``."""
+        return render(dir_path, config=config, recipe=recipe)
+
+    def list_presets(self) -> list[dict]:
+        """List all WorkenvConfig presets stored in the DB."""
+        return self._templates.list_all()
+
+    def seed_presets(self) -> int:
+        """Seed built-in presets into the DB (idempotent). Returns count seeded."""
+        return self._templates.seed(load_seed_templates())
+
+    def workenv_from_preset(self, name: str) -> WorkenvConfig | None:
+        """Load a ``WorkenvConfig`` from a named preset. Returns ``None`` if not found."""
+        row = self._templates.get_by_name(name)
+        if row is None:
+            return None
+        raw = row.get("config_json")
+        if isinstance(raw, str):
+            raw = json.loads(raw)
+        if not isinstance(raw, dict):
+            return None
+        return WorkenvConfig._from_dict(raw)  # pyright: ignore[reportArgumentType]
+
+    def load_workenv(
+        self,
+        workspace_id: str,
+        *,
+        settings: Settings | None = None,
+        permissions: dict[str, Any] | None = None,
+    ) -> WorkenvConfig:
+        """Load a ``WorkenvConfig`` for *workspace_id* from the DB."""
+        store = self._session_store()
+        return _load_workenv_from_db(store, workspace_id, settings=settings or self._settings, permissions=permissions)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements RunStore at runtime; Phase C will switch to managers
+
+    def save_workenv_as_preset(
+        self,
+        name: str,
+        config: WorkenvConfig,
+        *,
+        engine: str = BackendName.CLAUDE_CODE,
+        description: str | None = None,
+    ) -> dict:
+        """Persist a ``WorkenvConfig`` as a named preset in the DB."""
+        config_json = json.loads(json.dumps(config._to_dict()))
+        return self._templates.upsert(
+            name,
+            engine=engine,
+            config_json=config_json,
+            description=description or config.description,
+        )
 
     # ═══════════════════════════════════════════════════════════════════
     # Skill discovery (from skills.py)
@@ -1064,6 +1164,24 @@ class WorkspaceService(Service):
             "total_groups": len(groups),
             "total_tools": sum(g["tool_count"] for g in groups),
         }
+
+    # -------------------------------------------------------------------
+    # Subagents
+    # -------------------------------------------------------------------
+
+    def list_workspace_subagents_raw(self, workspace_id: str) -> list[dict]:
+        """Return raw subagent rows for a workspace."""
+        return self._subagents.list_for_workspace(workspace_id)
+
+    def replace_workspace_subagents(
+        self,
+        workspace_id: str,
+        subagents: list[dict],
+        *,
+        actor: str | None = None,
+    ) -> list[dict]:
+        """Atomically replace workspace subagents and return rows."""
+        return self._subagents.replace_for_workspace(workspace_id, subagents, actor=actor)
 
 
 # ── helpers ────────────────────────────────────────────────────────────

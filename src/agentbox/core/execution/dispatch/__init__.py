@@ -14,11 +14,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from agentbox.core.config import Settings
-from agentbox.core.db import AgentDef, RunRecord, RunStore
+from agentbox.core.data import AgentDef, RunRecord
 
 from agentbox.core.execution.dispatch.channels.webhook import WebhookChannel
 from agentbox.core.execution.dispatch.payload import CompletionPayload, build_completion_payload
-from agentbox.core.execution.dispatch.policy import DispatchPolicy, on_delivery_done
+from agentbox.core.execution.dispatch.policy import DispatchPolicy, DispatchStore, on_delivery_done
 from agentbox.core.execution.dispatch.registry import get_channel
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def resolve_channels(
 def dispatch_completion(
     run: RunRecord,
     agent: AgentDef | None,
-    store: RunStore,
+    store: DispatchStore,
     broadcaster: Any | None = None,
     transcript_path: Path | None = None,
     settings: Settings | None = None,

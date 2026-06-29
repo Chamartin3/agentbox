@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.db import McpSnapshot, RunnerSnapshot, SnapshotStore
+from agentbox.core.data import McpSnapshot, RunnerSnapshot
+from agentbox.core.protocols import SnapshotStore
 
 from .mcp import build_mcp_snapshot
 from .resources import resolve_host_env_grants

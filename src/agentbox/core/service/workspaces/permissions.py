@@ -14,7 +14,6 @@ from agentbox.core.config import Settings
 from agentbox.core.db import SessionStore
 from agentbox.core.service.workspaces.service import WorkspaceService
 
-from .files import resolve_workspace_path
 
 __all__ = [
     "get_permissions",

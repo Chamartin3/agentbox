@@ -17,17 +17,18 @@ emerges.
 from __future__ import annotations
 
 import json as _json
+import re
+import uuid
 from typing import Any
 
 from agentbox.core.agents.resolve import list_engines, resolve_engine_by_name
-from agentbox.core.db import (
+from agentbox.core.data import (
     RunnerProfile,
     RunnerProfileCreate,
     RunnerProfilePatch,
     RunnerProfileStats,
-    now_iso,
 )
-from agentbox.core.db.engines.profiles import _derive_profile_id
+from agentbox.core.data._util import now_iso
 from agentbox.core.engines import (
     ProviderDescriptor,
     ProviderModel,
@@ -48,6 +49,26 @@ from agentbox.core.service.engines import profile_validation
 from agentbox.core.db import SessionStore  # noqa: E402  (ponytail bridge)
 from agentbox.core.config import load_settings  # noqa: E402  (ponytail bridge)
 from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
+
+
+def _slugify_id(name: str) -> str:
+    """Derive a URL-safe profile id from a display name."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    if not slug:
+        slug = "profile"
+    return slug
+
+
+def _derive_profile_id(name: str, existing_ids: set[str]) -> str:
+    """Create a unique slug-style id from *name*, appending a numeric suffix on collision."""
+    base = _slugify_id(name)
+    if base not in existing_ids:
+        return base
+    for i in range(2, 1000):
+        candidate = f"{base}-{i}"
+        if candidate not in existing_ids:
+            return candidate
+    return f"{base}-{uuid.uuid4().hex[:8]}"
 
 
 class ProfileNotFound(LookupError):

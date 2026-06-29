@@ -8,7 +8,7 @@ from urllib.error import URLError
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 health_app = typer.Typer(
     name="health",
@@ -31,7 +31,7 @@ def health_check(
 
     If the server is not running, exit with code 2.
     """
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
 
     try:
         req = urllib.request.Request(f"{base_url}/health")

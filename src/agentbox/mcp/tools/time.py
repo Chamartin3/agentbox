@@ -8,10 +8,10 @@ from datetime import UTC, datetime
 from fastmcp import FastMCP
 
 from agentbox.core.constants import RunStatus
-from agentbox.mcp.deps import get_context
+from agentbox.mcp.context import MCPContext
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_run_time_remaining(run_id: str) -> dict:
         """Return how much time is left for the current run before timeout.
@@ -19,7 +19,6 @@ def register(mcp: FastMCP) -> None:
         Use this to decide whether you have enough budget to perform
         additional tool calls, reasoning steps, or output generation.
         """
-        ctx = get_context()
 
         run = ctx.db.runs.get(run_id)
         if run is None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 
 # TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import (
@@ -24,7 +24,7 @@ host_env_app = typer.Typer(
 @host_env_app.command("profiles")
 def he_profiles(ctx: typer.Context) -> None:
     """List all host-env profiles."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     rows = list_host_env_profiles(obj.store)
     obj.render.system.host_env_profiles_table(rows)
 
@@ -32,7 +32,7 @@ def he_profiles(ctx: typer.Context) -> None:
 @host_env_app.command("grants")
 def he_grants(ctx: typer.Context, workspace_id: str) -> None:
     """Show the resolved host-env grants for a workspace."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     row = get_workspace_host_env(obj.store, workspace_id)
     if not row:
         obj.render.system.host_env_no_grants(workspace_id)
@@ -45,6 +45,6 @@ def he_grants(ctx: typer.Context, workspace_id: str) -> None:
 @host_env_app.command("audit")
 def he_audit(ctx: typer.Context, run_id: str) -> None:
     """Show the host-env call audit log for a run."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     rows = list_host_env_calls_for_run(obj.store, run_id)
     obj.render.system.host_env_audit_table(rows, run_id)

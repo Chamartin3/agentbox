@@ -11,7 +11,7 @@ from agentbox.core import workspaces as ws
 from agentbox.core.db import SessionStore
 from agentbox.core.service.workspaces.service import WorkspaceService
 
-from .files import _resolve_agent_or_raise, resolve_workspace_path
+from .files import _resolve_agent_or_raise
 
 __all__ = [
     "generate_skills_by_name",

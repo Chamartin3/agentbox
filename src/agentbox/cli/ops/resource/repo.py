@@ -6,8 +6,9 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_resource_service
+from agentbox.core.constants import ResourceType
 # TODO(cli-arch): ResourceService (plan 090)
 from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings  # TODO(cli-arch)
 from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound  # TODO(cli-arch)
@@ -27,9 +28,9 @@ def repo_ls(
     limit: int = typer.Option(50, "--limit", help="Max rows to return"),
 ) -> None:
     """List resources in the repository."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     svc = get_resource_service()
-    rows = svc.list_resources(type=type, limit=limit)["items"]
+    rows = svc.list_resources(type=ResourceType(type) if type else None, limit=limit)["items"]
     if tag:
         rows = [r for r in rows if tag in (r.get("tags") or "")]
     if not rows:
@@ -41,7 +42,7 @@ def repo_ls(
 @repo_app.command("show")
 def repo_show(ctx: typer.Context, slug: str) -> None:
     """Show a resource and its version history."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     svc = get_resource_service()
     resource = svc.get_by_slug(slug)
     if not resource:
@@ -59,7 +60,7 @@ def repo_upload(
     changelog: str = typer.Option("cli upload", "--changelog", help="Changelog"),
 ) -> None:
     """Upload a file as a new resource version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(changelog.strip()) < 3:
         obj.render.ops.error("--changelog must be at least 3 characters")
         raise typer.Exit(1)
@@ -90,7 +91,7 @@ def repo_upload(
 @repo_app.command("log")
 def repo_log(ctx: typer.Context, slug: str) -> None:
     """List versions for a resource."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     svc = get_resource_service()
     resource = svc.get_by_slug(slug)
     if not resource:
@@ -111,7 +112,7 @@ def repo_publish(
     changelog: str = typer.Option("publish via cli", "--changelog"),
 ) -> None:
     """Promote a draft version to active."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(changelog.strip()) < 3:
         obj.render.ops.error("--changelog must be at least 3 characters")
         raise typer.Exit(1)
@@ -138,7 +139,7 @@ def repo_rollback(
     changelog: str = typer.Option(..., "--changelog", help="Reason for rollback"),
 ) -> None:
     """Roll back to a previous version."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if len(changelog.strip()) < 3:
         obj.render.ops.error("--changelog must be at least 3 characters")
         raise typer.Exit(1)
@@ -165,7 +166,7 @@ def repo_preview_modes(
     resource_id: str = typer.Argument(..., help="Resource ID"),
 ) -> None:
     """List available preview modes."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     svc = get_resource_service()
     try:
         result = svc.preview_modes(resource_id)
@@ -191,7 +192,7 @@ def repo_migrate_composition(
     dry_run: bool = typer.Option(False, "--dry-run", help="Report without writing"),
 ) -> None:
     """Migrate composition slots to resource bindings."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     if dry_run:
         obj.render.ops.warn("--dry-run not implemented; running for real.")
     store = obj.store

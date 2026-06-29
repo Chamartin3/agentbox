@@ -1,7 +1,7 @@
 """CLI dependency-injection context.
 
 A thin DI seam over the existing ``deps.py`` singleton factories.
-Every command group feeds a ``CliCtx`` into ``ctx.obj`` so leaf
+Every command group feeds a ``CLIContext`` into ``ctx.obj`` so leaf
 commands read ``ctx.obj.<field>`` instead of importing globals.
 
 Also owns the CLI error-handling contract (``handle_cli_errors``) and
@@ -18,10 +18,10 @@ from typing import Iterator
 import typer
 
 from agentbox.core.config import Settings
-from agentbox.core.db import AgentDef
-from agentbox.core.service import SessionStore
-from agentbox.core.service import AgentService, ExecutionService, EvaluationService, SystemService
-from agentbox.core.service.engines.service import EngineService
+from agentbox.core.service import AgentDef, SessionStore
+from agentbox.core.service import AgentService, EngineService, ExecutionService, EvaluationService, SystemService
+from agentbox.core.service.resources.service import ResourceService
+from agentbox.core.service.workspaces.service import WorkspaceService
 
 from agentbox.cli.shared.deps import (
     get_settings,
@@ -31,6 +31,8 @@ from agentbox.cli.shared.deps import (
     get_engine_service,
     get_evaluation_service,
     get_system_service,
+    get_resource_service,
+    get_workspace_service,
 )
 from agentbox.cli.shared.render import console
 from agentbox.cli.shared.renderers import (
@@ -72,7 +74,7 @@ def handle_cli_errors() -> Iterator[None]:
 
 def resolve_agent(agent_id: str) -> AgentDef:
     """Resolve an agent by id, printing an error and exiting on failure."""
-    a = get_store().get_agent_def(agent_id)
+    a = get_agent_service().resolve_agent(agent_id)
     if a is None:
         console.print(f"[red]unknown agent[/red] {agent_id!r}")
         raise typer.Exit(2)
@@ -102,7 +104,7 @@ class Renderers:
 
 
 @dataclass
-class CliCtx:
+class CLIContext:
     """Shared dependency graph for CLI commands."""
 
     settings: Settings
@@ -113,11 +115,13 @@ class CliCtx:
     engines: EngineService
     evaluation: EvaluationService
     system: SystemService
+    resources: ResourceService
+    workspaces: WorkspaceService
 
 
-def build_ctx() -> CliCtx:
+def build_ctx() -> CLIContext:
     """Thin wrapper over ``deps.py`` singleton factories."""
-    return CliCtx(
+    return CLIContext(
         settings=get_settings(),
         store=get_store(),
         render=Renderers(
@@ -133,11 +137,13 @@ def build_ctx() -> CliCtx:
         engines=get_engine_service(),
         evaluation=get_evaluation_service(),
         system=get_system_service(),
+        resources=get_resource_service(),
+        workspaces=get_workspace_service(),
     )
 
 
 def group_callback(ctx: typer.Context) -> None:
-    """Attach ``CliCtx`` to ``ctx.obj`` for every command in this group.
+    """Attach ``CLIContext`` to ``ctx.obj`` for every command in this group.
 
     Only builds the context when a subcommand is actually invoked
     (not for bare ``--help``), so help output never triggers DB init.

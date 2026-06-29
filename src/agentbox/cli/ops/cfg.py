@@ -4,7 +4,7 @@ import os
 
 import typer
 
-from agentbox.cli.shared import CliCtx
+from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
 from agentbox.core import workspaces as ws_mod  # noqa: E402  # TODO(cli-arch)
 from agentbox.core.service.agents import list_all_agents  # noqa: E402  # TODO(cli-arch)
@@ -19,7 +19,7 @@ cfg_app = typer.Typer(
 @cfg_app.command("show")
 def cfg_show(ctx: typer.Context) -> None:
     """Show resolved Settings + AGENTBOX_* environment variables."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     settings = obj.settings
 
     s_table = obj.render.ops.grid()
@@ -55,7 +55,7 @@ def cfg_show(ctx: typer.Context) -> None:
 @cfg_app.command("paths")
 def cfg_paths(ctx: typer.Context) -> None:
     """Show all important paths as a tree."""
-    obj: CliCtx = ctx.obj
+    obj: CLIContext = ctx.obj
     obj.render.ops.cfg_tree(
         obj.settings,
         ws_mod.resolve_path,

@@ -5,16 +5,10 @@ because the data shapes are flat rows, the public API returns plain
 dicts / dataclasses, and the analytics queries are conditional aggregates
 that read more clearly as SQL expressions than as ORM relationships.
 
-``SessionStore`` is composed from per-domain mixins:
-- ``SessionsMixin``        — session CRUD
-- ``RunCommentsMixin``     — run comment CRUD
-- ``UsageMixin``           — usage record/query
-- ``WebhooksMixin``        — webhook delivery logging
-- ``RunPromptsMixin``      — run prompt capture
-- ``RunSnapshotsMixin``    — composition, resource, and runner snapshots
-- ``RunsMixin``            — run lifecycle CRUD
-- ``AgentToolGrantsMixin`` — agent-scoped tool grant/revoke CRUD
-- ``PromptVersionsMixin``  — draft/publish/rollback for prompt history
+``SessionStore`` is composed from per-domain mixins managed by dedicated
+services (ResourceService, ExecutionService, etc.). Legacy CRUD mixins
+(SessionsMixin, RunsMixin, etc.) have been retired in favour of these
+service-layer abstractions.
 """
 
 from __future__ import annotations
@@ -34,9 +28,8 @@ from agentbox.core.db.agents.sync import AgentSyncMixin
 from agentbox.core.db.agents.grants import AgentToolGrantsMixin
 from agentbox.core.db.agents.versions import AgentVersionsMixin
 from agentbox.core.db.agents.prompts import PromptVersionsMixin
-# ResourcesMixin, SharedResourcesMixin, ResourceBindingsMixin replaced by SessionStore-level
-# backward-compat redirect methods delegating to ResourceService. See _rsvc() helpers below.
 # Execution mixins retired in plan 088 — ExecutionService now owns the run lifecycle.
+# Resource mixins retired in plan 090_01 — ResourceService now owns the resource domain.
 # RunsMixin, SessionsMixin, RunCommentsMixin, UsageMixin, WebhooksMixin,
 # RunPromptsMixin, RunSnapshotsMixin removed.
 from agentbox.core.db.schema import (
@@ -185,7 +178,7 @@ class SessionStore(
     # Resource-domain backward-compat redirects → ResourceService
     # ------------------------------------------------------------------
     def _rsvc(self):
-        from agentbox.core.service.resources.service import ResourceService
+        from agentbox.core.service.resources.service import ResourceService  # noqa: PLC0415
         return ResourceService()
 
     def get_repo_resource(self, resource_id: str):
@@ -283,7 +276,7 @@ class SessionStore(
     def activate_shared_resource(self, id: str, version: int):
         return self._rsvc()._shared_resources.activate_version(id, version)
 
-    # Prompt / workspace bindings (from ResourceBindingsMixin)
+    # Prompt / workspace bindings (→ ResourceService)
     def list_prompt_bindings(self, agent_id: str):
         return self._rsvc()._prompt_bindings.list_for_agent(agent_id)
 
@@ -303,7 +296,9 @@ class SessionStore(
         return self._rsvc()._file_bindings.replace_skill_bindings(workspace_id, skill_resource_ids, reason=reason, actor=actor)
 
     def list_workspace_subagents(self, workspace_id: str):
-        return self._rsvc()._subagents.list_for_workspace(workspace_id)
+        from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
+        return WorkspaceService()._subagents.list_for_workspace(workspace_id)
 
     def replace_workspace_subagents(self, workspace_id: str, subagents, *, actor: str | None = None):
-        return self._rsvc()._subagents.replace_for_workspace(workspace_id, subagents, actor=actor)
+        from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
+        return WorkspaceService()._subagents.replace_for_workspace(workspace_id, subagents, actor=actor)

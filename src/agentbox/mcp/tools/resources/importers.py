@@ -10,7 +10,7 @@ import zipfile
 from fastmcp import FastMCP
 
 from agentbox.core.constants import ResourceType
-from agentbox.mcp.deps import get_resource_service
+from agentbox.mcp.context import MCPContext
 
 
 def _require_reason(reason: str) -> dict | None:
@@ -22,7 +22,7 @@ def _require_reason(reason: str) -> dict | None:
     return None
 
 
-def register_importers(mcp: FastMCP) -> None:
+def register_importers(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool(timeout=30)
     def create_repo_resource_from_files(
         slug: str,
@@ -98,7 +98,9 @@ def register_importers(mcp: FastMCP) -> None:
                 }
             entries.append((path, raw))
 
-        if rtype is ResourceType.SKILL and not any(p.lower() == "skill.md" for p, _ in entries):
+        if rtype is ResourceType.SKILL and not any(
+            p.lower() == "skill.md" for p, _ in entries
+        ):
             return {
                 "error": "invalid_request",
                 "detail": "skill resources require a SKILL.md at the archive root",
@@ -110,7 +112,7 @@ def register_importers(mcp: FastMCP) -> None:
                 zf.writestr(path, raw)
         zip_bytes = buf.getvalue()
 
-        svc = get_resource_service()
+        svc = ctx.resources()
         try:
             resource = svc.create_resource(
                 slug=slug,

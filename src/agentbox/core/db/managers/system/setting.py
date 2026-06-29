@@ -8,7 +8,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.system.setting import Setting
-from agentbox.core.db.workspaces.manifest import McpServerSpec
+from agentbox.core.data.manifests.workspaces import McpServerSpec
 
 _PROJ_MCP_SERVERS = "project_mcp_servers"
 _PROJ_SHARED_ASSETS = "project_shared_assets"

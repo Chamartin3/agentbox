@@ -14,7 +14,7 @@ from typing import Any, ClassVar
 
 from agentbox.core.engines.backends.opencode.stream import _run_opencode_stream
 
-from agentbox.core.db import (
+from agentbox.core.events import (
     DoneEvent,
     LogEvent,
     RunEvent,

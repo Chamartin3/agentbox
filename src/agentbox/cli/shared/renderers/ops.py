@@ -15,14 +15,8 @@ from rich.tree import Tree
 from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
 
-# TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core.workspaces.generation.config import WorkenvConfig  # TODO(cli-arch)
-from agentbox.core.workspaces.generation.recipe import Recipe  # TODO(cli-arch)
-from agentbox.core.workspaces.generation.generator import render  # TODO(cli-arch)
-
-# TODO(cli-arch): Settings / agent types (plan 095 / 094)
-from agentbox.core.config import Settings  # TODO(cli-arch)
-from agentbox.core.db import SessionStore, AgentDef  # TODO(cli-arch)
+from agentbox.core.config import Settings
+from agentbox.core.service import AgentDef, Recipe, SessionStore, WorkenvConfig, WorkspaceService
 
 
 class OpsRenderer(Renderer):
@@ -342,7 +336,7 @@ class OpsRenderer(Renderer):
         """Print rendered workenv output to stdout instead of writing to disk."""
         with _tempfile.TemporaryDirectory() as td:
             dir_path = Path(td)
-            result = render(dir_path, config=config, recipe=recipe)
+            result = WorkspaceService().render_workenv(dir_path, config=config, recipe=recipe)
             for p in result.written_paths:
                 rel = p.relative_to(dir_path)
                 content = p.read_text(encoding="utf-8")

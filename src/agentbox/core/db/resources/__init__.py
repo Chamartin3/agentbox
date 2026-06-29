@@ -1,9 +1,10 @@
 """Resource-scoped data layer.
 
-Submodules:
-- crud/ : ResourcesMixin — versioned resource repository CRUD (split into
-  ``_repo``, ``_versions``, ``_blobs`` sub-mixins)
-- shared/ : SharedResourcesMixin — versioned shared resource persistence
-  (split into ``_models``, ``hash``, ``lookup``, ``write`` sub-modules)
-- bindings: ResourceBindingsMixin — prompt embedding + workspace file bindings
+Resource mixins (ResourcesMixin, SharedResourcesMixin, ResourceBindingsMixin)
+have been retired in plan 090_01 — ResourceService now owns the resource domain.
+
+Remaining modules:
+- ``_rows.py`` — row-conversion helpers shared with the broader resources package.
+- ``models.py`` — dataclasses (Resource, ResourceVersion, ResourceBlob, etc.).
+- ``shared/_models.py`` — SharedResourceRecord used by ResourceService and managers.
 """

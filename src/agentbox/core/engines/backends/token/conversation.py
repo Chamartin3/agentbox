@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.db import RunRecord, read_transcript
+from agentbox.core.data import RunRecord, read_transcript
 from agentbox.core.execution.observability.conversation.base import ConversationSource
 from agentbox.core.execution.observability.conversation.transcript import (
     _events_to_conversation_view,

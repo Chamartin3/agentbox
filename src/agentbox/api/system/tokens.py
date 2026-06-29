@@ -7,10 +7,11 @@ at rest (key from ``AGENTBOX_SECRET_KEY`` env var or per-DB fallback).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.core.service.system.service import SystemService
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 
 router = APIRouter(prefix="/api/api-tokens", tags=["api-tokens"])
 
@@ -29,20 +30,22 @@ class RotateBody(BaseModel):
     secret: str = Field(..., min_length=4)
 
 
-def _svc() -> SystemService:
-    return SystemService()
-
-
 @router.get("")
-def list_tokens(environment: str | None = None) -> dict:
-    items = _svc().list_api_tokens(environment=environment)
+def list_tokens(
+    environment: str | None = None,
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
+    items = ctx.system.list_api_tokens(environment=environment)
     return {"items": items, "total": len(items)}
 
 
 @router.post("", status_code=201)
-def create_token(body: CreateBody) -> dict:
+def create_token(
+    body: CreateBody,
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
     try:
-        return _svc().create_api_token(
+        return ctx.system.create_api_token(
             environment=body.environment, name=body.name, secret=body.secret
         )
     except ValueError as exc:
@@ -56,17 +59,25 @@ def create_token(body: CreateBody) -> dict:
 
 
 @router.patch("/{token_id}")
-def rename_token(token_id: str, body: RenameBody) -> dict:
-    result = _svc().rename_api_token(token_id, body.name)
+def rename_token(
+    token_id: str,
+    body: RenameBody,
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
+    result = ctx.system.rename_api_token(token_id, body.name)
     if result is None:
         raise HTTPException(404, f"token {token_id!r} not found")
     return result
 
 
 @router.post("/{token_id}/rotate")
-def rotate_token(token_id: str, body: RotateBody) -> dict:
+def rotate_token(
+    token_id: str,
+    body: RotateBody,
+    ctx: APIContext = Depends(get_api_context),
+) -> dict:
     try:
-        result = _svc().rotate_api_token(token_id, secret=body.secret)
+        result = ctx.system.rotate_api_token(token_id, secret=body.secret)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     if result is None:
@@ -75,6 +86,9 @@ def rotate_token(token_id: str, body: RotateBody) -> dict:
 
 
 @router.delete("/{token_id}", status_code=204)
-def delete_token(token_id: str) -> None:
-    if not _svc().delete_api_token(token_id):
+def delete_token(
+    token_id: str,
+    ctx: APIContext = Depends(get_api_context),
+) -> None:
+    if not ctx.system.delete_api_token(token_id):
         raise HTTPException(404, f"token {token_id!r} not found")

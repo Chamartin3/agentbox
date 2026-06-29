@@ -4,14 +4,10 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from agentbox.core.service import (
-    PreviewError,
-    render_agent_prompt_preview,
-)
-from agentbox.mcp.deps import get_agent_service, get_context
+from agentbox.mcp.context import MCPContext
 
 
-def register_prompts(mcp: FastMCP) -> None:
+def register_prompts(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def preview_prompt(
         agent_id: str,
@@ -25,17 +21,16 @@ def register_prompts(mcp: FastMCP) -> None:
         ``snapshot`` of every resolved binding (resource_id, version_id,
         content_hash, chars). Use ``template_override`` to preview with a
         candidate prompt body instead of the agent's current one."""
-        ctx = get_context()
         if template_override is None:
-            agent = get_agent_service().resolve_agent(agent_id)
+            agent = ctx.agents.resolve_agent(agent_id)
             if agent is None:
                 return {"error": "agent_not_found", "agent_id": agent_id}
             template = agent.prompt or ""
         else:
             template = template_override
         try:
-            return render_agent_prompt_preview(
-                ctx.store, agent_id=agent_id, template=template
+            return ctx.agents.render_agent_prompt_preview(
+                agent_id=agent_id, template=template
             )
         except PreviewError as exc:
             return {"error": exc.code, "detail": exc.detail}

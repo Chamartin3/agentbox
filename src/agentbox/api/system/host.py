@@ -15,8 +15,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_store
-from agentbox.core.service import SessionStore
+from agentbox.api.deps import get_workspace_service
+from agentbox.core.service import WorkspaceService
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.tools import CAPABILITIES
 
@@ -59,15 +59,15 @@ def list_capabilities():
 
 
 @router.get("/api/host-env/profiles")
-def list_profiles(store: Annotated[SessionStore, Depends(get_store)]):
-    return {"items": store.list_host_env_profiles()}
+def list_profiles(ws: Annotated[WorkspaceService, Depends(get_workspace_service)]):
+    return {"items": ws.list_host_env_profiles()}
 
 
 @router.post("/api/host-env/profiles", status_code=201)
 def create_profile(
-    body: ProfileBody, store: Annotated[SessionStore, Depends(get_store)]
+    body: ProfileBody, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
 ):
-    return store.upsert_host_env_profile(
+    return ws.upsert_host_env_profile(
         name=body.name,
         description=body.description,
         grants=body.grants,
@@ -79,11 +79,11 @@ def create_profile(
 def update_profile(
     profile_id: str,
     body: ProfileBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
-    if not store.get_host_env_profile(profile_id):
+    if not ws.get_host_env_profile(profile_id):
         raise HTTPException(status_code=404, detail="profile not found")
-    return store.upsert_host_env_profile(
+    return ws.upsert_host_env_profile(
         profile_id=profile_id,
         name=body.name,
         description=body.description,
@@ -93,26 +93,26 @@ def update_profile(
 
 
 @router.delete("/api/host-env/profiles/{profile_id}", status_code=204)
-def delete_profile(profile_id: str, store: Annotated[SessionStore, Depends(get_store)]):
-    store.delete_host_env_profile(profile_id)
+def delete_profile(profile_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]):
+    ws.delete_host_env_profile(profile_id)
 
 
 @router.get("/api/workspaces/{workspace_id}/host-env")
 def get_workspace_host_env(
-    workspace_id: str, store: Annotated[SessionStore, Depends(get_store)]
+    workspace_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
 ):
     """Read the host-env provisioning config for *workspace_id*."""
-    return store.resolve_workspace_host_env(workspace_id)
+    return ws.resolve_workspace_host_env(workspace_id)
 
 
 @router.put("/api/workspaces/{workspace_id}/host-env")
 def set_workspace_host_env(
     workspace_id: str,
     body: WorkspaceHostEnvBody,
-    store: Annotated[SessionStore, Depends(get_store)],
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ):
     try:
-        store.set_workspace_host_env(
+        ws.set_workspace_host_env(
             workspace_id,
             profile_id=body.profile_id,
             overrides=body.overrides,
@@ -121,7 +121,7 @@ def set_workspace_host_env(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return store.resolve_workspace_host_env(workspace_id)
+    return ws.resolve_workspace_host_env(workspace_id)
 
 
 @router.get("/api/runs/{run_id}/host-env-calls")

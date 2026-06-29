@@ -9,7 +9,8 @@ from __future__ import annotations
 import logging
 
 from agentbox.core.config import Settings
-from agentbox.core.db import ProjectManifest, SessionStore
+from agentbox.core.data import ProjectManifest
+from agentbox.core.db import SessionStore
 from agentbox.core.resources.boot import (
     import_composition_references,
     import_repo_resources,

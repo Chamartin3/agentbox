@@ -20,10 +20,11 @@ from __future__ import annotations
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.api.deps import get_agent_service
+from agentbox.api.context import APIContext
+from agentbox.api.deps import get_api_context
 from agentbox.core.service.agents import AgentServiceError
 
 logger = logging.getLogger(__name__)
@@ -66,15 +67,17 @@ class AgentValidationPut(BaseModel):
 @router.get("/api/agents/{agent_id}/validation")
 def get_agent_validation(
     agent_id: str,
+    ctx: APIContext = Depends(get_api_context),
 ):
     """Return the active version's inline validators per direction."""
-    return get_agent_service().get_agent_validation(agent_id)
+    return ctx.agents.get_agent_validation(agent_id)
 
 
 @router.put("/api/agents/{agent_id}/validation")
 def put_agent_validation(
     agent_id: str,
     body: AgentValidationPut,
+    ctx: APIContext = Depends(get_api_context),
 ):
     """Write inline validators by minting a new active version.
 
@@ -93,7 +96,7 @@ def put_agent_validation(
         else None
     )
     try:
-        return get_agent_service().put_agent_validation(
+        return ctx.agents.put_agent_validation(
             agent_id,
             input_validators=input_validators,
             output_validators=output_validators,

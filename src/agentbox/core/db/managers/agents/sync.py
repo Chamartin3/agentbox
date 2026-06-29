@@ -12,7 +12,7 @@ from sqlalchemy import Row
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.sync import AgentSync
-from agentbox.core.db.row_types import AgentSyncRow, _AgentSyncFields, _AgentSyncPatchFields
+from agentbox.core.data.rows import AgentSyncRow, _AgentSyncFields, _AgentSyncPatchFields
 from agentbox.core.db.schema import agent_sync
 
 

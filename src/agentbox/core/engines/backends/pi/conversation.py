@@ -8,7 +8,7 @@ UI / MCP can fall back to the agentbox JSONL transcript.
 
 from __future__ import annotations
 
-from agentbox.core.db import RunRecord
+from agentbox.core.data import RunRecord
 from agentbox.core.execution.observability.conversation.base import ConversationSource
 from agentbox.core.execution.observability.conversation.types import ConversationView, TokenTotals
 

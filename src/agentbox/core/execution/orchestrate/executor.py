@@ -8,7 +8,8 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.config import Settings
-from agentbox.core.db import AgentDef, RunStore
+from agentbox.core.data import AgentDef
+from agentbox.core.protocols import RunStore
 from agentbox.core.db import Database
 from agentbox.core.engines.profiles import RunnerProfileResolver
 from agentbox.core.execution.orchestrate._runner import _run as _run_loop

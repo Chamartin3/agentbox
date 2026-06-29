@@ -33,7 +33,7 @@ from types import TracebackType
 from typing import TextIO
 
 from agentbox.core.constants import LogLevel, TerminalRunStatus, ValidationCheckMode, ValidationMode
-from agentbox.core.db import (
+from agentbox.core.events import (
     DoneEvent,
     LogEvent,
     RetryEvent,

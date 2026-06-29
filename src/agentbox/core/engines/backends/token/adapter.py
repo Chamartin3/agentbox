@@ -28,7 +28,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.db import DoneEvent, LogEvent, RunEvent
+from agentbox.core.events import DoneEvent, LogEvent, RunEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, HasAgentConfig, RenderedConfig
 from agentbox.core.engines.contracts.views import PythonAgentConfigView
 from agentbox.core.engines.backends.token.run_direct import run_direct_agent_mode

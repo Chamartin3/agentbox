@@ -1,4 +1,4 @@
-"""Runner profile models and mixin for profile-based runtime configuration.
+"""Runner profile persistence mixin — data types live in ``core.data.profiles``.
 
 Composed into ``SessionStore``. Reads ``self.engine`` and operates on
 ``runner_profiles`` and ``agent_runner_profiles`` tables.
@@ -6,87 +6,51 @@ Composed into ``SessionStore``. Reads ``self.engine`` and operates on
 
 from __future__ import annotations
 
-import warnings
-
 import json as _json
 import re
 import uuid
+import warnings
 from typing import Any
 
-from pydantic import BaseModel, Field
 from sqlalchemy import insert, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
-from agentbox.core.db.engines.models import RunnerProfileStats, _row_to_profile
+from agentbox.core.data.profiles import (
+    RunnerProfile,
+    RunnerProfileCreate,
+    RunnerProfilePatch,
+    RunnerProfileStats,
+)
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.schema import agent_runner_profiles, runner_profiles
 
-# Re-export so callers can ``from agentbox.core.db.engines.profiles import
-# RunnerProfileStats`` — the canonical model lives in ``_models`` but the
-# package contract advertises it here.
+
+def _row_to_profile(row) -> RunnerProfile:
+    """Convert a database row to a RunnerProfile model."""
+    m = row._mapping
+    return RunnerProfile(
+        id=m["id"],
+        name=m["name"],
+        description=m.get("description"),
+        backend=m["backend"],
+        provider=m.get("provider"),
+        model=m.get("model"),
+        base_url=m.get("base_url"),
+        api_key_env=m.get("api_key_env"),
+        api_token_id=m.get("api_token_id"),
+        output_mode=m.get("output_mode") or "auto",
+        params=_json.loads(m.get("params_json") or "{}"),
+        headers=_json.loads(m.get("headers_json") or "{}"),
+        extra_args=_json.loads(m.get("extra_args_json") or "[]"),
+        is_enabled=bool(m.get("is_enabled", 1)),
+        is_system_default=bool(m.get("is_system_default", 0)),
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
+    )
+
+# Re-export for backward compatibility
 __all__ = ["RunnerProfileStats"]
-
-
-class RunnerProfile(BaseModel):
-    """A runtime configuration profile for agent execution."""
-
-    id: str
-    name: str
-    description: str | None = None
-    backend: str
-    provider: str | None = None
-    model: str | None = None
-    base_url: str | None = None
-    api_key_env: str | None = None
-    api_token_id: str | None = None
-    output_mode: str = "auto"
-    params: dict[str, Any] = Field(default_factory=dict)
-    headers: dict[str, str] = Field(default_factory=dict)
-    extra_args: list[str] = Field(default_factory=list)
-    is_enabled: bool = True
-    is_system_default: bool = False
-    created_at: str
-    updated_at: str
-
-
-class RunnerProfileCreate(BaseModel):
-    """Mutable fields for creating a new runner profile."""
-
-    id: str | None = None
-    name: str
-    description: str | None = None
-    backend: str
-    provider: str | None = None
-    model: str | None = None
-    base_url: str | None = None
-    api_key_env: str | None = None
-    api_token_id: str | None = None
-    output_mode: str = "auto"
-    params: dict[str, Any] = Field(default_factory=dict)
-    headers: dict[str, str] = Field(default_factory=dict)
-    extra_args: list[str] = Field(default_factory=list)
-    is_enabled: bool = True
-    is_system_default: bool = False
-
-
-class RunnerProfilePatch(BaseModel):
-    """Mutable fields for updating a runner profile."""
-
-    name: str | None = None
-    description: str | None = None
-    backend: str | None = None
-    provider: str | None = None
-    model: str | None = None
-    base_url: str | None = None
-    api_key_env: str | None = None
-    api_token_id: str | None = None
-    output_mode: str | None = None
-    params: dict[str, Any] | None = None
-    headers: dict[str, str] | None = None
-    extra_args: list[str] | None = None
-    is_enabled: bool | None = None
-    is_system_default: bool | None = None
 
 
 def _slugify_id(name: str) -> str:

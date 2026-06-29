@@ -6,14 +6,14 @@ import logging
 
 from fastmcp import FastMCP
 
-from agentbox.api.deps import get_settings
-from agentbox.core.service import build_workspace_by_name
-from agentbox.core.service.system.service import SystemService
-from agentbox.core.service.env_doc import (
-    env_doc_body,
-    render_env_doc_preview,
-)
-from agentbox.mcp.deps import get_context, get_resource_service
+# TODO: Imports shoudl be replaces by context impors
+# from agentbox.api.deps import get_settings
+# from agentbox.core.service import build_workspace_by_name
+# from agentbox.core.service.env_doc import (
+#     env_doc_body,
+#     render_env_doc_preview,
+# )
+from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
 
@@ -26,7 +26,7 @@ def _require_reason(reason: str) -> dict | None:
     return None
 
 
-def register_workspace(mcp: FastMCP) -> None:
+def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def set_workspace_resources(
         workspace_id: str,
@@ -53,9 +53,11 @@ def register_workspace(mcp: FastMCP) -> None:
             }
             for b in bindings
         ]
-        svc = get_resource_service()
+        svc = ctx.resources()
         try:
-            rows = svc.replace_workspace_resources(workspace_id, normalized, reason=reason)["items"]
+            rows = svc.replace_workspace_resources(
+                workspace_id, normalized, reason=reason
+            )["items"]
         except ValueError as exc:
             return {"error": "invalid_binding", "detail": str(exc)}
         return {"workspace_id": workspace_id, "bindings": rows}
@@ -65,7 +67,7 @@ def register_workspace(mcp: FastMCP) -> None:
         """Return what would be materialized for the workspace without writing files.
 
         Lists each binding with its resolved resource version and target path."""
-        svc = get_resource_service()
+        svc = ctx.resources()
         result = svc.dry_run_workspace_resources(workspace_id)
         return {
             "workspace_id": workspace_id,
@@ -107,7 +109,6 @@ def register_workspace(mcp: FastMCP) -> None:
 
         Returns the CLAUDE.md / AGENTS.md content (identical body) without
         writing files."""
-        ctx = get_context()
         doc = ctx.store.get_active_env_doc(workspace_id)
         if doc is None:
             return {"workspace_id": workspace_id, "claude_md": None, "agents_md": None}
@@ -133,7 +134,6 @@ def register_workspace(mcp: FastMCP) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        ctx = get_context()
         row = ctx.store.set_workspace_host_env(
             workspace_id, profile_id=None, overrides=grants, changelog=reason
         )
@@ -147,6 +147,6 @@ def register_workspace(mcp: FastMCP) -> None:
         """List host-env capability calls recorded for a run.
 
         Returns audit log entries: capability, status, params, error, ts."""
-        rows = SystemService().list_host_env_calls_for_run(run_id)
+        rows = ctx.system.list_host_env_calls_for_run(run_id)
         limit = clamp_limit(limit)
         return {"run_id": run_id, "calls": rows[:limit], "total": len(rows)}
