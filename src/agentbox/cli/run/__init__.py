@@ -9,7 +9,7 @@ Positional-argument semantics
 ------------------------------
 * ``AGENT`` (optional) is always an **agent id**. The agent's ``runner.kind``
   determines which backend to launch in interactive mode.
-* Ad-hoc interactive with no agent: pass ``--backend/-b {claude|opencode|\u2026}``
+* Ad-hoc interactive with no agent: pass ``--backend/-b {claude|opencode|…}``
   with an optional ``--workspace/-w`` flag.
 
 Validation
@@ -29,8 +29,7 @@ import typer
 import websockets
 
 from agentbox.cli.ops.launch import _launch_session
-from agentbox.cli.shared import CliCtx, build_ctx
-from agentbox.cli.shared import get_store as _get_store  # TODO(cli-arch): AgentService (plan 094)
+from agentbox.cli.shared import CliCtx
 
 # Mapping from BackendName values to RunnerKind strings used by _launch_session.
 # "token" passes through and is rejected by _launch_session with a clear message.
@@ -43,14 +42,13 @@ _BACKEND_NAME_TO_RUNNER: dict[str, str] = {
 }
 
 
-async def _stream(obj: CliCtx, api: str, run_id: str) -> None:
+async def _stream(api: str, run_id: str, run_renderer) -> None:
     ws_url = api.replace("http", "ws") + f"/api/runs/{run_id}/stream"
     async with websockets.connect(ws_url) as ws:
         async for msg in ws:
             ev = json.loads(msg)
             t = ev.get("type", "?")
-            # Use RunRenderer.event_line (plan 097 consolidation)
-            obj.render.run.event_line(t, ev)
+            run_renderer.event_line(t, ev)
 
 
 def run_cmd(
@@ -111,28 +109,22 @@ def run_cmd(
     Headless:
         agentbox run my-agent -p "Summarise the codebase"
     """
-    obj: CliCtx = ctx.obj if isinstance(ctx.obj, CliCtx) else build_ctx()
+    obj: CliCtx = ctx.obj
+    render = obj.render
+
     is_headless = bool(prompt) or headless
 
     # --- Validation -------------------------------------------------------
     if backend and is_headless:
-        obj.render.ops.error(
-            "--backend is for interactive sessions only. "
-            "Headless runs require an AGENT id, not a --backend."
-        )
+        render.error("--backend is for interactive sessions only. Headless runs require an AGENT id, not a --backend.")
         raise typer.Exit(2)
 
     if is_headless and not agent:
-        obj.render.ops.error(
-            "Headless mode requires an AGENT id. "
-            "Pass an agent id as the first argument."
-        )
+        render.error("Headless mode requires an AGENT id. Pass an agent id as the first argument.")
         raise typer.Exit(2)
 
     if is_headless and not prompt:
-        obj.render.ops.error(
-            "--headless requires a prompt. Pass -p/--prompt TEXT."
-        )
+        render.error("--headless requires a prompt. Pass -p/--prompt TEXT.")
         raise typer.Exit(2)
 
     # --- Headless path ----------------------------------------------------
@@ -145,13 +137,12 @@ def run_cmd(
         resp = httpx.post(f"{api}/api/runs", json=body, timeout=30)
         resp.raise_for_status()
         run_id = resp.json()["run_id"]
-        obj.render.ops.dim(f"run_id={run_id}")
-        obj.render.ops.panel(
+        render.dim(f"run_id={run_id}")
+        render.panel(
             f"View: [link={api}/runs/{run_id}]{api}/runs/{run_id}[/link]",
-            title="run",
             border="cyan",
         )
-        asyncio.run(_stream(obj, api, run_id))
+        asyncio.run(_stream(api, run_id, render.run))
         return
 
     # --- Interactive path -------------------------------------------------
@@ -160,14 +151,14 @@ def run_cmd(
     if backend:
         runner = backend
     elif agent:
-        agent_def = _get_store().get_agent_def(agent)
+        agent_def = obj.store.get_agent_def(agent)
         if agent_def is None:
-            obj.render.ops.error(f"Unknown agent: {agent!r}")
+            render.error(f"Unknown agent: {agent!r}")
             raise typer.Exit(1)
         raw_kind = agent_def.runner.kind
         runner = _BACKEND_NAME_TO_RUNNER.get(raw_kind, raw_kind)
     else:
-        obj.render.ops.error(
+        render.error(
             "No agent or --backend specified. "
             "Pass an AGENT id or --backend {claude|opencode|codex|pi}."
         )

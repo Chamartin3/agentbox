@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from rich.table import Table
 
 from agentbox.cli.shared import CliCtx
-from agentbox.cli.shared.deps import get_resource_service  # TODO(cli-arch): ResourceService (plan 090)
-from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings  # TODO(cli-arch): ResourceService (plan 090)
+from agentbox.cli.shared.deps import get_resource_service
+# TODO(cli-arch): ResourceService (plan 090)
+from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings
 from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound
 
 repo_app = typer.Typer(
@@ -32,28 +32,7 @@ def repo_ls(
     rows = svc.list_resources(type=type, limit=limit)["items"]
     if tag:
         rows = [r for r in rows if tag in (r.get("tags") or "")]
-    if not rows:
-        obj.render.ops.warn("No resources found.")
-        return
-    table = Table(
-        title="Resources", title_style="bold", header_style="bold cyan", padding=(0, 1)
-    )
-    table.add_column("Slug", style="bold")
-    table.add_column("Type", style="cyan")
-    table.add_column("Name")
-    table.add_column("Status", style="dim")
-    table.add_column("Active version", style="dim")
-    table.add_column("Tags", style="magenta")
-    for r in rows:
-        table.add_row(
-            r["slug"],
-            r["type"],
-            r.get("display_name") or "",
-            r.get("status") or "active",
-            r.get("active_version_id") or "[dim]---[/dim]",
-            r.get("tags") or "",
-        )
-    obj.render.ops.print(table)
+    obj.render.ops.resource_table(rows)
 
 
 @repo_app.command("show")
@@ -65,41 +44,15 @@ def repo_show(ctx: typer.Context, slug: str) -> None:
     if not resource:
         obj.render.ops.error(f"Resource not found: {slug!r}")
         raise typer.Exit(2)
-    meta = Table.grid(padding=(0, 2))
-    meta.add_column(style="dim", justify="right")
-    meta.add_column()
-    meta.add_row("id", resource["id"])
-    meta.add_row("slug", resource["slug"])
-    meta.add_row("type", resource["type"])
-    meta.add_row("name", resource.get("display_name") or "---")
-    meta.add_row("description", resource.get("description") or "---")
-    obj.render.ops.panel(meta, title=f"Resource: {slug}", border="cyan")
+    meta_pairs = [
+        ("id", resource["id"]),
+        ("slug", resource["slug"]),
+        ("type", resource["type"]),
+        ("name", resource.get("display_name") or "---"),
+        ("description", resource.get("description") or "---"),
+    ]
     versions = svc.list_versions(resource["id"])["items"]
-    if not versions:
-        obj.render.ops.dim("No versions.")
-        return
-    vtable = Table(header_style="bold green", padding=(0, 1))
-    vtable.add_column("#", style="dim")
-    vtable.add_column("ID", style="dim")
-    vtable.add_column("Draft", justify="center")
-    vtable.add_column("Source")
-    vtable.add_column("Changelog")
-    vtable.add_column("Created at", style="dim")
-    for v in versions:
-        draft = (
-            "[yellow]draft[/yellow]"
-            if v.get("is_draft")
-            else "[green]published[/green]"
-        )
-        vtable.add_row(
-            str(v["version_number"]),
-            v["id"],
-            draft,
-            v.get("import_source") or "",
-            v.get("changelog") or "",
-            v.get("created_at") or "",
-        )
-    obj.render.ops.panel(vtable, title="Versions", border="green")
+    obj.render.ops.resource_detail(slug, meta_pairs, versions)
 
 
 @repo_app.command("upload")
@@ -122,7 +75,9 @@ def repo_upload(
     svc = get_resource_service()
     resource = svc.get_by_slug(slug)
     if not resource:
-        obj.render.ops.warn(f"Resource {slug!r} not found --- creating it as 'document'.")
+        obj.render.ops.warn(
+            f"Resource {slug!r} not found --- creating it as 'document'."
+        )
         resource = svc.create_resource(slug=slug, type="document", display_name=slug)
     version = svc.import_upload_version(
         resource["id"],
@@ -131,7 +86,7 @@ def repo_upload(
         mime_type=None,
         changelog=changelog,
     )
-    obj.render.ops.success(f"uploaded version [bold]{version['version_number']}[/bold] for [bold]{slug}[/bold]")
+    obj.render.ops.resource_uploaded(slug, version["version_number"])
 
 
 @repo_app.command("log")
@@ -144,31 +99,7 @@ def repo_log(ctx: typer.Context, slug: str) -> None:
         obj.render.ops.error(f"Resource not found: {slug!r}")
         raise typer.Exit(2)
     versions = svc.list_versions(resource["id"])["items"]
-    if not versions:
-        obj.render.ops.dim("No versions.")
-        return
-    vtable = Table(header_style="bold green", padding=(0, 1))
-    vtable.add_column("#", style="dim")
-    vtable.add_column("ID", style="dim")
-    vtable.add_column("Draft", justify="center")
-    vtable.add_column("Source")
-    vtable.add_column("Changelog")
-    vtable.add_column("Created at", style="dim")
-    for v in versions:
-        draft = (
-            "[yellow]draft[/yellow]"
-            if v.get("is_draft")
-            else "[green]published[/green]"
-        )
-        vtable.add_row(
-            str(v["version_number"]),
-            v["id"],
-            draft,
-            v.get("import_source") or "",
-            v.get("changelog") or "",
-            v.get("created_at") or "",
-        )
-    obj.render.ops.print(vtable)
+    obj.render.ops.versions_table(versions)
 
 
 @repo_app.command("publish")
@@ -193,7 +124,7 @@ def repo_publish(
     except (ResourceNotFound, InvalidResource) as exc:
         obj.render.ops.error(f"Publish failed: {exc}")
         raise typer.Exit(2)
-    obj.render.ops.success(f"published version [bold]{version['version_number']}[/bold] for [bold]{slug}[/bold]")
+    obj.render.ops.resource_published(slug, version["version_number"])
 
 
 @repo_app.command("rollback")
@@ -220,7 +151,7 @@ def repo_rollback(
     except (ResourceNotFound, InvalidResource) as exc:
         obj.render.ops.error(f"Rollback failed: {exc}")
         raise typer.Exit(2)
-    obj.render.ops.success(f"rolled back to v{version_number} --- new v{version['version_number']} for [bold]{slug}[/bold]")
+    obj.render.ops.resource_rolled_back(version_number, version["version_number"], slug)
 
 
 @repo_app.command("preview-modes")
@@ -237,13 +168,7 @@ def repo_preview_modes(
         obj.render.ops.error(f"resource {resource_id!r} not found")
         raise typer.Exit(1)
     modes = result.get("modes", [])
-    if not modes:
-        obj.render.ops.dim(f"No preview modes for resource {resource_id!r}")
-        return
-    for m in modes:
-        obj.render.ops.info(
-            f"[bold]{m.get('mode', '?')}[/bold]: {m.get('text', m.get('description', ''))[:80]}"
-        )
+    obj.render.ops.preview_modes_list(resource_id, modes)
 
 
 @repo_app.command("migrate-composition")
@@ -258,22 +183,12 @@ def repo_migrate_composition(
     obj: CliCtx = ctx.obj
     if dry_run:
         obj.render.ops.warn("--dry-run not implemented; running for real.")
+    store = obj.store
+    settings = obj.settings
     report = migrate_composition_to_bindings(
-        obj.store, only_agent_id=agent, project_root=obj.settings.project_root
+        store, only_agent_id=agent, project_root=settings.project_root
     )
     summary = report.summary()
-    table = Table(
-        title="Composition Migration", header_style="bold cyan", padding=(0, 2)
-    )
-    table.add_column("Metric", style="bold")
-    table.add_column("Count", justify="right")
-    for k, v in summary.items():
-        table.add_row(k, str(v))
-    obj.render.ops.print(table)
-    if report.agents_migrated:
-        obj.render.ops.success(f"migrated: {', '.join(report.agents_migrated)}")
+    obj.render.ops.migration_composition_report(summary, report.agents_migrated, report.failed)
     if report.failed:
-        obj.render.ops.error("failed:")
-        for agent_id, err in report.failed:
-            obj.render.ops.error(f"  {agent_id}: {err}")
         raise typer.Exit(1)

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import typer
-from rich.table import Table
 
 from agentbox.cli.shared import CliCtx
-from agentbox.cli.shared.deps import get_resource_service  # TODO(cli-arch): ResourceService (plan 090)
-from agentbox.core.service import (  # TODO(cli-arch): ResourceService (plan 090)
+from agentbox.cli.shared.deps import get_resource_service
+# TODO(cli-arch): ResourceService (plan 090)
+from agentbox.core.service import (
     get_active_agent_version,
     resolve_agent_prompt_bindings,
     resolve_prompt,
@@ -23,36 +23,10 @@ prompt_bindings_app = typer.Typer(
 @prompt_bindings_app.command("list")
 def pb_list(ctx: typer.Context, agent_id: str) -> None:
     """List all prompt bindings for an agent."""
-    obj: CliCtx = ctx.obj
     svc = get_resource_service()
     rows = svc.list_prompt_bindings_raw(agent_id)
-    if not rows:
-        obj.render.ops.warn(f"No prompt bindings for agent {agent_id!r}.")
-        return
-
-    table = Table(
-        title=f"Prompt bindings \u2014 {agent_id}",
-        title_style="bold",
-        header_style="bold cyan",
-        padding=(0, 1),
-    )
-    table.add_column("Order", style="dim")
-    table.add_column("Marker", style="bold")
-    table.add_column("Resource ID", style="dim")
-    table.add_column("Mode", style="cyan")
-    table.add_column("Required", justify="center")
-    table.add_column("Pinned version", style="dim")
-    for r in rows:
-        required = "[green]\u2713[/green]" if r.get("required") else "[dim]\u00b7[/dim]"
-        table.add_row(
-            str(r.get("display_order", 0)),
-            r["marker"],
-            r["resource_id"],
-            r.get("mode") or "",
-            required,
-            r.get("pinned_version_id") or "\u2014",
-        )
-    obj.render.ops.print(table)
+    obj: CliCtx = ctx.obj
+    obj.render.ops.bindings_table(rows, agent_id)
 
 
 @prompt_bindings_app.command("set")
@@ -97,17 +71,15 @@ def pb_set(
     kept.append(new_binding)
 
     svc.replace_prompt_bindings_raw(agent_id, kept, reason=reason)
-    obj.render.ops.success(
-        f"binding set: agent=[bold]{agent_id}[/bold] "
-        f"marker=[bold]{marker}[/bold] \u2192 {resource_slug} (mode={mode})"
-    )
+    obj.render.ops.binding_set_success(agent_id, marker, resource_slug, mode)
 
 
 @prompt_bindings_app.command("preview")
 def pb_preview(ctx: typer.Context, agent_id: str) -> None:
     """Preview the resolved prompt for an agent with all bindings applied."""
     obj: CliCtx = ctx.obj
-    active = get_active_agent_version(obj.store, agent_id)
+    store = obj.store
+    active = get_active_agent_version(store, agent_id)
     if not active:
         obj.render.ops.error(f"No active version for agent {agent_id!r}")
         raise typer.Exit(2)
@@ -117,30 +89,15 @@ def pb_preview(ctx: typer.Context, agent_id: str) -> None:
         obj.render.ops.warn(f"Agent {agent_id!r} has no prompt content.")
         return
 
-    resolved_bindings = resolve_agent_prompt_bindings(obj.store, agent_id)
+    resolved_bindings = resolve_agent_prompt_bindings(store, agent_id)
     resolution = resolve_prompt(prompt_content, resolved_bindings)
 
-    if resolution.warnings:
-        for w in resolution.warnings:
-            obj.render.ops.warn(str(w))
-    if resolution.unresolved_markers:
-        obj.render.ops.warn(
-            f"unresolved markers: {', '.join(resolution.unresolved_markers)}"
-        )
-
-    obj.render.ops.syntax_panel(
+    obj.render.ops.resolved_prompt(
         resolution.rendered_prompt,
-        "markdown",
-        title=f"Resolved prompt \u2014 {agent_id}",
-        border="cyan",
+        agent_id,
+        warnings=resolution.warnings if resolution.warnings else None,
+        unresolved=list(resolution.unresolved_markers) if resolution.unresolved_markers else None,
     )
 
     if resolution.snapshot:
-        snap_table = Table(header_style="bold magenta", padding=(0, 1))
-        snap_table.add_column("Marker")
-        snap_table.add_column("Resource ID", style="dim")
-        snap_table.add_column("Mode")
-        snap_table.add_column("Version", style="dim")
-        for rb in resolution.snapshot:
-            snap_table.add_row(rb.marker, rb.resource_id, rb.mode, rb.version_id)
-        obj.render.ops.panel(snap_table, title="Binding snapshot", border="green")
+        obj.render.ops.binding_snapshot_table(list(resolution.snapshot))

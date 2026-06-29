@@ -18,9 +18,10 @@ from pathlib import Path
 
 import typer
 
+from rich.console import Console as _RichConsole
+
 from agentbox.cli.shared import CliCtx
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.core.config import load_settings
 from agentbox.core.db import Database
 from agentbox.core.service.workspaces import launch_runner_configs
 from agentbox.core.service import SessionStore
@@ -109,7 +110,5 @@ def _render_env_doc(
         entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)
         return bool(entries)
     except Exception as exc:
-        # Use local Rich instance since this is a private helper
-        from rich.console import Console
-        Console().print(f"[yellow]env-doc render skipped:[/yellow] {exc}")
+        _RichConsole().print(f"[yellow]env-doc render skipped:[/yellow] {exc}")
         return False
