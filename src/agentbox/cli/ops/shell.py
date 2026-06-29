@@ -18,17 +18,18 @@ from pathlib import Path
 
 import typer
 
-from agentbox.cli.shared import console
+from agentbox.cli.shared import CliCtx
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.core.config import load_settings
-from agentbox.core.db import Database
-from agentbox.core.service.workspaces import launch_runner_configs
-from agentbox.core.service import SessionStore
-from agentbox.core.workspaces.prep import render_env_doc
-from agentbox.core.service import get_agent_def, get_workspace
+from agentbox.core.config import load_settings  # TODO(cli-arch): settings via ctx
+from agentbox.core.db import Database  # TODO(cli-arch): db via ctx
+from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
+from agentbox.core.service import SessionStore  # TODO(cli-arch): store via ctx
+from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
+from agentbox.core.service import get_agent_def, get_workspace  # TODO(cli-arch): AgentService (plan 094)
 
 
 def shell_cmd(
+    ctx: typer.Context,
     agent: str = typer.Argument(..., help="Agent ID whose workspace to enter"),
     workspace: str | None = typer.Option(
         None, "--workspace", "-w", help="Named workspace or path override"
@@ -47,13 +48,14 @@ def shell_cmd(
     shell at the workspace root. Configs land under
     ``<workspace>/.agentbox/generated/`` and are overwritten each invocation.
     """
+    obj: CliCtx = ctx.obj
     settings = load_settings()
     _db = Database(settings.db_path)
     store = SessionStore(settings.db_path)
 
     agent_def = get_agent_def(store, agent)
     if agent_def is None:
-        console.print(f"[red]Unknown agent:[/red] {agent!r}")
+        obj.render.ops.error(f"Unknown agent: {agent!r}")
         raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, _ = _resolve_workspace(
@@ -70,14 +72,14 @@ def shell_cmd(
     )
     launch_cm.__enter__()
 
-    env_doc_rendered = _render_env_doc(settings, workspace, agent_def, workspace_path)
+    env_doc_rendered = _render_env_doc(obj, settings, workspace, agent_def, workspace_path)
 
-    _print_banner(agent, workspace_path, is_ephemeral, creds, env_doc_rendered)
+    _print_banner(obj, agent, workspace_path, is_ephemeral, creds, env_doc_rendered)
 
     if yazi:
         bin_path = shutil.which("yazi")
         if not bin_path:
-            console.print("[red]yazi not found on PATH[/red]")
+            obj.render.ops.error("yazi not found on PATH")
             raise typer.Exit(127)
         argv = [bin_path, str(workspace_path)]
     else:
@@ -89,6 +91,7 @@ def shell_cmd(
 
 
 def _render_env_doc(
+    obj: CliCtx,
     settings,
     workspace_override: str | None,
     agent_def,
@@ -107,28 +110,29 @@ def _render_env_doc(
         entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)
         return bool(entries)
     except Exception as exc:
-        console.print(f"[yellow]env-doc render skipped:[/yellow] {exc}")
+        obj.render.ops.warn(f"env-doc render skipped: {exc}")
         return False
 
 
 def _print_banner(
+    obj: CliCtx,
     agent: str,
     workspace_path: Path,
     is_ephemeral: bool,
     creds: str | None,
     env_doc_rendered: bool,
 ) -> None:
-    console.print("━" * 60)
-    console.print(f"[bold]agentbox shell[/bold] — [cyan]{agent}[/cyan]")
-    console.print("━" * 60)
-    console.print(
+    obj.render.ops.con.print("\u2501" * 60)
+    obj.render.ops.con.print(f"[bold]agentbox shell[/bold] \u2014 [cyan]{agent}[/cyan]")
+    obj.render.ops.con.print("\u2501" * 60)
+    obj.render.ops.con.print(
         f"  workdir:   {workspace_path}{'  (ephemeral)' if is_ephemeral else ''}"
     )
-    console.print(
+    obj.render.ops.con.print(
         f"  env-doc:   {'rendered (CLAUDE.md / AGENTS.md)' if env_doc_rendered else 'none'}"
     )
-    console.print(f"  creds:     {creds or 'default'}")
-    console.print()
-    console.print("  Native config (.mcp.json / .claude / opencode.json) is in cwd.")
-    console.print("  Exit the shell to return.")
-    console.print()
+    obj.render.ops.con.print(f"  creds:     {creds or 'default'}")
+    obj.render.ops.con.print()
+    obj.render.ops.con.print("  Native config (.mcp.json / .claude / opencode.json) is in cwd.")
+    obj.render.ops.con.print("  Exit the shell to return.")
+    obj.render.ops.con.print()

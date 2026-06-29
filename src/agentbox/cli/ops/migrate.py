@@ -3,14 +3,16 @@ from __future__ import annotations
 import json
 import tomllib
 from pathlib import Path
+
 import typer
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.cli.shared import console, get_settings, get_store
+from agentbox.cli.shared import CliCtx
 from agentbox.core.constants import BackendName
-from agentbox.core.service.system.service import SystemService
+# TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
 from agentbox.core.db.system.seeds import backfill as _backfill_prompt_versions
+# TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
 from agentbox.core.migrations import migrate_capabilities_to_manifest
 from agentbox.core.service import (
     ProjectManifest,
@@ -29,18 +31,18 @@ migrate_app = typer.Typer(
 
 
 @migrate_app.command("ws-perms")
-def migrate_ws_perms() -> None:
+def migrate_ws_perms(ctx: typer.Context) -> None:
     """Migrate workspace permissions from capabilities.json to agentbox.toml.
 
     Reads each workspace's permissions/capabilities.json and patches the
     corresponding [[workspaces]] block in the manifest. Original JSON files
     are backed up with a timestamp.
     """
-    settings = get_settings()
-    results = migrate_capabilities_to_manifest(settings.project_root)
+    obj: CliCtx = ctx.obj
+    results = migrate_capabilities_to_manifest(obj.settings.project_root)
 
     if not results:
-        console.print("[yellow]No workspaces found or no migration needed.[/yellow]")
+        obj.render.ops.warn("No workspaces found or no migration needed.")
         return
 
     table = Table(
@@ -62,15 +64,13 @@ def migrate_ws_perms() -> None:
         )
         table.add_row(ws_name, migrated, backed_up)
 
-    console.print(table)
+    obj.render.ops.print(table)
     migrated_count = sum(1 for r in results.values() if r["migrated"])
-    console.print(
-        f"\n[green]✓[/green] migrated [bold]{migrated_count}[/bold] workspace(s)"
-    )
+    obj.render.ops.success(f"migrated [bold]{migrated_count}[/bold] workspace(s)")
 
 
 @migrate_app.command("to-db-only")
-def migrate_to_db_only(agent_id: str) -> None:
+def migrate_to_db_only(ctx: typer.Context, agent_id: str) -> None:
     """Migrate a TOML-backed agent to DB-only management.
 
     Reads the active version's source TOML, copies content into the DB
@@ -79,43 +79,41 @@ def migrate_to_db_only(agent_id: str) -> None:
 
     Idempotent: running twice will not create duplicate versions.
     """
-    store = get_store()
+    obj: CliCtx = ctx.obj
+    store = obj.store
 
     # Get active version
     active = get_active_agent_version(store, agent_id)
     if active is None:
-        console.print(f"[red]error:[/red] agent {agent_id!r} has no active version")
+        obj.render.ops.error(f"agent {agent_id!r} has no active version")
         raise typer.Exit(1)
 
     # If config_json is empty, load the agent and populate it
     if not active.get("config_json"):
         agent = get_agent_def(store, agent_id)
         if agent is None:
-            console.print(
-                f"[red]error:[/red] could not load agent {agent_id!r} from DB"
-            )
+            obj.render.ops.error(f"could not load agent {agent_id!r} from DB")
             raise typer.Exit(1)
 
         # Rebuild the active version with config_json populated
         config_json_str = build_config_json_str(agent)
         replace_version_config(store, active["id"], config_json_str)
-        console.print(
-            f"[cyan]info:[/cyan] populated config_json for v{active['version']}"
-        )
+        obj.render.ops.info(f"populated config_json for v{active['version']}")
 
     # Update agent_meta: sync_mode="off", export_to_disk=True
     result = update_agent_meta(store, agent_id, sync_mode="off", export_to_disk=True)
     if result is None:
-        console.print(f"[red]error:[/red] agent_meta row not found for {agent_id!r}")
+        obj.render.ops.error(f"agent_meta row not found for {agent_id!r}")
         raise typer.Exit(1)
 
-    console.print(f"[green]✓[/green] migrated {agent_id!r} to DB-only management")
-    console.print("  sync_mode: watch → off")
-    console.print(f"  export_to_disk: {bool(result.get('export_to_disk'))}")
+    obj.render.ops.success(f"migrated {agent_id!r} to DB-only management")
+    obj.render.ops.print("  sync_mode: watch → off")
+    obj.render.ops.print(f"  export_to_disk: {bool(result.get('export_to_disk'))}")
 
 
 @migrate_app.command("import-manifest")
 def import_manifest(
+    ctx: typer.Context,
     from_path: str | None = typer.Option(
         None, "--from", help="Path to agentbox.toml (defaults to project layout)."
     ),
@@ -135,7 +133,8 @@ def import_manifest(
     - ``backend_preference``/``tool_manifest_path``/``project`` →
       section ``project_runtime``
     """
-    settings = get_settings()
+    obj: CliCtx = ctx.obj
+    settings = obj.settings
 
     if from_path:
         manifest_path = Path(from_path).expanduser()
@@ -145,8 +144,8 @@ def import_manifest(
         manifest_path = candidate_new if candidate_new.exists() else candidate_old
 
     if not manifest_path.exists():
-        console.print(
-            f"[yellow]no manifest at {manifest_path}; nothing to import[/yellow]"
+        obj.render.ops.warn(
+            f"no manifest at {manifest_path}; nothing to import"
         )
         return
 
@@ -154,11 +153,11 @@ def import_manifest(
         data = tomllib.load(f)
     manifest = ProjectManifest.model_validate(data)
 
-    svc = SystemService()
+    svc = obj.system
 
-    existing_servers = svc.get_settings_section(SystemService.PROJ_MCP_SERVERS)
-    existing_assets = svc.get_settings_section(SystemService.PROJ_SHARED_ASSETS)
-    existing_runtime = svc.get_settings_section(SystemService.PROJ_RUNTIME)
+    existing_servers = svc.get_settings_section(obj.system.PROJ_MCP_SERVERS)
+    existing_assets = svc.get_settings_section(obj.system.PROJ_SHARED_ASSETS)
+    existing_runtime = svc.get_settings_section(obj.system.PROJ_RUNTIME)
 
     table = Table(
         title=f"Importing {manifest_path}",
@@ -175,17 +174,17 @@ def import_manifest(
 
     for spec in manifest.mcp_servers or []:
         if not force and spec.name in existing_servers:
-            _row(SystemService.PROJ_MCP_SERVERS, spec.name, "skip", "dim")
+            _row(obj.system.PROJ_MCP_SERVERS, spec.name, "skip", "dim")
             continue
         svc.set_project_mcp_server(spec, author="migrate:import-manifest")
-        _row(SystemService.PROJ_MCP_SERVERS, spec.name, "write", "green")
+        _row(obj.system.PROJ_MCP_SERVERS, spec.name, "write", "green")
 
     for name, path in (manifest.shared_assets or {}).items():
         if not force and name in existing_assets:
-            _row(SystemService.PROJ_SHARED_ASSETS, name, "skip", "dim")
+            _row(obj.system.PROJ_SHARED_ASSETS, name, "skip", "dim")
             continue
         svc.set_project_shared_asset(name, path, author="migrate:import-manifest")
-        _row(SystemService.PROJ_SHARED_ASSETS, name, "write", "green")
+        _row(obj.system.PROJ_SHARED_ASSETS, name, "write", "green")
 
     runtime_writes: list[tuple[str, object]] = []
     if manifest.backend_preference:
@@ -197,35 +196,36 @@ def import_manifest(
 
     for key, value in runtime_writes:
         if not force and key in existing_runtime:
-            _row(SystemService.PROJ_RUNTIME, key, "skip", "dim")
+            _row(obj.system.PROJ_RUNTIME, key, "skip", "dim")
             continue
-        svc.set_setting(SystemService.PROJ_RUNTIME, key, value, author="migrate:import-manifest")
-        _row(SystemService.PROJ_RUNTIME, key, "write", "green")
+        svc.set_setting(obj.system.PROJ_RUNTIME, key, value, author="migrate:import-manifest")
+        _row(obj.system.PROJ_RUNTIME, key, "write", "green")
 
-    console.print(table)
-    console.print("[green]done.[/green] manifest file may now be removed.")
+    obj.render.ops.print(table)
+    obj.render.ops.print("done. manifest file may now be removed.")
 
 
 @migrate_app.command("prompt-versions")
-def migrate_prompt_versions() -> None:
+def migrate_prompt_versions(ctx: typer.Context) -> None:
     """Backfill ``runs.prompt_version_id`` from historical prompt_versions.
 
     See ``agentbox.core.db.backfill_prompt_versions``.
     """
-    store = get_store()
-    n = _backfill_prompt_versions(store)
-    console.print(f"[green]✓[/green] backfilled {n} run(s) with prompt_version_id")
+    obj: CliCtx = ctx.obj
+    n = _backfill_prompt_versions(obj.store)
+    obj.render.ops.success(f"backfilled {n} run(s) with prompt_version_id")
 
 
 @migrate_app.command("workenv-engine")
-def migrate_workenv_engine() -> None:
+def migrate_workenv_engine(ctx: typer.Context) -> None:
     """Rename the old ``claude`` workenv-template engine to ``claude_code``.
 
     The recipe engine name now matches the backend entry-point name. Rows
     seeded before the rename still carry ``engine='claude'``; this updates
     them in place. Idempotent.
     """
-    store = get_store()
+    obj: CliCtx = ctx.obj
+    store = obj.store
     renamed = 0
     for tmpl in store.list_workenv_templates():
         if tmpl.get("engine") == "claude":
@@ -238,7 +238,7 @@ def migrate_workenv_engine() -> None:
                 description=tmpl.get("description"),
             )
             renamed += 1
-    console.print(
-        f"[green]✓[/green] updated {renamed} template(s) "
+    obj.render.ops.success(
+        f"updated {renamed} template(s) "
         f"claude → {BackendName.CLAUDE_CODE}"
     )

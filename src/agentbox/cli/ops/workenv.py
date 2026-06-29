@@ -13,31 +13,26 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from typing import TYPE_CHECKING
-
 import typer
-from rich.syntax import Syntax
 
-from agentbox.cli.shared import console, get_settings, get_store
+from agentbox.cli.shared import CliCtx
+from agentbox.core.config import Settings
 from agentbox.core.constants import BackendName
-from agentbox.core.workspaces.generation.config import WorkenvConfig
-from agentbox.core.workspaces.generation.builders.from_db import load_workenv
-from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
-from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.workspaces.generation.builders.interactive import build_interactive
-from agentbox.core.workspaces.generation.presets import (
+from agentbox.core.db import SessionStore
+from agentbox.core.workspaces.generation.config import WorkenvConfig  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
+from agentbox.core.workspaces.generation.builders.from_db import load_workenv  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
+from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
+from agentbox.core.workspaces.generation.generator import render  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
+from agentbox.core.workspaces.generation.builders.interactive import build_interactive  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
+from agentbox.core.workspaces.generation.presets import (  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
     from_preset,
     list_presets,
     save_as_preset,
     seed_presets,
 )
-from agentbox.core.workspaces.generation.recipe import Recipe, list_recipes, load_recipe
+from agentbox.core.workspaces.generation.recipe import Recipe, list_recipes, load_recipe  # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
 from agentbox.core.service.workspaces.files import resolve_workspace_path
 from agentbox.core.service.workspaces.permissions import load_effective_permissions
-
-if TYPE_CHECKING:
-    from agentbox.core.config import Settings
-    from agentbox.core.db import SessionStore
 
 workenv_app = typer.Typer(
     name="workenv",
@@ -56,6 +51,7 @@ class _ResolvedSource:
 
 @workenv_app.command("generate")
 def workenv_generate(
+    ctx: typer.Context,
     name: str | None = typer.Argument(
         None, help="Workspace name or agent ID (omit for interactive)"
     ),
@@ -107,24 +103,29 @@ def workenv_generate(
     (--config-file), from a preset (--preset), or interactively
     (no arguments or --interactive).
     """
-    store = get_store()
-    settings = get_settings()
+    obj: CliCtx = ctx.obj
+    store = obj.store
+    settings = obj.settings
 
-    source = _resolve_source(
-        name=name,
-        engine=engine,
-        target_dir=target_dir,
-        config_file=config_file,
-        preset=preset,
-        interactive=interactive,
-        store=store,
-        settings=settings,
-    )
+    try:
+        source = _resolve_source(
+            name=name,
+            engine=engine,
+            target_dir=target_dir,
+            config_file=config_file,
+            preset=preset,
+            interactive=interactive,
+            store=store,
+            settings=settings,
+        )
+    except ValueError as exc:
+        obj.render.ops.error(str(exc))
+        raise typer.Exit(1) from exc
 
     available = list_recipes()
     if source.engine not in available:
-        console.print(
-            f"[red]unknown engine {source.engine!r}[/red] — "
+        obj.render.ops.error(
+            f"unknown engine {source.engine!r} \u2014 "
             f"available: {', '.join(available)}"
         )
         raise typer.Exit(1)
@@ -140,23 +141,23 @@ def workenv_generate(
             engine=source.engine,
             description=f"Saved from CLI ({source.source_label})",
         )
-        console.print(f"[green]saved[/green] preset [bold]{save}[/bold]")
+        obj.render.ops.success(f"saved preset [bold]{save}[/bold]")
 
     if dry_run:
-        _print_dry_run(source.config, recipe)
+        _print_dry_run(obj, source.config, recipe)
         return
 
     result = render(source.target_dir, source.config, recipe)
-    console.print(
-        f"[green]generated[/green] {len(result.written_paths)} file(s) "
+    obj.render.ops.success(
+        f"generated {len(result.written_paths)} file(s) "
         f"in [bold]{source.target_dir}[/bold]"
     )
     for p in result.written_paths:
-        console.print(f"  [dim]{p.relative_to(source.target_dir)}[/dim]")
+        obj.render.ops.dim(f"  {p.relative_to(source.target_dir)}")
 
     if source.source_label == "interactive":
-        console.print(
-            "\n[dim]Tip: use --config-file or --save to persist this config.[/dim]"
+        obj.render.ops.dim(
+            "\nTip: use --config-file or --save to persist this config."
         )
 
 
@@ -175,7 +176,6 @@ def _resolve_source(
     if preset is not None:
         config = from_preset(store, preset)
         if config is None:
-            console.print(f"[red]preset not found:[/red] {preset}")
             raise typer.Exit(1)
         out_dir = _resolve_target_dir(target_dir, name, store, settings)
         return _ResolvedSource(config, engine, out_dir, "preset")
@@ -183,7 +183,6 @@ def _resolve_source(
     if config_file is not None:
         config_path = Path(config_file)
         if not config_path.is_file():
-            console.print(f"[red]config file not found:[/red] {config_file}")
             raise typer.Exit(1)
         config = load_from_yaml(config_path)
         out_dir = _resolve_target_dir(target_dir, name, store, settings)
@@ -221,55 +220,51 @@ def _resolve_target_dir(
 
 
 @workenv_app.command("seed-presets")
-def workenv_seed_presets() -> None:
+def workenv_seed_presets(ctx: typer.Context) -> None:
     """Load built-in presets into the DB (idempotent)."""
-    store = get_store()
-    count = seed_presets(store)
-    console.print(f"[green]seeded[/green] {count} preset(s)")
+    obj: CliCtx = ctx.obj
+    count = seed_presets(obj.store)
+    obj.render.ops.success(f"seeded {count} preset(s)")
 
 
 @workenv_app.command("list-presets")
-def workenv_list_presets() -> None:
+def workenv_list_presets(ctx: typer.Context) -> None:
     """List saved presets in the DB."""
-    store = get_store()
-    presets = list_presets(store)
+    obj: CliCtx = ctx.obj
+    presets = list_presets(obj.store)
     if not presets:
-        console.print("[yellow]No presets saved[/yellow]")
+        obj.render.ops.warn("No presets saved")
         return
-    console.print("Available presets:")
+    obj.render.ops.info("Available presets:")
     for p in presets:
         desc = p.get("description", "") or ""
         engine = p.get("engine", "?")
-        console.print(f"  [bold]{p['name']}[/bold]  [dim]({engine})[/dim]  {desc}")
+        obj.render.ops.con.print(f"  [bold]{p['name']}[/bold]  [dim]({engine})[/dim]  {desc}")
 
 
 @workenv_app.command("list-engines")
-def workenv_list_engines() -> None:
+def workenv_list_engines(ctx: typer.Context) -> None:
     """List available recipe engines."""
+    obj: CliCtx = ctx.obj
     available = list_recipes()
     if not available:
-        console.print("[yellow]No recipes found[/yellow]")
+        obj.render.ops.warn("No recipes found")
         return
-    console.print("Available engines:")
+    obj.render.ops.info("Available engines:")
     for r in available:
-        console.print(f"  [bold]{r}[/bold]")
+        obj.render.ops.con.print(f"  [bold]{r}[/bold]")
 
 
-def _print_dry_run(config: WorkenvConfig, recipe: Recipe) -> None:
+def _print_dry_run(obj: CliCtx, config: WorkenvConfig, recipe: Recipe) -> None:
     """Print rendered output to stdout instead of writing to disk."""
     with tempfile.TemporaryDirectory() as td:
         result = render(Path(td), config, recipe)
         for p in result.written_paths:
             rel = p.relative_to(Path(td))
             content = p.read_text(encoding="utf-8")
-            console.print(f"\n[bold cyan]─── {rel}[/bold cyan]")
-            syntax = Syntax(
-                content,
-                "json"
-                if rel.suffix == ".json"
-                else "yaml"
-                if rel.suffix in (".yaml", ".yml")
-                else "markdown",
-                theme="ansi_dark",
+            lexer = (
+                "json" if rel.suffix == ".json"
+                else "yaml" if rel.suffix in (".yaml", ".yml")
+                else "markdown"
             )
-            console.print(syntax)
+            obj.render.ops.workenv_preview(str(rel), content, lexer)

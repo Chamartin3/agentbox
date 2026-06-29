@@ -15,18 +15,24 @@ from agentbox.cli.ops.resource import app as _resource_app
 from agentbox.cli.ops.serve import serve
 from agentbox.cli.ops.shell import shell_cmd
 from agentbox.cli.ops.workenv import workenv_app as _workenv_app
+from agentbox.cli.shared import group_callback
 
 app = typer.Typer(
     name="ops",
     help="Operational commands: serve, shell, cfg, migrate, resources.",
     no_args_is_help=True,
 )
+app.callback()(group_callback)
+
 app.command(name="serve")(serve)
 app.command(name="shell")(shell_cmd)
 app.add_typer(_cfg_app, name="cfg")
+_cfg_app.callback()(group_callback)
 app.add_typer(_migrate_app, name="migrate")
+_migrate_app.callback()(group_callback)
 app.add_typer(_resource_app, name="resource")
 # ponytail: workenv still a separate group; fold into `cfg` in a later cleanup.
 app.add_typer(_workenv_app, name="workenv")
+_workenv_app.callback()(group_callback)
 
 __all__ = ["app"]
