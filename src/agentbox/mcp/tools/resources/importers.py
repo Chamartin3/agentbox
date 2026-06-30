@@ -112,7 +112,7 @@ def register_importers(mcp: FastMCP, ctx: MCPContext) -> None:
                 zf.writestr(path, raw)
         zip_bytes = buf.getvalue()
 
-        svc = ctx.resources()
+        svc = ctx.resources
         try:
             resource = svc.create_resource(
                 slug=slug,

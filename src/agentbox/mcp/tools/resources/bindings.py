@@ -25,7 +25,7 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
         marker, mode, slot, ``attach_as_reference`` flag, pinned version, and
         enriched resource metadata (slug, type, display_name, active_version_id).
         Mirrors ``GET /api/agents/{agent_id}/prompt-resources``."""
-        svc = ctx.resources()
+        svc = ctx.resources
         enriched = svc.list_prompt_resources(agent_id)["items"]
         return {"agent_id": agent_id, "items": enriched, "count": len(enriched)}
 
@@ -46,9 +46,9 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        svc = ctx.resources()
+        svc = ctx.resources
         try:
-            rows = svc.replace_prompt_bindings_raw(agent_id, bindings, reason=reason)
+            rows = svc.replace_prompt_bindings(agent_id, bindings, reason=reason)
         except ValueError as exc:
             return {"error": "invalid_binding", "detail": str(exc)}
         return {"agent_id": agent_id, "bindings": rows, "count": len(rows)}
@@ -78,8 +78,8 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        svc = ctx.resources()
-        current = svc.list_prompt_bindings_raw(agent_id)
+        svc = ctx.resources
+        current = svc.list_prompt_bindings(agent_id)
         existing = [
             {
                 "resource_id": b["resource_id"],
@@ -109,7 +109,7 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
             "display_order": next_order,
         }
         try:
-            rows = svc.replace_prompt_bindings_raw(
+            rows = svc.replace_prompt_bindings(
                 agent_id, [*existing, new_binding], reason=reason
             )
         except ValueError as exc:
@@ -155,8 +155,8 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
                 "error": "invalid_request",
                 "detail": "provide binding_id, or any of resource_id/marker/slot",
             }
-        svc = ctx.resources()
-        current = svc.list_prompt_bindings_raw(agent_id)
+        svc = ctx.resources
+        current = svc.list_prompt_bindings(agent_id)
 
         def _matches(b: dict) -> bool:
             if binding_id is not None:
@@ -186,7 +186,7 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
             if not _matches(b)
         ]
         try:
-            rows = svc.replace_prompt_bindings_raw(agent_id, keep, reason=reason)
+            rows = svc.replace_prompt_bindings(agent_id, keep, reason=reason)
         except ValueError as exc:
             return {"error": "invalid_binding", "detail": str(exc)}
         return {

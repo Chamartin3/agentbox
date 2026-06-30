@@ -20,7 +20,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         additional tool calls, reasoning steps, or output generation.
         """
 
-        run = ctx.db.runs.get(run_id)
+        run = ctx.execution.get_run(run_id)
         if run is None:
             return {"error": f"run {run_id!r} not found"}
 
@@ -32,7 +32,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "message": f"run is {run.status} — no time budget remaining",
             }
 
-        agent = ctx.store.get_agent_def(run.agent_id)
+        agent = ctx.agents.get_agent_def(run.agent_id)
         if agent is None:
             return {"error": f"agent {run.agent_id!r} not found"}
 

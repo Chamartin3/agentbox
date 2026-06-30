@@ -21,6 +21,8 @@ import uuid
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from pathlib import Path
+
 from agentbox.core.config import SETTINGS
 from agentbox.core.data import McpServerSpec, now_iso
 from agentbox.core.service.base import Service
@@ -134,6 +136,15 @@ class SystemService(Service):
         """Return the project shared-asset roots as ``{name: path}``."""
         section = self.get_settings_section(self.PROJ_SHARED_ASSETS)
         return {k: str(v) for k, v in section.items() if isinstance(v, str)}
+
+    def get_project_shared_roots(self) -> dict[str, Path]:
+        """Return shared-asset paths resolved against the project root.
+
+        Combines ``get_project_shared_assets()`` with ``SETTINGS.project_root``
+        so callers need only ``ctx.system`` — no direct settings access.
+        """
+        project_root = SETTINGS.project_root
+        return {key: project_root / rel for key, rel in self.get_project_shared_assets().items()}
 
     def set_project_shared_asset(
         self, name: str, path: str, *, author: str | None = None

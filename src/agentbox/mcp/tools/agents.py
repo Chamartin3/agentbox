@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from fastmcp import FastMCP
 
+from agentbox.core.service.engines.service import EngineService
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -36,7 +37,7 @@ def _strip_legacy_runner_model(d: dict) -> dict:
     return d
 
 
-def _inject_profile_model(d: dict, store: Any) -> dict:
+def _inject_profile_model(d: dict, engines: EngineService) -> dict:
     """Resolve the agent's effective model via its bound runner profile.
 
     Adds ``model``, ``model_provider`` and ``runner_profile_id`` at the
@@ -49,7 +50,7 @@ def _inject_profile_model(d: dict, store: Any) -> dict:
     if not agent_id:
         return d
     try:
-        profile = ctx.engines().get_agent_runner_profile(agent_id)
+        profile = engines.get_agent_runner_profile(agent_id)
     except Exception:
         profile = None
     if profile is not None:
@@ -91,7 +92,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         carries a ``disabled_at`` timestamp; invoking one would fail
         with ``agent_disabled``)."""
         limit = clamp_limit(limit)
-        svc = ctx.agents()
+        svc = ctx.agents
 
         def _attach_disabled(d: dict) -> dict:
             agent_id = d.get("id")
@@ -103,7 +104,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
             _attach_disabled(
                 _inject_profile_model(
                     _strip_legacy_runner_model(_agent_dict(a)),
-                    ctx.store,
+                    ctx.engines,
                 )
             )
             for a in svc.list_all_agents(include_disabled=include_disabled)
@@ -125,7 +126,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         limit = clamp_limit(limit)
         q = query.lower().strip()
         results = []
-        for a in ctx.agents().list_all_agents():
+        for a in ctx.agents.list_all_agents():
             d = _agent_dict(a)
             hay = " ".join(
                 [
@@ -136,7 +137,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
             ).lower()
             if q in hay:
                 results.append(
-                    _inject_profile_model(_strip_legacy_runner_model(d), ctx.store)
+                    _inject_profile_model(_strip_legacy_runner_model(d), ctx.engines)
                 )
         return _paginate(results, limit, offset)
 
@@ -147,7 +148,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         Reads from ``agent_versions`` / ``active_agent_versions`` (the
         DB-as-source-of-truth tables the UI uses). Falls back to
         ``latest_version`` when no active pointer is set."""
-        svc = ctx.agents()
+        svc = ctx.agents
         agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "not_found", "agent_id": agent_id}
@@ -162,7 +163,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "created_at": active.get("created_at"),
             }
         agent_payload = _inject_profile_model(
-            _strip_legacy_runner_model(_agent_dict(agent)), ctx.store
+            _strip_legacy_runner_model(_agent_dict(agent)), ctx.engines
         )
         meta = svc.get_meta(agent_id) or {}
         agent_payload["disabled_at"] = meta.get("disabled_at")
@@ -172,7 +173,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     def list_agent_tags() -> dict:
         """Distinct tags across all known agents (DB + manifest)."""
         tags: set[str] = set()
-        for a in ctx.agents().list_all_agents():
+        for a in ctx.agents.list_all_agents():
             tags.update(_agent_dict(a).get("tags") or [])
         return {"items": sorted(tags), "total": len(tags)}
 
@@ -190,7 +191,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         pass to ``promote_version``.
         """
         limit = clamp_limit(limit)
-        svc = ctx.agents()
+        svc = ctx.agents
         rows = svc.list_versions(agent_id)
         # ``include_drafts`` is retained for API compatibility but ignored —
         # the draft concept was removed from agent_versions.
@@ -237,7 +238,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "error": "reason_required",
                 "detail": "reason must be at least 3 characters",
             }
-        svc = ctx.agents()
+        svc = ctx.agents
         agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}

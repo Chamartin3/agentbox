@@ -15,10 +15,7 @@ from fastmcp import FastMCP
 
 from agentbox.core.service import AgentVersionRow
 from agentbox.core.service import composition_preview as preview_composition
-from agentbox.core.service.execution.service import ExecutionService
-from agentbox.core.service.system.service import SystemService
 from agentbox.mcp.context import MCPContext
-from agentbox.mcp.deps import get_agent_service, get_context
 from agentbox.mcp.schemas import clamp_limit
 
 
@@ -54,7 +51,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         NOT include composition pieces (references, schemas, user
         template); for those use ``get_agent_prompt_fragments``. For the
         per-run captured fragments, use ``get_run_prompt_fragments``."""
-        svc = get_agent_service()
+        svc = ctx.agents
         agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
@@ -86,7 +83,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         Reads from ``agent_versions``. Each row includes ``is_active`` so
         callers can identify which version is currently pinned."""
         limit = clamp_limit(limit)
-        svc = get_agent_service()
+        svc = ctx.agents
         rows = svc.list_versions(agent_id)
         # ``include_drafts`` is retained for API compatibility but ignored —
         # the draft concept was removed from agent_versions.
@@ -130,7 +127,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "error": "reason_required",
                 "detail": "reason must be at least 3 characters",
             }
-        svc = get_agent_service()
+        svc = ctx.agents
         if svc.resolve_agent(agent_id) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
@@ -165,7 +162,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "error": "reason_required",
                 "detail": "reason must be at least 3 characters",
             }
-        svc = get_agent_service()
+        svc = ctx.agents
         if svc.resolve_agent(agent_id) is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         try:
@@ -182,7 +179,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_prompt_diff(agent_id: str, from_version: int, to_version: int) -> dict:
         """Unified diff of ``prompt_content`` between two agent versions."""
-        svc = get_agent_service()
+        svc = ctx.agents
         a = svc.get_version(agent_id, from_version)
         b = svc.get_version(agent_id, to_version)
         if a is None or b is None:
@@ -215,8 +212,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         Use this to see the *static* pieces of the prompt before run-time
         injection. For the run-time fragments (user input, MCP config,
         argv, claude_cli envelope), use ``get_run_prompt_fragments``."""
-        ctx = get_context()
-        agent = get_agent_service().resolve_agent(agent_id)
+        agent = ctx.agents.resolve_agent(agent_id)
         if agent is None:
             return {"error": "agent_not_found", "agent_id": agent_id}
         if agent.source_path is None:
@@ -232,10 +228,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "agent_id": agent_id,
                 "detail": f"no agent.toml in {bundle_path}",
             }
-        shared_roots: dict[str, Path] = {
-            key: ctx.settings.project_root / rel
-            for key, rel in (SystemService().get_project_shared_assets() or {}).items()
-        }
+        shared_roots = ctx.system.get_project_shared_roots()
         try:
             prev = preview_composition(bundle_path, shared_roots)
         except FileNotFoundError as exc:
@@ -266,11 +259,10 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         ``injected_by`` (which layer pushed it into model context).
         Inspectable=False means agentbox knows the fragment exists but
         cannot read its bytes (e.g. Claude CLI envelope)."""
-        ctx = get_context()
-        rec = ctx.db.runs.get(run_id)
+        rec = ctx.execution.get_run(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
-        raw = ExecutionService().get_run_prompt(run_id)
+        raw = ctx.execution.get_run_prompt(run_id)
         if raw is None:
             return {
                 "run_id": run_id,

@@ -13,10 +13,12 @@ unfinished runs). Only accept this as long as we're single-process SQLite.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any
 
+from agentbox.core.config import load_settings
 from agentbox.core.constants import RunStatus
-from agentbox.core.data import now_iso, RunnerSnapshot
+from agentbox.core.data import now_iso, read_transcript, RunnerSnapshot
 from agentbox.core.execution.observability.conversation import get as _get_conversation_source
 from agentbox.core.execution.observability.conversation.transcript import TranscriptSource
 from agentbox.core.service.base import Service
@@ -214,6 +216,77 @@ class ExecutionService(Service):
     def list_webhook_deliveries(self, run_id: str) -> list[dict]:
         """List all webhook delivery attempts for a run."""
         return self._webhooks.list_for_run(run_id)
+
+    # ══════════════════════════════════════════════════════════════════
+    # Transcript helpers (moved from tool bodies in plan 106_01)
+    # ══════════════════════════════════════════════════════════════════
+
+    def get_transcript(self, run_id: str, limit: int, offset: int) -> dict:
+        """Paginated JSONL transcript for a run.
+
+        Returns ``{items, total, limit, offset, has_more}``.  Items are raw
+        event dicts decoded from the JSONL file.
+        """
+        rec = self._runs.get(run_id)
+        if rec is None or not rec.transcript_path:
+            return {
+                "items": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False,
+            }
+        data_dir = load_settings().data_dir
+        events = read_transcript(Path(rec.transcript_path), data_dir)
+        total = len(events)
+        page = events[offset : offset + limit]
+        return {
+            "items": page,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(page) < total,
+        }
+
+    def get_logs(
+        self, run_id: str, level: str | None, limit: int, offset: int
+    ) -> dict:
+        """Log events from the transcript for a run.
+
+        Filters to ``type == "log"`` events, optionally further filtered by
+        *level*.  Returns lightweight ``{ts, level, message}`` rows.
+        """
+        rec = self._runs.get(run_id)
+        if rec is None or not rec.transcript_path:
+            return {
+                "items": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False,
+            }
+        data_dir = load_settings().data_dir
+        events = read_transcript(Path(rec.transcript_path), data_dir)
+        logs = [e for e in events if e.get("type") == "log"]
+        if level:
+            logs = [e for e in logs if e.get("level") == level]
+        total = len(logs)
+        page = logs[offset : offset + limit]
+        items = [
+            {
+                "ts": e.get("ts"),
+                "level": e.get("level", "info"),
+                "message": e.get("message", ""),
+            }
+            for e in page
+        ]
+        return {
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(items) < total,
+        }
 
     # ══════════════════════════════════════════════════════════════════
     # Prompts

@@ -23,6 +23,10 @@ import uuid
 from typing import Any, cast
 
 from agentbox.core.agents.composition.drift import _build_config_json, _build_snapshot
+from agentbox.core.agents.composition.preview import (
+    PreviewError as PreviewError,
+    render_agent_prompt_preview as _render_agent_prompt_preview,
+)
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.config import load_settings
 from agentbox.core.constants import SessionMode
@@ -952,6 +956,26 @@ class AgentService(Service):
     def resolve_agent(self, agent_id: str) -> AgentDef | None:
         """Active-else-latest ``AgentDef`` or ``None`` (alias of get_agent_def)."""
         return self.get_agent_def(agent_id)
+
+    def render_agent_prompt_preview(
+        self,
+        *,
+        agent_id: str,
+        template: str,
+        bindings_override: list[dict] | None = None,
+    ) -> dict:
+        """Render the composed prompt preview for an agent.
+
+        Thin delegator to the free-function in ``core.agents.composition.preview``
+        using ``_session_store()`` for live DB access (bindings, validation).
+        Raises ``PreviewError`` when a binding cannot be resolved.
+        """
+        return _render_agent_prompt_preview(
+            self._session_store(),
+            agent_id=agent_id,
+            template=template,
+            bindings_override=bindings_override,
+        )
 
     def require_agent_exists(self, agent_id: str) -> None:
         """Raise ``AgentNotFound`` when the agent has no usable version."""

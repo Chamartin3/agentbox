@@ -34,7 +34,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         description="List tool grants for an agent.",
     )
     def list_agent_tool_grants(agent_id: str, include_revoked: bool = False) -> dict:
-        return {"items": ctx.store.list_agent_tool_grants(agent_id, include_revoked)}
+        return {"items": ctx.agents.list_tool_grants(agent_id, include_revoked)}
 
     @mcp.tool(
         name="grant_agent_tool",
@@ -52,7 +52,8 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         if len(reason.strip()) < 3:
             return {"error": "reason must be at least 3 characters"}
         try:
-            return ctx.store.grant_agent_tool(agent_id, tool_name, reason, actor)
+            row = ctx.agents.grant_tool(agent_id, tool_name, reason, actor)
+            return dict(row)
         except ValueError as exc:
             return {"error": str(exc)}
 
@@ -69,7 +70,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         if len(reason.strip()) < 3:
             return {"error": "reason must be at least 3 characters"}
         try:
-            ctx.store.revoke_agent_tool(agent_id, tool_name, reason, actor)
+            ctx.agents.revoke_tool(agent_id, tool_name, reason, actor)
             return {"revoked": True}
         except ValueError as exc:
             return {"error": str(exc)}

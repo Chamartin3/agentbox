@@ -4,13 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from agentbox.core.service.evaluation.service import EvaluationService
-from agentbox.core.service.execution.feedback import (
-    add_comment as _add_run_comment,
-    list_comments as _list_run_comments,
-)
 from agentbox.mcp.context import MCPContext
-from agentbox.mcp.deps import get_agent_service, get_context
 
 
 def _success_rate(total: int, failures: int) -> float:
@@ -21,17 +15,17 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def aggregate_usage() -> dict:
         """Total tokens + cost across all runs."""
-        return EvaluationService().aggregate_usage()
+        return ctx.evaluation.aggregate_usage()
 
     @mcp.tool
     def activity_summary(since: str, agent_id: str | None = None) -> dict:
         """Roll up runs since ``since`` (ISO-8601) into totals + breakdowns."""
-        return EvaluationService().activity_summary(since, agent=agent_id)
+        return ctx.evaluation.activity_summary(since, agent=agent_id)
 
     @mcp.tool
     def agent_stats(agent_id: str, since: str) -> dict:
         """Per-agent rollup: run count, success rate, tokens, avg duration."""
-        summary = EvaluationService().activity_summary(since, agent=agent_id)
+        summary = ctx.evaluation.activity_summary(since, agent=agent_id)
         by_action = summary.get("by_action") or []
         agent_row = next(
             (r for r in by_action if r.get("action_name") == agent_id),
@@ -54,14 +48,15 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def list_executors() -> dict:
         """Distinct executor/model names across all recorded runs."""
-        items = EvaluationService().distinct_executors()
+        items = ctx.evaluation.distinct_executors()
         return {"items": items, "total": len(items)}
 
     @mcp.tool
     def list_run_comments(run_id: str) -> dict:
         """List human/agent comments attached to a run."""
-        store = get_context().store
-        return _list_run_comments(run_id, store=store)
+        if ctx.execution.get_run(run_id) is None:
+            return {"error": "not_found", "run_id": run_id}
+        return {"run_id": run_id, "comments": ctx.execution.list_run_comments(run_id)}
 
     @mcp.tool
     def add_run_comment(run_id: str, body: str, author: str = "mcp") -> dict:
@@ -72,9 +67,10 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         """
         if not body or not body.strip():
             return {"error": "empty_body"}
-        store = get_context().store
+        if ctx.execution.get_run(run_id) is None:
+            return {"error": "not_found", "run_id": run_id}
         try:
-            row = _add_run_comment(run_id, store=store, author=author, body=body)
+            row = ctx.execution.add_run_comment(run_id, author, body)
             return {"run_id": run_id, "comment": row}
         except Exception as exc:
             return {"error": str(exc), "run_id": run_id}
@@ -86,9 +82,8 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         """Rate an agent version (1–5)."""
         if not 1 <= rating <= 5:
             return {"error": "rating must be 1–5"}
-        svc = get_agent_service()
         try:
-            svc.set_rating(version_id, rating, rater=rater)
+            ctx.agents.set_rating(version_id, rating, rater=rater)
             return {"version_id": version_id, "rating": rating, "rater": rater}
         except Exception as exc:
             return {"error": str(exc), "version_id": version_id}
@@ -96,9 +91,8 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def list_agent_version_ratings(version_id: int) -> dict:
         """Return ratings + comments for an agent version."""
-        svc = get_agent_service()
-        rating = svc.get_rating(version_id)
-        comments = svc.list_comments(version_id)
+        rating = ctx.agents.get_rating(version_id)
+        comments = ctx.agents.list_comments(version_id)
         return {
             "version_id": version_id,
             "rating": rating,

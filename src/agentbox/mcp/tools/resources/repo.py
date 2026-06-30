@@ -61,7 +61,7 @@ def register_repo(mcp: FastMCP, ctx: MCPContext) -> None:
                 "detail": f"type must be one of {[t.value for t in ResourceType]}",
             }
 
-        svc = ctx.resources()
+        svc = ctx.resources
         try:
             resource = svc.create_resource(
                 slug=slug,
@@ -150,7 +150,7 @@ def register_repo(mcp: FastMCP, ctx: MCPContext) -> None:
         """Set the MCP server policy for a workspace.
 
         policy: 'allow_all_unless_disabled' | 'deny_all_unless_enabled'"""
-        result = ctx.store.set_workspace_mcp_policy(workspace_id, policy)
+        result = ctx.workspaces.set_mcp_policy(workspace_id, policy)
         return {"workspace_id": workspace_id, "policy": str(result)}
 
     @mcp.tool
@@ -166,7 +166,7 @@ def register_repo(mcp: FastMCP, ctx: MCPContext) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        row = ctx.store.set_workspace_mcp_server_override(
+        row = ctx.workspaces.set_mcp_server_override(
             workspace_id, server_name, enabled=enabled, changelog=reason
         )
         return row
@@ -185,7 +185,7 @@ def register_repo(mcp: FastMCP, ctx: MCPContext) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        row = ctx.store.set_workspace_mcp_tool_override(
+        row = ctx.workspaces.set_mcp_tool_override(
             workspace_id, server_name, tool_name, enabled=enabled
         )
         return row

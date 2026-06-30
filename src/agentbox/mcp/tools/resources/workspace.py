@@ -6,13 +6,7 @@ import logging
 
 from fastmcp import FastMCP
 
-# TODO: Imports shoudl be replaces by context impors
-# from agentbox.api.deps import get_settings
-# from agentbox.core.service import build_workspace_by_name
-# from agentbox.core.service.env_doc import (
-#     env_doc_body,
-#     render_env_doc_preview,
-# )
+from agentbox.core.service import render_env_doc_preview
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -53,7 +47,7 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
             }
             for b in bindings
         ]
-        svc = ctx.resources()
+        svc = ctx.resources
         try:
             rows = svc.replace_workspace_resources(
                 workspace_id, normalized, reason=reason
@@ -67,7 +61,7 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
         """Return what would be materialized for the workspace without writing files.
 
         Lists each binding with its resolved resource version and target path."""
-        svc = ctx.resources()
+        svc = ctx.resources
         result = svc.dry_run_workspace_resources(workspace_id)
         return {
             "workspace_id": workspace_id,
@@ -91,17 +85,15 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
         After saving, the workspace is re-synced so CLAUDE.md / AGENTS.md
         reflect the new content right away.
         """
-        ctx = get_context()
-        row = ctx.store.save_env_doc(
-            workspace_id, {"body": env_doc_body(content)}, changelog=reason or "edit"
-        )
         try:
-            build_workspace_by_name(ctx.store, get_settings(), workspace_id)
+            return ctx.workspaces.save_and_sync_env_doc(
+                workspace_id, content=content, reason=reason or "edit"
+            )
         except Exception:
             logging.getLogger(__name__).exception(
-                "set_env_doc: sync failed for %s", workspace_id
+                "set_env_doc: save_and_sync_env_doc failed for %s", workspace_id
             )
-        return row
+            raise
 
     @mcp.tool
     def render_env_doc(workspace_id: str) -> dict:
@@ -109,7 +101,7 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
 
         Returns the CLAUDE.md / AGENTS.md content (identical body) without
         writing files."""
-        doc = ctx.store.get_active_env_doc(workspace_id)
+        doc = ctx.workspaces.get_active_env_doc(workspace_id)
         if doc is None:
             return {"workspace_id": workspace_id, "claude_md": None, "agents_md": None}
 
@@ -134,7 +126,7 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
         err = _require_reason(reason)
         if err:
             return err
-        row = ctx.store.set_workspace_host_env(
+        row = ctx.workspaces.set_workspace_host_env(
             workspace_id, profile_id=None, overrides=grants, changelog=reason
         )
         return row

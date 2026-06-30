@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
-from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-# from agentbox.core.service import read_transcript
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -26,7 +24,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_run(run_id: str) -> dict:
         """Get a single run record (status, input, output, errors, timing)."""
-        rec = ctx.db.runs.get(run_id)
+        rec = ctx.execution.get_run(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
         usage = ctx.execution.get_usage(run_id)
@@ -72,25 +70,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     def get_run_transcript(run_id: str, limit: int = 200, offset: int = 0) -> dict:
         """Paginated slice of the JSONL transcript for a run."""
         limit = clamp_limit(limit)
-        rec = ctx.db.runs.get(run_id)
-        if rec is None or not rec.transcript_path:
-            return {
-                "items": [],
-                "total": 0,
-                "limit": limit,
-                "offset": offset,
-                "has_more": False,
-            }
-        events = read_transcript(Path(rec.transcript_path), ctx.settings.data_dir)
-        total = len(events)
-        page = events[offset : offset + limit]
-        return {
-            "items": page,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "has_more": offset + len(page) < total,
-        }
+        return ctx.execution.get_transcript(run_id, limit, offset)
 
     @mcp.tool
     def get_run_conversation(
@@ -117,7 +97,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         fallback fires, ``fallback_used`` in the response is set to
         ``"no_native_source"`` or ``"native_empty"``.
         """
-        rec = ctx.db.runs.get(run_id)
+        rec = ctx.execution.get_run(run_id)
         if rec is None or not rec.transcript_path:
             return {"error": "not_found", "run_id": run_id}
 
@@ -126,7 +106,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         # back to the agentbox JSONL transcript.
         fmt = getattr(rec, "conversation_format", None)
         turn_limit = clamp_limit(turn_limit)
-        view, fallback_used = ctx.evaluation.load_conversation(
+        view, fallback_used = ctx.execution.load_conversation(
             rec,
             fmt,
             include_bodies=include_bodies,
@@ -195,44 +175,15 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         done) use ``get_run_transcript``.
         """
         limit = clamp_limit(limit)
-        rec = ctx.db.runs.get(run_id)
-        if rec is None or not rec.transcript_path:
-            return {
-                "items": [],
-                "total": 0,
-                "limit": limit,
-                "offset": offset,
-                "has_more": False,
-            }
-        events = read_transcript(Path(rec.transcript_path), ctx.settings.data_dir)
-        logs = [e for e in events if e.get("type") == "log"]
-        if level:
-            logs = [e for e in logs if e.get("level") == level]
-        total = len(logs)
-        page = logs[offset : offset + limit]
-        items = [
-            {
-                "ts": e.get("ts"),
-                "level": e.get("level", "info"),
-                "message": e.get("message", ""),
-            }
-            for e in page
-        ]
-        return {
-            "items": items,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "has_more": offset + len(items) < total,
-        }
+        return ctx.execution.get_logs(run_id, level, limit, offset)
 
     @mcp.tool
     def get_run_webhook_deliveries(run_id: str) -> dict:
         """Webhook delivery attempts for a run (each attempt is one row)."""
-        rec = ctx.db.runs.get(run_id)
+        rec = ctx.execution.get_run(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
-        items = ctx.evaluation.list_webhook_deliveries(run_id)
+        items = ctx.execution.list_webhook_deliveries(run_id)
         return {"run_id": run_id, "items": items, "total": len(items)}
 
     @mcp.tool
@@ -244,7 +195,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_run_output(run_id: str) -> dict:
         """Final output payload for a run (without surrounding metadata)."""
-        rec = ctx.db.runs.get(run_id)
+        rec = ctx.execution.get_run(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
         return {"run_id": run_id, "output": rec.output, "status": rec.status}
@@ -252,7 +203,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_run_errors(run_id: str) -> dict:
         """Error + validation errors for a failed run."""
-        rec = ctx.db.runs.get(run_id)
+        rec = ctx.execution.get_run(run_id)
         if rec is None:
             return {"error": "not_found", "run_id": run_id}
         return {
