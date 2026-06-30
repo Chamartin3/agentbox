@@ -23,7 +23,7 @@ import os
 from pathlib import Path
 
 import pytest
-from agentbox.core.db import DoneEvent, LogEvent, TextEvent, ToolCallEvent
+from agentbox.core.events import DoneEvent, LogEvent, TextEvent, ToolCallEvent
 from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 

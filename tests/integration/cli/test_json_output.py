@@ -10,9 +10,11 @@ from typer.testing import CliRunner
 
 from agentbox.cli import app
 from agentbox.cli.shared import (
-    get_engine_service,
     get_executor,
     get_mcp_registry,
+)
+from agentbox.cli.shared.deps import (
+    get_engine_service,
     get_settings,
     get_store,
 )

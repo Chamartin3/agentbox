@@ -10,21 +10,22 @@ from typer.testing import CliRunner
 
 from agentbox.cli import app
 from agentbox.cli.shared import (
-    get_engine_service,
     get_executor,
     get_mcp_registry,
-    get_settings,
-    get_store,
 )
-from agentbox.cli.shared import get_store as _get_store
-from agentbox.core.db import AgentDef, RunnerProfileCreate
+from agentbox.cli.shared.deps import (
+    get_engine_service,
+    get_settings,
+    get_store as _get_store,
+)
+from agentbox.core.data import AgentDef, RunnerProfileCreate
 from agentbox.core.service.engines.service import EngineService
 
 runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    for fn in (get_settings, get_store, get_executor, get_mcp_registry, get_engine_service):
+    for fn in (get_settings, _get_store, get_executor, get_mcp_registry, get_engine_service):
         fn.cache_clear()
 
 

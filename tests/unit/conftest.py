@@ -10,7 +10,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 
 
 # --------------------------------------------------------------------------- #

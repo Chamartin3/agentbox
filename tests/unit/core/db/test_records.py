@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from agentbox.core.db.execution.records import RunRecord
-from agentbox.core.db.resources.shared import SharedResourceRecord
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data.records import RunRecord
+from agentbox.core.db.resources.shared._models import SharedResourceRecord
+from agentbox.core.data import now_iso
 
 
 class TestNowIso:

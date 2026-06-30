@@ -29,7 +29,8 @@ def _get_tool_fn(mcp: FastMCP, name: str):
 
 def _make_mcp() -> FastMCP:
     mcp = FastMCP("test")
-    register(mcp)
+    ctx = MagicMock()
+    register(mcp, ctx)
     return mcp
 
 
@@ -75,13 +76,13 @@ class TestSetPromptResources:
 
     def test_calls_store(self, tmp_path: Path):
         svc = MagicMock()
-        svc.replace_prompt_bindings_raw.return_value = []
+        svc.replace_prompt_resources.return_value = {"items": []}
         with patch("agentbox.mcp.tools.resources.bindings.get_resource_service", return_value=svc):
             mcp = _make_mcp()
             fn = _get_tool_fn(mcp, "set_prompt_resources")
             result = fn("ag1", [], "add first binding")
         assert result == {"agent_id": "ag1", "bindings": [], "count": 0}
-        svc.replace_prompt_bindings_raw.assert_called_once_with(
+        svc.replace_prompt_resources.assert_called_once_with(
             "ag1", [], reason="add first binding"
         )
 

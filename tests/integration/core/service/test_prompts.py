@@ -11,7 +11,7 @@ import warnings
 from pathlib import Path
 
 import pytest
-from agentbox.core.db import AgentDef
+from agentbox.core.data import AgentDef
 from agentbox.core.db import SessionStore
 from agentbox.core.service import prompts as prompts_service
 from agentbox.core.service.prompts import AgentNotFound

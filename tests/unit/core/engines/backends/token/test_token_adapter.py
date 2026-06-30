@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from agentbox.core.db import TextEvent
+from agentbox.core.events import TextEvent
 from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 from agentbox.core.execution.observability.stream import RunStreamSession

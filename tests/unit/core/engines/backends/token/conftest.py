@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 
 import pytest
 
-from agentbox.core.db import AgentDef
+from agentbox.core.data import AgentDef
 
 
 @pytest.fixture

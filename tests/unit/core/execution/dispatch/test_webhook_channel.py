@@ -20,7 +20,7 @@ from agentbox.core.execution.dispatch.channels.webhook import (
     _response_signals_failure,
 )
 from agentbox.core.execution.dispatch.policy import DispatchPolicy
-from agentbox.core.db import LogEvent
+from agentbox.core.events import LogEvent
 
 # --------------------------------------------------------------------------- #
 # Shared fixtures and constants

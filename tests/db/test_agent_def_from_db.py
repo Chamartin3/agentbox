@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 import pytest
-from agentbox.core.db import AgentDef
+from agentbox.core.data import AgentDef
 
 
 def _minimal_agent_dict(id: str = "test-agent", **extras: Any) -> dict:

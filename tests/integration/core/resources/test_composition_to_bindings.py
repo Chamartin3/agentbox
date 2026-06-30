@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from agentbox.core.db import CompositionConfig
+from agentbox.core.data import CompositionConfig
 from agentbox.core.db import SessionStore
 from agentbox.core.resources.boot import import_composition_references
 

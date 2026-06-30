@@ -11,9 +11,11 @@ from pathlib import Path
 
 import pytest
 import agentbox.core.service.engines.profile_validation as pv
-from agentbox.core.db import (
+from agentbox.core.data import (
     RunnerProfileCreate,
     RunnerProfilePatch,
+)
+from agentbox.core.db import (
     SessionStore,
 )
 from agentbox.core.engines.providers.base import ProviderDescriptor as PD

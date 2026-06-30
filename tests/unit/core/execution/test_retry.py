@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentbox.core.db import DoneEvent, RunEvent, TextEvent
+from agentbox.core.events import DoneEvent, RunEvent, TextEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.execution.observability.stream import CaptureSession
 from agentbox.core.execution.retry import (

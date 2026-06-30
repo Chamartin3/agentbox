@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from agentbox.core.db import AgentDef, SessionStore
+from agentbox.core.data import AgentDef
+from agentbox.core.db import SessionStore
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
 import agentbox.core.service.execution as runs_service

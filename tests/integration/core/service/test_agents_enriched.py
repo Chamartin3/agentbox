@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.config import Settings
-from agentbox.core.db import AgentDef
+from agentbox.core.data import AgentDef
 from agentbox.core.db import SessionStore
 from agentbox.core.service.agents import get_agent_detail, list_agents_enriched
 

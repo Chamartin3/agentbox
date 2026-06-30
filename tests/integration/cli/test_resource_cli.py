@@ -10,6 +10,8 @@ from agentbox.cli import app
 from agentbox.cli.shared import (
     get_executor,
     get_mcp_registry,
+)
+from agentbox.cli.shared.deps import (
     get_resource_service,
     get_settings,
     get_store,

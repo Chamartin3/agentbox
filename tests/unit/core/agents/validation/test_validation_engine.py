@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from agentbox.core.agents.composition.bundle import _append_validation_engine_hint
-from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.agents.validation import validate_output
 
 

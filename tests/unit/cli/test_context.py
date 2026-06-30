@@ -13,6 +13,8 @@ from agentbox.cli.shared import (
     SystemRenderer,
     WorkspaceRenderer,
     build_ctx,
+)
+from agentbox.cli.shared.deps import (
     get_agent_service,
     get_engine_service,
     get_evaluation_service,

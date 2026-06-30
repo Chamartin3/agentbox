@@ -14,7 +14,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 from agentbox.core.agents.validation import validate_output
-from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 

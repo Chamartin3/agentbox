@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentbox.core.db import McpSnapshot, RunnerSnapshot
+from agentbox.core.data import McpSnapshot, RunnerSnapshot
 from agentbox.core.execution.observability.snapshot.writer import SnapshotWriter
 
 pytestmark = pytest.mark.unit

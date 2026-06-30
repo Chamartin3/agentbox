@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from agentbox.core.db import (
+from agentbox.core.events import (
     DoneEvent,
     LogEvent,
     TextEvent,

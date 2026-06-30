@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agentbox.core.db import AgentDef, RunRecord
+from agentbox.core.data import AgentDef, RunRecord
 
 
 @pytest.fixture

@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator, Callable
 
 import pytest
 
-from agentbox.core.db import DoneEvent, RunEvent, TextEvent
+from agentbox.core.events import DoneEvent, RunEvent, TextEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 
 

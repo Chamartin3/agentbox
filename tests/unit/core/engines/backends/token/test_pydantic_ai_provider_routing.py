@@ -11,9 +11,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from agentbox.core.db import DoneEvent
+from agentbox.core.events import DoneEvent
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.token import TokenBackend
 
 DEFAULT_RUNNER = RunnerSpec(kind="token")

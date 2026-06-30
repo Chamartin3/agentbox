@@ -190,7 +190,7 @@ def test_get_skill_content_missing(store: SessionStore, settings: _FakeSettings)
 def test_generate_configs_by_name(store: SessionStore, settings: _FakeSettings) -> None:
     _register(store, "cfgrs")
     result = generate_configs_by_name(
-        "cfgrs", store=store, settings=settings  # type: ignore[arg-type]
+        "cfgrs", settings=settings  # type: ignore[arg-type]
     )
     assert isinstance(result, dict)
     # Generated config paths are nested under result["generated"]
@@ -203,13 +203,13 @@ def test_generate_configs_by_name(store: SessionStore, settings: _FakeSettings) 
 
 
 def test_resolve_workspace_mcp_empty(store: SessionStore) -> None:
-    result = resolve_workspace_mcp("nonexistent", store=store)
+    result = resolve_workspace_mcp("nonexistent")
     assert isinstance(result, dict)
     assert "servers" in result
 
 
 def test_resolve_workspace_mcp_with_workspace(store: SessionStore) -> None:
     store.create_workspace("mcp-ws")
-    result = resolve_workspace_mcp("mcp-ws", store=store)
+    result = resolve_workspace_mcp("mcp-ws")
     assert isinstance(result, dict)
     assert "servers" in result

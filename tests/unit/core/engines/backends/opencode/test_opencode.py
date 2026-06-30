@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.opencode import OpenCodeBackend
 
 DEFAULT_RUNNER = RunnerSpec(

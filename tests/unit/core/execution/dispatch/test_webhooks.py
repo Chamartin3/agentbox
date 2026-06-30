@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from agentbox.core.db import RunRecord
+from agentbox.core.data import RunRecord
 from agentbox.core.execution.dispatch.payload import (
     _parsed_output,
     _parsed_output_structured,

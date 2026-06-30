@@ -1,5 +1,6 @@
 [importlinter]
 root_package = agentbox
+include_external_packages = True
 
 
 # ─── Agents domain facade ────────────────────────────────────────────────
@@ -51,8 +52,6 @@ allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
     # api → core.workspaces
-    agentbox.api.agents.grants -> agentbox.core.workspaces.catalog
-    agentbox.api.workspaces.catalog -> agentbox.core.workspaces.catalog
     agentbox.api.workspaces.crud -> agentbox.core.workspaces.build
     # api → core.execution
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch
@@ -60,21 +59,19 @@ ignore_imports =
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.policy
     # cli → core.resources
     agentbox.cli.ops.resource.repo -> agentbox.core.resources.legacy_composition
-    agentbox.cli.resources.repo.manage -> agentbox.core.resources.legacy_composition
     # cli → core.workspaces
     agentbox.cli.ops.cfg -> agentbox.core.workspaces
     agentbox.cli.ops.shell -> agentbox.core.workspaces.prep
-    agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.from_db
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.from_yaml
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.interactive
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.config
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.generator
-    agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.presets
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.recipe
-    agentbox.cli.ops.launch -> agentbox.core.workspaces.build
-    agentbox.cli.root -> agentbox.core.workspaces
     agentbox.cli.system.doctor -> agentbox.core.workspaces
     agentbox.cli.work.ws -> agentbox.core.workspaces
+    # cli renderers → core.engines (render layer touches domain types to
+    # produce formatted output; real fix: shared value types below both layers)
+    # cli renderers → core.workspaces (same rationale)
 
 
 # ─── Resources is the foundation ─────────────────────────────────────────
@@ -93,6 +90,55 @@ forbidden_modules =
     agentbox.core.workspaces
 allow_indirect_imports = True
 
+
+# ─── CLI architecture: context owns the DI wiring ─────────────────────────
+# CLI branch packages (agent, engine, history, ops, run, system, work)
+# must not import agentbox.cli.shared.deps directly — the singleton
+# factories are owned by the context layer. Branches get their services
+# via ctx.obj (CLIContext), not by calling factories. Violations that
+# remain are transitional debt tracked in ignore_imports below.
+[importlinter:contract:cli-context-owns-core]
+name = CLI branches must not import shared.deps
+type = forbidden
+source_modules =
+    agentbox.cli.agent
+    agentbox.cli.engine
+    agentbox.cli.history
+    agentbox.cli.ops
+    agentbox.cli.run
+    agentbox.cli.system
+    agentbox.cli.work
+forbidden_modules =
+    agentbox.cli.shared.deps
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # agents/engine/history/run/system/work branch packages still import
+    # factories from shared.deps before ctx.obj migration is complete
+    agentbox.cli.ops.resource.bind -> agentbox.cli.shared.deps
+    agentbox.cli.ops.resource.repo -> agentbox.cli.shared.deps
+    agentbox.cli.work.res -> agentbox.cli.shared.deps
+
+# ─── CLI architecture: only render layer touches Rich ────────────────────
+# The Rich console library must only be imported by the render layer
+# (agentbox.cli.shared.render and agentbox.cli.shared.renderers.*).
+# Branch packages format output through the Renderer subclasses stored
+# in ctx.obj.render — they must not import Rich directly.
+[importlinter:contract:cli-render-owns-rich]
+name = CLI branches must not import Rich directly
+type = forbidden
+source_modules =
+    agentbox.cli.agent
+    agentbox.cli.engine
+    agentbox.cli.history
+    agentbox.cli.ops
+    agentbox.cli.run
+    agentbox.cli.system
+    agentbox.cli.work
+forbidden_modules =
+    rich
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
 
 # ─── Engines: only Tools + leaves ────────────────────────────────────────
 # Engines is the catalog of backends/providers/credentials. Per
@@ -239,13 +285,12 @@ ignore_imports =
     # DI wiring still constructs Database/SessionStore directly; goes
     # away when deps modules resolve Services instead
     agentbox.api.deps -> agentbox.core.db
-    agentbox.cli._deps -> agentbox.core.db
     agentbox.cli.shared.deps -> agentbox.core.db
     agentbox.mcp.deps -> agentbox.core.db
     # remaining direct store/row consumers
-    agentbox.api.workspaces.catalog -> agentbox.core.db
     agentbox.api.workspaces.crud -> agentbox.core.db
-    agentbox.cli.agent.definition -> agentbox.core.db
     agentbox.cli.ops.migrate -> agentbox.core.db.system.seeds
     agentbox.cli.ops.shell -> agentbox.core.db
-    agentbox.cli.ops.workenv -> agentbox.core.db
+    # cli renderers touch core.db types to render domain objects
+    # (real fix: shared value types below both layers)
+    # api/mcp transitional direct db access (TODO: route through Services)

@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 import pytest
 
-from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 
 DEFAULT_RUNNER = RunnerSpec(
     kind="claude_code",

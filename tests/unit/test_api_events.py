@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from agentbox.core.db import (
+from agentbox.core.events import (
     DoneEvent,
     LogEvent,
     RunEvent,

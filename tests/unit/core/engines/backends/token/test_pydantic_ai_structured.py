@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from agentbox.core.db import AgentDef, RunnerSpec
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.token import (
     TokenBackend,
     _json_schema_to_pydantic_model,

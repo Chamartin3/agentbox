@@ -14,7 +14,8 @@ from typing import Any
 import agentbox.core.engines.backends.registry as _plugins
 from agentbox.api.deps import get_store
 from agentbox.core.config import SETTINGS
-from agentbox.core.db import AgentDef, DoneEvent, RunEvent
+from agentbox.core.events import DoneEvent, RunEvent
+from agentbox.core.data import AgentDef
 from agentbox.core.engines.contracts.base import RenderedConfig
 
 
