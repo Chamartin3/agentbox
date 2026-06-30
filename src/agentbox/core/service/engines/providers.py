@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from agentbox.core.data import RunnerProfile
-from agentbox.core.db import get_database
+from agentbox.core.db.database import get_database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
 
 from agentbox.core.engines import (
     EffectiveRunnerConfig,

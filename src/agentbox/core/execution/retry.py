@@ -33,7 +33,7 @@ from typing import Any
 from agentbox.core.agents.validation import extract_json, validate_output
 from agentbox.core.constants import LogLevel
 from agentbox.core.events import DoneEvent
-from agentbox.core.db import RunStatus
+from agentbox.core.constants import RunStatus
 from agentbox.core.engines.contracts.base import (
     BackendAdapter,
     RenderedConfig,

@@ -282,15 +282,75 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # DI wiring still constructs Database/SessionStore directly; goes
-    # away when deps modules resolve Services instead
-    agentbox.api.deps -> agentbox.core.db
-    agentbox.cli.shared.deps -> agentbox.core.db
-    agentbox.mcp.deps -> agentbox.core.db
-    # remaining direct store/row consumers
-    agentbox.api.workspaces.crud -> agentbox.core.db
+    # DI wiring constructs Database directly from core.db.database; goes
+    # away when deps modules resolve Services instead (plan 113_04).
+    # After plan 109, Database/get_database are in core.db.database, not the
+    # top-level facade, so we point at the specific submodule:
+    agentbox.api.deps -> agentbox.core.db.database
+    agentbox.cli.shared.deps -> agentbox.core.db.database
+    agentbox.mcp.deps -> agentbox.core.db.database
+    agentbox.cli.ops.shell -> agentbox.core.db.database
+    # migration tooling: always-tolerated deep submodule path
     agentbox.cli.ops.migrate -> agentbox.core.db.system.seeds
-    agentbox.cli.ops.shell -> agentbox.core.db
     # cli renderers touch core.db types to render domain objects
     # (real fix: shared value types below both layers)
     # api/mcp transitional direct db access (TODO: route through Services)
+
+
+# ─── db façade is managers-only ──────────────────────────────────────────
+# Everything outside core.db (and its own tests) imports managers via the
+# top façade ``agentbox.core.db``, never a deep submodule.  Shared data
+# shapes live in core.data / core.protocols / core.events, not here.
+# The ignore_imports block is the known-debt registry — one line per debt
+# site, each tagged with the plan that burns it.
+[importlinter:contract:db-facade-managers-only]
+name = core.db exposes only managers via its façade
+type = forbidden
+source_modules =
+    agentbox.core.agents
+    agentbox.core.engines
+    agentbox.core.execution
+    agentbox.core.resources
+    agentbox.core.service
+    agentbox.core.tools
+    agentbox.core.workspaces
+forbidden_modules =
+    agentbox.core.db.schema
+    agentbox.core.db.base
+    agentbox.core.db.models
+    agentbox.core.db.store
+    agentbox.core.db.database
+    agentbox.core.db.managers
+    agentbox.core.db.agents
+    agentbox.core.db.workspaces
+    agentbox.core.db.resources
+    agentbox.core.db.engines
+    agentbox.core.db.system
+    agentbox.core.db.execution
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =
+    # ── Permanent allowlist (composition root — Database lifecycle) ──────
+    agentbox.core.service.base -> agentbox.core.db.database
+    # ── Transitional: burned by plans 111/112 ────────────────────────────
+    agentbox.core.agents.composition.drift -> agentbox.core.db.database
+    agentbox.core.agents.composition.drift -> agentbox.core.db.agents.versions
+    agentbox.core.engines.profiles -> agentbox.core.db.database
+    agentbox.core.execution.observability.snapshot.runner -> agentbox.core.db.database
+    agentbox.core.execution.orchestrate.executor -> agentbox.core.db.database
+    agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.schema
+    agentbox.core.service.agents.crud -> agentbox.core.db.schema
+    agentbox.core.service.engines.providers -> agentbox.core.db.database
+    # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
+    agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.database
+    agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.system.config
+    agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.database
+    agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.system.config
+    # ── Pre-existing deep imports (no manager API yet): ──────────────────
+    agentbox.core.agents.runtime -> agentbox.core.db.system.config
+    agentbox.core.engines.defaults -> agentbox.core.db.system.config
+    agentbox.core.execution.observability.snapshot.mcp -> agentbox.core.db.system.config
+    agentbox.core.resources -> agentbox.core.db.resources.models
+    agentbox.core.service.lifecycle.startup -> agentbox.core.db.engines.seeds
+    agentbox.core.workspaces.generation.builders.from_db -> agentbox.core.db.system.config
+    agentbox.core.workspaces.generation.presets -> agentbox.core.db.workspaces.templates

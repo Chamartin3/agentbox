@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from agentbox.api.context import APIContext
 from agentbox.core.config import Settings, load_settings
-from agentbox.core.db import Database
+from agentbox.core.db.database import Database  # ponytail: transitional — 113_04 routes DI through Services
 from agentbox.core.service import (
     AgentService,
     EngineService,

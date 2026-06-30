@@ -1,6 +1,10 @@
 """Tests for the models catalog in agentbox.core.db.
 
 Verifies schema construction, round-trips, validation, and facade encapsulation.
+
+After plan 109, ``agentbox.core.db`` exports managers only.  SQLModel entities
+come from ``agentbox.core.db.models`` and ``metadata`` from
+``agentbox.core.db.schema``.
 """
 from __future__ import annotations
 
@@ -9,8 +13,7 @@ from sqlalchemy import create_engine
 from sqlmodel import SQLModel
 
 import agentbox.core.db as db_pkg
-from agentbox.core.db import metadata as old_metadata
-from agentbox.core.db import (
+from agentbox.core.db.models import (
     Run,
     Session,
     Usage,
@@ -19,6 +22,7 @@ from agentbox.core.db import (
     Setting,
     AgentVersion,
 )
+from agentbox.core.db.schema import metadata as old_metadata
 from agentbox.core.db.models.engines.runner_profile import RunnerProfile
 
 
@@ -96,17 +100,26 @@ def test_invalid_construction_raises() -> None:
         pass
 
 
-def test_facade_encapsulation() -> None:
-    """core.db.__init__.__all__ contains Models but not Entity/Engine."""
+def test_facade_managers_only() -> None:
+    """After plan 109, core.db.__all__ contains only managers + SessionStore.
+
+    SQLModel entities (Run, Agent, etc.) are no longer re-exported by the
+    façade — they live in ``agentbox.core.db.models``.
+    """
     public_names = set(getattr(db_pkg, "__all__", dir(db_pkg)))
-    # Models should be present
-    assert "Run" in public_names
-    assert "Session" in public_names
-    assert "Agent" in public_names
-    assert "Workspace" in public_names
+    # Managers should be present
+    assert "RunManager" in public_names
+    assert "AgentManager" in public_names
+    assert "WorkspaceManager" in public_names
+    assert "SessionStore" in public_names
+    # SQLModel entities must NOT be in the managers-only facade
+    assert "Run" not in public_names, "Run leaked into managers-only facade"
+    assert "Agent" not in public_names, "Agent leaked into managers-only facade"
     # Internal machinery should NOT be present in __all__
     assert "Entity" not in public_names, "Entity leaked into public facade"
     assert "Engine" not in public_names, "Engine leaked into public facade"
+    assert "Database" not in public_names, "Database leaked into managers-only facade"
+    assert "get_database" not in public_names, "get_database leaked into managers-only facade"
 
 
 def test_tablenames_match_old_schema() -> None:

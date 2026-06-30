@@ -209,7 +209,7 @@ def dispatch_orphan_webhooks(
             dispatch_completion(
                 run=run,
                 agent=agent,
-                svc=ExecutionService(),
+                store=ExecutionService(),
                 settings=settings,
             )
             scheduled += 1

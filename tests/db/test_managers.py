@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import SQLModel
 
 import agentbox.core.db as db_pkg
-from agentbox.core.db import Database
+from agentbox.core.db.database import Database
 from agentbox.core.db.models.runs.run import Run
 
 
@@ -190,15 +190,24 @@ def test_generic_reads_return_models(blank_db: Database) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_facade_exports_database_and_models(blank_db: Database) -> None:
-    """The facade exports Database + Models but not engine/Entity/Manager."""
+def test_facade_exports_managers_only(blank_db: Database) -> None:
+    """After plan 109, the facade exports managers + SessionStore only.
+
+    Database and SQLModel entities (Run, etc.) are NOT in the facade — they
+    are internal wiring / model layer accessed via core.db.database /
+    core.db.models respectively.
+    """
     public = set(getattr(db_pkg, "__all__", []))
-    assert "Database" in public
-    assert "Run" in public
+    # Managers must be present
+    assert "RunManager" in public
+    assert "AgentManager" in public
+    assert "SessionStore" in public
+    # Database is no longer facade-exported
+    assert "Database" not in public
+    assert "Run" not in public
     # Internal machinery not in __all__
     assert "Entity" not in public
     assert "Engine" not in public
-    assert "Manager" not in public
 
 
 def test_create_missing_required_field_raises(blank_db: Database) -> None:

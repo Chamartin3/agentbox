@@ -28,7 +28,7 @@ def file_gen(
     obj: CLIContext = ctx.obj
     try:
         result = workspaces_service.generate_configs_by_name(
-            name, store=obj.store, settings=obj.settings,
+            name, settings=obj.settings,
         )
     except WorkspaceNotFound:
         obj.render.workspace.workspace_not_found(name)

@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from agentbox.core.db import Database, agent_version_files
+from agentbox.core.db.database import Database
+from agentbox.core.db.schema import agent_version_files
 from agentbox.core.service import RunnerSpec
 from agentbox.core.service.agents import (
     AgentAlreadyExists,

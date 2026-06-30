@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.data import AgentDef, AgentSource, RunnerSpec
-from agentbox.core.db import prompt_versions
+from agentbox.core.db.schema import prompt_versions
 from agentbox.core.agents.composition.drift import startup_sweep
 
 

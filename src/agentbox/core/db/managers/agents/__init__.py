@@ -7,6 +7,7 @@ from agentbox.core.db.managers.agents.agent import (
     AgentMetaManager,
     AgentRunnerProfileManager,
 )
+from agentbox.core.db.managers.agents.agent_def import AgentDefManager
 from agentbox.core.db.managers.agents.version import (
     AgentVersionManager,
     AgentVersionFileManager,
@@ -21,6 +22,7 @@ from agentbox.core.db.managers.agents.config_event import AgentConfigEventManage
 __all__ = [
     "ActiveAgentVersionManager",
     "AgentConfigEventManager",
+    "AgentDefManager",
     "AgentManager",
     "AgentMetaManager",
     "AgentRunnerProfileManager",

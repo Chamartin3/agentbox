@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import agentbox.api.deps as deps
 from agentbox.api.app import create_app
-from agentbox.core.db import agent_versions
+from agentbox.core.db.schema import agent_versions
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 

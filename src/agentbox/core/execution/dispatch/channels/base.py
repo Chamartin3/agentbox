@@ -6,10 +6,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.core.protocols import RunStore
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult
 from agentbox.core.execution.dispatch.payload import CompletionPayload
-from agentbox.core.execution.dispatch.policy import DispatchPolicy
+from agentbox.core.execution.dispatch.policy import DispatchPolicy, DispatchStore
 
 
 class DispatchChannel(ABC):
@@ -32,7 +31,7 @@ class DispatchChannel(ABC):
         run_id: str,
         broadcaster: Any | None = None,
         transcript_path: Path | None = None,
-        store: RunStore | None = None,
+        store: DispatchStore | None = None,
     ) -> DeliveryResult:
         """Deliver ``payload`` according to ``config`` and ``policy``."""
         ...

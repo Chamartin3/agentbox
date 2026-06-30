@@ -11,7 +11,8 @@ Lock the table set here so the split can't quietly drop one.
 
 from __future__ import annotations
 
-from agentbox.core.db import metadata, schema
+from agentbox.core.db import schema  # subpackage attribute — always accessible
+from agentbox.core.db.schema import metadata
 from agentbox.core.db._metadata import metadata as private
 
 EXPECTED_TABLES: frozenset[str] = frozenset(

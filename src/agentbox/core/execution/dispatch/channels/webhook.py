@@ -14,10 +14,9 @@ import httpx
 
 from agentbox.core.constants import LogLevel
 from agentbox.core.events import LogEvent, RunEvent
-from agentbox.core.protocols import RunStore
 from agentbox.core.execution.dispatch.channels.base import DeliveryResult, DispatchChannel
 from agentbox.core.execution.dispatch.payload import CompletionPayload
-from agentbox.core.execution.dispatch.policy import DispatchPolicy
+from agentbox.core.execution.dispatch.policy import DispatchPolicy, DispatchStore
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ def _response_signals_failure(body: str) -> bool:
 
 
 def _record_delivery(
-    store: RunStore | None,
+    store: DispatchStore | None,
     run_id: str,
     attempt: int,
     url: str,
@@ -105,7 +104,7 @@ class WebhookChannel(DispatchChannel):
         run_id: str,
         broadcaster: Any | None = None,
         transcript_path: Path | None = None,
-        store: RunStore | None = None,
+        store: DispatchStore | None = None,
     ) -> DeliveryResult:
         url = str(config.get("url", ""))
         if not url:

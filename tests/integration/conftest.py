@@ -14,7 +14,8 @@ import agentbox.api.deps as api_deps
 import agentbox.cli.shared.deps as cli_deps
 import pytest
 from agentbox.api.app import create_app
-from agentbox.core.db import Database, SessionStore
+from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from fastapi.testclient import TestClient
 
 

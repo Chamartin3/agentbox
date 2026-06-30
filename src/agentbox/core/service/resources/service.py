@@ -27,7 +27,7 @@ from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.config import load_settings
 from agentbox.core.constants import ResourceType
 from agentbox.core.db import SessionStore
-from agentbox.core.db.resources.shared._models import SharedResourceRecord
+from agentbox.core.data.records import SharedResourceRecord
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter
@@ -796,7 +796,7 @@ class ResourceService(Service):
         tags: list[str] | None = None,
         activate: bool = True,
     ) -> SharedResourceRecord:
-        return self._shared_resources.create(
+        return self._shared_resources.create_resource(
             id, kind, name,
             description=description,
             content=content,

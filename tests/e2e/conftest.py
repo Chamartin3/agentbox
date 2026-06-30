@@ -17,7 +17,8 @@ from typing import Any
 import agentbox.api.deps as deps
 import pytest
 from agentbox.api.app import create_app
-from agentbox.core.db import Database, SessionStore
+from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from fastapi.testclient import TestClient
 
 

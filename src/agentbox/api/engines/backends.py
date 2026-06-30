@@ -53,7 +53,7 @@ def list_runner_backends(
         out.append(
             BackendDescriptor(
                 id=name,
-                label=_LABELS.get(name, name),
+                label=_LABELS.get(name) or name,
                 default_model=getattr(cls, "default_model", None),
                 compatible_providers=compatible,
                 accepts_no_provider=True,

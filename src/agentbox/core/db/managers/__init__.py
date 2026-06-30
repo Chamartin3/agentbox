@@ -20,6 +20,7 @@ from agentbox.core.db.managers.runs import (
 from agentbox.core.db.managers.agents import (
     ActiveAgentVersionManager,
     AgentConfigEventManager,
+    AgentDefManager,
     AgentManager,
     AgentMetaManager,
     AgentRunnerProfileManager,
@@ -82,6 +83,7 @@ __all__ = [
     # agents
     "ActiveAgentVersionManager",
     "AgentConfigEventManager",
+    "AgentDefManager",
     "AgentManager",
     "AgentMetaManager",
     "AgentRunnerProfileManager",

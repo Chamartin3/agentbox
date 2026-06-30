@@ -1,6 +1,7 @@
 import pytest
 from agentbox.core.data import now_iso
-from agentbox.core.db import SessionStore, agents
+from agentbox.core.db import SessionStore
+from agentbox.core.db.schema import agents
 
 
 @pytest.fixture

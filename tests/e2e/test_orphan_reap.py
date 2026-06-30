@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.db import SessionStore
-from agentbox.core.db import runs
+from agentbox.core.db.schema import runs
 
 
 def test_reap_marks_orphaned_running_rows_as_incomplete(tmp_path: Path) -> None:

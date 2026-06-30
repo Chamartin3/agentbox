@@ -19,6 +19,7 @@ from agentbox.core.db.base.engine import init_engine
 from agentbox.core.db.managers.agents import (
     ActiveAgentVersionManager,
     AgentConfigEventManager,
+    AgentDefManager,
     AgentManager,
     AgentMetaManager,
     AgentRunnerProfileManager,
@@ -123,6 +124,7 @@ class Database:
         self.agent_tool_grants = AgentToolGrantManager(self._engine)
         self.agent_sync = AgentSyncManager(self._engine)
         self.agent_config_events = AgentConfigEventManager(self._engine)
+        self.agent_defs = AgentDefManager(self._engine)
 
         # Workspaces domain
         self.workspaces = WorkspaceManager(self._engine)

@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from agentbox.core.db import SessionStore
-from agentbox.core.db import Database
+from agentbox.core.db.database import Database  # ponytail: transitional — plan 110 re-plumbs mcp/servers
 from agentbox.core.db.system.config import record_host_env_call
 
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import cast
 
 import agentbox
 from alembic import command
@@ -23,6 +24,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.engine import Engine
 
 from agentbox.core.constants import RunStatus
+from agentbox.core.data.rows import RepoResourceRow
 from agentbox.core.db.agents.events import AgentConfigEventsMixin
 from agentbox.core.db.agents.sync import AgentSyncMixin
 from agentbox.core.db.agents.grants import AgentToolGrantsMixin
@@ -181,8 +183,9 @@ class SessionStore(
         from agentbox.core.service.resources.service import ResourceService  # noqa: PLC0415
         return ResourceService()
 
-    def get_repo_resource(self, resource_id: str):
-        return self._rsvc()._resources.get_resource(resource_id)
+    def get_repo_resource(self, resource_id: str) -> RepoResourceRow | None:
+        row = self._rsvc()._resources.get_resource(resource_id)
+        return cast(RepoResourceRow, row) if row else None
 
     def get_repo_resource_by_slug(self, slug: str):
         return self._rsvc()._resources.get_by_slug(slug)
@@ -243,7 +246,7 @@ class SessionStore(
         return self._rsvc()._shared_resources.list_versions(id, limit=limit, offset=offset)
 
     def create_resource(self, id: str, kind: str, name: str, *, description: str | None = None, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, tags: list[str] | None = None, activate: bool = True):
-        return self._rsvc()._shared_resources.create(id, kind, name, description=description, content=content, config_json=config_json, author=author, changelog=changelog, tags=tags, activate=activate)
+        return self._rsvc()._shared_resources.create_resource(id, kind, name, description=description, content=content, config_json=config_json, author=author, changelog=changelog, tags=tags, activate=activate)
 
     def create_resource_version(self, id: str, *, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, activate: bool = False, **fields_to_update):
         return self._rsvc()._shared_resources.create_version(id, content=content, config_json=config_json, author=author, changelog=changelog, activate=activate, **fields_to_update)
@@ -268,7 +271,7 @@ class SessionStore(
         return self._rsvc()._shared_resources.list_versions(id, limit=limit, offset=offset)
 
     def create_shared_resource(self, id: str, kind: str, name: str, *, description: str | None = None, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, tags: list[str] | None = None, activate: bool = True):
-        return self._rsvc()._shared_resources.create(id, kind, name, description=description, content=content, config_json=config_json, author=author, changelog=changelog, tags=tags, activate=activate)
+        return self._rsvc()._shared_resources.create_resource(id, kind, name, description=description, content=content, config_json=config_json, author=author, changelog=changelog, tags=tags, activate=activate)
 
     def create_shared_resource_version(self, id: str, *, content: str | None = None, config_json: str | None = None, author: str | None = None, changelog: str | None = None, activate: bool = False, **fields_to_update):
         return self._rsvc()._shared_resources.create_version(id, content=content, config_json=config_json, author=author, changelog=changelog, activate=activate, **fields_to_update)

@@ -23,7 +23,7 @@ from agentbox.core.data.profiles import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.data.records import RunRecord, row_to_run
+from agentbox.core.data.records import RunRecord, SharedResourceRecord, row_to_run
 from agentbox.core.data.rows import (
     AgentConfigEventRow,
     AgentMetaRow,
@@ -93,6 +93,7 @@ __all__ = [
     "RunnerSnapshot",
     "RunnerSpec",
     "RunRecord",
+    "SharedResourceRecord",
     "SharedRef",
     "VersionFileUploadRow",
     "WorkspaceDef",

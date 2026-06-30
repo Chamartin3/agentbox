@@ -20,7 +20,7 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.core.db import Database  # TODO(cli-arch): db via ctx
+from agentbox.core.db.database import Database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
 from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service import SessionStore  # TODO(cli-arch): store via ctx
 from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)

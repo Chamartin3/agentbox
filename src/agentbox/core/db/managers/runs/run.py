@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 
 from agentbox.core.constants import RunStatus as RS
+from agentbox.core.data.snapshots import RunnerSnapshot
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.runs.run import Run
@@ -188,7 +189,7 @@ class RunManager(Manager[Run]):
         if values:
             self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(**values))
 
-    def save_runner_snapshot(self, run_id: str, runner_snapshot: dict) -> None:
+    def save_runner_snapshot(self, run_id: str, runner_snapshot: RunnerSnapshot) -> None:
         """Persist the runner config snapshot; append-only (writes only if null)."""
         stmt = (
             sa_update(Run)

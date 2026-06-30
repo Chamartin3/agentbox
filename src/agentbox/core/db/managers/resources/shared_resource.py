@@ -8,7 +8,7 @@ from sqlalchemy import and_, func, or_, select
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.shared_resource import SharedResource
-from agentbox.core.db.resources.shared._models import SharedResourceRecord, row_to_record
+from agentbox.core.data.records import SharedResourceRecord, row_to_shared_resource as row_to_record
 from agentbox.core.db.schema import shared_resources
 from agentbox.core.db.utils import now_iso
 
@@ -135,7 +135,7 @@ class SharedResourceManager(Manager[SharedResource]):
             ).first()
             return int(row[0]) + 1 if row else 1
 
-    def create(
+    def create_resource(
         self,
         id: str,
         kind: str,

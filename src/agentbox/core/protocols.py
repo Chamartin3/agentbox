@@ -37,6 +37,7 @@ class RunStore(Protocol):
     of those collaborators passes pyright without ``# type: ignore``.
     """
 
+    db_path: Path
     engine: _Engine
 
     # ------------------------------------------------------------------
@@ -383,6 +384,8 @@ class WorkspaceBuildStore(Protocol):
     def get_active_repo_version(self, resource_id: str) -> dict | None: ...
 
     def iter_repo_blobs(self, version_id: str) -> Iterator[dict]: ...
+
+    def list_prompt_bindings(self, agent_id: str) -> list[dict]: ...
 
     def resolve_workspace_host_env(
         self, workspace_id: str
