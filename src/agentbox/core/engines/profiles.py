@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.core.engines.backends.registry import get_backend as resolve_engine_by_name
 from agentbox.core.engines.providers import get_provider
-from agentbox.core.db.database import get_database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
+from agentbox.core.db import RunnerProfileManager
 from agentbox.core.data.profiles import RunnerProfile
 
 SourceType = Literal[
@@ -89,7 +89,7 @@ class RunnerProfileResolver:
         self,
         *,
         agent: Any,  # AgentDef — duck-typed
-        store: Any,  # SessionStore — duck-typed
+        runner_profiles: RunnerProfileManager,
         runner_profile_id: str | None,
         runner_config: dict[str, Any] | None,
         backend_override: str | None,
@@ -99,7 +99,7 @@ class RunnerProfileResolver:
 
         Args:
             agent: AgentDef instance (duck-typed, not imported directly).
-            store: SessionStore instance (duck-typed, not imported directly).
+            runner_profiles: RunnerProfileManager for profile DB lookups.
             runner_profile_id: Explicit profile ID from the run request.
             runner_config: Inline config dict from the run request.
             backend_override: Per-run backend override.
@@ -138,9 +138,7 @@ class RunnerProfileResolver:
 
         # Rule 2: Per-run runner_profile_id
         if runner_profile_id:
-            row = get_database(str(store.db_path)).runner_profiles.get_by_id(
-                runner_profile_id
-            )
+            row = runner_profiles.get_by_id(runner_profile_id)
             if not row:
                 raise ValueError(f"runner profile {runner_profile_id!r} not found")
             profile = RunnerProfile(**row)
@@ -157,9 +155,7 @@ class RunnerProfileResolver:
 
         # Rule 3: Agent-bound runner profile
         if hasattr(agent, "id"):
-            row = get_database(str(store.db_path)).runner_profiles.get_agent_profile(
-                agent.id
-            )
+            row = runner_profiles.get_agent_profile(agent.id)
             if row:
                 profile = RunnerProfile(**row)
                 is_enabled = profile.is_enabled
@@ -174,7 +170,7 @@ class RunnerProfileResolver:
                 # Disabled agent-bound profile: fall through to next rules
 
         # Rule 4: System default runner profile
-        row = get_database(str(store.db_path)).runner_profiles.get_system_default()
+        row = runner_profiles.get_system_default()
         if row:
             profile = RunnerProfile(**row)
             config = self._build_from_profile(

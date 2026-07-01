@@ -13,20 +13,13 @@ from agentbox.cli.shared import CLIContext, resolve_agent
 from agentbox.cli.ops.launch import _launch_session
 # TODO(cli-arch): workspace CRUD → WorkspaceService (plan 089)
 from agentbox.core import workspaces as ws_core
-# TODO(cli-arch): WorkspaceService (plan 089)
-from agentbox.core.service import workspaces as workspaces_service
-from agentbox.core.service import get_workspace as service_get_workspace
 # TODO(cli-arch): move to facade export
 from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 
 def _resolve_workspace(obj: CLIContext, name: str) -> tuple[Path, str]:
     """Resolve a workspace path from name or agent ID."""
-    row = (
-        service_get_workspace(obj.store, name)
-        if hasattr(obj.store, "get_workspace")
-        else None
-    )
+    row = obj.workspaces.get_workspace(name)
     if row:
         rel = row.get("path")
         if rel:
@@ -34,7 +27,7 @@ def _resolve_workspace(obj: CLIContext, name: str) -> tuple[Path, str]:
             path.mkdir(parents=True, exist_ok=True)
             return path, name
     a = resolve_agent(name)
-    ws_path = ws_core.ensure(a, obj.settings, obj.store, scaffold=True)
+    ws_path = ws_core.ensure(a, obj.settings, scaffold=True)
     return ws_path, name
 
 
@@ -43,11 +36,7 @@ def _delegate_shell(obj: CLIContext, name: str | None, *, generate: bool) -> int
     workspace_arg: str | None = None
     agent_arg: str | None = None
     if name and name != "default":
-        row = (
-            service_get_workspace(obj.store, name)
-            if hasattr(obj.store, "get_workspace")
-            else None
-        )
+        row = obj.workspaces.get_workspace(name)
         if row:
             workspace_arg = name
         else:
@@ -74,7 +63,10 @@ ws_app = typer.Typer(
 def ws_ls(ctx: typer.Context) -> None:
     """List all configured agents and their workspaces."""
     obj: CLIContext = ctx.obj
-    rows = ws_core.list_all(obj.store, obj.settings)
+    rows = [
+        ws_core.info(a, obj.settings)
+        for a in obj.agents.list_all_agents()
+    ]
     obj.render.workspace.workspaces_table(rows)
 
 
@@ -104,12 +96,12 @@ def ws_new(
     obj: CLIContext = ctx.obj
     if reset:
         a = resolve_agent(agent)
-        path = ws_core.reset(a, obj.settings, obj.store)
+        path = ws_core.reset(a, obj.settings)
         obj.render.workspace.workspace_reset(path)
         return
 
     a = resolve_agent(agent)
-    path = ws_core.ensure(a, obj.settings, obj.store, scaffold=scaffold)
+    path = ws_core.ensure(a, obj.settings, scaffold=scaffold)
     obj.render.workspace.workspace_ready(path)
 
 
@@ -122,7 +114,7 @@ def ws_edit(
     """Open a workspace file in $EDITOR (falls back to vi)."""
     obj: CLIContext = ctx.obj
     a = resolve_agent(agent)
-    path = ws_core.ensure(a, obj.settings, obj.store, scaffold=True)
+    path = ws_core.ensure(a, obj.settings, scaffold=True)
     editor = os.environ.get("EDITOR", "vi")
     subprocess.call([editor, str(path / file)])
 
@@ -145,16 +137,15 @@ def ws_rm(
         if not confirm:
             raise typer.Exit(0)
     try:
-        result = workspaces_service.delete_workspace_registry(
+        result = obj.workspaces.delete_workspace(
             name,
-            store=obj.store,
             settings=obj.settings,
             purge_disk=purge_disk,
         )
     except WorkspaceNotFound:
         obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
-    obj.render.workspace.workspace_deleted(str(result["name"]))
+    obj.render.workspace.workspace_deleted(str(result["deleted"]))
 
 
 @ws_app.command("shell")

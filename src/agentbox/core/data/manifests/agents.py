@@ -34,7 +34,7 @@ class SharedRef(BaseModel):
     """Reference to a shared resource (versioned, stored in DB).
 
     When used in composition references, system prompt, or schemas, the
-    shared resource is resolved at run time via SessionStore.
+    shared resource is resolved at run time via the resource managers.
     """
 
     shared: str

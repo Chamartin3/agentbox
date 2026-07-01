@@ -1,19 +1,24 @@
 """Workspace administration service — MCP overrides, host env, env docs, usage.
 
 Pass-through functions that delegate to ``WorkspaceService``. UI layers call
-these instead of reaching into ``SessionStore`` directly. 
+these instead of reaching into the DB directly.
 
-The ``store`` parameter is retained for backward compatibility but
-ignored for workspace methods (which now go through ``WorkspaceService``).
-Non-workspace methods (agent versions) still use ``store``.
+The ``store`` parameter has been removed — all workspace methods go through
+``WorkspaceService`` (which owns its own DB managers). Agent-version methods
+take the specific manager they need.
 """
 
 from __future__ import annotations
 
-from agentbox.core.data import EnvDocRow, WorkspaceRow
-from agentbox.core.db import SessionStore
+from typing import TYPE_CHECKING
+
+from agentbox.core.data import EnvDocRow
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.service.workspaces.service import WorkspaceService
+
+if TYPE_CHECKING:
+    from agentbox.core.db import AgentMetaManager, AgentVersionManager
+    from agentbox.core.data.rows import AgentMetaRow
 
 
 def _ws() -> WorkspaceService:
@@ -23,34 +28,29 @@ def _ws() -> WorkspaceService:
 # ── Workspace registry ──────────────────────────────────────────────────
 
 
-def get_workspace(store: SessionStore, name: str) -> WorkspaceRow | None:
-    return store.get_workspace(name)
+def get_workspace(name: str) -> dict | None:
+    return _ws().get_workspace(name)
 
 
 # ── Workspace MCP policy ────────────────────────────────────────────────
 
 
-def get_workspace_mcp_policy(store: SessionStore, workspace_id: str) -> str:
+def get_workspace_mcp_policy(workspace_id: str) -> str:
     return _ws().get_mcp_policy(workspace_id)
 
 
-def set_workspace_mcp_policy(
-    store: SessionStore, workspace_id: str, policy: str
-) -> str:
+def set_workspace_mcp_policy(workspace_id: str, policy: str) -> str:
     return _ws().set_mcp_policy(workspace_id, policy)
 
 
 # ── Workspace MCP server overrides ──────────────────────────────────────
 
 
-def list_workspace_mcp_server_overrides(
-    store: SessionStore, workspace_id: str
-) -> list[dict]:
+def list_workspace_mcp_server_overrides(workspace_id: str) -> list[dict]:
     return _ws().list_mcp_server_overrides(workspace_id)
 
 
 def set_workspace_mcp_server_override(
-    store: SessionStore,
     workspace_id: str,
     server_name: str,
     *,
@@ -70,26 +70,19 @@ def set_workspace_mcp_server_override(
 # ── Workspace MCP tool overrides ────────────────────────────────────────
 
 
-def list_workspace_mcp_tool_overrides(
-    store: SessionStore, workspace_id: str
-) -> list[dict]:
+def list_workspace_mcp_tool_overrides(workspace_id: str) -> list[dict]:
     return _ws().list_mcp_tool_overrides(workspace_id)
 
 
 # ── Workspace file bindings ─────────────────────────────────────────────
-# Note: file bindings are part of ResourceService (Plan 090). These remain
-# on SessionStore until ResourceService exposes a manager-level interface.
 
 
-def list_workspace_file_bindings(
-    store: SessionStore, workspace_id: str
-) -> list[dict]:
+def list_workspace_file_bindings(workspace_id: str) -> list[dict]:
     from agentbox.core.service.resources.service import ResourceService  # noqa: PLC0415
     return ResourceService()._file_bindings.list_for_workspace(workspace_id)
 
 
 def replace_workspace_file_bindings(
-    store: SessionStore,
     workspace_id: str,
     bindings: list,
     *,
@@ -105,41 +98,34 @@ def replace_workspace_file_bindings(
 # ── Host env profiles ───────────────────────────────────────────────────
 
 
-def list_host_env_profiles(store: SessionStore) -> list[dict]:
+def list_host_env_profiles() -> list[dict]:
     return _ws().list_host_env_profiles()
 
 
-def get_workspace_host_env(
-    store: SessionStore, workspace_id: str
-) -> dict | None:
+def get_workspace_host_env(workspace_id: str) -> dict | None:
     return _ws().get_workspace_host_env(workspace_id)
 
 
-def resolve_workspace_host_env(
-    store: SessionStore, workspace_id: str
-) -> dict:
+def resolve_workspace_host_env(workspace_id: str) -> dict:
     return _ws().resolve_workspace_host_env(workspace_id)
 
 
-def list_host_env_calls_for_run(
-    store: SessionStore, run_id: str
-) -> list[dict]:
+def list_host_env_calls_for_run(run_id: str) -> list[dict]:
     return SystemService().list_host_env_calls_for_run(run_id)
 
 
 # ── Env docs ────────────────────────────────────────────────────────────
 
 
-def get_active_env_doc(store: SessionStore, workspace_id: str) -> EnvDocRow | None:
+def get_active_env_doc(workspace_id: str) -> EnvDocRow | None:
     return _ws().get_active_env_doc(workspace_id)
 
 
-def list_env_doc_versions(store: SessionStore, workspace_id: str) -> list[dict]:
+def list_env_doc_versions(workspace_id: str) -> list[dict]:
     return _ws().list_env_doc_versions(workspace_id)
 
 
 def save_env_doc(
-    store: SessionStore,
     workspace_id: str,
     content: dict,
     *,
@@ -152,14 +138,11 @@ def save_env_doc(
     )
 
 
-def publish_env_doc(
-    store: SessionStore, workspace_id: str, version_id: str
-) -> dict:
+def publish_env_doc(workspace_id: str, version_id: str) -> dict:
     return _ws().publish_env_doc(workspace_id, version_id)
 
 
 def rollback_env_doc(
-    store: SessionStore,
     workspace_id: str,
     version_id: str,
     *,
@@ -171,28 +154,33 @@ def rollback_env_doc(
     )
 
 
-# ── Agent versions (not workspace-specific — remain on SessionStore) ────
+# ── Agent versions ──────────────────────────────────────────────────────
 
 
 def replace_version_config(
-    store: SessionStore, version_id: int, config_json: str
+    agent_versions: AgentVersionManager, version_id: int, config_json: str
 ) -> None:
-    store.replace_version_config(version_id, config_json)
+    agent_versions.patch(version_id, config_json=config_json)
 
 
 def update_agent_meta(
-    store: SessionStore,
+    agent_meta: AgentMetaManager,
     agent_id: str,
     *,
     sync_mode: str | None = None,
     export_to_disk: bool | None = None,
     source_path: str | None = None,
     source_format: str | None = None,
-) -> dict | None:
-    return store.update_agent_meta(
-        agent_id,
-        sync_mode=sync_mode,
-        export_to_disk=export_to_disk,
-        source_path=source_path,
-        source_format=source_format,
-    )
+) -> AgentMetaRow | None:
+    kwargs: dict = {}
+    if sync_mode is not None:
+        kwargs["sync_mode"] = sync_mode
+    if export_to_disk is not None:
+        kwargs["export_to_disk"] = 1 if export_to_disk else 0
+    if source_path is not None:
+        kwargs["source_path"] = source_path
+    if source_format is not None:
+        kwargs["source_format"] = source_format
+    if kwargs:
+        agent_meta.patch(agent_id, **kwargs)
+    return agent_meta.get_meta(agent_id)

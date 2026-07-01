@@ -35,7 +35,10 @@ def doctor(ctx: typer.Context) -> None:
         fail("Manifest exists", f"not found at {path}")
 
     try:
-        rows = ws_workspaces.list_all(obj.store, obj.settings)
+        rows = [
+            ws_workspaces.info(a, obj.settings)
+            for a in obj.agents.list_all_agents()
+        ]
         resolvable = True
         for w in rows:
             if not w.exists and not w.ephemeral:

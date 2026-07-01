@@ -21,10 +21,10 @@ from typing import TYPE_CHECKING, Any, Final, cast
 from agentbox.core.events import UsageEvent
 from agentbox.core.config import Settings
 from agentbox.core.agents import AgentRuntimeView
+from agentbox.core.agents.runtime import _DbStoreAdapter
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef
-from agentbox.core.protocols import RunStore
 from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.execution.retry import RetryOrchestrator
 from agentbox.core.execution.observability.stream import RunStreamSession
@@ -110,15 +110,15 @@ class RunStepLoop:
     :class:`StepResult` ready for the finalizer.
     """
 
-    def __init__(self, store: RunStore, settings: Settings) -> None:
-        self.store = store
+    def __init__(self, db: Any, settings: Settings) -> None:
+        self._db = db
         self.settings = settings
 
     async def run(
         self,
         *,
         run_id: str,
-        adapter: BackendAdapter,
+        adapter: "BackendAdapter",
         rendered: RenderedConfig,
         agent: AgentDef,
         input_: str,
@@ -128,7 +128,8 @@ class RunStepLoop:
         effective: EffectiveRunnerConfig | None,
         composed: Any | None,
     ) -> StepResult:
-        view = AgentRuntimeView.from_agent(agent, store=self.store)
+        store = _DbStoreAdapter(self._db)
+        view = AgentRuntimeView.from_agent(agent, store=store)
 
         error_retries_left = view.max_error_retries or 0
         validation_retries_left = view.max_validation_retries or 0
@@ -151,7 +152,7 @@ class RunStepLoop:
         )
         session.add_observer(
             lambda ev: (
-                self.store.record_usage(run_id, ev.model_dump())
+                self._db.usage.record(run_id, ev.model_dump())
                 if isinstance(ev, UsageEvent)
                 else None
             )
@@ -184,7 +185,7 @@ class RunStepLoop:
                 agent=agent,
                 composed=composed,
                 workdir=workdir,
-                store=self.store,
+                store=store,
                 project_root=self.settings.project_root,
             )
             outcome = await orchestrator.execute(

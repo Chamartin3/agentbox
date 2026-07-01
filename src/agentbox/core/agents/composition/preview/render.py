@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from agentbox.core.agents.composition.resolver import resolve_prompt
 from agentbox.core.agents.composition.preview._helpers import (
+    PreviewError,
     _render_references_block,
     _resolve_binding,
     _schema_block,
@@ -14,14 +15,24 @@ from agentbox.core.agents.composition.preview._helpers import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import (
+        AgentPromptResourceBindingManager,
+        AgentVersionManager,
+        ResourceBlobManager,
+        ResourceManager,
+        ResourceVersionManager,
+    )
 
 
 def render_agent_prompt_preview(
-    store: SessionStore,
+    agent_versions: AgentVersionManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    resources: ResourceManager,
+    agent_prompt_resource_bindings: AgentPromptResourceBindingManager,
     *,
     agent_id: str,
-    template: str,
+    template: str | None = None,
     bindings_override: list[dict] | None = None,
 ) -> dict:
     """Render the full composed prompt for an agent.
@@ -37,15 +48,24 @@ def render_agent_prompt_preview(
 
     On binding-resolution failure raises ``PreviewError``.
     """
+    if template is None:
+        row = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
+        if row is None:
+            raise PreviewError(
+                "no_agent_version",
+                f"no prompt version for agent {agent_id!r}",
+            )
+        template = row.get("prompt_content") or ""
+
     if bindings_override is not None:
         raw = [
             {**b, "id": b.get("id") or f"preview-{i}"}
             for i, b in enumerate(bindings_override)
         ]
     else:
-        raw = store.list_prompt_bindings(agent_id)
+        raw = agent_prompt_resource_bindings.list_for_agent(agent_id)
 
-    resolved = [_resolve_binding(store, b) for b in raw]
+    resolved = [_resolve_binding(resources, resource_versions, resource_blobs, b) for b in raw]
 
     # DB-as-source-of-truth: ``agent_versions.prompt_content`` (passed in
     # as ``template``) is the only system-prompt source. Legacy
@@ -77,7 +97,7 @@ def render_agent_prompt_preview(
     # what core/prompt/output_contract.append() does at runtime so the
     # preview reflects what the model actually sees. The schema piece is
     # intentionally omitted (already rendered above from the binding).
-    validation_block, validation_view = _validation_block_for_preview(store, agent_id)
+    validation_block, validation_view = _validation_block_for_preview(agent_versions, resources, agent_id)
     if validation_block:
         composed = composed.rstrip() + "\n\n" + validation_block
 

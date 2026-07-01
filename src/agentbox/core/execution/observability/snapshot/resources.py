@@ -3,24 +3,30 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from agentbox.core.protocols import SnapshotStore
 from agentbox.core.tools.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
+from agentbox.core.workspaces.mcp.resolve import resolve_workspace_host_env_helper
+
+if TYPE_CHECKING:
+    from agentbox.core.db import WorkspaceHostEnvGrantManager
 
 logger = logging.getLogger(__name__)
 
 
 def resolve_host_env_grants(
-    store: SnapshotStore,
+    workspace_host_env_grants: "WorkspaceHostEnvGrantManager",
     workspace_id: str | None,
 ) -> dict | None:
     """Return the workspace's non-default host-env grants, or ``None``."""
     if not workspace_id:
         return None
     try:
-        resolved_he = store.resolve_workspace_host_env(workspace_id)
+        resolved_he = resolve_workspace_host_env_helper(
+            workspace_host_env_grants, workspace_id
+        )
         grants = resolved_he.get("grants") or {}
         non_default = {
             k for k, v in _HOST_ENV_CAPABILITIES.items() if not v.default_granted
@@ -35,8 +41,7 @@ def resolve_host_env_grants(
     return None
 
 
-# Alias used by the public observability facade. Host-env grants are the
-# resource-level snapshot material captured at prep time.
+# Alias used by the public observability facade.
 build_resource_snapshot_entries = resolve_host_env_grants
 
 

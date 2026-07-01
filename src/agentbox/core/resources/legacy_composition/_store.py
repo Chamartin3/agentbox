@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from typing import TYPE_CHECKING
 
 from agentbox.core.resources.legacy_composition._report import (
     MIGRATION_ACTOR,
@@ -14,9 +15,13 @@ from agentbox.core.resources.legacy_composition._helpers import (
     mime_for,
 )
 
+if TYPE_CHECKING:
+    from agentbox.core.db import ResourceManager, ResourceVersionManager
+
 
 def get_or_create_resource(
-    store,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
     *,
     content_text: str,
     type_: str,
@@ -31,11 +36,11 @@ def get_or_create_resource(
     slug = slug_for(type_, sha12)
     agent_tag = f"agent:{agent_id}"
 
-    existing = store.get_repo_resource_by_slug(slug)
+    existing = resources.get_by_slug(slug)
     if existing is not None:
         tags = parse_tags(existing.get("tags"))
         if agent_tag not in tags:
-            store.update_repo_resource(existing["id"], tags=[*tags, agent_tag])
+            resources.update_resource(existing["id"], tags=[*tags, agent_tag])
         return existing["id"]
 
     pretty_kind = (
@@ -50,7 +55,7 @@ def get_or_create_resource(
         if type_ == "schema"
         else f"{agent_id} {relative_path}"
     )
-    res = store.create_repo_resource(
+    res = resources.create_resource(
         slug=slug,
         type=type_,
         display_name=display,
@@ -59,7 +64,7 @@ def get_or_create_resource(
         created_by=MIGRATION_ACTOR,
     )
     report.resources_created += 1
-    store.import_repo_version(
+    resource_versions.import_version(
         res["id"],
         [("", content_bytes, mime_for(type_), content_text)],
         import_source="toml_migration",

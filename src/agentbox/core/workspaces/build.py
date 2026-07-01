@@ -35,7 +35,19 @@ from agentbox.core.workspaces.prep import (
 
 if TYPE_CHECKING:
     from agentbox.core.config import Settings
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import (
+        AgentDefManager,
+        AgentVersionManager,
+        ResourceBlobManager,
+        ResourceManager,
+        ResourceVersionManager,
+        WorkspaceEnvDocVersionManager,
+        WorkspaceFileResourceBindingManager,
+        WorkspaceMcpOverrideManager,
+        WorkspaceMcpToolOverrideManager,
+        WorkspaceManager,
+        WorkspaceSubagentManager,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +96,17 @@ def _remove_orphan(workdir: Path, rel_path: str) -> bool:
 
 
 def build_workspace(
-    store: SessionStore,
+    workspaces: WorkspaceManager,
+    agent_defs: AgentDefManager,
+    workspace_subagents: WorkspaceSubagentManager,
+    agent_versions: AgentVersionManager,
+    workspace_file_resource_bindings: WorkspaceFileResourceBindingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    workspace_mcp_overrides: WorkspaceMcpOverrideManager,
+    workspace_mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
+    workspace_env_doc_versions: WorkspaceEnvDocVersionManager,
     settings: Settings,
     workspace_id: str,
     workdir: Path,
@@ -111,14 +133,17 @@ def build_workspace(
     previous_paths: set[str] = set(previous_meta.get("materialized_paths") or [])
 
     try:
-        ws_bindings = resolve_workspace_resources(store, workspace_id)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements WorkspaceBuildStore at runtime; Phase C of resource service migration
+        ws_bindings = resolve_workspace_resources(
+            workspace_file_resource_bindings,
+            resources,
+            resource_versions,
+            resource_blobs,
+            workspace_id,
+        )
         if ws_bindings:
             # Sync runs on every launch + every save against a persistent
             # workspace, so the per-binding ``on_conflict`` semantics
             # (designed for one-shot run dirs) need to be overridden.
-            # The DB binding is the source of truth — overwrite stale
-            # on-disk copies unless the binding explicitly opted into
-            # ``skip``.
             for b in ws_bindings:
                 if b.get("on_conflict", "error") != "skip":
                     b["on_conflict"] = "overwrite"
@@ -134,8 +159,6 @@ def build_workspace(
                     result.bindings_materialized += 1
                 if o.target_path:
                     result.materialized_paths.append(o.target_path)
-            # Keep the snapshot conversion as a side effect for callers
-            # that want to merge into a run snapshot.
             workspace_outcomes_to_snapshot(outcomes)
     except Exception as e:
         logger.exception(
@@ -144,7 +167,7 @@ def build_workspace(
         result.errors.append(f"resources: {e}")
 
     try:
-        env_entries = render_env_doc(store, workspace_id, workdir)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements WorkspaceBuildStore at runtime; Phase C of resource service migration
+        env_entries = render_env_doc(workspace_env_doc_versions, workspace_id, workdir)
         result.env_doc_files = [e["file"] for e in env_entries]
     except Exception as e:
         logger.exception(
@@ -153,11 +176,18 @@ def build_workspace(
         result.errors.append(f"env_doc: {e}")
 
     try:
-        # Subagents come from the engine recipes — render to a temp dir and
-        # copy only the per-engine agents files into the workspace (env-doc
-        # and runner config are handled elsewhere; the DB is source of truth
-        # so overwriting is fine).
-        config = load_workenv(store, workspace_id, settings=settings)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements RunStore at runtime; Phase C of resource service migration
+        config = load_workenv(
+            workspaces,
+            agent_defs,
+            workspace_subagents,
+            agent_versions,
+            workspace_file_resource_bindings,
+            workspace_mcp_overrides,
+            workspace_mcp_tool_overrides,
+            workspace_env_doc_versions,
+            workspace_id,
+            settings=settings,
+        )
         subagents = [a for a in config.agents if a.role != "main"]
         with tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)
@@ -180,10 +210,7 @@ def build_workspace(
         )
         result.errors.append(f"subagents: {e}")
 
-    # Orphan cleanup — remove on-disk paths that were materialized in a
-    # prior sync but are no longer produced by any current binding. Only
-    # paths recorded in the previous meta.json are eligible — we never
-    # touch files agentbox didn't materialize.
+    # Orphan cleanup
     current_paths = set(result.materialized_paths)
     for orphan in sorted(previous_paths - current_paths):
         if _remove_orphan(workdir, orphan):
@@ -194,17 +221,14 @@ def build_workspace(
 
 
 def resolve_workspace_workdir(
-    store: SessionStore, settings: Settings, workspace_id: str
+    workspaces: WorkspaceManager,
+    settings: Settings,
+    workspace_id: str,
 ) -> Path | None:
-    """Resolve a workspace name → on-disk workdir path.
-
-    Tries the DB workspace record's ``path`` first; falls back to
-    ``settings.workspaces_root / workspace_id`` if the record has no
-    explicit path. Returns ``None`` for unknown or ephemeral workspaces.
-    """
+    """Resolve a workspace name → on-disk workdir path."""
     if not workspace_id or workspace_id == "<ephemeral>":
         return None
-    record = store.get_workspace(workspace_id)
+    record = workspaces.get_by_name(workspace_id)
     if record is not None:
         rel = record.get("path")
         if rel:
@@ -214,17 +238,40 @@ def resolve_workspace_workdir(
 
 
 def build_workspace_by_name(
-    store: SessionStore, settings: Settings, workspace_id: str
+    workspaces: WorkspaceManager,
+    agent_defs: AgentDefManager,
+    workspace_subagents: WorkspaceSubagentManager,
+    agent_versions: AgentVersionManager,
+    workspace_file_resource_bindings: WorkspaceFileResourceBindingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    workspace_mcp_overrides: WorkspaceMcpOverrideManager,
+    workspace_mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
+    workspace_env_doc_versions: WorkspaceEnvDocVersionManager,
+    settings: Settings,
+    workspace_id: str,
 ) -> WorkspaceSyncResult | None:
-    """Convenience wrapper: resolve workdir from name, then sync.
-
-    Returns ``None`` when the workspace has no resolvable workdir
-    (unknown name, ephemeral, or path missing).
-    """
-    workdir = resolve_workspace_workdir(store, settings, workspace_id)
+    """Convenience wrapper: resolve workdir from name, then sync."""
+    workdir = resolve_workspace_workdir(workspaces, settings, workspace_id)
     if workdir is None:
         return None
-    return build_workspace(store, settings, workspace_id, workdir)
+    return build_workspace(
+        workspaces,
+        agent_defs,
+        workspace_subagents,
+        agent_versions,
+        workspace_file_resource_bindings,
+        resources,
+        resource_versions,
+        resource_blobs,
+        workspace_mcp_overrides,
+        workspace_mcp_tool_overrides,
+        workspace_env_doc_versions,
+        settings,
+        workspace_id,
+        workdir,
+    )
 
 
 def _write_provenance(workdir: Path, result: WorkspaceSyncResult) -> None:

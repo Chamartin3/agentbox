@@ -1,7 +1,6 @@
 """Runtime workspace permissions overlay.
 
-Delegates to ``WorkspaceService`` for core permission operations. The
-``store`` parameter is retained for backward compatibility.
+Delegates to ``WorkspaceService`` for core permission operations.
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings
-from agentbox.core.db import SessionStore
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 
@@ -37,7 +35,6 @@ def _is_read_tool(tool: str) -> bool:
 def load_effective_permissions(
     name: str | None,
     *,
-    store: SessionStore,
     settings: Settings,
     mcp_manifest: Any | None = None,
 ) -> dict:
@@ -57,7 +54,6 @@ def _write_capabilities_artifact(ws_path: Path, permissions: dict) -> None:
 def get_permissions(
     name: str,
     *,
-    store: SessionStore,
     settings: Settings,
     mcp_manifest: Any | None = None,
 ) -> dict:
@@ -68,25 +64,17 @@ def set_permissions(
     name: str,
     permissions: dict,
     *,
-    store: SessionStore,
     settings: Settings,
     mcp_manifest: Any | None = None,
     sync_cb: Any = None,
 ) -> dict:
     svc = _ws()
-    result = svc.set_permissions(name, permissions, settings=settings, sync_cb=sync_cb)
-    if sync_cb is not None:
-        try:
-            sync_cb(store, settings, name)
-        except Exception:
-            pass
-    return result
+    return svc.set_permissions(name, permissions, settings=settings, sync_cb=sync_cb)
 
 
 def get_workspace_mcp_tools(
     name: str,
     *,
-    store: SessionStore,
     settings: Settings,
     mcp_manifest: Any | None = None,
 ) -> dict:

@@ -44,9 +44,7 @@ def file_skills(
     """Generate skill shell scripts into a workspace."""
     obj: CLIContext = ctx.obj
     try:
-        result = workspaces_service.generate_skills_by_name(
-            name, store=obj.store, settings=obj.settings,
-        )
+        result = obj.workspaces.generate_skills(name, settings=obj.settings)
     except WorkspaceNotFound:
         obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
@@ -82,9 +80,7 @@ def file_edit(
 
     if read:
         try:
-            result = workspaces_service.read_file_by_name(
-                name, file_path, store=obj.store, settings=obj.settings,
-            )
+            result = obj.workspaces.read_workspace_file(name, file_path, settings=obj.settings)
         except WorkspaceNotFound:
             obj.render.workspace.workspace_not_found(name)
             raise typer.Exit(1)
@@ -97,9 +93,7 @@ def file_edit(
         if write == "-":
             content = sys.stdin.read()
         try:
-            result = workspaces_service.write_file_by_name(
-                name, file_path, content, store=obj.store, settings=obj.settings,
-            )
+            result = obj.workspaces.write_workspace_file(name, file_path, content, settings=obj.settings)
         except WorkspaceNotFound:
             obj.render.workspace.workspace_not_found(name)
             raise typer.Exit(1)

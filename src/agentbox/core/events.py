@@ -4,9 +4,8 @@ Every event is a Pydantic model with a discriminator field ``type``. The
 union ``RunEvent`` is the wire format for the WS stream and the on-disk
 transcript (one JSON object per line).
 
-**This is the canonical home.** ``core/db/execution/events.py`` and ``api/events.py``
-are thin re-exports for backward compatibility. New code MUST import from
-here (or from the ``core.execution`` facade once it lands).
+**This is the canonical home.** All consumers MUST import event types
+directly from ``agentbox.core.events``; there are no re-export shims.
 """
 
 from __future__ import annotations

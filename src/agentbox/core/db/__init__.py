@@ -70,13 +70,6 @@ from agentbox.core.db.managers import (
     SettingManager,
 )
 
-# ---------------------------------------------------------------------------
-# SessionStore — transitional; being retired by plans 111 → 112 → 110.
-# Remove this export once SessionStore is deleted.
-# ponytail: transitional — remove when SessionStore is deleted
-# ---------------------------------------------------------------------------
-from agentbox.core.db.store import SessionStore
-
 __all__ = [
     # runs
     "RunCommentManager",
@@ -126,6 +119,4 @@ __all__ = [
     "HostEnvProfileManager",
     "McpToolDiscoveryCacheManager",
     "SettingManager",
-    # store (transitional)
-    "SessionStore",
 ]

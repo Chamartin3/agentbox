@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, cast
 
 from agentbox.core.data import McpSnapshot
-from agentbox.core.protocols import SnapshotStore
 from agentbox.core.db.system.config import load_project_mcp_servers
+from agentbox.core.workspaces.mcp.resolve import resolve_workspace_mcp_helper
+
+if TYPE_CHECKING:
+    from agentbox.core.db import (
+        WorkspaceMcpOverrideManager,
+        WorkspaceMcpPolicyManager,
+        WorkspaceMcpToolOverrideManager,
+    )
 
 logger = logging.getLogger(__name__)
 
 
 def build_mcp_snapshot(
-    store: SnapshotStore,
+    workspace_mcp_policies: "WorkspaceMcpPolicyManager",
+    workspace_mcp_overrides: "WorkspaceMcpOverrideManager",
+    workspace_mcp_tool_overrides: "WorkspaceMcpToolOverrideManager",
     *,
     workspace_id: str | None,
     host_env_grants: dict | None,
@@ -28,13 +38,17 @@ def build_mcp_snapshot(
             }
             for s in load_project_mcp_servers()
         ]
-        snapshot = store.resolve_workspace_mcp(
-            workspace_id, manifest_servers
+        raw = resolve_workspace_mcp_helper(
+            workspace_mcp_policies,
+            workspace_mcp_overrides,
+            workspace_mcp_tool_overrides,
+            workspace_id,
+            manifest_servers,
         )
         if host_env_grants:
-            snapshot["host_env_grants"] = list(host_env_grants.keys())
-            snapshot["host_env_injected"] = True
-        return snapshot
+            raw["host_env_grants"] = list(host_env_grants.keys())
+            raw["host_env_injected"] = True
+        return cast(McpSnapshot, raw)
     except Exception:
         logger.exception(
             "executor: MCP snapshot capture failed for workspace %r",

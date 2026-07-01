@@ -7,7 +7,7 @@ from typing import Any, cast
 
 from fastmcp import FastMCP
 
-from agentbox.core.service.engines.service import EngineService
+from agentbox.core.service import EngineService
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 

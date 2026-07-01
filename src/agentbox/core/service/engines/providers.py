@@ -23,8 +23,6 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from agentbox.core.data import RunnerProfile
-from agentbox.core.db.database import get_database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
-
 from agentbox.core.engines import (
     EffectiveRunnerConfig,
     ProviderDescriptor,
@@ -36,7 +34,7 @@ from agentbox.core.engines import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import RunnerProfileManager
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +92,7 @@ def refresh_providers() -> dict[str, Any]:
 async def list_provider_models(
     provider_id: str,
     *,
-    store: SessionStore,
+    runner_profiles: RunnerProfileManager,
     profile_id: str | None = None,
     base_url: str | None = None,
     api_key_env: str | None = None,
@@ -124,7 +122,7 @@ async def list_provider_models(
 
     config: EffectiveRunnerConfig
     if profile_id:
-        row = get_database(str(store.db_path)).runner_profiles.get_by_id(profile_id)
+        row = runner_profiles.get_by_id(profile_id)
         if not row:
             raise InvalidProviderRequest(f"Runner profile not found: {profile_id}")
         profile = RunnerProfile(**row)

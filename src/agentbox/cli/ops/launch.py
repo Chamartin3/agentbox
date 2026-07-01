@@ -20,6 +20,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
+from agentbox.cli.shared.deps import get_store
 from agentbox.cli.shared.renderers.ops import OpsRenderer
 from agentbox.core.config import Settings  # TODO(cli-arch): Settings (plan 095)
 from agentbox.core.constants import RunnerKind  # TODO(cli-arch): RunnerKind export (plan 095)
@@ -112,7 +113,7 @@ def _launch_session(
     if workspace_name and not is_ephemeral:
         try:
             sync_result = build_workspace(
-                store=obj.store,
+                get_store(),  # ponytail: transitional — build_workspace still takes SessionStore (plan 112)
                 settings=settings,
                 workspace_id=workspace_name,
                 workdir=workspace_path,

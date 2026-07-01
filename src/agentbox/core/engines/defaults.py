@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.db import SessionStore
 from agentbox.core.db.system.config import load_settings_section
 
 logger = logging.getLogger(__name__)
 
 
 def runtime_default_model(
-    store: SessionStore | None, backend_name: str
+    store: object | None, backend_name: str
 ) -> str | None:
     """Look up an operator-configured default model for a backend.
 

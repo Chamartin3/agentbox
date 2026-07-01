@@ -1,21 +1,23 @@
 """Workspace file IO, path resolution, and the ``is_user_file`` filter.
 
 Delegates path resolution to ``WorkspaceService``. File read/write
-operations still go through the store for now (they may route through
-ResourceService in Plan 090).
+operations route through the service.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
-from agentbox.core.db import SessionStore
 from agentbox.core.service.prompts import AgentNotFound
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .errors import WorkspacePathEscape
+
+if TYPE_CHECKING:
+    from agentbox.core.db import AgentDefManager
 
 __all__ = [
     "is_user_file",
@@ -34,8 +36,8 @@ def _ws() -> WorkspaceService:
     return WorkspaceService()
 
 
-def _resolve_agent_or_raise(agent_id: str, *, store: SessionStore):
-    agent = store.get_agent_def(agent_id)
+def _resolve_agent_or_raise(agent_id: str, *, agent_defs: AgentDefManager):
+    agent = agent_defs.get(agent_id)
     if agent is None:
         raise AgentNotFound(agent_id)
     return agent
@@ -63,7 +65,6 @@ def is_user_file(rel_path: str) -> bool:
 def resolve_workspace_path(
     name: str,
     *,
-    store: SessionStore,
     settings: Settings,
 ) -> tuple[Path, Path]:
     return _ws().resolve_workspace_path(name, settings=settings)
@@ -80,7 +81,6 @@ def read_file_by_name(
     name: str,
     path: str,
     *,
-    store: SessionStore,
     settings: Settings,
 ) -> dict | None:
     return _ws().read_workspace_file(name, path, settings=settings)
@@ -91,7 +91,6 @@ def write_file_by_name(
     path: str,
     content: str,
     *,
-    store: SessionStore,
     settings: Settings,
 ) -> dict:
     return _ws().write_workspace_file(name, path, content, settings=settings)
@@ -105,11 +104,11 @@ def write_file_by_name(
 def get_workspace_for_agent(
     agent_id: str,
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
     settings: Settings,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, store=store)
-    info = ws.info(agent, settings, store)
+    agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
+    info = ws.info(agent, settings, None)
     files: list[dict] = []
     if info.exists:
         for p in sorted(info.path.rglob("*")):
@@ -131,22 +130,22 @@ def get_workspace_for_agent(
 def create_workspace_for_agent(
     agent_id: str,
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
     settings: Settings,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, store=store)
-    path = ws.ensure(agent, settings, store, scaffold=True)
+    agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
+    path = ws.ensure(agent, settings, None, scaffold=True)
     return {"path": str(path)}
 
 
 def reset_workspace_for_agent(
     agent_id: str,
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
     settings: Settings,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, store=store)
-    path = ws.reset(agent, settings, store)
+    agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
+    path = ws.reset(agent, settings, None)
     return {"path": str(path)}
 
 
@@ -154,11 +153,11 @@ def read_file_for_agent(
     agent_id: str,
     path: str,
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
     settings: Settings,
 ) -> dict | None:
-    agent = _resolve_agent_or_raise(agent_id, store=store)
-    ws_path, _ = ws.resolve_path(agent, settings, store)
+    agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
+    ws_path, _ = ws.resolve_path(agent, settings, None)
     target = _safe_resolve(ws_path, path)
     if not target.is_file():
         return None
@@ -170,11 +169,11 @@ def write_file_for_agent(
     path: str,
     content: str,
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
     settings: Settings,
 ) -> dict:
-    agent = _resolve_agent_or_raise(agent_id, store=store)
-    ws_path = ws.ensure(agent, settings, store, scaffold=False)
+    agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
+    ws_path = ws.ensure(agent, settings, None, scaffold=False)
     target = _safe_resolve(ws_path, path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")

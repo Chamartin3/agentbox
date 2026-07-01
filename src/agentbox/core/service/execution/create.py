@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json as _json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
@@ -20,14 +20,14 @@ def _svc() -> ExecutionService:
     return ExecutionService()
 
 
-def _assert_enabled(store: "SessionStore", agent_id: str) -> None:
-    if store.is_agent_disabled(agent_id):
-        meta = store.get_agent_meta(agent_id) or {}
+def _assert_enabled(agent_meta: "AgentMetaManager", agent_id: str) -> None:
+    meta = agent_meta.get_meta(agent_id)
+    if meta and meta.get("disabled_at"):
         raise AgentDisabled(agent_id, meta.get("disabled_at"))
 
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import AgentDefManager, AgentMetaManager
     from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,9 @@ logger = logging.getLogger(__name__)
 async def create_run(
     agent_id: str,
     *,
-    store: SessionStore,
-    executor: RunExecutor,
+    agent_defs: "AgentDefManager",
+    agent_meta: "AgentMetaManager",
+    executor: "RunExecutor",
     input_: str | None = None,
     variables: dict[str, str] | None = None,
     session_id: str | None = None,
@@ -47,7 +48,7 @@ async def create_run(
     runner: str | None = None,
     backend: str | None = None,
     runner_profile: str | None = None,
-    runner_config: dict[str, Any] | None = None,
+    runner_config: dict | None = None,
     runner_embedded: bool = False,
 ) -> dict:
     """Validate input, resolve the agent, and dispatch to the executor.
@@ -55,10 +56,10 @@ async def create_run(
     Raises :class:`AgentNotFound`, :class:`InvalidRunInput`, or
     :class:`NoBackendAvailable`. Returns ``{"run_id", "agent"}``.
     """
-    agent = resolve_agent(agent_id, store=store)
+    agent = resolve_agent(agent_id, agent_defs=agent_defs)
     if agent is None:
         raise AgentNotFound(agent_id)
-    _assert_enabled(store, agent.id)
+    _assert_enabled(agent_meta, agent.id)
 
     if input_ is not None and variables is None:
         if agent.composition is not None:
@@ -104,17 +105,18 @@ async def create_run(
 async def rerun(
     run_id: str,
     *,
-    store: SessionStore,
-    executor: RunExecutor,
+    agent_defs: "AgentDefManager",
+    agent_meta: "AgentMetaManager",
+    executor: "RunExecutor",
 ) -> dict:
     """Re-execute a finished run with the same agent + input/variables."""
     rec = _svc().get_run(run_id)
     if rec is None:
         raise RunNotFound(run_id)
-    agent = resolve_agent(rec.agent_id, store=store)
+    agent = resolve_agent(rec.agent_id, agent_defs=agent_defs)
     if agent is None:
         raise AgentNotFound(rec.agent_id)
-    _assert_enabled(store, agent.id)
+    _assert_enabled(agent_meta, agent.id)
 
     variables: dict[str, str] | None = None
     if rec.variables:

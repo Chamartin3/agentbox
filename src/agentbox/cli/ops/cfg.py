@@ -7,7 +7,6 @@ import typer
 from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): WorkspaceService workenv methods (plan 089)
 from agentbox.core import workspaces as ws_mod  # noqa: E402  # TODO(cli-arch)
-from agentbox.core.service.agents import list_all_agents  # noqa: E402  # TODO(cli-arch)
 
 cfg_app = typer.Typer(
     name="cfg",
@@ -59,6 +58,5 @@ def cfg_paths(ctx: typer.Context) -> None:
     obj.render.ops.cfg_tree(
         obj.settings,
         ws_mod.resolve_path,
-        list_all_agents,
-        obj.store,
+        obj.agents.list_all_agents(),
     )

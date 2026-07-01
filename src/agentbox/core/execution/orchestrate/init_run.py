@@ -7,20 +7,23 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from agentbox.core.config import Settings
 from agentbox.core.agents import capture_fragments
-from agentbox.core.constants import LogLevel
+from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef
-from agentbox.core.protocols import RunSetupStore, RunStore
-from agentbox.core.db.schema import runs as _runs_table  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
+from agentbox.core.db.utils import now_iso
+from agentbox.core.db.schema import runs as _runs_table  # ponytail: transitional — direct SQL for agent_version_id stamp
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 from agentbox.core.execution.observability.snapshot import (
     SnapshotWriter,
     build_runner_snapshot,
 )
+
+if TYPE_CHECKING:
+    from agentbox.core.db.database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def fail_pre_run(
-    store: RunSetupStore,
+    db: "Database",
     settings: Settings,
     broadcasters: dict[str, RunBroadcaster],
     *,
@@ -41,23 +44,22 @@ def fail_pre_run(
     session_id: str | None,
     error_msg: str,
 ) -> str:
-    """Create an error run record and broadcast failure before execution starts.
-
-    Used when something during setup (workdir, profile resolution, missing
-    backend) makes it impossible to launch the run task. We still create a
-    row so the operator can see the failure in the UI / API.
-    """
+    """Create an error run record and broadcast failure before execution starts."""
     transcripts_dir = settings.data_dir / "transcripts"
     transcripts_dir.mkdir(parents=True, exist_ok=True)
     transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
-    run_id = store.create_run(
+    run_id = uuid.uuid4().hex
+    db.runs.create(
+        id=run_id,
         agent_id=agent.id,
-        input_=input_,
+        input=input_,
         workdir=str(workdir),
         transcript_path=str(transcript_path),
         session_id=session_id,
+        status=RunStatus.RUNNING.value,
+        created_at=now_iso(),
     )
-    store.finish_run(run_id, ok=False, error=error_msg)
+    db.runs.finish_full(run_id, ok=False, error=error_msg)
     broadcaster = RunBroadcaster()
     broadcasters[run_id] = broadcaster
     broadcaster.publish(
@@ -74,18 +76,18 @@ def fail_pre_run(
 
 
 def stamp_run_agent_version(
-    store: RunStore,
+    db: "Database",
     run_id: str,
     agent: AgentDef,
 ) -> None:
     """Stamp the run row with the active or latest agent version."""
     try:
         chosen = (
-            store.get_active_version(agent.id)
-            or store.latest_version(agent.id)
+            db.agent_versions.get_active(agent.id)
+            or db.agent_versions.get_latest(agent.id)
         )
         if chosen is not None:
-            with store.engine.begin() as conn:
+            with db.engine.begin() as conn:
                 conn.execute(
                     _runs_table.update()
                     .where(_runs_table.c.id == run_id)
@@ -104,7 +106,7 @@ def init_run(
     *,
     run_id: str,
     agent: AgentDef,
-    store: Any,
+    db: "Database",
     settings: Any,
     adapter: Any,
     rendered: Any,
@@ -124,11 +126,11 @@ def init_run(
     prepared_composed_result: Any,
     variables: dict[str, Any] | None,
 ) -> None:
-    """Initialize the run row after ``store.create_run``."""
+    """Initialize the run row after ``db.runs.create``."""
     _snapshots.save_runner(
         run_id,
         build_runner_snapshot(
-            store,
+            db.runner_profiles,
             effective=effective,
             rendered_model=rendered.model,
             backend_override=backend_override,
@@ -142,7 +144,7 @@ def init_run(
 
     if rendered.model:
         try:
-            store.record_usage(run_id, {"model": rendered.model})
+            db.usage.record(run_id, {"model": rendered.model})
         except Exception:
             logger.exception("failed to pre-record model for run %s", run_id)
 
@@ -154,7 +156,7 @@ def init_run(
             conv_uri = conv_meth(
                 run_id=run_id, transcript_path=str(transcript_path)
             )
-    store.set_run_conversation(run_id, conv_format, conv_uri)
+    db.runs.set_conversation(run_id, conv_format, conv_uri)
 
     if prepared_composed_result is not None:
         snapshot = {
@@ -165,7 +167,7 @@ def init_run(
                 for r in (agent.composition.references if agent.composition else [])
             ],
         }
-        store.save_run_composition(
+        db.runs.save_composition(
             run_id=run_id,
             composition_snapshot=snapshot,
             rendered_prompt={
@@ -178,7 +180,7 @@ def init_run(
     else:
         _final_system = composed.system if composed.system is not None else (agent.prompt or "")
         _final_schema = composed.schema
-        store.save_run_composition(
+        db.runs.save_composition(
             run_id=run_id,
             composition_snapshot=None,
             rendered_prompt={
@@ -201,7 +203,7 @@ def init_run(
         mcp_snapshot=_mcp_snapshot,
     )
 
-    stamp_run_agent_version(store, run_id, agent)
+    stamp_run_agent_version(db, run_id, agent)
 
 
 def launch_background_task(
@@ -214,7 +216,7 @@ def launch_background_task(
     workdir: Path,
     run_dir: Path,
     transcript_path: Path,
-    store: Any,
+    db: "Database",
     settings: Any,
     effective: Any,
     composed: Any,
@@ -233,10 +235,9 @@ def launch_background_task(
             agent=agent,
             user_input=input_,
             project_root=settings.project_root,
-            store=store,
             composed=composed,
         )
-        store.save_run_prompt(run_id, frags_json)
+        db.run_prompts.save(run_id, frags_json)
     except Exception:
         pass
 

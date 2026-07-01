@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sqlalchemy import text
+
+if TYPE_CHECKING:
+    from agentbox.core.db import AgentPromptResourceBindingManager
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +63,8 @@ def binding_to_input(b: dict) -> dict:
     }
 
 
-def backfill_slot_active_flag(store) -> None:
-    with store.engine.begin() as conn:
+def backfill_slot_active_flag(prompt_bindings: AgentPromptResourceBindingManager) -> None:
+    with prompt_bindings._engine.begin() as conn:
         conn.execute(
             text(
                 "UPDATE agent_prompt_resource_bindings "

@@ -2,23 +2,9 @@
 
 Stateful: the ``Database`` (managers) is resolved internally by ``Service``
 from settings — never passed in. Methods take only their domain arguments,
-never ``db`` or ``store``. This is the workspace slice of the manager
-migration that plan 064_03 left unfinished: logic lives on the managers,
-this object is the surface.
-
-    svc = WorkspaceService()
-    svc.create_workspace("my-workspace")
-
-ponytail: workspace create is row + env-doc v1 in separate transactions
-(manager insert + env-doc save).  Same pattern AgentService uses for its
-cross-manager ops — accepted because env-doc is auxiliary.
-
-Known debt — ``_session_store()`` temporary bridge:
-``save_and_sync_env_doc``, ``_generate_into``, and ``list_workspaces``
-enrichment need ``SessionStore`` for resource bindings, load_workenv,
-and build_workspace — none of which have a pure-manager surface yet.
-Once build_workspace / load_workenv are refactored to take managers
-(Phase C) this bridge is deleted.
+never ``db`` or ``store``. Logic lives on the managers, this object owns
+the rules: existence guards, timestamps, upsert branching, changelog
+validation, cross-manager orchestration.
 """
 
 from __future__ import annotations
@@ -28,14 +14,12 @@ import logging
 import shutil
 import tempfile
 from contextlib import contextmanager, suppress
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.constants import BackendName, McpPolicy
 from agentbox.core.data import EnvDocRow
-from agentbox.core.db import SessionStore
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.catalog import resolve_host_env_callables, resolve_workspace_callables
 from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
@@ -133,20 +117,9 @@ class WorkspaceService(Service):
     def _settings(self) -> Settings:
         return load_settings()
 
-    @lru_cache(maxsize=1)
-    def _session_store(self) -> SessionStore:
-        """Temporary bridge for methods that still need SessionStore.
-
-        Used only by ``save_and_sync_env_doc`` and ``_generate_into``
-        until ``build_workspace`` / ``load_workenv`` accept managers
-        (Phase C). Delete this property when Phase C is complete.
-        """
-        return SessionStore(self._settings.db_path)
-
     def _get_resource_counts(self) -> dict[str, int]:
         try:
-            store = self._session_store()
-            return store.count_workspace_file_bindings_by_workspace()
+            return self._db.workspace_file_resource_bindings.count_by_workspace()
         except Exception:
             return {}
 
@@ -346,9 +319,22 @@ class WorkspaceService(Service):
             workspace_id, {"body": body}, changelog=reason, publish=True, actor=actor
         )
         _s = settings or self._settings
-        store = self._session_store()
         try:
-            build_workspace_by_name(store, _s, workspace_id)
+            build_workspace_by_name(
+                self._workspaces,
+                self._db.agent_defs,
+                self._subagents,
+                self._db.agent_versions,
+                self._db.workspace_file_resource_bindings,
+                self._db.resources,
+                self._db.resource_versions,
+                self._db.resource_blobs,
+                self._mcp_overrides,
+                self._mcp_tool_overrides,
+                self._env_doc_versions,
+                _s,
+                workspace_id,
+            )
         except Exception:
             logger.exception(
                 "env_doc save: build_workspace_by_name failed for %s", workspace_id
@@ -361,7 +347,21 @@ class WorkspaceService(Service):
         Returns ``None`` when the workspace has no resolvable workdir
         (unknown name, ephemeral, or path missing on disk).
         """
-        return build_workspace_by_name(self._session_store(), self._settings, workspace_id)
+        return build_workspace_by_name(
+            self._workspaces,
+            self._db.agent_defs,
+            self._subagents,
+            self._db.agent_versions,
+            self._db.workspace_file_resource_bindings,
+            self._db.resources,
+            self._db.resource_versions,
+            self._db.resource_blobs,
+            self._mcp_overrides,
+            self._mcp_tool_overrides,
+            self._env_doc_versions,
+            self._settings,
+            workspace_id,
+        )
 
     # ═══════════════════════════════════════════════════════════════════
     # Workenv templates (from WorkenvTemplatesMixin)
@@ -649,7 +649,13 @@ class WorkspaceService(Service):
     ) -> list[CallableItem]:
         """Return every callable item (MCP, host-env, resource) installed in *workspace_id*."""
         return resolve_workspace_callables(
-            workspace_id, self._session_store(), mcp_registry
+            workspace_id,
+            self._host_env_grants,
+            self._db.workspace_file_resource_bindings,
+            self._mcp_policies,
+            self._mcp_overrides,
+            self._mcp_tool_overrides,
+            mcp_registry,
         )
 
     def mcp_callables(
@@ -658,11 +664,17 @@ class WorkspaceService(Service):
         mcp_registry: Any,
     ) -> list[CallableItem]:
         """Return MCP-source CallableItems for *workspace_id*."""
-        return resolve_mcp_callables(workspace_id, self._session_store(), mcp_registry)
+        return resolve_mcp_callables(
+            workspace_id,
+            self._mcp_policies,
+            self._mcp_overrides,
+            self._mcp_tool_overrides,
+            mcp_registry,
+        )
 
     def host_env_callables(self, workspace_id: str) -> list[CallableItem]:
         """Return host-env CallableItems for *workspace_id*."""
-        return resolve_host_env_callables(workspace_id, self._session_store())
+        return resolve_host_env_callables(workspace_id, self._host_env_grants)
 
     # ═══════════════════════════════════════════════════════════════════
     # Subagent bindings (from bindings.py)
@@ -813,9 +825,20 @@ class WorkspaceService(Service):
         workspace_path: Path,
         workspace_id: str,
     ) -> dict:
-        store = self._session_store()
         perms = self.load_effective_permissions(workspace_id)
-        config = _load_workenv_from_db(store, workspace_id, settings=self._settings, permissions=perms)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements RunStore at runtime; Phase C will switch to managers
+        config = _load_workenv_from_db(
+            self._workspaces,
+            self._db.agent_defs,
+            self._subagents,
+            self._db.agent_versions,
+            self._db.workspace_file_resource_bindings,
+            self._mcp_overrides,
+            self._mcp_tool_overrides,
+            self._env_doc_versions,
+            workspace_id,
+            settings=self._settings,
+            permissions=perms,
+        )
         paths: dict[str, str] = {}
         for engine in list_recipes():
             recipe = load_recipe(engine)
@@ -876,8 +899,19 @@ class WorkspaceService(Service):
         permissions: dict[str, Any] | None = None,
     ) -> WorkenvConfig:
         """Load a ``WorkenvConfig`` for *workspace_id* from the DB."""
-        store = self._session_store()
-        return _load_workenv_from_db(store, workspace_id, settings=settings or self._settings, permissions=permissions)  # pyright: ignore[reportArgumentType] — store is SessionStore, implements RunStore at runtime; Phase C will switch to managers
+        return _load_workenv_from_db(
+            self._workspaces,
+            self._db.agent_defs,
+            self._subagents,
+            self._db.agent_versions,
+            self._db.workspace_file_resource_bindings,
+            self._mcp_overrides,
+            self._mcp_tool_overrides,
+            self._env_doc_versions,
+            workspace_id,
+            settings=settings or self._settings,
+            permissions=permissions,
+        )
 
     def save_workenv_as_preset(
         self,

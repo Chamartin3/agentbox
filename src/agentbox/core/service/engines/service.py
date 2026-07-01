@@ -28,6 +28,7 @@ from agentbox.core.data import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
+from agentbox.core.tools.registry import SharedToolRegistry, ToolSpec
 from agentbox.core.data._util import now_iso
 from agentbox.core.engines import (
     ProviderDescriptor,
@@ -45,9 +46,7 @@ from agentbox.core.engines.credentials import builtin as _cred_builtin  # noqa: 
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines import profile_validation
 
-# ponytail bridges — temporary until a dedicated providers service emerges.
-from agentbox.core.db import SessionStore  # noqa: E402  (ponytail bridge)
-from agentbox.core.config import load_settings  # noqa: E402  (ponytail bridge)
+# ponytail bridge — temporary until a dedicated providers service emerges.
 from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
 
 
@@ -312,13 +311,12 @@ class EngineService(Service):
     ) -> list[ProviderModel]:
         """Resolve config and list models for a provider.
 
-        ponytail: delegates profile lookup through ``_session_store()``
-        bridge while the full providers service is not yet extracted.
+        ponytail: delegates to the free-function while a dedicated providers
+        service is not yet extracted.
         """
-        store = SessionStore(load_settings().db_path)
         return await _free_list_provider_models(
             provider_id,
-            store=store,
+            runner_profiles=self._db.runner_profiles,
             profile_id=profile_id,
             base_url=base_url,
             api_key_env=api_key_env,
@@ -365,3 +363,13 @@ class EngineService(Service):
     def get_credential(self, name: str) -> CredentialMethod | None:
         """Resolve a single credential method by name, or ``None``."""
         return get_credential(name)
+
+    # ── Shared tool registry passthrough ──────────────────────────────
+    def list_shared_tools(self) -> list[ToolSpec]:
+        """All consumer-registered shared agent tools discovered at startup.
+
+        Read-only passthrough to ``SharedToolRegistry.all()``. MCP tool
+        bodies call this via ``ctx.engines.list_shared_tools()`` rather
+        than importing the in-process registry directly.
+        """
+        return SharedToolRegistry.all()

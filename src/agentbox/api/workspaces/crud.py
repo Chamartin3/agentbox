@@ -14,7 +14,7 @@ from typing import NoReturn
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from agentbox.api._pagination import PaginatedEnvelope, paginate_list
+from agentbox.api.schemas import PaginatedEnvelope, paginate_list
 from agentbox.api.deps import get_mcp_registry, get_settings, get_store
 from agentbox.core.data import WorkspaceRow
 from agentbox.core.service import workspaces as workspaces_service

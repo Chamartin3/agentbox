@@ -16,7 +16,7 @@ from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
 
 from agentbox.core.config import Settings
-from agentbox.core.service import AgentDef, Recipe, SessionStore, WorkenvConfig, WorkspaceService
+from agentbox.core.service import AgentDef, Recipe, WorkenvConfig, WorkspaceService
 
 
 class OpsRenderer(Renderer):
@@ -48,9 +48,8 @@ class OpsRenderer(Renderer):
     def cfg_tree(
         self,
         settings: Settings,
-        ws_resolve: Callable[[AgentDef, Settings, SessionStore], tuple[Path, bool]],
-        list_all_agents: Callable[..., Sequence[AgentDef]],
-        store: SessionStore,
+        ws_resolve: Callable[..., tuple[Path, bool]],
+        agents: Sequence[AgentDef],
     ) -> None:
         """Show all important paths as a Rich tree."""
         tree = Tree(f"[bold]{settings.project_root}[/bold]")
@@ -75,8 +74,8 @@ class OpsRenderer(Renderer):
             _add(settings.outputs_dir, tree, "outputs/")
 
         ws_branch = tree.add("[bold]workspaces/[/bold]")
-        for a in list_all_agents(store=store):
-            path, _eph = ws_resolve(a, settings, store)
+        for a in agents:
+            path, _eph = ws_resolve(a, settings)
             _add(path, ws_branch, a.id + (" [yellow](ephemeral)[/yellow]" if _eph else ""))
 
         data = tree.add("[bold]/data[/bold]")

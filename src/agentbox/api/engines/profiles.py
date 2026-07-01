@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from agentbox.api._pagination import PaginatedEnvelope, paginate_list
+from agentbox.api.schemas import PaginatedEnvelope, paginate_list
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
 from agentbox.core.service import (

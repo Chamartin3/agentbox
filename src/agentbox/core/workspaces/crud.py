@@ -16,8 +16,7 @@ from agentbox.core.resources.skills import discover_skills
 
 if TYPE_CHECKING:
     from agentbox.core.data import AgentDef
-    from agentbox.core.protocols import WorkspaceLookupStore
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import WorkspaceManager
 
 
 @dataclass(frozen=True)
@@ -35,7 +34,7 @@ class WorkspaceInfo:
 def resolve_path(
     agent: AgentDef,
     settings: Settings,
-    store: WorkspaceLookupStore | None = None,
+    store: WorkspaceManager | None = None,
 ) -> tuple[Path, bool]:
     """Return (workspace_path, is_ephemeral) for an agent.
 
@@ -50,7 +49,7 @@ def resolve_path(
 
     if agent.workspace:
         if store is not None:
-            row = store.get_workspace(agent.workspace)
+            row = store.get_by_name(agent.workspace)
             row_path = row.get("path") if row else None
             if row_path:
                 return settings.project_root / row_path, False
@@ -60,7 +59,7 @@ def resolve_path(
 
 
 def info(
-    agent: AgentDef, settings: Settings, store: SessionStore | None = None
+    agent: AgentDef, settings: Settings, store: WorkspaceManager | None = None
 ) -> WorkspaceInfo:
     path, ephemeral = resolve_path(agent, settings, store)
     has_claude_md = (path / "CLAUDE.md").exists() if path.exists() else False
@@ -92,7 +91,7 @@ Edit freely — changes take effect on the next run.
 def ensure(
     agent: AgentDef,
     settings: Settings,
-    store: SessionStore | None = None,
+    store: WorkspaceManager | None = None,
     scaffold: bool = True,
 ) -> Path:
     """Create the workspace if missing. Optionally scaffold a starter CLAUDE.md."""
@@ -105,7 +104,7 @@ def ensure(
     return path
 
 
-def reset(agent: AgentDef, settings: Settings, store: SessionStore | None = None) -> Path:
+def reset(agent: AgentDef, settings: Settings, store: WorkspaceManager | None = None) -> Path:
     """Delete and recreate the workspace (drops everything inside)."""
     path, _ = resolve_path(agent, settings, store)
     if path.exists():

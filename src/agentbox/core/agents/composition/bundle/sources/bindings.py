@@ -38,7 +38,7 @@ class BindingsBundleSource:
     """
 
     agent_id: str
-    store: Any  # SessionStore — avoid circular import
+    store: Any  # duck-typed store (RunStore) — avoid circular import
     composition: dict[str, Any] = field(init=False)
 
     # Files attached to the active agent_version row (relative_path → content).

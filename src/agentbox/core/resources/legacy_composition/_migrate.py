@@ -22,13 +22,23 @@ from agentbox.core.resources.legacy_composition._helpers import (
 from agentbox.core.resources.legacy_composition._store import get_or_create_resource
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.data.rows import AgentVersionFileRow
+    from agentbox.core.db import (
+        AgentPromptResourceBindingManager,
+        AgentVersionFileManager,
+        AgentVersionManager,
+        ResourceManager,
+        ResourceVersionManager,
+    )
 
 logger = logging.getLogger(__name__)
 
 
 def _migrate_one_agent(
-    store: SessionStore,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    prompt_bindings: AgentPromptResourceBindingManager,
+    agent_version_files: AgentVersionFileManager,
     agent_id: str,
     composition: dict,
     version_id: int,
@@ -36,12 +46,12 @@ def _migrate_one_agent(
     report: CompositionMigrationReport,
 ) -> bool:
     """Migrate one agent. Returns True if any bindings were added."""
-    files = store.list_version_files(version_id)
-    files_by_kind_path: dict[tuple[str, str], dict] = {}
+    files = agent_version_files.list_for_version(version_id)
+    files_by_kind_path: dict[tuple[str, str], AgentVersionFileRow] = {}
     for f in files:
         files_by_kind_path[(f["kind"], f["relative_path"])] = f
 
-    existing_bindings = store.list_prompt_bindings(agent_id)
+    existing_bindings = prompt_bindings.list_for_agent(agent_id)
     existing_slots = {b["slot"] for b in existing_bindings if b.get("slot")}
     existing_marker_pairs = {
         (b["resource_id"], b["marker"])
@@ -91,7 +101,8 @@ def _migrate_one_agent(
                 )
                 return
         resource_id = get_or_create_resource(
-            store,
+            resources,
+            resource_versions,
             content_text=content_text,
             type_=type_,
             relative_path=content_rel,
@@ -138,7 +149,7 @@ def _migrate_one_agent(
         if content_text is not None:
             sha12 = hashlib.sha256(content_text.encode("utf-8")).hexdigest()[:12]
             candidate_slug = slug_for("document", sha12)
-            existing = store.get_repo_resource_by_slug(candidate_slug)
+            existing = resources.get_by_slug(candidate_slug)
             candidate_resource_id = existing["id"] if existing else None
             already_bound = (
                 candidate_resource_id is not None
@@ -151,7 +162,8 @@ def _migrate_one_agent(
 
             if not already_bound:
                 resource_id = get_or_create_resource(
-                    store,
+                    resources,
+                    resource_versions,
                     content_text=content_text,
                     type_="document",
                     relative_path=user_template_rel,
@@ -176,7 +188,7 @@ def _migrate_one_agent(
     if added == 0:
         return False
 
-    store.replace_prompt_bindings(
+    prompt_bindings.replace_for_agent(
         agent_id,
         new_inputs,
         reason=MIGRATION_REASON,
@@ -187,15 +199,19 @@ def _migrate_one_agent(
 
 
 def migrate_composition_to_bindings(
-    store: SessionStore,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    prompt_bindings: AgentPromptResourceBindingManager,
+    agent_version_files: AgentVersionFileManager,
+    agent_versions: AgentVersionManager,
     *,
     only_agent_id: str | None = None,
     project_root: Path | None = None,
 ) -> CompositionMigrationReport:
     """Walk every agent's active version and migrate composition slots to bindings."""
     report = CompositionMigrationReport()
-    backfill_slot_active_flag(store)
-    agent_rows = store.list_agents_with_latest()
+    backfill_slot_active_flag(prompt_bindings)
+    agent_rows = agent_versions.list_latest_per_agent()
 
     for row in agent_rows:
         agent_id = row["agent_id"]
@@ -203,7 +219,7 @@ def migrate_composition_to_bindings(
             continue
 
         try:
-            active = store.get_active_version(agent_id) or row
+            active = agent_versions.get_active(agent_id) or row
             config_json_str = active.get("config_json")
             if not config_json_str:
                 report.agents_skipped_no_composition.append(agent_id)
@@ -223,7 +239,10 @@ def migrate_composition_to_bindings(
                     if candidate.is_dir():
                         bundle_dir = candidate
             added = _migrate_one_agent(
-                store,
+                resources,
+                resource_versions,
+                prompt_bindings,
+                agent_version_files,
                 agent_id,
                 composition,
                 version_id=active["id"],

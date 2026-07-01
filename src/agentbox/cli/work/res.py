@@ -5,11 +5,7 @@ from __future__ import annotations
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.shared.deps import get_resource_service  # TODO(cli-arch): workspace resource surface → WorkspaceService (plan 089)
-from agentbox.core.service import (  # TODO(cli-arch): workspace resource surface → WorkspaceService (plan 089)
-    list_workspace_file_bindings,
-    replace_workspace_file_bindings,
-)
+from agentbox.cli.shared.deps import get_resource_service
 
 workspace_resources_app = typer.Typer(
     name="workspace-resources",
@@ -25,7 +21,7 @@ def wr_list(
 ) -> None:
     """List all file bindings for a workspace."""
     obj: CLIContext = ctx.obj
-    rows = list_workspace_file_bindings(obj.store, workspace_id)
+    rows = obj.resources.list_workspace_file_bindings(workspace_id)
     obj.render.workspace.file_bindings_table(rows, workspace_id)
 
 
@@ -57,7 +53,7 @@ def wr_set(
         obj.render.workspace.resource_not_found(resource_slug)
         raise typer.Exit(2)
 
-    existing = list_workspace_file_bindings(obj.store, workspace_id)
+    existing = obj.resources.list_workspace_file_bindings(workspace_id)
     kept = [b for b in existing if b.get("target_path") != dest_path]
     new_binding: dict[str, object] = {
         "resource_id": resource["id"],
@@ -68,7 +64,7 @@ def wr_set(
     }
     kept.append(new_binding)
 
-    replace_workspace_file_bindings(obj.store, workspace_id, kept, reason=reason)
+    obj.resources.replace_workspace_file_bindings(workspace_id, kept, reason=reason)
     obj.render.workspace.file_binding_set(workspace_id, dest_path, resource_slug, mode)
 
 

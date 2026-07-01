@@ -11,8 +11,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agentbox.core.db import SessionStore
-from agentbox.core.db.database import Database  # ponytail: transitional — plan 110 re-plumbs mcp/servers
+from agentbox.core.db.database import Database  # allowed: secondary-store opener (plan 110)
 from agentbox.core.db.system.config import record_host_env_call
 
 
@@ -24,7 +23,6 @@ class HostEnvContext:
     workdir: Path
     db_path: Path | None
 
-    _store: SessionStore | None = field(default=None, repr=False, compare=False)
     _db: Database | None = field(default=None, repr=False, compare=False)
 
     @classmethod
@@ -43,20 +41,6 @@ class HostEnvContext:
             workdir=workdir,
             db_path=db_path,
         )
-
-    @property
-    def store(self) -> SessionStore | None:
-        if self._store is not None:
-            return self._store
-        if self.db_path is None:
-            return None
-        try:
-            # Secondary store in a tool subprocess: must not reap orphans, or
-            # it would mark the parent's still-running run as orphaned on init.
-            self._store = SessionStore(self.db_path, reap_orphans=False)
-        except Exception:
-            pass
-        return self._store
 
     @property
     def db(self) -> Database | None:

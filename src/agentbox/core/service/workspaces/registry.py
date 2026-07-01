@@ -1,21 +1,18 @@
 """Workspace registry CRUD: list / get / create / delete by name.
 
-Delegates to ``WorkspaceService``. The ``store`` parameter is retained
-for backward compatibility but workspace methods go through the service.
+Delegates to ``WorkspaceService``. The ``store`` parameter has been removed
+— all workspace operations go through the service or its managers.
 """
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from agentbox.core.config import Settings
-from agentbox.core.data import WorkspaceRow
-from agentbox.core.db import SessionStore
 from agentbox.core.resources.skills import discover_skills
 from agentbox.core.service.workspaces.service import WorkspaceService
 
-from .errors import WorkspaceExists, WorkspaceNotFound
+from .errors import WorkspaceExists
 from .files import is_user_file
 
 __all__ = [
@@ -33,7 +30,6 @@ def _ws() -> WorkspaceService:
 
 def list_workspaces_enriched(
     *,
-    store: SessionStore,
     settings: Settings,
 ) -> list[dict]:
     """Return all named workspaces with agent assignments + summary stats."""
@@ -76,45 +72,27 @@ def list_workspaces_enriched(
 def create_workspace_registry(
     name: str,
     *,
-    store: SessionStore,
     description: str | None = None,
     path: str | None = None,
-) -> WorkspaceRow:
+) -> dict:
     try:
-        return store.create_workspace(name, description=description, path=path)
-    except ValueError as exc:
+        return _ws().create_workspace(name, description=description, path=path)
+    except Exception as exc:
         raise WorkspaceExists(name, str(exc)) from exc
 
 
 def delete_workspace_registry(
     name: str,
     *,
-    store: SessionStore,
     settings: Settings,
     purge_disk: bool = False,
 ) -> dict:
-    existing = store.get_workspace(name)
-    if existing is None:
-        raise WorkspaceNotFound(name)
-    counts = store.delete_workspace_cascade(name)
-    disk_removed = False
-    if purge_disk:
-        existing_path = existing.get("path")
-        ws_path: Path
-        if existing_path:
-            ws_path = settings.project_root / existing_path
-        else:
-            ws_path = settings.workspaces_root / name
-        if ws_path.exists() and ws_path.is_dir():
-            shutil.rmtree(ws_path)
-            disk_removed = True
-    return {"deleted": name, "counts": counts, "disk_removed": disk_removed}
+    return _ws().delete_workspace(name, settings=settings, purge_disk=purge_disk)
 
 
 def get_workspace_by_name(
     name: str,
     *,
-    store: SessionStore,
     settings: Settings,
 ) -> dict:
     svc = _ws()
@@ -138,10 +116,22 @@ def get_workspace_by_name(
 
 def list_all_workspaces(
     *,
-    store: SessionStore,
     settings: Settings,
 ) -> list:
-    """Return a WorkspaceInfo for every agent known to the DB."""
+    """Return a WorkspaceInfo for every agent known to the DB.
+
+    workspace path DB lookup is skipped (store=None) — deprecated callers
+    should use WorkspaceService.list_workspaces() instead.
+    """
+    from agentbox.core.data import AgentDef  # noqa: PLC0415
+    from agentbox.core.db.database import get_database  # noqa: PLC0415
     from agentbox.core.workspaces.crud import info as _workspace_info  # noqa: PLC0415
-    from agentbox.core.service.agents import list_all_agents  # noqa: PLC0415
-    return [_workspace_info(a, settings, store) for a in list_all_agents(store=store)]
+
+    db = get_database(str(settings.db_path))
+    agents: list[AgentDef] = []
+    for r in db.agent_versions.list_latest_per_agent():
+        try:
+            agents.append(AgentDef.from_db_row(r))
+        except Exception:
+            pass
+    return [_workspace_info(a, settings, None) for a in agents]

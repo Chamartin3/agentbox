@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 from agentbox.core.agents.resolve import resolve_engine
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef
-from agentbox.core.protocols import RunSetupStore
 from agentbox.core.config import Settings
 from agentbox.core.engines.contracts.base import (
     RenderedConfig,
@@ -72,11 +71,11 @@ class RunSetup:
 
     def __init__(
         self,
-        store: RunSetupStore,
+        db: Any,
         settings: Settings,
-        mcp_registry: McpRegistry | None,
+        mcp_registry: "McpRegistry | None",
     ) -> None:
-        self.store = store
+        self._db = db
         self.settings = settings
         self._mcp_registry = mcp_registry
 
@@ -89,32 +88,34 @@ class RunSetup:
     ) -> tuple[Path, str | None]:
         import tempfile  # noqa: PLC0415
 
+        ws_lookup = self._db.workspaces
+
         if workspace_override:
             original = agent.workspace
             agent.workspace = workspace_override
             try:
-                path, ephemeral = resolve_path(agent, self.settings, self.store)
+                path, ephemeral = resolve_path(agent, self.settings, ws_lookup)
             finally:
                 agent.workspace = original
             if not ephemeral:
                 path.mkdir(parents=True, exist_ok=True)
                 return path, session_id
 
-        path, ephemeral = resolve_path(agent, self.settings, self.store)
+        path, ephemeral = resolve_path(agent, self.settings, ws_lookup)
         if not ephemeral:
             path.mkdir(parents=True, exist_ok=True)
             return path, session_id
         if agent.session_mode == "persistent":
             if session_id:
-                existing = self.store.get_session(session_id)
+                existing = self._db.sessions.get_dict(session_id)
                 if existing and existing["workdir"]:
-                    self.store.touch_session(session_id)
+                    self._db.sessions.touch(session_id)
                     return Path(existing["workdir"]), session_id
             self.settings.sessions_dir.mkdir(parents=True, exist_ok=True)
-            sid = self.store.create_session(agent.id, agent.session_mode, None)
+            sid = self._db.sessions.create_session(agent.id, agent.session_mode, None)
             wd = self.settings.sessions_dir / sid / "workdir"
             wd.mkdir(parents=True, exist_ok=True)
-            self.store.set_session_workdir(sid, str(wd))
+            self._db.sessions.set_workdir(sid, str(wd))
             return wd, sid
         self.settings.runs_dir.mkdir(parents=True, exist_ok=True)
         wd = (
@@ -132,7 +133,7 @@ class RunSetup:
         backend_override: str | None = None,
         runner_config: EffectiveRunnerConfig | None = None,
         composed: Any | None = None,
-    ) -> tuple[BackendAdapter, RenderedConfig]:
+    ) -> tuple["BackendAdapter", RenderedConfig]:
         # Resolve cross-domain values before render so backends don't
         # import from agents / workspaces / resources domains directly.
         agent_config_json = _read_agent_config_json(agent)
@@ -150,7 +151,19 @@ class RunSetup:
         # Resolve the workspace-tool catalog and extract canonical tool
         # names for the agent ∩ workspace intersection.
         ws_id = agent.workspace
-        ws_callables = resolve_workspace_callables(ws_id, self.store, self._mcp_registry) if ws_id else []
+        ws_callables = (
+            resolve_workspace_callables(
+                ws_id,
+                self._db.workspace_host_env_grants,
+                self._db.workspace_file_resource_bindings,
+                self._db.workspace_mcp_policies,
+                self._db.workspace_mcp_overrides,
+                self._db.workspace_mcp_tool_overrides,
+                self._mcp_registry,
+            )
+            if ws_id
+            else []
+        )
         ws_allowed_tools: set[CanonicalTool] = set()
         for item in ws_callables:
             try:
@@ -158,7 +171,7 @@ class RunSetup:
             except ValueError:
                 pass  # non-canonical tools (MCP, resources) aren't intersected
 
-        def _try_backend(name: str) -> BackendAdapter | None:
+        def _try_backend(name: str) -> "BackendAdapter | None":
             try:
                 return resolve_engine(name)
             except KeyError:
@@ -189,7 +202,9 @@ class RunSetup:
     # ------------------------------------------------------------------ MCP grants
     def resolve_agent_tool_grants(self, agent_id: str) -> set[str] | None:
         try:
-            grants_set = self.store.list_active_grants(agent_id)
+            # list_for_agent(include_revoked=False) already excludes revoked rows
+            grants = self._db.agent_tool_grants.list_for_agent(agent_id)
+            grants_set = {g["tool_name"] for g in grants}
             if grants_set:
                 return grants_set
         except Exception:

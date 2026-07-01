@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from agentbox.core.data import AgentDef, RunnerSnapshot, now_iso
-from agentbox.core.protocols import SnapshotStore
-from agentbox.core.db.database import get_database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
+
+if TYPE_CHECKING:
+    from agentbox.core.db import RunnerProfileManager
 
 logger = logging.getLogger(__name__)
 
 
 def build_runner_snapshot(
-    store: SnapshotStore,
+    runner_profiles: "RunnerProfileManager",
     *,
     effective: EffectiveRunnerConfig,
     rendered_model: str | None,
@@ -25,19 +26,11 @@ def build_runner_snapshot(
     timeout_override: int | None,
     agent: AgentDef,
 ) -> RunnerSnapshot:
-    """Compose the append-only ``runner_snapshot`` dict for a run.
-
-    Captures everything the run-detail UI needs to render what actually
-    executed: backend, model, timeout, provider, extra_args, the
-    resolution source, and any per-run overrides that were applied.
-    Profile name is looked up best-effort.
-    """
+    """Compose the append-only ``runner_snapshot`` dict for a run."""
     profile_name: str | None = None
     if effective.profile_id:
         try:
-            row = get_database(str(store.db_path)).runner_profiles.get_by_id(
-                effective.profile_id
-            )
+            row = runner_profiles.get_by_id(effective.profile_id)
             if row is not None:
                 profile_name = row.get("name")
         except Exception:

@@ -39,7 +39,6 @@ from agentbox.core.data import AgentDef
 
 if TYPE_CHECKING:
     from agentbox.core.config import Settings
-    from agentbox.core.protocols import RunStore
 
 logger = logging.getLogger(__name__)
 
@@ -125,8 +124,8 @@ class ResolvedPrompt:
 
 def resolve_run_prompt(
     *,
-    store: RunStore,
-    settings: Settings,
+    db: Any,
+    settings: "Settings",
     agent: AgentDef,
     input_: str,
     variables: dict[str, Any] | None,
@@ -138,7 +137,7 @@ def resolve_run_prompt(
     or ``core.agents.config`` internals.
     """
     composed = compose_prompt(
-        store=store,
+        db=db,
         settings=settings,
         agent=agent,
         input_=input_,

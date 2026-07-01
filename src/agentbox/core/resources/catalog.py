@@ -6,21 +6,20 @@ a workspace.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from agentbox.core.tools.catalog import CallableItem
+
+if TYPE_CHECKING:
+    from agentbox.core.db import WorkspaceFileResourceBindingManager
 
 
 def resolve_resource_callables(
     workspace_id: str,
-    store: Any,
+    file_bindings: WorkspaceFileResourceBindingManager,
 ) -> list[CallableItem]:
-    """Return CallableItems for every file-resource binding in the workspace.
-
-    *store* must have ``list_workspace_file_bindings(workspace_id)``
-    (satisfied by ``SessionStore`` / ``RunStore`` at runtime).
-    """
-    bindings = store.list_workspace_file_bindings(workspace_id)
+    """Return CallableItems for every file-resource binding in the workspace."""
+    bindings = file_bindings.list_for_workspace(workspace_id)
     return [
         CallableItem(
             name=b.get("target_path", b.get("resource_id", "")),

@@ -18,14 +18,13 @@ from typing import Iterator
 import typer
 
 from agentbox.core.config import Settings
-from agentbox.core.service import AgentDef, SessionStore
+from agentbox.core.service import AgentDef
 from agentbox.core.service import AgentService, EngineService, ExecutionService, EvaluationService, SystemService
 from agentbox.core.service.resources.service import ResourceService
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 from agentbox.cli.shared.deps import (
     get_settings,
-    get_store,
     get_agent_service,
     get_execution_service,
     get_engine_service,
@@ -108,7 +107,6 @@ class CLIContext:
     """Shared dependency graph for CLI commands."""
 
     settings: Settings
-    store: SessionStore  # deprecated — remove once all branches use services
     render: Renderers
     agents: AgentService
     execution: ExecutionService
@@ -123,7 +121,6 @@ def build_ctx() -> CLIContext:
     """Thin wrapper over ``deps.py`` singleton factories."""
     return CLIContext(
         settings=get_settings(),
-        store=get_store(),
         render=Renderers(
             agent=AgentRenderer(),
             engine=EngineRenderer(),

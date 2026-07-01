@@ -1,15 +1,9 @@
-"""Load a WorkenvConfig from the authoritative DB state.
-
-Wraps the existing ``core/service/workspaces/configs.py`` DB resolution.
-No logic moves yet — only the wrapping.  This unblocks downstream phases
-without touching live code paths.
-"""
+"""Load a WorkenvConfig from the authoritative DB state."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from agentbox.core.protocols import RunStore
 from agentbox.core.db.system.config import load_project_mcp_servers
 from agentbox.core.workspaces.generation.config import (
     AgentRef,
@@ -21,42 +15,46 @@ from agentbox.core.workspaces.generation.config import (
 
 if TYPE_CHECKING:
     from agentbox.core.config import Settings
+    from agentbox.core.db import (
+        AgentDefManager,
+        AgentVersionManager,
+        WorkspaceEnvDocVersionManager,
+        WorkspaceFileResourceBindingManager,
+        WorkspaceMcpOverrideManager,
+        WorkspaceMcpToolOverrideManager,
+        WorkspaceManager,
+        WorkspaceSubagentManager,
+    )
 
 
 def load_workenv(
-    store: RunStore,
+    workspaces: WorkspaceManager,
+    agent_defs: AgentDefManager,
+    workspace_subagents: WorkspaceSubagentManager,
+    agent_versions: AgentVersionManager,
+    workspace_file_resource_bindings: WorkspaceFileResourceBindingManager,
+    workspace_mcp_overrides: WorkspaceMcpOverrideManager,
+    workspace_mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
+    workspace_env_doc_versions: WorkspaceEnvDocVersionManager,
     workspace_id: str,
     *,
     settings: Settings,
     permissions: dict[str, Any] | None = None,
 ) -> WorkenvConfig:
-    """Resolve a ``WorkenvConfig`` from the DB for *workspace_id*.
-
-    Args:
-        store: Active session store (DB connection).
-        workspace_id: Identifier of the workspace to load.
-        settings: Application settings (used for project-root resolution).
-        permissions: Pre-resolved effective permissions dict.  Callers in
-            the service layer should resolve this via
-            ``load_effective_permissions`` before calling here so that
-            ``from_db.py`` stays free of ``core.service`` imports.
-            Defaults to an empty permissions set when ``None``.
-    """
-    ws_row = store.get_workspace(workspace_id)
+    """Resolve a ``WorkenvConfig`` from the DB for *workspace_id*."""
+    ws_row = workspaces.get_by_name(workspace_id)
     workspace_name = workspace_id
 
     # Main agent (if one exists for the workspace)
-    agent_def = store.get_agent_def(workspace_id)
+    agent_def = agent_defs.get(workspace_id)
     agents: list[AgentRef] = []
     if agent_def is not None:
         agents.append(AgentRef(id=workspace_id, role="main"))
 
-    # Subagents — id is the workspace alias (the subagent's name in this
-    # workspace); the body is the agent's active prompt so the recipe can
-    # render native .claude/agents/{alias}.md (replacing materialize_subagents).
-    for sa in store.list_workspace_subagents(workspace_id):
+    # Subagents
+    for sa in workspace_subagents.list_for_workspace(workspace_id):
         sub_agent_id = sa["agent_id"]
-        active = store.get_active_version(sub_agent_id)
+        active = agent_versions.get_active(sub_agent_id)
         prompt = (
             (active or {}).get("prompt_content")
             or (active or {}).get("prompt_snapshot")
@@ -64,7 +62,7 @@ def load_workenv(
         )
         if not prompt:
             continue
-        sub_def = store.get_agent_def(sub_agent_id)
+        sub_def = agent_defs.get(sub_agent_id)
         agents.append(
             AgentRef(
                 id=sa["alias"],
@@ -77,16 +75,16 @@ def load_workenv(
     # Resource bindings
     resources: list[ResourceRef] = []
     skills: list[ResourceRef] = []
-    for b in store.list_workspace_file_bindings(workspace_id):
+    for b in workspace_file_resource_bindings.list_for_workspace(workspace_id):
         resources.append(ResourceRef(id=b["resource_id"]))
 
     # MCP servers (project-level + workspace overrides)
     project_servers = load_project_mcp_servers()
     server_overrides = {
         o["server_name"]: o
-        for o in store.list_workspace_mcp_server_overrides(workspace_id)
+        for o in workspace_mcp_overrides.list_for_workspace(workspace_id)
     }
-    tool_overrides = store.list_workspace_mcp_tool_overrides(workspace_id)
+    tool_overrides = workspace_mcp_tool_overrides.list_for_workspace(workspace_id)
 
     mcp_servers: list[McpRef] = []
     for srv in project_servers:
@@ -118,7 +116,7 @@ def load_workenv(
     resolved_permissions = Permissions(data=dict(permissions) if permissions else {})
 
     # Env doc
-    env_doc = store.get_active_env_doc(workspace_id)
+    env_doc = workspace_env_doc_versions.get_active(workspace_id)
     env_doc_content: str | ResourceRef | None = None
     if env_doc is not None:
         content_json = env_doc.get("content_json")

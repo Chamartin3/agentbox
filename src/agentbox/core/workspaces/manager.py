@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import cast
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.db import SessionStore
+from agentbox.core.db import AgentVersionManager
 from agentbox.core.workspaces.crud import WorkspaceInfo, info, resolve_path
 
 __all__ = [
@@ -29,7 +28,7 @@ __all__ = [
 ]
 
 
-def list_all(store: SessionStore, settings: Settings) -> list[WorkspaceInfo]:
+def list_all(store: AgentVersionManager, settings: Settings) -> list[WorkspaceInfo]:
     """Deprecated: moved to ``core.service.workspaces.registry.list_all_workspaces``."""
     warnings.warn(
         "manager.list_all is deprecated; use list_all_workspaces from "
@@ -37,8 +36,13 @@ def list_all(store: SessionStore, settings: Settings) -> list[WorkspaceInfo]:
         DeprecationWarning,
         stacklevel=2,
     )
-    agents = store.list_agents_with_latest()
-    return [info(cast(AgentDef, a), settings, store) for a in agents]
+    agents: list[AgentDef] = []
+    for r in store.list_latest_per_agent():
+        try:
+            agents.append(AgentDef.from_db_row(r))
+        except Exception:
+            pass
+    return [info(a, settings, None) for a in agents]
 
 
 # Re-export crud operations for backward compatibility

@@ -8,30 +8,27 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import yaml
 
 from agentbox.core.constants import BackendName
+from agentbox.core.db.managers.workspaces import WorkenvTemplateManager
 from agentbox.core.workspaces.generation.config import WorkenvConfig
-
-if TYPE_CHECKING:
-    from agentbox.core.db.workspaces.templates import WorkenvTemplatesMixin
 
 _SEEDS_DIR = Path(__file__).parent / "seeds"
 
 
-def list_presets(store: WorkenvTemplatesMixin) -> list[dict]:
+def list_presets(templates_mgr: WorkenvTemplateManager) -> list[dict]:
     """List all templates in the DB as summary dicts."""
-    return store.list_workenv_templates()
+    return templates_mgr.list_all()
 
 
-def from_preset(store: WorkenvTemplatesMixin, name: str) -> WorkenvConfig | None:
+def from_preset(templates_mgr: WorkenvTemplateManager, name: str) -> WorkenvConfig | None:
     """Load a ``WorkenvConfig`` from a named preset in the DB.
 
     Returns ``None`` if *name* is not found.
     """
-    row = store.get_workenv_template(name)
+    row = templates_mgr.get_by_name(name)
     if row is None:
         return None
     raw = row.get("config_json")
@@ -41,7 +38,7 @@ def from_preset(store: WorkenvTemplatesMixin, name: str) -> WorkenvConfig | None
 
 
 def save_as_preset(
-    store: WorkenvTemplatesMixin,
+    templates_mgr: WorkenvTemplateManager,
     name: str,
     config: WorkenvConfig,
     *,
@@ -50,7 +47,7 @@ def save_as_preset(
 ) -> dict:
     """Persist a ``WorkenvConfig`` as a named template."""
     config_json = json.loads(json.dumps(config._to_dict()))
-    return store.upsert_workenv_template(
+    return templates_mgr.upsert(
         name,
         engine=engine,
         config_json=config_json,
@@ -70,10 +67,10 @@ def load_seed_templates() -> list[dict]:
     return templates
 
 
-def seed_presets(store: WorkenvTemplatesMixin) -> int:
+def seed_presets(templates_mgr: WorkenvTemplateManager) -> int:
     """Idempotently seed built-in presets into the DB.
 
     Returns the number of templates seeded (existing ones are skipped).
     """
     templates = load_seed_templates()
-    return store.seed_workenv_templates(templates)
+    return templates_mgr.seed(templates)

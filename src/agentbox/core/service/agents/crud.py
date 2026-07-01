@@ -6,9 +6,11 @@ Import from ``service.agents`` (the package), never from this module directly.
 from __future__ import annotations
 
 import logging
+import types
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
+from sqlalchemy.engine import Engine
 
 from agentbox.core import workspaces as ws
 from agentbox.core.agents.composition.bundle import compose_from_source
@@ -20,7 +22,18 @@ from agentbox.core.service.engines.service import EngineService
 
 if TYPE_CHECKING:
     from agentbox.core.config import Settings
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import (
+        AgentDefManager,
+        AgentMetaManager,
+        AgentPromptResourceBindingManager,
+        AgentVersionCommentManager,
+        AgentVersionFileManager,
+        AgentVersionManager,
+        AgentVersionRatingManager,
+        ResourceBlobManager,
+        ResourceManager,
+        ResourceVersionManager,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -28,18 +41,26 @@ logger = logging.getLogger(__name__)
 def resolve_agent(
     agent_id: str,
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
 ) -> AgentDef | None:
-    return store.get_agent_def(agent_id)
+    return agent_defs.get(agent_id)
 
 
 def list_all_agents(
     *,
-    store: SessionStore,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
     include_disabled: bool = False,
 ) -> list[AgentDef]:
+    rows = agent_versions.list_latest_per_agent()
+    hidden: set[str] = set()
+    hidden |= agent_meta.agent_ids_with_deleted()
+    if not include_disabled:
+        hidden |= agent_meta.agent_ids_with_disabled()
     out: list[AgentDef] = []
-    for row in store.list_agents_with_latest(include_disabled=include_disabled):
+    for row in rows:
+        if row.get("agent_id") in hidden:
+            continue
         try:
             agent = AgentDef.from_db_row(row)
         except ValueError:
@@ -61,13 +82,13 @@ def list_all_agents(
 
 
 def _aggregate_run_metadata(
-    store: SessionStore,
+    engine: Engine,
 ) -> tuple[dict[str, int], dict[str, str], dict[str, str]]:
     run_counts: dict[str, int] = {}
     last_run_at: dict[str, str] = {}
     profile_bindings: dict[str, str] = {}
     try:
-        with store.engine.connect() as conn:
+        with engine.connect() as conn:
             for agent_id, n, last in conn.execute(
                 select(
                     runs_table.c.agent_id,
@@ -102,18 +123,21 @@ def _strip_legacy_runner_model(dumped: dict) -> dict:
 def _enrich_agent(
     agent: AgentDef,
     *,
-    store: SessionStore,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
     settings: Settings,
     run_counts: dict[str, int],
     last_run_at: dict[str, str],
     profile_bindings: dict[str, str],
 ) -> dict:
     try:
-        workspace_str = str(ws.resolve_path(agent, settings, store)[0])
+        # ponytail: pass None for WorkspaceLookupStore — ws.resolve_path gracefully
+        # falls back to settings-based path when no workspace row lookup is available.
+        workspace_str = str(ws.resolve_path(agent, settings, None)[0])
     except Exception:
         workspace_str = ""
-    active = store.get_active_version(agent.id)
-    latest = store.latest_version(agent.id)
+    active = agent_versions.get_active(agent.id)
+    latest = agent_versions.get_latest(agent.id)
     dumped = _strip_legacy_runner_model(agent.model_dump())
     profile_id = profile_bindings.get(agent.id)
     profile = None
@@ -138,43 +162,60 @@ def _enrich_agent(
         (t for t in (data.get("updated_at"), data.get("last_run_at")) if t),
         default=None,
     )
-    meta = store.get_agent_meta(agent.id) or {}
+    meta = agent_meta.get_meta(agent.id) or {}
     data["disabled_at"] = meta.get("disabled_at")
     return data
 
 
 def list_agents_enriched(
     *,
-    store: SessionStore,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    engine: Engine,
     settings: Settings,
     include_disabled: bool = False,
 ) -> list[dict]:
-    run_counts, last_run_at, profile_bindings = _aggregate_run_metadata(store)
+    run_counts, last_run_at, profile_bindings = _aggregate_run_metadata(engine)
     return [
         _enrich_agent(
             agent,
-            store=store,
+            agent_versions=agent_versions,
+            agent_meta=agent_meta,
             settings=settings,
             run_counts=run_counts,
             last_run_at=last_run_at,
             profile_bindings=profile_bindings,
         )
-        for agent in list_all_agents(store=store, include_disabled=include_disabled)
+        for agent in list_all_agents(
+            agent_versions=agent_versions,
+            agent_meta=agent_meta,
+            include_disabled=include_disabled,
+        )
     ]
 
 
 def get_agent_detail(
     agent_id: str,
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    agent_version_comments: AgentVersionCommentManager,
+    agent_version_ratings: AgentVersionRatingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    agent_version_files: AgentVersionFileManager,
+    agent_prompt_resource_bindings: AgentPromptResourceBindingManager,
     settings: Settings,
 ) -> dict | None:
-    agent = resolve_agent(agent_id, store=store)
+    agent = resolve_agent(agent_id, agent_defs=agent_defs)
     if agent is None:
         return None
-    workspace_path, ephemeral = ws.resolve_path(agent, settings, store)
+    # ponytail: pass None — ws.resolve_path falls back to settings-based path.
+    workspace_path, ephemeral = ws.resolve_path(agent, settings, None)
 
-    latest_row = store.get_active_version(agent_id) or store.latest_version(agent_id)
+    latest_row = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
     prompt = ""
     db_prompt = (latest_row or {}).get("prompt_content")
     if isinstance(db_prompt, str) and db_prompt:
@@ -188,7 +229,18 @@ def get_agent_detail(
     composed_system: str | None = None
     composed_user: str | None = None
     try:
-        bundle = load_bundle_from_bindings(agent_id=agent_id, store=store)
+        # Build a duck-typed shim for load_bundle_from_bindings (store: Any)
+        _store = types.SimpleNamespace(
+            list_prompt_bindings=lambda aid: agent_prompt_resource_bindings.list_for_agent(aid),
+            get_repo_resource=lambda rid: resources.get_resource(rid),
+            get_active_repo_version=lambda rid: resource_versions.get_active_version(rid),
+            get_repo_version=lambda vid: resource_versions.get_version(vid),
+            iter_repo_blobs=lambda vid: resource_blobs.iter_blobs(vid),
+            get_active_version=lambda aid: agent_versions.get_active(aid),
+            latest_version=lambda aid: agent_versions.get_latest(aid),
+            list_version_files=lambda vid: agent_version_files.list_for_version(vid),
+        )
+        bundle = load_bundle_from_bindings(agent_id=agent_id, store=_store)
         if bundle.source is None:
             raise FileNotFoundError("agent has no composition source")
         result = compose_from_source(bundle.source, variables={}, render=False)
@@ -204,11 +256,11 @@ def get_agent_detail(
             "get_agent_detail: composition preview failed for %r", agent_id
         )
 
-    versions = store.list_versions(agent_id)
+    versions = agent_versions.list_for_agent(agent_id)
     enriched_versions = []
     for v in versions:
-        comments = store.list_comments(v["id"])
-        rating = store.get_rating(v["id"])
+        comments = agent_version_comments.list_for_version(v["id"])
+        rating = agent_version_ratings.latest_for_version(v["id"])
         enriched_versions.append(
             {
                 "id": v["id"],
@@ -240,5 +292,5 @@ def get_agent_detail(
         },
         "current_version": latest_row["version"] if latest_row else None,
         "versions": enriched_versions,
-        "disabled_at": (store.get_agent_meta(agent_id) or {}).get("disabled_at"),
+        "disabled_at": (agent_meta.get_meta(agent_id) or {}).get("disabled_at"),
     }

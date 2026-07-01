@@ -15,7 +15,7 @@ import logging
 import shutil
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from agentbox.core.resources.binding_materialize import materialize_workspace
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
@@ -28,7 +28,21 @@ from agentbox.core.workspaces.generation.workspace_files import (
 if TYPE_CHECKING:
     from agentbox.core.config import Settings
     from agentbox.core.data import AgentDef
-    from agentbox.core.protocols import RunStore, WorkspaceBuildStore
+    from agentbox.core.db import (
+        AgentDefManager,
+        AgentPromptResourceBindingManager,
+        AgentVersionManager,
+        ResourceBlobManager,
+        ResourceManager,
+        ResourceVersionManager,
+        WorkspaceEnvDocVersionManager,
+        WorkspaceFileResourceBindingManager,
+        WorkspaceMcpOverrideManager,
+        WorkspaceMcpToolOverrideManager,
+        WorkspaceManager,
+        WorkspaceRuntimePermissionManager,
+        WorkspaceSubagentManager,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +52,24 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -> list[dict]:
+def resolve_workspace_resources(
+    workspace_file_resource_bindings: WorkspaceFileResourceBindingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    workspace_id: str,
+) -> list[dict]:
     """Hydrate all active workspace file bindings into materializer-ready dicts."""
     if not workspace_id or workspace_id == "<ephemeral>":
         return []
 
-    bindings = store.list_workspace_file_bindings(workspace_id)
+    bindings = workspace_file_resource_bindings.list_for_workspace(workspace_id)
     if not bindings:
         return []
 
     resolved: list[dict] = []
     for b in bindings:
-        resource = store.get_repo_resource(b["resource_id"])
+        resource = resources.get_resource(b["resource_id"])
         if not resource:
             logger.warning(
                 "workspace prep: workspace binding %s references missing resource %s — skipping",
@@ -59,7 +79,7 @@ def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -
             continue
         version_id = b.get("pinned_version_id")
         if not version_id:
-            active = store.get_active_repo_version(b["resource_id"])
+            active = resource_versions.get_active_version(b["resource_id"])
             if not active:
                 logger.warning(
                     "workspace prep: resource %s has no active version — skipping workspace binding %s",
@@ -68,7 +88,7 @@ def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -
                 )
                 continue
             version_id = active["id"]
-        version = store.get_repo_version(version_id)
+        version = resource_versions.get_version(version_id)
         if version is None:
             logger.warning(
                 "workspace prep: version %s not found — skipping workspace binding %s",
@@ -76,7 +96,7 @@ def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -
                 b["id"],
             )
             continue
-        blobs = list(store.iter_repo_blobs(version_id))
+        blobs = list(resource_blobs.iter_blobs(version_id))
         source_metadata: dict = {}
         raw_meta = version.get("source_metadata")
         if raw_meta:
@@ -112,19 +132,24 @@ def resolve_workspace_resources(store: WorkspaceBuildStore, workspace_id: str) -
 # ---------------------------------------------------------------------------
 
 
-def resolve_workspace_subagents(store: WorkspaceBuildStore, workspace_id: str) -> list[dict]:
+def resolve_workspace_subagents(
+    workspace_subagents: WorkspaceSubagentManager,
+    agent_versions: AgentVersionManager,
+    agent_defs: AgentDefManager,
+    workspace_id: str,
+) -> list[dict]:
     """Hydrate workspace subagent rows into renderer-ready dicts."""
     if not workspace_id or workspace_id == "<ephemeral>":
         return []
 
-    rows = store.list_workspace_subagents(workspace_id)
+    rows = workspace_subagents.list_for_workspace(workspace_id)
     if not rows:
         return []
 
     resolved: list[dict] = []
     for r in rows:
         agent_id = r["agent_id"]
-        active = store.get_active_version(agent_id)
+        active = agent_versions.get_active(agent_id)
         prompt = (active or {}).get("prompt_content") or (active or {}).get(
             "prompt_snapshot"
         )
@@ -137,7 +162,7 @@ def resolve_workspace_subagents(store: WorkspaceBuildStore, workspace_id: str) -
                 agent_id,
             )
             continue
-        agent_def = store.get_agent_def(agent_id)
+        agent_def = agent_defs.get(agent_id)
         resolved.append(
             {
                 "workspace_id": workspace_id,
@@ -158,7 +183,7 @@ def resolve_workspace_subagents(store: WorkspaceBuildStore, workspace_id: str) -
 
 
 def render_env_doc(
-    store: WorkspaceBuildStore,
+    workspace_env_doc_versions: WorkspaceEnvDocVersionManager,
     workspace_id: str,
     workdir: Path,
 ) -> list[dict]:
@@ -166,7 +191,7 @@ def render_env_doc(
     if not workspace_id or workspace_id == "<ephemeral>":
         return []
 
-    doc = store.get_active_env_doc(workspace_id)
+    doc = workspace_env_doc_versions.get_active(workspace_id)
     if not doc:
         return []
 
@@ -266,19 +291,25 @@ def prompt_resolution_to_snapshot(resolution: Any) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def resolve_agent_prompt_bindings(store: RunStore, agent_id: str) -> list[dict]:
+def resolve_agent_prompt_bindings(
+    agent_prompt_resource_bindings: AgentPromptResourceBindingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    agent_id: str,
+) -> list[dict]:
     """Hydrate all active prompt bindings for an agent into resolver-ready dicts.
 
     Returns the same shape as ``_resolve_binding_for_prompt`` in the API
     route, so ``resolve_prompt`` can consume them directly.
     """
-    bindings = store.list_prompt_bindings(agent_id)
+    bindings = agent_prompt_resource_bindings.list_for_agent(agent_id)
     if not bindings:
         return []
 
     resolved: list[dict] = []
     for b in bindings:
-        resource = store.get_repo_resource(b["resource_id"])
+        resource = resources.get_resource(b["resource_id"])
         if not resource:
             logger.warning(
                 "workspace prep: prompt binding %s references missing resource %s — skipping",
@@ -290,7 +321,7 @@ def resolve_agent_prompt_bindings(store: RunStore, agent_id: str) -> list[dict]:
         if version_id:
             version_id = str(version_id)
         if not version_id:
-            active = store.get_active_repo_version(b["resource_id"])
+            active = resource_versions.get_active_version(b["resource_id"])
             if not active:
                 logger.warning(
                     "workspace prep: resource %s has no active version — skipping prompt binding %s",
@@ -299,10 +330,10 @@ def resolve_agent_prompt_bindings(store: RunStore, agent_id: str) -> list[dict]:
                 )
                 continue
             version_id = str(active["id"])
-        version = store.get_repo_version(version_id)
+        version = resource_versions.get_version(version_id)
         if version is None:
             continue
-        blobs = list(store.iter_repo_blobs(version_id))
+        blobs = list(resource_blobs.iter_blobs(version_id))
         resolved.append(
             {
                 "binding_id": b["id"],
@@ -331,7 +362,7 @@ def load_workspace_permissions(
     workdir: Path,
     agent: AgentDef,
     settings: Settings,
-    store: WorkspaceBuildStore | None = None,
+    workspace_runtime_permissions: WorkspaceRuntimePermissionManager | None = None,
 ) -> dict:
     """Resolve effective workspace permissions from the DB overlay.
 
@@ -342,10 +373,10 @@ def load_workspace_permissions(
     """
     if not agent.workspace or agent.workspace == "<ephemeral>":
         return {}
-    if store is None:
+    if workspace_runtime_permissions is None:
         return {}
     try:
-        overlay = store.get_workspace_runtime_permissions(agent.workspace)
+        overlay = workspace_runtime_permissions.get_for_workspace(agent.workspace)
     except Exception:
         return {}
     if not overlay:
@@ -371,7 +402,18 @@ def load_workspace_permissions(
 
 def prepare_run_workdir(
     *,
-    store: RunStore,
+    workspace_file_resource_bindings: WorkspaceFileResourceBindingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    workspace_env_doc_versions: WorkspaceEnvDocVersionManager,
+    workspace_runtime_permissions: WorkspaceRuntimePermissionManager | None = None,
+    workspaces: WorkspaceManager,
+    agent_defs: AgentDefManager,
+    workspace_subagents: WorkspaceSubagentManager,
+    agent_versions: AgentVersionManager,
+    workspace_mcp_overrides: WorkspaceMcpOverrideManager,
+    workspace_mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
     settings: Settings,
     workspace_id: str | None,
     agent: AgentDef,
@@ -403,7 +445,13 @@ def prepare_run_workdir(
     # ── 1. Workspace resources, env-doc, subagents ────────────────────────
     if workspace_id and workspace_id != "<ephemeral>":
         try:
-            ws_bindings = resolve_workspace_resources(store, workspace_id)
+            ws_bindings = resolve_workspace_resources(
+                workspace_file_resource_bindings,
+                resources,
+                resource_versions,
+                resource_blobs,
+                workspace_id,
+            )
             if ws_bindings:
                 outcomes = materialize_workspace(
                     workdir,
@@ -418,7 +466,7 @@ def prepare_run_workdir(
             )
 
         try:
-            env_doc_entries = render_env_doc(store, workspace_id, workdir)
+            env_doc_entries = render_env_doc(workspace_env_doc_versions, workspace_id, workdir)
             resource_snapshot_entries.extend(env_doc_entries)
         except Exception:
             logger.exception(
@@ -439,9 +487,21 @@ def prepare_run_workdir(
     # CLAUDE.md/.mcp.json/.claude/agents, OpenCode → AGENTS.md/opencode.json).
     # Tool gating is enforced by the backend at dispatch (--allowedTools),
     # not by a settings file, so permissions are left off the config here.
-    permissions = load_workspace_permissions(workdir, agent, settings, store)
+    permissions = load_workspace_permissions(workdir, agent, settings, workspace_runtime_permissions)
     wsid = workspace_id if workspace_id and workspace_id != "<ephemeral>" else agent.id
-    config = load_workenv(store, wsid, settings=settings, permissions=None)
+    config = load_workenv(
+        workspaces,
+        agent_defs,
+        workspace_subagents,
+        agent_versions,
+        workspace_file_resource_bindings,
+        workspace_mcp_overrides,
+        workspace_mcp_tool_overrides,
+        workspace_env_doc_versions,
+        wsid,
+        settings=settings,
+        permissions=None,
+    )
     for engine in list_recipes():
         render(run_dir, config, load_recipe(engine), system_prompt=system_prompt)
 
@@ -466,7 +526,7 @@ def prepare_run_workdir(
 
 def write_secrets(
     workdir: Path,
-    secrets: Mapping[str, str],
+    secrets: dict,
 ) -> None:
     """Write opaque secrets into ``<workdir>/.agentbox/secrets.env``.
 

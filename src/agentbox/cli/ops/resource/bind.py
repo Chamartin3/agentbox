@@ -6,12 +6,6 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_resource_service
-# TODO(cli-arch): ResourceService (plan 090)
-from agentbox.core.service import (
-    get_active_agent_version,
-    resolve_agent_prompt_bindings,
-    resolve_prompt,
-)
 
 prompt_bindings_app = typer.Typer(
     name="prompt-bindings",
@@ -84,32 +78,23 @@ def pb_set(
 def pb_preview(ctx: typer.Context, agent_id: str) -> None:
     """Preview the resolved prompt for an agent with all bindings applied."""
     obj: CLIContext = ctx.obj
-    store = obj.store
-    active = get_active_agent_version(store, agent_id)
-    if not active:
-        obj.render.ops.error(f"No active version for agent {agent_id!r}")
-        raise typer.Exit(2)
+    result = obj.resources.preview_prompt(agent_id)
 
-    prompt_content = active.get("prompt_content") or ""
-    if not prompt_content:
-        obj.render.ops.warn(f"Agent {agent_id!r} has no prompt content.")
-        return
-
-    resolved_bindings = resolve_agent_prompt_bindings(store, agent_id)
-    resolution = resolve_prompt(prompt_content, resolved_bindings)
-
-    # Decompose resolution object for the renderer
-    snapshot_rows: list[tuple[str, str, str, str]] | None = None
-    if resolution.snapshot:
-        snapshot_rows = [
-            (rb.marker, rb.resource_id, rb.mode, rb.version_id)
-            for rb in resolution.snapshot
+    snapshot = result.get("snapshot") or []
+    snapshot_rows: list[tuple[str, str, str, str]] | None = (
+        [
+            (str(s.get("marker", "")), str(s.get("resource_id", "")),
+             str(s.get("mode", "")), str(s.get("version_id", "")))
+            for s in snapshot
         ]
+        if snapshot
+        else None
+    )
 
     obj.render.ops.prompt_preview(
         agent_id,
-        resolution.rendered_prompt,
-        list(resolution.warnings),
-        list(resolution.unresolved_markers),
+        str(result.get("rendered_prompt", "")),
+        list(result.get("warnings") or []),
+        list(result.get("unresolved_markers") or []),
         snapshot_rows,
     )

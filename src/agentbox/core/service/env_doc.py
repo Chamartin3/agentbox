@@ -11,9 +11,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentbox.core.config import Settings
-from agentbox.core.db import SessionStore
-
 
 def env_doc_body(content: Any) -> str:
     from agentbox.core.service.workspaces.service import env_doc_body as _body  # noqa: PLC0415
@@ -26,21 +23,13 @@ def render_env_doc_preview(content: Any) -> dict[str, str]:
 
 
 def save_and_sync_env_doc(
-    store: SessionStore,  # noqa: ARG001 — deprecated, accepted for backward compat, unused
-    settings: Settings,  # noqa: ARG001 — deprecated, accepted for backward compat, unused
     workspace_id: str,
     *,
     content: Any,
     reason: str = "edit",
     actor: str | None = None,
 ) -> dict[str, Any]:
-    """Persist env-doc as live version, then sync CLAUDE.md/AGENTS.md on disk.
-
-    .. deprecated::
-        ``store`` and ``settings`` are accepted but unused — the service layer
-        self-wires its own store via ``WorkspaceService._session_store()``.
-        Prefer ``WorkspaceService().save_and_sync_env_doc()`` for new callers.
-    """
+    """Persist env-doc as live version, then sync CLAUDE.md/AGENTS.md on disk."""
     from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
     return WorkspaceService().save_and_sync_env_doc(
         workspace_id,

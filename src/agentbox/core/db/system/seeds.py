@@ -13,25 +13,22 @@ Usage
 -----
 ::
 
-    from agentbox.core.db.store import SessionStore
-    from agentbox.core.db.backfill_prompt_versions import backfill
+    from agentbox.core.db import Database
+    from agentbox.core.db.system.seeds import backfill
 
-    store = SessionStore("path/to/agentbox.db")
-    n = backfill(store)
+    db = Database(Path("path/to/agentbox.db"))
+    n = backfill(db)
     print(f"updated {n} runs")
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from sqlalchemy import text
 
-if TYPE_CHECKING:
-    from agentbox.core.db.store import SessionStore
+from agentbox.core.db.database import Database
 
 
-def backfill(store: SessionStore) -> int:
+def backfill(db: Database) -> int:
     """Run the backfill. Returns the number of rows updated."""
     sql = text(
         """
@@ -49,6 +46,6 @@ def backfill(store: SessionStore) -> int:
           AND created_at IS NOT NULL
         """
     )
-    with store.engine.begin() as conn:
+    with db.engine.begin() as conn:
         result = conn.execute(sql)
         return int(result.rowcount or 0)

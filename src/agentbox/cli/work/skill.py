@@ -5,9 +5,6 @@ from __future__ import annotations
 import typer
 
 from agentbox.cli.shared import CLIContext
-# TODO(cli-arch): WorkspaceService (plan 089)
-from agentbox.core.service import workspaces as workspaces_service
-# TODO(cli-arch): move to facade export
 from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 skills_app = typer.Typer(
@@ -25,9 +22,7 @@ def skills_ls(
     """List skills for a workspace."""
     obj: CLIContext = ctx.obj
     try:
-        result = workspaces_service.list_skills_by_name(
-            name, store=obj.store, settings=obj.settings,
-        )
+        result = obj.workspaces.list_skills(name, settings=obj.settings)
     except WorkspaceNotFound:
         obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
@@ -45,9 +40,7 @@ def skills_show(
     """Show full skill content."""
     obj: CLIContext = ctx.obj
     try:
-        result = workspaces_service.get_skill_content_by_name(
-            name, skill_name, store=obj.store, settings=obj.settings,
-        )
+        result = obj.workspaces.get_skill_content(name, skill_name, settings=obj.settings)
     except WorkspaceNotFound:
         obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)

@@ -1,12 +1,11 @@
-"""Shared pagination helper for list endpoints.
+"""Shared API response shapes.
 
-Provides a consistent envelope `{items, total, offset, limit, has_more}`
-and an in-memory sort/filter/page helper so endpoints that don't yet have
-DB-level sort can still expose the same contract that `DataTable` (server
-mode) and other consumers expect.
+Provides the pagination envelope ``PaginatedEnvelope`` and the in-memory
+sort/filter/page helper ``paginate_list`` used by list endpoints throughout
+``agentbox.api``.
 
-DB-level sort can be added per-endpoint later without changing the wire
-contract.
+The wire contract is ``{items, total, offset, limit, has_more}``.  DB-level
+sort can be added per-endpoint later without changing the contract.
 """
 
 from __future__ import annotations

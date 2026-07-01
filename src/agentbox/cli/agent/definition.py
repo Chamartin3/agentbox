@@ -14,9 +14,6 @@ from agentbox.cli.shared import CLIContext, resolve_agent
 from agentbox.core.service import AgentDef, build_agent_snapshot, build_config_json_payload
 from agentbox.core.service.engines.service import ProfileNotFound
 
-# TODO(cli-arch): AgentService.list_all
-from agentbox.core.service.agents import list_all_agents
-
 
 # TODO(cli-arch): candidate AgentService export/import methods
 def _set_dotted(obj: dict[str, object], dotted: str, value: object) -> None:
@@ -41,8 +38,7 @@ def _coerce(value: str) -> object:
 
 
 def _list_agent_ids(obj: CLIContext) -> list[str]:
-    # TODO(cli-arch): AgentService.list_all ids
-    rows = obj.store.list_agents_with_latest()
+    rows = obj.agents.list_agents_with_latest()
     return [r["agent_id"] for r in rows]
 
 
@@ -90,7 +86,7 @@ def def_ls(
 ) -> None:
     """List agents registered in the DB."""
     obj: CLIContext = ctx.obj
-    rows = list_all_agents(store=obj.store)  # TODO(cli-arch): AgentService.list_all
+    rows = obj.agents.list_all_agents()
 
     if json_output:
         obj.render.agent.agents_json(

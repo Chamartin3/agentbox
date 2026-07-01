@@ -9,8 +9,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
-from agentbox.core.db import SessionStore
-from agentbox.core.db.database import Database  # ponytail: transitional — plan 110 re-plumbs mcp/servers
+from agentbox.core.db.database import Database  # allowed: secondary-store opener (plan 110)
 from agentbox.core.db.system.config import record_host_env_call
 
 
@@ -34,11 +33,7 @@ class AgentToolsContext:
         )
 
     @cached_property
-    def store(self):
-        return SessionStore(self.db_path)
-
-    @cached_property
-    def db(self):
+    def db(self) -> Database:
         return Database(self.db_path)
 
     def is_granted(self, tool_name: str) -> bool:

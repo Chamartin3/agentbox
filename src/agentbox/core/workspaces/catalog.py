@@ -15,12 +15,23 @@ Each source slice lives in its own domain module:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from agentbox.core.resources.catalog import resolve_resource_callables
 from agentbox.core.tools.capabilities import CAPABILITIES
 from agentbox.core.tools.catalog import CallableItem, enumerate_callables
 from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
+from agentbox.core.workspaces.permissions import resolve_grants
+
+if TYPE_CHECKING:
+    from agentbox.core.db import (
+        WorkspaceFileResourceBindingManager,
+        WorkspaceHostEnvGrantManager,
+        WorkspaceMcpOverrideManager,
+        WorkspaceMcpPolicyManager,
+        WorkspaceMcpToolOverrideManager,
+    )
+    from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 
 __all__ = [
     "resolve_workspace_callables",
@@ -30,14 +41,11 @@ __all__ = [
 
 def resolve_host_env_callables(
     workspace_id: str,
-    store: Any,
+    host_env_grants: WorkspaceHostEnvGrantManager,
 ) -> list[CallableItem]:
     """Return CallableItems for host-env capabilities provisioned in *workspace_id*.
 
-    *store* must have ``resolve_workspace_host_env(workspace_id)``
-    (satisfied by ``SessionStore`` / ``RunStore`` at runtime).
-
-    Reads resolved grants via ``store.resolve_workspace_host_env`` and
+    Reads resolved grants via the ``workspace_host_env_grants`` manager and
     cross-references against the canonical ``CAPABILITIES`` registry.
 
     ``# ponytail:`` This function lives in the workspaces module as a
@@ -46,14 +54,22 @@ def resolve_host_env_callables(
     The host_env_profiles / host_env_call_log table names and MCP tool
     names are wire contracts and stay.
     """
-    resolved = store.resolve_workspace_host_env(workspace_id)
-    grants: dict[str, Any] = (
-        resolved.get("grants", {}) if isinstance(resolved, dict) else {}
-    )
+    row = host_env_grants.get_grant(workspace_id)
+    if not row:
+        effective_grants = resolve_grants(None, None)
+    else:
+        profile = (
+            host_env_grants.get_profile(row["profile_id"])
+            if row.get("profile_id")
+            else None
+        )
+        effective_grants = resolve_grants(
+            profile["grants"] if profile else None, row.get("overrides")
+        )
 
     items: list[CallableItem] = []
     for cap_name, cap_def in CAPABILITIES.items():
-        if cap_name in grants or cap_def.default_granted:
+        if cap_name in effective_grants or cap_def.default_granted:
             items.append(
                 CallableItem(
                     name=str(cap_name),
@@ -67,8 +83,12 @@ def resolve_host_env_callables(
 
 def resolve_workspace_callables(
     workspace_id: str,
-    store: Any,
-    mcp_registry: Any = None,
+    host_env_grants: WorkspaceHostEnvGrantManager,
+    workspace_file_resource_bindings: WorkspaceFileResourceBindingManager,
+    mcp_policies: WorkspaceMcpPolicyManager,
+    mcp_overrides: WorkspaceMcpOverrideManager,
+    mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
+    mcp_registry: McpRegistry | None = None,
 ) -> list[CallableItem]:
     """Return every callable item installed in *workspace_id*.
 
@@ -76,7 +96,7 @@ def resolve_workspace_callables(
     de-duplicates by name.
     """
     return enumerate_callables([
-        resolve_mcp_callables(workspace_id, store, mcp_registry),
-        resolve_host_env_callables(workspace_id, store),
-        resolve_resource_callables(workspace_id, store),
+        resolve_mcp_callables(workspace_id, mcp_policies, mcp_overrides, mcp_tool_overrides, mcp_registry),
+        resolve_host_env_callables(workspace_id, host_env_grants),
+        resolve_resource_callables(workspace_id, workspace_file_resource_bindings),
     ])

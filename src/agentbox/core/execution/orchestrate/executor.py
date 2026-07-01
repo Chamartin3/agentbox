@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING, Any
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.protocols import RunStore
-from agentbox.core.db.database import Database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
+from agentbox.core.db.database import Database
+from agentbox.core.db.utils import now_iso
+from agentbox.core.constants import RunStatus
 from agentbox.core.engines.profiles import RunnerProfileResolver
 from agentbox.core.execution.orchestrate._runner import _run as _run_loop
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
@@ -49,12 +50,10 @@ class RunExecutor:
 
     def __init__(
         self,
-        store: RunStore,
+        db: Database,
         settings: Settings,
         mcp_registry: "McpRegistry | None" = None,
-        db: Database | None = None,
     ):
-        self.store = store
         self.db = db
         self.settings = settings
         self._mcp_registry = mcp_registry
@@ -62,10 +61,10 @@ class RunExecutor:
         self._tasks: set[asyncio.Task[None]] = set()
         self._run_tasks: dict[str, asyncio.Task[None]] = {}
         self._profile_resolver = RunnerProfileResolver()
-        self._setup = RunSetup(store, settings, mcp_registry)
-        self._snapshots = SnapshotWriter(store)
-        self._step_loop = RunStepLoop(store, settings)
-        self._finalizer = RunFinalizer(store, settings)
+        self._setup = RunSetup(db, settings, mcp_registry)
+        self._snapshots = SnapshotWriter(db)
+        self._step_loop = RunStepLoop(db, settings)
+        self._finalizer = RunFinalizer(db, settings)
 
     def broadcaster(self, run_id: str) -> RunBroadcaster | None:
         return self._broadcasters.get(run_id)
@@ -96,7 +95,7 @@ class RunExecutor:
 
         # ── Prompt / composition resolution (agents domain) ───────────────
         resolved = resolve_run_prompt(
-            store=self.store,
+            db=self.db,
             settings=self.settings,
             agent=agent,
             input_=input_,
@@ -107,17 +106,14 @@ class RunExecutor:
         composed = resolved.to_composed_state()
         _prompt_snapshot_entries = resolved.snapshot_entries
         # Prefer the run-requested workspace (same source prepare_workdir used
-        # for the workdir); fall back to the agent's bound workspace. Using
-        # only agent.workspace silently dropped host-env grants for runs that
-        # set the workspace per-request (e.g. API-bound agents whose binding
-        # isn't persisted to the agent def), starving every backend of tools.
+        # for the workdir); fall back to the agent's bound workspace.
         _ws_from_agent = agent.workspace if agent.workspace != "<ephemeral>" else None
         _workspace_id = workspace_override or _ws_from_agent
 
         try:
             effective = self._profile_resolver.resolve(
                 agent=agent,
-                store=self.store,
+                runner_profiles=self.db.runner_profiles,
                 runner_profile_id=runner_profile,
                 runner_config=runner_config,
                 backend_override=backend,
@@ -125,7 +121,7 @@ class RunExecutor:
             )
         except ValueError as exc:
             return _fail_pre_run_fn(
-                self.store,
+                self.db,
                 self.settings,
                 self._broadcasters,
                 agent=agent, input_=input_, workdir=workdir,
@@ -134,7 +130,7 @@ class RunExecutor:
 
         if effective.backend is None and backend is None:
             return _fail_pre_run_fn(
-                self.store,
+                self.db,
                 self.settings,
                 self._broadcasters,
                 agent=agent, input_=input_, workdir=workdir,
@@ -151,7 +147,18 @@ class RunExecutor:
 
         # ── Workspace materialization + run_dir creation ──────────────────
         run_dir, _workspace_snapshot_entries = prepare_run_workdir(
-            store=self.store,
+            workspace_file_resource_bindings=self.db.workspace_file_resource_bindings,
+            resources=self.db.resources,
+            resource_versions=self.db.resource_versions,
+            resource_blobs=self.db.resource_blobs,
+            workspace_env_doc_versions=self.db.workspace_env_doc_versions,
+            workspace_runtime_permissions=self.db.workspace_runtime_permissions,
+            workspaces=self.db.workspaces,
+            agent_defs=self.db.agent_defs,
+            workspace_subagents=self.db.workspace_subagents,
+            agent_versions=self.db.agent_versions,
+            workspace_mcp_overrides=self.db.workspace_mcp_overrides,
+            workspace_mcp_tool_overrides=self.db.workspace_mcp_tool_overrides,
             settings=self.settings,
             workspace_id=_workspace_id,
             agent=agent,
@@ -187,9 +194,6 @@ class RunExecutor:
                 db_path=self.settings.db_path,
             )
 
-        # The token direct path (pydantic-ai → OpenAI-compatible) can't read
-        # the injected .mcp.json; hand it the resolved grants via agent_meta so
-        # it can wire the host-env fs tools in-process (see token/tools.py).
         if _host_env_grants:
             rendered.agent_meta["host_env_grants"] = _host_env_grants
             rendered.agent_meta["agent_tool_grants"] = (
@@ -202,17 +206,22 @@ class RunExecutor:
         transcripts_dir = self.settings.data_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)
         transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
-        run_id = self.store.create_run(
-            agent_id=agent.id, input_=input_,
+        run_id = uuid.uuid4().hex
+        self.db.runs.create(
+            id=run_id,
+            agent_id=agent.id,
+            input=input_,
             workdir=str(workdir),
             transcript_path=str(transcript_path),
             session_id=session_id,
+            status=RunStatus.RUNNING.value,
+            created_at=now_iso(),
             config_digest=rendered.digest,
             runner_profile_id=effective.profile_id,
         )
 
         init_run(
-            run_id=run_id, agent=agent, store=self.store,
+            run_id=run_id, agent=agent, db=self.db,
             settings=self.settings, adapter=adapter, rendered=rendered,
             composed=composed, input_=input_,
             transcript_path=transcript_path,
@@ -231,7 +240,7 @@ class RunExecutor:
 
         if runner_embedded:
             if variables:
-                self.store.save_run_composition(
+                self.db.runs.save_composition(
                     run_id=run_id, composition_snapshot=None,
                     rendered_prompt=None, variables=variables,
                 )
@@ -241,7 +250,7 @@ class RunExecutor:
             run_id=run_id, adapter=adapter, rendered=rendered,
             agent=agent, input_=input_, workdir=workdir, run_dir=run_dir,
             transcript_path=transcript_path,
-            store=self.store, settings=self.settings,
+            db=self.db, settings=self.settings,
             effective=effective, composed=composed,
             step_loop=self._step_loop, finalizer=self._finalizer,
             _run_loop=_run_loop,
@@ -255,7 +264,7 @@ class RunExecutor:
         """Cancel an in-progress run."""
         return _cancel_run_helper(
             run_id=run_id,
-            store=self.store,
+            db=self.db,
             broadcasters=self._broadcasters,
             run_tasks=self._run_tasks,
             settings=self.settings,

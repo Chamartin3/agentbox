@@ -24,7 +24,7 @@ from agentbox.core.constants import BackendName
 from agentbox.core.data import AgentDef
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import PromptVersionManager
 
 
 @dataclass
@@ -60,7 +60,7 @@ def build_fragments(
     user_input: str,
     project_root: Path,
     argv: list[str] | None = None,
-    store: SessionStore | None = None,
+    prompt_versions: PromptVersionManager | None = None,
     composed: object | None = None,
 ) -> list[PromptFragment]:
     frags: list[PromptFragment] = [
@@ -95,8 +95,8 @@ def build_fragments(
             )
     elif agent.prompt_path:
         text: str | None = None
-        if store is not None:
-            committed = store.get_latest_committed_prompt(agent.id)
+        if prompt_versions is not None:
+            committed = prompt_versions.get_latest_committed(agent.id)
             if committed:
                 text = committed["content"]
         if text is None:

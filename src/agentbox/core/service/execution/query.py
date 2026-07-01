@@ -10,17 +10,17 @@ from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import AgentVersionManager
 
 
 def _svc() -> ExecutionService:
     return ExecutionService()
 
 
-def _enrich_with_version(store: SessionStore, d: dict) -> dict:
+def _enrich_with_version(agent_versions: "AgentVersionManager", d: dict) -> dict:
     vid = d.get("agent_version_id")
     if vid is not None:
-        v = store.get_version_by_id(vid)
+        v = agent_versions.get_by_id(vid)
         d["agent_version"] = v["version"] if v else None
     else:
         d["agent_version"] = None
@@ -29,7 +29,7 @@ def _enrich_with_version(store: SessionStore, d: dict) -> dict:
 
 def list_runs(
     *,
-    store: SessionStore,
+    agent_versions: "AgentVersionManager",
     agent: str | None = None,
     status: str | None = None,
     executor: str | None = None,
@@ -48,7 +48,7 @@ def list_runs(
         [status, executor, q, since, until, offset, agent_version]
     ):
         result: list[dict] = [
-            _enrich_with_version(store, r)
+            _enrich_with_version(agent_versions, r)
             for r in svc.list_runs(limit=limit, agent_id=agent)
         ]
         if with_usage:
@@ -66,7 +66,7 @@ def list_runs(
         limit=limit,
         offset=offset,
     )
-    enriched = [_enrich_with_version(store, r) for r in items]
+    enriched = [_enrich_with_version(agent_versions, r) for r in items]
     if with_usage:
         for d in enriched:
             d["usage"] = svc.get_usage(d["id"])
@@ -81,7 +81,6 @@ def list_runs(
 
 def run_stats(
     *,
-    store: SessionStore,
     agent: str | None = None,
     status: str | None = None,
     executor: str | None = None,
@@ -101,7 +100,7 @@ def run_stats(
     )
 
 
-def run_facets(*, store: SessionStore) -> dict:
+def run_facets() -> dict:
     return {
         "agents": EvaluationService().distinct_agent_ids(),
         "executors": EvaluationService().distinct_executors(),
@@ -109,7 +108,7 @@ def run_facets(*, store: SessionStore) -> dict:
     }
 
 
-def get_run_detail(run_id: str, *, store: SessionStore) -> dict:
+def get_run_detail(run_id: str, *, agent_versions: "AgentVersionManager") -> dict:
     svc = _svc()
     rec = svc.get_run(run_id)
     if rec is None:
@@ -117,7 +116,7 @@ def get_run_detail(run_id: str, *, store: SessionStore) -> dict:
     usage = svc.get_usage(run_id)
     run_dict = rec.model_dump() if hasattr(rec, "model_dump") else dict(rec.__dict__)
     if rec.agent_version_id is not None:
-        ver = store.get_version_by_id(rec.agent_version_id)
+        ver = agent_versions.get_by_id(rec.agent_version_id)
         if ver is not None:
             run_dict["agent_version"] = ver.get("version")
 
@@ -140,7 +139,7 @@ def get_run_detail(run_id: str, *, store: SessionStore) -> dict:
     return {"run": run_dict, "usage": usage}
 
 
-def get_run_prompt(run_id: str, *, store: SessionStore) -> dict:
+def get_run_prompt(run_id: str) -> dict:
     svc = _svc()
     rec = svc.get_run(run_id)
     if rec is None:

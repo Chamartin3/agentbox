@@ -12,6 +12,7 @@ Versioned prompt support:
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -19,9 +20,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.data import AgentDef
+from agentbox.core.data._util import now_iso
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import AgentVersionManager, PromptVersionManager
 
 
 @dataclass(frozen=True)
@@ -87,7 +89,10 @@ def write(agent: AgentDef, project_root: Path, content: str) -> PromptDoc:
 
 
 def read_versioned(
-    agent: AgentDef, project_root: Path, store: SessionStore
+    agent: AgentDef,
+    project_root: Path,
+    agent_versions: AgentVersionManager,
+    prompt_versions: PromptVersionManager,
 ) -> PromptDoc:
     """Return the active prompt for this agent.
 
@@ -97,16 +102,16 @@ def read_versioned(
     2. Legacy ``prompt_versions`` committed entry.
     3. Fall back to reading the file from disk (backward compat).
     """
-    row = store.get_active_version(agent.id) or store.latest_version(agent.id)
+    row = agent_versions.get_active(agent.id) or agent_versions.get_latest(agent.id)
     if row and row.get("prompt_content"):
-        content = row["prompt_content"]
+        content: str = row["prompt_content"] or ""
         return PromptDoc(
             path=agent.prompt_path or "",
             content=content,
             size=len(content.encode("utf-8")),
             mtime=row.get("created_at", ""),
         )
-    committed = store.get_latest_committed_prompt(agent.id)
+    committed = prompt_versions.get_latest_committed(agent.id)
     if committed:
         return PromptDoc(
             path=agent.prompt_path or "",
@@ -126,9 +131,9 @@ def write_to_disk(agent: AgentDef, project_root: Path, content: str) -> PromptDo
     return write(agent, project_root, content)
 
 
-def read_draft(agent_id: str, store: SessionStore) -> PromptDoc | None:
+def read_draft(agent_id: str, prompt_versions: PromptVersionManager) -> PromptDoc | None:
     """Return the current draft for an agent, or None."""
-    draft = store.get_prompt_draft(agent_id)
+    draft = prompt_versions.get_draft(agent_id)
     if not draft:
         return None
     return PromptDoc(
@@ -140,10 +145,17 @@ def read_draft(agent_id: str, store: SessionStore) -> PromptDoc | None:
 
 
 def save_draft(
-    agent_id: str, store: SessionStore, content: str, author: str = "system"
+    agent_id: str, prompt_versions: PromptVersionManager, content: str, author: str = "system"
 ) -> PromptDoc:
     """Save a draft version for an agent."""
-    result = store.save_prompt_draft(agent_id, content, author)
+    result = prompt_versions.replace_draft(
+        agent_id,
+        content=content,
+        content_hash=hashlib.sha256(content.encode()).hexdigest(),
+        author=author,
+        changelog="",
+        created_at=now_iso(),
+    )
     return PromptDoc(
         path="",
         content=result["content"],
@@ -154,14 +166,19 @@ def save_draft(
 
 def publish(
     agent_id: str,
-    store: SessionStore,
+    prompt_versions: PromptVersionManager,
     project_root: Path,
     agent: AgentDef | None = None,
     changelog: str = "",
     author: str = "system",
 ) -> PromptDoc:
     """Publish the current draft as a committed version and sync to disk."""
-    committed = store.publish_prompt(agent_id, changelog, author)
+    draft = prompt_versions.get_draft(agent_id)
+    if not draft:
+        raise PromptError("no_draft", f"no draft for agent {agent_id!r}")
+    prompt_versions.patch(draft["id"], is_draft=0, changelog=changelog, created_at=now_iso())
+    committed = prompt_versions.get_by_number(agent_id, draft["version"])
+    assert committed is not None, f"prompt version {draft['version']} missing after publish"
     if agent and agent.prompt_path:
         write_to_disk(agent, project_root, committed["content"])
     return PromptDoc(
@@ -174,14 +191,27 @@ def publish(
 
 def rollback(
     agent_id: str,
-    store: SessionStore,
+    prompt_versions: PromptVersionManager,
     project_root: Path,
     target_version: int,
     agent: AgentDef | None = None,
     author: str = "system",
 ) -> PromptDoc:
     """Rollback to a previous committed version and sync to disk."""
-    committed = store.rollback_prompt(agent_id, target_version, author)
+    target = prompt_versions.get_by_number(agent_id, target_version)
+    if not target:
+        raise PromptError("not_found", f"version {target_version} not found for agent {agent_id!r}")
+    if target["is_draft"]:
+        raise PromptError("is_draft", f"cannot rollback to a draft version ({target_version})")
+    committed = prompt_versions.insert_committed(
+        agent_id,
+        content=target["content"],
+        content_hash=hashlib.sha256(target["content"].encode()).hexdigest(),
+        author=author,
+        changelog=f"Rollback to version {target_version}",
+        created_at=now_iso(),
+        delete_drafts=True,
+    )
     if agent and agent.prompt_path:
         write_to_disk(agent, project_root, committed["content"])
     return PromptDoc(

@@ -48,9 +48,6 @@ from agentbox.core.data import (
     _AgentVersionFields,
 )
 from agentbox.core.data._util import now_iso
-from agentbox.core.db import (
-    SessionStore,
-)
 from agentbox.core.service.agents.crud import (
     get_agent_detail as _get_agent_detail_free,
     list_agents_enriched as _list_agents_enriched_free,
@@ -966,12 +963,15 @@ class AgentService(Service):
     ) -> dict:
         """Render the composed prompt preview for an agent.
 
-        Thin delegator to the free-function in ``core.agents.composition.preview``
-        using ``_session_store()`` for live DB access (bindings, validation).
+        Thin delegator to the free-function in ``core.agents.composition.preview``.
         Raises ``PreviewError`` when a binding cannot be resolved.
         """
         return _render_agent_prompt_preview(
-            self._session_store(),
+            self._versions,
+            self._db.resource_versions,
+            self._db.resource_blobs,
+            self._db.resources,
+            self._db.agent_prompt_resource_bindings,
             agent_id=agent_id,
             template=template,
             bindings_override=bindings_override,
@@ -1361,27 +1361,14 @@ class AgentService(Service):
         return self.get_agent_validation(agent_id)
 
     # ── enriched read views (cross-domain) ─────────────────────────────
-    def _session_store(self) -> SessionStore:
-        """Lazy ``SessionStore`` for cross-domain enrichment reads.
-
-        The enriched views below need runs (run counts), workspaces
-        (``resolve_path``), runner profiles, and composition bindings —
-        none of which have a manager/service surface yet. Agent-domain
-        policy stays on this object; the store is only the cross-domain
-        reach. Documented in the migration report.
-        """
-        store: SessionStore | None = getattr(self, "_store_cache", None)
-        if store is None:
-            store = SessionStore(load_settings().db_path)
-            self._store_cache = store
-        return store
-
     def list_agents_enriched(
         self, include_disabled: bool = False, *, settings: Any = None
     ) -> list[dict]:
         """Latest-version snapshot per agent enriched with run/profile/workspace."""
         return _list_agents_enriched_free(
-            store=self._session_store(),
+            agent_versions=self._versions,
+            agent_meta=self._meta,
+            engine=self._db.engine,
             settings=settings or load_settings(),
             include_disabled=include_disabled,
         )
@@ -1390,6 +1377,15 @@ class AgentService(Service):
         """Full agent detail (prompt, composition preview, versions, workspace)."""
         return _get_agent_detail_free(
             agent_id,
-            store=self._session_store(),
+            agent_defs=self._db.agent_defs,
+            agent_versions=self._versions,
+            agent_meta=self._meta,
+            agent_version_comments=self._comments,
+            agent_version_ratings=self._ratings,
+            resources=self._db.resources,
+            resource_versions=self._db.resource_versions,
+            resource_blobs=self._db.resource_blobs,
+            agent_version_files=self._files,
+            agent_prompt_resource_bindings=self._db.agent_prompt_resource_bindings,
             settings=settings or load_settings(),
         )

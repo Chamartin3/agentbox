@@ -20,11 +20,9 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.core.db.database import Database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
+from agentbox.cli.shared.deps import get_store
 from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.service import SessionStore  # TODO(cli-arch): store via ctx
 from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.service import get_agent_def, get_workspace  # TODO(cli-arch): AgentService (plan 094)
 
 
 def shell_cmd(
@@ -49,10 +47,8 @@ def shell_cmd(
     """
     obj: CLIContext = ctx.obj
     settings = obj.settings
-    _db = Database(settings.db_path)
-    store = SessionStore(settings.db_path)
 
-    agent_def = get_agent_def(store, agent)
+    agent_def = obj.agents.get_agent_def(agent)
     if agent_def is None:
         obj.render.ops.error(f"Unknown agent: {agent!r}")
         raise typer.Exit(1)
@@ -101,12 +97,14 @@ def _render_env_doc(
     if not ws_name or ws_name == "<ephemeral>":
         return False
     try:
-        _db = Database(settings.db_path)
-        store = SessionStore(settings.db_path)
-        ws = get_workspace(store, ws_name)
+        ws = obj.workspaces.get_workspace(ws_name)
         if not ws:
             return False
-        entries = render_env_doc(store, ws.get("id") or ws_name, workspace_path)  # type: ignore[arg-type]  # TODO(cli-arch): store protocol → plan 095
+        entries = render_env_doc(
+            store=get_store(),  # ponytail: transitional — render_env_doc needs WorkspaceBuildStore (plan 095)
+            workspace_id=ws.get("id") or ws_name,
+            workdir=workspace_path,
+        )
         return bool(entries)
     except Exception as exc:
         obj.render.ops.warn(f"env-doc render skipped: {exc}")

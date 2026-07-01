@@ -19,9 +19,6 @@ if TYPE_CHECKING:
         RunnerProfilePatch,
         RunnerProfileStats,
     )
-    from agentbox.core.db import (
-        SessionStore,
-    )
 
 # Preserve the historical import location for callers doing
 # ``from ...engines.profiles import ProfileNotFound``.
@@ -30,7 +27,7 @@ ProfileNotFound = _EngProfileNotFound
 
 def list_profiles(
     *,
-    store: SessionStore,
+    store: object,
     backend: str | None = None,
     provider: str | None = None,
     enabled: bool | None = None,
@@ -38,28 +35,28 @@ def list_profiles(
     return EngineService().list_profiles(backend=backend, provider=provider, enabled=enabled)
 
 
-def create_profile(data: RunnerProfileCreate, *, store: SessionStore) -> RunnerProfile:
+def create_profile(data: RunnerProfileCreate, *, store: object) -> RunnerProfile:
     return EngineService().create_profile(data)
 
 
-def get_profile(profile_id: str, *, store: SessionStore) -> RunnerProfile:
+def get_profile(profile_id: str, *, store: object) -> RunnerProfile:
     return EngineService().get_profile(profile_id)
 
 
 def update_profile(
-    profile_id: str, patch: RunnerProfilePatch, *, store: SessionStore
+    profile_id: str, patch: RunnerProfilePatch, *, store: object
 ) -> RunnerProfile:
     return EngineService().update_profile(profile_id, patch)
 
 
-def delete_profile(profile_id: str, *, store: SessionStore) -> None:
+def delete_profile(profile_id: str, *, store: object) -> None:
     EngineService().delete_profile(profile_id)
 
 
 def get_profile_stats(
     profile_id: str,
     *,
-    store: SessionStore,
+    store: object,
     since: str | None = None,
     until: str | None = None,
 ) -> RunnerProfileStats:
@@ -68,7 +65,7 @@ def get_profile_stats(
 
 # ── pass-through wrappers for CLI consumers ────────────────────────────────
 def list_runner_profiles(
-    store: SessionStore,
+    store: object,
     *,
     backend: str | None = None,
     provider: str | None = None,
@@ -77,33 +74,33 @@ def list_runner_profiles(
     return EngineService().list_profiles(backend=backend, provider=provider, enabled=enabled)
 
 
-def get_runner_profile(store: SessionStore, profile_id: str) -> RunnerProfile | None:
+def get_runner_profile(store: object, profile_id: str) -> RunnerProfile | None:
     try:
         return EngineService().get_profile(profile_id)
     except ProfileNotFound:
         return None
 
 
-def create_runner_profile(store: SessionStore, profile: RunnerProfileCreate) -> RunnerProfile:
+def create_runner_profile(store: object, profile: RunnerProfileCreate) -> RunnerProfile:
     return EngineService().create_profile(profile)
 
 
-def delete_runner_profile(store: SessionStore, profile_id: str) -> None:
+def delete_runner_profile(store: object, profile_id: str) -> None:
     EngineService().delete_profile(profile_id)
 
 
 def set_agent_runner_profile(
-    store: SessionStore, agent_id: str, profile_id: str
+    store: object, agent_id: str, profile_id: str
 ) -> RunnerProfile:
     return EngineService().set_agent_runner_profile(agent_id, profile_id)
 
 
-def get_agent_runner_profile(store: SessionStore, agent_id: str) -> RunnerProfile | None:
+def get_agent_runner_profile(store: object, agent_id: str) -> RunnerProfile | None:
     return EngineService().get_agent_runner_profile(agent_id)
 
 
 def runner_profile_stats(
-    store: SessionStore,
+    store: object,
     profile_id: str,
     *,
     since: str | None = None,
@@ -113,7 +110,7 @@ def runner_profile_stats(
 
 
 def list_runner_profile_stats(
-    store: SessionStore,
+    store: object,
     *,
     since: str | None = None,
     until: str | None = None,

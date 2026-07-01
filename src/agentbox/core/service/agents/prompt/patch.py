@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json as _json
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from agentbox.core.agents.composition.drift import (
     _build_config_json,
@@ -17,8 +17,16 @@ from agentbox.core.agents.composition.drift import (
 from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure
 from agentbox.core.agents.resolve import list_engines
 from agentbox.core.data import AgentDef
-from agentbox.core.db import SessionStore
+from agentbox.core.data._util import now_iso
 from agentbox.core.service.agents.crud import resolve_agent
+
+if TYPE_CHECKING:
+    from agentbox.core.db import (
+        ActiveAgentVersionManager,
+        AgentDefManager,
+        AgentSyncManager,
+        AgentVersionManager,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +101,10 @@ def _validate_runner_against_registry(agent: AgentDef) -> None:
 
 def patch_agent_config(
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
+    agent_versions: AgentVersionManager,
+    active_agent_versions: ActiveAgentVersionManager,
+    agent_sync: AgentSyncManager,
     settings: Any,
     agent_id: str,
     patch: dict,
@@ -101,7 +112,7 @@ def patch_agent_config(
     if not patch:
         raise AgentServiceError(400, "empty_patch", "empty patch")
 
-    current = resolve_agent(agent_id, store=store)
+    current = resolve_agent(agent_id, agent_defs=agent_defs)
     if current is None:
         raise AgentServiceError(404, "unknown_agent", agent_id)
 
@@ -123,7 +134,7 @@ def patch_agent_config(
     snapshot = _build_snapshot(updated)
     config_json = _build_config_json(updated)
 
-    active_row = store.get_active_version(agent_id)
+    active_row = agent_versions.get_active(agent_id)
 
     prior_cfg = decode_config_json((active_row or {}).get("config_json"))
     new_cfg = _json.loads(config_json)
@@ -146,8 +157,9 @@ def patch_agent_config(
     )
 
     try:
-        new_version = store.create_version(
+        vid = agent_versions.insert_version(
             agent_id=updated.id,
+            version=agent_versions.next_version(updated.id),
             source_path=str(updated.source_path) if updated.source_path else "",
             source_format=(
                 updated.source_format.value if updated.source_format else "unknown"
@@ -157,25 +169,43 @@ def patch_agent_config(
             content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
             author="api:patch",
             changelog=f"patch: {', '.join(sorted(patch))}",
-            files=None,
             config_json=config_json,
             prompt_content=carried_prompt_content,
+            is_legacy=0,
+            created_at=now_iso(),
+            source="api",
         )
+        new_version = agent_versions.get_by_id(vid)
+        assert new_version is not None
     except Exception as exc:
         logger.exception("patch_agent_config: DB write failed for %r", agent_id)
         raise AgentServiceError(500, "db_write_failed", agent_id) from exc
 
     try:
-        store.activate_version(updated.id, int(new_version["id"]))
+        active_agent_versions.set_pointer(updated.id, int(new_version["id"]), now_iso())
     except Exception as exc:
         logger.exception(
             "patch_agent_config: activate_version failed for %r", agent_id
         )
         raise AgentServiceError(500, "activate_failed", agent_id) from exc
 
-    store.upsert_agent_sync(
-        agent_id=updated.id,
-        proxy_path=str(updated.source_path) if updated.source_path else None,
-    )
+    # upsert_agent_sync
+    now = now_iso()
+    proxy_path = str(updated.source_path) if updated.source_path else None
+    if agent_sync.get_row(updated.id) is None:
+        agent_sync.insert(
+            agent_id=updated.id,
+            proxy_path=proxy_path,
+            sync_mode="manual",
+            sync_policy="db_wins",
+            last_file_hash=None,
+            last_file_mtime=None,
+            last_sync_at=now,
+        )
+    else:
+        patch_values: dict = {"last_sync_at": now}
+        if proxy_path is not None:
+            patch_values["proxy_path"] = proxy_path
+        agent_sync.patch(updated.id, **patch_values)
 
     return updated

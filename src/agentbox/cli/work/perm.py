@@ -7,9 +7,6 @@ import json
 import typer
 
 from agentbox.cli.shared import CLIContext
-# TODO(cli-arch): WorkspaceService (plan 089)
-from agentbox.core.service import workspaces as workspaces_service
-# TODO(cli-arch): move to facade export
 from agentbox.core.service.workspaces.errors import WorkspaceNotFound
 
 permissions_app = typer.Typer(
@@ -27,9 +24,7 @@ def permissions_get(
     """Show current permissions for a workspace."""
     obj: CLIContext = ctx.obj
     try:
-        result = workspaces_service.get_permissions(
-            name, store=obj.store, settings=obj.settings,
-        )
+        result = obj.workspaces.get_permissions(name)
     except WorkspaceNotFound:
         obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)
@@ -58,9 +53,7 @@ def permissions_put(
         raise typer.Exit(2)
 
     try:
-        workspaces_service.set_permissions(
-            name, permissions, store=obj.store, settings=obj.settings,
-        )
+        obj.workspaces.set_permissions(name, permissions)
     except WorkspaceNotFound:
         obj.render.workspace.workspace_not_found(name)
         raise typer.Exit(1)

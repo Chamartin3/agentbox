@@ -5,10 +5,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
 
 _AGENTBOX_ROOT = Path("/agentbox")
 
@@ -213,16 +209,12 @@ class Settings:
                 "    - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml:ro"
             )
 
-    def check_runtime_sources(self, store: SessionStore | None = None) -> bool:
+    def check_runtime_sources(self) -> bool:
         """Check if AgentBox can start, allowing manifest-free operation.
 
         Returns True if any of the following are true:
         1. A manifest file exists at manifest_path.
-        2. The DB has at least one active agent version (DB-only agents).
-        3. Neither condition is met (startup proceeds with empty state).
-
-        Args:
-            store: SessionStore instance. If None, only checks manifest existence.
+        2. Neither condition is met (startup proceeds with empty state).
 
         Returns:
             True if startup should proceed, False never returned (always True).
@@ -234,16 +226,6 @@ class Settings:
         # Check if manifest exists
         if self.manifest_path.exists():
             return True
-
-        # Check if DB has any agents (manifest-free mode)
-        if store is not None:
-            try:
-                agents = store.list_agents_with_latest()
-                if agents:
-                    return True
-            except Exception:
-                # DB query failed, but allow startup anyway
-                pass
 
         # Always allow startup — empty state is valid. Operator can create agents
         # via API or load a manifest later.

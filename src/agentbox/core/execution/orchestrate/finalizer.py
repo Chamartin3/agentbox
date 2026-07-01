@@ -5,7 +5,7 @@ crashes). Its job is to:
 
 * Re-persist ``conversation_uri`` for backends that discover their
   session ID mid-run (OpenCode).
-* Call ``store.finish_run`` with the terminal status payload.
+* Call ``db.runs.finish_full`` with the terminal status payload.
 * Schedule the completion webhook.
 * Close the broadcaster (drain WS subscribers).
 * Tidy up the run scratch dir and the ephemeral workdir if applicable.
@@ -18,14 +18,14 @@ would orphan WS subscribers and leave the row in ``running``.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import logging
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agentbox.core.config import SETTINGS, Settings
-from agentbox.core.data import AgentDef
-from agentbox.core.protocols import RunStore
+from agentbox.core.data import AgentDef, RunRecord
 
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
@@ -55,11 +55,49 @@ def cleanup_workdir(agent: AgentDef, workdir: Path) -> None:
         shutil.rmtree(workdir.parent, ignore_errors=True)
 
 
+class _RunDispatchAdapter:
+    """Minimal DispatchStore adapter backed by Database managers."""
+
+    def __init__(self, db: Any) -> None:
+        self._db = db
+
+    def get_run(self, run_id: str) -> Any:
+        return self._db.runs.get(run_id)
+
+    def set_run_status(self, run_id: str, status: str) -> None:
+        self._db.runs.set_status(run_id, status)
+
+    def get_usage(self, run_id: str) -> dict | None:
+        return self._db.usage.get_dict(run_id)
+
+    def record_webhook_delivery(
+        self,
+        run_id: str,
+        attempt: int,
+        url: str,
+        payload: dict | None = None,
+        response_status: int | None = None,
+        response_body: str | None = None,
+        latency_ms: int | None = None,
+        error: str | None = None,
+    ) -> None:
+        self._db.webhook_deliveries.record(
+            run_id,
+            attempt,
+            url,
+            payload=payload,
+            response_status=response_status,
+            response_body=response_body,
+            latency_ms=latency_ms,
+            error=error,
+        )
+
+
 class RunFinalizer:
     """Persists terminal state, fires dispatch channels, and cleans up."""
 
-    def __init__(self, store: RunStore, settings: Settings) -> None:
-        self.store = store
+    def __init__(self, db: Any, settings: Settings) -> None:
+        self._db = db
         self.settings = settings
 
     def finalize(
@@ -72,15 +110,9 @@ class RunFinalizer:
         broadcaster: RunBroadcaster,
         workdir: Path,
         run_dir: Path,
-        step_result: StepResult | None,
+        step_result: "StepResult | None",
     ) -> None:
-        """Terminal-state persist + webhook + cleanup.
-
-        Mirrors the original ``finally`` block of ``RunExecutor._run``.
-        ``step_result`` may be ``None`` if the step loop blew up before
-        producing a result; in that case we still finish the run as a
-        non-ok crash so the row never stays in ``running``.
-        """
+        """Terminal-state persist + webhook + cleanup."""
         # Re-persist conversation_uri for runners that discover their
         # session ID during execution (e.g. OpenCode).
         conv_meth = getattr(adapter, "conversation_uri", None)
@@ -90,7 +122,7 @@ class RunFinalizer:
                     run_id=run_id, transcript_path=str(transcript_path)
                 )
                 if post_uri:
-                    self.store.set_run_conversation(
+                    self._db.runs.set_conversation(
                         run_id,
                         conversation_format=None,
                         conversation_uri=post_uri,
@@ -100,11 +132,8 @@ class RunFinalizer:
                     "finalizer: failed to refresh conversation_uri for %s", run_id
                 )
 
-        # Preserve original behavior: when the step loop blows up
-        # before producing a result, finish_run is called with the
-        # zero-init defaults (ok=False, no output/error/status).
         if step_result is None:
-            self.store.finish_run(
+            self._db.runs.finish_full(
                 run_id,
                 ok=False,
                 output=None,
@@ -115,7 +144,7 @@ class RunFinalizer:
                 schema_validated_via=None,
             )
         else:
-            self.store.finish_run(
+            self._db.runs.finish_full(
                 run_id,
                 ok=step_result.final_ok,
                 output=step_result.output,
@@ -127,12 +156,17 @@ class RunFinalizer:
             )
 
         try:
-            refreshed = self.store.get_run(run_id)
-            if refreshed is not None:
+            refreshed_run = self._db.runs.get(run_id)
+            if refreshed_run is not None:
+                _record_fields = {f.name for f in dataclasses.fields(RunRecord)}
+                refreshed = RunRecord(**{
+                    k: v for k, v in refreshed_run.model_dump().items()
+                    if k in _record_fields
+                })
                 dispatch_completion(
                     run=refreshed,
                     agent=agent,
-                    store=self.store,
+                    store=_RunDispatchAdapter(self._db),
                     broadcaster=broadcaster,
                     transcript_path=transcript_path,
                     settings=self.settings,

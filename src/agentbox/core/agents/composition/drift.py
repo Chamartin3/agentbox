@@ -12,27 +12,16 @@ import logging
 import warnings
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING
 
 from agentbox.core.agents.config import build_config_json_payload
-from agentbox.core.config import load_settings
 from agentbox.core.data import RunnerProfileCreate
 from agentbox.core.data._util import now_iso
-from agentbox.core.db.database import get_database  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
+from agentbox.core.db.managers.agents import AgentVersionManager, PromptVersionManager
+from agentbox.core.db.managers.engines import RunnerProfileManager
 
 if TYPE_CHECKING:
-    from agentbox.core.db.agents.versions import AgentVersionsMixin  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
     from agentbox.core.data import AgentDef
-
-
-class _PromptSyncStore(Protocol):
-    def sync_prompt_from_disk(
-        self,
-        agent_id: str,
-        content: str,
-        author: str = "filesystem",
-        changelog: str | None = None,
-    ) -> dict | None: ...
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +39,11 @@ def _compute_file_hash(path: Path | None) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def check_drift(agent: AgentDef, store: AgentVersionsMixin) -> AgentDriftStatus:
+def check_drift(agent: AgentDef, agent_versions: AgentVersionManager) -> AgentDriftStatus:
     """Compare current agent file hash to the latest stored version."""
     if agent.source_path is None:
         return AgentDriftStatus.UNKNOWN_SOURCE
-    latest = store.latest_version(agent.id)
+    latest = agent_versions.get_latest(agent.id)
     if latest is None:
         return AgentDriftStatus.NEW
     file_hash = _compute_file_hash(agent.source_path)
@@ -108,7 +97,7 @@ def _load_prompt_safe(agent: AgentDef) -> str:
 
 def _sync_prompt(
     agent: AgentDef,
-    store: _PromptSyncStore,
+    prompt_versions: PromptVersionManager,
     project_root: Path | None,
 ) -> None:
     """Capture the on-disk prompt as a new committed prompt version if it changed.
@@ -134,19 +123,39 @@ def _sync_prompt(
             return
         if not content:
             return
-        result = store.sync_prompt_from_disk(agent.id, content, author="filesystem")
-        if result is not None:
-            logger.info(
-                "versioning: captured prompt v%d for agent %r (%s)",
-                result["version"],
-                agent.id,
-                result["changelog"],
-            )
+
+        # Sync prompt from disk: compare to latest committed and create if changed
+        new_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        latest = prompt_versions.get_latest_committed(agent.id)
+        if latest is not None:
+            existing_hash = latest["content_hash"] or hashlib.sha256(
+                latest["content"].encode("utf-8")
+            ).hexdigest()
+            if existing_hash == new_hash:
+                return
+            default_changelog = "Out-of-band file edit"
+        else:
+            default_changelog = "Imported from disk"
+
+        result = prompt_versions.insert_committed(
+            agent.id,
+            content=content,
+            content_hash=new_hash,
+            author="filesystem",
+            changelog=default_changelog,
+            created_at=now_iso(),
+        )
+        logger.info(
+            "versioning: captured prompt v%d for agent %r (%s)",
+            result["version"],
+            agent.id,
+            result["changelog"],
+        )
     except Exception:
         logger.exception("versioning: prompt sync failed for agent %r", agent.id)
 
 
-def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
+def _heal_active_pointer(agent_id: str, agent_versions: AgentVersionManager) -> None:
     """If versions exist but no active pointer, promote the latest one.
 
     Reproduces the 'orphaned versions' state: rows in ``agent_versions``,
@@ -155,14 +164,14 @@ def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
     the UI. Heal by activating the latest version.
     """
     try:
-        existing = store.get_active_version(agent_id)
+        existing = agent_versions.get_active(agent_id)
         if existing is not None:
             return
-        versions = store.list_versions(agent_id)
+        versions = agent_versions.list_for_agent(agent_id)
         if not versions:
             return
         target = versions[0]
-        store.activate_version(agent_id, target["id"])
+        agent_versions.set_active(agent_id, target["id"])
         logger.info(
             "versioning: healed missing active pointer for %r → v%d",
             agent_id,
@@ -175,6 +184,7 @@ def _heal_active_pointer(agent_id: str, store: AgentVersionsMixin) -> None:
 def _ingest_runner_profile(
     agent: AgentDef,
     agent_id: str,
+    runner_profiles: RunnerProfileManager,
 ) -> None:
     """Create or reuse a runner profile for an agent with a [runner] block.
 
@@ -186,7 +196,7 @@ def _ingest_runner_profile(
 
     try:
         profile_id = f"legacy:{agent_id}"
-        mgr = get_database(str(load_settings().db_path)).runner_profiles
+        mgr = runner_profiles
 
         # Check if profile already exists
         existing = mgr.get_by_id(profile_id)
@@ -274,7 +284,9 @@ def _collect_version_files(agent: AgentDef) -> list[dict] | None:
 
 def startup_sweep(
     agents: list[AgentDef],
-    store: AgentVersionsMixin,
+    agent_versions: AgentVersionManager,
+    prompt_versions: PromptVersionManager,
+    runner_profiles: RunnerProfileManager,
     project_root: Path | None = None,
     shared_roots: dict[str, Path] | None = None,
 ) -> None:
@@ -292,8 +304,8 @@ def startup_sweep(
     shared_roots = shared_roots or {}
     for agent in agents:
         try:
-            status = check_drift(agent, store)
-            _heal_active_pointer(agent.id, store)
+            status = check_drift(agent, agent_versions)
+            _heal_active_pointer(agent.id, agent_versions)
             if status == AgentDriftStatus.NEW:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
                 prompt_text = (
@@ -303,7 +315,7 @@ def startup_sweep(
                     if hasattr(agent, "load_prompt") and agent.source_path
                     else ""
                 )
-                store.create_version(
+                agent_versions.insert_version(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
                     source_format=(
@@ -320,10 +332,10 @@ def startup_sweep(
                 )
                 logger.info("versioning: created v1 for new agent %r", agent.id)
                 # Import runner profile if agent has [runner] block
-                _ingest_runner_profile(agent, agent.id)
+                _ingest_runner_profile(agent, agent.id, runner_profiles)
             elif status == AgentDriftStatus.DRIFTED:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
-                store.create_version(
+                agent_versions.insert_version(
                     agent_id=agent.id,
                     source_path=str(agent.source_path) if agent.source_path else "",
                     source_format=(
@@ -345,15 +357,14 @@ def startup_sweep(
 
         # Always sync prompt content — prompt edits are independent of
         # agent-definition drift and must be versioned in their own table.
-        _sync_prompt(agent, cast(_PromptSyncStore, store), project_root)
+        _sync_prompt(agent, prompt_versions, project_root)
 
     # Degraded-mode boot — warn (don't fail) for agents with no
     # runner profile binding. They remain non-runnable until bound; the
     # executor enforces this at dispatch time via `_fail_pre_run`.
-    mgr = get_database(str(load_settings().db_path)).runner_profiles
     for agent in agents:
         try:
-            binding = mgr.get_agent_profile(agent.id)
+            binding = runner_profiles.get_agent_profile(agent.id)
             if binding is None:
                 logger.warning(
                     "versioning: agent %r has no runner profile bound — "

@@ -15,7 +15,12 @@ from agentbox.core.agents.composition.output_contract import render as _render_o
 from agentbox.core.agents.composition.rendering import render_for_type
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import (
+        AgentVersionManager,
+        ResourceBlobManager,
+        ResourceManager,
+        ResourceVersionManager,
+    )
 
 
 class PreviewError(Exception):
@@ -27,27 +32,32 @@ class PreviewError(Exception):
         self.detail = detail
 
 
-def _resolve_binding(store: SessionStore, b: dict) -> dict:
-    resource = store.get_repo_resource(b["resource_id"])
+def _resolve_binding(
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    b: dict,
+) -> dict:
+    resource = resources.get_resource(b["resource_id"])
     if not resource:
         raise PreviewError(
             "resource_not_found", f"resource {b['resource_id']!r} not found"
         )
     version_id = b.get("pinned_version_id")
     if not version_id:
-        active = store.get_active_repo_version(b["resource_id"])
+        active = resource_versions.get_active_version(b["resource_id"])
         if not active:
             raise PreviewError(
                 "no_active_version",
                 f"resource {b['resource_id']!r} has no active version",
             )
         version_id = active["id"]
-    version = store.get_repo_version(version_id)
+    version = resource_versions.get_version(version_id)
     if not version:
         raise PreviewError(
             "no_version", f"version {version_id!r} not found"
         )
-    blobs = list(store.iter_repo_blobs(version_id))
+    blobs = list(resource_blobs.iter_blobs(version_id))
     return {
         "binding_id": b.get("id") or b.get("binding_id") or "live",
         "marker": b.get("marker"),
@@ -122,7 +132,9 @@ def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
 
 
 def _validation_block_for_preview(
-    store: SessionStore, agent_id: str
+    agent_versions: AgentVersionManager,
+    resources: ResourceManager,
+    agent_id: str,
 ) -> tuple[str, dict | None]:
     """Render the validators hint block from the agent's inline
     ``config_json["output"].validators`` on the active version.
@@ -132,7 +144,7 @@ def _validation_block_for_preview(
     Returns ``(rendered_text, view_dict)`` where view_dict is the
     structured payload returned to the UI under ``validation``.
     """
-    active = store.get_active_version(agent_id)
+    active = agent_versions.get_active(agent_id)
     if not active or active.get("id") is None:
         return "", None
     raw_cfg = active.get("config_json")
@@ -179,7 +191,7 @@ def _validation_block_for_preview(
             )
         elif kind == "script":
             rid = entry.get("resource_id", "")
-            resource = store.get_repo_resource(rid) if rid else None
+            resource = resources.get_resource(rid) if rid else None
             validators_meta.append(
                 {
                     "kind": "script",

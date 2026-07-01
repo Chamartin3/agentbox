@@ -7,8 +7,6 @@ import typer
 from agentbox.cli.shared import CLIContext, handle_cli_errors, resolve_agent
 from agentbox.core.service.agents import AgentNotFound as ServiceAgentNotFound
 
-# TODO(cli-arch): remaining free-fns used in version_new direct-create path
-from agentbox.core.service import get_agent_def as _get_agent_def
 
 version_app = typer.Typer(
     name="version",
@@ -178,7 +176,7 @@ def version_new(
         raise typer.Exit(2)
 
     # TODO(cli-arch): direct create legacy path — replace with AgentService.create_version
-    agent = _get_agent_def(obj.store, agent_id)
+    agent = obj.agents.get_agent_def(agent_id)
     if agent is None:
         obj.render.agent.error(f"unknown agent {agent_id!r}")
         raise typer.Exit(1)

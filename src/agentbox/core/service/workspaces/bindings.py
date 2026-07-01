@@ -9,7 +9,7 @@ from agentbox.core.service.resources.service import BindingError, ResourceServic
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import AgentDefManager
 
 __all__ = [
     "list_workspace_subagents",
@@ -24,12 +24,12 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
-def list_workspace_subagents(workspace_id: str, *, store: SessionStore) -> dict:
+def list_workspace_subagents(workspace_id: str, *, agent_defs: AgentDefManager) -> dict:
     svc = WorkspaceService()
     items = svc.list_workspace_subagents_raw(workspace_id)
     enriched = []
     for s in items:
-        agent = store.get_agent_def(s["agent_id"])
+        agent = agent_defs.get(s["agent_id"])
         enriched.append(
             {
                 **s,
@@ -46,7 +46,6 @@ def replace_workspace_subagents(
     workspace_id: str,
     subagents: list[dict],
     *,
-    store: SessionStore,
     actor: str | None = None,
     settings: Any = None,
     sync_cb: Any = None,
@@ -58,7 +57,7 @@ def replace_workspace_subagents(
         raise BindingError(str(exc)) from exc
     if sync_cb is not None and settings is not None:
         with contextlib.suppress(Exception):
-            sync_cb(store, settings, workspace_id)
+            sync_cb(settings, workspace_id)
     return {"items": items}
 
 
@@ -67,7 +66,7 @@ def replace_workspace_subagents(
 # ---------------------------------------------------------------------------
 
 
-def list_workspace_skill_bindings(workspace_id: str, *, store: SessionStore) -> dict:  # noqa: ARG001
+def list_workspace_skill_bindings(workspace_id: str) -> dict:
     return ResourceService().list_workspace_skill_bindings(workspace_id)
 
 
@@ -75,7 +74,6 @@ def replace_workspace_skill_bindings(
     workspace_id: str,
     skill_resource_ids: list[str],
     *,
-    store: SessionStore,
     reason: str,
     actor: str | None = None,
     settings: Any = None,
@@ -90,5 +88,5 @@ def replace_workspace_skill_bindings(
         raise BindingError(str(exc)) from exc
     if sync_cb is not None and settings is not None:
         with contextlib.suppress(Exception):
-            sync_cb(store, settings, workspace_id)
+            sync_cb(settings, workspace_id)
     return result

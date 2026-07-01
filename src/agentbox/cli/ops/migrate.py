@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
+from agentbox.cli.shared.deps import get_store
 from agentbox.core.constants import BackendName
 from agentbox.core.service.system.service import SystemService  # TODO(cli-arch): SystemService → facade (plan 095)
 # TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
@@ -16,10 +17,6 @@ from agentbox.core.migrations import migrate_capabilities_to_manifest
 from agentbox.core.service import (
     ProjectManifest,
     build_config_json_str,
-    get_active_agent_version,
-    get_agent_def,
-    replace_version_config,
-    update_agent_meta,
 )
 
 migrate_app = typer.Typer(
@@ -61,28 +58,27 @@ def migrate_to_db_only(ctx: typer.Context, agent_id: str) -> None:
     Idempotent: running twice will not create duplicate versions.
     """
     obj: CLIContext = ctx.obj
-    store = obj.store
 
     # Get active version
-    active = get_active_agent_version(store, agent_id)
+    active = obj.agents.active_version(agent_id) or obj.agents.latest_version(agent_id)
     if active is None:
         obj.render.ops.error(f"agent {agent_id!r} has no active version")
         raise typer.Exit(1)
 
     # If config_json is empty, load the agent and populate it
     if not active.get("config_json"):
-        agent = get_agent_def(store, agent_id)
+        agent = obj.agents.get_agent_def(agent_id)
         if agent is None:
             obj.render.ops.error(f"could not load agent {agent_id!r} from DB")
             raise typer.Exit(1)
 
         # Rebuild the active version with config_json populated
         config_json_str = build_config_json_str(agent)
-        replace_version_config(store, active["id"], config_json_str)
+        obj.agents.replace_version_config(int(active["id"]), config_json_str)
         obj.render.ops.info(f"populated config_json for v{active['version']}")
 
     # Update agent_meta: sync_mode="off", export_to_disk=True
-    result = update_agent_meta(store, agent_id, sync_mode="off", export_to_disk=True)
+    result = obj.agents.update_agent_meta(agent_id, sync_mode="off", export_to_disk=True)
     if result is None:
         obj.render.ops.error(f"agent_meta row not found for {agent_id!r}")
         raise typer.Exit(1)
@@ -198,7 +194,8 @@ def migrate_prompt_versions(ctx: typer.Context) -> None:
     See ``agentbox.core.db.backfill_prompt_versions``.
     """
     obj: CLIContext = ctx.obj
-    n = _backfill_prompt_versions(obj.store)
+    # ponytail: get_store() transitional — _backfill_prompt_versions only uses store.engine
+    n = _backfill_prompt_versions(get_store())
     obj.render.ops.success(f"backfilled {n} run(s) with prompt_version_id")
 
 
@@ -211,11 +208,10 @@ def migrate_workenv_engine(ctx: typer.Context) -> None:
     them in place. Idempotent.
     """
     obj: CLIContext = ctx.obj
-    store = obj.store
     renamed = 0
-    for tmpl in store.list_workenv_templates():
+    for tmpl in obj.workspaces.list_templates():
         if tmpl.get("engine") == "claude":
-            store.upsert_workenv_template(
+            obj.workspaces.upsert_template(
                 tmpl["name"],
                 engine=BackendName.CLAUDE_CODE,
                 config_json=json.loads(tmpl["config_json"])

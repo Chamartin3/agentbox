@@ -3,7 +3,7 @@
 All types and functions the executor needs to compose prompts, capture
 fragments, and validate output live here.  Execution code imports from
 ``core.agents`` (the top-level facade) — never from
-``core.agents.composition.*`` or ``core.agents.config``.
+``core.agents.composition.*`` or ``core.agents.config`` internals.
 
 Mirrors the inversion pattern established for Engines in
 :mod:`agentbox.core.engines.contracts.views`.
@@ -15,6 +15,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.agents.composition.bundle import (
@@ -47,8 +48,7 @@ from agentbox.core.agents.config import (
     resolve_output_config as _resolve_output_config,
 )
 from agentbox.core.data import AgentDef
-from agentbox.core.protocols import RunStore
-from agentbox.core.db import SessionStore
+from agentbox.core.db import PromptVersionManager
 from agentbox.core.db.system.config import load_project_shared_assets
 from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,
@@ -56,13 +56,49 @@ from agentbox.core.engines.contracts.schema_to_model import (
 )
 from agentbox.core.workspaces.prep import (
     prompt_resolution_to_snapshot,
-    resolve_agent_prompt_bindings,
 )
 
 logger = logging.getLogger(__name__)
 
 
 # ── value types ───────────────────────────────────────────────────────
+
+
+class _DbStoreAdapter:
+    """Duck-typed shim satisfying the store interface used by prompt
+    composition internals (``load_bundle_from_bindings``,
+    ``_resolve_output_config``, ``validate_output``).
+    """
+
+    def __init__(self, db: Any) -> None:
+        self._db = db
+
+    def list_prompt_bindings(self, agent_id: str) -> list[dict]:
+        return self._db.agent_prompt_resource_bindings.list_for_agent(agent_id)
+
+    def get_repo_resource(self, resource_id: str) -> dict | None:
+        return self._db.resources.get_resource(resource_id)
+
+    def get_active_repo_version(self, resource_id: str) -> dict | None:
+        return self._db.resource_versions.get_active_version(resource_id)
+
+    def get_repo_version(self, version_id: str) -> dict | None:
+        return self._db.resource_versions.get_version(version_id)
+
+    def iter_repo_blobs(self, version_id: str):  # type: ignore[return]
+        return self._db.resource_blobs.iter_blobs(version_id)
+
+    def read_repo_blob(self, version_id: str, relative_path: str = "") -> Any:
+        return self._db.resource_blobs.get_blob(version_id, relative_path)
+
+    def get_active_version(self, agent_id: str) -> Any:
+        return self._db.agent_versions.get_active(agent_id)
+
+    def latest_version(self, agent_id: str) -> Any:
+        return self._db.agent_versions.get_latest(agent_id)
+
+    def list_version_files(self, version_id: int) -> Any:
+        return self._db.agent_version_files.list_for_version(version_id)
 
 
 @dataclass(frozen=True)
@@ -84,7 +120,7 @@ class AgentRuntimeView:
 
     @classmethod
     def from_agent(
-        cls, agent: AgentDef, *, store: RunStore | SessionStore | None = None
+        cls, agent: AgentDef, *, store: Any = None
     ) -> AgentRuntimeView:
         exec_cfg = ExecutionConfig.from_agent(agent)
         python_cfg = PythonAgentConfig.from_agent(agent)
@@ -136,9 +172,60 @@ class ComposedPrompt:
 # ── facade functions ──────────────────────────────────────────────────
 
 
+def _resolve_prompt_bindings(store: Any, agent_id: str) -> list[dict]:
+    """Hydrate agent prompt bindings from duck-typed store methods."""
+    raw = store.list_prompt_bindings(agent_id)
+    if not raw:
+        return []
+    resolved: list[dict] = []
+    for b in raw:
+        resource = store.get_repo_resource(b["resource_id"])
+        if not resource:
+            logger.warning(
+                "executor: prompt binding %s references missing resource %s — skipping",
+                b["id"],
+                b["resource_id"],
+            )
+            continue
+        version_id = b.get("pinned_version_id")
+        if version_id:
+            version_id = str(version_id)
+        if not version_id:
+            active = store.get_active_repo_version(b["resource_id"])
+            if not active:
+                logger.warning(
+                    "executor: resource %s has no active version — skipping prompt binding %s",
+                    resource["slug"],
+                    b["id"],
+                )
+                continue
+            version_id = str(active["id"])
+        version = store.get_repo_version(version_id)
+        if version is None:
+            continue
+        blobs = list(store.iter_repo_blobs(version_id))
+        resolved.append(
+            {
+                "binding_id": b["id"],
+                "marker": b.get("marker"),
+                "slot": b.get("slot"),
+                "attach_as_reference": bool(b.get("attach_as_reference")),
+                "resource_id": b["resource_id"],
+                "version_id": version_id,
+                "content_hash": version["content_hash"],
+                "type": resource["type"],
+                "mode": b.get("mode"),
+                "display_name": resource["display_name"],
+                "required": bool(b.get("required", 1)),
+                "blobs": blobs,
+            }
+        )
+    return resolved
+
+
 def compose_prompt(
     *,
-    store: RunStore,
+    db: Any,
     settings: Settings,
     agent: AgentDef,
     input_: str,
@@ -146,15 +233,13 @@ def compose_prompt(
 ) -> ComposedPrompt:
     """Compose the agent's prompt bundle + resolve bindings + output contract.
 
-    This is the single entry point for the composition pipeline.  It
-    replaces the inline logic that previously lived in
-    ``core/execution/prepare/prompts.py::resolve_run_prompt`` and the
-    five deep imports that function required.
+    This is the single entry point for the composition pipeline.
 
     Returns a :class:`ComposedPrompt` with every field the executor
     needs — it should *not* drill into ``core.agents.composition.*``
     internals for any of the returned data.
     """
+    store = _DbStoreAdapter(db)
     snapshot_entries: list[dict[str, object]] = []
     agent_copied = False
 
@@ -201,7 +286,7 @@ def compose_prompt(
     # ---- Stage 2: prompt-resource binding substitution ------------------
     prompt_bindings: list[dict[str, object]] = []
     try:
-        prompt_bindings = resolve_agent_prompt_bindings(store, agent.id)
+        prompt_bindings = _resolve_prompt_bindings(store, agent.id)
         if prompt_bindings:
             if system_text is not None:
                 resolution = resolve_prompt(system_text, prompt_bindings)
@@ -327,7 +412,7 @@ def capture_fragments(
     user_input: str,
     project_root: Path,
     argv: list[str] | None = None,
-    store: SessionStore | None = None,
+    prompt_versions: PromptVersionManager | None = None,
     composed: ComposedPrompt | None = None,
 ) -> str:
     """Build prompt fragments and return them as a JSON string.
@@ -342,7 +427,7 @@ def capture_fragments(
         user_input=user_input,
         project_root=project_root,
         argv=argv,
-        store=store,
+        prompt_versions=prompt_versions,
         composed=composed,
     )
     return _fragments_to_json(frags)

@@ -10,10 +10,6 @@ from agentbox.cli.shared import CLIContext
 from agentbox.core.service.prompts import (
     AgentNotFound,
     PromptError,
-    get_prompt as _get_prompt,
-    get_version as _get_version,
-    list_versions as _list_versions,
-    put_prompt as _put_prompt,
 )
 
 prompt_app = typer.Typer(
@@ -43,20 +39,11 @@ def prompt_show(
             raise typer.Exit(2)
         content = committed["content"]
     else:
-        try:
-            # TODO(cli-arch): free-fn get_prompt has no AgentService equivalent yet
-            doc = _get_prompt(
-                agent_id,
-                store=obj.store,
-                project_root=obj.settings.project_root,
-            )
-        except AgentNotFound:
+        ver = obj.agents.active_version(agent_id) or obj.agents.latest_version(agent_id)
+        if ver is None:
             obj.render.agent.error(f"unknown agent {agent_id!r}")
             raise typer.Exit(1)
-        except PromptError as exc:
-            obj.render.agent.error(f"{exc.code}: {exc.detail}")
-            raise typer.Exit(1)
-        content = doc.content
+        content = ver.get("prompt_content") or ""
 
     obj.render.agent.prompt_view(content or "")
 
@@ -70,18 +57,14 @@ def prompt_edit(
     """Write a prompt to disk and create a new committed version."""
     obj: CLIContext = ctx.obj
     try:
-        # TODO(cli-arch): free-fn put_prompt has no AgentService equivalent yet
-        _put_prompt(
-            agent_id,
-            content,
-            store=obj.store,
-            project_root=obj.settings.project_root,
+        obj.agents.save_prompt_revision(
+            agent_id, prompt_content=content, author="cli", changelog="cli edit", activate=True
         )
-    except AgentNotFound:
-        obj.render.agent.error(f"unknown agent {agent_id!r}")
-        raise typer.Exit(1)
-    except PromptError as exc:
-        obj.render.agent.error(f"{exc.code}: {exc.detail}")
+    except (AgentNotFound, ValueError) as exc:
+        if isinstance(exc, AgentNotFound):
+            obj.render.agent.error(f"unknown agent {agent_id!r}")
+        else:
+            obj.render.agent.error(str(exc))
         raise typer.Exit(1)
     obj.render.agent.prompt_updated(agent_id)
 
@@ -97,18 +80,16 @@ def prompt_log(
     """List prompt versions, or show a specific version with --version."""
     obj: CLIContext = ctx.obj
     try:
-        # TODO(cli-arch): free-fn list_versions has no AgentService equivalent yet
-        payload = _list_versions(agent_id, store=obj.store)
+        all_versions = obj.agents.list_prompt_versions(agent_id)
     except AgentNotFound:
         obj.render.agent.error(f"unknown agent {agent_id!r}")
         raise typer.Exit(1)
 
-    committed = payload.get("committed", [])
-    drafts = payload.get("drafts", [])
+    committed: list[dict[str, object]] = [dict(v) for v in all_versions if not v.get("is_draft")]
+    drafts: list[dict[str, object]] = [dict(v) for v in all_versions if v.get("is_draft")]
 
     if version is not None:
-        # TODO(cli-arch): free-fn get_version has no AgentService equivalent yet
-        ver = _get_version(agent_id, version, store=obj.store)
+        ver = obj.agents.get_prompt_version(agent_id, version)
         if ver is None:
             obj.render.agent.error(f"version {version} not found")
             raise typer.Exit(1)

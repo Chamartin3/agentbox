@@ -12,7 +12,7 @@ from agentbox.core.service.execution.types import RunNotFound
 from agentbox.core.constants import RunStatus
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import AgentDefManager
     from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def _svc() -> ExecutionService:
 def complete_run(
     run_id: str,
     *,
-    store: SessionStore,
+    agent_defs: "AgentDefManager",
     ok: bool,
     output: str | None,
     error: str | None,
@@ -47,15 +47,15 @@ def complete_run(
 
     refreshed = svc.get_run(run_id) or existing
     if schedule_webhook_cb is not None:
-        agent = resolve_agent(refreshed.agent_id, store=store)
-        schedule_webhook_cb(agent, refreshed, store)
+        agent = resolve_agent(refreshed.agent_id, agent_defs=agent_defs)
+        schedule_webhook_cb(agent, refreshed)
     return {"ok": True, "run_id": run_id, "status": refreshed.status}
 
 
 def snapshot_run(
     run_id: str,
     *,
-    store: SessionStore,
+    agent_defs: "AgentDefManager",
     rendered_prompt: dict,
     variables: dict,
     response_raw: str,
@@ -91,16 +91,15 @@ def snapshot_run(
 
     refreshed = svc.get_run(run_id) or existing
     if schedule_webhook_cb is not None:
-        agent = resolve_agent(refreshed.agent_id, store=store)
+        agent = resolve_agent(refreshed.agent_id, agent_defs=agent_defs)
         if agent is not None:
-            schedule_webhook_cb(agent, refreshed, store)
+            schedule_webhook_cb(agent, refreshed)
     return {"ok": True, "run_id": run_id}
 
 
 def post_outcome(
     run_id: str,
     *,
-    store: SessionStore,
     status: str,
     error_kind: str | None = None,
     errors: list[dict] | None = None,
@@ -119,8 +118,7 @@ def post_outcome(
 async def cancel_run(
     run_id: str,
     *,
-    store: SessionStore,
-    executor: RunExecutor,
+    executor: "RunExecutor",
 ) -> dict:
     """Cancel an in-progress run. Idempotent on terminal runs."""
     svc = _svc()

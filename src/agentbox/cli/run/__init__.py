@@ -168,7 +168,7 @@ def run_cmd(
     if backend:
         runner = backend
     elif agent:
-        agent_def = obj.store.get_agent_def(agent)
+        agent_def = obj.agents.get_agent_def(agent)
         if agent_def is None:
             renders.ops.error(f"Unknown agent: {agent!r}")
             raise typer.Exit(1)

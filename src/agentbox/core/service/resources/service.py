@@ -16,17 +16,13 @@ from __future__ import annotations
 import io
 import json
 import zipfile
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
 from jsonschema import Draft202012Validator
 
-from agentbox.core.agents.composition.preview import render_agent_prompt_preview
 from agentbox.core.agents.composition.rendering import render_for_type
-from agentbox.core.config import load_settings
 from agentbox.core.constants import ResourceType
-from agentbox.core.db import SessionStore
 from agentbox.core.data.records import SharedResourceRecord
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.host_path import HostPathImporter
@@ -79,15 +75,6 @@ class ResourceService(Service):
         self._shared_resources = self._db.shared_resources
         self._prompt_bindings = self._db.agent_prompt_resource_bindings
         self._file_bindings = self._db.workspace_file_resource_bindings
-
-    @lru_cache(maxsize=1)
-    def _session_store(self) -> SessionStore:
-        """Temporary bridge for methods that still need SessionStore.
-
-        Used only by ``preview_prompt`` (via ``render_agent_prompt_preview``)
-        until that helper is migrated to managers (Phase C). Delete when done.
-        """
-        return SessionStore(load_settings().db_path)
 
     # -----------------------------------------------------------------------
     # Internal helpers
@@ -616,19 +603,19 @@ class ResourceService(Service):
     ) -> dict:
         """Render a preview of the agent prompt with resource bindings resolved.
 
-        Uses ``AgentService`` for agent-version reads and ``_session_store()``
-        for the binding-resolution helper until ``render_agent_prompt_preview``
-        is migrated to managers (Phase C).
+        Delegates to ``AgentService.render_agent_prompt_preview`` which owns
+        the composed-prompt rendering until ``render_agent_prompt_preview``
+        is migrated fully to managers (Phase C).
         """
+        from agentbox.core.service import AgentService  # noqa: PLC0415
+
+        agent_svc = AgentService()
         if template is None:
-            from agentbox.core.service.agents.service import AgentService  # noqa: PLC0415
-            agent_svc = AgentService()
-            active = agent_svc.active_version(agent_id) or agent_svc.latest_version(agent_id)
-            if active is None:
+            agent_def = agent_svc.resolve_agent(agent_id)
+            if agent_def is None:
                 raise AgentVersionMissing(agent_id)
-            template = active.get("prompt_content") or ""
-        return render_agent_prompt_preview(
-            self._session_store(),
+            template = agent_def.prompt or ""
+        return agent_svc.render_agent_prompt_preview(
             agent_id=agent_id,
             template=template,
             bindings_override=bindings_override,

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from agentbox.core.constants import ResourceType
 
 if TYPE_CHECKING:
-    from agentbox.core.db import SessionStore
+    from agentbox.core.db import ResourceManager, ResourceVersionManager
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,8 @@ def _blob_tuple(
 
 
 def import_manifest_documents(
-    store: SessionStore,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
     documents_dir: Path,
 ) -> int:
     """Import every file under ``documents_dir`` as a document resource version.
@@ -69,12 +70,12 @@ def import_manifest_documents(
         data = path.read_bytes()
         content_hash = _blobs_hash(path.name, data)
 
-        existing = store.get_repo_resource_by_slug(slug)
+        existing = resources.get_by_slug(slug)
         if existing is not None:
-            active = store.get_active_repo_version(existing["id"])
+            active = resource_versions.get_active_version(existing["id"])
             if active is not None and active.get("content_hash") == content_hash:
                 continue
-            store.import_repo_version(
+            resource_versions.import_version(
                 existing["id"],
                 [_blob_tuple(path.name, data)],
                 import_source="toml_migration",
@@ -83,13 +84,13 @@ def import_manifest_documents(
             imported += 1
             logger.info("resource-drift: updated document resource %r", slug)
         else:
-            row = store.create_repo_resource(
+            row = resources.create_resource(
                 slug=slug,
                 type=ResourceType.DOCUMENT,
                 display_name=slug,
                 description=f"Imported from {path.name}",
             )
-            store.import_repo_version(
+            resource_versions.import_version(
                 row["id"],
                 [_blob_tuple(path.name, data)],
                 import_source="toml_migration",
@@ -102,7 +103,8 @@ def import_manifest_documents(
 
 
 def import_manifest_skills(
-    store: SessionStore,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
     skills_dir: Path,
 ) -> int:
     """Import *.md files from ``skills_dir`` as skill resources.
@@ -121,12 +123,12 @@ def import_manifest_skills(
         data = path.read_bytes()
         content_hash = _blobs_hash(path.name, data)
 
-        existing = store.get_repo_resource_by_slug(slug)
+        existing = resources.get_by_slug(slug)
         if existing is not None:
-            active = store.get_active_repo_version(existing["id"])
+            active = resource_versions.get_active_version(existing["id"])
             if active is not None and active.get("content_hash") == content_hash:
                 continue
-            store.import_repo_version(
+            resource_versions.import_version(
                 existing["id"],
                 [_blob_tuple(path.name, data)],
                 import_source="toml_migration",
@@ -135,13 +137,13 @@ def import_manifest_skills(
             imported += 1
             logger.info("resource-drift: updated skill resource %r", slug)
         else:
-            row = store.create_repo_resource(
+            row = resources.create_resource(
                 slug=slug,
                 type=ResourceType.SKILL,
                 display_name=path.stem,
                 description=f"Imported from {path.name}",
             )
-            store.import_repo_version(
+            resource_versions.import_version(
                 row["id"],
                 [_blob_tuple(path.name, data)],
                 import_source="toml_migration",
@@ -159,7 +161,7 @@ def extract_prompt_markers(prompt_text: str) -> list[str]:
 
 
 def propose_prompt_bindings(
-    store: SessionStore,
+    resources: ResourceManager,
     agent_id: str,
     prompt_text: str,
 ) -> list[dict]:
@@ -175,7 +177,7 @@ def propose_prompt_bindings(
 
     proposals = []
     for marker in markers:
-        resource = store.get_repo_resource_by_slug(marker)
+        resource = resources.get_by_slug(marker)
         if resource is None:
             continue
         proposals.append(
@@ -190,7 +192,8 @@ def propose_prompt_bindings(
 
 
 def detect_resource_hash_mismatches(
-    store: SessionStore,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
     documents_dir: Path,
 ) -> list[dict]:
     """Compare each active resource version's hash against its on-disk source.
@@ -207,10 +210,10 @@ def detect_resource_hash_mismatches(
         if not path.is_file():
             continue
         slug = path.stem
-        resource = store.get_repo_resource_by_slug(slug)
+        resource = resources.get_by_slug(slug)
         if resource is None:
             continue
-        active = store.get_active_repo_version(resource["id"])
+        active = resource_versions.get_active_version(resource["id"])
         if active is None:
             continue
         stored_hash = active.get("content_hash")
@@ -230,7 +233,8 @@ def detect_resource_hash_mismatches(
 
 
 def run_all_sweeps(
-    store: SessionStore,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
     *,
     documents_dir: Path | None = None,
     skills_dir: Path | None = None,
@@ -240,10 +244,10 @@ def run_all_sweeps(
     skills_imported = 0
 
     if documents_dir is not None:
-        docs_imported = import_manifest_documents(store, documents_dir)
+        docs_imported = import_manifest_documents(resources, resource_versions, documents_dir)
 
     if skills_dir is not None:
-        skills_imported = import_manifest_skills(store, skills_dir)
+        skills_imported = import_manifest_skills(resources, resource_versions, skills_dir)
 
     return {
         "docs_imported": docs_imported,

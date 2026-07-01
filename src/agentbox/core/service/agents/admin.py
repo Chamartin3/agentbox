@@ -6,30 +6,42 @@ from workspace concerns per the domain split.
 
 from __future__ import annotations
 
-from agentbox.core.db import SessionStore
+from typing import TYPE_CHECKING
+
+from agentbox.core.data._util import now_iso
+
+if TYPE_CHECKING:
+    from agentbox.core.data import AgentMetaRow
+    from agentbox.core.db import AgentMetaManager, AgentVersionManager
 
 
 def replace_version_config(
-    store: SessionStore, version_id: int, config_json: str
+    agent_versions: AgentVersionManager, version_id: int, config_json: str
 ) -> None:
     """Replace the config_json payload on an agent version."""
-    store.replace_version_config(version_id, config_json)
+    agent_versions.patch(version_id, config_json=config_json)
 
 
 def update_agent_meta(
-    store: SessionStore,
+    agent_meta: AgentMetaManager,
     agent_id: str,
     *,
     sync_mode: str | None = None,
     export_to_disk: bool | None = None,
     source_path: str | None = None,
     source_format: str | None = None,
-) -> dict | None:
+) -> AgentMetaRow | None:
     """Update agent metadata fields."""
-    return store.update_agent_meta(
-        agent_id,
-        sync_mode=sync_mode,
-        export_to_disk=export_to_disk,
-        source_path=source_path,
-        source_format=source_format,
-    )
+    if agent_meta.get_meta(agent_id) is None:
+        return None
+    values: dict = {"updated_at": now_iso()}
+    if sync_mode is not None:
+        values["sync_mode"] = sync_mode
+    if export_to_disk is not None:
+        values["export_to_disk"] = int(export_to_disk)
+    if source_path is not None:
+        values["source_path"] = source_path
+    if source_format is not None:
+        values["source_format"] = source_format
+    agent_meta.patch(agent_id, **values)
+    return agent_meta.get_meta(agent_id)

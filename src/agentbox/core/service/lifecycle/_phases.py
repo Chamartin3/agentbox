@@ -7,10 +7,10 @@ Splitting them out keeps cyclomatic complexity in check.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.data import ProjectManifest
-from agentbox.core.db import SessionStore
 from agentbox.core.resources.boot import (
     import_composition_references,
     import_repo_resources,
@@ -28,9 +28,11 @@ from agentbox.core.service.lifecycle._utils import _error
 _log = logging.getLogger(__name__)
 
 
-def _phase_import_repo(store: SessionStore, settings: Settings) -> StartupReport:
+def _phase_import_repo(db: Any, settings: Settings) -> StartupReport:
     try:
-        summary = import_repo_resources(store, settings.project_root)
+        summary = import_repo_resources(
+            db.resources, db.resource_versions, settings.project_root
+        )
     except Exception as exc:
         _log.exception("repo-resource boot import failed")
         return _error("import_repo_resources", exc)
@@ -49,9 +51,11 @@ def _phase_import_repo(store: SessionStore, settings: Settings) -> StartupReport
     )
 
 
-def _phase_legacy_migration(store: SessionStore) -> StartupReport:
+def _phase_legacy_migration(db: Any) -> StartupReport:
     try:
-        report = migrate_shared_resources_to_repo(store)
+        report = migrate_shared_resources_to_repo(
+            db.shared_resources, db.resources, db.resource_versions
+        )
         summary = report.summary()
     except Exception as exc:
         _log.exception("legacy shared_resources sweep failed")
@@ -64,10 +68,12 @@ def _phase_legacy_migration(store: SessionStore) -> StartupReport:
 
 
 def _phase_workspace_bindings(
-    store: SessionStore, manifest: ProjectManifest | None
+    db: Any, manifest: ProjectManifest | None
 ) -> StartupReport:
     try:
-        summary = sweep_workspace_skill_bindings(store, manifest)
+        summary = sweep_workspace_skill_bindings(
+            db.resources, db.workspace_file_resource_bindings, manifest
+        )
     except Exception as exc:
         _log.exception("workspace skill binding sweep failed")
         return _error("sweep_workspace_skill_bindings", exc)
@@ -85,13 +91,17 @@ def _phase_workspace_bindings(
 
 
 def _phase_composition_refs(
-    store: SessionStore,
+    db: Any,
     settings: Settings,
     manifest: ProjectManifest | None,
 ) -> StartupReport:
     try:
         summary = import_composition_references(
-            store, settings.project_root, manifest
+            db.resources,
+            db.resource_versions,
+            db.agent_prompt_resource_bindings,
+            settings.project_root,
+            manifest,
         )
     except Exception as exc:
         _log.exception("composition refs import failed")
@@ -111,11 +121,16 @@ def _phase_composition_refs(
 
 
 def _phase_composition_migration(
-    store: SessionStore, settings: Settings
+    db: Any, settings: Settings
 ) -> StartupReport:
     try:
         report = migrate_composition_to_bindings(
-            store, project_root=settings.project_root
+            db.resources,
+            db.resource_versions,
+            db.agent_prompt_resource_bindings,
+            db.agent_version_files,
+            db.agent_versions,
+            project_root=settings.project_root,
         )
         summary = report.summary()
     except Exception as exc:

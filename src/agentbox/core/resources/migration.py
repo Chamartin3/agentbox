@@ -17,6 +17,14 @@ delete legacy rows — the legacy table is left in place until the
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agentbox.core.db import (
+        ResourceManager,
+        ResourceVersionManager,
+        SharedResourceManager,
+    )
 
 KIND_TO_TYPE = {
     "output_schema": "schema",
@@ -50,10 +58,14 @@ def _slug_for(record) -> str:
     return f"legacy:{record.kind}:{record.id}"
 
 
-def migrate_shared_resources_to_repo(store) -> MigrationReport:
+def migrate_shared_resources_to_repo(
+    shared_resources: SharedResourceManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+) -> MigrationReport:
     """Walk active shared_resources and import each into the repo."""
     report = MigrationReport()
-    legacy = store.list_resources(limit=10_000)
+    legacy = shared_resources.list_active(limit=10_000)
 
     for rec in legacy:
         if rec.kind in SKIPPED_KINDS:
@@ -68,7 +80,7 @@ def migrate_shared_resources_to_repo(store) -> MigrationReport:
         existing = next(
             (
                 r
-                for r in store.list_repo_resources(query=slug, limit=10)
+                for r in resources.list_resources(query=slug, limit=10)
                 if r["slug"] == slug
             ),
             None,
@@ -78,7 +90,7 @@ def migrate_shared_resources_to_repo(store) -> MigrationReport:
             continue
 
         try:
-            created = store.create_repo_resource(
+            created = resources.create_resource(
                 slug=slug,
                 type=target_type,
                 display_name=rec.name,
@@ -86,8 +98,10 @@ def migrate_shared_resources_to_repo(store) -> MigrationReport:
                 tags=[*list(rec.tags), f"legacy_kind:{rec.kind}"],
             )
             content_bytes = (rec.content or rec.config_json or "").encode("utf-8")
-            blobs = [("", content_bytes, "text/plain", rec.content or rec.config_json)]
-            store.import_repo_version(
+            blobs: list[tuple[str, bytes, str | None, str | None]] = [
+                ("", content_bytes, "text/plain", rec.content or rec.config_json)
+            ]
+            resource_versions.import_version(
                 created["id"],
                 blobs,
                 import_source="toml_migration",

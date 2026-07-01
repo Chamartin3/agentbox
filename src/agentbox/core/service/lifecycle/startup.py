@@ -13,9 +13,9 @@ import logging
 from typing import Final
 
 from agentbox.core.config import SETTINGS, Settings
-from agentbox.core.agents.composition.drift import startup_sweep
+from agentbox.core.agents.composition.drift import startup_sweep as _startup_sweep
 from agentbox.core.data import ProjectManifest, RunRecord
-from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.db.engines.seeds import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
@@ -58,7 +58,7 @@ def discover_agent_tools() -> StartupReport:
 
 
 def sync_project_mcp_servers(
-    store: SessionStore, settings: Settings
+    db: Database, settings: Settings
 ) -> StartupReport:
     """Schedule async sync of any project-level MCP server specs."""
     try:
@@ -81,14 +81,10 @@ def sync_project_mcp_servers(
 
 def import_on_start_sweep(
     manifest: ProjectManifest | None,
-    store: SessionStore,
+    db: Database,
     settings: Settings,
 ) -> StartupReport:
-    """Filesystem → DB import for agent versions. Opt-in via env flag.
-
-    Without ``AGENTBOX_IMPORT_ON_START=1`` the manifest is read-only at
-    boot, so files cannot silently overwrite DB state.
-    """
+    """Filesystem → DB import for agent versions. Opt-in via env flag."""
     if not SETTINGS.import_on_start:
         return StartupReport()
     if manifest is None or not manifest.agents:
@@ -99,9 +95,11 @@ def import_on_start_sweep(
             k: (project_root / v).resolve()
             for k, v in SystemService().get_project_shared_assets().items()
         }
-        startup_sweep(
+        _startup_sweep(
             manifest.agents,
-            store,
+            db.agent_versions,
+            db.prompt_versions,
+            db.runner_profiles,
             project_root=project_root,
             shared_roots=shared_roots,
         )
@@ -111,12 +109,12 @@ def import_on_start_sweep(
     return StartupReport(drift_sweep_ran=True)
 
 
-def seed_runner_profiles(store: SessionStore) -> StartupReport:
+def seed_runner_profiles(db: Database) -> StartupReport:
     """Idempotent seed of the default runner profiles."""
     if SETTINGS.skip_default_profiles:
         return StartupReport()
     try:
-        created = seed_default_runner_profiles(store)
+        created = seed_default_runner_profiles()
     except Exception as exc:
         _log.exception("default runner profile seed failed")
         return _error("seed_runner_profiles", exc)
@@ -126,30 +124,25 @@ def seed_runner_profiles(store: SessionStore) -> StartupReport:
 
 
 def boot_import_resources(
-    store: SessionStore,
+    db: Database,
     settings: Settings,
     manifest: ProjectManifest | None,
 ) -> StartupReport:
-    """Populate the central resource repository from on-disk manifest layout.
-
-    Runs four idempotent sub-steps: repo import, legacy migration,
-    workspace skill bindings, composition refs. Optionally runs the
-    composition→bindings migration when its rollout flag is set.
-    """
+    """Populate the central resource repository from on-disk manifest layout."""
     if SETTINGS.skip_resource_import:
         return StartupReport()
 
-    out = _phase_import_repo(store, settings)
-    out = _merge(out, _phase_legacy_migration(store))
-    out = _merge(out, _phase_workspace_bindings(store, manifest))
-    out = _merge(out, _phase_composition_refs(store, settings, manifest))
+    out = _phase_import_repo(db, settings)
+    out = _merge(out, _phase_legacy_migration(db))
+    out = _merge(out, _phase_workspace_bindings(db, manifest))
+    out = _merge(out, _phase_composition_refs(db, settings, manifest))
     if SETTINGS.migrate_composition:
-        out = _merge(out, _phase_composition_migration(store, settings))
+        out = _merge(out, _phase_composition_migration(db, settings))
     return out
 
 
 def sync_workspace_registry(
-    store: SessionStore, manifest: ProjectManifest | None
+    db: Database, manifest: ProjectManifest | None
 ) -> StartupReport:
     """Prune phantom workspace rows that no real subsystem references."""
     try:
@@ -170,7 +163,7 @@ def sync_workspace_registry(
     return StartupReport(workspaces_pruned=len(pruned))
 
 
-def reap_orphan_runs(store: SessionStore) -> StartupReport:
+def reap_orphan_runs(db: Database) -> StartupReport:
     """Mark any pre-existing 'running' rows as orphaned."""
     try:
         reaped = ExecutionService().reap_orphan_runs()
@@ -183,18 +176,12 @@ def reap_orphan_runs(store: SessionStore) -> StartupReport:
 
 
 def dispatch_orphan_webhooks(
-    store: SessionStore, settings: Settings
+    db: Database, settings: Settings
 ) -> StartupReport:
-    """Fire dispatch channels for orphan-reaped runs whose post pipeline never ran.
-
-    ``SessionStore`` reaps orphans synchronously inside ``__init__``,
-    before the event loop exists, so the dispatches couldn't have been
-    scheduled then. This phase runs once the loop is up.
-    """
+    """Fire dispatch channels for orphan-reaped runs whose post pipeline never ran."""
     try:
         svc = ExecutionService()
         pending_raw = svc.list_orphaned_unnotified_runs()
-        # Convert dicts back to RunRecord-like objects for downstream use
         pending = [RunRecord(**r) for r in pending_raw] if pending_raw else []
     except Exception as exc:
         _log.exception("orphan dispatch lookup failed")
@@ -205,7 +192,7 @@ def dispatch_orphan_webhooks(
     scheduled = 0
     for run in pending:
         try:
-            agent = resolve_agent(run.agent_id, store=store)
+            agent = resolve_agent(run.agent_id, agent_defs=db.agent_defs)
             dispatch_completion(
                 run=run,
                 agent=agent,
@@ -219,25 +206,19 @@ def dispatch_orphan_webhooks(
 
 
 def run_startup_tasks(
-    store: SessionStore,
+    db: Database,
     settings: Settings,
     manifest: ProjectManifest | None,
 ) -> StartupReport:
-    """Run every boot-time phase in canonical order.
-
-    Each phase is best-effort: a failure logs and is recorded in
-    :attr:`StartupReport.errors`, but never aborts the sequence.
-    Migration ordering is preserved exactly from the legacy
-    ``api.app._on_startup`` implementation.
-    """
-    settings.check_runtime_sources(store)
+    """Run every boot-time phase in canonical order."""
+    settings.check_runtime_sources()
     report = StartupReport()
     report = _merge(report, discover_agent_tools())
-    report = _merge(report, sync_project_mcp_servers(store, settings))
-    report = _merge(report, import_on_start_sweep(manifest, store, settings))
-    report = _merge(report, seed_runner_profiles(store))
-    report = _merge(report, boot_import_resources(store, settings, manifest))
-    report = _merge(report, sync_workspace_registry(store, manifest))
-    report = _merge(report, reap_orphan_runs(store))
-    report = _merge(report, dispatch_orphan_webhooks(store, settings))
+    report = _merge(report, sync_project_mcp_servers(db, settings))
+    report = _merge(report, import_on_start_sweep(manifest, db, settings))
+    report = _merge(report, seed_runner_profiles(db))
+    report = _merge(report, boot_import_resources(db, settings, manifest))
+    report = _merge(report, sync_workspace_registry(db, manifest))
+    report = _merge(report, reap_orphan_runs(db))
+    report = _merge(report, dispatch_orphan_webhooks(db, settings))
     return report

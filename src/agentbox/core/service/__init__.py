@@ -36,7 +36,6 @@ from agentbox.core.data import AgentVersionRow as AgentVersionRow
 from agentbox.core.data import AgentVersionCommentRow as AgentVersionCommentRow
 from agentbox.core.data import AgentVersionRatingRow as AgentVersionRatingRow
 from agentbox.core.data import EnvDocRow as EnvDocRow
-from agentbox.core.db import SessionStore as SessionStore
 from agentbox.core.data import SharedResourceRecord as SharedResourceRecord
 from agentbox.core.engines.providers.base import ProviderDescriptor as ProviderDescriptor
 from agentbox.core.engines.providers.base import ProviderModel as ProviderModel

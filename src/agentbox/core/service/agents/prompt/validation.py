@@ -9,18 +9,25 @@ from __future__ import annotations
 import hashlib
 import json as _json
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from agentbox.core.agents.composition.drift import (
     _build_snapshot,
 )
 from agentbox.core.constants import ValidatorKind
-from agentbox.core.db import SessionStore
+from agentbox.core.data._util import now_iso
 from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.agents.prompt.patch import (
     AgentServiceError,
     decode_config_json,
 )
+
+if TYPE_CHECKING:
+    from agentbox.core.db import (
+        ActiveAgentVersionManager,
+        AgentDefManager,
+        AgentVersionManager,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +127,11 @@ def _validators_view(cfg: dict, direction: str) -> dict | None:
     return {"validators": cleaned}
 
 
-def get_agent_validation(store: SessionStore, agent_id: str) -> dict:
-    active = store.get_active_version(agent_id)
+def get_agent_validation(
+    agent_versions: AgentVersionManager,
+    agent_id: str,
+) -> dict:
+    active = agent_versions.get_active(agent_id)
     if not active or active.get("id") is None:
         return {
             "agent_id": agent_id,
@@ -140,7 +150,9 @@ def get_agent_validation(store: SessionStore, agent_id: str) -> dict:
 
 def put_agent_validation(
     *,
-    store: SessionStore,
+    agent_defs: AgentDefManager,
+    agent_versions: AgentVersionManager,
+    active_agent_versions: ActiveAgentVersionManager,
     settings: Any,
     agent_id: str,
     input_validators: list[dict] | None,
@@ -148,7 +160,7 @@ def put_agent_validation(
     reason: str,
     actor: str | None,
 ) -> dict:
-    current = resolve_agent(agent_id, store=store)
+    current = resolve_agent(agent_id, agent_defs=agent_defs)
     if current is None:
         raise AgentServiceError(404, "unknown_agent", agent_id)
 
@@ -162,7 +174,7 @@ def put_agent_validation(
             400, "empty_validation_patch", "supply input and/or output"
         )
 
-    active = store.get_active_version(current.id) or {}
+    active = agent_versions.get_active(current.id) or {}
     base_cfg = decode_config_json(active.get("config_json"))
     for direction, validators in explicit.items():
         section = base_cfg.get(direction)
@@ -187,8 +199,9 @@ def put_agent_validation(
     )
 
     try:
-        new_version = store.create_version(
+        vid = agent_versions.insert_version(
             agent_id=current.id,
+            version=agent_versions.next_version(current.id),
             source_path=str(current.source_path) if current.source_path else "",
             source_format=(
                 current.source_format.value if current.source_format else "unknown"
@@ -198,20 +211,24 @@ def put_agent_validation(
             content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
             author=actor or "api:validation",
             changelog=f"validation: {reason}",
-            files=None,
             config_json=new_config_json,
             prompt_content=carried_prompt_content,
+            is_legacy=0,
+            created_at=now_iso(),
+            source="api",
         )
+        new_version = agent_versions.get_by_id(vid)
+        assert new_version is not None
     except Exception as exc:
         logger.exception("put_agent_validation: create_version failed for %r", agent_id)
         raise AgentServiceError(500, "db_write_failed", agent_id) from exc
 
     try:
-        store.activate_version(current.id, int(new_version["id"]))
+        active_agent_versions.set_pointer(current.id, int(new_version["id"]), now_iso())
     except Exception as exc:
         logger.exception(
             "put_agent_validation: activate_version failed for %r", agent_id
         )
         raise AgentServiceError(500, "activate_failed", agent_id) from exc
 
-    return get_agent_validation(store, agent_id)
+    return get_agent_validation(agent_versions, agent_id)
