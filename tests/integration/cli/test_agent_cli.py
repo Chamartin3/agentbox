@@ -16,9 +16,10 @@ from agentbox.cli.shared import (
 from agentbox.cli.shared.deps import (
     get_agent_service,
     get_settings,
-    get_store as _get_store,
+    get_db as _get_store,
 )
 from agentbox.core.data import AgentDef
+from agentbox.core.service.agents.service import AgentService
 
 runner = CliRunner()
 
@@ -56,7 +57,7 @@ def _seed_agent(store, agent_id: str = "t1", **kw) -> dict:
             if k not in ("description", "runner_kind", "model")
         },
     )
-    return store.create_agent(
+    return AgentService().create_agent(
         agent_id=agent_id,
         config_json=agent_def.model_dump(
             mode="python", exclude_none=True, warnings=False

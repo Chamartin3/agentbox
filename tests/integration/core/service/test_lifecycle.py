@@ -10,8 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.config import load_settings
-from agentbox.core.db import SessionStore
+from agentbox.core.config import Settings, load_settings
+from agentbox.core.db.database import Database
 from agentbox.core.service.lifecycle import (
     StartupReport,
     run_startup_tasks,
@@ -21,19 +21,19 @@ from agentbox.core.service.lifecycle import (
 @pytest.fixture
 def lifecycle_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> tuple[SessionStore, object]:
-    """Real SessionStore + Settings pointed at an isolated tmp dir."""
+) -> tuple[Database, Settings]:
+    """Real Database + Settings pointed at an isolated tmp dir."""
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     monkeypatch.setenv("AGENTBOX_SKIP_RESOURCE_IMPORT", "1")
     settings = load_settings()
-    store = SessionStore(tmp_path / "agentbox.sqlite")
+    store = Database(tmp_path / "agentbox.sqlite")
     return store, settings
 
 
 def test_run_startup_tasks_on_empty_store_returns_clean_report(
-    lifecycle_env: tuple[SessionStore, object],
+    lifecycle_env: tuple[Database, Settings],
 ) -> None:
     # Arrange
     store, settings = lifecycle_env
@@ -50,7 +50,7 @@ def test_run_startup_tasks_on_empty_store_returns_clean_report(
 
 
 def test_run_startup_tasks_is_idempotent(
-    lifecycle_env: tuple[SessionStore, object],
+    lifecycle_env: tuple[Database, Settings],
 ) -> None:
     # Arrange
     store, settings = lifecycle_env
@@ -76,7 +76,7 @@ def test_run_startup_tasks_handles_seed_profiles_flag(
     monkeypatch.setenv("AGENTBOX_SKIP_RESOURCE_IMPORT", "1")
     monkeypatch.delenv("AGENTBOX_SKIP_DEFAULT_PROFILES", raising=False)
     settings = load_settings()
-    store = SessionStore(tmp_path / "agentbox.sqlite")
+    store = Database(tmp_path / "agentbox.sqlite")
 
     # Act
     report = run_startup_tasks(store, settings, manifest=None)

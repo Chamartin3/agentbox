@@ -159,13 +159,13 @@ class TestRunFinalizerCrashRecovery:
     def test_none_step_result_calls_finish_run_with_ok_false(
         self, mock_store: MagicMock, run_finalize: Callable[..., None]
     ) -> None:
-        """When step_result is None (step loop blew up), finish_run must be called
+        """When step_result is None (step loop blew up), finish_full must be called
         with ok=False so the run row never stays in 'running'."""
         # Act
         run_finalize(run_id="run-crash-001", step_result=None)
 
         # Assert
-        mock_store.finish_run.assert_called_once_with(
+        mock_store.runs.finish_full.assert_called_once_with(
             "run-crash-001",
             ok=False,
             output=None,
@@ -181,14 +181,14 @@ class TestRunFinalizerCrashRecovery:
     ) -> None:
         """finalize must persist the terminal state even when dispatch paths raise — run must not stay 'running'."""
         # Arrange
-        mock_store.get_run.side_effect = RuntimeError("store unavailable")
+        mock_store.runs.get.side_effect = RuntimeError("store unavailable")
 
         # Act / Assert — no exception propagated
         run_finalize(run_id="run-crash-002", step_result=None)
 
-        # Assert — finish_run was called before get_run was attempted
-        mock_store.finish_run.assert_called_once()
-        assert mock_store.finish_run.call_args.kwargs["ok"] is False
+        # Assert — finish_full was called before get was attempted
+        mock_store.runs.finish_full.assert_called_once()
+        assert mock_store.runs.finish_full.call_args.kwargs["ok"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ class TestRunFinalizerNormalPath:
         run_finalize: Callable[..., None],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize must forward every StepResult field to store.finish_run with correct kwarg names."""
+        """finalize must forward every StepResult field to db.runs.finish_full with correct kwarg names."""
         # Arrange
         step_result = make_step_result(
             final_ok=True,
@@ -219,7 +219,7 @@ class TestRunFinalizerNormalPath:
         run_finalize(run_id="run-normal-001", step_result=step_result)
 
         # Assert
-        mock_store.finish_run.assert_called_once_with(
+        mock_store.runs.finish_full.assert_called_once_with(
             "run-normal-001",
             ok=True,
             output='{"result": 42}',
@@ -249,7 +249,7 @@ class TestRunFinalizerNormalPath:
         run_finalize(run_id="run-failed-001", step_result=step_result)
 
         # Assert
-        call_kwargs = mock_store.finish_run.call_args.kwargs
+        call_kwargs = mock_store.runs.finish_full.call_args.kwargs
         assert call_kwargs["ok"] is False
         assert call_kwargs["error"] == "rate limit exceeded"
         assert call_kwargs["status"] == "failed"
@@ -268,7 +268,7 @@ class TestRunFinalizerConversationUri:
         run_finalize: Callable[..., None],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize calls store.set_run_conversation with the URI returned by adapter.conversation_uri."""
+        """finalize calls db.runs.set_conversation with the URI returned by adapter.conversation_uri."""
         # Arrange
         transcript_path = tmp_path / "transcript.jsonl"
         adapter = MagicMock()
@@ -286,7 +286,7 @@ class TestRunFinalizerConversationUri:
         adapter.conversation_uri.assert_called_once_with(
             run_id="run-conv-001", transcript_path=str(transcript_path)
         )
-        mock_store.set_run_conversation.assert_called_once_with(
+        mock_store.runs.set_conversation.assert_called_once_with(
             "run-conv-001",
             conversation_format=None,
             conversation_uri="opencode://sessions/abc123",
@@ -298,7 +298,7 @@ class TestRunFinalizerConversationUri:
         run_finalize: Callable[..., None],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize must not call store.set_run_conversation when conversation_uri returns None."""
+        """finalize must not call db.runs.set_conversation when conversation_uri returns None."""
         # Arrange
         adapter = MagicMock()
         adapter.conversation_uri.return_value = None
@@ -309,7 +309,7 @@ class TestRunFinalizerConversationUri:
         )
 
         # Assert
-        mock_store.set_run_conversation.assert_not_called()
+        mock_store.runs.set_conversation.assert_not_called()
 
     def test_skips_conversation_uri_when_adapter_lacks_the_attribute(
         self,
@@ -317,7 +317,7 @@ class TestRunFinalizerConversationUri:
         run_finalize: Callable[..., None],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize must not crash and must skip set_run_conversation when adapter has no conversation_uri."""
+        """finalize must not crash and must skip set_conversation when adapter has no conversation_uri."""
         # Arrange
         adapter = MagicMock(spec=[])  # empty spec — no conversation_uri attribute
 
@@ -327,7 +327,7 @@ class TestRunFinalizerConversationUri:
         )
 
         # Assert
-        mock_store.set_run_conversation.assert_not_called()
+        mock_store.runs.set_conversation.assert_not_called()
 
     def test_swallows_exception_from_conversation_uri(
         self,
@@ -335,7 +335,7 @@ class TestRunFinalizerConversationUri:
         run_finalize: Callable[..., None],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize must not propagate exceptions from adapter.conversation_uri; finish_run must still be called."""
+        """finalize must not propagate exceptions from adapter.conversation_uri; finish_full must still be called."""
         # Arrange
         adapter = MagicMock()
         adapter.conversation_uri.side_effect = ValueError("session not found")
@@ -346,7 +346,7 @@ class TestRunFinalizerConversationUri:
         )
 
         # Assert — the rest of finalization still completed
-        mock_store.finish_run.assert_called_once()
+        mock_store.runs.finish_full.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -363,10 +363,23 @@ class TestRunFinalizerDispatchAndBroadcaster:
         make_agent: Callable[..., MagicMock],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize calls dispatch_completion with the run dict returned by store.get_run."""
+        """finalize calls dispatch_completion with the run returned by db.runs.get (converted to RunRecord)."""
         # Arrange
-        refreshed_run = {"id": "run-dispatch-001", "status": "done"}
-        mock_store.get_run.return_value = refreshed_run
+        mock_run = MagicMock()
+        mock_run.model_dump.return_value = {
+            "id": "run-dispatch-001",
+            "status": "done",
+            "agent_id": "agent-1",
+            "session_id": None,
+            "input": "test",
+            "output": None,
+            "error": None,
+            "workdir": "/tmp",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "created_at": "2026-07-01T00:00:00",
+            "finished_at": None,
+        }
+        mock_store.runs.get.return_value = mock_run
         agent = make_agent()
 
         # Act
@@ -377,7 +390,6 @@ class TestRunFinalizerDispatchAndBroadcaster:
         # Assert
         patch_dispatch.assert_called_once()
         call_kwargs = patch_dispatch.call_args.kwargs
-        assert call_kwargs["run"] is refreshed_run
         assert call_kwargs["agent"] is agent
 
     def test_skips_dispatch_when_get_run_returns_none(
@@ -387,9 +399,9 @@ class TestRunFinalizerDispatchAndBroadcaster:
         run_finalize: Callable[..., None],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize must not call dispatch_completion when store.get_run returns None."""
+        """finalize must not call dispatch_completion when db.runs.get returns None."""
         # Arrange
-        mock_store.get_run.return_value = None
+        mock_store.runs.get.return_value = None
 
         # Act
         run_finalize(run_id="run-dispatch-002", step_result=make_step_result())
@@ -406,7 +418,21 @@ class TestRunFinalizerDispatchAndBroadcaster:
     ) -> None:
         """finalize must not propagate exceptions raised by dispatch_completion."""
         # Arrange
-        mock_store.get_run.return_value = {"id": "run-dispatch-003"}
+        mock_run = MagicMock()
+        mock_run.model_dump.return_value = {
+            "id": "run-dispatch-003",
+            "status": "done",
+            "agent_id": "agent-1",
+            "session_id": None,
+            "input": "test",
+            "output": None,
+            "error": None,
+            "workdir": "/tmp",
+            "transcript_path": "/tmp/transcript.jsonl",
+            "created_at": "2026-07-01T00:00:00",
+            "finished_at": None,
+        }
+        mock_store.runs.get.return_value = mock_run
         patch_dispatch.side_effect = RuntimeError("network failure")
 
         # Act / Assert — no exception propagated

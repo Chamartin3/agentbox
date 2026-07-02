@@ -12,7 +12,7 @@ from pathlib import Path
 import yaml
 
 from agentbox.core.constants import BackendName
-from agentbox.core.db.managers.workspaces import WorkenvTemplateManager
+from agentbox.core.db import WorkenvTemplateManager
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 
 _SEEDS_DIR = Path(__file__).parent / "seeds"

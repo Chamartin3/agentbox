@@ -20,32 +20,10 @@ from agentbox.cli.shared.deps import (
     get_evaluation_service,
     get_execution_service,
     get_settings,
-    get_store,
     get_system_service,
 )
 from agentbox.core.service import AgentService, ExecutionService, EvaluationService, SystemService
 from agentbox.core.service.engines.service import EngineService
-
-
-def test_build_ctx_store_is_singleton(tmp_path: Path, monkeypatch) -> None:
-    """DI wiring smoke check: build_ctx().store is the same lru_cache instance."""
-    # Patch settings to use a temp directory
-    monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text("project = 'test'\n")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
-    monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
-
-    # Clear caches so settings are re-read
-    get_settings.cache_clear()
-    get_store.cache_clear()
-
-    ctx = build_ctx()
-    assert ctx.store is get_store()
-
-    get_settings.cache_clear()
-    get_store.cache_clear()
 
 
 def test_build_ctx_service_fields(tmp_path: Path, monkeypatch) -> None:
@@ -60,7 +38,6 @@ def test_build_ctx_service_fields(tmp_path: Path, monkeypatch) -> None:
     # Clear all relevant caches
     for fn in (
         get_settings,
-        get_store,
         get_agent_service,
         get_execution_service,
         get_engine_service,
@@ -86,7 +63,6 @@ def test_build_ctx_service_fields(tmp_path: Path, monkeypatch) -> None:
 
     for fn in (
         get_settings,
-        get_store,
         get_agent_service,
         get_execution_service,
         get_engine_service,
@@ -105,7 +81,7 @@ def test_build_ctx_render_registry(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
 
-    for fn in (get_settings, get_store):
+    for fn in (get_settings,):
         fn.cache_clear()
 
     ctx = build_ctx()
@@ -118,5 +94,5 @@ def test_build_ctx_render_registry(tmp_path: Path, monkeypatch) -> None:
     assert isinstance(ctx.render.system, SystemRenderer), f"Expected SystemRenderer, got {type(ctx.render.system)}"
     assert isinstance(ctx.render.ops, OpsRenderer), f"Expected OpsRenderer, got {type(ctx.render.ops)}"
 
-    for fn in (get_settings, get_store):
+    for fn in (get_settings,):
         fn.cache_clear()

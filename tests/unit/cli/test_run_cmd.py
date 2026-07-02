@@ -19,22 +19,27 @@ import pytest
 from typer.testing import CliRunner
 
 from agentbox.cli import app
-from agentbox.cli.shared import (
-    get_executor,
-    get_mcp_registry,
-)
 from agentbox.cli.shared.deps import (
-    get_settings,
-    get_store as _get_store,
+    get_db as _get_store,
 )
 from agentbox.core.data import AgentDef
+from agentbox.core.service.agents.service import AgentService
 
 runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    for fn in (get_settings, _get_store, get_executor, get_mcp_registry):
-        fn.cache_clear()
+    import agentbox.cli.shared.deps as _cli_deps
+    from agentbox.core.db.database import get_database
+
+    # Clear every lru_cache in cli.shared.deps — the service factories
+    # (get_agent_service, …) are @lru_cache(maxsize=1) and otherwise leak a
+    # service bound to a prior test's DB path across tests.
+    for name in dir(_cli_deps):
+        fn = getattr(_cli_deps, name)
+        if hasattr(fn, "cache_clear"):
+            fn.cache_clear()
+    get_database.cache_clear()
 
 
 @pytest.fixture
@@ -58,7 +63,7 @@ def _seed_agent(store, agent_id: str, runner_kind: str = "claude_code") -> None:
         description="Test agent",
         runner={"kind": runner_kind, "model": "test-model"},
     )
-    store.create_agent(
+    AgentService().create_agent(
         agent_id=agent_id,
         config_json=agent_def.model_dump(
             mode="python", exclude_none=True, warnings=False

@@ -117,28 +117,31 @@ class TestNoBackendAvailable:
 
 class TestResolveAgentToolGrants:
     def test_returns_grants_from_store(self, mock_store: MagicMock) -> None:
-        """resolve_agent_tool_grants returns the non-empty set from store.list_active_grants."""
-        mock_store.list_active_grants.return_value = {"shell.exec", "fs.read"}
-        setup = RunSetup(store=mock_store, settings=MagicMock(), mcp_registry=None)
+        """resolve_agent_tool_grants returns the non-empty set from db.agent_tool_grants.list_for_agent."""
+        mock_store.agent_tool_grants.list_for_agent.return_value = [
+            {"tool_name": "shell.exec"},
+            {"tool_name": "fs.read"},
+        ]
+        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
 
         result = setup.resolve_agent_tool_grants("agent-1")
 
         assert result == {"shell.exec", "fs.read"}
-        mock_store.list_active_grants.assert_called_once_with("agent-1")
+        mock_store.agent_tool_grants.list_for_agent.assert_called_once_with("agent-1")
 
     def test_returns_none_when_store_raises(self, mock_store: MagicMock) -> None:
         """resolve_agent_tool_grants swallows store exceptions and returns None."""
-        mock_store.list_active_grants.side_effect = RuntimeError("permission denied")
-        setup = RunSetup(store=mock_store, settings=MagicMock(), mcp_registry=None)
+        mock_store.agent_tool_grants.list_for_agent.side_effect = RuntimeError("permission denied")
+        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
 
         result = setup.resolve_agent_tool_grants("agent-2")
 
         assert result is None
 
     def test_returns_none_when_grants_are_empty(self, mock_store: MagicMock) -> None:
-        """resolve_agent_tool_grants returns None when the store returns an empty set."""
-        mock_store.list_active_grants.return_value = set()
-        setup = RunSetup(store=mock_store, settings=MagicMock(), mcp_registry=None)
+        """resolve_agent_tool_grants returns None when the store returns an empty list."""
+        mock_store.agent_tool_grants.list_for_agent.return_value = []
+        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
 
         result = setup.resolve_agent_tool_grants("agent-3")
 
@@ -156,7 +159,7 @@ class TestSelectBackend:
     ) -> None:
         """select_backend raises NoBackendAvailable when neither backend_override nor
         runner_config is provided — no candidates means no adapter can be tried."""
-        setup = RunSetup(store=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
         agent = make_agent()
         agent.id = "test-agent"
         agent.workspace = None
@@ -179,7 +182,7 @@ class TestSelectBackend:
         make_agent: MagicMock,
     ) -> None:
         """select_backend raises NoBackendAvailable when the named backend is not registered."""
-        setup = RunSetup(store=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
         agent = make_agent()
         agent.id = "agent-no-backend"
         agent.workspace = None
@@ -210,7 +213,7 @@ class TestSelectBackend:
         make_agent: MagicMock,
     ) -> None:
         """select_backend returns the adapter and its rendered config when the backend resolves."""
-        setup = RunSetup(store=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
         agent = make_agent()
         agent.id = "agent-with-backend"
         agent.workspace = None
@@ -252,7 +255,7 @@ class TestPrepareWorkdir:
         make_agent: MagicMock,
     ) -> None:
         """prepare_workdir with a named workspace returns the resolved path unchanged."""
-        setup = RunSetup(store=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
         agent = make_agent(workspace="production-ws", session_mode="stateless")
         expected_path = tmp_path / "production-ws"
 
@@ -264,5 +267,5 @@ class TestPrepareWorkdir:
 
         assert path == expected_path
         assert session_id == "sess-1"
-        # store must not be called to create a session for a named workspace
-        mock_store.create_session.assert_not_called()
+        # db.sessions.create_session must not be called to create a session for a named workspace
+        mock_store.sessions.create_session.assert_not_called()

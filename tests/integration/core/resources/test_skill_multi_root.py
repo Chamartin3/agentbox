@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 import pytest
-from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from agentbox.core.resources.boot import (
     import_one_skill,
     import_repo_resources,
@@ -15,8 +15,8 @@ from agentbox.core.resources.boot import (
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 def _make_skill(root: Path, name: str, body: str = "skill body") -> Path:
@@ -29,34 +29,34 @@ def _make_skill(root: Path, name: str, body: str = "skill body") -> Path:
 
 
 def test_import_repo_resources_discovers_skills_across_roots(
-    store: SessionStore, tmp_path: Path
+    store: Database, tmp_path: Path
 ) -> None:
     _make_skill(tmp_path / "apps" / "cvman" / "mcp" / "skills", "foo")
     _make_skill(tmp_path / "agentbox" / "skills", "bar")
 
-    summary = import_repo_resources(store, tmp_path)
+    summary = import_repo_resources(store.resources, store.resource_versions, tmp_path)
     assert summary["failed"] == 0
     assert summary["created"] >= 2
 
-    foo = store.get_repo_resource_by_slug("skill:foo")
-    bar = store.get_repo_resource_by_slug("skill:bar")
+    foo = store.resources.get_by_slug("skill:foo")
+    bar = store.resources.get_by_slug("skill:bar")
     assert foo is not None and foo["type"] == "skill"
     assert bar is not None and bar["type"] == "skill"
 
 
 def test_duplicate_skill_names_log_warning(
-    store: SessionStore, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    store: Database, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     _make_skill(tmp_path / "apps" / "cvman" / "mcp" / "skills", "dup", body="A")
     _make_skill(tmp_path / "agentbox" / "skills", "dup", body="B")
 
     with caplog.at_level(logging.WARNING, logger="agentbox.core.resources.boot_import"):
-        import_repo_resources(store, tmp_path)
+        import_repo_resources(store.resources, store.resource_versions, tmp_path)
 
     msgs = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
     assert any("duplicate skill" in m and "dup" in m for m in msgs), msgs
 
-    dup = store.get_repo_resource_by_slug("skill:dup")
+    dup = store.resources.get_by_slug("skill:dup")
     assert dup is not None and dup["type"] == "skill"
 
 
@@ -80,10 +80,10 @@ def test_resolve_skill_roots_skips_vendor_paths(
     assert bad not in roots
 
 
-def test_import_one_skill_idempotent(store: SessionStore, tmp_path: Path) -> None:
+def test_import_one_skill_idempotent(store: Database, tmp_path: Path) -> None:
     skill_dir = _make_skill(tmp_path / "skills", "solo")
-    action1, slug = import_one_skill(store, skill_dir, tmp_path)
+    action1, slug = import_one_skill(store.resources, store.resource_versions, skill_dir, tmp_path)
     assert action1 == "created"
     assert slug == "skill:solo"
-    action2, _ = import_one_skill(store, skill_dir, tmp_path)
+    action2, _ = import_one_skill(store.resources, store.resource_versions, skill_dir, tmp_path)
     assert action2 == "skipped"

@@ -15,9 +15,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import pytest
-from agentbox.core.db import SessionStore
+from agentbox.core.config import Settings
+from agentbox.core.db.database import Database
 from agentbox.core.service import workspaces as ws_service
 from agentbox.core.service.workspaces import (
     WorkspaceExists,
@@ -33,17 +35,18 @@ class _FakeSettings:
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
-def settings(tmp_path: Path) -> _FakeSettings:
+def settings(tmp_path: Path) -> Settings:
     project_root = tmp_path / "project"
     project_root.mkdir()
     ws_root = project_root / "workspaces"
     ws_root.mkdir()
-    return _FakeSettings(project_root=project_root, workspaces_root=ws_root)
+    # ponytail: fake exposes only the two attrs the service reads; cast once here
+    return cast(Settings, _FakeSettings(project_root=project_root, workspaces_root=ws_root))
 
 
 # ---------------------------------------------------------------------------
@@ -52,20 +55,20 @@ def settings(tmp_path: Path) -> _FakeSettings:
 
 
 def test_resolve_workspace_path_raises_when_unknown(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
     with pytest.raises(WorkspaceNotFound):
         ws_service.resolve_workspace_path(
-            "missing", store=store, settings=settings  # type: ignore[arg-type]
+            "missing", settings=settings  # type: ignore[arg-type]
         )
 
 
 def test_resolve_workspace_path_falls_back_to_workspaces_root(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    store.create_workspace("alpha")
+    store.workspaces.insert(name="alpha")
     path, project_root = ws_service.resolve_workspace_path(
-        "alpha", store=store, settings=settings  # type: ignore[arg-type]
+        "alpha", settings=settings  # type: ignore[arg-type]
     )
     assert path == settings.workspaces_root / "alpha"
     assert project_root == settings.project_root
@@ -77,32 +80,34 @@ def test_resolve_workspace_path_falls_back_to_workspaces_root(
 
 
 def test_create_workspace_registry_duplicate_raises(
-    store: SessionStore,
+    store: Database,
 ) -> None:
-    ws_service.create_workspace_registry("alpha", store=store)
+    from agentbox.core.service.workspaces.service import WorkspaceService
+
+    svc = WorkspaceService()
+    svc.create_workspace("alpha")
     with pytest.raises(WorkspaceExists):
-        ws_service.create_workspace_registry("alpha", store=store)
+        svc.create_workspace("alpha")
 
 
 def test_delete_workspace_registry_raises_when_unknown(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
     with pytest.raises(WorkspaceNotFound):
         ws_service.delete_workspace_registry(
-            "missing", store=store, settings=settings  # type: ignore[arg-type]
+            "missing", settings=settings  # type: ignore[arg-type]
         )
 
 
 def test_delete_workspace_registry_purges_disk_when_requested(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    ws_service.create_workspace_registry("alpha", store=store)
+    store.workspaces.insert(name="alpha")
     ws_path = settings.workspaces_root / "alpha"
     ws_path.mkdir()
     (ws_path / "file.txt").write_text("x")
     result = ws_service.delete_workspace_registry(
         "alpha",
-        store=store,
         settings=settings,  # type: ignore[arg-type]
         purge_disk=True,
     )
@@ -117,9 +122,9 @@ def test_delete_workspace_registry_purges_disk_when_requested(
 
 
 def test_get_workspace_by_name_lists_user_files(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    store.create_workspace("alpha")
+    store.workspaces.insert(name="alpha")
     ws_path = settings.workspaces_root / "alpha"
     ws_path.mkdir()
     (ws_path / "user.txt").write_text("hi")
@@ -128,7 +133,7 @@ def test_get_workspace_by_name_lists_user_files(
     (ws_path / "CLAUDE.md").write_text("render artifact")
 
     doc = ws_service.get_workspace_by_name(
-        "alpha", store=store, settings=settings  # type: ignore[arg-type]
+        "alpha", settings=settings  # type: ignore[arg-type]
     )
     paths = {f["path"] for f in doc["files"]}
     assert "user.txt" in paths
@@ -150,48 +155,46 @@ def test_is_user_file_excludes_render_artifacts_and_hidden_dirs() -> None:
 
 
 def test_write_then_read_file_roundtrip(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    store.create_workspace("alpha")
+    store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
     written = ws_service.write_file_by_name(
         "alpha",
         "notes/x.txt",
         "hi",
-        store=store,
         settings=settings,  # type: ignore[arg-type]
     )
     assert written == {"path": "notes/x.txt", "bytes": 2}
     read = ws_service.read_file_by_name(
-        "alpha", "notes/x.txt", store=store, settings=settings  # type: ignore[arg-type]
+        "alpha", "notes/x.txt", settings=settings  # type: ignore[arg-type]
     )
     assert read == {"path": "notes/x.txt", "content": "hi"}
 
 
 def test_read_file_returns_none_for_missing(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    store.create_workspace("alpha")
+    store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
     assert (
         ws_service.read_file_by_name(
-            "alpha", "ghost.txt", store=store, settings=settings  # type: ignore[arg-type]
+            "alpha", "ghost.txt", settings=settings  # type: ignore[arg-type]
         )
         is None
     )
 
 
 def test_write_file_rejects_path_escape(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    store.create_workspace("alpha")
+    store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
     with pytest.raises(WorkspacePathEscape):
         ws_service.write_file_by_name(
             "alpha",
             "../escape.txt",
             "evil",
-            store=store,
             settings=settings,  # type: ignore[arg-type]
         )
 
@@ -202,21 +205,23 @@ def test_write_file_rejects_path_escape(
 
 
 def test_load_effective_permissions_returns_defaults_for_unknown_name(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
     perms = ws_service.load_effective_permissions(
-        None, store=store, settings=settings  # type: ignore[arg-type]
+        None, settings=settings  # type: ignore[arg-type]
     )
     assert perms["allowed_tools"] == []
     assert perms["allow_file_write"] is True
 
 
 def test_load_effective_permissions_applies_db_overlay(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    store.create_workspace("alpha")
-    store.set_workspace_runtime_permissions(
-        "alpha",
+    store.workspaces.insert(name="alpha")
+    ws_row = store.workspaces.get_by_name("alpha")
+    ws_id = ws_row["name"]  # workspace_id is the workspace name
+    store.workspace_runtime_permissions.set_for_workspace(
+        ws_id,
         allowed_builtin_tools=["WebFetch"],
         files=None,
         max_tokens=4096,
@@ -224,7 +229,7 @@ def test_load_effective_permissions_applies_db_overlay(
         allow_network=False,
     )
     perms = ws_service.load_effective_permissions(
-        "alpha", store=store, settings=settings  # type: ignore[arg-type]
+        "alpha", settings=settings  # type: ignore[arg-type]
     )
     assert perms["allowed_builtin_tools"] == ["WebFetch"]
     assert perms["max_tokens"] == 4096
@@ -238,14 +243,14 @@ def test_load_effective_permissions_applies_db_overlay(
 
 
 def test_list_workspaces_enriched_shape(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
-    store.create_workspace("alpha", description="dev")
+    store.workspaces.insert(name="alpha", description="dev")
     (settings.workspaces_root / "alpha").mkdir()
     (settings.workspaces_root / "alpha" / "note.txt").write_text("hi")
 
     result = ws_service.list_workspaces_enriched(
-        store=store, settings=settings  # type: ignore[arg-type]
+        settings=settings  # type: ignore[arg-type]
     )
     assert len(result) == 1
     row = result[0]

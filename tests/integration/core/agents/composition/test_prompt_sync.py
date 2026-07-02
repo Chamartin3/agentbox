@@ -7,6 +7,7 @@ from pathlib import Path
 from agentbox.core.data import AgentDef, AgentSource, RunnerSpec
 from agentbox.core.db.schema import prompt_versions
 from agentbox.core.agents.composition.drift import startup_sweep
+from agentbox.core.service.agents.service import AgentService
 
 
 def _agent_with_prompt(agent_id: str, source_path: Path, prompt_path: str) -> AgentDef:
@@ -20,8 +21,8 @@ def _agent_with_prompt(agent_id: str, source_path: Path, prompt_path: str) -> Ag
 
 
 class TestSyncPromptFromDisk:
-    def test_creates_v1_when_no_history(self, session_store) -> None:
-        result = session_store.sync_prompt_from_disk(
+    def test_creates_v1_when_no_history(self, db) -> None:
+        result = AgentService().sync_prompt_from_disk(
             "agent-a", "hello world", author="filesystem"
         )
         assert result is not None
@@ -31,32 +32,32 @@ class TestSyncPromptFromDisk:
         assert result["changelog"] == "Imported from disk"
         assert result["content_hash"] is not None
 
-    def test_noop_when_content_unchanged(self, session_store) -> None:
-        session_store.sync_prompt_from_disk("agent-b", "same content")
-        result = session_store.sync_prompt_from_disk("agent-b", "same content")
+    def test_noop_when_content_unchanged(self, db) -> None:
+        AgentService().sync_prompt_from_disk("agent-b", "same content")
+        result = AgentService().sync_prompt_from_disk("agent-b", "same content")
         assert result is None
-        versions = session_store.list_prompt_versions("agent-b")
+        versions = db.prompt_versions.list_for_agent("agent-b")
         assert len(versions) == 1
 
-    def test_creates_new_version_when_content_changes(self, session_store) -> None:
-        session_store.sync_prompt_from_disk("agent-c", "v1 content")
-        result = session_store.sync_prompt_from_disk("agent-c", "v2 content")
+    def test_creates_new_version_when_content_changes(self, db) -> None:
+        AgentService().sync_prompt_from_disk("agent-c", "v1 content")
+        result = AgentService().sync_prompt_from_disk("agent-c", "v2 content")
         assert result is not None
         assert result["version"] == 2
         assert result["changelog"] == "Out-of-band file edit"
-        versions = session_store.list_prompt_versions("agent-c")
+        versions = db.prompt_versions.list_for_agent("agent-c")
         assert len(versions) == 2
 
-    def test_respects_explicit_changelog(self, session_store) -> None:
-        result = session_store.sync_prompt_from_disk(
+    def test_respects_explicit_changelog(self, db) -> None:
+        result = AgentService().sync_prompt_from_disk(
             "agent-d", "first", changelog="manual sync"
         )
         assert result is not None
         assert result["changelog"] == "manual sync"
 
-    def test_handles_legacy_rows_without_hash(self, session_store) -> None:
+    def test_handles_legacy_rows_without_hash(self, db) -> None:
         # Simulate a legacy row written before content_hash existed.
-        with session_store.engine.begin() as conn:
+        with db.engine.begin() as conn:
             conn.execute(
                 prompt_versions.insert().values(
                     agent_id="agent-e",
@@ -70,15 +71,15 @@ class TestSyncPromptFromDisk:
                 )
             )
         # Same content => still a no-op (hash computed from content).
-        assert session_store.sync_prompt_from_disk("agent-e", "legacy") is None
+        assert AgentService().sync_prompt_from_disk("agent-e", "legacy") is None
         # Different content => new version.
-        result = session_store.sync_prompt_from_disk("agent-e", "updated")
+        result = AgentService().sync_prompt_from_disk("agent-e", "updated")
         assert result is not None
         assert result["version"] == 2
 
 
 class TestStartupSweepPromptSync:
-    def test_sweep_captures_prompt_on_first_load(self, session_store, tmp_path) -> None:
+    def test_sweep_captures_prompt_on_first_load(self, db, tmp_path) -> None:
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
         toml_path = agents_dir / "a.toml"
@@ -87,15 +88,15 @@ class TestStartupSweepPromptSync:
         prompt_file.write_text("hello prompt")
 
         agent = _agent_with_prompt("a", toml_path, str(prompt_file))
-        startup_sweep([agent], session_store, project_root=tmp_path)
+        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles, project_root=tmp_path)
 
-        versions = session_store.list_prompt_versions("a")
+        versions = db.prompt_versions.list_for_agent("a")
         assert len(versions) == 1
         assert versions[0]["content"] == "hello prompt"
         assert versions[0]["author"] == "filesystem"
 
     def test_sweep_captures_out_of_band_prompt_edit(
-        self, session_store, tmp_path
+        self, db, tmp_path
     ) -> None:
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
@@ -105,13 +106,13 @@ class TestStartupSweepPromptSync:
         prompt_file.write_text("original")
 
         agent = _agent_with_prompt("b", toml_path, str(prompt_file))
-        startup_sweep([agent], session_store, project_root=tmp_path)
+        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles, project_root=tmp_path)
 
         # Edit prompt only — agent.toml unchanged
         prompt_file.write_text("edited on disk")
-        startup_sweep([agent], session_store, project_root=tmp_path)
+        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles, project_root=tmp_path)
 
-        versions = session_store.list_prompt_versions("b")
+        versions = db.prompt_versions.list_for_agent("b")
         assert len(versions) == 2
         # list returns desc by version
         assert versions[0]["version"] == 2
@@ -119,7 +120,7 @@ class TestStartupSweepPromptSync:
         assert versions[0]["changelog"] == "Out-of-band file edit"
 
     def test_sweep_is_idempotent_when_prompt_unchanged(
-        self, session_store, tmp_path
+        self, db, tmp_path
     ) -> None:
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir()
@@ -129,14 +130,14 @@ class TestStartupSweepPromptSync:
         prompt_file.write_text("stable")
 
         agent = _agent_with_prompt("c", toml_path, str(prompt_file))
-        startup_sweep([agent], session_store, project_root=tmp_path)
-        startup_sweep([agent], session_store, project_root=tmp_path)
-        startup_sweep([agent], session_store, project_root=tmp_path)
+        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles, project_root=tmp_path)
+        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles, project_root=tmp_path)
+        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles, project_root=tmp_path)
 
-        versions = session_store.list_prompt_versions("c")
+        versions = db.prompt_versions.list_for_agent("c")
         assert len(versions) == 1
 
-    def test_sweep_skips_agents_without_prompt(self, session_store, tmp_path) -> None:
+    def test_sweep_skips_agents_without_prompt(self, db, tmp_path) -> None:
         toml_path = tmp_path / "d.toml"
         toml_path.write_text("id = 'd'")
         agent = AgentDef(
@@ -145,5 +146,5 @@ class TestStartupSweepPromptSync:
             source_format=AgentSource.STANDALONE_TOML,
             runner=RunnerSpec(),
         )
-        startup_sweep([agent], session_store, project_root=tmp_path)
-        assert session_store.list_prompt_versions("d") == []
+        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles, project_root=tmp_path)
+        assert db.prompt_versions.list_for_agent("d") == []

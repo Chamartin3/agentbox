@@ -20,10 +20,11 @@ from typing import Any
 
 import pytest
 from agentbox.core.data import AgentDef
-from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
 import agentbox.core.service.execution as runs_service
+from agentbox.core.service.agents.service import AgentService
 from agentbox.core.service.execution import (
     AgentNotFound,
     InvalidRunInput,
@@ -51,12 +52,12 @@ class _FakeExecutor:
         return True
 
 
-def _seed_agent(store: SessionStore, agent_id: str = "alpha") -> None:
+def _seed_agent(store: Database, agent_id: str = "alpha") -> None:
     agent = AgentDef.model_validate({"id": agent_id, "description": "x"})
     with _w.catch_warnings():
         _w.simplefilter("ignore", category=UserWarning)
         config_json = agent.model_dump_json()
-    row = store.create_version(
+    row = AgentService().create_version(
         agent_id=agent_id,
         source_path="",
         source_format="db_only",
@@ -67,11 +68,11 @@ def _seed_agent(store: SessionStore, agent_id: str = "alpha") -> None:
         prompt_content="",
         source="manifest",
     )
-    store.activate_version(agent_id, row["id"])
+    AgentService().activate_version(agent_id, row["id"])
 
 
 def _seed_run(
-    store: SessionStore,
+    store: Database,
     agent_id: str = "alpha",
     workdir: str = "/tmp/wd",
 ) -> str:
@@ -84,8 +85,8 @@ def _seed_run(
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 # ---------------------------------------------------------------------------
@@ -93,39 +94,39 @@ def store(tmp_path: Path) -> SessionStore:
 # ---------------------------------------------------------------------------
 
 
-async def test_create_run_raises_when_agent_unknown(store: SessionStore) -> None:
+async def test_create_run_raises_when_agent_unknown(store: Database) -> None:
     with pytest.raises(AgentNotFound):
         await runs_service.create_run(
-            "missing", store=store, executor=_FakeExecutor(), variables={}
+            "missing", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=_FakeExecutor(), variables={}
         )
 
 
 async def test_create_run_raises_invalid_when_no_input_or_variables(
-    store: SessionStore,
+    store: Database,
 ) -> None:
     _seed_agent(store)
     with pytest.raises(InvalidRunInput):
         await runs_service.create_run(
-            "alpha", store=store, executor=_FakeExecutor()
+            "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=_FakeExecutor()
         )
 
 
-async def test_create_run_dispatches_legacy_input(store: SessionStore) -> None:
+async def test_create_run_dispatches_legacy_input(store: Database) -> None:
     _seed_agent(store)
     ex = _FakeExecutor()
     result = await runs_service.create_run(
-        "alpha", store=store, executor=ex, input_="hi"
+        "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=ex, input_="hi"
     )
     assert result == {"run_id": "new-run-id", "agent": "alpha"}
     assert ex.calls[0]["input"] == "hi"
     assert "variables" not in ex.calls[0]
 
 
-async def test_create_run_dispatches_with_variables(store: SessionStore) -> None:
+async def test_create_run_dispatches_with_variables(store: Database) -> None:
     _seed_agent(store)
     ex = _FakeExecutor()
     await runs_service.create_run(
-        "alpha", store=store, executor=ex, variables={"k": "v"}
+        "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=ex, variables={"k": "v"}
     )
     assert ex.calls[0]["variables"] == {"k": "v"}
     assert ex.calls[0]["input"] == ""
@@ -136,11 +137,11 @@ async def test_create_run_dispatches_with_variables(store: SessionStore) -> None
 # ---------------------------------------------------------------------------
 
 
-def test_complete_run_raises_when_unknown(store: SessionStore) -> None:
+def test_complete_run_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
         runs_service.complete_run(
             "no-such-run",
-            store=store,
+            agent_defs=store.agent_defs,
             ok=True,
             output=None,
             error=None,
@@ -149,18 +150,18 @@ def test_complete_run_raises_when_unknown(store: SessionStore) -> None:
 
 
 def test_complete_run_marks_terminal_and_fires_callback(
-    store: SessionStore,
+    store: Database,
 ) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     calls: list[tuple] = []
 
-    def cb(agent, refreshed, s):
-        calls.append((agent.id if agent else None, refreshed.id, s))
+    def cb(agent, refreshed):
+        calls.append((agent.id if agent else None, refreshed.id))
 
     result = runs_service.complete_run(
         run_id,
-        store=store,
+        agent_defs=store.agent_defs,
         ok=True,
         output="result",
         error=None,
@@ -173,44 +174,44 @@ def test_complete_run_marks_terminal_and_fires_callback(
     assert calls and calls[0][0] == "alpha"
 
 
-def test_post_outcome_records_status(store: SessionStore) -> None:
+def test_post_outcome_records_status(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     result = runs_service.post_outcome(
-        run_id, store=store, status="ok", error_kind=None, errors=None
+        run_id, status="ok", error_kind=None, errors=None
     )
     assert result["ok"] is True
     assert result["run_id"] == run_id
 
 
-def test_post_outcome_raises_when_unknown(store: SessionStore) -> None:
+def test_post_outcome_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
-        runs_service.post_outcome("missing", store=store, status="ok")
+        runs_service.post_outcome("missing", status="ok")
 
 
-async def test_cancel_run_idempotent_on_terminal(store: SessionStore) -> None:
+async def test_cancel_run_idempotent_on_terminal(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     ExecutionService().finish_run(run_id, ok=True, output="done")
     ex = _FakeExecutor()
-    result = await runs_service.cancel_run(run_id, store=store, executor=ex)
+    result = await runs_service.cancel_run(run_id, executor=ex)
     assert result["cancelled"] is False
     assert ex.cancelled == []
 
 
-async def test_cancel_run_calls_executor_when_running(store: SessionStore) -> None:
+async def test_cancel_run_calls_executor_when_running(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     ex = _FakeExecutor()
-    result = await runs_service.cancel_run(run_id, store=store, executor=ex)
+    result = await runs_service.cancel_run(run_id, executor=ex)
     assert result["cancelled"] is True
     assert ex.cancelled == [run_id]
 
 
-async def test_cancel_run_raises_when_unknown(store: SessionStore) -> None:
+async def test_cancel_run_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
         await runs_service.cancel_run(
-            "missing", store=store, executor=_FakeExecutor()
+            "missing", executor=_FakeExecutor()
         )
 
 
@@ -219,40 +220,40 @@ async def test_cancel_run_raises_when_unknown(store: SessionStore) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_list_runs_returns_raw_list_when_unfiltered(store: SessionStore) -> None:
+def test_list_runs_returns_raw_list_when_unfiltered(store: Database) -> None:
     _seed_agent(store)
     _seed_run(store)
-    result = runs_service.list_runs(store=store)
+    result = runs_service.list_runs(agent_versions=store.agent_versions)
     assert isinstance(result, list)
     assert len(result) == 1
     assert result[0]["agent_version"] is None
 
 
-def test_list_runs_returns_envelope_when_paginated(store: SessionStore) -> None:
+def test_list_runs_returns_envelope_when_paginated(store: Database) -> None:
     _seed_agent(store)
     _seed_run(store)
-    result = runs_service.list_runs(store=store, paginated=True)
+    result = runs_service.list_runs(agent_versions=store.agent_versions, paginated=True)
     assert isinstance(result, dict)
     assert set(result) == {"items", "total", "offset", "limit", "has_more"}
     assert result["total"] == 1
 
 
-def test_get_run_detail_raises_when_unknown(store: SessionStore) -> None:
+def test_get_run_detail_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
-        runs_service.get_run_detail("missing", store=store)
+        runs_service.get_run_detail("missing", agent_versions=store.agent_versions)
 
 
-def test_get_run_detail_shape(store: SessionStore) -> None:
+def test_get_run_detail_shape(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
-    detail = runs_service.get_run_detail(run_id, store=store)
+    detail = runs_service.get_run_detail(run_id, agent_versions=store.agent_versions)
     assert set(detail) == {"run", "usage"}
     assert detail["run"]["id"] == run_id
     assert detail["run"]["backend"] is None
 
 
-def test_run_facets_includes_known_statuses(store: SessionStore) -> None:
-    facets = runs_service.run_facets(store=store)
+def test_run_facets_includes_known_statuses(store: Database) -> None:
+    facets = runs_service.run_facets()
     assert "running" in facets["statuses"]
     assert "ok" in facets["statuses"]
 
@@ -262,12 +263,12 @@ def test_run_facets_includes_known_statuses(store: SessionStore) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_list_comments_raises_when_unknown(store: SessionStore) -> None:
+def test_list_comments_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
         runs_service.list_comments("missing", store=store)
 
 
-def test_add_and_list_comment(store: SessionStore) -> None:
+def test_add_and_list_comment(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     runs_service.add_comment(run_id, store=store, author="me", body="hi")

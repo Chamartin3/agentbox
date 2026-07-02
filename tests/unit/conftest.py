@@ -20,7 +20,7 @@ from agentbox.core.data import AgentDef, RunnerSpec
 
 @pytest.fixture
 def mock_store() -> MagicMock:
-    """MagicMock wrapping SessionStore — no SQLite, no filesystem."""
+    """MagicMock standing in for the ``Database`` — no SQLite, no filesystem."""
     return MagicMock()
 
 

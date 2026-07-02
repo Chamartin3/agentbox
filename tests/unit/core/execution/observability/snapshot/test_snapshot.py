@@ -49,18 +49,18 @@ _MCP_SNAPSHOT: McpSnapshot = {
 
 class TestSaveRunner:
     def test_delegates_to_store(self, mock_store: MagicMock) -> None:
-        """save_runner must forward the run_id and snapshot to the store."""
+        """save_runner must forward the run_id and snapshot to db.runs.save_runner_snapshot."""
         writer = SnapshotWriter(mock_store)
 
         writer.save_runner("run-001", _RUNNER_SNAPSHOT)
 
-        mock_store.save_run_runner_snapshot.assert_called_once_with(
+        mock_store.runs.save_runner_snapshot.assert_called_once_with(
             "run-001", _RUNNER_SNAPSHOT
         )
 
     def test_swallows_store_exception(self, mock_store: MagicMock) -> None:
         """save_runner must not propagate store errors — snapshot loss is non-fatal."""
-        mock_store.save_run_runner_snapshot.side_effect = RuntimeError("db locked")
+        mock_store.runs.save_runner_snapshot.side_effect = RuntimeError("db locked")
         writer = SnapshotWriter(mock_store)
 
         # Act / Assert — no exception raised
@@ -74,7 +74,7 @@ class TestSaveRunner:
 
 class TestBuildMcpSnapshot:
     def test_delegates_to_helper_with_workspace(self, mock_store: MagicMock) -> None:
-        """build_mcp_snapshot passes store, workspace_id, and grants to the helper."""
+        """build_mcp_snapshot passes workspace managers and grants to the helper."""
         writer = SnapshotWriter(mock_store)
 
         with patch(
@@ -86,7 +86,9 @@ class TestBuildMcpSnapshot:
             )
 
         mock_helper.assert_called_once_with(
-            mock_store,
+            mock_store.workspace_mcp_policies,
+            mock_store.workspace_mcp_overrides,
+            mock_store.workspace_mcp_tool_overrides,
             workspace_id="ws-1",
             host_env_grants={"shell.exec": True},
         )
@@ -114,7 +116,7 @@ class TestBuildMcpSnapshot:
 
 class TestSaveResourceAndMcp:
     def test_delegates_to_store(self, mock_store: MagicMock) -> None:
-        """save_resource_and_mcp forwards resource and MCP snapshots to the store."""
+        """save_resource_and_mcp forwards resource and MCP snapshots to db.runs.save_resource_snapshots."""
         writer = SnapshotWriter(mock_store)
 
         writer.save_resource_and_mcp(
@@ -123,7 +125,7 @@ class TestSaveResourceAndMcp:
             mcp_snapshot=_MCP_SNAPSHOT,
         )
 
-        mock_store.save_resource_snapshots.assert_called_once_with(
+        mock_store.runs.save_resource_snapshots.assert_called_once_with(
             "run-003",
             resource_snapshot=None,  # empty list → None
             mcp_snapshot=_MCP_SNAPSHOT,
@@ -132,7 +134,7 @@ class TestSaveResourceAndMcp:
     def test_passes_none_resource_snapshot_unchanged(
         self, mock_store: MagicMock
     ) -> None:
-        """None resource_snapshot is forwarded as None to store."""
+        """None resource_snapshot is forwarded as None to db.runs."""
         writer = SnapshotWriter(mock_store)
 
         writer.save_resource_and_mcp(
@@ -141,13 +143,13 @@ class TestSaveResourceAndMcp:
             mcp_snapshot=None,
         )
 
-        call_kwargs = mock_store.save_resource_snapshots.call_args.kwargs
+        call_kwargs = mock_store.runs.save_resource_snapshots.call_args.kwargs
         assert call_kwargs["resource_snapshot"] is None
         assert call_kwargs["mcp_snapshot"] is None
 
     def test_swallows_store_exception(self, mock_store: MagicMock) -> None:
         """save_resource_and_mcp swallows store errors — snapshot loss is non-fatal."""
-        mock_store.save_resource_snapshots.side_effect = OSError("disk full")
+        mock_store.runs.save_resource_snapshots.side_effect = OSError("disk full")
         writer = SnapshotWriter(mock_store)
 
         # Act / Assert — no exception raised
@@ -165,7 +167,7 @@ class TestSaveResourceAndMcp:
 
 class TestResolveHostEnvGrants:
     def test_delegates_to_helper(self, mock_store: MagicMock) -> None:
-        """resolve_host_env_grants forwards store and workspace_id to the helper."""
+        """resolve_host_env_grants forwards workspace_host_env_grants manager and workspace_id to the helper."""
         writer = SnapshotWriter(mock_store)
 
         with patch(
@@ -174,7 +176,7 @@ class TestResolveHostEnvGrants:
             mock_helper.return_value = {"shell.exec": {"capability": "shell.exec"}}
             result = writer.resolve_host_env_grants("ws-2")
 
-        mock_helper.assert_called_once_with(mock_store, "ws-2")
+        mock_helper.assert_called_once_with(mock_store.workspace_host_env_grants, "ws-2")
         assert result == {"shell.exec": {"capability": "shell.exec"}}
 
     def test_returns_none_when_no_workspace(self, mock_store: MagicMock) -> None:

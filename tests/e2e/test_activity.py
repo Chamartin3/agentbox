@@ -2,21 +2,32 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from agentbox.core.db import SessionStore
+from agentbox.core.data import now_iso
+from agentbox.core.db.database import Database
 
 
-def _seed(store: SessionStore, agent: str, status: str, model: str = "haiku") -> str:
-    rid = store.create_run(agent, "in", "/tmp/wd", "/tmp/t.jsonl")
-    store.record_usage(
+def _seed(db: Database, agent: str, status: str, model: str = "haiku") -> str:
+    rid = uuid.uuid4().hex
+    db.runs.create(
+        id=rid,
+        agent_id=agent,
+        status="running",
+        input="in",
+        workdir="/tmp/wd",
+        transcript_path="/tmp/t.jsonl",
+        created_at=now_iso(),
+    )
+    db.usage.record(
         rid,
         {"model": model, "input_tokens": 10, "output_tokens": 20, "cost_usd": 0.001},
     )
     if status != "running":
-        store.finish_run(
-            rid,
+        db.runs.finish_full(
+            run_id=rid,
             ok=(status == "ok"),
             output=None,
             error=None if status == "ok" else "boom",
@@ -25,13 +36,13 @@ def _seed(store: SessionStore, agent: str, status: str, model: str = "haiku") ->
 
 
 def test_activity_summary_basic(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "agentbox.sqlite")
-    _seed(store, "fill_job_post", "ok", "haiku")
-    _seed(store, "fill_job_post", "error", "haiku")
-    _seed(store, "extract_keywords", "ok", "sonnet")
+    db = Database(tmp_path / "agentbox.sqlite")
+    _seed(db, "fill_job_post", "ok", "haiku")
+    _seed(db, "fill_job_post", "error", "haiku")
+    _seed(db, "extract_keywords", "ok", "sonnet")
     since = (datetime.now(UTC) - timedelta(days=1)).isoformat(timespec="seconds")
 
-    s = store.activity_summary(since)
+    s = db.runs.activity_summary(since)
     t = s["totals"]
     assert t["runs"] == 3
     assert t["successes"] == 2
@@ -50,19 +61,19 @@ def test_activity_summary_basic(tmp_path: Path) -> None:
 
 
 def test_activity_summary_agent_filter(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "agentbox.sqlite")
-    _seed(store, "fill_job_post", "ok")
-    _seed(store, "extract_keywords", "ok")
+    db = Database(tmp_path / "agentbox.sqlite")
+    _seed(db, "fill_job_post", "ok")
+    _seed(db, "extract_keywords", "ok")
     since = (datetime.now(UTC) - timedelta(days=1)).isoformat(timespec="seconds")
-    s = store.activity_summary(since, agent="fill_job_post")
+    s = db.runs.activity_summary(since, agent="fill_job_post")
     assert s["totals"]["runs"] == 1
 
 
 def test_list_runs_rich(tmp_path: Path) -> None:
-    store = SessionStore(tmp_path / "agentbox.sqlite")
-    rid = _seed(store, "fill_job_post", "ok", "haiku")
+    db = Database(tmp_path / "agentbox.sqlite")
+    rid = _seed(db, "fill_job_post", "ok", "haiku")
     since = (datetime.now(UTC) - timedelta(days=1)).isoformat(timespec="seconds")
-    rows = store.list_runs_rich(since)
+    rows = db.runs.list_runs_rich(since)
     assert len(rows) == 1
     assert rows[0]["id"] == rid
     assert rows[0]["reported_model"] == "haiku"

@@ -116,7 +116,6 @@ def test_doctor_includes_credentials(
 def _clear_deps_caches() -> None:
     for fn in (
         deps.get_settings,
-        deps.get_store,
         deps.get_executor,
         deps.get_mcp_registry,
         deps.get_engine_service,

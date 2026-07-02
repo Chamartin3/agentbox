@@ -11,7 +11,10 @@ from unittest.mock import patch
 
 import agentbox.api.deps as deps
 from agentbox.api.app import create_app
+from agentbox.core.config import load_settings
+from agentbox.core.db.database import get_database
 from agentbox.core.db.schema import agent_versions
+from agentbox.core.service.agents.service import AgentService
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 
@@ -22,7 +25,7 @@ class _ManagedTestClient(TestClient):
             self.__exit__(None, None, None)
 
 
-def _setup_agent_with_active_version(store) -> dict:
+def _setup_agent_with_active_version(svc: AgentService) -> dict:
     """Create an agent with v1 active, return the version record."""
     config_json = {
         "id": "test-agent",
@@ -30,7 +33,7 @@ def _setup_agent_with_active_version(store) -> dict:
         "runner": {"kind": "claude_code", "model": "claude-3-5-sonnet-20241022"},
     }
     # Create the agent
-    v1 = store.create_agent(
+    v1 = svc.create_agent(
         agent_id="test-agent",
         config_json=config_json,
         author="system",
@@ -38,31 +41,30 @@ def _setup_agent_with_active_version(store) -> dict:
         prompt_content="Test prompt",
     )
     # Activate it
-    store.activate_version("test-agent", v1["id"])
+    svc.activate_version("test-agent", v1["id"])
     return v1
 
 
 def _app(tmp_path):
-    """Clear DI, create app with startup triggered, return (client, store)."""
+    """Clear DI, create app with startup triggered, return (client, svc)."""
     for fn in (
         deps.get_settings,
-        deps.get_store,
         deps.get_executor,
         deps.get_mcp_registry,
     ):
         fn.cache_clear()
     client = _ManagedTestClient(create_app())
     client.__enter__()
-    store = deps.get_store()
-    return client, store
+    svc = AgentService()
+    return client, svc
 
 
 class TestPublishVersion:
     def test_publish_returns_200_and_makes_active(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        _setup_agent_with_active_version(store)
+        client, svc = _app(isolated_data_dir)
+        _setup_agent_with_active_version(svc)
         # Create a new draft
-        draft = store.branch_draft("test-agent", author="test")
+        draft = svc.branch_draft("test-agent", author="test")
         # Publish the draft
         resp = client.post(
             f"/api/agents/test-agent/versions/{draft['version']}/publish",
@@ -72,14 +74,14 @@ class TestPublishVersion:
         data = resp.json()
         assert data["version"] == draft["version"]
         # Verify it's active
-        active = store.get_active_version("test-agent")
+        active = svc.active_version("test-agent")
         assert active is not None
         assert active["version"] == draft["version"]
 
     def test_publish_short_reason_returns_422(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        _setup_agent_with_active_version(store)
-        draft = store.branch_draft("test-agent", author="test")
+        client, svc = _app(isolated_data_dir)
+        _setup_agent_with_active_version(svc)
+        draft = svc.branch_draft("test-agent", author="test")
         resp = client.post(
             f"/api/agents/test-agent/versions/{draft['version']}/publish",
             json={"reason": "ab"},  # Too short
@@ -95,9 +97,9 @@ class TestPublishVersion:
         assert resp.status_code == 404
 
     def test_publish_idempotent(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        _setup_agent_with_active_version(store)
-        draft = store.branch_draft("test-agent", author="test")
+        client, svc = _app(isolated_data_dir)
+        _setup_agent_with_active_version(svc)
+        draft = svc.branch_draft("test-agent", author="test")
         # First publish
         resp1 = client.post(
             f"/api/agents/test-agent/versions/{draft['version']}/publish",
@@ -114,8 +116,8 @@ class TestPublishVersion:
 
 class TestBranchDraft:
     def test_branch_draft_creates_new_draft_version(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        v1 = _setup_agent_with_active_version(store)
+        client, svc = _app(isolated_data_dir)
+        v1 = _setup_agent_with_active_version(svc)
         # Branch a draft
         resp = client.post(
             "/api/agents/test-agent/draft",
@@ -127,14 +129,14 @@ class TestBranchDraft:
         assert data["author"] == "test-user"
 
     def test_branch_draft_no_active_returns_404(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
+        client, svc = _app(isolated_data_dir)
         # Create agent but don't activate
         config_json = {
             "id": "test-agent",
             "description": "lifecycle test",
             "runner": {"kind": "claude_code", "model": "claude-3-5-sonnet-20241022"},
         }
-        store.create_agent(
+        svc.create_agent(
             agent_id="test-agent",
             config_json=config_json,
             author="system",
@@ -152,10 +154,10 @@ class TestRollbackVersion:
     def test_rollback_creates_new_version_pointing_to_target(
         self, isolated_data_dir
     ) -> None:
-        client, store = _app(isolated_data_dir)
-        v1 = _setup_agent_with_active_version(store)
+        client, svc = _app(isolated_data_dir)
+        v1 = _setup_agent_with_active_version(svc)
         # Create and publish v2 with different config
-        store.create_version(
+        svc.create_version(
             agent_id="test-agent",
             source_path="test.toml",
             source_format="standalone_toml",
@@ -165,9 +167,9 @@ class TestRollbackVersion:
             author="system",
             changelog="Create v2",
         )
-        v2 = store.latest_version("test-agent")
+        v2 = svc.latest_version("test-agent")
         # Publish v2
-        store.publish_version("test-agent", v2["version"], "Publish v2")
+        svc.publish_version("test-agent", v2["version"], "Publish v2")
         # Rollback to v1
         resp = client.post(
             f"/api/agents/test-agent/versions/{v1['version']}/rollback",
@@ -178,13 +180,13 @@ class TestRollbackVersion:
         assert data["version"] == v1["version"] + 2  # v3
         assert data["author"] == "admin"
         # Verify it's active
-        active = store.get_active_version("test-agent")
+        active = svc.active_version("test-agent")
         assert active is not None
         assert active["version"] == v1["version"] + 2
 
     def test_rollback_missing_version_returns_404(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        _setup_agent_with_active_version(store)
+        client, svc = _app(isolated_data_dir)
+        _setup_agent_with_active_version(svc)
         # Try to rollback to non-existent version
         resp = client.post(
             "/api/agents/test-agent/versions/9999/rollback",
@@ -193,8 +195,8 @@ class TestRollbackVersion:
         assert resp.status_code == 404
 
     def test_rollback_short_reason_returns_422(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        v1 = _setup_agent_with_active_version(store)
+        client, svc = _app(isolated_data_dir)
+        v1 = _setup_agent_with_active_version(svc)
         # Try to rollback with short reason
         resp = client.post(
             f"/api/agents/test-agent/versions/{v1['version']}/rollback",
@@ -205,7 +207,7 @@ class TestRollbackVersion:
 
 class TestPublishWebhook:
     def test_publish_fires_webhook_when_configured(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
+        client, svc = _app(isolated_data_dir)
         # Create agent with webhook_url
         config_json = {
             "id": "test-agent",
@@ -213,23 +215,24 @@ class TestPublishWebhook:
             "runner": {"kind": "claude_code", "model": "claude-3-5-sonnet-20241022"},
             "webhook_url": "http://example.com/webhook",
         }
-        v1 = store.create_agent(
+        v1 = svc.create_agent(
             agent_id="test-agent",
             config_json=config_json,
             author="system",
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        with store.engine.begin() as conn:
+        _db = get_database(str(load_settings().db_path))
+        with _db.engine.begin() as conn:
             conn.execute(
                 update(agent_versions)
                 .where(agent_versions.c.id == v1["id"])
                 .values(content_snapshot=json.dumps(config_json))
             )
-        store.activate_version("test-agent", v1["id"])
+        svc.activate_version("test-agent", v1["id"])
 
         # Create draft
-        draft = store.branch_draft("test-agent", author="test")
+        draft = svc.branch_draft("test-agent", author="test")
 
         # Mock the webhook dispatcher
         with patch(
@@ -251,30 +254,31 @@ class TestPublishWebhook:
         assert call_kwargs["reason"] == "Test publish webhook"
 
     def test_publish_skips_webhook_when_url_missing(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
+        client, svc = _app(isolated_data_dir)
         # Create agent without webhook_url
         config_json = {
             "id": "test-agent",
             "description": "webhook test",
             "runner": {"kind": "claude_code", "model": "claude-3-5-sonnet-20241022"},
         }
-        v1 = store.create_agent(
+        v1 = svc.create_agent(
             agent_id="test-agent",
             config_json=config_json,
             author="system",
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        with store.engine.begin() as conn:
+        _db = get_database(str(load_settings().db_path))
+        with _db.engine.begin() as conn:
             conn.execute(
                 update(agent_versions)
                 .where(agent_versions.c.id == v1["id"])
                 .values(content_snapshot=json.dumps(config_json))
             )
-        store.activate_version("test-agent", v1["id"])
+        svc.activate_version("test-agent", v1["id"])
 
         # Create draft
-        draft = store.branch_draft("test-agent", author="test")
+        draft = svc.branch_draft("test-agent", author="test")
 
         # Mock the webhook dispatcher
         with patch(
@@ -292,7 +296,7 @@ class TestPublishWebhook:
     def test_publish_webhook_failure_does_not_break_response(
         self, isolated_data_dir
     ) -> None:
-        client, store = _app(isolated_data_dir)
+        client, svc = _app(isolated_data_dir)
         # Create agent with webhook_url
         config_json = {
             "id": "test-agent",
@@ -300,23 +304,24 @@ class TestPublishWebhook:
             "runner": {"kind": "claude_code", "model": "claude-3-5-sonnet-20241022"},
             "webhook_url": "http://example.com/webhook",
         }
-        v1 = store.create_agent(
+        v1 = svc.create_agent(
             agent_id="test-agent",
             config_json=config_json,
             author="system",
             changelog="Initial version",
         )
         # Populate content_snapshot so get_agent_def can find it
-        with store.engine.begin() as conn:
+        _db = get_database(str(load_settings().db_path))
+        with _db.engine.begin() as conn:
             conn.execute(
                 update(agent_versions)
                 .where(agent_versions.c.id == v1["id"])
                 .values(content_snapshot=json.dumps(config_json))
             )
-        store.activate_version("test-agent", v1["id"])
+        svc.activate_version("test-agent", v1["id"])
 
         # Create draft
-        draft = store.branch_draft("test-agent", author="test")
+        draft = svc.branch_draft("test-agent", author="test")
 
         # Mock the webhook dispatcher to raise
         with patch(

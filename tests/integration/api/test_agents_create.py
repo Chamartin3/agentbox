@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentbox.api.deps import get_store
+from agentbox.core.service.agents.service import AgentService
 
 
 def test_create_agent_happy_path(client: Any) -> None:
@@ -101,8 +101,8 @@ def test_upload_file_to_published_returns_409(client: Any) -> None:
     create_resp.json()["version_id"]
 
     # Publish the version
-    store = _get_store(client)
-    store.publish_version("test_agent", 1, "Published for testing")
+    svc = _get_svc()
+    svc.publish_version("test_agent", 1, "Published for testing")
 
     # Try to upload file to published version
     file_req = {
@@ -176,8 +176,9 @@ def test_delete_file_from_draft_succeeds_returns_204(client: Any) -> None:
     assert delete_resp.status_code == 204
 
     # Verify file is gone
-    store = _get_store(client)
-    files = store.list_version_files(store.get_version("test_agent", 1)["id"])
+    svc = _get_svc()
+    ver = svc.get_version("test_agent", 1)
+    files = svc.list_version_files(ver["id"])
     assert not any(f["id"] == file_id for f in files)
 
 
@@ -205,14 +206,14 @@ def test_delete_file_from_published_returns_409(client: Any) -> None:
     file_id = upload_resp.json()["file_id"]
 
     # Publish version
-    store = _get_store(client)
-    store.publish_version("test_agent", 1, "Published")
+    svc = _get_svc()
+    svc.publish_version("test_agent", 1, "Published")
 
     # Try to delete from published version
     delete_resp = client.delete(f"/api/agents/test_agent/versions/1/files/{file_id}")
     assert delete_resp.status_code == 409
 
 
-def _get_store(client: Any) -> Any:
-    """Helper to get the store from the client fixture."""
-    return get_store()
+def _get_svc() -> AgentService:
+    """Helper to get the agent service (self-wires from settings)."""
+    return AgentService()

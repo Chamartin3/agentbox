@@ -12,13 +12,14 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data import AgentDef
-from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from agentbox.core.service import prompts as prompts_service
 from agentbox.core.service.prompts import AgentNotFound
+from agentbox.core.service.agents.service import AgentService
 
 
 def _seed_agent_with_prompt(
-    store: SessionStore,
+    store: Database,
     agent_id: str,
     prompt_path: str,
     prompt_content: str = "",
@@ -29,7 +30,7 @@ def _seed_agent_with_prompt(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         config_json = agent.model_dump_json()
-    row = store.create_version(
+    row = AgentService().create_version(
         agent_id=agent_id,
         source_path="",
         source_format="db_only",
@@ -40,31 +41,31 @@ def _seed_agent_with_prompt(
         prompt_content=prompt_content,
         source="manifest",
     )
-    store.activate_version(agent_id, row["id"])
+    AgentService().activate_version(agent_id, row["id"])
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
-def test_get_prompt_raises_when_unknown(store: SessionStore, tmp_path: Path) -> None:
+def test_get_prompt_raises_when_unknown(store: Database, tmp_path: Path) -> None:
     with pytest.raises(AgentNotFound):
         prompts_service.get_prompt(
-            "missing", store=store, project_root=tmp_path
+            "missing", agent_defs=store.agent_defs, agent_versions=store.agent_versions, prompt_versions=store.prompt_versions, project_root=tmp_path
         )
 
 
-def test_get_prompt_reads_db_content(store: SessionStore, tmp_path: Path) -> None:
+def test_get_prompt_reads_db_content(store: Database, tmp_path: Path) -> None:
     _seed_agent_with_prompt(
         store, "alpha", prompt_path="prompts/alpha.md", prompt_content="from-db"
     )
-    doc = prompts_service.get_prompt("alpha", store=store, project_root=tmp_path)
+    doc = prompts_service.get_prompt("alpha", agent_defs=store.agent_defs, agent_versions=store.agent_versions, prompt_versions=store.prompt_versions, project_root=tmp_path)
     assert doc.content == "from-db"
 
 
 def test_put_prompt_writes_disk_and_creates_version(
-    store: SessionStore, tmp_path: Path
+    store: Database, tmp_path: Path
 ) -> None:
     _seed_agent_with_prompt(
         store, "alpha", prompt_path="prompts/alpha.md", prompt_content=""
@@ -72,45 +73,45 @@ def test_put_prompt_writes_disk_and_creates_version(
     doc = prompts_service.put_prompt(
         "alpha",
         "new body",
-        store=store,
+        agent_defs=store.agent_defs, prompt_versions=store.prompt_versions,
         project_root=tmp_path,
     )
     assert doc.content == "new body"
     disk = (tmp_path / "prompts" / "alpha.md").read_text(encoding="utf-8")
     assert disk == "new body"
     # sync_prompt_from_disk captured a new prompt_versions row
-    versions = store.list_prompt_versions("alpha")
+    versions = AgentService().list_prompt_versions("alpha")
     assert any(v["content"] == "new body" for v in versions)
 
 
-def test_list_versions_raises_when_unknown(store: SessionStore) -> None:
+def test_list_versions_raises_when_unknown(store: Database) -> None:
     with pytest.raises(AgentNotFound):
-        prompts_service.list_versions("missing", store=store)
+        prompts_service.list_versions("missing", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions)
 
 
-def test_list_versions_returns_shape_when_empty(store: SessionStore) -> None:
+def test_list_versions_returns_shape_when_empty(store: Database) -> None:
     _seed_agent_with_prompt(store, "alpha", prompt_path="prompts/alpha.md")
-    payload = prompts_service.list_versions("alpha", store=store)
+    payload = prompts_service.list_versions("alpha", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions)
     assert payload["agent_id"] == "alpha"
     assert payload["versions"] == []
     assert payload["active_version"] is None
     assert payload["draft_version"] is None
 
 
-def test_get_version_returns_none_when_missing(store: SessionStore) -> None:
+def test_get_version_returns_none_when_missing(store: Database) -> None:
     _seed_agent_with_prompt(store, "alpha", prompt_path="prompts/alpha.md")
-    assert prompts_service.get_version("alpha", 42, store=store) is None
+    assert prompts_service.get_version("alpha", 42, agent_defs=store.agent_defs, prompt_versions=store.prompt_versions) is None
 
 
 def test_save_draft_then_get_version_roundtrip(
-    store: SessionStore, tmp_path: Path
+    store: Database, tmp_path: Path
 ) -> None:
     _seed_agent_with_prompt(store, "alpha", prompt_path="prompts/alpha.md")
-    prompts_service.save_draft("alpha", "draft body", store=store, author="tester")
-    payload = prompts_service.list_versions("alpha", store=store)
+    prompts_service.save_draft("alpha", "draft body", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions, author="tester")
+    payload = prompts_service.list_versions("alpha", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions)
     assert payload["draft_version"] is not None
     fetched = prompts_service.get_version(
-        "alpha", payload["draft_version"], store=store
+        "alpha", payload["draft_version"], agent_defs=store.agent_defs, prompt_versions=store.prompt_versions
     )
     assert fetched is not None
     assert fetched["content"] == "draft body"

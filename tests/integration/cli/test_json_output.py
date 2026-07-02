@@ -16,14 +16,14 @@ from agentbox.cli.shared import (
 from agentbox.cli.shared.deps import (
     get_engine_service,
     get_settings,
-    get_store,
+    get_db,
 )
 
 runner = CliRunner()
 
 
 def _clear_deps_caches() -> None:
-    for fn in (get_settings, get_store, get_executor, get_mcp_registry, get_engine_service):
+    for fn in (get_settings, get_db, get_executor, get_mcp_registry, get_engine_service):
         fn.cache_clear()
 
 

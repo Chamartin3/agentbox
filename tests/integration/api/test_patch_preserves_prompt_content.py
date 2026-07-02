@@ -19,6 +19,7 @@ import warnings
 import agentbox.api.deps as deps
 import pytest
 from agentbox.api.app import create_app
+from agentbox.core.service.agents.service import AgentService
 from fastapi.testclient import TestClient
 
 # resolve_agent serializes session_mode back as a str default, which trips
@@ -47,25 +48,24 @@ _PROMPT_BODY = "You are a test agent. Emit a single JSON object."
 def _app(_tmp_path):
     for fn in (
         deps.get_settings,
-        deps.get_store,
         deps.get_executor,
         deps.get_mcp_registry,
     ):
         fn.cache_clear()
     client = _ManagedTestClient(create_app())
     client.__enter__()
-    store = deps.get_store()
-    return client, store
+    svc = AgentService()
+    return client, svc
 
 
-def _create_db_only_agent(store) -> dict:
+def _create_db_only_agent(svc: AgentService) -> dict:
     """Create a DB-only agent with prompt_content set (no disk file)."""
     config_json = {
         "id": "patch-prompt-agent",
         "description": "regression test agent",
         "runner": {"kind": "claude_code", "model": "haiku"},
     }
-    v1 = store.create_agent(
+    v1 = svc.create_agent(
         agent_id="patch-prompt-agent",
         config_json=config_json,
         author="test",
@@ -74,15 +74,15 @@ def _create_db_only_agent(store) -> dict:
         source="ui",
     )
     # Publish + activate v1 so PATCH/validation see it as the active version.
-    store.publish_version("patch-prompt-agent", v1["version"], reason="seed")
-    store.activate_version("patch-prompt-agent", v1["id"])
+    svc.publish_version("patch-prompt-agent", v1["version"], reason="seed")
+    svc.activate_version("patch-prompt-agent", v1["id"])
     return v1
 
 
 class TestPatchPreservesPromptContent:
     def test_patch_webhook_url_keeps_prompt_content(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        _create_db_only_agent(store)
+        client, svc = _app(isolated_data_dir)
+        _create_db_only_agent(svc)
 
         resp = client.patch(
             "/api/agents/patch-prompt-agent",
@@ -93,7 +93,7 @@ class TestPatchPreservesPromptContent:
         # The latest version is what the runtime resolves to. PATCH must
         # carry forward prompt_content into the new row, whether or not
         # it also bumps the active pointer.
-        latest = store.latest_version("patch-prompt-agent")
+        latest = svc.latest_version("patch-prompt-agent")
         assert latest is not None
         assert latest.get("prompt_content") == _PROMPT_BODY, (
             f"PATCH dropped prompt_content; latest row has "
@@ -108,8 +108,8 @@ class TestPatchPreservesPromptContent:
         stale data and overwrites whatever the PATCH just changed.
         That's how composition got clobbered in stage.generate_generic.
         """
-        client, store = _app(isolated_data_dir)
-        _create_db_only_agent(store)
+        client, svc = _app(isolated_data_dir)
+        _create_db_only_agent(svc)
 
         resp = client.patch(
             "/api/agents/patch-prompt-agent",
@@ -117,8 +117,8 @@ class TestPatchPreservesPromptContent:
         )
         assert resp.status_code == 200, resp.text
 
-        latest = store.latest_version("patch-prompt-agent")
-        active = store.get_active_version("patch-prompt-agent")
+        latest = svc.latest_version("patch-prompt-agent")
+        active = svc.active_version("patch-prompt-agent")
         assert latest is not None and active is not None
         assert active["id"] == latest["id"], (
             f"PATCH did not activate the new version: "
@@ -135,8 +135,8 @@ class TestPatchPreservesValidators:
     """
 
     def test_patch_webhook_url_preserves_validators(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        _create_db_only_agent(store)
+        client, svc = _app(isolated_data_dir)
+        _create_db_only_agent(svc)
 
         validators_payload = [
             {
@@ -170,8 +170,8 @@ class TestPatchPreservesValidators:
 
 class TestValidationPreservesPromptContent:
     def test_put_validation_keeps_prompt_content(self, isolated_data_dir) -> None:
-        client, store = _app(isolated_data_dir)
-        _create_db_only_agent(store)
+        client, svc = _app(isolated_data_dir)
+        _create_db_only_agent(svc)
 
         resp = client.put(
             "/api/agents/patch-prompt-agent/validation",
@@ -191,7 +191,7 @@ class TestValidationPreservesPromptContent:
         )
         assert resp.status_code == 200, resp.text
 
-        active = store.get_active_version("patch-prompt-agent")
+        active = svc.active_version("patch-prompt-agent")
         assert active is not None
         assert active.get("prompt_content") == _PROMPT_BODY, (
             "PUT /validation dropped prompt_content from the active version"

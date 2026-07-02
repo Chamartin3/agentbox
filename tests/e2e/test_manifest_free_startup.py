@@ -15,8 +15,8 @@ import pytest
 import agentbox.api.deps as _deps
 from agentbox.api.app import create_app
 from agentbox.core.config import load_settings
-from agentbox.core.db import SessionStore
 from fastapi.testclient import TestClient
+from agentbox.core.service.agents.service import AgentService
 
 
 def test_startup_with_no_manifest_and_empty_db(
@@ -30,7 +30,7 @@ def test_startup_with_no_manifest_and_empty_db(
     # Clear caches so the next call reads the new env vars
     for fn in (
         _deps.get_settings,
-        _deps.get_store,
+        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -48,7 +48,7 @@ def test_startup_with_no_manifest_and_empty_db(
     # Clear caches again for good measure
     for fn in (
         _deps.get_settings,
-        _deps.get_store,
+        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -63,10 +63,9 @@ def test_check_runtime_sources_allows_empty_db(
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
 
     settings = load_settings()
-    store = SessionStore(tmp_path / "agentbox.sqlite")
 
     # Should always return True
-    assert settings.check_runtime_sources(store) is True
+    assert settings.check_runtime_sources() is True
 
 
 def test_check_runtime_sources_detects_manifest(
@@ -81,7 +80,7 @@ def test_check_runtime_sources_detects_manifest(
     settings = load_settings()
 
     # Should return True because manifest exists
-    assert settings.check_runtime_sources(None) is True
+    assert settings.check_runtime_sources() is True
 
 
 def test_check_runtime_sources_detects_db_agents(
@@ -93,10 +92,9 @@ def test_check_runtime_sources_detects_db_agents(
     monkeypatch.setenv("AGENTBOX_MANIFEST", nonexistent)
 
     settings = load_settings()
-    store = SessionStore(tmp_path / "agentbox.sqlite")
 
     # Create a DB agent
-    store.create_agent(
+    AgentService().create_agent(
         agent_id="test-agent",
         config_json={"id": "test-agent"},
         author="test",
@@ -104,7 +102,7 @@ def test_check_runtime_sources_detects_db_agents(
     )
 
     # Should return True because DB has agents
-    assert settings.check_runtime_sources(store) is True
+    assert settings.check_runtime_sources() is True
 
 
 def test_agents_list_endpoint_empty_in_manifest_free_mode(
@@ -117,7 +115,7 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
     # Clear caches
     for fn in (
         _deps.get_settings,
-        _deps.get_store,
+        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -132,7 +130,7 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
     # Clear caches again
     for fn in (
         _deps.get_settings,
-        _deps.get_store,
+        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):

@@ -15,9 +15,10 @@ from agentbox.cli.shared import (
 )
 from agentbox.cli.shared.deps import (
     get_settings,
-    get_store as _get_store,
+    get_db as _get_store,
 )
 from agentbox.core.data import AgentDef
+from agentbox.core.service.agents.service import AgentService
 
 runner = CliRunner()
 
@@ -47,7 +48,7 @@ def _seed_agent(store, agent_id: str = "t1") -> str:
         description="Test agent",
         runner={"kind": "token", "model": "gpt-4o"},
     )
-    store.create_agent(
+    AgentService().create_agent(
         agent_id=agent_id,
         config_json=agent_def.model_dump(
             mode="python", exclude_none=True, warnings=False

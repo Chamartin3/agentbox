@@ -15,10 +15,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agentbox.core.agents.config import build_config_json_payload
-from agentbox.core.data import RunnerProfileCreate
-from agentbox.core.data._util import now_iso
-from agentbox.core.db.managers.agents import AgentVersionManager, PromptVersionManager
-from agentbox.core.db.managers.engines import RunnerProfileManager
+from agentbox.core.data import RunnerProfileCreate, now_iso
+from agentbox.core.db import (
+    AgentVersionManager,
+    PromptVersionManager,
+    RunnerProfileManager,
+)
 
 if TYPE_CHECKING:
     from agentbox.core.data import AgentDef
@@ -317,6 +319,10 @@ def startup_sweep(
                 )
                 agent_versions.insert_version(
                     agent_id=agent.id,
+                    version=agent_versions.next_version(agent.id),
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    source="manifest",
                     source_path=str(agent.source_path) if agent.source_path else "",
                     source_format=(
                         agent.source_format.value if agent.source_format else "unknown"
@@ -337,6 +343,10 @@ def startup_sweep(
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
                 agent_versions.insert_version(
                     agent_id=agent.id,
+                    version=agent_versions.next_version(agent.id),
+                    is_legacy=0,
+                    created_at=now_iso(),
+                    source="manifest",
                     source_path=str(agent.source_path) if agent.source_path else "",
                     source_format=(
                         agent.source_format.value if agent.source_format else "unknown"

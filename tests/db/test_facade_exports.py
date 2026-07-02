@@ -1,14 +1,12 @@
 """Regression guard for the ``agentbox.core.db`` façade.
 
-After plan 109 the façade exports **managers only** (plus the transitional
-``SessionStore``). If a name disappears from ``__all__`` (or stops being
-importable), call sites break.
+The façade exports **managers only**. If a name disappears from ``__all__``
+(or stops being importable), call sites break.
 """
 
 from __future__ import annotations
 
 import agentbox.core.db as data
-from agentbox.core.db.store import SessionStore as direct
 
 
 EXPECTED_EXPORTS: frozenset[str] = frozenset(
@@ -61,8 +59,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "HostEnvProfileManager",
         "McpToolDiscoveryCacheManager",
         "SettingManager",
-        # store (transitional — plan 111 → 112 → 110 retire it)
-        "SessionStore",
     }
 )
 
@@ -82,5 +78,6 @@ def test_every_export_is_importable() -> None:
     assert not missing, f"declared in __all__ but not present on module: {missing}"
 
 
-def test_session_store_is_the_store_class() -> None:
-    assert data.SessionStore is direct
+def test_session_store_is_gone() -> None:
+    assert "SessionStore" not in data.__all__
+    assert not hasattr(data, "SessionStore")

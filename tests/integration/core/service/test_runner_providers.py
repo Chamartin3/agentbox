@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import pytest
 from agentbox.core.engines.providers.base import ProviderDescriptor
-from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from agentbox.core.service.engines.providers import (
     InvalidProviderRequest,
     ProviderAuthFailed,
@@ -22,8 +22,8 @@ from agentbox.core.service.engines.providers import (
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 class _FakeProvider:
@@ -89,29 +89,29 @@ def test_list_runner_providers_backend_filter_excludes(monkeypatch) -> None:
 # ── list_provider_models ───────────────────────────────────────────────
 
 
-async def test_list_provider_models_unknown_provider(store: SessionStore) -> None:
+async def test_list_provider_models_unknown_provider(store: Database) -> None:
     with pytest.raises(ProviderNotFound):
-        await list_provider_models("nonexistent", store=store)
+        await list_provider_models("nonexistent", runner_profiles=store.runner_profiles)
 
 
 async def test_list_provider_models_incompatible_backend(
-    store: SessionStore, monkeypatch
+    store: Database, monkeypatch
 ) -> None:
     _patch_providers(monkeypatch, compat=["other"])
     with pytest.raises(InvalidProviderRequest, match="not compatible"):
-        await list_provider_models("mock", store=store, backend="mock")
+        await list_provider_models("mock", runner_profiles=store.runner_profiles, backend="mock")
 
 
 async def test_list_provider_models_missing_profile(
-    store: SessionStore, monkeypatch
+    store: Database, monkeypatch
 ) -> None:
     _patch_providers(monkeypatch, compat=["mock"])
     with pytest.raises(InvalidProviderRequest, match="Runner profile not found"):
-        await list_provider_models("mock", store=store, profile_id="missing")
+        await list_provider_models("mock", runner_profiles=store.runner_profiles, profile_id="missing")
 
 
 async def test_list_provider_models_auth_failed(
-    store: SessionStore, monkeypatch
+    store: Database, monkeypatch
 ) -> None:
     _patch_providers(monkeypatch, compat=["mock"])
 
@@ -127,12 +127,12 @@ async def test_list_provider_models_auth_failed(
         _raise_auth,
     )
     with pytest.raises(ProviderAuthFailed) as exc_info:
-        await list_provider_models("mock", store=store, backend="mock")
+        await list_provider_models("mock", runner_profiles=store.runner_profiles, backend="mock")
     assert exc_info.value.status_code == 401
 
 
 async def test_list_provider_models_upstream_error(
-    store: SessionStore, monkeypatch
+    store: Database, monkeypatch
 ) -> None:
     _patch_providers(monkeypatch, compat=["mock"])
 
@@ -148,11 +148,11 @@ async def test_list_provider_models_upstream_error(
         _raise_500,
     )
     with pytest.raises(ProviderUpstreamError):
-        await list_provider_models("mock", store=store, backend="mock")
+        await list_provider_models("mock", runner_profiles=store.runner_profiles, backend="mock")
 
 
 async def test_list_provider_models_request_error(
-    store: SessionStore, monkeypatch
+    store: Database, monkeypatch
 ) -> None:
     _patch_providers(monkeypatch, compat=["mock"])
 
@@ -164,11 +164,11 @@ async def test_list_provider_models_request_error(
         _raise_request_error,
     )
     with pytest.raises(ProviderUpstreamError):
-        await list_provider_models("mock", store=store, backend="mock")
+        await list_provider_models("mock", runner_profiles=store.runner_profiles, backend="mock")
 
 
 async def test_list_provider_models_value_error_from_registry(
-    store: SessionStore, monkeypatch
+    store: Database, monkeypatch
 ) -> None:
     _patch_providers(monkeypatch, compat=["mock"])
 
@@ -180,4 +180,4 @@ async def test_list_provider_models_value_error_from_registry(
         _raise_value_error,
     )
     with pytest.raises(InvalidProviderRequest):
-        await list_provider_models("mock", store=store, backend="mock")
+        await list_provider_models("mock", runner_profiles=store.runner_profiles, backend="mock")

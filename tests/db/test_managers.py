@@ -191,7 +191,7 @@ def test_generic_reads_return_models(blank_db: Database) -> None:
 
 
 def test_facade_exports_managers_only(blank_db: Database) -> None:
-    """After plan 109, the facade exports managers + SessionStore only.
+    """The facade exports managers only.
 
     Database and SQLModel entities (Run, etc.) are NOT in the facade — they
     are internal wiring / model layer accessed via core.db.database /
@@ -201,8 +201,8 @@ def test_facade_exports_managers_only(blank_db: Database) -> None:
     # Managers must be present
     assert "RunManager" in public
     assert "AgentManager" in public
-    assert "SessionStore" in public
-    # Database is no longer facade-exported
+    # SessionStore has been deleted; Database is internal wiring
+    assert "SessionStore" not in public
     assert "Database" not in public
     assert "Run" not in public
     # Internal machinery not in __all__

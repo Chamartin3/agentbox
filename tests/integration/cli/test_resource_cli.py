@@ -5,8 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.api.deps import get_store as _get_store
+from agentbox.api.deps import get_db as _get_store
 from agentbox.cli import app
+from agentbox.core.service.resources.repo import create_resource as create_repo_resource
 from agentbox.cli.shared import (
     get_executor,
     get_mcp_registry,
@@ -14,7 +15,7 @@ from agentbox.cli.shared import (
 from agentbox.cli.shared.deps import (
     get_resource_service,
     get_settings,
-    get_store,
+    get_db,
 )
 from typer.testing import CliRunner
 
@@ -29,7 +30,7 @@ def _clear_shared_deps_caches() -> None:
     ``agentbox.cli.shared``, which must be cleared independently so each
     test gets a fresh store pointed at its own tmp_path.
     """
-    for fn in (get_settings, get_store, get_executor, get_mcp_registry, get_resource_service):
+    for fn in (get_settings, get_db, get_executor, get_mcp_registry, get_resource_service):
         fn.cache_clear()
 
 
@@ -66,15 +67,15 @@ def test_resource_list_empty(store_fixture) -> None:
 
 
 def test_resource_list_shows_resource(store_fixture) -> None:
-    store_fixture.create_repo_resource("my-doc", "document", "My Doc")
+    create_repo_resource(slug="my-doc", type="document", display_name="My Doc")
     result = runner.invoke(app, ["ops", "resource", "repo", "ls"])
     assert result.exit_code == 0
     assert "my-doc" in result.output
 
 
 def test_resource_list_type_filter(store_fixture) -> None:
-    store_fixture.create_repo_resource("skill-a", "skill", "Skill A")
-    store_fixture.create_repo_resource("doc-b", "document", "Doc B")
+    create_repo_resource(slug="skill-a", type="skill", display_name="Skill A")
+    create_repo_resource(slug="doc-b", type="document", display_name="Doc B")
     result = runner.invoke(app, ["ops", "resource", "repo", "ls", "--type", "skill"])
     assert result.exit_code == 0
     assert "skill-a" in result.output
@@ -92,7 +93,7 @@ def test_resource_show_not_found(store_fixture) -> None:
 
 
 def test_resource_show_existing(store_fixture) -> None:
-    store_fixture.create_repo_resource("test-slug", "document", "Test Resource")
+    create_repo_resource(slug="test-slug", type="document", display_name="Test Resource")
     result = runner.invoke(app, ["ops", "resource", "repo", "show", "test-slug"])
     assert result.exit_code == 0
     assert "test-slug" in result.output
@@ -107,7 +108,7 @@ def test_resource_upload_creates_version(store_fixture, tmp_path: Path) -> None:
     src = tmp_path / "hello.txt"
     src.write_text("hello world")
     # Create the resource first
-    store_fixture.create_repo_resource("upload-test", "document", "Upload Test")
+    create_repo_resource(slug="upload-test", type="document", display_name="Upload Test")
     result = runner.invoke(
         app,
         [
@@ -206,7 +207,7 @@ def test_prompt_bindings_set_missing_resource(store_fixture) -> None:
 
 
 def test_prompt_bindings_set_and_list(store_fixture) -> None:
-    store_fixture.create_repo_resource("kb-docs", "document", "KB Docs")
+    create_repo_resource(slug="kb-docs", type="document", display_name="KB Docs")
     result = runner.invoke(
         app,
         [

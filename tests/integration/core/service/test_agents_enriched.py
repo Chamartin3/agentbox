@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.db import SessionStore
-from agentbox.core.service.agents import get_agent_detail, list_agents_enriched
+from agentbox.core.db.database import Database
+from agentbox.core.service.agents.service import AgentService
 
 
 def _make_settings(tmp_path: Path) -> Settings:
@@ -37,12 +37,12 @@ def _make_settings(tmp_path: Path) -> Settings:
     )
 
 
-def _seed_agent(store: SessionStore, agent_id: str) -> None:
+def _seed_agent(store: Database, agent_id: str) -> None:
     agent = AgentDef.model_validate({"id": agent_id, "description": f"desc-{agent_id}"})
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         config_json = agent.model_dump_json()
-    row = store.create_version(
+    row = AgentService().create_version(
         agent_id=agent_id,
         source_path="",
         source_format="db_only",
@@ -53,12 +53,12 @@ def _seed_agent(store: SessionStore, agent_id: str) -> None:
         prompt_content="hello prompt",
         source="manifest",
     )
-    store.activate_version(agent_id, row["id"])
+    AgentService().activate_version(agent_id, row["id"])
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
@@ -67,12 +67,12 @@ def settings(tmp_path: Path) -> Settings:
 
 
 def test_list_agents_enriched_returns_dicts_with_run_metadata(
-    store: SessionStore, settings: Settings
+    store: Database, settings: Settings
 ) -> None:
     _seed_agent(store, "alpha")
     _seed_agent(store, "beta")
 
-    listed = list_agents_enriched(store=store, settings=settings)
+    listed = AgentService().list_agents_enriched(settings=settings)
     by_id = {a["id"]: a for a in listed}
 
     assert set(by_id) == {"alpha", "beta"}
@@ -88,22 +88,22 @@ def test_list_agents_enriched_returns_dicts_with_run_metadata(
 
 
 def test_list_agents_enriched_empty_when_no_agents(
-    store: SessionStore, settings: Settings
+    store: Database, settings: Settings
 ) -> None:
-    assert list_agents_enriched(store=store, settings=settings) == []
+    assert AgentService().list_agents_enriched(settings=settings) == []
 
 
 def test_get_agent_detail_returns_none_for_unknown(
-    store: SessionStore, settings: Settings
+    store: Database, settings: Settings
 ) -> None:
-    assert get_agent_detail("missing", store=store, settings=settings) is None
+    assert AgentService().get_agent_detail("missing", settings=settings) is None
 
 
 def test_get_agent_detail_returns_full_payload(
-    store: SessionStore, settings: Settings
+    store: Database, settings: Settings
 ) -> None:
     _seed_agent(store, "alpha")
-    detail = get_agent_detail("alpha", store=store, settings=settings)
+    detail = AgentService().get_agent_detail("alpha", settings=settings)
 
     assert detail is not None
     assert detail["agent"]["id"] == "alpha"

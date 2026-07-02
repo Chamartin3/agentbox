@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from agentbox.core.service.workspaces import (
     WorkspaceExists,
     WorkspaceNotFound,
@@ -38,8 +38,8 @@ class _FakeSettings:
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
@@ -51,40 +51,40 @@ def settings(tmp_path: Path) -> _FakeSettings:
     return _FakeSettings(project_root=project_root, workspaces_root=ws_root)
 
 
-def _register(store: SessionStore, name: str) -> None:
-    store.create_workspace(name)
+def _register(store: Database, name: str) -> None:
+    store.workspaces.insert(name=name)
 
 
 # ── _registry ───────────────────────────────────────────────────────────
 
 
-def test_create_workspace_registry_happy(store: SessionStore) -> None:
-    result = create_workspace_registry("alpha", store=store)
+def test_create_workspace_registry_happy(store: Database) -> None:
+    result = create_workspace_registry("alpha")
     assert result["name"] == "alpha"
 
 
-def test_create_workspace_registry_duplicate(store: SessionStore) -> None:
+def test_create_workspace_registry_duplicate(store: Database) -> None:
     _register(store, "alpha")
     with pytest.raises(WorkspaceExists):
-        create_workspace_registry("alpha", store=store)
+        create_workspace_registry("alpha")
 
 
-def test_delete_workspace_registry(store: SessionStore) -> None:
+def test_delete_workspace_registry(store: Database, settings: _FakeSettings) -> None:
     _register(store, "alpha")
-    delete_workspace_registry("alpha", store=store, settings=None)  # type: ignore[arg-type]
+    delete_workspace_registry("alpha", settings=settings)  # type: ignore[arg-type]
     with pytest.raises(WorkspaceNotFound):
-        get_workspace_by_name("alpha", store=store, settings=None)  # type: ignore[arg-type]
+        get_workspace_by_name("alpha", settings=settings)  # type: ignore[arg-type]
 
 
-def test_get_workspace_by_name_unknown(store: SessionStore, settings: _FakeSettings) -> None:
+def test_get_workspace_by_name_unknown(store: Database, settings: _FakeSettings) -> None:
     with pytest.raises(WorkspaceNotFound):
-        get_workspace_by_name("missing", store=store, settings=settings)  # type: ignore[arg-type]
+        get_workspace_by_name("missing", settings=settings)  # type: ignore[arg-type]
 
 
-def test_list_workspaces_enriched(store: SessionStore, settings: _FakeSettings) -> None:
+def test_list_workspaces_enriched(store: Database, settings: _FakeSettings) -> None:
     _register(store, "ws1")
     _register(store, "ws2")
-    result = list_workspaces_enriched(store=store, settings=settings)  # type: ignore[arg-type]
+    result = list_workspaces_enriched(settings=settings)  # type: ignore[arg-type]
     assert len(result) >= 2
 
 
@@ -92,94 +92,93 @@ def test_list_workspaces_enriched(store: SessionStore, settings: _FakeSettings) 
 
 
 def test_read_file_by_name_happy(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
     _register(store, "filers")
     ws_path = settings.workspaces_root / "filers"
     ws_path.mkdir(parents=True, exist_ok=True)
     (ws_path / "README.md").write_text("hello")
     result = read_file_by_name(
-        "filers", "README.md", store=store, settings=settings  # type: ignore[arg-type]
+        "filers", "README.md", settings=settings  # type: ignore[arg-type]
     )
     assert result["content"] == "hello"
 
 
 def test_write_file_then_read(
-    store: SessionStore, settings: _FakeSettings
+    store: Database, settings: _FakeSettings
 ) -> None:
     _register(store, "writrs")
     write_file_by_name(
-        "writrs", "notes.txt", "data", store=store, settings=settings  # type: ignore[arg-type]
+        "writrs", "notes.txt", "data", settings=settings  # type: ignore[arg-type]
     )
     result = read_file_by_name(
-        "writrs", "notes.txt", store=store, settings=settings  # type: ignore[arg-type]
+        "writrs", "notes.txt", settings=settings  # type: ignore[arg-type]
     )
     assert result["content"] == "data"
 
 
-def test_read_file_path_escape(store: SessionStore, settings: _FakeSettings) -> None:
+def test_read_file_path_escape(store: Database, settings: _FakeSettings) -> None:
     _register(store, "escape")
     with pytest.raises(WorkspacePathEscape):
         read_file_by_name(
-            "escape", "../outside.txt", store=store, settings=settings  # type: ignore[arg-type]
+            "escape", "../outside.txt", settings=settings  # type: ignore[arg-type]
         )
 
 
 # ── _permissions ────────────────────────────────────────────────────────
 
 
-def test_get_permissions_defaults(store: SessionStore, settings: _FakeSettings) -> None:
+def test_get_permissions_defaults(store: Database, settings: _FakeSettings) -> None:
     _register(store, "perms-ws")
     result = get_permissions(
-        "perms-ws", store=store, settings=settings  # type: ignore[arg-type]
+        "perms-ws", settings=settings  # type: ignore[arg-type]
     )
     assert "permissions" in result
 
 
-def test_set_permissions_happy(store: SessionStore, settings: _FakeSettings) -> None:
+def test_set_permissions_happy(store: Database, settings: _FakeSettings) -> None:
     _register(store, "perms-ws2")
     result = set_permissions(
         "perms-ws2",
         {"network": "allow"},
-        store=store,
         settings=settings,  # type: ignore[arg-type]
     )
     permissions = result.get("permissions", result)
     assert permissions is not None
 
 
-def test_permissions_unknown_workspace(store: SessionStore, settings: _FakeSettings) -> None:
+def test_permissions_unknown_workspace(store: Database, settings: _FakeSettings) -> None:
     with pytest.raises(WorkspaceNotFound):
         get_permissions(
-            "missing", store=store, settings=settings  # type: ignore[arg-type]
+            "missing", settings=settings  # type: ignore[arg-type]
         )
 
 
 # ── _skills ─────────────────────────────────────────────────────────────
 
 
-def test_generate_skills_by_name(store: SessionStore, settings: _FakeSettings) -> None:
+def test_generate_skills_by_name(store: Database, settings: _FakeSettings) -> None:
     _register(store, "skillz")
     result = generate_skills_by_name(
-        "skillz", store=store, settings=settings  # type: ignore[arg-type]
+        "skillz", settings=settings  # type: ignore[arg-type]
     )
     assert isinstance(result, dict)
     assert result["workspace"] == "skillz"
 
 
-def test_list_skills_by_name_empty(store: SessionStore, settings: _FakeSettings) -> None:
+def test_list_skills_by_name_empty(store: Database, settings: _FakeSettings) -> None:
     _register(store, "noskills")
     result = list_skills_by_name(
-        "noskills", store=store, settings=settings  # type: ignore[arg-type]
+        "noskills", settings=settings  # type: ignore[arg-type]
     )
     assert isinstance(result, dict)
     assert result["skills"] == []
 
 
-def test_get_skill_content_missing(store: SessionStore, settings: _FakeSettings) -> None:
+def test_get_skill_content_missing(store: Database, settings: _FakeSettings) -> None:
     _register(store, "nosuchskill")
     result = get_skill_content_by_name(
-        "nosuchskill", "missing_skill", store=store, settings=settings  # type: ignore[arg-type]
+        "nosuchskill", "missing_skill", settings=settings  # type: ignore[arg-type]
     )
     assert result is None
 
@@ -187,7 +186,7 @@ def test_get_skill_content_missing(store: SessionStore, settings: _FakeSettings)
 # ── _configs ────────────────────────────────────────────────────────────
 
 
-def test_generate_configs_by_name(store: SessionStore, settings: _FakeSettings) -> None:
+def test_generate_configs_by_name(store: Database, settings: _FakeSettings) -> None:
     _register(store, "cfgrs")
     result = generate_configs_by_name(
         "cfgrs", settings=settings  # type: ignore[arg-type]
@@ -202,14 +201,14 @@ def test_generate_configs_by_name(store: SessionStore, settings: _FakeSettings) 
 # ── _mcp ────────────────────────────────────────────────────────────────
 
 
-def test_resolve_workspace_mcp_empty(store: SessionStore) -> None:
+def test_resolve_workspace_mcp_empty(store: Database) -> None:
     result = resolve_workspace_mcp("nonexistent")
     assert isinstance(result, dict)
     assert "servers" in result
 
 
-def test_resolve_workspace_mcp_with_workspace(store: SessionStore) -> None:
-    store.create_workspace("mcp-ws")
+def test_resolve_workspace_mcp_with_workspace(store: Database) -> None:
+    store.workspaces.insert(name="mcp-ws")
     result = resolve_workspace_mcp("mcp-ws")
     assert isinstance(result, dict)
     assert "servers" in result

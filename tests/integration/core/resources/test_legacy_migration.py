@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.db import SessionStore
+from agentbox.core.db.database import Database
 from agentbox.core.resources.migration import (
     KIND_TO_TYPE,
     migrate_shared_resources_to_repo,
@@ -13,12 +13,12 @@ from agentbox.core.resources.migration import (
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
-def _seed(store: SessionStore, *, kind: str, name: str, content: str = "x") -> None:
-    store.create_resource(
+def _seed(store: Database, *, kind: str, name: str, content: str = "x") -> None:
+    store.shared_resources.create_resource(
         id=f"{kind}-{name}",
         kind=kind,
         name=name,
@@ -26,7 +26,7 @@ def _seed(store: SessionStore, *, kind: str, name: str, content: str = "x") -> N
     )
 
 
-def test_migrates_each_supported_kind(store: SessionStore) -> None:
+def test_migrates_each_supported_kind(store: Database) -> None:
     _seed(store, kind="output_schema", name="OutSchema", content='{"type":"object"}')
     _seed(store, kind="input_schema", name="InSchema", content='{"type":"object"}')
     _seed(store, kind="user_template", name="UserTpl")
@@ -34,26 +34,34 @@ def test_migrates_each_supported_kind(store: SessionStore) -> None:
     _seed(store, kind="reference", name="Ref")
     _seed(store, kind="skill", name="MySkill")
 
-    report = migrate_shared_resources_to_repo(store)
+    report = migrate_shared_resources_to_repo(
+        store.shared_resources, store.resources, store.resource_versions
+    )
     assert report.summary()["migrated"] == 6
     assert report.failed == []
 
-    all_repo = store.list_repo_resources(limit=100)
+    all_repo = store.resources.list_resources(limit=100)
     types = sorted(r["type"] for r in all_repo)
     assert types == ["document", "document", "document", "schema", "schema", "skill"]
 
 
-def test_skips_mcp_server_kind(store: SessionStore) -> None:
+def test_skips_mcp_server_kind(store: Database) -> None:
     _seed(store, kind="mcp_server", name="srv")
-    report = migrate_shared_resources_to_repo(store)
+    report = migrate_shared_resources_to_repo(
+        store.shared_resources, store.resources, store.resource_versions
+    )
     assert report.summary()["skipped_kinds"] == 1
     assert report.summary()["migrated"] == 0
 
 
-def test_idempotent_second_run(store: SessionStore) -> None:
+def test_idempotent_second_run(store: Database) -> None:
     _seed(store, kind="reference", name="r1")
-    first = migrate_shared_resources_to_repo(store)
-    second = migrate_shared_resources_to_repo(store)
+    first = migrate_shared_resources_to_repo(
+        store.shared_resources, store.resources, store.resource_versions
+    )
+    second = migrate_shared_resources_to_repo(
+        store.shared_resources, store.resources, store.resource_versions
+    )
     assert first.summary()["migrated"] == 1
     assert second.summary()["migrated"] == 0
     assert second.summary()["skipped_existing"] == 1

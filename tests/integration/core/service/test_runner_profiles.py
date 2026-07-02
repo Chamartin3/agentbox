@@ -15,9 +15,7 @@ from agentbox.core.data import (
     RunnerProfileCreate,
     RunnerProfilePatch,
 )
-from agentbox.core.db import (
-    SessionStore,
-)
+from agentbox.core.db.database import Database
 from agentbox.core.engines.providers.base import ProviderDescriptor as PD
 from agentbox.core.service.engines.profile_validation import (
     InvalidProfile,
@@ -36,8 +34,8 @@ from agentbox.core.service.engines.profiles import (
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 # ── Fake plugin / provider surfaces ────────────────────────────────────
@@ -210,7 +208,7 @@ def test_validate_patch_uses_current_backend_for_compat(monkeypatch) -> None:
 # ── CRUD round-trip ────────────────────────────────────────────────────
 
 
-def test_create_profile_round_trip(store: SessionStore, monkeypatch) -> None:
+def test_create_profile_round_trip(store: Database, monkeypatch) -> None:
     _patch_backends(monkeypatch)
     data = RunnerProfileCreate(name="test", backend="mock")
     profile = create_profile(data, store=store)
@@ -219,31 +217,31 @@ def test_create_profile_round_trip(store: SessionStore, monkeypatch) -> None:
     assert profile.id
 
 
-def test_get_profile_raises_profile_not_found(store: SessionStore) -> None:
+def test_get_profile_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
         get_profile("nonexistent", store=store)
 
 
-def test_update_profile_raises_profile_not_found(store: SessionStore) -> None:
+def test_update_profile_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
         update_profile("nonexistent", RunnerProfilePatch(name="x"), store=store)
 
 
-def test_delete_profile_raises_profile_not_found(store: SessionStore) -> None:
+def test_delete_profile_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
         delete_profile("nonexistent", store=store)
 
 
-def test_get_profile_stats_raises_profile_not_found(store: SessionStore) -> None:
+def test_get_profile_stats_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
         get_profile_stats("nonexistent", store=store)
 
 
-def test_list_profiles_returns_empty_list(store: SessionStore) -> None:
+def test_list_profiles_returns_empty_list(store: Database) -> None:
     assert list_profiles(store=store) == []
 
 
-def test_list_profiles_filters_by_backend(store: SessionStore, monkeypatch) -> None:
+def test_list_profiles_filters_by_backend(store: Database, monkeypatch) -> None:
     _patch_backends(monkeypatch)
     create_profile(RunnerProfileCreate(name="a", backend="mock"), store=store)
     create_profile(RunnerProfileCreate(name="b", backend="mock"), store=store)
