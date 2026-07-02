@@ -9,7 +9,7 @@ import os
 import time as _time
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.events import (
@@ -29,14 +29,21 @@ from agentbox.core.engines.streaming.rate_limit import (
     detect_in_text_line,
 )
 
-if TYPE_CHECKING:
-    from agentbox.core.engines.backends.opencode.adapter import OpenCodeBackend
+class _SessionCarrier(Protocol):
+    """Minimal surface stream needs from the backend — the mutable session id.
+
+    Declared here (the lower module) so streaming depends on no adapter type;
+    ``OpenCodeBackend`` satisfies it structurally.
+    """
+
+    _session_id: str | None
+
 
 _HEARTBEAT_INTERVAL_SECONDS = 30.0
 
 
 async def _run_opencode_stream(
-    backend: OpenCodeBackend,
+    backend: _SessionCarrier,
     run_id: str,
     argv: list[str],
     cwd: Path,
