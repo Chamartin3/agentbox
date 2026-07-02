@@ -333,14 +333,14 @@ ignore_imports =
     # ── Permanent allowlist (composition root — Database lifecycle) ──────
     agentbox.core.service.base -> agentbox.core.db.database
     # ── Transitional: burned by plans 111/112 ────────────────────────────
-    agentbox.core.agents.composition.drift -> agentbox.core.db.database
-    agentbox.core.agents.composition.drift -> agentbox.core.db.agents.versions
     agentbox.core.engines.profiles -> agentbox.core.db.database
     agentbox.core.execution.observability.snapshot.runner -> agentbox.core.db.database
     agentbox.core.execution.orchestrate.executor -> agentbox.core.db.database
     agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.schema
     agentbox.core.service.agents.crud -> agentbox.core.db.schema
     agentbox.core.service.engines.providers -> agentbox.core.db.database
+    agentbox.core.service.lifecycle.startup -> agentbox.core.db.database
+    agentbox.core.service.workspaces.registry -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
     agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.database
     agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.system.config
