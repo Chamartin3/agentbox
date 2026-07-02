@@ -33,8 +33,10 @@ from agentbox.core.service.agents.crud import (
     list_all_agents as list_all_agents,
     resolve_agent as resolve_agent,
 )
-from agentbox.core.service.agents.prompt import (
+from agentbox.core.service.agents.prompt_patch import (
     AgentServiceError as AgentServiceError,
+)
+from agentbox.core.service.agents.prompt_validation import (
     get_agent_validation as get_agent_validation,
     put_agent_validation as put_agent_validation,
 )

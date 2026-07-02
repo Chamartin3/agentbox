@@ -17,7 +17,7 @@ from agentbox.core.agents.composition.drift import (
 from agentbox.core.constants import ValidatorKind
 from agentbox.core.data._util import now_iso
 from agentbox.core.service.agents.crud import resolve_agent
-from agentbox.core.service.agents.prompt.patch import (
+from agentbox.core.service.agents.prompt_patch import (
     AgentServiceError,
     decode_config_json,
 )

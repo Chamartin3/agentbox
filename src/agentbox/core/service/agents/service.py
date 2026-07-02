@@ -52,13 +52,13 @@ from agentbox.core.service.agents.crud import (
     get_agent_detail as _get_agent_detail_free,
     list_agents_enriched as _list_agents_enriched_free,
 )
-from agentbox.core.service.agents.prompt.patch import (
+from agentbox.core.service.agents.prompt_patch import (
     AgentServiceError as AgentServiceError,
     _apply_patch_to_agent,
     _validate_runner_against_registry,
     decode_config_json as _decode_config_json_free,
 )
-from agentbox.core.service.agents.prompt.validation import (
+from agentbox.core.service.agents.prompt_validation import (
     _validators_view,
     normalize_validator_entries as _normalize_validator_entries_free,
 )
