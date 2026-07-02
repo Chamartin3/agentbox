@@ -30,7 +30,7 @@ from agentbox.core.engines.streaming.rate_limit import (
 )
 
 if TYPE_CHECKING:
-    from agentbox.core.engines.backends.opencode import OpenCodeBackend
+    from agentbox.core.engines.backends.opencode.adapter import OpenCodeBackend
 
 _HEARTBEAT_INTERVAL_SECONDS = 30.0
 

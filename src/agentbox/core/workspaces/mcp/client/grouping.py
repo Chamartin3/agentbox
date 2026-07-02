@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from agentbox.core.workspaces.mcp.client.tool_manifest import Tool
+from agentbox.core.workspaces.mcp.client.types import Tool
 
 _READ_PREFIXES = ("get_", "list_", "search_", "check_", "select_", "find_")
 

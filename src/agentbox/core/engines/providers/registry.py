@@ -5,15 +5,13 @@ import time
 from typing import Any
 
 from agentbox.core.constants import BackendName
-from agentbox.core.engines.providers import (
-    anthropic,
-    cli,
-    google,
-    ollama,
-    openai,
-    openrouter,
-    xai,
-)
+import agentbox.core.engines.providers.anthropic as anthropic
+import agentbox.core.engines.providers.cli as cli
+import agentbox.core.engines.providers.google as google
+import agentbox.core.engines.providers.ollama as ollama
+import agentbox.core.engines.providers.openai as openai
+import agentbox.core.engines.providers.openrouter as openrouter
+import agentbox.core.engines.providers.xai as xai
 from agentbox.core.engines.providers.base import ProviderAdapter, ProviderDescriptor
 
 logger = logging.getLogger(__name__)

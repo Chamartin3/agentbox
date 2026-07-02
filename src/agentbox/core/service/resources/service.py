@@ -32,6 +32,7 @@ from agentbox.core.resources.importers.skill import SkillImporter
 from agentbox.core.resources.importers.upload import UploadImporter
 from agentbox.core.resources.importers.zip import ZipUploadImporter
 from agentbox.core.resources.pydantic_export import schema_to_pydantic
+from agentbox.core.service.agents.service import AgentService
 from agentbox.core.service.base import Service
 
 
@@ -607,8 +608,6 @@ class ResourceService(Service):
         the composed-prompt rendering until ``render_agent_prompt_preview``
         is migrated fully to managers (Phase C).
         """
-        from agentbox.core.service import AgentService  # noqa: PLC0415
-
         agent_svc = AgentService()
         if template is None:
             agent_def = agent_svc.resolve_agent(agent_id)

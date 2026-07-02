@@ -1,15 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from agentbox.core.workspaces.mcp.client.grouping import derive_groups
-
-
-@dataclass(frozen=True)
-class Tool:
-    name: str
-    description: str = ""
-    input_schema: dict | None = None
+from agentbox.core.workspaces.mcp.client.types import Tool
 
 
 class McpToolManifest:

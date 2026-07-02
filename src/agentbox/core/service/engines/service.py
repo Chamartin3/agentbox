@@ -44,7 +44,7 @@ from agentbox.core.engines import (
 from agentbox.core.engines.credentials import CredentialMethod
 from agentbox.core.engines.credentials import builtin as _cred_builtin  # noqa: F401 (registers credential methods on import)
 from agentbox.core.service.base import Service
-from agentbox.core.service.engines import profile_validation
+from agentbox.core.service.engines.profile_validation import validate_create, validate_patch
 
 # ponytail bridge — temporary until a dedicated providers service emerges.
 from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
@@ -112,7 +112,7 @@ class EngineService(Service):
         supplied; atomically clears ``is_system_default`` on sibling
         profiles when setting it True.
         """
-        profile_validation.validate_create(data)
+        validate_create(data)
 
         if data.id:
             profile_id = data.id
@@ -164,7 +164,7 @@ class EngineService(Service):
         ``is_system_default`` on sibling profiles when setting it True.
         """
         current = self.get_profile(profile_id)
-        profile_validation.validate_patch(patch, current_backend=current.backend)
+        validate_patch(patch, current_backend=current.backend)
 
         values: dict[str, Any] = {}
         if patch.name is not None:
