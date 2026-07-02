@@ -11,7 +11,7 @@ from typing import NoReturn
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_settings, get_store
+from agentbox.api.deps import get_db, get_settings
 from agentbox.core.service import prompts as prompts_service
 from agentbox.core.service.prompts import AgentNotFound, PromptError
 
@@ -30,9 +30,12 @@ def _raise_prompt_error(exc: PromptError) -> NoReturn:
 @router.get("/agents/{agent_id}/prompt")
 def get_prompt(agent_id: str) -> dict:
     try:
+        db = get_db()
         doc = prompts_service.get_prompt(
             agent_id,
-            store=get_store(),
+            agent_defs=db.agent_defs,
+            agent_versions=db.agent_versions,
+            prompt_versions=db.prompt_versions,
             project_root=get_settings().project_root,
         )
     except AgentNotFound as exc:
@@ -50,10 +53,12 @@ class PromptBody(BaseModel):
 def put_prompt(agent_id: str, body: PromptBody) -> dict:
     """Write prompt to disk and create a new committed version if changed."""
     try:
+        db = get_db()
         doc = prompts_service.put_prompt(
             agent_id,
             body.content,
-            store=get_store(),
+            agent_defs=db.agent_defs,
+            prompt_versions=db.prompt_versions,
             project_root=get_settings().project_root,
         )
     except AgentNotFound as exc:
@@ -71,7 +76,12 @@ def put_prompt(agent_id: str, body: PromptBody) -> dict:
 @router.get("/agents/{agent_id}/prompt/versions")
 def list_versions(agent_id: str) -> dict:
     try:
-        return prompts_service.list_versions(agent_id, store=get_store())
+        db = get_db()
+        return prompts_service.list_versions(
+            agent_id,
+            agent_defs=db.agent_defs,
+            prompt_versions=db.prompt_versions,
+        )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
 
@@ -79,7 +89,13 @@ def list_versions(agent_id: str) -> dict:
 @router.get("/agents/{agent_id}/prompt/versions/{version}")
 def get_version(agent_id: str, version: int) -> dict:
     try:
-        payload = prompts_service.get_version(agent_id, version, store=get_store())
+        db = get_db()
+        payload = prompts_service.get_version(
+            agent_id,
+            version,
+            agent_defs=db.agent_defs,
+            prompt_versions=db.prompt_versions,
+        )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
     if payload is None:
@@ -100,10 +116,12 @@ class DraftBody(BaseModel):
 @router.post("/agents/{agent_id}/prompt/draft")
 def save_draft(agent_id: str, body: DraftBody) -> dict:
     try:
+        db = get_db()
         doc = prompts_service.save_draft(
             agent_id,
             body.content,
-            store=get_store(),
+            agent_defs=db.agent_defs,
+            prompt_versions=db.prompt_versions,
             author=body.author,
         )
     except AgentNotFound as exc:
@@ -119,9 +137,11 @@ class PublishBody(BaseModel):
 @router.post("/agents/{agent_id}/prompt/publish")
 def publish_prompt(agent_id: str, body: PublishBody) -> dict:
     try:
+        db = get_db()
         doc = prompts_service.publish(
             agent_id,
-            store=get_store(),
+            agent_defs=db.agent_defs,
+            prompt_versions=db.prompt_versions,
             project_root=get_settings().project_root,
             changelog=body.changelog,
             author=body.author,
@@ -143,10 +163,12 @@ class RollbackBody(BaseModel):
 @router.post("/agents/{agent_id}/prompt/rollback")
 def rollback_prompt(agent_id: str, body: RollbackBody) -> dict:
     try:
+        db = get_db()
         doc = prompts_service.rollback(
             agent_id,
             body.target_version,
-            store=get_store(),
+            agent_defs=db.agent_defs,
+            prompt_versions=db.prompt_versions,
             project_root=get_settings().project_root,
             author=body.author,
         )

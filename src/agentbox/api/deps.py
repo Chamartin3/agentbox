@@ -13,7 +13,6 @@ from agentbox.core.service import (
     EvaluationService,
     ExecutionService,
     ResourceService,
-    SessionStore,
     SystemService,
     WorkspaceService,
 )
@@ -24,11 +23,6 @@ from agentbox.core.workspaces.mcp.client import McpRegistry
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return load_settings()
-
-
-@lru_cache(maxsize=1)
-def get_store() -> SessionStore:
-    return SessionStore(get_settings().db_path)
 
 
 @lru_cache(maxsize=1)
@@ -80,7 +74,7 @@ def get_workspace_service():
 
 @lru_cache(maxsize=1)
 def get_executor() -> RunExecutor:
-    return RunExecutor(get_store(), get_settings(), get_mcp_registry(), db=get_db())
+    return RunExecutor(get_db(), get_settings(), get_mcp_registry())
 
 
 @lru_cache(maxsize=1)

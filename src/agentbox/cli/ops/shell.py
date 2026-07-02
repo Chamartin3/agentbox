@@ -20,7 +20,7 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.cli.shared.deps import get_store
+from agentbox.cli.shared.deps import get_db
 from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 
@@ -100,10 +100,11 @@ def _render_env_doc(
         ws = obj.workspaces.get_workspace(ws_name)
         if not ws:
             return False
+        db = get_db()
         entries = render_env_doc(
-            store=get_store(),  # ponytail: transitional — render_env_doc needs WorkspaceBuildStore (plan 095)
-            workspace_id=ws.get("id") or ws_name,
-            workdir=workspace_path,
+            db.workspace_env_doc_versions,
+            ws.get("id") or ws_name,
+            workspace_path,
         )
         return bool(entries)
     except Exception as exc:

@@ -9,17 +9,18 @@ since it's a presentation concern.
 
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Annotated, NoReturn
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from agentbox.api.schemas import PaginatedEnvelope, paginate_list
-from agentbox.api.deps import get_mcp_registry, get_settings, get_store
-from agentbox.core.data import WorkspaceRow
-from agentbox.core.service import workspaces as workspaces_service
-from agentbox.core.workspaces.build import build_workspace_by_name
-from agentbox.core.service.prompts import AgentNotFound
+from agentbox.api.deps import get_db, get_mcp_registry, get_settings, get_workspace_service
+from agentbox.core import workspaces as ws
+from agentbox.core.config import Settings
+from agentbox.core.db.database import Database
+from agentbox.core.service.workspaces.files import is_user_file
+from agentbox.core.service.workspaces.service import WorkspaceService
 from agentbox.core.service.workspaces.errors import (
     WorkspaceExists,
     WorkspaceNotFound,
@@ -44,8 +45,9 @@ def _raise_agent_not_found(agent_id: str) -> NoReturn:
     raise HTTPException(404, f"unknown agent {agent_id!r}")
 
 
-def _build_workspace_cb(store, settings, name: str) -> None:
-    build_workspace_by_name(store, settings, name)
+def _build_workspace_cb(settings: Settings, name: str) -> None:
+    """Callback to build workspace after permissions are set."""
+    WorkspaceService().build_workspace(name)
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +57,8 @@ def _build_workspace_cb(store, settings, name: str) -> None:
 
 @router.get("")
 def list_workspaces(
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
     paginated: bool = False,
     q: str | None = None,
     sort: str | None = None,
@@ -62,9 +66,7 @@ def list_workspaces(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> list[dict] | PaginatedEnvelope:
-    result = workspaces_service.list_workspaces_enriched(
-        store=get_store(), settings=get_settings()
-    )
+    result = svc.list_workspaces(settings=settings)
     if paginated:
         return paginate_list(
             result,
@@ -85,11 +87,13 @@ class CreateWorkspaceBody(BaseModel):
 
 
 @router.post("", status_code=201)
-def create_workspace_registry(body: CreateWorkspaceBody) -> WorkspaceRow:
+def create_workspace_registry(
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    body: CreateWorkspaceBody,
+) -> dict:
     try:
-        return workspaces_service.create_workspace_registry(
+        return svc.create_workspace(
             body.name,
-            store=get_store(),
             description=body.description,
             path=body.path,
         )
@@ -98,12 +102,16 @@ def create_workspace_registry(body: CreateWorkspaceBody) -> WorkspaceRow:
 
 
 @router.delete("/by-name/{name}", status_code=200)
-def delete_workspace_registry(name: str, purge_disk: bool = False) -> dict:
+def delete_workspace_registry(
+    name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    purge_disk: bool = False,
+) -> dict:
     try:
-        return workspaces_service.delete_workspace_registry(
+        return svc.delete_workspace(
             name,
-            store=get_store(),
-            settings=get_settings(),
+            settings=settings,
             purge_disk=purge_disk,
         )
     except WorkspaceNotFound:
@@ -116,11 +124,28 @@ def delete_workspace_registry(name: str, purge_disk: bool = False) -> dict:
 
 
 @router.get("/by-name/{name}")
-def get_workspace_by_name(name: str) -> dict:
+def get_workspace_by_name(
+    name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        return workspaces_service.get_workspace_by_name(
-            name, store=get_store(), settings=get_settings()
-        )
+        ws_path, _ = svc.resolve_workspace_path(name, settings=settings)
+        files: list[dict] = []
+        if ws_path.exists():
+            for p in sorted(ws_path.rglob("*")):
+                if p.is_file():
+                    rel = str(p.relative_to(ws_path))
+                    if not is_user_file(rel):
+                        continue
+                    files.append({"path": rel, "size": p.stat().st_size})
+        return {
+            "name": name,
+            "path": str(ws_path),
+            "exists": ws_path.exists(),
+            "files": files,
+            "generated_configs": {},
+        }
     except WorkspaceNotFound:
         _raise_not_found(name)
 
@@ -131,14 +156,12 @@ def get_workspace_by_name(name: str) -> dict:
 
 
 @router.get("/by-name/{name}/permissions")
-def get_permissions_by_name(name: str) -> dict:
+def get_permissions_by_name(
+    name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+) -> dict:
     try:
-        return workspaces_service.get_permissions(
-            name,
-            store=get_store(),
-            settings=get_settings(),
-            mcp_manifest=_try_get_mcp_manifest(),
-        )
+        return svc.get_permissions(name)
     except WorkspaceNotFound:
         _raise_not_found(name)
 
@@ -148,14 +171,17 @@ class PermissionsBody(BaseModel):
 
 
 @router.put("/by-name/{name}/permissions")
-def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
+def set_permissions_by_name(
+    name: str,
+    body: PermissionsBody,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        return workspaces_service.set_permissions(
+        return svc.set_permissions(
             name,
             body.permissions,
-            store=get_store(),
-            settings=get_settings(),
-            mcp_manifest=_try_get_mcp_manifest(),
+            settings=settings,
             sync_cb=_build_workspace_cb,
         )
     except WorkspaceNotFound:
@@ -163,14 +189,12 @@ def set_permissions_by_name(name: str, body: PermissionsBody) -> dict:
 
 
 @router.get("/by-name/{name}/mcp-tools")
-def get_workspace_mcp_tools(name: str) -> dict:
+def get_workspace_mcp_tools(
+    name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+) -> dict:
     try:
-        return workspaces_service.get_workspace_mcp_tools(
-            name,
-            store=get_store(),
-            settings=get_settings(),
-            mcp_manifest=_try_get_mcp_manifest(),
-        )
+        return svc.get_workspace_mcp_tools(name)
     except WorkspaceNotFound:
         _raise_not_found(name)
 
@@ -181,47 +205,50 @@ def get_workspace_mcp_tools(name: str) -> dict:
 
 
 @router.post("/by-name/{name}/generate-configs")
-def generate_configs_by_name(name: str) -> dict:
+def generate_configs_by_name(
+    name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        return workspaces_service.generate_configs_by_name(
-            name,
-            store=get_store(),
-            settings=get_settings(),
-            mcp_manifest=_try_get_mcp_manifest(),
-        )
+        return svc.generate_configs(name, settings=settings)
     except WorkspaceNotFound:
         _raise_not_found(name)
 
 
 @router.post("/by-name/{name}/generate-skills")
-def generate_skills_by_name(name: str) -> dict:
+def generate_skills_by_name(
+    name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        return workspaces_service.generate_skills_by_name(
-            name, store=get_store(), settings=get_settings()
-        )
+        return svc.generate_skills(name, settings=settings)
     except WorkspaceNotFound:
         _raise_not_found(name)
 
 
 @router.get("/by-name/{name}/skills")
-def list_skills_by_name(name: str) -> dict:
+def list_skills_by_name(
+    name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        return workspaces_service.list_skills_by_name(
-            name, store=get_store(), settings=get_settings()
-        )
+        return svc.list_skills(name, settings=settings)
     except WorkspaceNotFound:
         _raise_not_found(name)
 
 
 @router.get("/by-name/{name}/skills/{skill_name}")
-def get_skill_content_by_name(name: str, skill_name: str) -> dict:
+def get_skill_content_by_name(
+    name: str,
+    skill_name: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        payload = workspaces_service.get_skill_content_by_name(
-            name,
-            skill_name,
-            store=get_store(),
-            settings=get_settings(),
-        )
+        payload = svc.get_skill_content(name, skill_name, settings=settings)
     except WorkspaceNotFound:
         _raise_not_found(name)
     if payload is None:
@@ -240,11 +267,14 @@ class FileBody(BaseModel):
 
 
 @router.get("/by-name/{name}/file")
-def read_file_by_name(name: str, path: str) -> dict:
+def read_file_by_name(
+    name: str,
+    path: str,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        payload = workspaces_service.read_file_by_name(
-            name, path, store=get_store(), settings=get_settings()
-        )
+        payload = svc.read_workspace_file(name, path, settings=settings)
     except WorkspaceNotFound:
         _raise_not_found(name)
     except WorkspacePathEscape as exc:
@@ -255,14 +285,18 @@ def read_file_by_name(name: str, path: str) -> dict:
 
 
 @router.put("/by-name/{name}/file")
-def write_file_by_name(name: str, body: FileBody) -> dict:
+def write_file_by_name(
+    name: str,
+    body: FileBody,
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
     try:
-        return workspaces_service.write_file_by_name(
+        return svc.write_workspace_file(
             name,
             body.path,
             body.content,
-            store=get_store(),
-            settings=get_settings(),
+            settings=settings,
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
@@ -276,69 +310,124 @@ def write_file_by_name(name: str, body: FileBody) -> dict:
 
 
 @router.get("/{agent_id}")
-def get_workspace(agent_id: str) -> dict:
-    try:
-        return workspaces_service.get_workspace_for_agent(
-            agent_id, store=get_store(), settings=get_settings()
-        )
-    except AgentNotFound:
+def get_workspace(
+    agent_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    db: Annotated[Database, Depends(get_db)]
+) -> dict:
+    agent = db.agent_defs.get(agent_id)
+    if agent is None:
         _raise_agent_not_found(agent_id)
+    info = ws.info(agent, settings, None)
+    files: list[dict] = []
+    if info.exists:
+        for p in sorted(info.path.rglob("*")):
+            if p.is_file():
+                rel = str(p.relative_to(info.path))
+                if not is_user_file(rel):
+                    continue
+                files.append({"path": rel, "size": p.stat().st_size})
+    return {
+        "agent_id": info.agent_id,
+        "path": str(info.path),
+        "exists": info.exists,
+        "ephemeral": info.ephemeral,
+        "files": files,
+        "generated_configs": {},
+    }
 
 
 @router.post("/{agent_id}")
-def create_workspace(agent_id: str) -> dict:
-    try:
-        return workspaces_service.create_workspace_for_agent(
-            agent_id, store=get_store(), settings=get_settings()
-        )
-    except AgentNotFound as exc:
-        raise HTTPException(404) from exc
+def create_workspace(
+    agent_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    db: Annotated[Database, Depends(get_db)]
+) -> dict:
+    agent = db.agent_defs.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    path = ws.ensure(agent, settings, None, scaffold=True)
+    return {"path": str(path)}
 
 
 @router.delete("/{agent_id}")
-def reset_workspace(agent_id: str) -> dict:
-    try:
-        return workspaces_service.reset_workspace_for_agent(
-            agent_id, store=get_store(), settings=get_settings()
-        )
-    except AgentNotFound as exc:
-        raise HTTPException(404) from exc
+def reset_workspace(
+    agent_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    db: Annotated[Database, Depends(get_db)]
+) -> dict:
+    agent = db.agent_defs.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    path = ws.reset(agent, settings, None)
+    return {"path": str(path)}
 
 
 @router.post("/{agent_id}/generate-configs")
-def generate_configs(agent_id: str) -> dict:
-    try:
-        return workspaces_service.generate_configs_for_agent(
-            agent_id,
-            store=get_store(),
-            settings=get_settings(),
-            mcp_manifest=_try_get_mcp_manifest(),
-        )
-    except AgentNotFound as exc:
-        raise HTTPException(404) from exc
+def generate_configs(
+    agent_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    db: Annotated[Database, Depends(get_db)]
+) -> dict:
+    agent = db.agent_defs.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    workspace_path, _ = ws.resolve_path(agent, settings)
+    workspace_id = (
+        agent.workspace
+        if agent.workspace and agent.workspace != "<ephemeral>"
+        else agent_id
+    )
+    paths = svc.generate_configs(workspace_id, settings=settings)
+    return {
+        "workspace": str(workspace_path),
+        "generated": paths.get("generated", {}),
+    }
 
 
 @router.get("/{agent_id}/skills")
-def list_skills(agent_id: str) -> dict:
-    try:
-        return workspaces_service.list_skills_for_agent(
-            agent_id, store=get_store(), settings=get_settings()
-        )
-    except AgentNotFound as exc:
-        raise HTTPException(404) from exc
+def list_skills(
+    agent_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    db: Annotated[Database, Depends(get_db)]
+) -> dict:
+    agent = db.agent_defs.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    workspace_path, _ = ws.resolve_path(agent, settings, None)
+    workspace_name = (
+        agent.workspace
+        if agent.workspace and agent.workspace != "<ephemeral>"
+        else agent_id
+    )
+    skills_result = svc.list_skills(workspace_name, settings=settings)
+    return {
+        "agent_id": agent_id,
+        "workspace": str(workspace_path),
+        "skills": skills_result.get("skills", []),
+    }
 
 
 @router.get("/{agent_id}/file")
-def read_file(agent_id: str, path: str) -> dict:
+def read_file(
+    agent_id: str,
+    path: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    db: Annotated[Database, Depends(get_db)]
+) -> dict:
+    agent = db.agent_defs.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    workspace_name = (
+        agent.workspace
+        if agent.workspace and agent.workspace != "<ephemeral>"
+        else agent_id
+    )
     try:
-        payload = workspaces_service.read_file_for_agent(
-            agent_id,
-            path,
-            store=get_store(),
-            settings=get_settings(),
-        )
-    except AgentNotFound as exc:
-        raise HTTPException(404) from exc
+        payload = svc.read_workspace_file(workspace_name, path, settings=settings)
     except WorkspacePathEscape as exc:
         raise HTTPException(400, "path escapes workspace") from exc
     if payload is None:
@@ -347,16 +436,27 @@ def read_file(agent_id: str, path: str) -> dict:
 
 
 @router.put("/{agent_id}/file")
-def write_file(agent_id: str, body: FileBody) -> dict:
+def write_file(
+    agent_id: str,
+    body: FileBody,
+    settings: Annotated[Settings, Depends(get_settings)],
+    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    db: Annotated[Database, Depends(get_db)]
+) -> dict:
+    agent = db.agent_defs.get(agent_id)
+    if agent is None:
+        raise HTTPException(404)
+    workspace_name = (
+        agent.workspace
+        if agent.workspace and agent.workspace != "<ephemeral>"
+        else agent_id
+    )
     try:
-        return workspaces_service.write_file_for_agent(
-            agent_id,
+        return svc.write_workspace_file(
+            workspace_name,
             body.path,
             body.content,
-            store=get_store(),
-            settings=get_settings(),
+            settings=settings,
         )
-    except AgentNotFound as exc:
-        raise HTTPException(404) from exc
     except WorkspacePathEscape as exc:
         raise HTTPException(400, "path escapes workspace") from exc

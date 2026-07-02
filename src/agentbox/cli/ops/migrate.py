@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.shared.deps import get_store
+from agentbox.cli.shared.deps import get_db
 from agentbox.core.constants import BackendName
 from agentbox.core.service.system.service import SystemService  # TODO(cli-arch): SystemService → facade (plan 095)
 # TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
@@ -194,8 +194,7 @@ def migrate_prompt_versions(ctx: typer.Context) -> None:
     See ``agentbox.core.db.backfill_prompt_versions``.
     """
     obj: CLIContext = ctx.obj
-    # ponytail: get_store() transitional — _backfill_prompt_versions only uses store.engine
-    n = _backfill_prompt_versions(get_store())
+    n = _backfill_prompt_versions(get_db())
     obj.render.ops.success(f"backfilled {n} run(s) with prompt_version_id")
 
 

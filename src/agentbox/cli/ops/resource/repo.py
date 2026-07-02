@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.shared.deps import get_resource_service, get_store
+from agentbox.cli.shared.deps import get_resource_service, get_db
 from agentbox.core.constants import ResourceType
 # TODO(cli-arch): ResourceService (plan 090)
 from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings  # TODO(cli-arch)
@@ -196,8 +196,13 @@ def repo_migrate_composition(
     if dry_run:
         obj.render.ops.warn("--dry-run not implemented; running for real.")
     settings = obj.settings
+    db = get_db()
     report = migrate_composition_to_bindings(
-        get_store(),  # ponytail: transitional — migrate_composition_to_bindings needs SessionStore
+        db.resources,
+        db.resource_versions,
+        db.agent_prompt_resource_bindings,
+        db.agent_version_files,
+        db.agent_versions,
         only_agent_id=agent,
         project_root=settings.project_root,
     )

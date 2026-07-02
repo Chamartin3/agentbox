@@ -15,7 +15,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from agentbox.api.deps import get_store
+from agentbox.api.deps import get_db
 from agentbox.core.service.engines import ProviderDescriptor, ProviderModel
 from agentbox.core.service.engines import providers as svc
 from agentbox.core.service.engines.providers import (
@@ -53,9 +53,10 @@ async def list_provider_models(
 ) -> list[ProviderModel]:
     """List available models from a provider."""
     try:
+        db = get_db()
         return await svc.list_provider_models(
             provider_id,
-            store=get_store(),
+            runner_profiles=db.runner_profiles,
             profile_id=profile_id,
             base_url=base_url,
             api_key_env=api_key_env,

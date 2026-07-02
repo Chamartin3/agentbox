@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.shared.deps import get_store
+from agentbox.cli.shared.deps import get_db
 
 from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): migrate to WorkspaceService (plan 095)
 
@@ -120,10 +120,11 @@ def env_doc_preview(
         return
 
     try:
+        db = get_db()
         entries = render_env_doc(
-            store=get_store(),  # ponytail: transitional — render_env_doc needs WorkspaceBuildStore (plan 095)
-            workspace_id=workspace_id,
-            workdir=Path("."),
+            db.workspace_env_doc_versions,
+            workspace_id,
+            Path("."),
         )
     except Exception as exc:
         obj.render.system.error(f"preview failed: {exc}")

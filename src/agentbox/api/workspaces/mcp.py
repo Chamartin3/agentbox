@@ -16,8 +16,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_workspace_service
 from agentbox.core.constants import McpPolicy
-from agentbox.core.service import WorkspaceService
-from agentbox.core.service import workspaces as ws_service
+from agentbox.core.service.workspaces.service import WorkspaceService
 
 router = APIRouter(tags=["workspace-mcp-provisioning"])
 
@@ -39,14 +38,20 @@ class PolicyBody(BaseModel):
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp")
-def get_effective_mcp(workspace_id: str):
-    return ws_service.resolve_workspace_mcp(workspace_id)
+def get_effective_mcp(
+    workspace_id: str,
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
+):
+    return ws.resolve_workspace_mcp(workspace_id)
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp/servers")
-def get_effective_servers(workspace_id: str):
+def get_effective_servers(
+    workspace_id: str,
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
+):
     """Effective per-workspace MCP servers — union of manifest + overrides."""
-    return ws_service.resolve_workspace_mcp(workspace_id)
+    return ws.resolve_workspace_mcp(workspace_id)
 
 
 @router.get("/api/workspaces/{workspace_id}/mcp/policy")
@@ -110,9 +115,12 @@ def set_tool_override(
 
 
 @router.post("/api/workspaces/{workspace_id}/mcp/refresh", status_code=200)
-def refresh_workspace_mcp_discovery(workspace_id: str):
+def refresh_workspace_mcp_discovery(
+    workspace_id: str,
+    ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
+):
     """Invalidate the MCP tool discovery cache for this workspace's servers.
 
     Returns count of cache entries removed.
     """
-    return ws_service.refresh_workspace_mcp_discovery(workspace_id)
+    return ws.refresh_mcp_discovery(workspace_id)

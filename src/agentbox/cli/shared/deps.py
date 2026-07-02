@@ -15,7 +15,6 @@ from functools import lru_cache
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db.database import Database  # ponytail: transitional — 113_04 routes DI through Services
-from agentbox.core.service import SessionStore
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
@@ -23,11 +22,6 @@ from agentbox.core.workspaces.mcp.client import McpRegistry
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return load_settings()
-
-
-@lru_cache(maxsize=1)
-def get_store() -> SessionStore:
-    return SessionStore(get_settings().db_path)
 
 
 @lru_cache(maxsize=1)
@@ -43,7 +37,7 @@ def get_mcp_registry() -> McpRegistry:
 
 @lru_cache(maxsize=1)
 def get_executor() -> RunExecutor:
-    return RunExecutor(get_store(), get_settings(), get_mcp_registry(), db=get_db())
+    return RunExecutor(get_db(), get_settings(), get_mcp_registry())
 
 
 # ---------------------------------------------------------------------------

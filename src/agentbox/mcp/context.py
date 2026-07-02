@@ -18,7 +18,7 @@ from agentbox.core.service import (
     SystemService,
     WorkspaceService,
 )
-from agentbox.mcp.deps import _get_db, _get_settings, _get_store
+from agentbox.mcp.deps import _get_db, _get_settings
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,6 @@ def get_mcp_context() -> MCPContext:
     """Cached singleton factory. Called once in ``build_server()``."""
     _get_settings()
     _get_db()
-    _get_store()
     return MCPContext(
         agents=AgentService(),
         workspaces=WorkspaceService(),

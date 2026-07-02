@@ -20,7 +20,6 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.shared.deps import get_store
 from agentbox.cli.shared.renderers.ops import OpsRenderer
 from agentbox.core.config import Settings  # TODO(cli-arch): Settings (plan 095)
 from agentbox.core.constants import RunnerKind  # TODO(cli-arch): RunnerKind export (plan 095)
@@ -29,8 +28,6 @@ from agentbox.core.service import AgentDef, WorkspaceService  # TODO(cli-arch): 
 from agentbox.core.service.system.service import SystemService
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.workspaces import launch_runner_configs
-# TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.service import build_workspace
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.mcp.client import McpRegistry
 
@@ -112,13 +109,8 @@ def _launch_session(
     # workspaces (build_workspace also no-ops on those).
     if workspace_name and not is_ephemeral:
         try:
-            sync_result = build_workspace(
-                get_store(),  # ponytail: transitional — build_workspace still takes SessionStore (plan 112)
-                settings=settings,
-                workspace_id=workspace_name,
-                workdir=workspace_path,
-            )
-            if sync_result.errors:
+            sync_result = obj.workspaces.build_workspace(workspace_name)
+            if sync_result and sync_result.errors:
                 for err in sync_result.errors:
                     ops.warn(f"sync warning: {err}")
         except Exception as e:
