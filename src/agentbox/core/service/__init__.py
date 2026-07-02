@@ -162,3 +162,4 @@ from agentbox.core.workspaces.build import build_workspace_by_name as build_work
 from agentbox.core.service.workspaces.service import WorkspaceService as WorkspaceService
 from agentbox.core.service.workspaces.service import env_doc_body as env_doc_body
 from agentbox.core.service.workspaces.service import render_env_doc_preview as render_env_doc_preview
+from agentbox.core.service.workspaces.service import save_and_sync_env_doc as save_and_sync_env_doc

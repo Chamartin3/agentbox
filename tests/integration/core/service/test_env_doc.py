@@ -1,4 +1,4 @@
-"""Tests for ``core.service.env_doc`` — preview, save+sync.
+"""Tests for the env-doc service free functions — preview, save+sync.
 
 The env-doc is plain markdown text stored as ``content_json = {"body": ...}``.
 """
@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from agentbox.core.db import SessionStore
-from agentbox.core.service.env_doc import (
+from agentbox.core.db.database import Database
+from agentbox.core.service import (
     env_doc_body,
     render_env_doc_preview,
     save_and_sync_env_doc,
@@ -18,8 +18,8 @@ from agentbox.core.service.env_doc import (
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> SessionStore:
-    return SessionStore(tmp_path / "agentbox.sqlite")
+def store(tmp_path: Path) -> Database:
+    return Database(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
@@ -56,25 +56,21 @@ def test_render_env_doc_preview_identical_body() -> None:
 
 
 def test_save_and_sync_env_doc_creates_version(
-    store: SessionStore, settings: object
+    store: Database, settings: object
 ) -> None:
-    store.create_workspace("test-ws")
-    result = save_and_sync_env_doc(
-        store, settings, "test-ws", content="# Test\n\nTesting"  # type: ignore[arg-type]
-    )
+    store.workspaces.insert("test-ws")
+    result = save_and_sync_env_doc("test-ws", content="# Test\n\nTesting")
     assert isinstance(result, dict)
     assert result.get("changelog") is not None
-    active = store.get_active_env_doc("test-ws")
+    active = store.workspace_env_doc_versions.get_active("test-ws")
     assert active is not None
     assert active["content_json"]["body"] == "# Test\n\nTesting"
 
 
 def test_save_and_sync_missing_workspace(
-    store: SessionStore, settings: object
+    store: Database, settings: object
 ) -> None:
     """save_env_doc creates a workspace record if none exists, so this
     verifies the function completes rather than crashing."""
-    result = save_and_sync_env_doc(
-        store, settings, "nonexistent", content="# X"  # type: ignore[arg-type]
-    )
+    result = save_and_sync_env_doc("nonexistent", content="# X")
     assert isinstance(result, dict)

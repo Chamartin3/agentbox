@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
-from agentbox.core.service import env_doc as svc
+from agentbox.core.service import render_env_doc_preview
 
 router = APIRouter(tags=["env-doc"])
 
@@ -67,4 +67,4 @@ def preview_env_doc(
         if not active:
             raise HTTPException(status_code=404, detail="no env doc for workspace")
         content = active["content_json"]
-    return svc.render_env_doc_preview(content)
+    return render_env_doc_preview(content)

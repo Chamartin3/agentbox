@@ -1245,3 +1245,16 @@ def render_env_doc_preview(content: Any) -> dict[str, str]:
     """Preview the instruction files. Identical body for every engine."""
     body = env_doc_body(content)
     return {"claude_md": body, "agents_md": body}
+
+
+def save_and_sync_env_doc(
+    workspace_id: str,
+    *,
+    content: Any,
+    reason: str = "edit",
+    actor: str | None = None,
+) -> dict[str, Any]:
+    """Persist env-doc as live version, then sync CLAUDE.md/AGENTS.md on disk."""
+    return WorkspaceService().save_and_sync_env_doc(
+        workspace_id, content=content, reason=reason, actor=actor
+    )
