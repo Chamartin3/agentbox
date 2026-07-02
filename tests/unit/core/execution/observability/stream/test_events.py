@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.events import (
     DoneEvent,
     LogEvent,
@@ -27,13 +28,13 @@ _ADAPTER: TypeAdapter[RunEvent] = TypeAdapter(RunEvent)
         ToolResultEvent(run_id=RUN_ID, tool="bash", ok=True, result_excerpt="a\nb"),
         TextEvent(run_id=RUN_ID, text="hi"),
         UsageEvent(run_id=RUN_ID, input_tokens=10, output_tokens=2, model="haiku"),
-        LogEvent(run_id=RUN_ID, level="warn", message="oops"),
+        LogEvent(run_id=RUN_ID, level=LogLevel.WARN, message="oops"),
         DoneEvent(run_id=RUN_ID, ok=True),
-        DoneEvent(run_id=RUN_ID, ok=False, status="timeout", error="took too long"),
+        DoneEvent(run_id=RUN_ID, ok=False, status=RunStatus.TIMEOUT, error="took too long"),
     ],
     ids=lambda e: e.type,
 )
-def test_event_roundtrips_through_json(event) -> None:  # type: ignore[no-untyped-def]
+def test_event_roundtrips_through_json(event: RunEvent) -> None:
     raw = event.model_dump_json()
     parsed = _ADAPTER.validate_json(raw)
     assert parsed.type == event.type

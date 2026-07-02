@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from fastapi.testclient import TestClient
 
-def test_create_and_get_active_resource(client) -> None:  # type: ignore[no-untyped-def]
+
+def test_create_and_get_active_resource(client: TestClient) -> None:
     """POST resource, then GET /{id} returns the active version."""
     # Create a resource
     create_resp = client.post(
@@ -36,7 +38,7 @@ def test_create_and_get_active_resource(client) -> None:  # type: ignore[no-unty
     assert data["is_active"] is True
 
 
-def test_create_duplicate_returns_409(client) -> None:  # type: ignore[no-untyped-def]
+def test_create_duplicate_returns_409(client: TestClient) -> None:
     """Creating a resource with duplicate id returns 409."""
     # Create first resource
     client.post(
@@ -64,7 +66,7 @@ def test_create_duplicate_returns_409(client) -> None:  # type: ignore[no-untype
     assert dup_resp.status_code == 409
 
 
-def test_list_resources_filters_by_kind(client) -> None:  # type: ignore[no-untyped-def]
+def test_list_resources_filters_by_kind(client: TestClient) -> None:
     """GET /api/resources?kind=X filters by resource kind."""
     # Create resources of different kinds
     client.post(
@@ -97,7 +99,7 @@ def test_list_resources_filters_by_kind(client) -> None:  # type: ignore[no-unty
     assert items[0]["id"] == "schema1"
 
 
-def test_list_resources_filters_by_query(client) -> None:  # type: ignore[no-untyped-def]
+def test_list_resources_filters_by_query(client: TestClient) -> None:
     """GET /api/resources?q=X filters by name/description search."""
     # Create resources with distinct names and descriptions
     client.post(
@@ -131,7 +133,7 @@ def test_list_resources_filters_by_query(client) -> None:  # type: ignore[no-unt
     assert items[0]["id"] == "res1"
 
 
-def test_list_resource_versions_single(client) -> None:  # type: ignore[no-untyped-def]
+def test_list_resource_versions_single(client: TestClient) -> None:
     """GET /versions on a single-version resource returns that version."""
     # Create a resource
     client.post(
@@ -156,7 +158,7 @@ def test_list_resource_versions_single(client) -> None:  # type: ignore[no-untyp
     assert items[0]["is_active"] is True
 
 
-def test_activate_version_on_nonexistent_returns_404(client) -> None:  # type: ignore[no-untyped-def]
+def test_activate_version_on_nonexistent_returns_404(client: TestClient) -> None:
     """POST activate on non-existent version returns 404."""
     # Try to activate a non-existent version
     resp = client.post(
@@ -166,13 +168,13 @@ def test_activate_version_on_nonexistent_returns_404(client) -> None:  # type: i
     assert resp.status_code == 404
 
 
-def test_get_missing_resource_returns_404(client) -> None:  # type: ignore[no-untyped-def]
+def test_get_missing_resource_returns_404(client: TestClient) -> None:
     """GET /api/resources/{id} returns 404 for non-existent resource."""
     resp = client.get("/api/resources/nonexistent")
     assert resp.status_code == 404
 
 
-def test_create_resource_missing_author_returns_422(client) -> None:  # type: ignore[no-untyped-def]
+def test_create_resource_missing_author_returns_422(client: TestClient) -> None:
     """POST without author returns 422 (Pydantic validation)."""
     resp = client.post(
         "/api/resources",
@@ -187,7 +189,7 @@ def test_create_resource_missing_author_returns_422(client) -> None:  # type: ig
     assert resp.status_code == 422
 
 
-def test_create_resource_short_changelog_returns_400(client) -> None:  # type: ignore[no-untyped-def]
+def test_create_resource_short_changelog_returns_400(client: TestClient) -> None:
     """POST with changelog < 3 chars returns 400."""
     resp = client.post(
         "/api/resources",
@@ -204,7 +206,7 @@ def test_create_resource_short_changelog_returns_400(client) -> None:  # type: i
     )
 
 
-def test_create_version_missing_resource_returns_404(client) -> None:  # type: ignore[no-untyped-def]
+def test_create_version_missing_resource_returns_404(client: TestClient) -> None:
     """POST /api/resources/{id}/versions on non-existent id returns 404."""
     resp = client.post(
         "/api/resources/nonexistent/versions",
@@ -217,7 +219,7 @@ def test_create_version_missing_resource_returns_404(client) -> None:  # type: i
     assert resp.status_code == 404
 
 
-def test_activate_missing_version_returns_404(client) -> None:  # type: ignore[no-untyped-def]
+def test_activate_missing_version_returns_404(client: TestClient) -> None:
     """POST /api/resources/{id}/activate with non-existent version returns 404."""
     # Create a resource
     client.post(
@@ -239,7 +241,7 @@ def test_activate_missing_version_returns_404(client) -> None:  # type: ignore[n
     assert resp.status_code == 404
 
 
-def test_resource_tags_serialization(client) -> None:  # type: ignore[no-untyped-def]
+def test_resource_tags_serialization(client: TestClient) -> None:
     """Tags are stored and returned as a list in JSON."""
     # Create with tags
     create_resp = client.post(

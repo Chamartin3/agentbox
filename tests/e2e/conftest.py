@@ -17,8 +17,6 @@ from typing import Any
 import agentbox.api.deps as deps
 import pytest
 from agentbox.api.app import create_app
-from agentbox.core.db import SessionStore
-from agentbox.core.db.database import Database
 from fastapi.testclient import TestClient
 
 
@@ -60,49 +58,32 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     manifest.write_text("# test manifest\n")
     monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
 
-    for fn in (
-        deps.get_settings,
-        deps.get_store,
-        deps.get_executor,
-        deps.get_mcp_registry,
-    ):
-        fn.cache_clear()
+    _reset_deps_caches()
     return tmp_path
-
-
-@pytest.fixture
-def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
-    """Fresh on-disk SessionStore (sqlite) under ``tmp_path``."""
-    return SessionStore(tmp_path / "agentbox.sqlite")
-
-
-@pytest.fixture
-def db(tmp_path: Path):  # type: ignore[no-untyped-def]
-    """Fresh on-disk Database (sqlite) under ``tmp_path``."""
-    return Database(tmp_path / "agentbox.sqlite")
 
 
 @pytest.fixture
 def client(isolated_data_dir: Path) -> Iterator[Any]:
     """FastAPI TestClient with an isolated data dir."""
-    for fn in (
-        deps.get_settings,
-        deps.get_store,
-        deps.get_executor,
-        deps.get_mcp_registry,
-    ):
-        fn.cache_clear()
+    _reset_deps_caches()
 
     with TestClient(create_app()) as c:
         yield c
 
-    for fn in (
-        deps.get_settings,
-        deps.get_store,
-        deps.get_executor,
-        deps.get_mcp_registry,
-    ):
-        fn.cache_clear()
+    _reset_deps_caches()
+
+
+# Reset every lru_cache in ``api.deps`` plus the shared ``get_database`` pool so
+# a prior test never leaks a service/Database bound to its own data dir. Named
+# with a leading underscore and NOT a fixture — called from the fixtures above.
+def _reset_deps_caches() -> None:
+    from agentbox.core.db.database import get_database
+
+    for _name in dir(deps):
+        _fn = getattr(deps, _name)
+        if hasattr(_fn, "cache_clear"):
+            _fn.cache_clear()
+    get_database.cache_clear()
 
 
 # --------------------------------------------------------------------------- #

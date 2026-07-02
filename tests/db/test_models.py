@@ -87,9 +87,13 @@ def test_invalid_construction_raises() -> None:
         # (the actual validation is at the DB constraint level; the model
         # just ensures required fields are present)
 
-    # A model missing a required field should raise.
+    # A model missing a required field should raise. Build via model_validate
+    # with a dict so the deliberately-incomplete payload is a runtime concern,
+    # not a static type error.
     try:
-        Run(id="no-agent-id", status="running", input="hello", created_at="now")
+        Run.model_validate(
+            {"id": "no-agent-id", "status": "running", "input": "hello", "created_at": "now"}
+        )
         # agent_id is required but missing -> should raise
     except pydantic.ValidationError:
         pass
@@ -101,7 +105,7 @@ def test_invalid_construction_raises() -> None:
 
 
 def test_facade_managers_only() -> None:
-    """After plan 109, core.db.__all__ contains only managers + SessionStore.
+    """core.db.__all__ contains only managers.
 
     SQLModel entities (Run, Agent, etc.) are no longer re-exported by the
     façade — they live in ``agentbox.core.db.models``.
@@ -111,7 +115,8 @@ def test_facade_managers_only() -> None:
     assert "RunManager" in public_names
     assert "AgentManager" in public_names
     assert "WorkspaceManager" in public_names
-    assert "SessionStore" in public_names
+    # SessionStore has been deleted
+    assert "SessionStore" not in public_names
     # SQLModel entities must NOT be in the managers-only facade
     assert "Run" not in public_names, "Run leaked into managers-only facade"
     assert "Agent" not in public_names, "Agent leaked into managers-only facade"

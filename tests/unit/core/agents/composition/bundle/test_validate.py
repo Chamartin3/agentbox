@@ -54,7 +54,7 @@ class _ValidatorShim:
         return r.ok, r.error, r.engine
 
 
-def _make_executor(tmp_path: Path):  # type: ignore[no-untyped-def]
+def _make_executor(tmp_path: Path) -> _ValidatorShim:
     # Validation no longer needs an executor — return the shim to keep
     # the existing call sites working. The Settings/store/loader setup
     # was only ever used by ``_validate_output``, which now reads

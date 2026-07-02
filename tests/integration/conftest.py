@@ -1,6 +1,6 @@
 """Integration-test fixtures.
 
-All tests under ``tests/integration/`` get a real SQLite SessionStore
+All tests under ``tests/integration/`` get a real SQLite ``Database``
 and a full FastAPI TestClient with an isolated data directory per test.
 """
 
@@ -14,8 +14,6 @@ import agentbox.api.deps as api_deps
 import agentbox.cli.shared.deps as cli_deps
 import pytest
 from agentbox.api.app import create_app
-from agentbox.core.db import SessionStore
-from agentbox.core.db.database import Database
 from fastapi.testclient import TestClient
 
 
@@ -24,33 +22,27 @@ from fastapi.testclient import TestClient
 # --------------------------------------------------------------------------- #
 
 
+def _reset_all_deps_caches() -> None:
+    """Clear EVERY lru_cache in api.deps and cli.shared.deps plus the shared
+    ``get_database`` pool. The service factories (get_agent_service, …) are
+    ``@lru_cache`` and otherwise leak a service bound to a prior test's data
+    dir, which makes seed-then-read tests flaky under the full suite."""
+    from agentbox.core.db.database import get_database
+
+    for deps in (api_deps, cli_deps):
+        for name in dir(deps):
+            fn = getattr(deps, name)
+            if hasattr(fn, "cache_clear"):
+                fn.cache_clear()
+    get_database.cache_clear()
+
+
 @pytest.fixture(autouse=True)
 def _reset_agentbox_deps_caches() -> Iterator[None]:
-    """Clear every lru_cache in agentbox.api.deps and agentbox.cli.shared.deps
-    before AND after each integration test so cached singletons don't leak."""
-    for deps in (api_deps, cli_deps):
-        for fn in (
-            deps.get_settings,
-            deps.get_store,
-            deps.get_executor,
-            deps.get_mcp_registry,
-        ):
-            fn.cache_clear()
-        rsvc = getattr(deps, "get_resource_service", None)
-        if rsvc is not None and hasattr(rsvc, "cache_clear"):
-            rsvc.cache_clear()
+    """Reset DI caches before AND after each integration test."""
+    _reset_all_deps_caches()
     yield
-    for deps in (api_deps, cli_deps):
-        for fn in (
-            deps.get_settings,
-            deps.get_store,
-            deps.get_executor,
-            deps.get_mcp_registry,
-        ):
-            fn.cache_clear()
-        rsvc = getattr(deps, "get_resource_service", None)
-        if rsvc is not None and hasattr(rsvc, "cache_clear"):
-            rsvc.cache_clear()
+    _reset_all_deps_caches()
 
 
 # --------------------------------------------------------------------------- #
@@ -74,7 +66,6 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     for fn in (
         api_deps.get_settings,
-        api_deps.get_store,
         api_deps.get_executor,
         api_deps.get_mcp_registry,
     ):
@@ -88,18 +79,6 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.fixture
-def session_store(tmp_path: Path):  # type: ignore[no-untyped-def]
-    """Fresh on-disk SessionStore (sqlite) under ``tmp_path``."""
-    return SessionStore(tmp_path / "agentbox.sqlite")
-
-
-@pytest.fixture
-def db(tmp_path: Path):  # type: ignore[no-untyped-def]
-    """Fresh on-disk Database (sqlite) under ``tmp_path``."""
-    return Database(tmp_path / "agentbox.sqlite")
-
-
-@pytest.fixture
 def client(isolated_data_dir: Path) -> Iterator[Any]:
     """FastAPI TestClient with an isolated data dir.
 
@@ -108,7 +87,6 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
     """
     for fn in (
         api_deps.get_settings,
-        api_deps.get_store,
         api_deps.get_executor,
         api_deps.get_mcp_registry,
     ):
@@ -119,7 +97,6 @@ def client(isolated_data_dir: Path) -> Iterator[Any]:
 
     for fn in (
         api_deps.get_settings,
-        api_deps.get_store,
         api_deps.get_executor,
         api_deps.get_mcp_registry,
     ):

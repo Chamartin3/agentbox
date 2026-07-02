@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 from agentbox.core.events import DoneEvent, RunEvent, TextEvent
@@ -41,8 +42,8 @@ class _SlowBackend(BackendAdapter):
         self._sleep_s = sleep_s
         self._output = output
 
-    def render(  # type: ignore[no-untyped-def]
-        self, agent, workdir, mcp_tools=None, creds=None, runner_config=None
+    def render(
+        self, agent: object, workdir: Path, *args: object, **kw: object
     ) -> RenderedConfig:
         return RenderedConfig()
 
@@ -50,7 +51,7 @@ class _SlowBackend(BackendAdapter):
         self, rendered: RenderedConfig, input: str, run_id: str
     ) -> AsyncIterator[RunEvent]:
         await asyncio.sleep(self._sleep_s)
-        yield TextEvent(run_id=run_id, text=self._output, role="assistant")
+        yield TextEvent(run_id=run_id, text=self._output)
         yield DoneEvent(run_id=run_id, ok=True)
 
 

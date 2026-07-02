@@ -7,14 +7,16 @@ explode when the project has no agents/runs yet.
 
 from __future__ import annotations
 
+from fastapi.testclient import TestClient
 
-def test_list_agents_empty(client) -> None:  # type: ignore[no-untyped-def]
+
+def test_list_agents_empty(client: TestClient) -> None:
     r = client.get("/api/agents")
     assert r.status_code == 200
     assert r.json() == []
 
 
-def test_list_runs_empty(client) -> None:  # type: ignore[no-untyped-def]
+def test_list_runs_empty(client: TestClient) -> None:
     r = client.get("/api/runs")
     assert r.status_code == 200
     body = r.json()
@@ -24,19 +26,19 @@ def test_list_runs_empty(client) -> None:  # type: ignore[no-untyped-def]
     assert runs == []
 
 
-def test_usage_aggregate_zero_state(client) -> None:  # type: ignore[no-untyped-def]
+def test_usage_aggregate_zero_state(client: TestClient) -> None:
     r = client.get("/api/usage")
     assert r.status_code == 200
     body = r.json()
     assert body.get("runs", 0) == 0
 
 
-def test_activity_summary_default_range(client) -> None:  # type: ignore[no-untyped-def]
+def test_activity_summary_default_range(client: TestClient) -> None:
     r = client.get("/api/activity/summary")
     assert r.status_code == 200
     assert isinstance(r.json(), dict)
 
 
-def test_unknown_agent_404(client) -> None:  # type: ignore[no-untyped-def]
+def test_unknown_agent_404(client: TestClient) -> None:
     r = client.get("/api/agents/does-not-exist")
     assert r.status_code == 404

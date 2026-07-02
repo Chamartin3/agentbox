@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Callable
+from pathlib import Path
 
 import pytest
 
@@ -29,14 +30,16 @@ def make_slow_backend() -> Callable[..., BackendAdapter]:
         class _SlowBackend(BackendAdapter):
             name = "test-slow"
 
-            def render(self, agent, workdir, **kw) -> RenderedConfig:  # type: ignore[no-untyped-def]
+            def render(
+                self, agent: object, workdir: Path, *args: object, **kw: object
+            ) -> RenderedConfig:
                 return RenderedConfig()
 
             async def run(  # type: ignore[override]
                 self, rendered: RenderedConfig, input: str, run_id: str
             ) -> AsyncIterator[RunEvent]:
                 await asyncio.sleep(sleep_s)
-                yield TextEvent(run_id=run_id, text=output, role="assistant")
+                yield TextEvent(run_id=run_id, text=output)
                 yield DoneEvent(run_id=run_id, ok=True)
 
         return _SlowBackend()

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Coroutine
+from typing import TypeVar
 from unittest.mock import patch
 
 import httpx
@@ -13,12 +15,14 @@ from agentbox.core.workspaces.mcp.client.discovery import (
     discover_tools,
 )
 
+_T = TypeVar("_T")
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _run(coro):  # type: ignore[no-untyped-def]
+def _run(coro: Coroutine[object, object, _T]) -> _T:
     """Run a coroutine in a fresh event loop.
 
     Use a dedicated loop (created+closed inside this helper) instead of
