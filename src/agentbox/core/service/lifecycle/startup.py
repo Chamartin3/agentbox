@@ -37,6 +37,7 @@ from agentbox.core.service.lifecycle._utils import (
     _to_mcp_config,
 )
 from agentbox.core.service.lifecycle.report import StartupReport
+from agentbox.core.service.workspaces.service import WorkspaceService
 
 _log = logging.getLogger(__name__)
 
@@ -146,7 +147,6 @@ def sync_workspace_registry(
 ) -> StartupReport:
     """Prune phantom workspace rows that no real subsystem references."""
     try:
-        from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
         keep: set[str] = {"default"}
         if manifest is not None:
             keep |= {a.workspace or "default" for a in manifest.agents}

@@ -21,7 +21,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from pydantic import ValidationError
-from pydantic_ai import NativeOutput, PromptedOutput, RunContext
+from pydantic_ai import Agent, NativeOutput, PromptedOutput, RunContext
 # OpenAIChatModel is pydantic-ai's canonical class; the old OpenAIModel name is
 # now a deprecated subclass. Import the canonical name (aliased for local use).
 from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
@@ -99,18 +99,6 @@ async def run_direct_agent_mode(
     db_path: str | None = None,
 ) -> AsyncIterator[RunEvent]:
     """Drive a directly-constructed ``pydantic_ai.Agent`` to completion."""
-    try:
-        from pydantic_ai import Agent  # noqa: PLC0415
-    except ImportError:
-        yield DoneEvent(
-            run_id=run_id,
-            ok=False,
-            error=(
-                "pydantic-ai is not installed. Install it to use the token backend."
-            ),
-        )
-        return
-
     # Build result_type from output schema when present. The strict
     # converter preserves enums, length/pattern, ranges and
     # ``additionalProperties=false`` so pydantic-ai's own validation

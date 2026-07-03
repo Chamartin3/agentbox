@@ -9,8 +9,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.config import Settings
+from agentbox.core.data import AgentDef
+from agentbox.core.db.database import get_database
 from agentbox.core.resources.skills import discover_skills
 from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.workspaces.crud import info as _workspace_info
 
 from .errors import WorkspaceExists
 from .files import is_user_file
@@ -123,10 +126,6 @@ def list_all_workspaces(
     workspace path DB lookup is skipped (store=None) — deprecated callers
     should use WorkspaceService.list_workspaces() instead.
     """
-    from agentbox.core.data import AgentDef  # noqa: PLC0415
-    from agentbox.core.db.database import get_database  # noqa: PLC0415
-    from agentbox.core.workspaces.crud import info as _workspace_info  # noqa: PLC0415
-
     db = get_database(str(settings.db_path))
     agents: list[AgentDef] = []
     for r in db.agent_versions.list_latest_per_agent():

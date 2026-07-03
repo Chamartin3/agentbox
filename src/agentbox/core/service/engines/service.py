@@ -45,6 +45,7 @@ from agentbox.core.engines.credentials import CredentialMethod
 from agentbox.core.engines.credentials import builtin as _cred_builtin  # noqa: F401 (registers credential methods on import)
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines.profile_validation import validate_create, validate_patch
+from agentbox.core.service.evaluation.service import EvaluationService
 
 # ponytail bridge — temporary until a dedicated providers service emerges.
 from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
@@ -267,8 +268,6 @@ class EngineService(Service):
 
         Raises ``ProfileNotFound`` if the profile does not exist.
         """
-        from agentbox.core.service.evaluation.service import EvaluationService  # noqa: PLC0415
-
         if self._db.runner_profiles.get_by_id(profile_id) is None:
             raise ProfileNotFound(profile_id)
         return EvaluationService().runner_profile_stats(profile_id, since=since, until=until)
@@ -279,8 +278,6 @@ class EngineService(Service):
         until: str | None = None,
     ) -> list[RunnerProfileStats]:
         """Aggregate stats for all runner profiles."""
-        from agentbox.core.service.evaluation.service import EvaluationService  # noqa: PLC0415
-
         return EvaluationService().list_runner_profile_stats(since=since, until=until)
 
     # ------------------------------------------------------------------
