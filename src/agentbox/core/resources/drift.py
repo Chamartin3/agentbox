@@ -12,12 +12,9 @@ import hashlib
 import logging
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from agentbox.core.constants import ResourceType
-
-if TYPE_CHECKING:
-    from agentbox.core.db import ResourceManager, ResourceVersionManager
+from agentbox.core.db import ResourceManager, ResourceVersionManager
 
 logger = logging.getLogger(__name__)
 

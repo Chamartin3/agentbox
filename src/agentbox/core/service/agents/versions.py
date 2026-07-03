@@ -7,20 +7,18 @@ from __future__ import annotations
 
 import hashlib
 import json as _json
-from typing import Any, TYPE_CHECKING, cast
+from typing import Any, cast
 
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.constants import SessionMode
 from agentbox.core.data import AgentDef, AgentVersionRow
 from agentbox.core.data._util import now_iso
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        AgentDefManager,
-        AgentMetaManager,
-        AgentVersionFileManager,
-        AgentVersionManager,
-    )
+from agentbox.core.db import (
+    AgentDefManager,
+    AgentMetaManager,
+    AgentVersionFileManager,
+    AgentVersionManager,
+)
 
 
 class AgentAlreadyExists(ValueError):

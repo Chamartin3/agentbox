@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
 
 from agentbox.core.agents.config import (
     HttpValidatorConfig,
@@ -13,14 +12,12 @@ from agentbox.core.agents.config import (
 from agentbox.core.agents.composition.bundle import _append_input_schema, _append_schema
 from agentbox.core.agents.composition.output_contract import render as _render_output_contract
 from agentbox.core.agents.composition.rendering import render_for_type
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        AgentVersionManager,
-        ResourceBlobManager,
-        ResourceManager,
-        ResourceVersionManager,
-    )
+from agentbox.core.db import (
+    AgentVersionManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
+)
 
 
 class PreviewError(Exception):

@@ -6,13 +6,9 @@ from workspace concerns per the domain split.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from agentbox.core.data import AgentMetaRow
 from agentbox.core.data._util import now_iso
-
-if TYPE_CHECKING:
-    from agentbox.core.data import AgentMetaRow
-    from agentbox.core.db import AgentMetaManager, AgentVersionManager
+from agentbox.core.db import AgentMetaManager, AgentVersionManager
 
 
 def replace_version_config(

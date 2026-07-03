@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import types
-from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
@@ -15,25 +14,23 @@ from sqlalchemy.engine import Engine
 from agentbox.core import workspaces as ws
 from agentbox.core.agents.composition.bundle import compose_from_source
 from agentbox.core.agents.composition.bundle.loader import load_bundle_from_bindings
+from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
+from agentbox.core.db import (
+    AgentDefManager,
+    AgentMetaManager,
+    AgentPromptResourceBindingManager,
+    AgentVersionCommentManager,
+    AgentVersionFileManager,
+    AgentVersionManager,
+    AgentVersionRatingManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
+)
 from agentbox.core.db.schema import agent_runner_profiles  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
 from agentbox.core.db.schema import runs as runs_table  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
 from agentbox.core.service.engines.service import EngineService
-
-if TYPE_CHECKING:
-    from agentbox.core.config import Settings
-    from agentbox.core.db import (
-        AgentDefManager,
-        AgentMetaManager,
-        AgentPromptResourceBindingManager,
-        AgentVersionCommentManager,
-        AgentVersionFileManager,
-        AgentVersionManager,
-        AgentVersionRatingManager,
-        ResourceBlobManager,
-        ResourceManager,
-        ResourceVersionManager,
-    )
 
 logger = logging.getLogger(__name__)
 

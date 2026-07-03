@@ -15,17 +15,13 @@ source of truth: every entry point goes through
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from agentbox.core.agents.composition import prompts as _prompts
 from agentbox.core.agents.composition.prompts import PromptDoc, PromptError
+from agentbox.core.data import AgentDef
 from agentbox.core.data._util import now_iso
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from agentbox.core.data import AgentDef
-    from agentbox.core.db import AgentDefManager, AgentVersionManager, PromptVersionManager
+from agentbox.core.db import AgentDefManager, AgentVersionManager, PromptVersionManager
 
 __all__ = [
     "AgentNotFound",

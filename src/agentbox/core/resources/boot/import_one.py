@@ -5,15 +5,12 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from agentbox.core.constants import ResourceType
 from agentbox.core.data import hash_blobs
+from agentbox.core.db import ResourceManager, ResourceVersionManager
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.skill import SkillImporter
-
-if TYPE_CHECKING:
-    from agentbox.core.db import ResourceManager, ResourceVersionManager
 
 logger = logging.getLogger(__name__)
 

@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING
 
+from agentbox.core.db import ResourceManager, ResourceVersionManager
+from agentbox.core.resources.legacy_composition._helpers import (
+    mime_for,
+    parse_tags,
+    slug_for,
+)
 from agentbox.core.resources.legacy_composition._report import (
     MIGRATION_ACTOR,
     CompositionMigrationReport,
 )
-from agentbox.core.resources.legacy_composition._helpers import (
-    parse_tags,
-    slug_for,
-    mime_for,
-)
-
-if TYPE_CHECKING:
-    from agentbox.core.db import ResourceManager, ResourceVersionManager
 
 
 def get_or_create_resource(

@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from agentbox.core.db import AgentDefManager
 from agentbox.core.service.resources.service import BindingError, ResourceService
 from agentbox.core.service.workspaces.service import WorkspaceService
-
-if TYPE_CHECKING:
-    from agentbox.core.db import AgentDefManager
 
 __all__ = [
     "list_workspace_subagents",

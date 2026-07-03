@@ -6,12 +6,8 @@ a workspace.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from agentbox.core.db import WorkspaceFileResourceBindingManager
 from agentbox.core.tools.catalog import CallableItem
-
-if TYPE_CHECKING:
-    from agentbox.core.db import WorkspaceFileResourceBindingManager
 
 
 def resolve_resource_callables(

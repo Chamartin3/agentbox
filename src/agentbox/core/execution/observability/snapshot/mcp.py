@@ -3,18 +3,16 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from agentbox.core.data import McpSnapshot
+from agentbox.core.db import (
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpPolicyManager,
+    WorkspaceMcpToolOverrideManager,
+)
 from agentbox.core.db.system.config import load_project_mcp_servers
 from agentbox.core.workspaces.mcp.resolve import resolve_workspace_mcp_helper
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        WorkspaceMcpOverrideManager,
-        WorkspaceMcpPolicyManager,
-        WorkspaceMcpToolOverrideManager,
-    )
 
 logger = logging.getLogger(__name__)
 

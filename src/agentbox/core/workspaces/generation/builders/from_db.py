@@ -2,8 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from agentbox.core.config import Settings
+from agentbox.core.db import (
+    AgentDefManager,
+    AgentVersionManager,
+    WorkspaceEnvDocVersionManager,
+    WorkspaceFileResourceBindingManager,
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpToolOverrideManager,
+    WorkspaceManager,
+    WorkspaceSubagentManager,
+)
 from agentbox.core.db.system.config import load_project_mcp_servers
 from agentbox.core.workspaces.generation.config import (
     AgentRef,
@@ -12,19 +23,6 @@ from agentbox.core.workspaces.generation.config import (
     ResourceRef,
     WorkenvConfig,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.config import Settings
-    from agentbox.core.db import (
-        AgentDefManager,
-        AgentVersionManager,
-        WorkspaceEnvDocVersionManager,
-        WorkspaceFileResourceBindingManager,
-        WorkspaceMcpOverrideManager,
-        WorkspaceMcpToolOverrideManager,
-        WorkspaceManager,
-        WorkspaceSubagentManager,
-    )
 
 
 def load_workenv(

@@ -4,7 +4,7 @@ import difflib
 import hashlib
 import json
 import uuid
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 from agentbox.core.data import (
     AgentDef,
@@ -16,18 +16,16 @@ from agentbox.core.data import (
     PromptVersionRow,
 )
 from agentbox.core.data._util import now_iso
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        ActiveAgentVersionManager,
-        AgentDefManager,
-        AgentMetaManager,
-        AgentToolGrantManager,
-        AgentVersionCommentManager,
-        AgentVersionManager,
-        AgentVersionRatingManager,
-        PromptVersionManager,
-    )
+from agentbox.core.db import (
+    ActiveAgentVersionManager,
+    AgentDefManager,
+    AgentMetaManager,
+    AgentToolGrantManager,
+    AgentVersionCommentManager,
+    AgentVersionManager,
+    AgentVersionRatingManager,
+    PromptVersionManager,
+)
 
 
 # ---------------------------------------------------------------------------

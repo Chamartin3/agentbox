@@ -5,16 +5,12 @@ Delegates to ``WorkspaceService``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
+from agentbox.core.config import Settings
+from agentbox.core.db import AgentDefManager
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .files import _resolve_agent_or_raise
-
-if TYPE_CHECKING:
-    from agentbox.core.db import AgentDefManager
 
 __all__ = [
     "generate_skills_by_name",

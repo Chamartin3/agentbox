@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import json as _json
-from typing import TYPE_CHECKING
 
+from agentbox.core.db import AgentVersionManager
 from agentbox.core.service.evaluation.service import EvaluationService
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
-
-if TYPE_CHECKING:
-    from agentbox.core.db import AgentVersionManager
 
 
 def _svc() -> ExecutionService:

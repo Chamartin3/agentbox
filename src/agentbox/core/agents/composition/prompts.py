@@ -17,13 +17,10 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from agentbox.core.data import AgentDef
 from agentbox.core.data._util import now_iso
-
-if TYPE_CHECKING:
-    from agentbox.core.db import AgentVersionManager, PromptVersionManager
+from agentbox.core.db import AgentVersionManager, PromptVersionManager
 
 
 @dataclass(frozen=True)

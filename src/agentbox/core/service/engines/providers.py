@@ -18,11 +18,12 @@ Domain errors raised here:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import httpx
 
 from agentbox.core.data import RunnerProfile
+from agentbox.core.db import RunnerProfileManager
 from agentbox.core.engines import (
     EffectiveRunnerConfig,
     ProviderDescriptor,
@@ -32,9 +33,6 @@ from agentbox.core.engines import (
     list_providers,
     refresh_opencode_providers,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.db import RunnerProfileManager
 
 logger = logging.getLogger(__name__)
 

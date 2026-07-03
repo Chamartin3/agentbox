@@ -6,17 +6,13 @@ directly with managers rather than going through a service class.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from agentbox.core.db import (
+    WorkspaceHostEnvGrantManager,
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpPolicyManager,
+    WorkspaceMcpToolOverrideManager,
+)
 from agentbox.core.workspaces.permissions import resolve_grants
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        WorkspaceHostEnvGrantManager,
-        WorkspaceMcpOverrideManager,
-        WorkspaceMcpPolicyManager,
-        WorkspaceMcpToolOverrideManager,
-    )
 
 
 def _shallow_merge(base: dict | None, overrides: dict | None) -> dict:

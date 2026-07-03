@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json as _json
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 from agentbox.core.agents.composition.drift import (
     _build_config_json,
@@ -18,15 +18,13 @@ from agentbox.core.agents.resolve import engine_load_failure as backend_load_fai
 from agentbox.core.agents.resolve import list_engines
 from agentbox.core.data import AgentDef
 from agentbox.core.data._util import now_iso
+from agentbox.core.db import (
+    ActiveAgentVersionManager,
+    AgentDefManager,
+    AgentSyncManager,
+    AgentVersionManager,
+)
 from agentbox.core.service.agents.crud import resolve_agent
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        ActiveAgentVersionManager,
-        AgentDefManager,
-        AgentSyncManager,
-        AgentVersionManager,
-    )
 
 logger = logging.getLogger(__name__)
 

@@ -15,8 +15,25 @@ import logging
 import shutil
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from agentbox.core.config import Settings
+from agentbox.core.data import AgentDef
+from agentbox.core.db import (
+    AgentDefManager,
+    AgentPromptResourceBindingManager,
+    AgentVersionManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
+    WorkspaceEnvDocVersionManager,
+    WorkspaceFileResourceBindingManager,
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpToolOverrideManager,
+    WorkspaceManager,
+    WorkspaceRuntimePermissionManager,
+    WorkspaceSubagentManager,
+)
 from agentbox.core.resources.binding_materialize import materialize_workspace
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
 from agentbox.core.workspaces.generation.generator import render
@@ -24,25 +41,6 @@ from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
 from agentbox.core.workspaces.generation.workspace_files import (
     materialize_workspace_files,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.config import Settings
-    from agentbox.core.data import AgentDef
-    from agentbox.core.db import (
-        AgentDefManager,
-        AgentPromptResourceBindingManager,
-        AgentVersionManager,
-        ResourceBlobManager,
-        ResourceManager,
-        ResourceVersionManager,
-        WorkspaceEnvDocVersionManager,
-        WorkspaceFileResourceBindingManager,
-        WorkspaceMcpOverrideManager,
-        WorkspaceMcpToolOverrideManager,
-        WorkspaceManager,
-        WorkspaceRuntimePermissionManager,
-        WorkspaceSubagentManager,
-    )
 
 logger = logging.getLogger(__name__)
 

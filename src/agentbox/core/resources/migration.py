@@ -17,14 +17,12 @@ delete legacy rows — the legacy table is left in place until the
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        ResourceManager,
-        ResourceVersionManager,
-        SharedResourceManager,
-    )
+from agentbox.core.db import (
+    ResourceManager,
+    ResourceVersionManager,
+    SharedResourceManager,
+)
 
 KIND_TO_TYPE = {
     "output_schema": "schema",

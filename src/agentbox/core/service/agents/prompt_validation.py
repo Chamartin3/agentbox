@@ -9,25 +9,23 @@ from __future__ import annotations
 import hashlib
 import json as _json
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 from agentbox.core.agents.composition.drift import (
     _build_snapshot,
 )
 from agentbox.core.constants import ValidatorKind
 from agentbox.core.data._util import now_iso
+from agentbox.core.db import (
+    ActiveAgentVersionManager,
+    AgentDefManager,
+    AgentVersionManager,
+)
 from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.agents.prompt_patch import (
     AgentServiceError,
     decode_config_json,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        ActiveAgentVersionManager,
-        AgentDefManager,
-        AgentVersionManager,
-    )
 
 logger = logging.getLogger(__name__)
 

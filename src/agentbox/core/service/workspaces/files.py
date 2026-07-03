@@ -7,17 +7,14 @@ operations route through the service.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
+from agentbox.core.config import Settings
+from agentbox.core.db import AgentDefManager
 from agentbox.core.service.agents.prompts import AgentNotFound
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .errors import WorkspacePathEscape
-
-if TYPE_CHECKING:
-    from agentbox.core.db import AgentDefManager
 
 __all__ = [
     "is_user_file",

@@ -18,13 +18,10 @@ import json
 import shlex
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from agentbox.core.constants import BackendName
 from agentbox.core.data import AgentDef
-
-if TYPE_CHECKING:
-    from agentbox.core.db import PromptVersionManager
+from agentbox.core.db import PromptVersionManager
 
 
 @dataclass

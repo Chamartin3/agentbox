@@ -4,32 +4,29 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from agentbox.core.resources.legacy_composition._report import (
-    USER_TEMPLATE_MARKER,
-    USER_TEMPLATE_MODE,
-    MIGRATION_REASON,
-    MIGRATION_ACTOR,
-    CompositionMigrationReport,
+from agentbox.core.data.rows import AgentVersionFileRow
+from agentbox.core.db import (
+    AgentPromptResourceBindingManager,
+    AgentVersionFileManager,
+    AgentVersionManager,
+    ResourceManager,
+    ResourceVersionManager,
 )
 from agentbox.core.resources.legacy_composition._helpers import (
-    read_disk_file,
-    binding_to_input,
-    slug_for,
     backfill_slot_active_flag,
+    binding_to_input,
+    read_disk_file,
+    slug_for,
+)
+from agentbox.core.resources.legacy_composition._report import (
+    MIGRATION_ACTOR,
+    MIGRATION_REASON,
+    USER_TEMPLATE_MARKER,
+    USER_TEMPLATE_MODE,
+    CompositionMigrationReport,
 )
 from agentbox.core.resources.legacy_composition._store import get_or_create_resource
-
-if TYPE_CHECKING:
-    from agentbox.core.data.rows import AgentVersionFileRow
-    from agentbox.core.db import (
-        AgentPromptResourceBindingManager,
-        AgentVersionFileManager,
-        AgentVersionManager,
-        ResourceManager,
-        ResourceVersionManager,
-    )
 
 logger = logging.getLogger(__name__)
 

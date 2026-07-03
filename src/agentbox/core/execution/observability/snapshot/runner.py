@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentbox.core.data import AgentDef, RunnerSnapshot, now_iso
+from agentbox.core.db import RunnerProfileManager
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
-
-if TYPE_CHECKING:
-    from agentbox.core.db import RunnerProfileManager
 
 logger = logging.getLogger(__name__)
 

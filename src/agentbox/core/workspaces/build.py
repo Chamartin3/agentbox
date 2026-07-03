@@ -21,8 +21,21 @@ import tempfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from agentbox.core.config import Settings
+from agentbox.core.db import (
+    AgentDefManager,
+    AgentVersionManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
+    WorkspaceEnvDocVersionManager,
+    WorkspaceFileResourceBindingManager,
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpToolOverrideManager,
+    WorkspaceManager,
+    WorkspaceSubagentManager,
+)
 from agentbox.core.resources.binding_materialize import materialize_workspace
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
 from agentbox.core.workspaces.generation.generator import render
@@ -32,22 +45,6 @@ from agentbox.core.workspaces.prep import (
     resolve_workspace_resources,
     workspace_outcomes_to_snapshot,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.config import Settings
-    from agentbox.core.db import (
-        AgentDefManager,
-        AgentVersionManager,
-        ResourceBlobManager,
-        ResourceManager,
-        ResourceVersionManager,
-        WorkspaceEnvDocVersionManager,
-        WorkspaceFileResourceBindingManager,
-        WorkspaceMcpOverrideManager,
-        WorkspaceMcpToolOverrideManager,
-        WorkspaceManager,
-        WorkspaceSubagentManager,
-    )
 
 logger = logging.getLogger(__name__)
 

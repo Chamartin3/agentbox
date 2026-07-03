@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from agentbox.core.agents.composition.resolver import resolve_prompt
 from agentbox.core.agents.composition.preview._helpers import (
     PreviewError,
     _render_references_block,
@@ -13,15 +10,14 @@ from agentbox.core.agents.composition.preview._helpers import (
     _schema_for_slot,
     _validation_block_for_preview,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        AgentPromptResourceBindingManager,
-        AgentVersionManager,
-        ResourceBlobManager,
-        ResourceManager,
-        ResourceVersionManager,
-    )
+from agentbox.core.agents.composition.resolver import resolve_prompt
+from agentbox.core.db import (
+    AgentPromptResourceBindingManager,
+    AgentVersionManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
+)
 
 
 def render_agent_prompt_preview(
