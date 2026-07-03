@@ -178,6 +178,7 @@ def test_delete_file_from_draft_succeeds_returns_204(client: Any) -> None:
     # Verify file is gone
     svc = _get_svc()
     ver = svc.get_version("test_agent", 1)
+    assert ver is not None
     files = svc.list_version_files(ver["id"])
     assert not any(f["id"] == file_id for f in files)
 

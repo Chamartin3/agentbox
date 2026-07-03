@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
+
+from agentbox.core.config import Settings
 from unittest.mock import MagicMock
 
 from agentbox.core.workspaces.build import build_workspace
@@ -31,11 +34,11 @@ def test_build_workspace_accepts_narrow_protocol(tmp_path):
     workspace_env_doc_versions = MagicMock()
     workspace_env_doc_versions.get_active.return_value = None
 
-    settings = SimpleNamespace(
+    settings = cast(Settings, SimpleNamespace(
         resource_cache_dir=tmp_path / "cache",
         project_root=tmp_path,
         workspaces_root=tmp_path,
-    )
+    ))
 
     result = build_workspace(
         workspaces,

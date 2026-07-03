@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from agentbox.core.data import CompositionConfig
@@ -26,7 +27,7 @@ def _seed_shared_file(root: Path, rel: str, body: str) -> Path:
 def _agent(agent_id: str, refs: list[str]) -> SimpleNamespace:
     return SimpleNamespace(
         id=agent_id,
-        composition=CompositionConfig(references=refs),
+        composition=CompositionConfig(references=cast(list, refs)),
         source_path=None,
     )
 

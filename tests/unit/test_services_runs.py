@@ -16,13 +16,13 @@ from __future__ import annotations
 
 import warnings as _w
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
 from agentbox.core.service.execution.service import ExecutionService
-from agentbox.core.execution.orchestrate.executor import NoBackendAvailable
+from agentbox.core.execution.orchestrate.executor import NoBackendAvailable, RunExecutor
 import agentbox.core.service.execution as runs_service
 from agentbox.core.service.agents.service import AgentService
 from agentbox.core.service.execution import (
@@ -97,7 +97,7 @@ def store(tmp_path: Path) -> Database:
 async def test_create_run_raises_when_agent_unknown(store: Database) -> None:
     with pytest.raises(AgentNotFound):
         await runs_service.create_run(
-            "missing", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=_FakeExecutor(), variables={}
+            "missing", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, _FakeExecutor()), variables={}
         )
 
 
@@ -107,7 +107,7 @@ async def test_create_run_raises_invalid_when_no_input_or_variables(
     _seed_agent(store)
     with pytest.raises(InvalidRunInput):
         await runs_service.create_run(
-            "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=_FakeExecutor()
+            "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, _FakeExecutor())
         )
 
 
@@ -115,7 +115,7 @@ async def test_create_run_dispatches_legacy_input(store: Database) -> None:
     _seed_agent(store)
     ex = _FakeExecutor()
     result = await runs_service.create_run(
-        "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=ex, input_="hi"
+        "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, ex), input_="hi"
     )
     assert result == {"run_id": "new-run-id", "agent": "alpha"}
     assert ex.calls[0]["input"] == "hi"
@@ -126,7 +126,7 @@ async def test_create_run_dispatches_with_variables(store: Database) -> None:
     _seed_agent(store)
     ex = _FakeExecutor()
     await runs_service.create_run(
-        "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=ex, variables={"k": "v"}
+        "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, ex), variables={"k": "v"}
     )
     assert ex.calls[0]["variables"] == {"k": "v"}
     assert ex.calls[0]["input"] == ""
@@ -170,6 +170,7 @@ def test_complete_run_marks_terminal_and_fires_callback(
     )
     assert result["ok"] is True
     rec = ExecutionService().get_run(run_id)
+    assert rec is not None
     assert rec.status == "ok"
     assert calls and calls[0][0] == "alpha"
 
@@ -194,7 +195,7 @@ async def test_cancel_run_idempotent_on_terminal(store: Database) -> None:
     run_id = _seed_run(store)
     ExecutionService().finish_run(run_id, ok=True, output="done")
     ex = _FakeExecutor()
-    result = await runs_service.cancel_run(run_id, executor=ex)
+    result = await runs_service.cancel_run(run_id, executor=cast(RunExecutor, ex))
     assert result["cancelled"] is False
     assert ex.cancelled == []
 
@@ -203,7 +204,7 @@ async def test_cancel_run_calls_executor_when_running(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     ex = _FakeExecutor()
-    result = await runs_service.cancel_run(run_id, executor=ex)
+    result = await runs_service.cancel_run(run_id, executor=cast(RunExecutor, ex))
     assert result["cancelled"] is True
     assert ex.cancelled == [run_id]
 
@@ -211,7 +212,7 @@ async def test_cancel_run_calls_executor_when_running(store: Database) -> None:
 async def test_cancel_run_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
         await runs_service.cancel_run(
-            "missing", executor=_FakeExecutor()
+            "missing", executor=cast(RunExecutor, _FakeExecutor())
         )
 
 

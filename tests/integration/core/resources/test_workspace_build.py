@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
+
+from agentbox.core.config import Settings
 
 import pytest
 from agentbox.core.db.database import Database
@@ -17,16 +20,16 @@ def store(tmp_path: Path) -> Database:
 
 
 @pytest.fixture
-def fake_settings(tmp_path: Path) -> SimpleNamespace:
-    return SimpleNamespace(
+def fake_settings(tmp_path: Path) -> Settings:
+    return cast(Settings, SimpleNamespace(
         project_root=tmp_path,
         workspaces_root=tmp_path / "workspaces",
         resource_cache_dir=tmp_path / "cache",
-    )
+    ))
 
 
 def _build_workspace_from_store(
-    store: Database, settings: SimpleNamespace, workspace_id: str, workdir: Path
+    store: Database, settings: Settings, workspace_id: str, workdir: Path
 ):
     """Helper to extract managers from store and call build_workspace."""
     return build_workspace(
@@ -48,7 +51,7 @@ def _build_workspace_from_store(
 
 
 def _build_workspace_by_name_from_store(
-    store: Database, settings: SimpleNamespace, workspace_id: str
+    store: Database, settings: Settings, workspace_id: str
 ):
     """Helper to extract managers from store and call build_workspace_by_name."""
     return build_workspace_by_name(

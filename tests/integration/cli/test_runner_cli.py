@@ -18,7 +18,7 @@ from agentbox.cli.shared.deps import (
     get_settings,
     get_db as _get_store,
 )
-from agentbox.core.data import AgentDef, RunnerProfileCreate
+from agentbox.core.data import AgentDef, RunnerProfileCreate, RunnerSpec
 from agentbox.core.service.engines.service import EngineService
 from agentbox.core.service.agents.service import AgentService
 
@@ -48,7 +48,7 @@ def _seed_agent(store, agent_id: str = "test-agent") -> None:
     agent_def = AgentDef(
         id=agent_id,
         description="Test agent",
-        runner={"kind": "token", "model": "gpt-4o"},
+        runner=RunnerSpec(kind="token", model="gpt-4o"),
     )
     AgentService().create_agent(
         agent_id=agent_id,
@@ -71,7 +71,6 @@ def _seed_profile(store, profile_id: str = "prof-1", **kw) -> None:
         backend=kw.get("backend", "token"),
         provider=kw.get("provider", "openai"),
         model=kw.get("model", "gpt-4o"),
-        system_prompt=kw.get("system_prompt", "You are a helpful assistant."),
     )
     EngineService().create_profile(profile)
 
