@@ -16,10 +16,6 @@ CLI_ROOT = Path(__file__).parents[3] / "src" / "agentbox" / "cli"
 # Files allowed to construct Services: the DI composition root only.
 _ALLOWED = {"shared/deps.py", "shared/context.py"}
 
-# ponytail: launch.py litter is owned by plan 101_02 (launch_full_ctx_migration);
-# remove this entry when that plan lands.
-_KNOWN_DEBT = {"ops/launch.py"}
-
 _CONSTRUCTION = re.compile(r"\b[A-Z]\w*Service\(\)")
 
 
@@ -27,7 +23,7 @@ def test_no_inline_service_construction() -> None:
     offenders: list[str] = []
     for path in CLI_ROOT.rglob("*.py"):
         rel = path.relative_to(CLI_ROOT).as_posix()
-        if rel in _ALLOWED or rel in _KNOWN_DEBT:
+        if rel in _ALLOWED:
             continue
         for lineno, line in enumerate(path.read_text().splitlines(), 1):
             if _CONSTRUCTION.search(line):

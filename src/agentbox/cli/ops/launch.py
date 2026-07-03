@@ -99,7 +99,7 @@ def _launch_session(
             raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, workspace_name = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings, ops
+        agent_def, workspace, ephemeral, settings, ops, obj.workspaces
     )
 
     _apply_creds(creds, settings, ops)
@@ -123,7 +123,9 @@ def _launch_session(
     needs_config = runner in _RUNNERS_NEEDING_CONFIG or runner == RunnerKind.SHELL
     config_cm: contextlib.AbstractContextManager = contextlib.nullcontext()
     if needs_config:
-        _registry, servers = _resolve_mcp_for_launch(settings, workspace_name)
+        _registry, servers = _resolve_mcp_for_launch(
+            settings, workspace_name, obj.system, obj.workspaces
+        )
         # The service owns placing native runner config in the workspace
         # cwd (where the engine discovers it) and cleaning up what it wrote.
         config_cm = launch_runner_configs(
@@ -165,6 +167,7 @@ def _resolve_workspace(
     force_ephemeral: bool,
     settings: Settings,
     ops: OpsRenderer,
+    workspace_svc: WorkspaceService,
 ) -> tuple[Path, bool, str | None, str | None]:
     """Return (workspace_path, is_ephemeral, creds, workspace_name).
 
@@ -192,7 +195,7 @@ def _resolve_workspace(
         # Look up the DB registry (workspaces created via the API/UI).
         # Returning the name lets build_workspace materialize env-doc +
         # resource bindings.
-        db_row = WorkspaceService().get_workspace(ws_name)
+        db_row = workspace_svc.get_workspace(ws_name)
         if db_row is not None:
             rel_path = db_row.get("path")
             path = (
@@ -245,7 +248,9 @@ def _apply_creds(creds: str | None, settings: Settings, ops: OpsRenderer) -> Non
 
 def _resolve_mcp_for_launch(
     settings: Settings,
-    workspace_id: str | None = None,
+    workspace_id: str | None,
+    system_svc: SystemService,
+    workspace_svc: WorkspaceService,
 ) -> tuple[McpRegistry, list[dict] | None]:
     """Resolve MCP registry and workspace-specific server overrides.
 
@@ -253,7 +258,7 @@ def _resolve_mcp_for_launch(
     workspace-filtered MCP server list (or None when there's no
     workspace_id).
     """
-    manifest_specs = list(SystemService().get_project_mcp_servers())
+    manifest_specs = list(system_svc.get_project_mcp_servers())
 
     # Per-workspace MCP isolation: resolve overrides and only emit
     # enabled servers. Without a workspace_id we fall back to the
@@ -264,7 +269,7 @@ def _resolve_mcp_for_launch(
             {"name": s.name, "config": s.model_dump(exclude={"name"})}
             for s in manifest_specs
         ]
-        resolved = WorkspaceService().resolve_workspace_mcp(workspace_id, manifest_dicts)
+        resolved = workspace_svc.resolve_workspace_mcp(workspace_id, manifest_dicts)
         servers = []
         for entry in resolved.get("servers", []):
             if not entry.get("enabled"):

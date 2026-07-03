@@ -54,7 +54,7 @@ def shell_cmd(
         raise typer.Exit(1)
 
     workspace_path, is_ephemeral, creds, _ = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings, obj.render.ops
+        agent_def, workspace, ephemeral, settings, obj.render.ops, obj.workspaces
     )
 
     _apply_creds(creds, settings, obj.render.ops)
