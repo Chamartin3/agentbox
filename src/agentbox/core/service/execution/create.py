@@ -7,7 +7,7 @@ import logging
 
 from agentbox.core.db import AgentDefManager, AgentMetaManager
 from agentbox.core.execution.orchestrate.executor import RunExecutor
-from agentbox.core.service.agents import resolve_agent
+from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import (
     AgentDisabled,

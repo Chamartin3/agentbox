@@ -19,7 +19,7 @@ from agentbox.core.db.database import Database
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.db.engines.seeds import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
-from agentbox.core.service.agents import resolve_agent
+from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.tools import discover_tools
 from agentbox.core.workspaces.mcp.client import McpRegistry

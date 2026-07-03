@@ -241,6 +241,33 @@ ignore_imports =
     agentbox.core.db.workspaces.host_env -> agentbox.core.workspaces.permissions
 
 
+# ─── core.service intra-domain layering (plan 110) ───────────────────────────
+# The service subdomains form a DAG: lifecycle orchestrates everything; each
+# lower layer may import from layers further down but never from layers above.
+#
+#   lifecycle  (top — orchestrates all domains at startup)
+#   workspaces
+#   execution | resources  (independent peers; neither imports the other)
+#   agents
+#   engines
+#   evaluation | system  (leaf services — no cross-service imports)
+#
+# This contract catches the "facade back-edge" anti-pattern that caused the
+# pre-plan-110 cycles: a submodule importing via its own package __init__.
+[importlinter:contract:service-layers]
+name = core.service subdomains are acyclically layered
+type = layers
+containers =
+    agentbox.core.service
+layers =
+    lifecycle
+    workspaces
+    execution | resources
+    agents
+    engines
+    evaluation | system
+
+
 # ─── Domains never import Services (CORE_ARCHITECTURE §2) ────────────────
 # The dependency arrow points down: Services orchestrate domains, never
 # the reverse. A domain importing core.service is a layering inversion.
