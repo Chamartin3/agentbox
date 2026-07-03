@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from agentbox.core.agents.resolve import resolve_engine
-from agentbox.core.engines.profiles import EffectiveRunnerConfig
-from agentbox.core.data import AgentDef
 from agentbox.core.config import Settings
+from agentbox.core.data import AgentDef
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.engines.contracts.base import (
     RenderedConfig,
     RuntimeConfigView,
@@ -86,8 +87,6 @@ class RunSetup:
         session_id: str | None,
         workspace_override: str | None = None,
     ) -> tuple[Path, str | None]:
-        import tempfile  # noqa: PLC0415
-
         ws_lookup = self._db.workspaces
 
         if workspace_override:

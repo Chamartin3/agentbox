@@ -51,3 +51,6 @@ from agentbox.core.service.agents.versions import (
     require_agent_exists as require_agent_exists,
     upload_version_file as upload_version_file,
 )
+from agentbox.core.agents.composition.preview import (
+    PreviewError as PreviewError,
+)

@@ -34,6 +34,7 @@ from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.workspaces.generation.payload import RenderedDir
 from agentbox.core.workspaces.generation.recipe import Recipe, list_recipes, load_recipe
 from agentbox.core.workspaces.permissions import resolve_grants
+from agentbox.core.workspaces.prep import render_env_doc as _render_env_doc
 
 from .errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
 
@@ -255,6 +256,10 @@ class WorkspaceService(Service):
 
     def get_active_env_doc(self, workspace_id: str) -> EnvDocRow | None:
         return self._env_doc_versions.get_active(workspace_id)
+
+    def render_env_doc(self, workspace_id: str, workdir: Path) -> list[dict]:
+        """Render the active env doc's instruction files for a workspace."""
+        return _render_env_doc(self._env_doc_versions, workspace_id, workdir)
 
     def list_env_doc_versions(self, workspace_id: str) -> list[dict]:
         return self._env_doc_versions.list_for_workspace(workspace_id)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from agentbox.core.agents.composition.preview import PreviewError
+from agentbox.core.service.agents import PreviewError
 from agentbox.mcp.context import MCPContext
 
 

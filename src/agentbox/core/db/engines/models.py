@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import json as _json
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from agentbox.core.data.profiles import RunnerProfile
+from agentbox.core.data.profiles import RunnerProfile
 
 
 def _row_to_profile(row) -> RunnerProfile:
     """Convert a database row to a RunnerProfile model."""
-    from agentbox.core.data.profiles import RunnerProfile  # noqa: PLC0415
 
     m = row._mapping
     return RunnerProfile(

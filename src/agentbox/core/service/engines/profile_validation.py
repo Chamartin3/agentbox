@@ -8,17 +8,14 @@ adapter that wants to validate a ``RunnerProfileCreate`` /
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
 
 from agentbox.core.agents.resolve import (
     engine_load_failure,
     list_engines,
     resolve_engine_by_name,
 )
+from agentbox.core.data import RunnerProfileCreate, RunnerProfilePatch
 from agentbox.core.engines import get_provider, list_providers
-
-if TYPE_CHECKING:
-    from agentbox.core.data import RunnerProfileCreate, RunnerProfilePatch
 
 
 class InvalidProfile(ValueError):

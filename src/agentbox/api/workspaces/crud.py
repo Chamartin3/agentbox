@@ -15,10 +15,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from agentbox.api.schemas import PaginatedEnvelope, paginate_list
-from agentbox.api.deps import get_db, get_mcp_registry, get_settings, get_workspace_service
+from agentbox.api.deps import get_agent_service, get_mcp_registry, get_settings, get_workspace_service
 from agentbox.core import workspaces as ws
 from agentbox.core.config import Settings
-from agentbox.core.db.database import Database
+from agentbox.core.service import AgentService
 from agentbox.core.service.workspaces.files import is_user_file
 from agentbox.core.service.workspaces.service import WorkspaceService
 from agentbox.core.service.workspaces.errors import (
@@ -313,9 +313,9 @@ def write_file_by_name(
 def get_workspace(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
-    db: Annotated[Database, Depends(get_db)]
+    agents: Annotated[AgentService, Depends(get_agent_service)]
 ) -> dict:
-    agent = db.agent_defs.get(agent_id)
+    agent = agents.get_agent_def(agent_id)
     if agent is None:
         _raise_agent_not_found(agent_id)
     info = ws.info(agent, settings, None)
@@ -341,9 +341,9 @@ def get_workspace(
 def create_workspace(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
-    db: Annotated[Database, Depends(get_db)]
+    agents: Annotated[AgentService, Depends(get_agent_service)]
 ) -> dict:
-    agent = db.agent_defs.get(agent_id)
+    agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
     path = ws.ensure(agent, settings, None, scaffold=True)
@@ -354,9 +354,9 @@ def create_workspace(
 def reset_workspace(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
-    db: Annotated[Database, Depends(get_db)]
+    agents: Annotated[AgentService, Depends(get_agent_service)]
 ) -> dict:
-    agent = db.agent_defs.get(agent_id)
+    agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
     path = ws.reset(agent, settings, None)
@@ -368,9 +368,9 @@ def generate_configs(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    db: Annotated[Database, Depends(get_db)]
+    agents: Annotated[AgentService, Depends(get_agent_service)]
 ) -> dict:
-    agent = db.agent_defs.get(agent_id)
+    agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
     workspace_path, _ = ws.resolve_path(agent, settings)
@@ -391,9 +391,9 @@ def list_skills(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    db: Annotated[Database, Depends(get_db)]
+    agents: Annotated[AgentService, Depends(get_agent_service)]
 ) -> dict:
-    agent = db.agent_defs.get(agent_id)
+    agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
     workspace_path, _ = ws.resolve_path(agent, settings, None)
@@ -416,9 +416,9 @@ def read_file(
     path: str,
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    db: Annotated[Database, Depends(get_db)]
+    agents: Annotated[AgentService, Depends(get_agent_service)]
 ) -> dict:
-    agent = db.agent_defs.get(agent_id)
+    agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
     workspace_name = (
@@ -441,9 +441,9 @@ def write_file(
     body: FileBody,
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    db: Annotated[Database, Depends(get_db)]
+    agents: Annotated[AgentService, Depends(get_agent_service)]
 ) -> dict:
-    agent = db.agent_defs.get(agent_id)
+    agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
     workspace_name = (

@@ -11,6 +11,7 @@ push their slices in; this module owns only the type and the algebra.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -49,8 +50,6 @@ def enumerate_callables(
     for chunk in slices:
         for item in chunk:
             if item.name in seen:
-                import logging  # noqa: PLC0415 — lazy import OK for rare path
-
                 logging.getLogger(__name__).debug(
                     "enumerate_callables: dropping duplicate %r (kind=%s)",
                     item.name,

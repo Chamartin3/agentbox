@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from agentbox.core.constants import McpPolicy
 from agentbox.core.tools.catalog import CallableItem
 
 if TYPE_CHECKING:
@@ -66,7 +67,6 @@ def resolve_mcp_callables(
         if override is not None:
             enabled = bool(override["enabled"])
         else:
-            from agentbox.core.constants import McpPolicy  # noqa: PLC0415
             enabled = policy == McpPolicy.ALLOW_ALL_UNLESS_DISABLED
 
         if not enabled:

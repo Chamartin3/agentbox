@@ -51,8 +51,11 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # api → core.workspaces
-    agentbox.api.workspaces.crud -> agentbox.core.workspaces.build
+    # api → core.workspaces (reads filesystem workspace info via the `ws` helper)
+    agentbox.api.workspaces.crud -> agentbox.core.workspaces
+    # cli render layer touches workspace domain types to format output
+    # (real fix: shared value types below both layers)
+    agentbox.cli.shared.renderers.workspace -> agentbox.core.workspaces
     # api → core.execution
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.payload
@@ -118,6 +121,10 @@ ignore_imports =
     agentbox.cli.ops.resource.bind -> agentbox.cli.shared.deps
     agentbox.cli.ops.resource.repo -> agentbox.cli.shared.deps
     agentbox.cli.work.res -> agentbox.cli.shared.deps
+    # ops composition-root commands legitimately open a Database via get_db
+    # (migrate bootstraps alembic; shell is a debug REPL)
+    agentbox.cli.ops.migrate -> agentbox.cli.shared.deps
+    agentbox.cli.ops.shell -> agentbox.cli.shared.deps
 
 # ─── CLI architecture: only render layer touches Rich ────────────────────
 # The Rich console library must only be imported by the render layer
@@ -353,4 +360,3 @@ ignore_imports =
     agentbox.core.resources -> agentbox.core.db.resources.models
     agentbox.core.service.lifecycle.startup -> agentbox.core.db.engines.seeds
     agentbox.core.workspaces.generation.builders.from_db -> agentbox.core.db.system.config
-    agentbox.core.workspaces.generation.presets -> agentbox.core.db.workspaces.templates

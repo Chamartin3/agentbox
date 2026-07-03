@@ -9,9 +9,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.shared.deps import get_db
 
-from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): migrate to WorkspaceService (plan 095)
 
 env_doc_app = typer.Typer(
     name="env-doc",
@@ -120,12 +118,7 @@ def env_doc_preview(
         return
 
     try:
-        db = get_db()
-        entries = render_env_doc(
-            db.workspace_env_doc_versions,
-            workspace_id,
-            Path("."),
-        )
+        entries = obj.workspaces.render_env_doc(workspace_id, Path("."))
     except Exception as exc:
         obj.render.system.error(f"preview failed: {exc}")
         raise typer.Exit(1)

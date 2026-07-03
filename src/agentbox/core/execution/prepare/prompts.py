@@ -32,13 +32,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentbox.core.agents import compose_prompt
+from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-
-if TYPE_CHECKING:
-    from agentbox.core.config import Settings
 
 logger = logging.getLogger(__name__)
 

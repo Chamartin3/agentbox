@@ -12,18 +12,14 @@ import logging
 import warnings
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from agentbox.core.agents.config import build_config_json_payload
-from agentbox.core.data import RunnerProfileCreate, now_iso
+from agentbox.core.data import AgentDef, RunnerProfileCreate, now_iso
 from agentbox.core.db import (
     AgentVersionManager,
     PromptVersionManager,
     RunnerProfileManager,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.data import AgentDef
 
 logger = logging.getLogger(__name__)
 

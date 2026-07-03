@@ -8,17 +8,13 @@ remaining api/cli/test callers migrate to ``EngineService`` directly; the
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from agentbox.core.data import (
+    RunnerProfile,
+    RunnerProfileCreate,
+    RunnerProfilePatch,
+    RunnerProfileStats,
+)
 from agentbox.core.service.engines.service import EngineService, ProfileNotFound as _EngProfileNotFound
-
-if TYPE_CHECKING:
-    from agentbox.core.data import (
-        RunnerProfile,
-        RunnerProfileCreate,
-        RunnerProfilePatch,
-        RunnerProfileStats,
-    )
 
 # Preserve the historical import location for callers doing
 # ``from ...engines.profiles import ProfileNotFound``.
