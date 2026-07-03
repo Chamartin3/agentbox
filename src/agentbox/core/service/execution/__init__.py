@@ -30,7 +30,7 @@ from agentbox.core.service.execution.query import (
 )
 from agentbox.core.service.execution.stream import get_transcript
 from agentbox.core.service.execution.types import InvalidRunInput, RunNotFound, no_backend_detail
-from agentbox.core.service.prompts import AgentNotFound
+from agentbox.core.service.agents.prompts import AgentNotFound
 
 __all__ = [
     "add_comment",

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from agentbox.core.config import Settings
 from agentbox.core import workspaces as ws
-from agentbox.core.service.prompts import AgentNotFound
+from agentbox.core.service.agents.prompts import AgentNotFound
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 from .errors import WorkspacePathEscape

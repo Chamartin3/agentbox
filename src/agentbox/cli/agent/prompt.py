@@ -7,7 +7,7 @@ import typer
 from agentbox.cli.shared import CLIContext
 
 # TODO(cli-arch): migrate remaining PromptError handling to AgentService errors
-from agentbox.core.service.prompts import (
+from agentbox.core.service.agents.prompts import (
     AgentNotFound,
     PromptError,
 )

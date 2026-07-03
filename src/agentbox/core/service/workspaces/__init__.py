@@ -21,12 +21,12 @@ Domain errors raised here:
 * :class:`WorkspacePathEscape` -- file ops where the resolved path
   walks above the workspace root.
 * :class:`AgentNotFound` -- re-exported from
-  :mod:`core.service.prompts` for the legacy agent-centric endpoints.
+  :mod:`core.service.agents.prompts` for the legacy agent-centric endpoints.
 """
 
 from __future__ import annotations
 
-from agentbox.core.service.prompts import AgentNotFound
+from agentbox.core.service.agents.prompts import AgentNotFound
 
 from .configs import (
     generate_configs_by_name,

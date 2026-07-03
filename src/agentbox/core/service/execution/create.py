@@ -13,7 +13,7 @@ from agentbox.core.service.execution.types import (
     InvalidRunInput,
     RunNotFound,
 )
-from agentbox.core.service.prompts import AgentNotFound
+from agentbox.core.service.agents.prompts import AgentNotFound
 
 
 def _svc() -> ExecutionService:

@@ -1,4 +1,4 @@
-"""Tests for ``core.service.prompts`` — the use-case wrappers.
+"""Tests for ``core.service.agents.prompts`` — the use-case wrappers.
 
 Both the REST routes and MCP tools now go through this module, so we
 pin: agent-not-found raises ``AgentNotFound``; reading falls back from
@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
-from agentbox.core.service import prompts as prompts_service
-from agentbox.core.service.prompts import AgentNotFound
+from agentbox.core.service.agents import prompts as prompts_service
+from agentbox.core.service.agents.prompts import AgentNotFound
 from agentbox.core.service.agents.service import AgentService
 
 

@@ -1,6 +1,6 @@
 """Prompt read/write endpoints with versioning, scoped per agent.
 
-Thin HTTP layer: delegates to ``core.service.prompts`` and maps
+Thin HTTP layer: delegates to ``core.service.agents.prompts`` and maps
 ``AgentNotFound`` / ``PromptError`` / ``ValueError`` to HTTPException.
 """
 
@@ -12,8 +12,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from agentbox.api.deps import get_db, get_settings
-from agentbox.core.service import prompts as prompts_service
-from agentbox.core.service.prompts import AgentNotFound, PromptError
+from agentbox.core.service.agents import prompts as prompts_service
+from agentbox.core.service.agents.prompts import AgentNotFound, PromptError
 
 router = APIRouter(prefix="/api", tags=["prompts"])
 
