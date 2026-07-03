@@ -10,6 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from agentbox.core.constants import ResourceType
+from agentbox.core.data import RepoResourceRow
 from agentbox.core.db.database import Database
 from agentbox.core.service import resources as res_service
 from agentbox.core.service.resources import (
@@ -24,10 +26,10 @@ def store(tmp_path: Path) -> Database:
     return Database(tmp_path / "agentbox.sqlite")
 
 
-def _create(store: Database, slug: str = "doc/a", rtype: str = "document") -> dict:
+def _create(store: Database, slug: str = "doc/a", rtype: ResourceType = ResourceType.DOCUMENT) -> RepoResourceRow:
     return res_service.create_resource(
-                slug=slug,
-        type=rtype,  # type: ignore[arg-type]
+        slug=slug,
+        type=rtype,
         display_name=slug,
     )
 

@@ -55,20 +55,20 @@ def settings(tmp_path: Path) -> Settings:
 
 
 def test_resolve_workspace_path_raises_when_unknown(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     with pytest.raises(WorkspaceNotFound):
         ws_service.resolve_workspace_path(
-            "missing", settings=settings  # type: ignore[arg-type]
+            "missing", settings=settings
         )
 
 
 def test_resolve_workspace_path_falls_back_to_workspaces_root(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
     path, project_root = ws_service.resolve_workspace_path(
-        "alpha", settings=settings  # type: ignore[arg-type]
+        "alpha", settings=settings
     )
     assert path == settings.workspaces_root / "alpha"
     assert project_root == settings.project_root
@@ -91,16 +91,16 @@ def test_create_workspace_registry_duplicate_raises(
 
 
 def test_delete_workspace_registry_raises_when_unknown(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     with pytest.raises(WorkspaceNotFound):
         ws_service.delete_workspace_registry(
-            "missing", settings=settings  # type: ignore[arg-type]
+            "missing", settings=settings
         )
 
 
 def test_delete_workspace_registry_purges_disk_when_requested(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
     ws_path = settings.workspaces_root / "alpha"
@@ -108,7 +108,7 @@ def test_delete_workspace_registry_purges_disk_when_requested(
     (ws_path / "file.txt").write_text("x")
     result = ws_service.delete_workspace_registry(
         "alpha",
-        settings=settings,  # type: ignore[arg-type]
+        settings=settings,
         purge_disk=True,
     )
     assert result["deleted"] == "alpha"
@@ -122,7 +122,7 @@ def test_delete_workspace_registry_purges_disk_when_requested(
 
 
 def test_get_workspace_by_name_lists_user_files(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
     ws_path = settings.workspaces_root / "alpha"
@@ -133,7 +133,7 @@ def test_get_workspace_by_name_lists_user_files(
     (ws_path / "CLAUDE.md").write_text("render artifact")
 
     doc = ws_service.get_workspace_by_name(
-        "alpha", settings=settings  # type: ignore[arg-type]
+        "alpha", settings=settings
     )
     paths = {f["path"] for f in doc["files"]}
     assert "user.txt" in paths
@@ -155,7 +155,7 @@ def test_is_user_file_excludes_render_artifacts_and_hidden_dirs() -> None:
 
 
 def test_write_then_read_file_roundtrip(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
@@ -163,30 +163,30 @@ def test_write_then_read_file_roundtrip(
         "alpha",
         "notes/x.txt",
         "hi",
-        settings=settings,  # type: ignore[arg-type]
+        settings=settings,
     )
     assert written == {"path": "notes/x.txt", "bytes": 2}
     read = ws_service.read_file_by_name(
-        "alpha", "notes/x.txt", settings=settings  # type: ignore[arg-type]
+        "alpha", "notes/x.txt", settings=settings
     )
     assert read == {"path": "notes/x.txt", "content": "hi"}
 
 
 def test_read_file_returns_none_for_missing(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
     assert (
         ws_service.read_file_by_name(
-            "alpha", "ghost.txt", settings=settings  # type: ignore[arg-type]
+            "alpha", "ghost.txt", settings=settings
         )
         is None
     )
 
 
 def test_write_file_rejects_path_escape(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
@@ -195,7 +195,7 @@ def test_write_file_rejects_path_escape(
             "alpha",
             "../escape.txt",
             "evil",
-            settings=settings,  # type: ignore[arg-type]
+            settings=settings,
         )
 
 
@@ -205,20 +205,21 @@ def test_write_file_rejects_path_escape(
 
 
 def test_load_effective_permissions_returns_defaults_for_unknown_name(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     perms = ws_service.load_effective_permissions(
-        None, settings=settings  # type: ignore[arg-type]
+        None, settings=settings
     )
     assert perms["allowed_tools"] == []
     assert perms["allow_file_write"] is True
 
 
 def test_load_effective_permissions_applies_db_overlay(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
     ws_row = store.workspaces.get_by_name("alpha")
+    assert ws_row is not None
     ws_id = ws_row["name"]  # workspace_id is the workspace name
     store.workspace_runtime_permissions.set_for_workspace(
         ws_id,
@@ -229,7 +230,7 @@ def test_load_effective_permissions_applies_db_overlay(
         allow_network=False,
     )
     perms = ws_service.load_effective_permissions(
-        "alpha", settings=settings  # type: ignore[arg-type]
+        "alpha", settings=settings
     )
     assert perms["allowed_builtin_tools"] == ["WebFetch"]
     assert perms["max_tokens"] == 4096
@@ -243,14 +244,14 @@ def test_load_effective_permissions_applies_db_overlay(
 
 
 def test_list_workspaces_enriched_shape(
-    store: Database, settings: _FakeSettings
+    store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha", description="dev")
     (settings.workspaces_root / "alpha").mkdir()
     (settings.workspaces_root / "alpha" / "note.txt").write_text("hi")
 
     result = ws_service.list_workspaces_enriched(
-        settings=settings  # type: ignore[arg-type]
+        settings=settings
     )
     assert len(result) == 1
     row = result[0]

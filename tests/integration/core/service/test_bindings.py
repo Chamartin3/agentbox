@@ -10,6 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from agentbox.core.constants import ResourceType
+from agentbox.core.data import RepoResourceRow
 from agentbox.core.db.database import Database
 from agentbox.core.service import resources as res_service
 from agentbox.core.service.resources import ResourceNotFound
@@ -34,9 +36,9 @@ def store(tmp_path: Path) -> Database:
     return Database(tmp_path / "agentbox.sqlite")
 
 
-def _make_resource(store: Database, slug: str = "doc/a") -> dict:
+def _make_resource(store: Database, slug: str = "doc/a") -> RepoResourceRow:
     return res_service.create_resource(
-        slug=slug, type="document", display_name=slug
+        slug=slug, type=ResourceType.DOCUMENT, display_name=slug
     )
 
 
@@ -78,9 +80,9 @@ def test_list_workspace_resources_empty(store: Database) -> None:
 
 def test_replace_workspace_resources_invokes_sync_cb(store: Database) -> None:
     store.workspaces.insert("alpha")
-    calls: list[tuple] = []
+    calls: list[tuple[object, str]] = []
 
-    def fake_sync(settings, name):  # noqa: ANN001
+    def fake_sync(settings: object, name: str) -> None:
         calls.append((settings, name))
 
     replace_workspace_resources(

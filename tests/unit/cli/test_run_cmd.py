@@ -22,7 +22,7 @@ from agentbox.cli import app
 from agentbox.cli.shared.deps import (
     get_db as _get_store,
 )
-from agentbox.core.data import AgentDef
+from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.service.agents.service import AgentService
 
 runner = CliRunner()
@@ -61,7 +61,7 @@ def _seed_agent(store, agent_id: str, runner_kind: str = "claude_code") -> None:
     agent_def = AgentDef(
         id=agent_id,
         description="Test agent",
-        runner={"kind": runner_kind, "model": "test-model"},
+        runner=RunnerSpec(kind=runner_kind, model="test-model"),
     )
     AgentService().create_agent(
         agent_id=agent_id,
