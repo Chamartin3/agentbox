@@ -39,7 +39,11 @@ from agentbox.core.db import (
 from agentbox.core.resources.binding_materialize import materialize_workspace
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
 from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
+from agentbox.core.engines.backends.recipe_loader import (
+    backend_for_engine,
+    list_recipes,
+    load_recipe,
+)
 from agentbox.core.workspaces.prep import (
     render_env_doc,
     resolve_workspace_resources,
@@ -192,7 +196,11 @@ def build_workspace(
                 recipe = load_recipe(engine)
                 if not recipe.layout.get("subagent"):
                     continue
-                render(tmp_dir, config, recipe)
+                try:
+                    extra = backend_for_engine(engine).build_workspace_items(config)
+                except KeyError:
+                    extra = []
+                render(tmp_dir, config, recipe, extra_items=extra)
                 for a in subagents:
                     rel = recipe.resolve_layout("subagent", name=a.id)
                     src = tmp_dir / rel

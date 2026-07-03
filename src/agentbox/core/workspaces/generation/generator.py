@@ -11,7 +11,7 @@ from pathlib import Path
 
 from agentbox.core.workspaces.generation.config import McpRef, ResourceRef, WorkenvConfig
 from agentbox.core.workspaces.generation.payload import Item, RenderedDir, Role
-from agentbox.core.workspaces.generation.recipe import Recipe, backend_for_engine
+from agentbox.core.workspaces.generation.recipe import Recipe
 
 
 def render(
@@ -20,12 +20,15 @@ def render(
     recipe: Recipe,
     *,
     system_prompt: str | None = None,
+    extra_items: list[Item] | None = None,
 ) -> RenderedDir:
     """Render a ``WorkenvConfig`` to disk against a ``Recipe``.
 
     Builds a list of :class:`Item` objects, then writes each to the path
-    the recipe layout prescribes. Engine-specific config blobs come from
-    the backend's ``build_workspace_items`` hook.
+    the recipe layout prescribes. Engine-specific config blobs (e.g.
+    opencode.json) are passed by the caller via *extra_items* — the
+    backend's ``build_workspace_items`` is invoked at the call site, not
+    here, so ``generator`` stays independent of the backend registry.
 
     When ``system_prompt`` is provided, it replaces the env-doc baseline
     as the content for the ``context`` role item (CLAUDE.md / AGENTS.md).
@@ -33,10 +36,8 @@ def render(
     Callers may want to call ``config.validate()`` before rendering.
     """
     items = _build_items(config, recipe, system_prompt=system_prompt)
-    try:
-        items += backend_for_engine(recipe.engine).build_workspace_items(config)
-    except KeyError:
-        pass  # no backend registered for this recipe engine
+    if extra_items:
+        items += extra_items
 
     written: list[Path] = []
     for item in items:

@@ -20,9 +20,7 @@ from agentbox.core.constants import BackendName
 from agentbox.core.service import WorkspaceService
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
-from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.workspaces.generation.builders.interactive import build_interactive
-from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
 
 workenv_app = typer.Typer(
     name="workenv",
@@ -112,7 +110,7 @@ def workenv_generate(
         obj.render.ops.error(str(exc))
         raise typer.Exit(1) from exc
 
-    available = list_recipes()
+    available = svc.list_recipe_engines()
     if source.engine not in available:
         obj.render.ops.error(
             f"unknown engine {source.engine!r} — "
@@ -120,7 +118,7 @@ def workenv_generate(
         )
         raise typer.Exit(1)
 
-    recipe = load_recipe(source.engine)
+    recipe = svc.load_workenv_recipe(source.engine)
     source.target_dir.mkdir(parents=True, exist_ok=True)
 
     if save is not None:
@@ -136,7 +134,7 @@ def workenv_generate(
         obj.render.ops.workenv_preview(source.config, recipe)
         return
 
-    result = render(source.target_dir, source.config, recipe)
+    result = svc.render_workenv(source.target_dir, config=source.config, recipe=recipe)
     obj.render.ops.success(
         f"generated {len(result.written_paths)} file(s) "
         f"in {source.target_dir}"
@@ -181,7 +179,9 @@ def _resolve_source(
         return _ResolvedSource(config, engine, out_dir, "yaml")
 
     if interactive or name is None:
-        config, chosen_engine, chosen_dir = build_interactive()
+        config, chosen_engine, chosen_dir = build_interactive(
+            available_engines=svc.list_recipe_engines()
+        )
         return _ResolvedSource(config, chosen_engine, chosen_dir, "interactive")
 
     perms = svc.load_effective_permissions(name)
@@ -231,7 +231,7 @@ def workenv_list_presets(ctx: typer.Context) -> None:
 def workenv_list_engines(ctx: typer.Context) -> None:
     """List available recipe engines."""
     obj: CLIContext = ctx.obj
-    available = list_recipes()
+    available = WorkspaceService().list_recipe_engines()
     if not available:
         obj.render.ops.warn("No recipes found")
         return

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.workspaces.generation.recipe import load_recipe
+from agentbox.core.engines.backends.recipe_loader import load_recipe, backend_for_engine
 
 _BODY = "# Acme\n\nDo the thing. Then verify it.\n"
 
@@ -23,14 +23,26 @@ def _config() -> WorkenvConfig:
 
 def test_claude_context_is_raw_body() -> None:
     with tempfile.TemporaryDirectory() as td:
-        render(Path(td), _config(), load_recipe("claude_code"))
+        config = _config()
+        recipe = load_recipe("claude_code")
+        try:
+            extra = backend_for_engine("claude_code").build_workspace_items(config)
+        except KeyError:
+            extra = []
+        render(Path(td), config, recipe, extra_items=extra)
         assert (Path(td) / "CLAUDE.md").read_text() == _BODY
         assert not (Path(td) / "AGENTS.md").exists()
 
 
 def test_opencode_context_is_raw_body() -> None:
     with tempfile.TemporaryDirectory() as td:
-        render(Path(td), _config(), load_recipe("opencode"))
+        config = _config()
+        recipe = load_recipe("opencode")
+        try:
+            extra = backend_for_engine("opencode").build_workspace_items(config)
+        except KeyError:
+            extra = []
+        render(Path(td), config, recipe, extra_items=extra)
         # opencode reads AGENTS.md (same body), plus its own opencode.json blob.
         assert (Path(td) / "AGENTS.md").read_text() == _BODY
         assert (Path(td) / "opencode.json").exists()

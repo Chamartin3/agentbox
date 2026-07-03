@@ -14,7 +14,15 @@ from agentbox.core.workspaces.generation.config import (
     WorkenvConfig,
 )
 from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
+from agentbox.core.engines.backends.recipe_loader import list_recipes, load_recipe, backend_for_engine
+
+
+def _get_extra_items(engine: str, config: WorkenvConfig) -> list:
+    """Helper to get extra_items for rendering."""
+    try:
+        return backend_for_engine(engine).build_workspace_items(config)
+    except KeyError:
+        return []
 
 
 def _make_fixture_config(**overrides: object) -> WorkenvConfig:
@@ -58,7 +66,7 @@ class TestRenderOpenCode:
         config = WorkenvConfig(name="minimal")
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            result = render(Path(td), config, recipe)
+            result = render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
             assert result.target_dir == Path(td)
             assert len(result.written_paths) >= 1
 
@@ -71,7 +79,7 @@ class TestRenderOpenCode:
         config = _make_fixture_config()
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
 
             oc_json = Path(td) / "opencode.json"
             assert oc_json.exists()
@@ -91,7 +99,7 @@ class TestRenderOpenCode:
         config = _make_fixture_config()
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
 
             sub = Path(td) / ".opencode" / "agents" / "sub-1.md"
             assert sub.exists()
@@ -103,7 +111,7 @@ class TestRenderOpenCode:
         config = _make_fixture_config()
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
 
             main_agent_file = Path(td) / "agents" / "main-agent.md"
             assert not main_agent_file.exists()
@@ -112,7 +120,7 @@ class TestRenderOpenCode:
         config = _make_fixture_config(mcp_servers=[])
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
 
             oc_json = Path(td) / "opencode.json"
             data = json.loads(oc_json.read_text())
@@ -122,7 +130,7 @@ class TestRenderOpenCode:
         config = WorkenvConfig(name="no-agents")
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
 
             oc_json = Path(td) / "opencode.json"
             data = json.loads(oc_json.read_text())
@@ -131,16 +139,17 @@ class TestRenderOpenCode:
     def test_idempotent(self) -> None:
         config = _make_fixture_config()
         recipe = load_recipe("opencode")
+        extra = _get_extra_items("opencode", config)
         with tempfile.TemporaryDirectory() as td:
-            result1 = render(Path(td), config, recipe)
-            result2 = render(Path(td), config, recipe)
+            result1 = render(Path(td), config, recipe, extra_items=extra)
+            result2 = render(Path(td), config, recipe, extra_items=extra)
             assert len(result1.written_paths) == len(result2.written_paths)
 
     def test_no_claude_files_written(self) -> None:
         config = _make_fixture_config()
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
 
             assert not (Path(td) / "CLAUDE.md").exists()
             assert not (Path(td) / ".mcp.json").exists()
@@ -158,7 +167,7 @@ class TestRenderOpenCode:
         )
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
 
             oc_json = Path(td) / "opencode.json"
             data = json.loads(oc_json.read_text())
@@ -174,5 +183,5 @@ class TestRenderOpenCode:
 
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), restored, recipe)
+            render(Path(td), restored, recipe, extra_items=_get_extra_items("opencode", restored))
             assert (Path(td) / "opencode.json").exists()

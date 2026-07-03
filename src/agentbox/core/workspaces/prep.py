@@ -37,7 +37,11 @@ from agentbox.core.db import (
 from agentbox.core.resources.binding_materialize import materialize_workspace
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
 from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
+from agentbox.core.engines.backends.recipe_loader import (
+    backend_for_engine,
+    list_recipes,
+    load_recipe,
+)
 from agentbox.core.workspaces.generation.workspace_files import (
     materialize_workspace_files,
 )
@@ -501,7 +505,12 @@ def prepare_run_workdir(
         permissions=None,
     )
     for engine in list_recipes():
-        render(run_dir, config, load_recipe(engine), system_prompt=system_prompt)
+        recipe = load_recipe(engine)
+        try:
+            extra = backend_for_engine(engine).build_workspace_items(config)
+        except KeyError:
+            extra = []
+        render(run_dir, config, recipe, system_prompt=system_prompt, extra_items=extra)
 
     # Claude runs with `--mcp-config .mcp.json --strict-mcp-config`, which
     # errors if the file is absent; render only emits it when servers exist.

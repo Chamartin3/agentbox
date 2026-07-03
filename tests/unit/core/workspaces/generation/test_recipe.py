@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.workspaces.generation.recipe import list_recipes, load_recipe
+from agentbox.core.engines.backends.recipe_loader import list_recipes, load_recipe
 
 
 class TestRecipe:

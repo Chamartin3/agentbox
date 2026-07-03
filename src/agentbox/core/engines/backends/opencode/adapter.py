@@ -27,8 +27,7 @@ from agentbox.core.engines.backends.opencode.session import (  # noqa: F401
 )
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
-from agentbox.core.workspaces.generation.config import WorkenvConfig
-from agentbox.core.workspaces.generation.payload import Item
+from agentbox.core.data.workenv import Item, WorkenvConfig
 
 __all__ = [
     "OpenCodeBackend",

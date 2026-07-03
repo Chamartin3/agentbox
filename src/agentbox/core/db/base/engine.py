@@ -56,8 +56,12 @@ def init_engine(db_path: Path) -> Engine:
         connect_args={"check_same_thread": False},
         future=True,
     )
-    _reap_orphaned_runs(engine)
-
+    # NOTE: reaping is NOT done here. Every process that opens the DB calls
+    # init_engine — including tool subprocesses (e.g. the agentbox-host-env MCP
+    # server) spawned by a live run. Reaping on each engine init makes such a
+    # subprocess mark the very run that spawned it as "orphaned" the moment it
+    # uses a tool. The API server reaps real orphans on startup via
+    # run_startup_tasks -> reap_orphan_runs (see api/app.py _on_startup).
     return engine
 
 

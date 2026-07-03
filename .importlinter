@@ -68,8 +68,6 @@ ignore_imports =
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.from_yaml
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.interactive
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.config
-    agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.generator
-    agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.recipe
     agentbox.cli.system.doctor -> agentbox.core.workspaces
     agentbox.cli.work.ws -> agentbox.core.workspaces
     # cli renderers → core.engines (render layer touches domain types to
@@ -168,19 +166,12 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # engines → workspaces (backend renderers consume WorkenvConfig/payload
-    # from workspaces.generation; real fix: move those value types to a
-    # neutral layer below both domains)
-    agentbox.core.engines.backends.codex.render -> agentbox.core.workspaces.generation.config
-    agentbox.core.engines.backends.codex.render -> agentbox.core.workspaces.generation.payload
-    agentbox.core.engines.backends.opencode.adapter -> agentbox.core.workspaces.generation.config
-    agentbox.core.engines.backends.opencode.adapter -> agentbox.core.workspaces.generation.payload
-    agentbox.core.engines.backends.opencode.render -> agentbox.core.workspaces.generation.config
-    agentbox.core.engines.backends.opencode.render -> agentbox.core.workspaces.generation.payload
+    # engines.backends.token.tools reaches into workspaces for the in-process
+    # host-env MCP toolset (inject.py) and grant checks (permissions.py).
+    # These are intentional: the token backend must spawn the same host-env
+    # server as the MCP-aware backends.
     agentbox.core.engines.backends.token.tools -> agentbox.core.workspaces.generation.inject
     agentbox.core.engines.backends.token.tools -> agentbox.core.workspaces.permissions
-    agentbox.core.engines.contracts.base -> agentbox.core.workspaces.generation.config
-    agentbox.core.engines.contracts.base -> agentbox.core.workspaces.generation.payload
 
 
 # ─── Agents ⟂ Workspace (peer rule) ──────────────────────────────────────

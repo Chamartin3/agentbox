@@ -16,8 +16,7 @@ from agentbox.core.engines.backends.opencode.schema import (
     McpRemote,
     OpenCodeConfig,
 )
-from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
-from agentbox.core.workspaces.generation.payload import Item, Role
+from agentbox.core.data.workenv import Item, McpRef, Role, WorkenvConfig
 
 
 def build_opencode_items(config: WorkenvConfig) -> list[Item]:

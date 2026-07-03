@@ -19,7 +19,7 @@ import inspect
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol
+from typing import Any, ClassVar, Protocol
 
 import yaml
 
@@ -29,9 +29,7 @@ from ._mcp_types import McpToolSpec
 from .rendered import RenderedConfig
 from .views import ComposedView, RuntimeConfigView
 
-if TYPE_CHECKING:
-    from agentbox.core.workspaces.generation.config import WorkenvConfig
-    from agentbox.core.workspaces.generation.payload import Item
+from agentbox.core.data.workenv import Item, WorkenvConfig
 
 
 class HasAgentConfig(Protocol):

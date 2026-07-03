@@ -17,7 +17,6 @@ from agentbox.core.workspaces.generation.config import (
     Permissions,
     WorkenvConfig,
 )
-from agentbox.core.workspaces.generation.recipe import list_recipes
 
 _console = Console()
 
@@ -26,11 +25,16 @@ def build_interactive(
     *,
     engine: str | None = None,
     target_dir: str | None = None,
+    available_engines: list[str] | None = None,
 ) -> tuple[WorkenvConfig, str, Path]:
     """Run interactive prompts to build a WorkenvConfig.
 
     Returns the constructed WorkenvConfig, the chosen engine name,
     and the target directory path.
+
+    *available_engines* is required when *engine* is ``None``; it is
+    supplied by the caller (e.g. ``WorkspaceService.list_recipe_engines()``)
+    so that this module has no import dependency on the backend registry.
     """
     _console.print("\n[bold]WorkenvConfig Interactive Builder[/bold]\n")
 
@@ -43,7 +47,7 @@ def build_interactive(
     )
 
     if engine is None:
-        engine = _prompt_engine()
+        engine = _prompt_engine(available_engines)
     if target_dir is None:
         target_dir = _prompt_target_dir()
 
@@ -51,8 +55,7 @@ def build_interactive(
     return config, engine, out_dir
 
 
-def _prompt_engine() -> str:
-    available = list_recipes()
+def _prompt_engine(available: list[str] | None = None) -> str:
     if not available:
         _console.print("[red]No recipes found — cannot generate[/red]")
         raise SystemExit(1)

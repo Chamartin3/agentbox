@@ -14,7 +14,15 @@ from agentbox.core.workspaces.generation.config import (
     WorkenvConfig,
 )
 from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.workspaces.generation.recipe import load_recipe
+from agentbox.core.engines.backends.recipe_loader import load_recipe, backend_for_engine
+
+
+def _get_extra_items(engine: str, config: WorkenvConfig) -> list:
+    """Helper to get extra_items for rendering."""
+    try:
+        return backend_for_engine(engine).build_workspace_items(config)
+    except KeyError:
+        return []
 
 
 def _make_fixture_config(**overrides: object) -> WorkenvConfig:
@@ -49,7 +57,7 @@ class TestRenderClaude:
         config = WorkenvConfig(name="minimal")
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            result = render(Path(td), config, recipe)
+            result = render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
             assert result.target_dir == Path(td)
             assert len(result.written_paths) >= 1
 
@@ -60,7 +68,7 @@ class TestRenderClaude:
         config = _make_fixture_config()
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
 
             claude_md = Path(td) / "CLAUDE.md"
             assert claude_md.exists()
@@ -72,7 +80,7 @@ class TestRenderClaude:
         config = _make_fixture_config()
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
 
             sub1 = Path(td) / ".claude" / "agents" / "sub-1.md"
             sub2 = Path(td) / ".claude" / "agents" / "sub-2.md"
@@ -96,7 +104,7 @@ class TestRenderClaude:
         )
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
             text = (Path(td) / ".claude" / "agents" / "sub-1.md").read_text()
             assert 'description: "does the thing"' in text
             assert "You are a careful worker." in text
@@ -105,7 +113,7 @@ class TestRenderClaude:
         config = _make_fixture_config()
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
 
             main_agent_file = Path(td) / ".claude" / "agents" / "main-agent.md"
             assert not main_agent_file.exists()
@@ -114,7 +122,7 @@ class TestRenderClaude:
         config = _make_fixture_config()
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
 
             mcp_file = Path(td) / ".mcp.json"
             assert mcp_file.exists()
@@ -130,7 +138,7 @@ class TestRenderClaude:
         config = _make_fixture_config()
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
 
             perm_file = Path(td) / ".claude" / "settings.json"
             assert perm_file.exists()
@@ -141,23 +149,24 @@ class TestRenderClaude:
     def test_idempotent(self) -> None:
         config = _make_fixture_config()
         recipe = load_recipe("claude_code")
+        extra = _get_extra_items("claude_code", config)
         with tempfile.TemporaryDirectory() as td:
-            result1 = render(Path(td), config, recipe)
-            result2 = render(Path(td), config, recipe)
+            result1 = render(Path(td), config, recipe, extra_items=extra)
+            result2 = render(Path(td), config, recipe, extra_items=extra)
             assert len(result1.written_paths) == len(result2.written_paths)
 
     def test_no_mcp_when_empty(self) -> None:
         config = _make_fixture_config(mcp_servers=[])
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
             assert not (Path(td) / ".mcp.json").exists()
 
     def test_no_permissions_when_empty(self) -> None:
         config = _make_fixture_config(permissions=Permissions(data={}))
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
-            render(Path(td), config, recipe)
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
             assert not (Path(td) / ".claude" / "settings.json").exists()
 
     def test_yaml_round_trip_to_render(self) -> None:

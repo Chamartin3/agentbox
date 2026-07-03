@@ -32,7 +32,12 @@ from agentbox.core.workspaces.generation.presets import load_seed_templates
 from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.workspaces.generation.payload import RenderedDir
-from agentbox.core.workspaces.generation.recipe import Recipe, list_recipes, load_recipe
+from agentbox.core.workspaces.generation.recipe import Recipe
+from agentbox.core.engines.backends.recipe_loader import (
+    backend_for_engine,
+    list_recipes,
+    load_recipe,
+)
 from agentbox.core.workspaces.permissions import resolve_grants
 from agentbox.core.workspaces.prep import render_env_doc as _render_env_doc
 
@@ -806,8 +811,13 @@ class WorkspaceService(Service):
             tmp_dir = Path(tmp)
             rels: set[str] = set()
             for engine in list_recipes():
+                recipe_obj = load_recipe(engine)
+                try:
+                    extra = backend_for_engine(engine).build_workspace_items(config)
+                except KeyError:
+                    extra = []
                 for p in render(
-                    tmp_dir, config, load_recipe(engine)
+                    tmp_dir, config, recipe_obj, extra_items=extra
                 ).written_paths:
                     rels.add(str(p.relative_to(tmp_dir)))
             for rel in rels:
@@ -847,7 +857,11 @@ class WorkspaceService(Service):
         paths: dict[str, str] = {}
         for engine in list_recipes():
             recipe = load_recipe(engine)
-            result = render(workspace_path, config, recipe)
+            try:
+                extra = backend_for_engine(engine).build_workspace_items(config)
+            except KeyError:
+                extra = []
+            result = render(workspace_path, config, recipe, extra_items=extra)
             for p in result.written_paths:
                 try:
                     key = str(p.relative_to(workspace_path))
@@ -873,8 +887,24 @@ class WorkspaceService(Service):
         config: WorkenvConfig,
         recipe: Recipe,
     ) -> RenderedDir:
-        """Render a WorkenvConfig to disk against a Recipe. Thin wrapper over ``render``."""
-        return render(dir_path, config=config, recipe=recipe)
+        """Render a WorkenvConfig to disk against a Recipe.
+
+        Dispatches to the backend's ``build_workspace_items`` for
+        engine-specific files and passes them as *extra_items*.
+        """
+        try:
+            extra = backend_for_engine(recipe.engine).build_workspace_items(config)
+        except KeyError:
+            extra = []
+        return render(dir_path, config=config, recipe=recipe, extra_items=extra)
+
+    def list_recipe_engines(self) -> list[str]:
+        """List available recipe engine names (backends with a recipe.yaml)."""
+        return list_recipes()
+
+    def load_workenv_recipe(self, engine: str) -> Recipe:
+        """Load the recipe for *engine*. Raises ``FileNotFoundError`` if absent."""
+        return load_recipe(engine)
 
     def list_presets(self) -> list[dict]:
         """List all WorkenvConfig presets stored in the DB."""

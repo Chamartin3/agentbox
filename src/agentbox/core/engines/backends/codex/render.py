@@ -13,8 +13,7 @@ Ref: https://developers.openai.com/codex/subagents
 
 from __future__ import annotations
 
-from agentbox.core.workspaces.generation.config import WorkenvConfig
-from agentbox.core.workspaces.generation.payload import Item, Role
+from agentbox.core.data.workenv import Item, Role, WorkenvConfig
 
 
 def _toml_basic_string(s: str) -> str:

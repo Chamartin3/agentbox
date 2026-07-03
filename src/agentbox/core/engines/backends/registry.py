@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import logging
 from importlib.metadata import entry_points
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
-if TYPE_CHECKING:
-    from agentbox.core.engines.contracts.base import BackendAdapter
+from agentbox.core.engines.contracts.base import BackendAdapter
 
 T = TypeVar("T")
 
