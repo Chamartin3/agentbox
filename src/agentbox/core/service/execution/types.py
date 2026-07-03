@@ -3,17 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from agentbox.core.agents.resolve import (
     engine_load_failure as backend_load_failure,
     list_engines as backends,
 )
-
-if TYPE_CHECKING:
-    # Imported lazily to avoid circular import at runtime.
-    # executor → service.execution → types → setup → ExecutionService
-    from agentbox.core.execution.orchestrate.setup import NoBackendAvailable
+from agentbox.core.execution.orchestrate.setup import NoBackendAvailable
 
 logger = logging.getLogger(__name__)
 

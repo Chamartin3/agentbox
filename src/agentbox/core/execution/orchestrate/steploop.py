@@ -16,24 +16,21 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import Any, Final, cast
 
 from agentbox.core.events import UsageEvent
 from agentbox.core.config import Settings
 from agentbox.core.agents import AgentRuntimeView
 from agentbox.core.agents.runtime import _DbStoreAdapter
+from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import AgentDef
-from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.execution.retry import RetryOrchestrator
 from agentbox.core.execution.observability.stream import RunStreamSession
 from agentbox.core.execution.observability.stream.session import DoneStatus
 
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
-
-if TYPE_CHECKING:
-    from agentbox.core.engines.contracts.base import BackendAdapter
 
 logger = logging.getLogger(__name__)
 

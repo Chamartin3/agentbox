@@ -7,18 +7,14 @@ own manager instances and McpRegistry; no HTTP involved.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from agentbox.core.constants import McpPolicy
+from agentbox.core.db import (
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpPolicyManager,
+    WorkspaceMcpToolOverrideManager,
+)
 from agentbox.core.tools.catalog import CallableItem
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        WorkspaceMcpOverrideManager,
-        WorkspaceMcpPolicyManager,
-        WorkspaceMcpToolOverrideManager,
-    )
-    from agentbox.core.workspaces.mcp.client.registry import McpRegistry
+from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 
 
 def resolve_mcp_callables(

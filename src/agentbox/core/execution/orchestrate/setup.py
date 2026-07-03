@@ -5,13 +5,13 @@ from __future__ import annotations
 import logging
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentbox.core.agents.resolve import resolve_engine
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.engines.contracts.base import (
+    BackendAdapter,
     RenderedConfig,
     RuntimeConfigView,
 )
@@ -20,19 +20,17 @@ from agentbox.core.engines.contracts.views import (
     ComposedView,
     PythonAgentConfigView,
 )
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.execution.orchestrate.generator import (
     _read_agent_config_json,
 )
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.workspaces import (
+    McpRegistry,
     load_workspace_permissions,
     resolve_path,
 )
 from agentbox.core.workspaces.catalog import resolve_workspace_callables
-
-if TYPE_CHECKING:
-    from agentbox.core.engines.contracts.base import BackendAdapter
-    from agentbox.core.workspaces import McpRegistry
 
 logger = logging.getLogger(__name__)
 

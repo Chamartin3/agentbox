@@ -24,12 +24,10 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol
 import yaml
 
 from agentbox.core.events import RunEvent
+from agentbox.core.tools.canonical import CanonicalTool
 from ._mcp_types import McpToolSpec
 from .rendered import RenderedConfig
 from .views import ComposedView, RuntimeConfigView
-
-if TYPE_CHECKING:
-    from agentbox.core.tools.canonical import CanonicalTool
 
 if TYPE_CHECKING:
     from agentbox.core.workspaces.generation.config import WorkenvConfig

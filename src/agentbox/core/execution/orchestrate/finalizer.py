@@ -22,16 +22,14 @@ import dataclasses
 import logging
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.data import AgentDef, RunRecord
 
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
-
-if TYPE_CHECKING:
-    from agentbox.core.execution.orchestrate.steploop import StepResult
+from agentbox.core.execution.orchestrate.steploop import StepResult
 
 logger = logging.getLogger(__name__)
 

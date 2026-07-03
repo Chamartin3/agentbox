@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json as _json
 import logging
-from typing import TYPE_CHECKING
 
+from agentbox.core.db import AgentDefManager, AgentMetaManager
+from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import (
@@ -20,15 +21,11 @@ def _svc() -> ExecutionService:
     return ExecutionService()
 
 
-def _assert_enabled(agent_meta: "AgentMetaManager", agent_id: str) -> None:
+def _assert_enabled(agent_meta: AgentMetaManager, agent_id: str) -> None:
     meta = agent_meta.get_meta(agent_id)
     if meta and meta.get("disabled_at"):
         raise AgentDisabled(agent_id, meta.get("disabled_at"))
 
-
-if TYPE_CHECKING:
-    from agentbox.core.db import AgentDefManager, AgentMetaManager
-    from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)
 

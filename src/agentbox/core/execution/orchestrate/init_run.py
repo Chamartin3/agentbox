@@ -7,13 +7,14 @@ import asyncio
 import logging
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.agents import capture_fragments
 from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef
+from agentbox.core.db.database import Database
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.schema import runs as _runs_table  # ponytail: transitional — direct SQL for agent_version_id stamp
 from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
@@ -21,9 +22,6 @@ from agentbox.core.execution.observability.snapshot import (
     SnapshotWriter,
     build_runner_snapshot,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.db.database import Database
 
 logger = logging.getLogger(__name__)
 

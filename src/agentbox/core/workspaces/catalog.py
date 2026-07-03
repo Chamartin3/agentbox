@@ -15,23 +15,19 @@ Each source slice lives in its own domain module:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from agentbox.core.db import (
+    WorkspaceFileResourceBindingManager,
+    WorkspaceHostEnvGrantManager,
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpPolicyManager,
+    WorkspaceMcpToolOverrideManager,
+)
 from agentbox.core.resources.catalog import resolve_resource_callables
 from agentbox.core.tools.capabilities import CAPABILITIES
 from agentbox.core.tools.catalog import CallableItem, enumerate_callables
 from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
+from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 from agentbox.core.workspaces.permissions import resolve_grants
-
-if TYPE_CHECKING:
-    from agentbox.core.db import (
-        WorkspaceFileResourceBindingManager,
-        WorkspaceHostEnvGrantManager,
-        WorkspaceMcpOverrideManager,
-        WorkspaceMcpPolicyManager,
-        WorkspaceMcpToolOverrideManager,
-    )
-    from agentbox.core.workspaces.mcp.client.registry import McpRegistry
 
 __all__ = [
     "resolve_workspace_callables",

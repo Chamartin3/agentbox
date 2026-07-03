@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
@@ -34,13 +34,11 @@ from agentbox.core.engines.contracts.rendered import RenderedConfig
 from agentbox.core.workspaces import (
     prepare_run_workdir,
 )
+from agentbox.core.workspaces import McpRegistry
 from agentbox.core.workspaces.generation.inject import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )
-
-if TYPE_CHECKING:
-    from agentbox.core.workspaces import McpRegistry
 
 logger = logging.getLogger(__name__)
 

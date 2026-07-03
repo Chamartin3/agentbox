@@ -13,12 +13,8 @@ Ref: https://developers.openai.com/codex/subagents
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from agentbox.core.workspaces.generation.config import WorkenvConfig
 from agentbox.core.workspaces.generation.payload import Item, Role
-
-if TYPE_CHECKING:
-    from agentbox.core.workspaces.generation.config import WorkenvConfig
 
 
 def _toml_basic_string(s: str) -> str:

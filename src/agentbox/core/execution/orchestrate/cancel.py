@@ -7,16 +7,14 @@ import contextlib
 import dataclasses
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef, RunRecord
 from agentbox.core.execution.dispatch import dispatch_completion
-
-if TYPE_CHECKING:
-    from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
+from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
 
 logger = logging.getLogger(__name__)
 

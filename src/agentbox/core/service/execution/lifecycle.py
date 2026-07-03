@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from agentbox.core.db import AgentDefManager
+from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
 
 from agentbox.core.constants import RunStatus
-
-if TYPE_CHECKING:
-    from agentbox.core.db import AgentDefManager
-    from agentbox.core.execution.orchestrate.executor import RunExecutor
 
 logger = logging.getLogger(__name__)
 
