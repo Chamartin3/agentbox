@@ -168,18 +168,6 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # engines → execution (conversation decoders from Plan 051)
-    agentbox.core.engines.backends.claude_code.conversation -> agentbox.core.execution.observability.conversation.base
-    agentbox.core.engines.backends.claude_code.conversation -> agentbox.core.execution.observability.conversation.types
-    agentbox.core.engines.backends.codex.conversation -> agentbox.core.execution.observability.conversation.base
-    agentbox.core.engines.backends.codex.conversation -> agentbox.core.execution.observability.conversation.types
-    agentbox.core.engines.backends.opencode.conversation -> agentbox.core.execution.observability.conversation.base
-    agentbox.core.engines.backends.opencode.conversation -> agentbox.core.execution.observability.conversation.types
-    agentbox.core.engines.backends.pi.conversation -> agentbox.core.execution.observability.conversation.base
-    agentbox.core.engines.backends.pi.conversation -> agentbox.core.execution.observability.conversation.types
-    agentbox.core.engines.backends.token.conversation -> agentbox.core.execution.observability.conversation.base
-    agentbox.core.engines.backends.token.conversation -> agentbox.core.execution.observability.conversation.transcript
-    agentbox.core.engines.backends.token.conversation -> agentbox.core.execution.observability.conversation.types
     # engines → workspaces (backend renderers consume WorkenvConfig/payload
     # from workspaces.generation; real fix: move those value types to a
     # neutral layer below both domains)

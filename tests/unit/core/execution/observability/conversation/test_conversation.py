@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from agentbox.core.execution.observability.conversation.transcript import (
+from agentbox.core.data.conversation.transcript import (
     _events_to_conversation_view,
 )
-from agentbox.core.execution.observability.conversation.types import (
+from agentbox.core.data.conversation.types import (
     ConversationView,
 )
 

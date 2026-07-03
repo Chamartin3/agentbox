@@ -14,8 +14,8 @@ from typing import Final
 
 from agentbox.core.constants import ContentBlockType, MessageRole
 from agentbox.core.data import RunRecord, find_session_log, parse_session_log
-from agentbox.core.execution.observability.conversation.base import ConversationSource
-from agentbox.core.execution.observability.conversation.types import (
+from agentbox.core.data.conversation.base import ConversationSource
+from agentbox.core.data.conversation.types import (
     ContentPart,
     ConversationView,
     TokenTotals,

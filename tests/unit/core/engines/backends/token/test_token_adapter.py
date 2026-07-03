@@ -10,7 +10,7 @@ from agentbox.core.events import TextEvent
 from agentbox.core.engines.contracts.base import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 from agentbox.core.execution.observability.stream import RunStreamSession
-from agentbox.core.execution.observability.conversation.transcript import (
+from agentbox.core.data.conversation.transcript import (
     _events_to_conversation_view,
 )
 from pydantic import BaseModel, ValidationError

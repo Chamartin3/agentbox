@@ -20,7 +20,7 @@ from agentbox.core.config import load_settings
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import now_iso, read_transcript, RunnerSnapshot
 from agentbox.core.execution.observability.conversation import get as _get_conversation_source
-from agentbox.core.execution.observability.conversation.transcript import TranscriptSource
+from agentbox.core.data.conversation.transcript import TranscriptSource
 from agentbox.core.service.base import Service
 
 

@@ -28,7 +28,7 @@ from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.data import AgentDef, RunRecord
 
 from agentbox.core.execution.dispatch import dispatch_completion
-from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
+from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 from agentbox.core.execution.orchestrate.steploop import StepResult
 
 logger = logging.getLogger(__name__)

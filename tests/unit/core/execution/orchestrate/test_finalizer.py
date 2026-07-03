@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
+from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 from agentbox.core.execution.orchestrate.finalizer import (
     cleanup_run_dir,
     cleanup_workdir,

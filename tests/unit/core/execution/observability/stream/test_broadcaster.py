@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 from agentbox.core.events import TextEvent
-from agentbox.core.execution.orchestrate.broadcaster import RunBroadcaster
+from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 
 
 class TestRunBroadcaster:

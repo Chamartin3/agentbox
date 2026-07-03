@@ -10,8 +10,8 @@ conversation available, see the agentbox transcript" hint and fall back to
 from __future__ import annotations
 
 from agentbox.core.data import RunRecord
-from agentbox.core.execution.observability.conversation.base import ConversationSource
-from agentbox.core.execution.observability.conversation.types import ConversationView, TokenTotals
+from agentbox.core.data.conversation.base import ConversationSource
+from agentbox.core.data.conversation.types import ConversationView, TokenTotals
 
 
 class CodexSessionSource(ConversationSource):

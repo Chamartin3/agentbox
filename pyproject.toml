@@ -37,7 +37,7 @@ pi = "agentbox.core.engines.backends.pi:PiBackend"
 claude-cli-jsonl = "agentbox.core.engines.backends.claude_code.conversation:ClaudeCliJsonlSource"
 opencode-session = "agentbox.core.engines.backends.opencode.conversation:OpencodeSessionSource"
 pydantic-ai-history = "agentbox.core.engines.backends.token.conversation:PydanticAiHistorySource"
-agentbox-transcript = "agentbox.core.execution.observability.conversation.transcript:TranscriptSource"
+agentbox-transcript = "agentbox.core.data.conversation.transcript:TranscriptSource"
 codex-session = "agentbox.core.engines.backends.codex.conversation:CodexSessionSource"
 pi-session = "agentbox.core.engines.backends.pi.conversation:PiSessionSource"
 

@@ -10,11 +10,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.data import RunRecord, read_transcript
-from agentbox.core.execution.observability.conversation.base import ConversationSource
-from agentbox.core.execution.observability.conversation.transcript import (
+from agentbox.core.data.conversation.base import ConversationSource
+from agentbox.core.data.conversation.transcript import (
     _events_to_conversation_view,
 )
-from agentbox.core.execution.observability.conversation.types import ConversationView, TokenTotals
+from agentbox.core.data.conversation.types import ConversationView, TokenTotals
 
 
 class PydanticAiHistorySource(ConversationSource):

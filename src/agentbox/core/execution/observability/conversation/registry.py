@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from importlib.metadata import entry_points
 
-from agentbox.core.execution.observability.conversation.base import ConversationSource
+from agentbox.core.data.conversation.base import ConversationSource
 
 _CONVERSATION_CLASSES: dict[str, type[ConversationSource]] | None = None
 
