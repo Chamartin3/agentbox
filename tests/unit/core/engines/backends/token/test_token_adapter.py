@@ -97,7 +97,7 @@ async def test_direct_mode_emits_system_user_assistant_on_success() -> None:
     fake_agent = MagicMock()
     fake_agent.run_stream_events = _streaming_mock(_fake_result("assistant text"))
 
-    with patch("pydantic_ai.Agent", return_value=fake_agent):
+    with patch("agentbox.core.engines.backends.token.run_direct.Agent", return_value=fake_agent):
         events = await _collect(TokenBackend().run(_direct_rendered(), "hello", "rid"))
 
     assert [e.type for e in events] == [
@@ -132,7 +132,7 @@ async def test_direct_mode_surfaces_openrouter_finish_reason_error() -> None:
     )
 
     rendered = _direct_rendered(provider="openrouter")
-    with patch("pydantic_ai.Agent", return_value=fake_agent):
+    with patch("agentbox.core.engines.backends.token.run_direct.Agent", return_value=fake_agent):
         events = await _collect(TokenBackend().run(rendered, "hello", "rid"))
 
     text_roles = [getattr(e, "role", None) for e in events if e.type == "text"]
@@ -170,7 +170,7 @@ async def test_direct_mode_emits_tool_call_and_result_from_message_history() -> 
     fake_agent = MagicMock()
     fake_agent.run_stream_events = _streaming_mock(_fake_result("5", messages))
 
-    with patch("pydantic_ai.Agent", return_value=fake_agent):
+    with patch("agentbox.core.engines.backends.token.run_direct.Agent", return_value=fake_agent):
         events = await _collect(TokenBackend().run(_direct_rendered(), "2+3", "rid"))
 
     tool_call = next(e for e in events if e.type == "tool_call")

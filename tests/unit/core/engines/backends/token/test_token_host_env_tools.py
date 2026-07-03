@@ -155,7 +155,7 @@ async def test_backend_prefers_mcp_toolset_when_available() -> None:
     fake_agent, captured = _capture_agent_tools()
     sentinel = [object()]
     with (
-        patch("pydantic_ai.Agent", side_effect=fake_agent),
+        patch("agentbox.core.engines.backends.token.run_direct.Agent", side_effect=fake_agent),
         patch(
             "agentbox.core.engines.backends.token.run_direct.build_host_env_toolsets",
             return_value=sentinel,
@@ -173,7 +173,7 @@ async def test_backend_falls_back_to_inprocess_tools() -> None:
     # fs.read/fs.list tools are wired instead so the model still has tools.
     fake_agent, captured = _capture_agent_tools()
     with (
-        patch("pydantic_ai.Agent", side_effect=fake_agent),
+        patch("agentbox.core.engines.backends.token.run_direct.Agent", side_effect=fake_agent),
         patch(
             "agentbox.core.engines.backends.token.run_direct.build_host_env_toolsets",
             return_value=[],
@@ -199,7 +199,7 @@ async def test_backend_wires_no_tools_without_grants() -> None:
         },
         model="ollama:llama3.2:1b",
     )
-    with patch("pydantic_ai.Agent", side_effect=fake_agent):
+    with patch("agentbox.core.engines.backends.token.run_direct.Agent", side_effect=fake_agent):
         await _collect(TokenBackend().run(rendered, "hi", "rid"))
 
     assert "tools" not in captured["kwargs"]
