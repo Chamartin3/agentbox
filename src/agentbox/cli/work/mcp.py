@@ -7,7 +7,6 @@ import typer
 from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): workspace MCP surface belongs on WorkspaceService (plan 089)
 from agentbox.cli.shared import get_mcp_registry
-from agentbox.core.service import SystemService
 
 mcp_workspace_app = typer.Typer(
     name="mcp-workspace",
@@ -23,7 +22,7 @@ def mcp_show(
 ) -> None:
     """Show MCP policy and server overrides for a workspace."""
     obj: CLIContext = ctx.obj
-    servers = SystemService().get_project_mcp_servers()
+    servers = obj.system.get_project_mcp_servers()
 
     policy = obj.workspaces.get_mcp_policy(workspace_id)
     server_overrides = obj.workspaces.list_mcp_server_overrides(workspace_id)
@@ -88,7 +87,7 @@ def mcp_refresh(
     obj: CLIContext = ctx.obj
     overrides = obj.workspaces.list_mcp_server_overrides(workspace_id)
     server_names = {o["server_name"] for o in overrides}
-    for s in SystemService().get_project_mcp_servers():
+    for s in obj.system.get_project_mcp_servers():
         server_names.add(s.name)
 
     if not server_names:

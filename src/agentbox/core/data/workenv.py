@@ -224,6 +224,14 @@ class RenderedDir:
     written_paths: list[Path] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class RenderedFile:
+    """One rendered file as an in-memory preview (no disk residue)."""
+
+    rel_path: Path
+    content: str
+
+
 # ── Recipe value type ─────────────────────────────────────────────────────────
 
 

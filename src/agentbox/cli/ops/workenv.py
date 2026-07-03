@@ -93,7 +93,7 @@ def workenv_generate(
     """
     obj: CLIContext = ctx.obj
     settings = obj.settings
-    svc = WorkspaceService()
+    svc = obj.workspaces
 
     try:
         source = _resolve_source(
@@ -131,7 +131,7 @@ def workenv_generate(
         obj.render.ops.success(f"saved preset [bold]{save}[/bold]")
 
     if dry_run:
-        obj.render.ops.workenv_preview(source.config, recipe)
+        obj.render.ops.workenv_preview(svc.preview_workenv(config=source.config, recipe=recipe))
         return
 
     result = svc.render_workenv(source.target_dir, config=source.config, recipe=recipe)
@@ -208,7 +208,7 @@ def _resolve_target_dir(
 def workenv_seed_presets(ctx: typer.Context) -> None:
     """Load built-in presets into the DB (idempotent)."""
     obj: CLIContext = ctx.obj
-    count = WorkspaceService().seed_presets()
+    count = obj.workspaces.seed_presets()
     obj.render.ops.success(f"seeded {count} preset(s)")
 
 
@@ -216,7 +216,7 @@ def workenv_seed_presets(ctx: typer.Context) -> None:
 def workenv_list_presets(ctx: typer.Context) -> None:
     """List saved presets in the DB."""
     obj: CLIContext = ctx.obj
-    presets = WorkspaceService().list_presets()
+    presets = obj.workspaces.list_presets()
     if not presets:
         obj.render.ops.warn("No presets saved")
         return
@@ -231,7 +231,7 @@ def workenv_list_presets(ctx: typer.Context) -> None:
 def workenv_list_engines(ctx: typer.Context) -> None:
     """List available recipe engines."""
     obj: CLIContext = ctx.obj
-    available = WorkspaceService().list_recipe_engines()
+    available = obj.workspaces.list_recipe_engines()
     if not available:
         obj.render.ops.warn("No recipes found")
         return

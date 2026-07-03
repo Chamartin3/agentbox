@@ -31,6 +31,7 @@ from agentbox.core.workspaces.generation.builders.from_db import load_workenv as
 from agentbox.core.workspaces.generation.presets import load_seed_templates
 from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
+from agentbox.core.data.workenv import RenderedFile
 from agentbox.core.workspaces.generation.payload import RenderedDir
 from agentbox.core.workspaces.generation.recipe import Recipe
 from agentbox.core.engines.backends.recipe_loader import (
@@ -897,6 +898,21 @@ class WorkspaceService(Service):
         except KeyError:
             extra = []
         return render(dir_path, config=config, recipe=recipe, extra_items=extra)
+
+    def preview_workenv(
+        self,
+        *,
+        config: WorkenvConfig,
+        recipe: Recipe,
+    ) -> list[RenderedFile]:
+        """Render a WorkenvConfig to a throwaway dir and return the file contents."""
+        with tempfile.TemporaryDirectory() as td:
+            dir_path = Path(td)
+            result = self.render_workenv(dir_path, config=config, recipe=recipe)
+            return [
+                RenderedFile(p.relative_to(dir_path), p.read_text(encoding="utf-8"))
+                for p in result.written_paths
+            ]
 
     def list_recipe_engines(self) -> list[str]:
         """List available recipe engine names (backends with a recipe.yaml)."""

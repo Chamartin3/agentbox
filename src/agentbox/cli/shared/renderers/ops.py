@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile as _tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
@@ -16,7 +15,8 @@ from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
 
 from agentbox.core.config import Settings
-from agentbox.core.service import AgentDef, Recipe, WorkenvConfig, WorkspaceService
+from agentbox.core.data.workenv import RenderedFile
+from agentbox.core.service import AgentDef
 
 
 class OpsRenderer(Renderer):
@@ -331,25 +331,20 @@ class OpsRenderer(Renderer):
     # workenv
     # ------------------------------------------------------------------
 
-    def workenv_preview(self, config: WorkenvConfig, recipe: Recipe) -> None:
-        """Print rendered workenv output to stdout instead of writing to disk."""
-        with _tempfile.TemporaryDirectory() as td:
-            dir_path = Path(td)
-            result = WorkspaceService().render_workenv(dir_path, config=config, recipe=recipe)
-            for p in result.written_paths:
-                rel = p.relative_to(dir_path)
-                content = p.read_text(encoding="utf-8")
-                self.con.print(f"\n[bold cyan]─── {rel}[/bold cyan]")
-                syntax = Syntax(
-                    content,
-                    "json"
-                    if rel.suffix == ".json"
-                    else "yaml"
-                    if rel.suffix in (".yaml", ".yml")
-                    else "markdown",
-                    theme="ansi_dark",
-                )
-                self.con.print(syntax)
+    def workenv_preview(self, files: Sequence[RenderedFile]) -> None:
+        """Print rendered workenv files to stdout instead of writing to disk."""
+        for f in files:
+            self.con.print(f"\n[bold cyan]─── {f.rel_path}[/bold cyan]")
+            syntax = Syntax(
+                f.content,
+                "json"
+                if f.rel_path.suffix == ".json"
+                else "yaml"
+                if f.rel_path.suffix in (".yaml", ".yml")
+                else "markdown",
+                theme="ansi_dark",
+            )
+            self.con.print(syntax)
 
     # ------------------------------------------------------------------
     # run
