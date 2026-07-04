@@ -15,8 +15,6 @@ from agentbox.core.data._util import hash_blobs, now_iso
 from agentbox.core.data.payload_types import (
     AgentDiffResult,
     AgentMetaDict,
-    BackendLabelsDict,
-    BackendToRunnerDict,
     ChannelConfig,
     ChannelSpec,
     CodexModelRow,
@@ -32,9 +30,16 @@ from agentbox.core.data.payload_types import (
     NotFoundResult,
     PromptBindingSpec,
     PromptPreviewResult,
+    RefSection,
     RefreshProvidersResult,
     RenderMetadata,
     RenderedBlob,
+    RunCreatedResult,
+    RerunResult,
+    RunErrorResult,
+    RunLifecycleResult,
+    RunOutputResult,
+    CancelRunResult,
     RunnerProfileRow,
     RunnerProfileStatsRow,
     StubResult,
@@ -42,7 +47,14 @@ from agentbox.core.data.payload_types import (
     WebhookChannelConfig,
 )
 from agentbox.core.data.claude_session import find_session_log, parse_session_log
-from agentbox.core.data.manifests.agents import AgentDef, AgentManifest, AgentSource, CompositionConfig, SharedRef
+from agentbox.core.data.manifests.agents import (
+    AgentDef,
+    AgentManifest,
+    AgentSource,
+    CompositionConfig,
+    RefEntry,
+    SharedRef,
+)
 from agentbox.core.data.manifests.engines import RunnerManifest, RunnerSpec
 from agentbox.core.data.manifests.system import ProjectManifest
 from agentbox.core.data.manifests.workspaces import McpServerSpec, McpTransport, WorkspaceDef, WorkspaceFile
@@ -116,8 +128,7 @@ __all__ = [
     "AgentVersionRow",
     "ApiTokenPublicRow",
     "ApiTokenRow",
-    "BackendLabelsDict",
-    "BackendToRunnerDict",
+    "CancelRunResult",
     "ChannelConfig",
     "ChannelSpec",
     "CodexModelRow",
@@ -146,11 +157,18 @@ __all__ = [
     "PromptPreviewResult",
     "RefreshProvidersResult",
     "RenderMetadata",
+    "RefEntry",
+    "RefSection",
     "RenderedBlob",
+    "RerunResult",
     "RepoResourceRow",
     "ResourceSnapshotEntry",
     "ResourceStatus",
     "RunCommentRow",
+    "RunCreatedResult",
+    "RunErrorResult",
+    "RunLifecycleResult",
+    "RunOutputResult",
     "RunnerManifest",
     "RunnerProfile",
     "RunnerProfileCreate",

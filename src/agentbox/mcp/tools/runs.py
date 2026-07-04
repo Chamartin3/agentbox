@@ -8,7 +8,7 @@ from typing import Any
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-from agentbox.core.data import NotFoundResult, UsagePayload
+from agentbox.core.data import NotFoundResult, RunErrorResult, RunOutputResult, UsagePayload
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -196,7 +196,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         return usage
 
     @mcp.tool
-    def get_run_output(run_id: str) -> dict:
+    def get_run_output(run_id: str) -> RunOutputResult | NotFoundResult:
         """Final output payload for a run (without surrounding metadata)."""
         rec = ctx.execution.get_run(run_id)
         if rec is None:
@@ -204,7 +204,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         return {"run_id": run_id, "output": rec.output, "status": rec.status}
 
     @mcp.tool
-    def get_run_errors(run_id: str) -> dict:
+    def get_run_errors(run_id: str) -> RunErrorResult | NotFoundResult:
         """Error + validation errors for a failed run."""
         rec = ctx.execution.get_run(run_id)
         if rec is None:

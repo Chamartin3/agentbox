@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agentbox.core.data.payload_types import UsagePayload
+from agentbox.core.data.payload_types import (
+    CancelRunResult,
+    RunLifecycleResult,
+    UsagePayload,
+)
 
 import logging
 from typing import Any
@@ -31,7 +35,7 @@ def complete_run(
     error: str | None,
     usage: UsagePayload | None,
     schedule_webhook_cb: Any = None,
-) -> dict:
+) -> RunLifecycleResult:
     """Finalize a run from an external worker."""
     svc = _svc()
     existing = svc.get_run(run_id)
@@ -63,7 +67,7 @@ def snapshot_run(
     validation_errors: list[str] | None = None,
     composition_snapshot: dict | None = None,
     schedule_webhook_cb: Any = None,
-) -> dict:
+) -> RunLifecycleResult:
     """Store a snapshot for an embedded run; idempotent on terminal runs."""
     svc = _svc()
     existing = svc.get_run(run_id)
@@ -103,7 +107,7 @@ def post_outcome(
     status: str,
     error_kind: str | None = None,
     errors: list[dict] | None = None,
-) -> dict:
+) -> RunLifecycleResult:
     svc = _svc()
     existing = svc.get_run(run_id)
     if existing is None:
@@ -119,7 +123,7 @@ async def cancel_run(
     run_id: str,
     *,
     executor: "RunExecutor",
-) -> dict:
+) -> CancelRunResult:
     """Cancel an in-progress run. Idempotent on terminal runs."""
     svc = _svc()
     existing = svc.get_run(run_id)

@@ -14,11 +14,14 @@ from __future__ import annotations
 from typing import Literal, NotRequired, TypedDict
 
 from agentbox.core.data.rows import (
+    McpServerConfigView,
+    PermissionFileEntry,
     AgentPromptBindingRow,
     RepoResourceRow,
     ResourceBlobRow,
     ResourceVersionRow,
     WorkspaceFileBindingRow,
+    WorkspaceSubagentRow,
 )
 
 
@@ -34,31 +37,60 @@ class UsagePayload(TypedDict):
     duration_ms: NotRequired[int | None]
 
 
+class RunCreatedResult(TypedDict):
+    """``POST /api/runs`` response — the run was dispatched to a backend."""
+
+    run_id: str
+    agent: str
+
+
+class RerunResult(RunCreatedResult):
+    """``POST /api/runs/{run_id}/rerun`` — same shape as RunCreatedResult plus
+    ``rerun_of`` pointing to the original run."""
+
+    rerun_of: str
+
+
+class RunLifecycleResult(TypedDict):
+    """Terminal lifecycle action (complete / snapshot / post-outcome)."""
+
+    ok: Literal[True]
+    run_id: str
+    status: NotRequired[str]
+    post_status: NotRequired[str | None]
+
+
+class CancelRunResult(TypedDict):
+    """``POST /api/runs/{run_id}/cancel`` response."""
+
+    run_id: str
+    cancelled: bool
+    status: str
+
+
+class RunOutputResult(TypedDict):
+    """MCP ``get_run_output`` — final output without surrounding metadata."""
+
+    run_id: str
+    output: str | None
+    status: str
+
+
+class RunErrorResult(TypedDict):
+    """MCP ``get_run_errors`` — error details for a failed run."""
+
+    run_id: str
+    status: str
+    error: str | None
+    validation_status: str | None
+    validation_errors: list[str] | None
+
+
 class NotFoundResult(TypedDict):
     """Standard MCP tool error: requested resource was not found."""
 
     error: str
     run_id: str
-
-
-class BackendLabelsDict(TypedDict):
-    """Mapping from every known ``BackendName`` to its display label."""
-
-    claude_code: str
-    opencode: str
-    codex: str
-    pi: str
-    token: str
-
-
-class BackendToRunnerDict(TypedDict):
-    """Mapping from every known ``BackendName`` to its ``RunnerKind`` string."""
-
-    claude_code: str
-    opencode: str
-    codex: str
-    pi: str
-    token: str
 
 
 class EventStylesDict(TypedDict):
@@ -89,6 +121,13 @@ class EnvDocPreviewResult(TypedDict):
 
     claude_md: str
     agents_md: str
+
+
+class RefSection(TypedDict):
+    """Rendered reference section — one file's content with its heading."""
+
+    heading: str
+    content: str
 
 
 class ChannelConfig(TypedDict, total=False):
@@ -259,7 +298,7 @@ class AgentMetaDict(TypedDict, total=False):
     model: str | None
     output_schema: JsonSchemaDict | None
     input_schema: JsonSchemaDict | None
-    references: list[dict[str, str]]
+    references: list[RefSection]
     timeout_seconds: int | None
     effective_tools: list[str]
     provider: str | None
@@ -664,7 +703,311 @@ class PromptPreviewResult(TypedDict):
     snapshot: list[SnapshotEntryView]
 
 
+# ── Workspace-service result shapes ─────────────────────────────────────────
+
+
+class SubagentSpec(TypedDict):
+    """Caller-supplied workspace subagent input."""
+
+    agent_id: str
+    alias: str
+    display_order: NotRequired[int]
+
+
+class WorkspaceListItem(TypedDict):
+    """One entry from ``WorkspaceService.list_workspaces()``."""
+
+    name: str
+    path: str
+    description: str | None
+    source: str | None
+    kind: str
+    agents: list[str]
+    agent_count: int
+    file_count: int
+    skill_count: int
+    resource_count: int
+    exists: bool
+    on_disk: bool
+    created_at: str | None
+    updated_at: str | None
+
+
+class WorkspaceDeleteResult(TypedDict):
+    """Return shape of ``WorkspaceService.delete_workspace()``."""
+
+    deleted: str
+    counts: dict[str, int]
+    disk_removed: bool
+
+
+class EnvDocRenderEntry(TypedDict):
+    """One snapshot entry produced by rendering the env doc into a workdir."""
+
+    role: str
+    file: str
+    workspace_id: str
+    env_doc_version_id: str
+    bytes: int
+
+
+class ResolvedMcpServer(TypedDict):
+    name: str
+    enabled: bool
+    config: McpServerConfigView | None
+    disabled_tools: list[str]
+    source: str
+
+
+class ResolvedWorkspaceMcp(TypedDict):
+    """Return shape of ``WorkspaceService.resolve_workspace_mcp()``."""
+
+    servers: list[ResolvedMcpServer]
+    policy: str
+
+
+class McpDiscoveryRefreshResult(TypedDict):
+    invalidated: int
+
+
+class ResolvedHostEnv(TypedDict):
+    """Return shape of ``WorkspaceService.resolve_workspace_host_env()``."""
+
+    grants: dict[str, GrantConfig]
+    profile_id: str | None
+    overrides: NotRequired[dict[str, GrantConfig] | None]
+
+
+class WorkspaceFileRead(TypedDict):
+    path: str
+    content: str
+
+
+class WorkspaceFileWrite(TypedDict):
+    path: str
+    bytes: int
+
+
+class GeneratedConfigsResult(TypedDict):
+    """Return shape of ``WorkspaceService.generate_configs()``."""
+
+    workspace: str
+    generated: dict[str, str]
+
+
+class GeneratedSkillsResult(TypedDict):
+    """Return shape of ``WorkspaceService.generate_skills()``."""
+
+    workspace: str
+    skills_count: int
+    generated: dict[str, str]
+
+
+class SkillListItem(TypedDict):
+    name: str
+    path: str
+    size: int
+
+
+class SkillsListResult(TypedDict):
+    workspace: str
+    workspace_path: str
+    skills: list[SkillListItem]
+
+
+class SkillContentResult(TypedDict):
+    workspace: str
+    skill: str
+    path: str
+    content: str
+
+
+class EffectivePermissions(TypedDict):
+    """Effective runtime permissions for one workspace."""
+
+    allowed_tools: list[str]
+    allowed_builtin_tools: list[str]
+    files: list[PermissionFileEntry]
+    max_tokens: int | None
+    allow_file_write: bool
+    allow_network: bool
+
+
+class PermissionsPatch(TypedDict, total=False):
+    """Caller-supplied permissions update (``set_permissions``)."""
+
+    allowed_tools: list[str] | None
+    allowed_builtin_tools: list[str] | None
+    files: list[PermissionFileEntry] | None
+    max_tokens: int | None
+    allow_file_write: bool | None
+    allow_network: bool | None
+
+
+class PermissionsView(TypedDict):
+    workspace: str
+    path: str
+    permissions: EffectivePermissions
+
+
+class PermissionsSetResult(TypedDict):
+    workspace: str
+    path: str
+    permissions: EffectivePermissions
+    regenerated: dict[str, str]
+
+
+class McpToolGroup(TypedDict):
+    name: str
+    tools: list[str]
+    claude_tools: list[str]
+    opencode_tools: list[str]
+    tool_count: int
+    kind: str
+    active: NotRequired[bool]
+    fully_active: NotRequired[bool]
+
+
+class WorkspaceMcpToolsResult(TypedDict):
+    """Return shape of ``WorkspaceService.get_workspace_mcp_tools()``."""
+
+    workspace: str
+    mcp_server_name: str
+    claude_prefix: str
+    opencode_prefix: str
+    groups: list[McpToolGroup]
+    builtin_tools: list[str]
+    total_groups: int
+    total_tools: int
+
+
+class EnrichedSubagentRow(TypedDict):
+    """A ``WorkspaceSubagentRow`` enriched with agent metadata (API layer)."""
+
+    id: str
+    workspace_id: str
+    agent_id: str
+    alias: str
+    display_order: int
+    created_at: str
+    created_by: str | None
+    agent_name: str | None
+    agent_description: str | None
+
+
+class SubagentItemsResult(TypedDict):
+    items: list[EnrichedSubagentRow]
+
+
+class SubagentRowsResult(TypedDict):
+    items: list[WorkspaceSubagentRow]
+
+
+class WorkspaceFileInfo(TypedDict):
+    path: str
+    size: int
+
+
+class WorkspaceDetail(TypedDict):
+    """Return shape of ``get_workspace_by_name()``."""
+
+    name: str
+    path: str
+    exists: bool
+    files: list[WorkspaceFileInfo]
+    generated_configs: dict[str, str]
+
+
+class AgentWorkspaceDetail(TypedDict):
+    """Return shape of ``get_workspace_for_agent()``."""
+
+    agent_id: str
+    path: str
+    exists: bool
+    ephemeral: bool
+    files: list[WorkspaceFileInfo]
+    generated_configs: dict[str, str]
+
+
+class WorkspacePathResult(TypedDict):
+    path: str
+
+
+class AgentSkillsResult(TypedDict):
+    """Return shape of ``list_skills_for_agent()``."""
+
+    agent_id: str
+    workspace: str
+    skills: list[SkillListItem]
+
+
+class WorkspaceFileSnapshotEntry(TypedDict):
+    """Snapshot row for one materialized workspace file binding."""
+
+    role: str
+    binding_id: str
+    resource_id: str
+    version_id: str
+    content_hash: str
+    target_path: str
+    files_written: int
+    mode: str
+    skipped: bool
+    skipped_reason: str | None
+
+
+class PromptEmbedSnapshotEntry(TypedDict):
+    """Snapshot row for one prompt-embedded resource binding."""
+
+    role: str
+    binding_id: str
+    marker: str
+    resource_id: str
+    version_id: str
+    content_hash: str
+    mode: str
+
+
+type RunSnapshotEntry = EnvDocRenderEntry | WorkspaceFileSnapshotEntry | PromptEmbedSnapshotEntry
+"""Any JSON-serializable resource snapshot row captured during run prep."""
+
+
 __all__ = [
+    "RunSnapshotEntry",
+    "PromptEmbedSnapshotEntry",
+    "WorkspaceFileSnapshotEntry",
+    "AgentSkillsResult",
+    "WorkspacePathResult",
+    "AgentWorkspaceDetail",
+    "WorkspaceDetail",
+    "WorkspaceFileInfo",
+    "EffectivePermissions",
+    "EnrichedSubagentRow",
+    "EnvDocRenderEntry",
+    "GeneratedConfigsResult",
+    "GeneratedSkillsResult",
+    "McpDiscoveryRefreshResult",
+    "McpServerConfigView",
+    "McpServerConfigView",
+    "McpToolGroup",
+    "PermissionFileEntry",
+    "PermissionsPatch",
+    "PermissionsSetResult",
+    "PermissionsView",
+    "ResolvedHostEnv",
+    "ResolvedMcpServer",
+    "ResolvedWorkspaceMcp",
+    "SkillContentResult",
+    "SkillListItem",
+    "SkillsListResult",
+    "SubagentItemsResult",
+    "SubagentRowsResult",
+    "SubagentSpec",
+    "WorkspaceDeleteResult",
+    "WorkspaceFileRead",
+    "WorkspaceFileWrite",
+    "WorkspaceListItem",
+    "WorkspaceMcpToolsResult",
     "AgentDiffResult",
     "ChangedEntry",
     "DiffValue",

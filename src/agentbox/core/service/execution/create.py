@@ -8,6 +8,7 @@ import logging
 from agentbox.core.db import AgentDefManager, AgentMetaManager
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.service.agents.crud import resolve_agent
+from agentbox.core.data.payload_types import RunCreatedResult, RerunResult
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import (
     AgentDisabled,
@@ -47,7 +48,7 @@ async def create_run(
     runner_profile: str | None = None,
     runner_config: dict | None = None,
     runner_embedded: bool = False,
-) -> dict:
+) -> RunCreatedResult:
     """Validate input, resolve the agent, and dispatch to the executor.
 
     Raises :class:`AgentNotFound`, :class:`InvalidRunInput`, or
@@ -105,7 +106,7 @@ async def rerun(
     agent_defs: "AgentDefManager",
     agent_meta: "AgentMetaManager",
     executor: "RunExecutor",
-) -> dict:
+) -> RerunResult:
     """Re-execute a finished run with the same agent + input/variables."""
     rec = _svc().get_run(run_id)
     if rec is None:

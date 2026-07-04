@@ -21,6 +21,11 @@ from agentbox.api.runs.schemas import (
     SnapshotBody,
 )
 from agentbox.api.runs.webhooks import schedule_webhook
+from agentbox.core.data.payload_types import (
+    CancelRunResult,
+    RunCreatedResult,
+    RunLifecycleResult,
+)
 from agentbox.core.data.rows import RunCommentRow, RunStatsRow
 from agentbox.core.service import read_transcript, NoBackendAvailable
 from agentbox.core.service.execution import (
@@ -48,7 +53,7 @@ router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 
 @router.post("")
-async def create_run(body: CreateRunBody) -> dict:
+async def create_run(body: CreateRunBody) -> RunCreatedResult:
     try:
         db = get_db()
         return await _svc_create_run(
@@ -139,7 +144,7 @@ def runs_stats(
 
 
 @router.post("/{run_id}/complete")
-async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
+async def complete_run(run_id: str, body: CompleteRunBody) -> RunLifecycleResult:
     try:
         db = get_db()
         return _svc_complete_run(
@@ -156,7 +161,7 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> dict:
 
 
 @router.post("/{run_id}/snapshot")
-async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
+async def snapshot_run(run_id: str, body: SnapshotBody) -> RunLifecycleResult:
     try:
         db = get_db()
         return _svc_snapshot_run(
@@ -175,7 +180,7 @@ async def snapshot_run(run_id: str, body: SnapshotBody) -> dict:
 
 
 @router.post("/{run_id}/post_outcome")
-def post_outcome(run_id: str, body: PostOutcomeBody) -> dict:
+def post_outcome(run_id: str, body: PostOutcomeBody) -> RunLifecycleResult:
     """Record downstream post-processing outcome for a completed run."""
     try:
         return _svc_post_outcome(
@@ -189,7 +194,7 @@ def post_outcome(run_id: str, body: PostOutcomeBody) -> dict:
 
 
 @router.post("/{run_id}/rerun")
-async def rerun(run_id: str) -> dict:
+async def rerun(run_id: str) -> RunCreatedResult:
     """Re-execute a finished run with the same agent + input/variables."""
     try:
         db = get_db()
@@ -234,7 +239,7 @@ def add_comment(run_id: str, body: RunCommentBody) -> RunCommentRow:
 
 
 @router.post("/{run_id}/cancel")
-async def cancel_run(run_id: str) -> dict:
+async def cancel_run(run_id: str) -> CancelRunResult:
     """Cancel an in-progress run. Idempotent."""
     try:
         return await _svc_cancel_run(run_id, executor=get_executor())
