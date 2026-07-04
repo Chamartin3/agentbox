@@ -97,6 +97,7 @@ async def run_direct_agent_mode(
     workspace_id: str | None = None,
     workdir: str | None = None,
     db_path: str | None = None,
+    model_params: dict[str, Any] | None = None,
 ) -> AsyncIterator[RunEvent]:
     """Drive a directly-constructed ``pydantic_ai.Agent`` to completion."""
     # Build result_type from output schema when present. The strict
@@ -216,6 +217,15 @@ async def run_direct_agent_mode(
         common_kwargs["output_type"] = wrapped_output_type
     if isinstance(output_retries, int) and output_retries > 0:
         common_kwargs["output_retries"] = output_retries
+
+    # Runner-profile ``params`` map 1:1 onto pydantic-ai ModelSettings keys
+    # (max_tokens, temperature, extra_body, ...). Passing them as model_settings
+    # is what lets local reasoning models be tamed, e.g.
+    # params = {"extra_body": {"reasoning_effort": "none"}} disables qwen3's
+    # thinking on the Ollama /v1 endpoint (verified: kills the degenerate
+    # thinking loops). Previously these params were silently dropped.
+    if model_params:
+        common_kwargs["model_settings"] = dict(model_params)
 
     # Wire the host-env tools so the model can actually call them. Without this
     # the direct path presents zero tools and every model can only hallucinate

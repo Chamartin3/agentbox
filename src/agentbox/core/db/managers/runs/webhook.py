@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json as _json
+from typing import cast
 
+from agentbox.core.data.rows import WebhookDeliveryRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.runs.webhook import WebhookDelivery
 from agentbox.core.db.schema import webhook_deliveries
@@ -40,7 +42,7 @@ class WebhookDeliveryManager(Manager[WebhookDelivery]):
             )
         )
 
-    def list_for_run(self, run_id: str) -> list[dict]:
+    def list_for_run(self, run_id: str) -> list[WebhookDeliveryRow]:
         """List all webhook delivery attempts for a run ordered by id."""
         with self._engine.connect() as conn:
             rows = conn.execute(
@@ -48,4 +50,4 @@ class WebhookDeliveryManager(Manager[WebhookDelivery]):
                 .where(webhook_deliveries.c.run_id == run_id)
                 .order_by(webhook_deliveries.c.id)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(WebhookDeliveryRow, dict(r._mapping)) for r in rows]

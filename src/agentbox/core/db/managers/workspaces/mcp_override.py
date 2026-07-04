@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 
+from agentbox.core.data.rows import WorkspaceMcpOverrideRow, WorkspaceMcpToolOverrideRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.mcp_override import (
     WorkspaceMcpOverride,
@@ -65,14 +67,14 @@ class WorkspaceMcpOverrideManager(Manager[WorkspaceMcpOverride]):
 
     # ── pure-DB primitives (ported from McpOverridesMixin) ──────────────
 
-    def list_for_workspace(self, workspace_id: str) -> list[dict]:
+    def list_for_workspace(self, workspace_id: str) -> list[WorkspaceMcpOverrideRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 workspace_mcp_overrides.select().where(
                     workspace_mcp_overrides.c.workspace_id == workspace_id
                 )
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(WorkspaceMcpOverrideRow, dict(r._mapping)) for r in rows]
 
     def set_override(
         self,
@@ -83,7 +85,7 @@ class WorkspaceMcpOverrideManager(Manager[WorkspaceMcpOverride]):
         config_overrides: dict | None = None,
         changelog: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceMcpOverrideRow:
         now = now_iso()
         with self._engine.begin() as conn:
             existing = conn.execute(
@@ -126,7 +128,7 @@ class WorkspaceMcpOverrideManager(Manager[WorkspaceMcpOverride]):
                 )
             ).first()
         assert row is not None
-        return dict(row._mapping)
+        return cast(WorkspaceMcpOverrideRow, dict(row._mapping))
 
 
 class WorkspaceMcpToolOverrideManager(Manager[WorkspaceMcpToolOverride]):
@@ -136,14 +138,14 @@ class WorkspaceMcpToolOverrideManager(Manager[WorkspaceMcpToolOverride]):
 
     # ── pure-DB primitives (ported from McpOverridesMixin) ──────────────
 
-    def list_for_workspace(self, workspace_id: str) -> list[dict]:
+    def list_for_workspace(self, workspace_id: str) -> list[WorkspaceMcpToolOverrideRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 workspace_mcp_tool_overrides.select().where(
                     workspace_mcp_tool_overrides.c.workspace_id == workspace_id
                 )
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(WorkspaceMcpToolOverrideRow, dict(r._mapping)) for r in rows]
 
     def set_override(
         self,
@@ -153,7 +155,7 @@ class WorkspaceMcpToolOverrideManager(Manager[WorkspaceMcpToolOverride]):
         *,
         enabled: bool,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceMcpToolOverrideRow:
         now = now_iso()
         with self._engine.begin() as conn:
             existing = conn.execute(
@@ -192,4 +194,4 @@ class WorkspaceMcpToolOverrideManager(Manager[WorkspaceMcpToolOverride]):
                 )
             ).first()
         assert row is not None
-        return dict(row._mapping)
+        return cast(WorkspaceMcpToolOverrideRow, dict(row._mapping))

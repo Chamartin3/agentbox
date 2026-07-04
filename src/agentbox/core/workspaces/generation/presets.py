@@ -12,13 +12,14 @@ from pathlib import Path
 import yaml
 
 from agentbox.core.constants import BackendName
+from agentbox.core.data.rows import WorkenvTemplateRow
 from agentbox.core.db import WorkenvTemplateManager
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 
 _SEEDS_DIR = Path(__file__).parent / "seeds"
 
 
-def list_presets(templates_mgr: WorkenvTemplateManager) -> list[dict]:
+def list_presets(templates_mgr: WorkenvTemplateManager) -> list[WorkenvTemplateRow]:
     """List all templates in the DB as summary dicts."""
     return templates_mgr.list_all()
 
@@ -44,7 +45,7 @@ def save_as_preset(
     *,
     engine: str = BackendName.CLAUDE_CODE,
     description: str | None = None,
-) -> dict:
+) -> WorkenvTemplateRow:
     """Persist a ``WorkenvConfig`` as a named template."""
     config_json = json.loads(json.dumps(config._to_dict()))
     return templates_mgr.upsert(

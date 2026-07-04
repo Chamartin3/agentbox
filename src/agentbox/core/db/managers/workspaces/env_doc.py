@@ -7,7 +7,7 @@ from typing import cast
 from sqlalchemy import func, select
 
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.data.rows import EnvDocRow
+from agentbox.core.data.rows import EnvDocRow, WorkspaceEnvDocPointerRow
 from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
 from agentbox.core.db.schema import workspace_env_doc_versions, workspace_env_docs
 from agentbox.core.db.utils import now_iso
@@ -18,14 +18,14 @@ class WorkspaceEnvDocManager(Manager[WorkspaceEnvDoc]):
 
     model = WorkspaceEnvDoc
 
-    def get_pointer(self, workspace_id: str) -> dict | None:
+    def get_pointer(self, workspace_id: str) -> WorkspaceEnvDocPointerRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 workspace_env_docs.select().where(
                     workspace_env_docs.c.workspace_id == workspace_id
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(WorkspaceEnvDocPointerRow, dict(row._mapping)) if row else None
 
 
 class WorkspaceEnvDocVersionManager(Manager[WorkspaceEnvDocVersion]):
@@ -51,23 +51,23 @@ class WorkspaceEnvDocVersionManager(Manager[WorkspaceEnvDocVersion]):
             ).first()
             return cast(EnvDocRow, dict(ver._mapping)) if ver else None
 
-    def list_for_workspace(self, workspace_id: str) -> list[dict]:
+    def list_for_workspace(self, workspace_id: str) -> list[EnvDocRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 workspace_env_doc_versions.select()
                 .where(workspace_env_doc_versions.c.workspace_id == workspace_id)
                 .order_by(workspace_env_doc_versions.c.version_number.desc())
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(EnvDocRow, dict(r._mapping)) for r in rows]
 
-    def get_by_version_id(self, version_id: str) -> dict | None:
+    def get_by_version_id(self, version_id: str) -> EnvDocRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 workspace_env_doc_versions.select().where(
                     workspace_env_doc_versions.c.id == version_id
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(EnvDocRow, dict(row._mapping)) if row else None
 
     def next_version_number(self, workspace_id: str) -> int:
         with self._engine.connect() as conn:
@@ -88,7 +88,7 @@ class WorkspaceEnvDocVersionManager(Manager[WorkspaceEnvDocVersion]):
         changelog: str,
         publish: bool = True,
         actor: str | None = None,
-    ) -> dict:
+    ) -> EnvDocRow:
         version_id = uuid.uuid4().hex
         next_num = self.next_version_number(workspace_id)
         now = now_iso()
@@ -137,7 +137,7 @@ class WorkspaceEnvDocVersionManager(Manager[WorkspaceEnvDocVersion]):
         self,
         workspace_id: str,
         version_id: str,
-    ) -> dict:
+    ) -> EnvDocRow:
         with self._engine.begin() as conn:
             ver = conn.execute(
                 workspace_env_doc_versions.select().where(

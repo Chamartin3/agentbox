@@ -10,7 +10,14 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agentbox.cli.shared.render import Renderer
-from agentbox.core.service import EnvDocRow, McpServerSpec
+from agentbox.core.service import (
+    EnvDocRow,
+    HostEnvCallLogRow,
+    HostEnvProfileRow,
+    McpServerSpec,
+    WorkspaceHostEnvGrantRow,
+    ApiTokenRow,
+)
 
 
 class SystemRenderer(Renderer):
@@ -45,7 +52,7 @@ class SystemRenderer(Renderer):
     # Tokens
     # ------------------------------------------------------------------
 
-    def tokens_table(self, items: list[dict]) -> None:
+    def tokens_table(self, items: Sequence[ApiTokenRow]) -> None:
         """Render a table of API tokens."""
         if not items:
             self.dim("no tokens")
@@ -174,7 +181,7 @@ class SystemRenderer(Renderer):
             )
         )
 
-    def env_doc_versions_table(self, rows: list[dict], workspace_id: str) -> None:
+    def env_doc_versions_table(self, rows: Sequence[EnvDocRow], workspace_id: str) -> None:
         """Render a table of env doc versions."""
         if not rows:
             self.warn(f"No env doc versions for workspace {workspace_id!r}.")
@@ -236,7 +243,7 @@ class SystemRenderer(Renderer):
     # Host env
     # ------------------------------------------------------------------
 
-    def host_env_profiles_table(self, rows: list[dict]) -> None:
+    def host_env_profiles_table(self, rows: Sequence[HostEnvProfileRow]) -> None:
         """Render a table of host-env profiles."""
         if not rows:
             self.warn("No host-env profiles defined.")
@@ -256,7 +263,7 @@ class SystemRenderer(Renderer):
         self.print(table)
 
     def host_env_grants_view(
-        self, workspace_id: str, row: dict, resolved: dict
+        self, workspace_id: str, row: WorkspaceHostEnvGrantRow, resolved: dict[str, object]
     ) -> None:
         """Render host-env grants for a workspace."""
         meta = Table.grid(padding=(0, 2))
@@ -270,7 +277,8 @@ class SystemRenderer(Renderer):
             Panel(meta, title=f"Host-env grant — {workspace_id}", border_style="cyan")
         )
 
-        grants = resolved.get("grants") or {}
+        grants_raw = resolved.get("grants")
+        grants: dict[str, object] = grants_raw if isinstance(grants_raw, dict) else {}
         if grants:
             gtable = self.table("Capability", "Value")
             gtable.title = None
@@ -286,7 +294,7 @@ class SystemRenderer(Renderer):
         """Print warning when no host-env grant exists for a workspace."""
         self.warn(f"No host-env grant for workspace {workspace_id!r}.")
 
-    def host_env_audit_table(self, rows: list[dict], run_id: str) -> None:
+    def host_env_audit_table(self, rows: Sequence[HostEnvCallLogRow], run_id: str) -> None:
         """Render a table of host-env call audit log for a run."""
         if not rows:
             self.warn(f"No host-env calls recorded for run {run_id!r}.")

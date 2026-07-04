@@ -11,6 +11,7 @@ from rich.text import Text
 
 from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
+from agentbox.core.service import RunCommentRow, UsageSummaryRow
 
 
 class RunRenderer(Renderer):
@@ -98,7 +99,7 @@ class RunRenderer(Renderer):
     # usage aggregate
     # ------------------------------------------------------------------
 
-    def usage_summary(self, agg: Mapping[str, JsonValue]) -> None:
+    def usage_summary(self, agg: UsageSummaryRow) -> None:
         """Render the aggregate usage summary line."""
         self.dim(
             f"totals: "
@@ -142,7 +143,7 @@ class RunRenderer(Renderer):
         style = self.event_style(event_type)
         self.con.print(f"[{style}][{event_type}][/{style}] {_json.dumps(payload, default=str)[:400]}")
 
-    def comments_list(self, items: Sequence[Mapping[str, JsonValue]]) -> None:
+    def comments_list(self, items: Sequence[RunCommentRow]) -> None:
         """Render a list of run comments."""
         for c in items:
             self.con.print(

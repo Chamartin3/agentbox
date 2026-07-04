@@ -25,6 +25,11 @@ from pathlib import Path
 
 from agentbox.core.config import SETTINGS
 from agentbox.core.data import McpServerSpec, now_iso
+from agentbox.core.data.rows import (
+    ApiTokenPublicRow,
+    ApiTokenRow,
+    HostEnvCallLogRow,
+)
 from agentbox.core.service.base import Service
 
 
@@ -193,7 +198,7 @@ class SystemService(Service):
 
     def list_api_tokens(
         self, *, environment: str | None = None
-    ) -> list[dict]:
+    ) -> list[ApiTokenRow]:
         """List API tokens, optionally filtered by environment."""
         return self._db.api_tokens.list_tokens(environment=environment)
 
@@ -203,7 +208,7 @@ class SystemService(Service):
         *,
         environment: str = "production",
         secret: str | None = None,
-    ) -> dict:
+    ) -> ApiTokenPublicRow:
         """Create a new API token. The plaintext secret is returned only here.
 
         When *secret* is not provided, a 256-bit URL-safe secret is generated.
@@ -216,7 +221,7 @@ class SystemService(Service):
         ts = now_iso()
         encrypted = self._fernet().encrypt(secret.encode()).decode()
         last_four = secret[-4:]
-        result = self._db.api_tokens.insert_token(
+        return self._db.api_tokens.insert_token(
             token_id=token_id,
             environment=environment,
             name=name,
@@ -225,17 +230,15 @@ class SystemService(Service):
             created_at=ts,
             updated_at=ts,
         )
-        result["secret"] = secret
-        return result
 
-    def rename_api_token(self, token_id: str, name: str) -> dict | None:
+    def rename_api_token(self, token_id: str, name: str) -> ApiTokenRow | None:
         """Rename an API token. Returns the updated row or None."""
         ts = now_iso()
         return self._db.api_tokens.update_token_name(token_id, name, ts)
 
     def rotate_api_token(
         self, token_id: str, *, secret: str | None = None
-    ) -> dict | None:
+    ) -> dict[str, object] | None:
         """Rotate a token's secret. Returns the updated row (with plaintext secret) or None."""
         if secret is None:
             secret = _secrets.token_urlsafe(32)
@@ -248,8 +251,10 @@ class SystemService(Service):
             token_id, encrypted, last_four, ts
         )
         if result is not None:
-            result["secret"] = secret
-        return result
+            result_dict: dict[str, object] = dict(result)
+            result_dict["secret"] = secret
+            return result_dict
+        return None
 
     def delete_api_token(self, token_id: str) -> bool:
         """Delete an API token. Returns True if a row was deleted."""
@@ -299,7 +304,7 @@ class SystemService(Service):
         )
         return row_id
 
-    def list_host_env_calls_for_run(self, run_id: str) -> list[dict]:
+    def list_host_env_calls_for_run(self, run_id: str) -> list[HostEnvCallLogRow]:
         """List all host-env call log entries for a run."""
         return self._db.host_env_call_log.list_calls_for_run(run_id)
 

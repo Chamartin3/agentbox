@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 
 from agentbox.core.agents.config import (
     HttpValidatorConfig,
@@ -33,22 +34,24 @@ def _resolve_binding(
     resources: ResourceManager,
     resource_versions: ResourceVersionManager,
     resource_blobs: ResourceBlobManager,
-    b: dict,
+    b: Mapping[str, object],
 ) -> dict:
-    resource = resources.get_resource(b["resource_id"])
+    resource_id = str(b["resource_id"])
+    resource = resources.get_resource(resource_id)
     if not resource:
         raise PreviewError(
-            "resource_not_found", f"resource {b['resource_id']!r} not found"
+            "resource_not_found", f"resource {resource_id!r} not found"
         )
     version_id = b.get("pinned_version_id")
     if not version_id:
-        active = resource_versions.get_active_version(b["resource_id"])
+        active = resource_versions.get_active_version(resource_id)
         if not active:
             raise PreviewError(
                 "no_active_version",
-                f"resource {b['resource_id']!r} has no active version",
+                f"resource {resource_id!r} has no active version",
             )
         version_id = active["id"]
+    version_id = str(version_id)
     version = resource_versions.get_version(version_id)
     if not version:
         raise PreviewError(

@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 
+from agentbox.core.data.rows import SessionRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.runs.session import Session
 from agentbox.core.db.schema import sessions
@@ -36,13 +38,13 @@ class SessionManager(Manager[Session]):
             .values(last_used_at=now_iso())
         )
 
-    def get_dict(self, session_id: str) -> dict | None:
-        """Fetch a session row by id as a plain dict, or None."""
+    def get_dict(self, session_id: str) -> SessionRow | None:
+        """Fetch a session row by id as a typed row, or None."""
         with self._engine.connect() as conn:
             row = conn.execute(
                 sessions.select().where(sessions.c.id == session_id)
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(SessionRow, dict(row._mapping)) if row else None
 
     def set_workdir(self, session_id: str, workdir: str) -> None:
         """Update a session's workdir (executor sets this on first run)."""

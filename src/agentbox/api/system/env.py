@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
+from agentbox.core.data.rows import EnvDocRow
 from agentbox.core.service import render_env_doc_preview
 
 router = APIRouter(tags=["env-doc"])
@@ -41,7 +42,7 @@ def save_env_doc(
     workspace_id: str,
     body: SaveEnvDocBody,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> EnvDocRow:
     """Save and publish the workspace env-doc, then re-sync on-disk renders."""
     try:
         return ctx.workspaces.save_and_sync_env_doc(

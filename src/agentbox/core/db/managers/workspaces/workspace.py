@@ -1,8 +1,11 @@
 """WorkspaceManager — workspace registry CRUD with cascade delete."""
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy import delete as sa_delete, text
 
+from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.binding import WorkspaceFileResourceBinding
 from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
@@ -39,19 +42,19 @@ class WorkspaceManager(Manager[Workspace]):
 
     # ── pure-DB primitives (ported from WorkspacesMixin) ─────────────────
 
-    def list_all(self) -> list[dict]:
+    def list_all(self) -> list[WorkspaceRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 workspaces_schema.select().order_by(workspaces_schema.c.name)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(WorkspaceRow, dict(r._mapping)) for r in rows]
 
-    def get_by_name(self, name: str) -> dict | None:
+    def get_by_name(self, name: str) -> WorkspaceRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 workspaces_schema.select().where(workspaces_schema.c.name == name)
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(WorkspaceRow, dict(row._mapping)) if row else None
 
     def insert(
         self,
@@ -61,7 +64,7 @@ class WorkspaceManager(Manager[Workspace]):
         path: str | None = None,
         source: str = "db",
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceRow:
         now = now_iso()
         with self._engine.begin() as conn:
             existing = conn.execute(
@@ -92,7 +95,7 @@ class WorkspaceManager(Manager[Workspace]):
         path: str | None = None,
         source: str | None = None,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceRow:
         now = now_iso()
         with self._engine.begin() as conn:
             existing = conn.execute(
@@ -127,7 +130,7 @@ class WorkspaceManager(Manager[Workspace]):
         assert result is not None
         return result
 
-    def delete_cascade(self, workspace_name: str) -> dict:
+    def delete_cascade(self, workspace_name: str) -> dict[str, int]:
         """Delete a workspace and all satellite records.
 
         Returns ``{table_name: rows_deleted}``. Idempotent — missing tables

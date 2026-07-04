@@ -66,6 +66,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentbox"]
 include = ["alembic/**/*"]
+# Built SPA is gitignored; run `npm run build` in web/ before building a wheel.
+artifacts = ["src/agentbox/ui/static/dist/**"]
 
 [tool.ruff.lint]
 extend-select = ["PLC0415"]

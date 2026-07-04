@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
+from agentbox.core.data.rows import ActivitySummaryRow, UsageSummaryRow
 from agentbox.mcp.context import MCPContext
 
 
@@ -13,12 +14,12 @@ def _success_rate(total: int, failures: int) -> float:
 
 def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
-    def aggregate_usage() -> dict:
+    def aggregate_usage() -> UsageSummaryRow:
         """Total tokens + cost across all runs."""
         return ctx.evaluation.aggregate_usage()
 
     @mcp.tool
-    def activity_summary(since: str, agent_id: str | None = None) -> dict:
+    def activity_summary(since: str, agent_id: str | None = None) -> ActivitySummaryRow:
         """Roll up runs since ``since`` (ISO-8601) into totals + breakdowns."""
         return ctx.evaluation.activity_summary(since, agent=agent_id)
 

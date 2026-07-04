@@ -13,6 +13,7 @@ from typing import cast
 
 from agentbox.core.constants import ResourceType
 from agentbox.core.data import RepoResourceRow
+from agentbox.core.data.rows import ResourceVersionRow
 from agentbox.core.service.resources.service import (
     InvalidResource,
     NoActiveVersion,
@@ -87,11 +88,11 @@ def list_versions(resource_id: str) -> dict:
     return _svc().list_versions(resource_id)
 
 
-def publish_version(resource_id: str, version_id: str, *, reason: str, actor: str | None = None) -> dict:
+def publish_version(resource_id: str, version_id: str, *, reason: str, actor: str | None = None) -> ResourceVersionRow:
     return _svc().publish_version(resource_id, version_id, reason=reason, actor=actor)
 
 
-def rollback_resource(resource_id: str, *, target_version: int, reason: str, actor: str | None = None) -> dict:
+def rollback_resource(resource_id: str, *, target_version: int, reason: str, actor: str | None = None) -> ResourceVersionRow:
     return _svc().rollback_resource(resource_id, target_version=target_version, reason=reason, actor=actor)
 
 

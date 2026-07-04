@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-
+from agentbox.core.data.rows import ResourceBlobRow
 from agentbox.core.service.resources.service import ResourceService
 
 __all__ = [
@@ -27,7 +27,7 @@ def _svc() -> ResourceService:
     return ResourceService()
 
 
-def get_blob(resource_id: str, *, path: str = "", version_id: str | None = None) -> dict:
+def get_blob(resource_id: str, *, path: str = "", version_id: str | None = None) -> ResourceBlobRow:
     return _svc().get_blob(resource_id, path=path, version_id=version_id)
 
 

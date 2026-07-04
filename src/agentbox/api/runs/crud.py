@@ -21,6 +21,7 @@ from agentbox.api.runs.schemas import (
     SnapshotBody,
 )
 from agentbox.api.runs.webhooks import schedule_webhook
+from agentbox.core.data.rows import RunCommentRow, RunStatsRow
 from agentbox.core.service import read_transcript, NoBackendAvailable
 from agentbox.core.service.execution import (
     add_comment as _svc_add_comment,
@@ -124,7 +125,7 @@ def runs_stats(
     q: str | None = None,
     since: str | None = None,
     until: str | None = None,
-) -> dict:
+) -> RunStatsRow:
     """Aggregated stats for the run dashboard."""
     return _svc_run_stats(
         agent=agent,
@@ -223,7 +224,7 @@ def list_comments(run_id: str) -> dict:
 
 
 @router.post("/{run_id}/comments")
-def add_comment(run_id: str, body: RunCommentBody) -> dict:
+def add_comment(run_id: str, body: RunCommentBody) -> RunCommentRow:
     try:
         return _svc_add_comment(
             run_id, author=body.author, body=body.body

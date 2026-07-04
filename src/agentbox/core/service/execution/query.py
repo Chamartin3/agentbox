@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json as _json
+from collections.abc import Mapping
 
 from agentbox.core.db import AgentVersionManager
 from agentbox.core.service.evaluation.service import EvaluationService
@@ -14,14 +15,15 @@ def _svc() -> ExecutionService:
     return ExecutionService()
 
 
-def _enrich_with_version(agent_versions: "AgentVersionManager", d: dict) -> dict:
+def _enrich_with_version(agent_versions: "AgentVersionManager", d: Mapping[str, object]) -> dict[str, object]:
+    result_dict: dict[str, object] = dict(d)
     vid = d.get("agent_version_id")
-    if vid is not None:
+    if vid is not None and isinstance(vid, int):
         v = agent_versions.get_by_id(vid)
-        d["agent_version"] = v["version"] if v else None
+        result_dict["agent_version"] = v["version"] if v else None
     else:
-        d["agent_version"] = None
-    return d
+        result_dict["agent_version"] = None
+    return result_dict
 
 
 def list_runs(
@@ -66,7 +68,7 @@ def list_runs(
     enriched = [_enrich_with_version(agent_versions, r) for r in items]
     if with_usage:
         for d in enriched:
-            d["usage"] = svc.get_usage(d["id"])
+            d["usage"] = svc.get_usage(str(d["id"]))
     return {
         "items": enriched,
         "total": total,
@@ -85,7 +87,7 @@ def run_stats(
     q: str | None = None,
     since: str | None = None,
     until: str | None = None,
-) -> dict:
+):
     return EvaluationService().stats_for_filters(
         agent_id=agent,
         status=status,

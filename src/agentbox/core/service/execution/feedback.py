@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from agentbox.core.data.rows import RunCommentRow
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
 
@@ -19,7 +20,7 @@ def list_comments(run_id: str, *, store: object | None = None) -> dict:
 
 def add_comment(
     run_id: str, *, store: object | None = None, author: str, body: str
-) -> dict:
+) -> RunCommentRow:
     svc = _svc()
     if svc.get_run(run_id) is None:
         raise RunNotFound(run_id)

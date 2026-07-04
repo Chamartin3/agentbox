@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 
+from agentbox.core.data.rows import HostEnvProfileRow, WorkspaceHostEnvGrantRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.host_env_grant import WorkspaceHostEnvGrant
 from agentbox.core.db.schema import host_env_profiles, workspace_host_env_grants
@@ -16,19 +18,19 @@ class WorkspaceHostEnvGrantManager(Manager[WorkspaceHostEnvGrant]):
 
     # ── pure-DB primitives for host env profiles ────────────────────────
 
-    def list_profiles(self) -> list[dict]:
+    def list_profiles(self) -> list[HostEnvProfileRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 host_env_profiles.select().order_by(host_env_profiles.c.name)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(HostEnvProfileRow, dict(r._mapping)) for r in rows]
 
-    def get_profile(self, profile_id: str) -> dict | None:
+    def get_profile(self, profile_id: str) -> HostEnvProfileRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 host_env_profiles.select().where(host_env_profiles.c.id == profile_id)
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(HostEnvProfileRow, dict(row._mapping)) if row else None
 
     def upsert_profile(
         self,
@@ -38,7 +40,7 @@ class WorkspaceHostEnvGrantManager(Manager[WorkspaceHostEnvGrant]):
         description: str | None = None,
         actor: str | None = None,
         profile_id: str | None = None,
-    ) -> dict:
+    ) -> HostEnvProfileRow:
         now = now_iso()
         with self._engine.begin() as conn:
             if profile_id:
@@ -71,14 +73,14 @@ class WorkspaceHostEnvGrantManager(Manager[WorkspaceHostEnvGrant]):
 
     # ── pure-DB primitives for workspace grants ─────────────────────────
 
-    def get_grant(self, workspace_id: str) -> dict | None:
+    def get_grant(self, workspace_id: str) -> WorkspaceHostEnvGrantRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 workspace_host_env_grants.select().where(
                     workspace_host_env_grants.c.workspace_id == workspace_id
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(WorkspaceHostEnvGrantRow, dict(row._mapping)) if row else None
 
     def set_grant(
         self,
@@ -88,7 +90,7 @@ class WorkspaceHostEnvGrantManager(Manager[WorkspaceHostEnvGrant]):
         overrides: dict | None,
         changelog: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceHostEnvGrantRow:
         now = now_iso()
         with self._engine.begin() as conn:
             existing = conn.execute(

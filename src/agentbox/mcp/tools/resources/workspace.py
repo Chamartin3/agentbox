@@ -6,6 +6,7 @@ import logging
 
 from fastmcp import FastMCP
 
+from agentbox.core.data.rows import EnvDocRow, WorkspaceHostEnvGrantRow
 from agentbox.core.service import render_env_doc_preview
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
@@ -75,7 +76,7 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
         workspace_id: str,
         content: str,
         reason: str = "edit",
-    ) -> dict:
+    ) -> EnvDocRow:
         """Save the workspace env-doc — immediately live (no drafts).
 
         ``content`` is the raw markdown body. It is placed verbatim into the
@@ -117,7 +118,7 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
         workspace_id: str,
         grants: dict,
         reason: str,
-    ) -> dict:
+    ) -> WorkspaceHostEnvGrantRow | dict:
         """Set host-env capability grants for a workspace.
 
         grants is a dict of capability → config, e.g.

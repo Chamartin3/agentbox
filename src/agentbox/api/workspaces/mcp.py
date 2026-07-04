@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_workspace_service
 from agentbox.core.constants import McpPolicy
+from agentbox.core.data.rows import WorkspaceMcpOverrideRow, WorkspaceMcpToolOverrideRow
 from agentbox.core.service.workspaces.service import WorkspaceService
 
 router = APIRouter(tags=["workspace-mcp-provisioning"])
@@ -81,7 +82,7 @@ def set_server_override(
     server_name: str,
     body: ServerOverrideBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> WorkspaceMcpOverrideRow:
     try:
         return ws.set_mcp_server_override(
             workspace_id,
@@ -104,7 +105,7 @@ def set_tool_override(
     tool_name: str,
     body: ToolOverrideBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> WorkspaceMcpToolOverrideRow:
     return ws.set_mcp_tool_override(
         workspace_id,
         server_name,

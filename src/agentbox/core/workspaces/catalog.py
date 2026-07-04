@@ -54,9 +54,10 @@ def resolve_host_env_callables(
     if not row:
         effective_grants = resolve_grants(None, None)
     else:
+        profile_id = row.get("profile_id")
         profile = (
-            host_env_grants.get_profile(row["profile_id"])
-            if row.get("profile_id")
+            host_env_grants.get_profile(profile_id)
+            if profile_id is not None
             else None
         )
         effective_grants = resolve_grants(

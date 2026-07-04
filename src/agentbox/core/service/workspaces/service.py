@@ -21,6 +21,16 @@ from typing import Any
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.constants import BackendName, McpPolicy
 from agentbox.core.data import EnvDocRow
+from agentbox.core.data.rows import (
+    HostEnvProfileRow,
+    WorkenvTemplateRow,
+    WorkspaceMcpOverrideRow,
+    WorkspaceMcpToolOverrideRow,
+    WorkspaceRuntimePermissionRow,
+    WorkspaceRow,
+    WorkspaceSubagentRow,
+    WorkspaceHostEnvGrantRow,
+)
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.catalog import resolve_host_env_callables, resolve_workspace_callables
 from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
@@ -185,10 +195,10 @@ class WorkspaceService(Service):
             )
         return result
 
-    def get_workspace(self, name: str) -> dict | None:
+    def get_workspace(self, name: str) -> WorkspaceRow | None:
         return self._workspaces.get_by_name(name)
 
-    def require_workspace(self, name: str) -> dict:
+    def require_workspace(self, name: str) -> WorkspaceRow:
         row = self._workspaces.get_by_name(name)
         if row is None:
             raise WorkspaceNotFound(name)
@@ -202,7 +212,7 @@ class WorkspaceService(Service):
         path: str | None = None,
         source: str = "db",
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceRow:
         if not name or not name.strip():
             raise ValueError("workspace name is required")
         if source not in ("manifest", "db"):
@@ -221,7 +231,7 @@ class WorkspaceService(Service):
         path: str | None = None,
         source: str | None = None,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceRow:
         return self._workspaces.upsert(
             name, description=description, path=path, source=source, actor=actor
         )
@@ -268,10 +278,10 @@ class WorkspaceService(Service):
         """Render the active env doc's instruction files for a workspace."""
         return _render_env_doc(self._env_doc_versions, workspace_id, workdir)
 
-    def list_env_doc_versions(self, workspace_id: str) -> list[dict]:
+    def list_env_doc_versions(self, workspace_id: str) -> list[EnvDocRow]:
         return self._env_doc_versions.list_for_workspace(workspace_id)
 
-    def get_env_doc_version(self, version_id: str) -> dict | None:
+    def get_env_doc_version(self, version_id: str) -> EnvDocRow | None:
         return self._env_doc_versions.get_by_version_id(version_id)
 
     def save_env_doc(
@@ -282,7 +292,7 @@ class WorkspaceService(Service):
         changelog: str,
         publish: bool = True,
         actor: str | None = None,
-    ) -> dict:
+    ) -> EnvDocRow:
         changelog = _validate_changelog(changelog)
         return self._env_doc_versions.save(
             workspace_id, content, changelog=changelog, publish=publish, actor=actor
@@ -292,7 +302,7 @@ class WorkspaceService(Service):
         self,
         workspace_id: str,
         version_id: str,
-    ) -> dict:
+    ) -> EnvDocRow:
         return self._env_doc_versions.publish(workspace_id, version_id)
 
     def rollback_env_doc(
@@ -302,7 +312,7 @@ class WorkspaceService(Service):
         *,
         changelog: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> EnvDocRow:
         changelog = _validate_changelog(changelog)
         target = self._env_doc_versions.get_by_version_id(target_version_id)
         if not target or target["workspace_id"] != workspace_id:
@@ -325,7 +335,7 @@ class WorkspaceService(Service):
         reason: str = "edit",
         actor: str | None = None,
         settings: Settings | None = None,
-    ) -> dict:
+    ) -> EnvDocRow:
         body = env_doc_body(content)
         result = self.save_env_doc(
             workspace_id, {"body": body}, changelog=reason, publish=True, actor=actor
@@ -379,10 +389,10 @@ class WorkspaceService(Service):
     # Workenv templates (from WorkenvTemplatesMixin)
     # ═══════════════════════════════════════════════════════════════════
 
-    def list_templates(self) -> list[dict]:
+    def list_templates(self) -> list[WorkenvTemplateRow]:
         return self._templates.list_all()
 
-    def get_template(self, name: str) -> dict | None:
+    def get_template(self, name: str) -> WorkenvTemplateRow | None:
         return self._templates.get_by_name(name)
 
     def upsert_template(
@@ -392,7 +402,7 @@ class WorkspaceService(Service):
         engine: str = "claude_code",
         config_json: dict,
         description: str | None = None,
-    ) -> dict:
+    ) -> WorkenvTemplateRow:
         return self._templates.upsert(
             name, engine=engine, config_json=config_json, description=description
         )
@@ -419,7 +429,7 @@ class WorkspaceService(Service):
         resolved = McpPolicy.coerce(policy, label="policy")
         return self._mcp_policies.set_policy(workspace_id, resolved)
 
-    def list_mcp_server_overrides(self, workspace_id: str) -> list[dict]:
+    def list_mcp_server_overrides(self, workspace_id: str) -> list[WorkspaceMcpOverrideRow]:
         return self._mcp_overrides.list_for_workspace(workspace_id)
 
     def set_mcp_server_override(
@@ -431,7 +441,7 @@ class WorkspaceService(Service):
         config_overrides: dict | None = None,
         changelog: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceMcpOverrideRow:
         changelog = _validate_changelog(changelog)
         return self._mcp_overrides.set_override(
             workspace_id,
@@ -442,7 +452,7 @@ class WorkspaceService(Service):
             actor=actor,
         )
 
-    def list_mcp_tool_overrides(self, workspace_id: str) -> list[dict]:
+    def list_mcp_tool_overrides(self, workspace_id: str) -> list[WorkspaceMcpToolOverrideRow]:
         return self._mcp_tool_overrides.list_for_workspace(workspace_id)
 
     def set_mcp_tool_override(
@@ -453,7 +463,7 @@ class WorkspaceService(Service):
         *,
         enabled: bool,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceMcpToolOverrideRow:
         return self._mcp_tool_overrides.set_override(
             workspace_id, server_name, tool_name, enabled=enabled, actor=actor
         )
@@ -556,7 +566,7 @@ class WorkspaceService(Service):
     # Runtime permissions (from RuntimePermissionsMixin + permissions.py)
     # ═══════════════════════════════════════════════════════════════════
 
-    def get_runtime_permissions(self, workspace_id: str) -> dict | None:
+    def get_runtime_permissions(self, workspace_id: str) -> WorkspaceRuntimePermissionRow | None:
         return self._runtime_permissions.get_for_workspace(workspace_id)
 
     def set_runtime_permissions(
@@ -569,7 +579,7 @@ class WorkspaceService(Service):
         allow_file_write: bool | None = None,
         allow_network: bool | None = None,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceRuntimePermissionRow:
         return self._runtime_permissions.set_for_workspace(
             workspace_id,
             allowed_builtin_tools=allowed_builtin_tools,
@@ -584,10 +594,10 @@ class WorkspaceService(Service):
     # Host env (from HostEnvMixin)
     # ═══════════════════════════════════════════════════════════════════
 
-    def list_host_env_profiles(self) -> list[dict]:
+    def list_host_env_profiles(self) -> list[HostEnvProfileRow]:
         return self._host_env_grants.list_profiles()
 
-    def get_host_env_profile(self, profile_id: str) -> dict | None:
+    def get_host_env_profile(self, profile_id: str) -> HostEnvProfileRow | None:
         return self._host_env_grants.get_profile(profile_id)
 
     def upsert_host_env_profile(
@@ -598,7 +608,7 @@ class WorkspaceService(Service):
         description: str | None = None,
         actor: str | None = None,
         profile_id: str | None = None,
-    ) -> dict:
+    ) -> HostEnvProfileRow:
         return self._host_env_grants.upsert_profile(
             name=name,
             grants=grants,
@@ -610,7 +620,7 @@ class WorkspaceService(Service):
     def delete_host_env_profile(self, profile_id: str) -> None:
         self._host_env_grants.delete_profile(profile_id)
 
-    def get_workspace_host_env(self, workspace_id: str) -> dict | None:
+    def get_workspace_host_env(self, workspace_id: str) -> WorkspaceHostEnvGrantRow | None:
         return self._host_env_grants.get_grant(workspace_id)
 
     def set_workspace_host_env(
@@ -621,7 +631,7 @@ class WorkspaceService(Service):
         overrides: dict | None,
         changelog: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceHostEnvGrantRow:
         changelog = _validate_changelog(changelog)
         return self._host_env_grants.set_grant(
             workspace_id,
@@ -635,9 +645,10 @@ class WorkspaceService(Service):
         row = self._host_env_grants.get_grant(workspace_id)
         if not row:
             return {"grants": resolve_grants(None, None), "profile_id": None}
+        profile_id = row.get("profile_id")
         profile = (
-            self._host_env_grants.get_profile(row["profile_id"])
-            if row.get("profile_id")
+            self._host_env_grants.get_profile(profile_id)
+            if profile_id is not None
             else None
         )
         grants = resolve_grants(
@@ -692,7 +703,7 @@ class WorkspaceService(Service):
     # Subagent bindings (from bindings.py)
     # ═══════════════════════════════════════════════════════════════════
 
-    def list_subagents(self, workspace_id: str) -> list[dict]:
+    def list_subagents(self, workspace_id: str) -> list[WorkspaceSubagentRow]:
         return self._subagents.list_for_workspace(workspace_id)
 
     def replace_subagents(
@@ -701,7 +712,7 @@ class WorkspaceService(Service):
         subagents: list[dict],
         *,
         actor: str | None = None,
-    ) -> list[dict]:
+    ) -> list[WorkspaceSubagentRow]:
         return self._subagents.replace_for_workspace(
             workspace_id, subagents, actor=actor
         )
@@ -923,7 +934,7 @@ class WorkspaceService(Service):
         """Load the recipe for *engine*. Raises ``FileNotFoundError`` if absent."""
         return load_recipe(engine)
 
-    def list_presets(self) -> list[dict]:
+    def list_presets(self) -> list[WorkenvTemplateRow]:
         """List all WorkenvConfig presets stored in the DB."""
         return self._templates.list_all()
 
@@ -972,7 +983,7 @@ class WorkspaceService(Service):
         *,
         engine: str = BackendName.CLAUDE_CODE,
         description: str | None = None,
-    ) -> dict:
+    ) -> WorkenvTemplateRow:
         """Persist a ``WorkenvConfig`` as a named preset in the DB."""
         config_json = json.loads(json.dumps(config._to_dict()))
         return self._templates.upsert(
@@ -1255,7 +1266,7 @@ class WorkspaceService(Service):
     # Subagents
     # -------------------------------------------------------------------
 
-    def list_workspace_subagents_raw(self, workspace_id: str) -> list[dict]:
+    def list_workspace_subagents_raw(self, workspace_id: str) -> list[WorkspaceSubagentRow]:
         """Return raw subagent rows for a workspace."""
         return self._subagents.list_for_workspace(workspace_id)
 
@@ -1265,7 +1276,7 @@ class WorkspaceService(Service):
         subagents: list[dict],
         *,
         actor: str | None = None,
-    ) -> list[dict]:
+    ) -> list[WorkspaceSubagentRow]:
         """Atomically replace workspace subagents and return rows."""
         return self._subagents.replace_for_workspace(workspace_id, subagents, actor=actor)
 
@@ -1305,7 +1316,7 @@ def save_and_sync_env_doc(
     content: Any,
     reason: str = "edit",
     actor: str | None = None,
-) -> dict[str, Any]:
+) -> EnvDocRow:
     """Persist env-doc as live version, then sync CLAUDE.md/AGENTS.md on disk."""
     return WorkspaceService().save_and_sync_env_doc(
         workspace_id, content=content, reason=reason, actor=actor

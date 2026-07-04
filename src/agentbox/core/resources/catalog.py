@@ -18,7 +18,7 @@ def resolve_resource_callables(
     bindings = file_bindings.list_for_workspace(workspace_id)
     return [
         CallableItem(
-            name=b.get("target_path", b.get("resource_id", "")),
+            name=(b.get("target_path") or b.get("resource_id") or ""),
             kind="resource",
             description=f"Resource binding: {b.get('resource_id', '')}",
             policy={"resource_id": b.get("resource_id", ""), "target_path": b.get("target_path", "")},

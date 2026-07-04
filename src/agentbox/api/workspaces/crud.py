@@ -18,6 +18,7 @@ from agentbox.api.schemas import PaginatedEnvelope, paginate_list
 from agentbox.api.deps import get_agent_service, get_mcp_registry, get_settings, get_workspace_service
 from agentbox.core import workspaces as ws
 from agentbox.core.config import Settings
+from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.service import AgentService
 from agentbox.core.service.workspaces.files import is_user_file
 from agentbox.core.service.workspaces.service import WorkspaceService
@@ -89,7 +90,7 @@ class CreateWorkspaceBody(BaseModel):
 def create_workspace_registry(
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     body: CreateWorkspaceBody,
-) -> dict:
+) -> WorkspaceRow:
     try:
         return svc.create_workspace(
             body.name,

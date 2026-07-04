@@ -14,11 +14,16 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from agentbox.core.config import load_settings
 from agentbox.core.constants import RunStatus
 from agentbox.core.data import now_iso, read_transcript, RunnerSnapshot
+from agentbox.core.data.rows import (
+    RunCommentRow,
+    SessionRow,
+    WebhookDeliveryRow,
+)
 from agentbox.core.db.models.runs.run import Run
 from agentbox.core.execution.observability.conversation import get as _get_conversation_source
 from agentbox.core.data.conversation.transcript import TranscriptSource
@@ -155,7 +160,7 @@ class ExecutionService(Service):
         """Update last_used_at to now for the given session."""
         self._sessions.touch(session_id)
 
-    def get_session(self, session_id: str) -> dict | None:
+    def get_session(self, session_id: str) -> SessionRow | None:
         """Fetch a session row by ID, return as dict or None."""
         return self._sessions.get_dict(session_id)
 
@@ -173,17 +178,18 @@ class ExecutionService(Service):
 
     def get_usage(self, run_id: str) -> dict | None:
         """Fetch usage row for a run_id, return as dict or None."""
-        return self._usage.get_dict(run_id)
+        result = self._usage.get_dict(run_id)
+        return cast(dict | None, result)
 
     # ══════════════════════════════════════════════════════════════════
     # Comments
     # ══════════════════════════════════════════════════════════════════
 
-    def add_run_comment(self, run_id: str, author: str, body: str) -> dict:
+    def add_run_comment(self, run_id: str, author: str, body: str) -> RunCommentRow:
         """Insert a comment on a run and return the new row as dict."""
         return self._comments.add(run_id, author, body)
 
-    def list_run_comments(self, run_id: str) -> list[dict]:
+    def list_run_comments(self, run_id: str) -> list[RunCommentRow]:
         """List all comments for a run ordered by created_at."""
         return self._comments.list_for_run(run_id)
 
@@ -214,7 +220,7 @@ class ExecutionService(Service):
             error=error,
         )
 
-    def list_webhook_deliveries(self, run_id: str) -> list[dict]:
+    def list_webhook_deliveries(self, run_id: str) -> list[WebhookDeliveryRow]:
         """List all webhook delivery attempts for a run."""
         return self._webhooks.list_for_run(run_id)
 

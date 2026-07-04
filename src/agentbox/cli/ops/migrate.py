@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import tomllib
 from pathlib import Path
 
@@ -213,9 +212,7 @@ def migrate_workenv_engine(ctx: typer.Context) -> None:
             obj.workspaces.upsert_template(
                 tmpl["name"],
                 engine=BackendName.CLAUDE_CODE,
-                config_json=json.loads(tmpl["config_json"])
-                if isinstance(tmpl.get("config_json"), str)
-                else tmpl.get("config_json", {}),
+                config_json=tmpl["config_json"],
                 description=tmpl.get("description"),
             )
             renamed += 1

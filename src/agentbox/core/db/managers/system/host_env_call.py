@@ -1,8 +1,11 @@
 """HostEnvCallLogManager — host env call audit log CRUD."""
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy import select as sa_select
 
+from agentbox.core.data.rows import HostEnvCallLogRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.system.host_env_call import HostEnvCallLog
 
@@ -47,7 +50,7 @@ class HostEnvCallLogManager(Manager[HostEnvCallLog]):
             )
         return row_id
 
-    def list_calls_for_run(self, run_id: str) -> list[dict]:
+    def list_calls_for_run(self, run_id: str) -> list[HostEnvCallLogRow]:
         """Return all call-log rows for a run, ordered by created_at."""
         tbl = HostEnvCallLog.__table__
         with self._engine.connect() as conn:
@@ -56,4 +59,4 @@ class HostEnvCallLogManager(Manager[HostEnvCallLog]):
                 .where(tbl.c.run_id == run_id)
                 .order_by(tbl.c.created_at)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(HostEnvCallLogRow, dict(r._mapping)) for r in rows]

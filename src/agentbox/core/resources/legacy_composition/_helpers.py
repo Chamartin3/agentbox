@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 
 from sqlalchemy import text
@@ -48,7 +49,7 @@ def read_disk_file(
     return None
 
 
-def binding_to_input(b: dict) -> dict:
+def binding_to_input(b: Mapping[str, object]) -> dict:
     return {
         "resource_id": b["resource_id"],
         "marker": b.get("marker"),

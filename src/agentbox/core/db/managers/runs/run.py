@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import json as _json
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import (
     Integer,
     case,
-    cast,
+    cast as sql_cast,
     func,
     literal_column,
     select,
@@ -16,6 +16,12 @@ from sqlalchemy import (
 )
 
 from agentbox.core.constants import RunStatus as RS
+from agentbox.core.data.rows import (
+    ActivitySummaryRow,
+    RichRunRow,
+    RunPagedRow,
+    RunStatsRow,
+)
 from agentbox.core.data.snapshots import RunnerSnapshot
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.base.manager import Manager
@@ -24,8 +30,8 @@ from agentbox.core.db.schema import agent_versions, runs, usage
 
 
 def _duration_ms_expr(c_started: object, c_finished: object) -> object:
-    epoch_finished = cast(func.strftime("%s", c_finished), Integer)
-    epoch_started = cast(func.strftime("%s", c_started), Integer)
+    epoch_finished = sql_cast(func.strftime("%s", c_finished), Integer)
+    epoch_started = sql_cast(func.strftime("%s", c_started), Integer)
     return (epoch_finished - epoch_started) * 1000
 
 
@@ -243,7 +249,7 @@ class RunManager(Manager[Run]):
         with self._engine.connect() as conn:
             return [r[0] for r in conn.execute(stmt)]
 
-    def activity_summary(self, since_iso: str, agent: str | None = None) -> dict:
+    def activity_summary(self, since_iso: str, agent: str | None = None) -> ActivitySummaryRow:
         """Roll up runs in a date range into the /activity endpoint shape."""
         base_filters = [runs.c.created_at >= since_iso]
         if agent:
@@ -359,7 +365,7 @@ class RunManager(Manager[Run]):
                 }
                 for m in (r._mapping for r in conn.execute(by_model_stmt))
             ]
-        return {"totals": totals, "series": series, "by_action": by_action, "by_reported_model": by_reported_model}
+        return cast(ActivitySummaryRow, {"totals": totals, "series": series, "by_action": by_action, "by_reported_model": by_reported_model})
 
     def stats_for_filters(
         self,
@@ -371,7 +377,7 @@ class RunManager(Manager[Run]):
         q: str | None = None,
         since_iso: str | None = None,
         until_iso: str | None = None,
-    ) -> dict:
+    ) -> RunStatsRow:
         """Aggregate stats matching the ``list_runs_paged`` filter set."""
         now = datetime.now(UTC)
         if not since_iso and not until_iso:
@@ -471,10 +477,10 @@ class RunManager(Manager[Run]):
             by_version = [dict(r._mapping) for r in conn.execute(by_version_stmt)]
             by_status = [dict(r._mapping) for r in conn.execute(by_status_stmt)]
             timeseries = [dict(r._mapping) for r in conn.execute(series_stmt)]
-        return {
+        return cast(RunStatsRow, {
             "totals": totals, "by_agent": by_agent, "by_model": by_model,
             "by_version": by_version, "by_status": by_status, "timeseries": timeseries,
-        }
+        })
 
     def list_runs_paged(
         self,
@@ -488,13 +494,13 @@ class RunManager(Manager[Run]):
         until_iso: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[dict], int]:
+    ) -> tuple[list[RunPagedRow], int]:
         """Paginated + filterable run listing with usage + duration."""
         duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
         cols = [
             runs, usage.c.input_tokens, usage.c.output_tokens, usage.c.cache_read_tokens,
             usage.c.cache_write_tokens, usage.c.cost_usd, usage.c.model,
-            cast(duration_ms, Integer).label("duration_ms"),
+            sql_cast(duration_ms, Integer).label("duration_ms"),
         ]
         stmt = select(*cols).select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
         count_from = runs
@@ -532,7 +538,7 @@ class RunManager(Manager[Run]):
 
         with self._engine.connect() as conn:
             total = int(conn.execute(count_stmt).scalar() or 0)
-            rows = [dict(r._mapping) for r in conn.execute(stmt)]
+            rows = [cast(RunPagedRow, dict(r._mapping)) for r in conn.execute(stmt)]
         return rows, total
 
     def list_runs_rich(
@@ -542,7 +548,7 @@ class RunManager(Manager[Run]):
         status: str | None = None,
         executor: str | None = None,
         limit: int = 50,
-    ) -> list[dict]:
+    ) -> list[RichRunRow]:
         """Recent-runs listing with usage joined in."""
         stmt = (
             select(
@@ -565,4 +571,4 @@ class RunManager(Manager[Run]):
         if executor:
             stmt = stmt.where(func.coalesce(usage.c.model, "unknown") == executor)
         with self._engine.connect() as conn:
-            return [dict(r._mapping) for r in conn.execute(stmt)]
+            return [cast(RichRunRow, dict(r._mapping)) for r in conn.execute(stmt)]

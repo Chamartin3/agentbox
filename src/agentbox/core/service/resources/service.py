@@ -24,6 +24,13 @@ from jsonschema import Draft202012Validator
 from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.constants import ResourceType
 from agentbox.core.data.records import SharedResourceRecord
+from agentbox.core.data.rows import (
+    AgentPromptBindingRow,
+    RepoResourceRow,
+    ResourceBlobRow,
+    ResourceVersionRow,
+    WorkspaceFileBindingRow,
+)
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter
@@ -87,13 +94,13 @@ class ResourceService(Service):
             raise ResourceNotFound(id_or_slug)
         return rid
 
-    def _active_version_or_raise(self, resource_id: str) -> dict:
+    def _active_version_or_raise(self, resource_id: str) -> ResourceVersionRow:
         active = self._resource_versions.get_active_version(resource_id)
         if not active:
             raise NoActiveVersion(resource_id)
         return active
 
-    def _require_resource(self, resource_id: str) -> dict:
+    def _require_resource(self, resource_id: str) -> RepoResourceRow:
         r = self._resources.get_resource(resource_id)
         if not r:
             raise ResourceNotFound(resource_id)
@@ -107,7 +114,7 @@ class ResourceService(Service):
         changelog: str,
         draft: bool,
         actor: str | None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         try:
             result = importer.run(ImporterContext(actor=actor, changelog=changelog))
         except (FileNotFoundError, ValueError) as exc:
@@ -183,7 +190,7 @@ class ResourceService(Service):
         description: str | None = None,
         tags: list[str] | None = None,
         created_by: str | None = None,
-    ) -> dict:
+    ) -> RepoResourceRow:
         """Create a new repo resource."""
         type_str = type.value if isinstance(type, ResourceType) else type
         try:
@@ -209,11 +216,11 @@ class ResourceService(Service):
         )
         return {"resource": r, "active_version": active}
 
-    def get_resource_row(self, resource_id: str) -> dict | None:
+    def get_resource_row(self, resource_id: str) -> RepoResourceRow | None:
         """Return the raw resource row dict by id, or None."""
         return self._resources.get_resource(resource_id)
 
-    def get_by_slug(self, slug: str) -> dict | None:
+    def get_by_slug(self, slug: str) -> RepoResourceRow | None:
         """Return the raw resource row dict by slug, or None."""
         return self._resources.get_by_slug(slug)
 
@@ -224,7 +231,7 @@ class ResourceService(Service):
         display_name: str | None = None,
         description: str | None = None,
         tags: list[str] | None = None,
-    ) -> dict:
+    ) -> RepoResourceRow:
         """Update resource metadata and return updated row."""
         rid = self._resolve_or_raise(resource_id)
         updated = self._resources.update_resource(
@@ -246,7 +253,7 @@ class ResourceService(Service):
         *,
         reason: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Promote a draft version to active."""
         v = self._resource_versions.get_version(version_id)
         if not v or v["resource_id"] != resource_id:
@@ -265,7 +272,7 @@ class ResourceService(Service):
         target_version: int,
         reason: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Create a new version copying blobs from ``target_version``."""
         self._require_resource(resource_id)
         try:
@@ -294,7 +301,7 @@ class ResourceService(Service):
         changelog: str,
         draft: bool = False,
         actor: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Import a single-file upload as a new version."""
         self._require_resource(resource_id)
         importer = UploadImporter(
@@ -314,7 +321,7 @@ class ResourceService(Service):
         changelog: str,
         draft: bool = False,
         actor: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Import from a host filesystem path as a new version."""
         resource = self._require_resource(resource_id)
         importer_cls = (
@@ -339,7 +346,7 @@ class ResourceService(Service):
         changelog: str,
         draft: bool = False,
         actor: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Import a ZIP archive as a new version (folder/skill only)."""
         resource = self._require_resource(resource_id)
         if resource["type"] not in ("folder", "skill"):
@@ -364,7 +371,7 @@ class ResourceService(Service):
         changelog: str,
         draft: bool = False,
         actor: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Import a JSON schema file as a new version (schema resources only)."""
         resource = self._require_resource(resource_id)
         if resource["type"] != "schema":
@@ -386,7 +393,7 @@ class ResourceService(Service):
         output_schema_resource_id: str | None = None,
         draft: bool = False,
         actor: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Import a script file as a new version (script resources only)."""
         resource = self._require_resource(resource_id)
         if resource["type"] != "script":
@@ -412,7 +419,7 @@ class ResourceService(Service):
         *,
         path: str = "",
         version_id: str | None = None,
-    ) -> dict:
+    ) -> ResourceBlobRow:
         """Return a blob dict for the given resource and path."""
         rid = self._resolve_or_raise(resource_id)
         vid: str = version_id or self._active_version_or_raise(rid)["id"]
@@ -542,20 +549,20 @@ class ResourceService(Service):
     # Prompt (agent) resource bindings
     # -----------------------------------------------------------------------
 
-    def list_prompt_bindings(self, agent_id: str) -> list[dict]:
+    def list_prompt_bindings(self, agent_id: str) -> list[AgentPromptBindingRow]:
         return self._prompt_bindings.list_for_agent(agent_id)
 
     def replace_prompt_bindings(
         self, agent_id: str, bindings: list[dict], *, reason: str, actor: str | None = None
-    ) -> list[dict]:
+    ) -> list[AgentPromptBindingRow]:
         return self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)
 
-    def list_workspace_file_bindings(self, workspace_id: str) -> list[dict]:
+    def list_workspace_file_bindings(self, workspace_id: str) -> list[WorkspaceFileBindingRow]:
         return self._file_bindings.list_for_workspace(workspace_id)
 
     def replace_workspace_file_bindings(
-        self, workspace_id: str, bindings: list[dict], *, reason: str, actor: str | None = None
-    ) -> list[dict]:
+        self, workspace_id: str, bindings: list[dict[str, object]], *, reason: str, actor: str | None = None
+    ) -> list[WorkspaceFileBindingRow]:
         return self._file_bindings.replace_for_workspace(workspace_id, bindings, reason=reason, actor=actor)
 
     def list_prompt_resources(self, agent_id: str) -> dict:

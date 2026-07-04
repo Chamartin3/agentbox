@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
 from agentbox.api.deps import get_resource_service
+from agentbox.core.data.rows import RepoResourceRow, ResourceVersionRow
 from agentbox.core.service.resources.service import (
     InvalidResource,
     NoActiveVersion,
@@ -41,7 +42,7 @@ def update_resource(
     resource_id: str,
     body: UpdateResourceBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict | None:
+) -> RepoResourceRow | None:
     try:
         return svc.update_resource(
             resource_id,
@@ -70,7 +71,7 @@ def publish_version(
     version_id: str,
     body: PublishBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict | None:
+) -> ResourceVersionRow | None:
     try:
         return svc.publish_version(
             resource_id,
@@ -89,7 +90,7 @@ def rollback_resource(
     resource_id: str,
     body: RollbackBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict | None:
+) -> ResourceVersionRow | None:
     try:
         return svc.rollback_resource(
             resource_id,

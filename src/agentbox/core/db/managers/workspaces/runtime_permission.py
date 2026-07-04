@@ -1,10 +1,11 @@
 """WorkspaceRuntimePermissionManager — runtime permission CRUD."""
 from __future__ import annotations
 
-from typing import Any
+from typing import cast
 
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from agentbox.core.data.rows import WorkspaceRuntimePermissionRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.runtime_permission import WorkspaceRuntimePermission
 from agentbox.core.db.schema import workspace_runtime_permissions
@@ -24,7 +25,7 @@ class WorkspaceRuntimePermissionManager(Manager[WorkspaceRuntimePermission]):
 
     # ── pure-DB primitives (ported from RuntimePermissionsMixin) ─────────
 
-    def get_for_workspace(self, workspace_id: str) -> dict | None:
+    def get_for_workspace(self, workspace_id: str) -> WorkspaceRuntimePermissionRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 workspace_runtime_permissions.select().where(
@@ -33,7 +34,7 @@ class WorkspaceRuntimePermissionManager(Manager[WorkspaceRuntimePermission]):
             ).first()
         if row is None:
             return None
-        return dict(row._mapping)
+        return cast(WorkspaceRuntimePermissionRow, dict(row._mapping))
 
     def set_for_workspace(
         self,
@@ -45,9 +46,9 @@ class WorkspaceRuntimePermissionManager(Manager[WorkspaceRuntimePermission]):
         allow_file_write: bool | None = None,
         allow_network: bool | None = None,
         actor: str | None = None,
-    ) -> dict:
-        existing = self.get_for_workspace(workspace_id) or {}
-        values: dict[str, Any] = {
+    ) -> WorkspaceRuntimePermissionRow:
+        existing = self.get_for_workspace(workspace_id) or cast(WorkspaceRuntimePermissionRow, {})
+        values = {
             "workspace_id": workspace_id,
             "allowed_builtin_tools": (
                 allowed_builtin_tools
@@ -78,4 +79,6 @@ class WorkspaceRuntimePermissionManager(Manager[WorkspaceRuntimePermission]):
         )
         with self._engine.begin() as conn:
             conn.execute(stmt)
-        return self.get_for_workspace(workspace_id) or {}
+        result = self.get_for_workspace(workspace_id)
+        assert result is not None, f"workspace {workspace_id!r} runtime permission must exist after upsert"
+        return result

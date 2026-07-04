@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
+from agentbox.core.data.rows import AgentPromptBindingRow
 from agentbox.mcp.context import MCPContext
 
 
@@ -158,7 +159,7 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
         svc = ctx.resources
         current = svc.list_prompt_bindings(agent_id)
 
-        def _matches(b: dict) -> bool:
+        def _matches(b: AgentPromptBindingRow) -> bool:
             if binding_id is not None:
                 return b["id"] == binding_id
             if resource_id is not None and b["resource_id"] != resource_id:

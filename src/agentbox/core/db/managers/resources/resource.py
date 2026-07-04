@@ -5,11 +5,13 @@ import hashlib
 import json
 import uuid
 from collections.abc import Iterator
+from typing import cast
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.engine import Connection
 
 from agentbox.core.constants import ImportSource, ResourceType
+from agentbox.core.data.rows import RepoResourceRow, ResourceBlobRow, ResourceVersionRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.resource import (
     ActiveResourceVersion,
@@ -76,8 +78,8 @@ class ResourceManager(Manager[Resource]):
         description: str | None = None,
         tags: list[str] | None = None,
         created_by: str | None = None,
-    ) -> dict:
-        """Insert a new resource row and return it as a plain dict."""
+    ) -> RepoResourceRow:
+        """Insert a new resource row and return it as a typed row."""
         ResourceType.coerce(type, label="resource type")
         if not slug or not slug.strip():
             raise ValueError("slug is required")
@@ -99,23 +101,25 @@ class ResourceManager(Manager[Resource]):
                     created_by=created_by,
                 )
             )
-        return self.get_resource(rid) or {}
+        result = self.get_resource(rid)
+        assert result is not None, f"just-inserted resource {rid!r} must be retrievable"
+        return result
 
-    def get_resource(self, resource_id: str) -> dict | None:
-        """Fetch a resource row by id. Returns a plain dict or None."""
+    def get_resource(self, resource_id: str) -> RepoResourceRow | None:
+        """Fetch a resource row by id. Returns a typed row or None."""
         with self._engine.connect() as conn:
             row = conn.execute(
                 resources_table.select().where(resources_table.c.id == resource_id)
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(RepoResourceRow, dict(row._mapping)) if row else None
 
-    def get_by_slug(self, slug: str) -> dict | None:
-        """Fetch a resource row by slug. Returns a plain dict or None."""
+    def get_by_slug(self, slug: str) -> RepoResourceRow | None:
+        """Fetch a resource row by slug. Returns a typed row or None."""
         with self._engine.connect() as conn:
             row = conn.execute(
                 resources_table.select().where(resources_table.c.slug == slug)
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(RepoResourceRow, dict(row._mapping)) if row else None
 
     def update_resource(
         self,
@@ -125,8 +129,8 @@ class ResourceManager(Manager[Resource]):
         display_name: str | None = None,
         description: str | None = None,
         tags: list[str] | None = None,
-    ) -> dict | None:
-        """Update mutable resource fields. Returns updated row dict or None."""
+    ) -> RepoResourceRow | None:
+        """Update mutable resource fields. Returns updated typed row or None."""
         values: dict = {}
         if type is not None:
             ResourceType.coerce(type, label="resource type")
@@ -156,7 +160,7 @@ class ResourceManager(Manager[Resource]):
         include_deleted: bool = False,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[dict]:
+    ) -> list[RepoResourceRow]:
         """List resource rows with optional filters."""
         stmt = resources_table.select()
         clauses = []
@@ -180,7 +184,7 @@ class ResourceManager(Manager[Resource]):
             .offset(offset)
         )
         with self._engine.connect() as conn:
-            return [dict(r._mapping) for r in conn.execute(stmt)]
+            return [cast(RepoResourceRow, dict(r._mapping)) for r in conn.execute(stmt)]
 
     def count_resources(
         self,
@@ -244,15 +248,15 @@ class ResourceVersionManager(Manager[ResourceVersion]):
 
     model = ResourceVersion
 
-    def get_version(self, version_id: str) -> dict | None:
-        """Fetch a version row by id. Returns plain dict or None."""
+    def get_version(self, version_id: str) -> ResourceVersionRow | None:
+        """Fetch a version row by id. Returns typed row or None."""
         with self._engine.connect() as conn:
             row = conn.execute(
                 resource_versions.select().where(resource_versions.c.id == version_id)
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(ResourceVersionRow, dict(row._mapping)) if row else None
 
-    def list_versions(self, resource_id: str) -> list[dict]:
+    def list_versions(self, resource_id: str) -> list[ResourceVersionRow]:
         """Return all versions for a resource ordered by version_number desc."""
         with self._engine.connect() as conn:
             rows = conn.execute(
@@ -260,7 +264,7 @@ class ResourceVersionManager(Manager[ResourceVersion]):
                 .where(resource_versions.c.resource_id == resource_id)
                 .order_by(resource_versions.c.version_number.desc())
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(ResourceVersionRow, dict(r._mapping)) for r in rows]
 
     def _next_version_number(self, resource_id: str) -> int:
         with self._engine.connect() as conn:
@@ -312,7 +316,7 @@ class ResourceVersionManager(Manager[ResourceVersion]):
         draft: bool = False,
         created_by: str | None = None,
         activate: bool = True,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Create a new resource version with blobs (atomic).
 
         Writes to resource_versions, resource_blobs, and (if activate) to
@@ -368,11 +372,13 @@ class ResourceVersionManager(Manager[ResourceVersion]):
             if activate and not draft:
                 self._activate_in_conn(conn, resource_id, vid, activated_by=created_by, now=now)
 
-        return self.get_version(vid) or {}
+        result = self.get_version(vid)
+        assert result is not None, f"just-inserted version {vid!r} must be retrievable"
+        return result
 
     def publish_version(
         self, version_id: str, *, reason: str, activated_by: str | None = None
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Promote a draft to active (atomic: flips is_draft=0, activates pointer)."""
         _validate_changelog(reason)
         version = self.get_version(version_id)
@@ -388,7 +394,9 @@ class ResourceVersionManager(Manager[ResourceVersion]):
             self._activate_in_conn(
                 conn, version["resource_id"], version_id, activated_by=activated_by, now=now
             )
-        return self.get_version(version_id) or {}
+        result = self.get_version(version_id)
+        assert result is not None, f"version {version_id!r} must exist after publish"
+        return result
 
     def rollback_resource(
         self,
@@ -397,7 +405,7 @@ class ResourceVersionManager(Manager[ResourceVersion]):
         *,
         reason: str,
         activated_by: str | None = None,
-    ) -> dict:
+    ) -> ResourceVersionRow:
         """Create a new version copying blobs from ``target_version`` (atomic)."""
         reason = _validate_changelog(reason)
         with self._engine.connect() as conn:
@@ -451,8 +459,8 @@ class ResourceVersionManager(Manager[ResourceVersion]):
             ).first()
             return row._mapping["version_id"] if row else None
 
-    def get_active_version(self, resource_id: str) -> dict | None:
-        """Return the currently active version row as a plain dict, or None."""
+    def get_active_version(self, resource_id: str) -> ResourceVersionRow | None:
+        """Return the currently active version row as a typed row, or None."""
         vid = self.get_active_version_id(resource_id)
         if not vid:
             return None
@@ -469,7 +477,7 @@ class ResourceBlobManager(Manager[ResourceBlob]):
 
     model = ResourceBlob
 
-    def get_blob(self, version_id: str, relative_path: str = "") -> dict | None:
+    def get_blob(self, version_id: str, relative_path: str = "") -> ResourceBlobRow | None:
         """Fetch a single blob by version and relative_path."""
         with self._engine.connect() as conn:
             row = conn.execute(
@@ -478,7 +486,7 @@ class ResourceBlobManager(Manager[ResourceBlob]):
                     resource_blobs.c.relative_path == relative_path,
                 )
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(ResourceBlobRow, dict(row._mapping)) if row else None
 
     def iter_blobs(self, version_id: str) -> Iterator[dict]:
         """Yield all blobs for a version ordered by relative_path."""

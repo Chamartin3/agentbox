@@ -10,6 +10,7 @@ from pathlib import Path
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
+from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.db.database import get_database
 from agentbox.core.resources.skills import discover_skills
 from agentbox.core.service.workspaces.service import WorkspaceService
@@ -77,7 +78,7 @@ def create_workspace_registry(
     *,
     description: str | None = None,
     path: str | None = None,
-) -> dict:
+) -> WorkspaceRow:
     try:
         return _ws().create_workspace(name, description=description, path=path)
     except Exception as exc:

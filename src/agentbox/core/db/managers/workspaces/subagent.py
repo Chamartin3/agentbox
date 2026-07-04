@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from typing import cast
 
+from agentbox.core.data.rows import WorkspaceSubagentRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.subagent import WorkspaceSubagent
 from agentbox.core.db.schema import workspace_subagents
@@ -15,7 +17,7 @@ class WorkspaceSubagentManager(Manager[WorkspaceSubagent]):
 
     model = WorkspaceSubagent
 
-    def list_for_workspace(self, workspace_id: str) -> list[dict]:
+    def list_for_workspace(self, workspace_id: str) -> list[WorkspaceSubagentRow]:
         """Return all subagents for a workspace ordered by display_order."""
         with self._engine.connect() as conn:
             rows = conn.execute(
@@ -23,7 +25,7 @@ class WorkspaceSubagentManager(Manager[WorkspaceSubagent]):
                 .where(workspace_subagents.c.workspace_id == workspace_id)
                 .order_by(workspace_subagents.c.display_order)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(WorkspaceSubagentRow, dict(r._mapping)) for r in rows]
 
     def replace_for_workspace(
         self,
@@ -31,7 +33,7 @@ class WorkspaceSubagentManager(Manager[WorkspaceSubagent]):
         subagents: Iterable[dict],
         *,
         actor: str | None = None,
-    ) -> list[dict]:
+    ) -> list[WorkspaceSubagentRow]:
         """Atomically replace all subagents for a workspace.
 
         Each dict must have ``agent_id`` and ``alias``; ``display_order``

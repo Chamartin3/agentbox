@@ -169,6 +169,8 @@ class TokenBackend(BackendAdapter):
                 agent_meta["api_key_env"] = runner_config.api_key_env
             if getattr(runner_config, "base_url", None):
                 agent_meta["base_url"] = runner_config.base_url
+            if getattr(runner_config, "params", None):
+                agent_meta["params"] = runner_config.params
             if getattr(runner_config, "profile_id", None):
                 agent_meta["profile_id"] = runner_config.profile_id
             if getattr(runner_config, "output_mode", None):
@@ -281,6 +283,7 @@ class TokenBackend(BackendAdapter):
             workspace_id=rendered.agent_meta.get("host_env_workspace_id"),
             workdir=rendered.agent_meta.get("host_env_workdir"),
             db_path=rendered.agent_meta.get("host_env_db_path"),
+            model_params=rendered.agent_meta.get("params"),
         ):
             yield ev
 

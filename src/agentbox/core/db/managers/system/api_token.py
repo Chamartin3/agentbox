@@ -1,9 +1,12 @@
 """ApiTokenManager — API credential token CRUD."""
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy import Executable, select as sa_select, update as sa_update, delete as sa_delete
 from sqlalchemy.engine import Row
 
+from agentbox.core.data.rows import ApiTokenPublicRow, ApiTokenRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.system.api_token import ApiToken
 
@@ -19,14 +22,14 @@ class ApiTokenManager(Manager[ApiToken]):
 
     def list_tokens(
         self, *, environment: str | None = None
-    ) -> list[dict]:
+    ) -> list[ApiTokenRow]:
         """Return all tokens, optionally filtered by environment (dicts)."""
         stmt = sa_select(ApiToken.__table__)
         if environment is not None:
             stmt = stmt.where(ApiToken.__table__.c.environment == environment)
         stmt = stmt.order_by(ApiToken.__table__.c.created_at.desc())
         rows = self._list_raw(stmt)
-        return [dict(r) for r in rows]
+        return [cast(ApiTokenRow, dict(r)) for r in rows]
 
     def insert_token(
         self,
@@ -38,8 +41,8 @@ class ApiTokenManager(Manager[ApiToken]):
         last_four: str,
         created_at: str,
         updated_at: str,
-    ) -> dict:
-        """Insert a new API token row. Returns the row as dict."""
+    ) -> ApiTokenPublicRow:
+        """Insert a new API token row. Returns the public view (no secret)."""
         tbl = ApiToken.__table__
         with self._engine.begin() as conn:
             conn.execute(
@@ -53,27 +56,27 @@ class ApiTokenManager(Manager[ApiToken]):
                     updated_at=updated_at,
                 )
             )
-        return {
-            "id": token_id,
-            "environment": environment,
-            "name": name,
-            "last_four": last_four,
-            "created_at": created_at,
-            "updated_at": updated_at,
-        }
+        return ApiTokenPublicRow(
+            id=token_id,
+            environment=environment,
+            name=name,
+            last_four=last_four,
+            created_at=created_at,
+            updated_at=updated_at,
+        )
 
-    def get_token(self, token_id: str) -> dict | None:
-        """Fetch a single token row by id. Returns dict or None."""
+    def get_token(self, token_id: str) -> ApiTokenRow | None:
+        """Fetch a single token row by id. Returns typed row or None."""
         tbl = ApiToken.__table__
         row = self._one_raw(
             sa_select(tbl).where(tbl.c.id == token_id)
         )
-        return dict(row) if row is not None else None
+        return cast(ApiTokenRow, dict(row)) if row is not None else None
 
     def update_token_name(
         self, token_id: str, name: str, updated_at: str
-    ) -> dict | None:
-        """Rename a token. Returns updated row as dict, or None if not found."""
+    ) -> ApiTokenRow | None:
+        """Rename a token. Returns updated row, or None if not found."""
         tbl = ApiToken.__table__
         with self._engine.begin() as conn:
             res = conn.execute(
@@ -86,7 +89,7 @@ class ApiTokenManager(Manager[ApiToken]):
             row = conn.execute(
                 sa_select(tbl).where(tbl.c.id == token_id)
             ).first()
-        return dict(row._mapping) if row is not None else None
+        return cast(ApiTokenRow, dict(row._mapping)) if row is not None else None
 
     def update_token_secret(
         self,
@@ -94,8 +97,8 @@ class ApiTokenManager(Manager[ApiToken]):
         secret_encrypted: str,
         last_four: str,
         updated_at: str,
-    ) -> dict | None:
-        """Rotate a token's secret. Returns updated row as dict, or None if not found."""
+    ) -> ApiTokenRow | None:
+        """Rotate a token's secret. Returns updated row, or None if not found."""
         tbl = ApiToken.__table__
         with self._engine.begin() as conn:
             res = conn.execute(
@@ -112,7 +115,7 @@ class ApiTokenManager(Manager[ApiToken]):
             row = conn.execute(
                 sa_select(tbl).where(tbl.c.id == token_id)
             ).first()
-        return dict(row._mapping) if row is not None else None
+        return cast(ApiTokenRow, dict(row._mapping)) if row is not None else None
 
     def delete_token(self, token_id: str) -> bool:
         """Delete a token by id. Returns True if a row was deleted."""

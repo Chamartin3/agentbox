@@ -8,6 +8,7 @@ import binascii
 from fastmcp import FastMCP
 
 from agentbox.core.constants import ResourceType
+from agentbox.core.data.rows import WorkspaceMcpOverrideRow, WorkspaceMcpToolOverrideRow
 from agentbox.mcp.context import MCPContext
 
 
@@ -159,7 +160,7 @@ def register_repo(mcp: FastMCP, ctx: MCPContext) -> None:
         server_name: str,
         enabled: bool,
         reason: str,
-    ) -> dict:
+    ) -> WorkspaceMcpOverrideRow | dict:
         """Enable or disable a specific MCP server in a workspace.
 
         ``reason`` must be ≥ 3 chars."""
@@ -178,7 +179,7 @@ def register_repo(mcp: FastMCP, ctx: MCPContext) -> None:
         tool_name: str,
         enabled: bool,
         reason: str,
-    ) -> dict:
+    ) -> WorkspaceMcpToolOverrideRow | dict:
         """Enable or disable a specific MCP tool in a workspace.
 
         ``reason`` must be ≥ 3 chars."""

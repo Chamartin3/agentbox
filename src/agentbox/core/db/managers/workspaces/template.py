@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 from agentbox.core.constants import BackendName
+from agentbox.core.data.rows import WorkenvTemplateRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.template import WorkenvTemplate
 from agentbox.core.db.schema import workenv_templates
@@ -17,19 +19,19 @@ class WorkenvTemplateManager(Manager[WorkenvTemplate]):
 
     # ── pure-DB primitives (ported from WorkenvTemplatesMixin) ──────────
 
-    def list_all(self) -> list[dict]:
+    def list_all(self) -> list[WorkenvTemplateRow]:
         with self._engine.connect() as conn:
             rows = conn.execute(
                 workenv_templates.select().order_by(workenv_templates.c.name)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(WorkenvTemplateRow, dict(r._mapping)) for r in rows]
 
-    def get_by_name(self, name: str) -> dict | None:
+    def get_by_name(self, name: str) -> WorkenvTemplateRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
                 workenv_templates.select().where(workenv_templates.c.name == name)
             ).first()
-            return dict(row._mapping) if row else None
+            return cast(WorkenvTemplateRow, dict(row._mapping)) if row else None
 
     def upsert(
         self,
@@ -38,7 +40,7 @@ class WorkenvTemplateManager(Manager[WorkenvTemplate]):
         engine: str = BackendName.CLAUDE_CODE,
         config_json: dict,
         description: str | None = None,
-    ) -> dict:
+    ) -> WorkenvTemplateRow:
         now = now_iso()
         existing = self.get_by_name(name)
         with self._engine.begin() as conn:

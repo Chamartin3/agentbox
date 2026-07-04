@@ -16,6 +16,11 @@ from rich.table import Table
 from rich.text import Text
 
 from agentbox.cli.shared.render import Renderer
+from agentbox.core.service import (
+    WorkspaceFileBindingRow,
+    WorkspaceMcpOverrideRow,
+    WorkspaceMcpToolOverrideRow,
+)
 from agentbox.core.workspaces import WorkspaceInfo
 
 
@@ -140,7 +145,7 @@ class WorkspaceRenderer(Renderer):
         meta.add_row("project_servers", str(server_count))
         self.print(Panel(meta, title="MCP workspace config", border_style="cyan"))
 
-    def mcp_server_overrides_table(self, overrides: Sequence[dict[str, object]]) -> None:
+    def mcp_server_overrides_table(self, overrides: Sequence[WorkspaceMcpOverrideRow]) -> None:
         """Render the server overrides table."""
         if not overrides:
             self.no_server_overrides()
@@ -161,7 +166,7 @@ class WorkspaceRenderer(Renderer):
             )
         self.print(Panel(stable, title="Server overrides", border_style="green"))
 
-    def mcp_tool_overrides_table(self, overrides: Sequence[dict[str, object]]) -> None:
+    def mcp_tool_overrides_table(self, overrides: Sequence[WorkspaceMcpToolOverrideRow]) -> None:
         """Render the tool overrides table."""
         ttable = Table(header_style="bold magenta", padding=(0, 1))
         ttable.add_column("Server", style="bold")
@@ -264,7 +269,7 @@ class WorkspaceRenderer(Renderer):
     # Resource bindings (res ls, set, check)
     # ------------------------------------------------------------------
 
-    def file_bindings_table(self, rows: Sequence[dict[str, object]], workspace_id: str) -> None:
+    def file_bindings_table(self, rows: Sequence[WorkspaceFileBindingRow], workspace_id: str) -> None:
         """Render workspace file bindings table."""
         if not rows:
             self.no_file_bindings(workspace_id)

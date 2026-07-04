@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_workspace_service
+from agentbox.core.data.rows import HostEnvProfileRow
 from agentbox.core.service import WorkspaceService
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.tools import CAPABILITIES
@@ -66,7 +67,7 @@ def list_profiles(ws: Annotated[WorkspaceService, Depends(get_workspace_service)
 @router.post("/api/host-env/profiles", status_code=201)
 def create_profile(
     body: ProfileBody, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
-) -> dict:
+) -> HostEnvProfileRow:
     return ws.upsert_host_env_profile(
         name=body.name,
         description=body.description,
@@ -80,7 +81,7 @@ def update_profile(
     profile_id: str,
     body: ProfileBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> HostEnvProfileRow:
     if not ws.get_host_env_profile(profile_id):
         raise HTTPException(status_code=404, detail="profile not found")
     return ws.upsert_host_env_profile(

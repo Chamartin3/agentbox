@@ -54,15 +54,16 @@ def wr_set(
         raise typer.Exit(2)
 
     existing = obj.resources.list_workspace_file_bindings(workspace_id)
-    kept = [b for b in existing if b.get("target_path") != dest_path]
-    new_binding: dict[str, object] = {
+    kept: list[dict[str, object]] = [
+        dict(b) for b in existing if b.get("target_path") != dest_path
+    ]
+    kept.append({
         "resource_id": resource["id"],
         "target_path": dest_path,
         "materialize_mode": mode,
         "on_conflict": "overwrite",
         "display_order": len(kept),
-    }
-    kept.append(new_binding)
+    })
 
     obj.resources.replace_workspace_file_bindings(workspace_id, kept, reason=reason)
     obj.render.workspace.file_binding_set(workspace_id, dest_path, resource_slug, mode)

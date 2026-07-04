@@ -1,9 +1,12 @@
 """UsageManager — token usage CRUD + usage aggregates."""
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from agentbox.core.data.rows import UsageRow, UsageSummaryRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.runs.usage import Usage
 from agentbox.core.db.schema import usage
@@ -42,13 +45,13 @@ class UsageManager(Manager[Usage]):
         )
         self._query(stmt)
 
-    def get_dict(self, run_id: str) -> dict | None:
-        """Fetch the usage row for a run as a plain dict, or None."""
+    def get_dict(self, run_id: str) -> UsageRow | None:
+        """Fetch the usage row for a run as a typed row, or None."""
         with self._engine.connect() as conn:
             row = conn.execute(usage.select().where(usage.c.run_id == run_id)).first()
-            return dict(row._mapping) if row else None
+            return cast(UsageRow, dict(row._mapping)) if row else None
 
-    def aggregate_usage(self) -> dict:
+    def aggregate_usage(self) -> UsageSummaryRow:
         """Sum tokens + cost across all usage rows, with a run count."""
         stmt = select(
             func.coalesce(func.sum(usage.c.input_tokens), 0).label("input_tokens"),
@@ -58,7 +61,7 @@ class UsageManager(Manager[Usage]):
         )
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
-        return dict(row._mapping) if row else {}
+        return cast(UsageSummaryRow, dict(row._mapping)) if row else UsageSummaryRow(input_tokens=0, output_tokens=0, cost_usd=0.0, runs=0)
 
     def distinct_executors(self) -> list[str]:
         """Distinct reported model values across usage rows, for filter UI."""

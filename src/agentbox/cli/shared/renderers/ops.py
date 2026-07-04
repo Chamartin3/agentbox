@@ -16,7 +16,7 @@ from agentbox.cli.shared.render import Renderer
 
 from agentbox.core.config import Settings
 from agentbox.core.data.workenv import RenderedFile
-from agentbox.core.service import AgentDef
+from agentbox.core.service import AgentDef, RepoResourceRow
 
 
 class OpsRenderer(Renderer):
@@ -172,7 +172,7 @@ class OpsRenderer(Renderer):
     def resource_detail(
         self,
         slug: str,
-        resource: Mapping[str, JsonValue],
+        resource: RepoResourceRow,
         versions: Sequence[Mapping[str, JsonValue]],
     ) -> None:
         """Render resource metadata + version history."""

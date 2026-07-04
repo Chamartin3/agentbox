@@ -89,9 +89,10 @@ def resolve_workspace_host_env_helper(
     row = workspace_host_env_grants.get_grant(workspace_id)
     if not row:
         return {"grants": resolve_grants(None, None), "profile_id": None}
+    profile_id = row.get("profile_id")
     profile = (
-        workspace_host_env_grants.get_profile(row["profile_id"])
-        if row.get("profile_id")
+        workspace_host_env_grants.get_profile(profile_id)
+        if profile_id is not None
         else None
     )
     grants = resolve_grants(

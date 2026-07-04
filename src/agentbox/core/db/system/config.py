@@ -13,6 +13,7 @@ from agentbox.core.config import load_settings
 from agentbox.core.db.database import Database, get_database
 from agentbox.core.db.utils import now_iso
 from agentbox.core.data.manifests.workspaces import McpServerSpec
+from agentbox.core.data.jsontypes import JsonDict
 
 __all__ = [
     "load_project_mcp_servers",
@@ -26,7 +27,7 @@ def _default_db() -> Database:
     return get_database(str(load_settings().db_path))
 
 
-def load_settings_section(section: str, *, db: Database | None = None) -> dict:
+def load_settings_section(section: str, *, db: Database | None = None) -> JsonDict:
     """Return all ``{key: value}`` pairs in a section (JSON-deserialised)."""
     return (db or _default_db()).settings.get_settings_section(section)
 

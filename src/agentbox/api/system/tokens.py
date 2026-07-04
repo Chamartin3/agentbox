@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
+from agentbox.core.data.rows import ApiTokenPublicRow, ApiTokenRow
 
 router = APIRouter(prefix="/api/api-tokens", tags=["api-tokens"])
 
@@ -43,7 +44,7 @@ def list_tokens(
 def create_token(
     body: CreateBody,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> ApiTokenPublicRow:
     try:
         return ctx.system.create_api_token(
             environment=body.environment, name=body.name, secret=body.secret
@@ -63,7 +64,7 @@ def rename_token(
     token_id: str,
     body: RenameBody,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> ApiTokenRow:
     result = ctx.system.rename_api_token(token_id, body.name)
     if result is None:
         raise HTTPException(404, f"token {token_id!r} not found")

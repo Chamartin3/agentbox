@@ -20,6 +20,13 @@ from datetime import datetime
 from typing import Any
 
 from agentbox.core.data.profiles import RunnerProfileStats
+from agentbox.core.data.rows import (
+    ActivitySummaryRow,
+    RichRunRow,
+    RunPagedRow,
+    RunStatsRow,
+    UsageSummaryRow,
+)
 from agentbox.core.db.feedback.types import ActivityRange, since_iso
 from agentbox.core.service.base import Service
 
@@ -35,7 +42,7 @@ class EvaluationService(Service):
 
     # ── Usage aggregates ──────────────────────────────────────────────
 
-    def aggregate_usage(self) -> dict:
+    def aggregate_usage(self) -> UsageSummaryRow:
         """Total tokens + cost across all runs."""
         return self._usage.aggregate_usage()
 
@@ -49,7 +56,7 @@ class EvaluationService(Service):
 
     # ── Activity / time-series ─────────────────────────────────────────
 
-    def activity_summary(self, since_iso_str: str, agent: str | None = None) -> dict:
+    def activity_summary(self, since_iso_str: str, agent: str | None = None) -> ActivitySummaryRow:
         """Roll up runs in a date range into /activity endpoint shape."""
         return self._runs.activity_summary(since_iso_str, agent)
 
@@ -65,7 +72,7 @@ class EvaluationService(Service):
         q: str | None = None,
         since_iso: str | None = None,
         until_iso: str | None = None,
-    ) -> dict:
+    ) -> RunStatsRow:
         """Aggregate stats matching the list_runs_paged filter set."""
         return self._runs.stats_for_filters(
             agent_id=agent_id,
@@ -91,7 +98,7 @@ class EvaluationService(Service):
         until_iso: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[dict], int]:
+    ) -> tuple[list[RunPagedRow], int]:
         """Paginated + filterable run listing."""
         return self._runs.list_runs_paged(
             agent_id=agent_id,
@@ -112,7 +119,7 @@ class EvaluationService(Service):
         status: str | None = None,
         executor: str | None = None,
         limit: int = 50,
-    ) -> list[dict]:
+    ) -> list[RichRunRow]:
         """Recent-runs listing with usage joined in (raw rows)."""
         return self._runs.list_runs_rich(since_iso_str, agent, status, executor, limit)
 

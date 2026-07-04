@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
 from agentbox.core.constants import ActivityStateFilter
+from agentbox.core.data.rows import ActivitySummaryRow
 from agentbox.core.service.evaluation import ActivityRange, since_iso
 
 router = APIRouter(prefix="/api/activity", tags=["activity"])
@@ -18,7 +19,7 @@ def get_summary(
     action: str | None = Query(default=None),
     executor: str | None = Query(default=None),
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> ActivitySummaryRow:
     return ctx.evaluation.activity_summary(since_iso(range), agent=action)
 
 

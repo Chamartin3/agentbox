@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from typing import cast
 
 from sqlalchemy import func, select
 
 from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
+from agentbox.core.data.rows import AgentPromptBindingRow, WorkspaceFileBindingRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.binding import (
     AgentPromptResourceBinding,
@@ -39,7 +41,7 @@ class AgentPromptResourceBindingManager(Manager[AgentPromptResourceBinding]):
 
     model = AgentPromptResourceBinding
 
-    def list_for_agent(self, agent_id: str) -> list[dict]:
+    def list_for_agent(self, agent_id: str) -> list[AgentPromptBindingRow]:
         """Return all prompt bindings for an agent ordered by display_order."""
         with self._engine.connect() as conn:
             rows = conn.execute(
@@ -47,7 +49,7 @@ class AgentPromptResourceBindingManager(Manager[AgentPromptResourceBinding]):
                 .where(agent_prompt_resource_bindings.c.agent_id == agent_id)
                 .order_by(agent_prompt_resource_bindings.c.display_order)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(AgentPromptBindingRow, dict(r._mapping)) for r in rows]
 
     def replace_for_agent(
         self,
@@ -56,7 +58,7 @@ class AgentPromptResourceBindingManager(Manager[AgentPromptResourceBinding]):
         *,
         reason: str,
         actor: str | None = None,
-    ) -> list[dict]:
+    ) -> list[AgentPromptBindingRow]:
         """Atomically replace all prompt bindings for an agent."""
         reason = _validate_reason(reason)
         rows: list[dict] = []
@@ -123,7 +125,7 @@ class WorkspaceFileResourceBindingManager(Manager[WorkspaceFileResourceBinding])
 
     model = WorkspaceFileResourceBinding
 
-    def list_for_workspace(self, workspace_id: str) -> list[dict]:
+    def list_for_workspace(self, workspace_id: str) -> list[WorkspaceFileBindingRow]:
         """Return all file bindings for a workspace ordered by display_order."""
         with self._engine.connect() as conn:
             rows = conn.execute(
@@ -131,7 +133,7 @@ class WorkspaceFileResourceBindingManager(Manager[WorkspaceFileResourceBinding])
                 .where(workspace_file_resource_bindings.c.workspace_id == workspace_id)
                 .order_by(workspace_file_resource_bindings.c.display_order)
             )
-            return [dict(r._mapping) for r in rows]
+            return [cast(WorkspaceFileBindingRow, dict(r._mapping)) for r in rows]
 
     def count_by_workspace(self) -> dict[str, int]:
         """Return {workspace_id: binding_count} for all workspaces with bindings."""
@@ -151,7 +153,7 @@ class WorkspaceFileResourceBindingManager(Manager[WorkspaceFileResourceBinding])
         *,
         reason: str,
         actor: str | None = None,
-    ) -> list[dict]:
+    ) -> list[WorkspaceFileBindingRow]:
         """Atomically replace all file bindings for a workspace.
 
         Validates: no duplicate folder target_paths, valid materialize_mode,
@@ -224,7 +226,7 @@ class WorkspaceFileResourceBindingManager(Manager[WorkspaceFileResourceBinding])
         *,
         reason: str = "skill bindings update",
         actor: str | None = None,
-    ) -> list[dict]:
+    ) -> list[WorkspaceFileBindingRow]:
         """Replace ONLY skill-type bindings, preserving other binding types."""
         current = self.list_for_workspace(workspace_id)
         merged: list[dict] = []
