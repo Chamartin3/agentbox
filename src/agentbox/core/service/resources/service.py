@@ -22,7 +22,7 @@ from typing import Any, Literal
 from jsonschema import Draft202012Validator
 
 from agentbox.core.agents.composition.rendering import render_for_type
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.data.payload_types import (
     EnrichedPromptBindingRow,
     EnrichedWorkspaceBindingRow,

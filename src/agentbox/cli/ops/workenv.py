@@ -16,7 +16,7 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.core.config import Settings
-from agentbox.core.constants import BackendName
+from agentbox.core.data.constants import BackendName
 from agentbox.core.service import WorkspaceService
 from agentbox.core.workspaces.generation.config import WorkenvConfig
 from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
@@ -61,18 +61,6 @@ def workenv_generate(
         "-f",
         help="Path to a YAML WorkenvConfig file (skips DB loading)",
     ),
-    preset: str | None = typer.Option(
-        None,
-        "--preset",
-        "-p",
-        help="Load from a named preset (requires Phase G)",
-    ),
-    save: str | None = typer.Option(
-        None,
-        "--save",
-        "-s",
-        help="Save as a named workspace after generation (requires Phase G)",
-    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -87,9 +75,10 @@ def workenv_generate(
 ) -> None:
     """Generate workspace config files using a recipe engine.
 
-    Loads configuration from the DB (by name), from a YAML file
-    (--config-file), from a preset (--preset), or interactively
-    (no arguments or --interactive).
+    Loads configuration from an existing workspace (by name), from a YAML
+    file (--config-file), or interactively (no arguments or --interactive).
+    A named workspace is the reusable "preset": save it once, generate from
+    it by name any time.
     """
     obj: CLIContext = ctx.obj
     settings = obj.settings
@@ -101,7 +90,6 @@ def workenv_generate(
             engine=engine,
             target_dir=target_dir,
             config_file=config_file,
-            preset=preset,
             interactive=interactive,
             svc=svc,
             settings=settings,
@@ -121,15 +109,6 @@ def workenv_generate(
     recipe = svc.load_workenv_recipe(source.engine)
     source.target_dir.mkdir(parents=True, exist_ok=True)
 
-    if save is not None:
-        svc.save_workenv_as_preset(
-            save,
-            source.config,
-            engine=source.engine,
-            description=f"Saved from CLI ({source.source_label})",
-        )
-        obj.render.ops.success(f"saved preset [bold]{save}[/bold]")
-
     if dry_run:
         obj.render.ops.workenv_preview(svc.preview_workenv(config=source.config, recipe=recipe))
         return
@@ -144,7 +123,7 @@ def workenv_generate(
 
     if source.source_label == "interactive":
         obj.render.ops.dim(
-            "\nTip: use --config-file or --save to persist this config."
+            "\nTip: use --config-file to persist this config."
         )
 
 
@@ -154,7 +133,6 @@ def _resolve_source(
     engine: str,
     target_dir: str | None,
     config_file: str | None,
-    preset: str | None,
     interactive: bool,
     svc: WorkspaceService,
     settings: Settings,
@@ -163,13 +141,6 @@ def _resolve_source(
 
     Raises ``ValueError`` on user-facing errors; caller prints and exits.
     """
-    if preset is not None:
-        config = svc.workenv_from_preset(preset)
-        if config is None:
-            raise ValueError(f"preset not found: {preset}")
-        out_dir = _resolve_target_dir(target_dir, name, svc, settings)
-        return _ResolvedSource(config, engine, out_dir, "preset")
-
     if config_file is not None:
         config_path = Path(config_file)
         if not config_path.is_file():
@@ -202,29 +173,6 @@ def _resolve_target_dir(
         ws_path, _project_root = svc.resolve_workspace_path(name, settings=settings)
         return ws_path
     return Path.cwd() / "out"
-
-
-@workenv_app.command("seed-presets")
-def workenv_seed_presets(ctx: typer.Context) -> None:
-    """Load built-in presets into the DB (idempotent)."""
-    obj: CLIContext = ctx.obj
-    count = obj.workspaces.seed_presets()
-    obj.render.ops.success(f"seeded {count} preset(s)")
-
-
-@workenv_app.command("list-presets")
-def workenv_list_presets(ctx: typer.Context) -> None:
-    """List saved presets in the DB."""
-    obj: CLIContext = ctx.obj
-    presets = obj.workspaces.list_presets()
-    if not presets:
-        obj.render.ops.warn("No presets saved")
-        return
-    obj.render.ops.dim("Available presets:")
-    for p in presets:
-        desc = p.get("description", "") or ""
-        engine = p.get("engine", "?")
-        obj.render.ops.dim(f"  {p['name']}  ({engine})  {desc}")
 
 
 @workenv_app.command("list-engines")

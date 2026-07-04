@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.constants import (
+from agentbox.core.data.constants import (
     BundleFile,
     EventType,
     ResourceType,

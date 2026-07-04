@@ -9,13 +9,15 @@ never “allowed vs forbidden”.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import McpDiscoveryRefreshResult, ResolvedWorkspaceMcp
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_workspace_service
-from agentbox.core.constants import McpPolicy
+from agentbox.core.data.constants import McpPolicy
 from agentbox.core.data.rows import WorkspaceMcpOverrideRow, WorkspaceMcpToolOverrideRow
 from agentbox.core.service.workspaces.service import WorkspaceService
 
@@ -42,7 +44,7 @@ class PolicyBody(BaseModel):
 def get_effective_mcp(
     workspace_id: str,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> ResolvedWorkspaceMcp:
     return ws.resolve_workspace_mcp(workspace_id)
 
 
@@ -50,7 +52,7 @@ def get_effective_mcp(
 def get_effective_servers(
     workspace_id: str,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> ResolvedWorkspaceMcp:
     """Effective per-workspace MCP servers — union of manifest + overrides."""
     return ws.resolve_workspace_mcp(workspace_id)
 
@@ -119,7 +121,7 @@ def set_tool_override(
 def refresh_workspace_mcp_discovery(
     workspace_id: str,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> McpDiscoveryRefreshResult:
     """Invalidate the MCP tool discovery cache for this workspace's servers.
 
     Returns count of cache entries removed.

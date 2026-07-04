@@ -7,6 +7,8 @@ helper lives in the domain that owns it.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import ResolvedHostEnv
+
 from agentbox.core.data import EnvDocRow
 from agentbox.core.data.rows import (
     HostEnvProfileRow,
@@ -82,7 +84,7 @@ def get_workspace_host_env(workspace_id: str) -> WorkspaceHostEnvGrantRow | None
     return _ws().get_workspace_host_env(workspace_id)
 
 
-def resolve_workspace_host_env(workspace_id: str) -> dict:
+def resolve_workspace_host_env(workspace_id: str) -> ResolvedHostEnv:
     return _ws().resolve_workspace_host_env(workspace_id)
 
 

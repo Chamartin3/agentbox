@@ -20,7 +20,7 @@ import subprocess
 from contextlib import suppress
 from typing import Final
 
-from agentbox.core.constants import ContentBlockType, MessageRole
+from agentbox.core.data.constants import ContentBlockType, MessageRole
 from agentbox.core.data import RunRecord
 from agentbox.core.data.conversation.base import ConversationSource
 from agentbox.core.data.conversation.types import (

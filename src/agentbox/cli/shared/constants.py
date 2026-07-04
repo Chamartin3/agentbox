@@ -1,7 +1,7 @@
 """CLI-scoped constants: rich styles and CLI-only magic values.
 
 Domain value-sets (session modes, backends, event types, workspace
-sentinels, …) live in :mod:`agentbox.core.constants` and are reused —
+sentinels, …) live in :mod:`agentbox.core.data.constants` and are reused —
 not redefined — here. This module only owns values that are specific to
 the terminal presentation layer or to CLI-originated DB writes.
 """
@@ -11,7 +11,6 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Final
 
-from agentbox.core.constants import EventType
 from agentbox.core.data import EventStylesDict
 
 # ---------------------------------------------------------------------------
@@ -64,16 +63,16 @@ CLI_SOURCE: Final[str] = "cli"
 RUNNER_CLEAR: Final[str] = "clear"
 
 # Event-type → rich style, the single lookup used by streaming/log renderers.
-EVENT_STYLES: Final[dict[EventType | str, str]] = {
-    EventType.TEXT: "white",
-    EventType.LOG: "dim",
-    EventType.TOOL_CALL: "cyan",
-    EventType.TOOL_RESULT: "green",
-    EventType.USAGE: "yellow",
-    EventType.RETRY: "bright_yellow",
-    EventType.THINKING: "bright_blue",
-    EventType.TIMEOUT: "bright_red",
-    EventType.DONE: "bold",
+EVENT_STYLES: Final[EventStylesDict] = {
+    "text": "white",
+    "log": "dim",
+    "tool_call": "cyan",
+    "tool_result": "green",
+    "usage": "yellow",
+    "retry": "bright_yellow",
+    "thinking": "bright_blue",
+    "timeout": "bright_red",
+    "done": "bold",
     "error": "red",
     "warning": "yellow",
 }

@@ -14,7 +14,7 @@ from agentbox.cli.ops.launch import _launch_session
 # TODO(cli-arch): workspace CRUD → WorkspaceService (plan 089)
 from agentbox.core import workspaces as ws_core
 # TODO(cli-arch): move to facade export
-from agentbox.core.service.workspaces.errors import WorkspaceNotFound
+from agentbox.core.data.errors import WorkspaceNotFound
 
 
 def _resolve_workspace(obj: CLIContext, name: str) -> tuple[Path, str]:
@@ -27,7 +27,7 @@ def _resolve_workspace(obj: CLIContext, name: str) -> tuple[Path, str]:
             path.mkdir(parents=True, exist_ok=True)
             return path, name
     a = resolve_agent(name)
-    ws_path = ws_core.ensure(a, obj.settings, scaffold=True)
+    ws_path = ws_core.ensure(a, obj.settings)
     return ws_path, name
 
 
@@ -86,7 +86,6 @@ def ws_show(
 def ws_new(
     ctx: typer.Context,
     agent: str,
-    scaffold: bool = True,
     reset: bool = typer.Option(False, "--reset", help="Delete and recreate"),
     register: bool = typer.Option(
         False, "--register", help="Register as a named workspace"
@@ -101,7 +100,7 @@ def ws_new(
         return
 
     a = resolve_agent(agent)
-    path = ws_core.ensure(a, obj.settings, scaffold=scaffold)
+    path = ws_core.ensure(a, obj.settings)
     obj.render.workspace.workspace_ready(path)
 
 
@@ -114,7 +113,7 @@ def ws_edit(
     """Open a workspace file in $EDITOR (falls back to vi)."""
     obj: CLIContext = ctx.obj
     a = resolve_agent(agent)
-    path = ws_core.ensure(a, obj.settings, scaffold=True)
+    path = ws_core.ensure(a, obj.settings)
     editor = os.environ.get("EDITOR", "vi")
     subprocess.call([editor, str(path / file)])
 

@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
-from agentbox.core.constants import RunStatus
+from agentbox.core.data.constants import RunStatus
 from agentbox.core.data.payload_types import UsagePayload
 
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult

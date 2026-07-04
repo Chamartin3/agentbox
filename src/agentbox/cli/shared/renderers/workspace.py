@@ -15,7 +15,15 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.core.data.payload_types import MaterializeConflict, MaterializeDryRunEntry
+from agentbox.core.data.payload_types import (
+    GeneratedConfigsResult,
+    GeneratedSkillsResult,
+    MaterializeConflict,
+    MaterializeDryRunEntry,
+    PermissionsView,
+    SkillListItem,
+    WorkspaceMcpToolsResult,
+)
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.service import (
     WorkspaceFileBindingRow,
@@ -45,7 +53,7 @@ class WorkspaceRenderer(Renderer):
         table.add_column("State", justify="center", width=7)
         table.add_column("Agent", style="bold")
         table.add_column("Path", style="dim")
-        table.add_column("CLAUDE.md", justify="center")
+        table.add_column("Context", justify="center")
         table.add_column("Skills", justify="right", style="magenta")
 
         for w in rows:
@@ -57,7 +65,7 @@ class WorkspaceRenderer(Renderer):
                 state = Text("NEW", style="bold blue")
             table.add_row(
                 state, w.agent_id, str(w.path),
-                self.check(w.has_claude_md),
+                self.check(w.has_context_doc),
                 str(w.skill_count) if w.skill_count else "[dim]\u00b7[/dim]",
             )
         self.print(table)
@@ -96,14 +104,14 @@ class WorkspaceRenderer(Renderer):
     # File generation (file gen, file skills)
     # ------------------------------------------------------------------
 
-    def configs_generated(self, result: dict[str, object]) -> None:
+    def configs_generated(self, result: GeneratedConfigsResult) -> None:
         """Print success message for config generation."""
         self.success(
             f"configs generated → {result.get('target_dir', '?')} "
             f"({result.get('files_written', 0)} files)"
         )
 
-    def skills_generated(self, result: dict[str, object]) -> None:
+    def skills_generated(self, result: GeneratedSkillsResult) -> None:
         """Print success message for skills generation."""
         self.success(
             f"skills generated → {result.get('target_dir', '?')} "
@@ -214,7 +222,7 @@ class WorkspaceRenderer(Renderer):
         """Print empty-state for no MCP tools in workspace."""
         self.dim(f"no MCP tools for workspace {workspace_id!r}")
 
-    def mcp_tools_table(self, result: dict[str, object], workspace_id: str) -> None:
+    def mcp_tools_table(self, result: WorkspaceMcpToolsResult, workspace_id: str) -> None:
         """Render the available MCP tools table for a workspace."""
         if not result:
             self.no_mcp_tools(workspace_id)
@@ -245,7 +253,7 @@ class WorkspaceRenderer(Renderer):
     # Permissions (perm get, set)
     # ------------------------------------------------------------------
 
-    def permissions_view(self, result: dict[str, object], name: str) -> None:
+    def permissions_view(self, result: PermissionsView, name: str) -> None:
         """Render permissions as a JSON-syntax panel."""
         self.print(
             Panel(
@@ -362,7 +370,7 @@ class WorkspaceRenderer(Renderer):
     # Skills (skill ls, show)
     # ------------------------------------------------------------------
 
-    def skills_list(self, skills: Sequence[dict[str, object]]) -> None:
+    def skills_list(self, skills: Sequence[SkillListItem]) -> None:
         """Render a list of skill names and descriptions."""
         if not skills:
             self.dim("no skills")

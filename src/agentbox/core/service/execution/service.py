@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from agentbox.core.config import load_settings
-from agentbox.core.constants import RunStatus
+from agentbox.core.data.constants import RunStatus
 from agentbox.core.data import now_iso, read_transcript, RunnerSnapshot, UsagePayload
 from agentbox.core.data.rows import (
     RunCommentRow,

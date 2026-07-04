@@ -36,6 +36,10 @@ SEARCH_ROOTS = (
 ALLOWED = {
     # Internal to the package — its own modules legitimately import siblings.
     REPO_ROOT / "src" / "agentbox" / "core" / "db",
+    # Alembic is the schema's own migration tooling, not application code: the
+    # baseline runs ``metadata.create_all`` and needs ``core.db.schema.metadata``
+    # (the facade is managers-only and does not re-export it).
+    REPO_ROOT / "alembic",
     # Lifecycle imports that reach into data submodules (pre-existing).
     REPO_ROOT / "src" / "agentbox" / "core" / "service" / "lifecycle.py",
     # ── plan 109 Phase A debt: core.db.database allowlist ──────────────────

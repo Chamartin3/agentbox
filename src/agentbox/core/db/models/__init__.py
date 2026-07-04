@@ -34,7 +34,6 @@ from agentbox.core.db.models.agents import (
 
 # Workspaces domain
 from agentbox.core.db.models.workspaces import (
-    WorkenvTemplate,
     Workspace,
     WorkspaceEnvDoc,
     WorkspaceEnvDocVersion,
@@ -93,7 +92,6 @@ __all__ = [
     "AgentVersionRating",
     "PromptVersion",
     # workspaces
-    "WorkenvTemplate",
     "Workspace",
     "WorkspaceEnvDoc",
     "WorkspaceEnvDocVersion",

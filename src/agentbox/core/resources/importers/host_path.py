@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.resources.importers.base import (
     ImportedBlob,
     ImporterContext,

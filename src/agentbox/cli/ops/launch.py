@@ -22,7 +22,7 @@ import typer
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.renderers.ops import OpsRenderer
 from agentbox.core.config import Settings  # TODO(cli-arch): Settings (plan 095)
-from agentbox.core.constants import RunnerKind  # TODO(cli-arch): RunnerKind export (plan 095)
+from agentbox.core.data.constants import RunnerKind  # TODO(cli-arch): RunnerKind export (plan 095)
 from agentbox.core.service import AgentDef, WorkspaceService  # TODO(cli-arch): facade export (plan 095)
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.system.service import SystemService

@@ -6,7 +6,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from agentbox.core.data.payload_types import JsonSchemaDict
-from agentbox.core.constants import BundleFile
+from agentbox.core.data.constants import BundleFile
 from agentbox.core.agents.composition.bundle._helpers import _read_text
 
 @dataclass(frozen=True)

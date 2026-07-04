@@ -23,7 +23,7 @@ from typing import Any, ClassVar, Protocol
 
 import yaml
 
-from agentbox.core.events import RunEvent
+from agentbox.core.data.events import RunEvent
 from agentbox.core.tools.canonical import CanonicalTool
 from ._mcp_types import McpToolSpec
 from .rendered import RenderedConfig

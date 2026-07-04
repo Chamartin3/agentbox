@@ -24,7 +24,6 @@ from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.tools import discover_tools
 from agentbox.core.workspaces.mcp.client import McpRegistry
 from agentbox.core.service.lifecycle._phases import (
-    _phase_composition_migration,
     _phase_composition_refs,
     _phase_import_repo,
     _phase_legacy_migration,
@@ -45,7 +44,6 @@ _log = logging.getLogger(__name__)
 ENV_IMPORT_ON_START: Final[str] = "AGENTBOX_IMPORT_ON_START"
 ENV_SKIP_DEFAULT_PROFILES: Final[str] = "AGENTBOX_SKIP_DEFAULT_PROFILES"
 ENV_SKIP_RESOURCE_IMPORT: Final[str] = "AGENTBOX_SKIP_RESOURCE_IMPORT"
-ENV_MIGRATE_COMPOSITION: Final[str] = "AGENTBOX_MIGRATE_COMPOSITION"
 
 
 def discover_agent_tools() -> StartupReport:
@@ -137,8 +135,6 @@ def boot_import_resources(
     out = _merge(out, _phase_legacy_migration(db))
     out = _merge(out, _phase_workspace_bindings(db, manifest))
     out = _merge(out, _phase_composition_refs(db, settings, manifest))
-    if SETTINGS.migrate_composition:
-        out = _merge(out, _phase_composition_migration(db, settings))
     return out
 
 

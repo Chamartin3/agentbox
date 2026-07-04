@@ -34,7 +34,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from agentbox.core.data.payload_types import JsonSchemaDict, ResolvedBindingView
+from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
 from agentbox.core.agents import compose_prompt
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
@@ -105,7 +105,7 @@ class ResolvedPrompt:
     validation_mode: str | None
     composition_result: Any
     prompt_bindings: list[ResolvedBindingView] = field(default_factory=list)
-    snapshot_entries: list[dict] = field(default_factory=list)
+    snapshot_entries: list[PromptEmbedSnapshotEntry] = field(default_factory=list)
 
     def to_composed_state(self) -> ComposedState:
         """Bundle the composed fields into the typed ComposedState."""

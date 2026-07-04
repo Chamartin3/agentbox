@@ -13,7 +13,7 @@ import logging
 import re
 from pathlib import Path
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.db import ResourceManager, ResourceVersionManager
 
 logger = logging.getLogger(__name__)

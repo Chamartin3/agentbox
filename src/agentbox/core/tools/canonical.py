@@ -13,7 +13,7 @@ dict keys continues to work without changes — adopt incrementally.
 
 from __future__ import annotations
 
-from agentbox.core.constants import CatalogEnum
+from agentbox.core.data.constants import CatalogEnum
 
 
 class CanonicalTool(CatalogEnum):

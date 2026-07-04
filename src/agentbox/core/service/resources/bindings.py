@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
-from agentbox.core.constants import PromptMode, PromptSlot
+from agentbox.core.data.constants import PromptMode, PromptSlot
 from agentbox.core.data.payload_types import (
     MaterializeDryRunResult,
     PromptBindingItemsResult,

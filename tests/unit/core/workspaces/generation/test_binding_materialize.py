@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from agentbox.core.resources.binding_materialize import (
+from agentbox.core.workspaces.generation.materialize import (
     MaterializeOutcome,
     _resolve_single_file_name,
     materialize_workspace,

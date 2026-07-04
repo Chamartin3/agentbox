@@ -7,7 +7,7 @@ import json
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.core.service.workspaces.errors import WorkspaceNotFound
+from agentbox.core.data.errors import WorkspaceNotFound
 
 permissions_app = typer.Typer(
     name="permissions",

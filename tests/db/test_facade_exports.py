@@ -33,7 +33,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "AgentVersionRatingManager",
         "PromptVersionManager",
         # workspaces managers
-        "WorkenvTemplateManager",
         "WorkspaceEnvDocManager",
         "WorkspaceEnvDocVersionManager",
         "WorkspaceHostEnvGrantManager",

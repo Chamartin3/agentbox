@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.data import RepoResourceRow
 from agentbox.core.db.database import Database
 from agentbox.core.service import resources as res_service

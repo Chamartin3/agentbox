@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from agentbox.core.data.payload_types import PromptBindingSpec, WorkspaceBindingSpec
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.data.manifests.system import ProjectManifest
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,

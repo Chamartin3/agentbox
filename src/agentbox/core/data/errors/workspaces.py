@@ -1,10 +1,12 @@
-"""Domain errors for workspace service operations."""
+"""Workspace-related exceptions."""
 
 from __future__ import annotations
 
-from agentbox.core.exceptions import WorkspaceError
+from agentbox.core.data.errors.base import AgentboxError
 
-__all__ = ["WorkspaceNotFound", "WorkspaceExists", "WorkspacePathEscape"]
+
+class WorkspaceError(AgentboxError):
+    """Workspace registry, permission, or sync failure."""
 
 
 class WorkspaceNotFound(WorkspaceError, LookupError):

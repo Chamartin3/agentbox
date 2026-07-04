@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_agent_service, get_resource_service, get_workspace_service
-from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
+from agentbox.core.data.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
 from agentbox.core.data.payload_types import (
     MaterializeDryRunResult,
     PromptBindingItemsResult,
@@ -257,7 +257,7 @@ def replace_workspace_subagents(
     try:
         items = svc.replace_workspace_subagents(
             workspace_id,
-            [s.model_dump() for s in body.subagents],
+            [{"agent_id": sub.agent_id, "alias": sub.alias, "display_order": sub.display_order} for sub in body.subagents],
             actor=body.actor,
         )
     except (ValueError, BindingError) as exc:

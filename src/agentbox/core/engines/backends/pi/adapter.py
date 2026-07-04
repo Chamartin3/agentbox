@@ -11,7 +11,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.core.events import (
+from agentbox.core.data.events import (
     DoneEvent,
     LogEvent,
     RunEvent,

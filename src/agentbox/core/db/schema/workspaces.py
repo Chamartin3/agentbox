@@ -18,7 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
-from agentbox.core.constants import BackendName, ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.db._metadata import metadata
 
 _RESOURCE_TYPES_SQL = ", ".join(f"'{t.value}'" for t in ResourceType)
@@ -167,19 +167,4 @@ workspaces = Table(
         "source IN ('manifest', 'db')",
         name="workspaces_source_check",
     ),
-)
-
-# Template presets for WorkenvConfig generation. Each row stores a complete
-# WorkenvConfig as JSON, plus the engine (recipe) it targets.
-# Seeds are loaded from core/workspaces/generation/seeds/*.yaml.
-
-workenv_templates = Table(
-    "workenv_templates",
-    metadata,
-    Column("name", String, primary_key=True),
-    Column("description", String, nullable=True),
-    Column("engine", String, nullable=False, server_default=BackendName.CLAUDE_CODE),
-    Column("config_json", JSON, nullable=False),
-    Column("created_at", String, nullable=False),
-    Column("updated_at", String, nullable=False),
 )

@@ -17,7 +17,7 @@ from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
 
-from agentbox.core.constants import RunStatus
+from agentbox.core.data.constants import RunStatus
 
 logger = logging.getLogger(__name__)
 

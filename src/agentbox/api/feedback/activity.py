@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from agentbox.api.context import APIContext
 from agentbox.core.data.payload_types import EnrichedRunsResult
 from agentbox.api.deps import get_api_context
-from agentbox.core.constants import ActivityStateFilter
+from agentbox.core.data.constants import ActivityStateFilter
 from agentbox.core.data.rows import ActivitySummaryRow
 from agentbox.core.service.evaluation import ActivityRange, since_iso
 

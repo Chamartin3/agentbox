@@ -1,6 +1,8 @@
 """WorkspaceSubagentManager — subagent registration CRUD."""
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import SubagentSpec
+
 import uuid
 from collections.abc import Iterable
 from typing import cast
@@ -30,7 +32,7 @@ class WorkspaceSubagentManager(Manager[WorkspaceSubagent]):
     def replace_for_workspace(
         self,
         workspace_id: str,
-        subagents: Iterable[dict],
+        subagents: Iterable[SubagentSpec],
         *,
         actor: str | None = None,
     ) -> list[WorkspaceSubagentRow]:

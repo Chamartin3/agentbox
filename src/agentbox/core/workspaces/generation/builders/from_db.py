@@ -1,7 +1,8 @@
 """Load a WorkenvConfig from the authoritative DB state."""
 
 from __future__ import annotations
-from typing import Any
+
+from agentbox.core.data.payload_types import EffectivePermissions
 
 from agentbox.core.config import Settings
 from agentbox.core.db import (
@@ -36,7 +37,7 @@ def load_workenv(
     workspace_id: str,
     *,
     settings: Settings,
-    permissions: dict[str, Any] | None = None,
+    permissions: EffectivePermissions | None = None,
 ) -> WorkenvConfig:
     """Resolve a ``WorkenvConfig`` from the DB for *workspace_id*."""
     ws_row = workspaces.get_by_name(workspace_id)

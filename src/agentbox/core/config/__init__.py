@@ -48,7 +48,6 @@ class Settings:
         import_on_start    →  False                       (AGENTBOX_IMPORT_ON_START)
         skip_default_profiles → False                     (AGENTBOX_SKIP_DEFAULT_PROFILES)
         skip_resource_import  → False                     (AGENTBOX_SKIP_RESOURCE_IMPORT)
-        migrate_composition   → False                     (AGENTBOX_MIGRATE_COMPOSITION)
 
     Misc:
         extra_skill_roots  →  ""                          (AGENTBOX_EXTRA_SKILL_ROOTS)
@@ -125,10 +124,6 @@ class Settings:
     @property
     def skip_resource_import(self) -> bool:
         return bool(os.environ.get("AGENTBOX_SKIP_RESOURCE_IMPORT"))
-
-    @property
-    def migrate_composition(self) -> bool:
-        return bool(os.environ.get("AGENTBOX_MIGRATE_COMPOSITION"))
 
     # Misc
     @property

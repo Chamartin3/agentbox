@@ -5,6 +5,8 @@ Delegates to ``WorkspaceService`` for config generation.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import GeneratedConfigsResult
+
 from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
@@ -45,7 +47,7 @@ def generate_configs_by_name(
     *,
     settings: Settings,
     mcp_manifest: Any | None = None,
-) -> dict:
+) -> GeneratedConfigsResult:
     return _ws().generate_configs(name, settings=settings)
 
 
@@ -54,7 +56,7 @@ def generate_configs_for_agent(
     *,
     settings: Settings,
     mcp_manifest: Any | None = None,
-) -> dict:
+) -> GeneratedConfigsResult:
     agent = AgentService().get_agent_def(agent_id)
     if agent is None:
         raise AgentNotFound(agent_id)

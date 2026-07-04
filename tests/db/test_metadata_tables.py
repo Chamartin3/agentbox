@@ -57,7 +57,6 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "workspace_runtime_permissions",
         "workspace_subagents",
         "workspaces",
-        "workenv_templates",
     }
 )
 

@@ -7,10 +7,8 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.shared.deps import get_resource_service, get_db
-from agentbox.core.constants import ResourceType
-# TODO(cli-arch): ResourceService (plan 090)
-from agentbox.core.resources.legacy_composition import migrate_composition_to_bindings  # TODO(cli-arch)
+from agentbox.cli.shared.deps import get_resource_service
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound  # TODO(cli-arch)
 
 repo_app = typer.Typer(
@@ -183,34 +181,4 @@ def repo_preview_modes(
         )
 
 
-@repo_app.command("migrate-composition")
-def repo_migrate_composition(
-    ctx: typer.Context,
-    agent: str | None = typer.Option(
-        None, "--agent", help="Migrate only this agent_id"
-    ),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Report without writing"),
-) -> None:
-    """Migrate composition slots to resource bindings."""
-    obj: CLIContext = ctx.obj
-    if dry_run:
-        obj.render.ops.warn("--dry-run not implemented; running for real.")
-    settings = obj.settings
-    db = get_db()
-    report = migrate_composition_to_bindings(
-        db.resources,
-        db.resource_versions,
-        db.agent_prompt_resource_bindings,
-        db.agent_version_files,
-        db.agent_versions,
-        only_agent_id=agent,
-        project_root=settings.project_root,
-    )
-    obj.render.ops.migration_composition_table(report.summary())
-    if report.agents_migrated:
-        obj.render.ops.success(f"migrated: {', '.join(report.agents_migrated)}")
-    if report.failed:
-        obj.render.ops.error("failed:")
-        for agent_id, err in report.failed:
-            obj.render.ops.error(f"  {agent_id}: {err}")
-        raise typer.Exit(1)
+

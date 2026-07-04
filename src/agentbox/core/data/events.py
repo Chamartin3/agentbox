@@ -5,7 +5,7 @@ union ``RunEvent`` is the wire format for the WS stream and the on-disk
 transcript (one JSON object per line).
 
 **This is the canonical home.** All consumers MUST import event types
-directly from ``agentbox.core.events``; there are no re-export shims.
+directly from ``agentbox.core.data.events``; there are no re-export shims.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.constants import (
+from agentbox.core.data.constants import (
     EventType,
     LogLevel,
     MessageRole,

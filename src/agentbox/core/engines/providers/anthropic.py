@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from agentbox.core.constants import BackendName
+from agentbox.core.data.constants import BackendName
 from agentbox.core.engines.providers.base import (
     HTTPProviderAdapter,
     Provider,

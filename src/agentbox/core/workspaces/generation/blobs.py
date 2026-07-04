@@ -1,7 +1,8 @@
 """Write a resource version's blobs into a target directory.
 
-Lays workspace file-materialize bindings into the run workdir. Kept in
-core/resources so the same materializer can be reused by tests and CLI.
+The low-level blob→file primitive of the generation submodule: given a
+version's blobs, lay them into the run workdir. Consumed by
+``generation.materialize`` (the binding-aware wrapper).
 """
 
 from __future__ import annotations

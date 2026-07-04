@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.resources.binding_materialize import (
+from agentbox.core.workspaces.generation.materialize import (
     _resolve_single_file_name,
     _resolve_target_path,
     materialize_workspace,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from agentbox.core.events import UsageEvent
+from agentbox.core.data.events import UsageEvent
 
 
 def _parse_envelope(raw: str) -> dict[str, Any] | None:

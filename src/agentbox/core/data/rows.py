@@ -434,6 +434,23 @@ class WorkspaceEnvDocPointerRow(TypedDict):
     active_version_id: str | None
 
 
+class PermissionFileEntry(TypedDict, total=False):
+    """One file-grant entry in workspace runtime permissions."""
+
+    path: str
+    mode: str
+    size: int
+
+
+class McpServerConfigView(TypedDict, total=False):
+    """Effective MCP server config after manifest + override merge."""
+
+    url: str | None
+    transport: str
+    command: list[str] | None
+    cache_ttl: int
+
+
 class WorkspaceMcpOverrideRow(TypedDict):
     """A row from ``workspace_mcp_overrides``."""
 
@@ -441,7 +458,7 @@ class WorkspaceMcpOverrideRow(TypedDict):
     workspace_id: str
     server_name: str
     enabled: int
-    config_overrides: dict[str, Any] | None
+    config_overrides: McpServerConfigView | None
     changelog: str
     created_at: str
     created_by: str | None
@@ -474,8 +491,8 @@ class WorkspaceRuntimePermissionRow(TypedDict):
     """A row from ``workspace_runtime_permissions``."""
 
     workspace_id: str
-    allowed_builtin_tools: list | None
-    files: list | None
+    allowed_builtin_tools: list[str] | None
+    files: list[PermissionFileEntry] | None
     max_tokens: int | None
     allow_file_write: int | None
     allow_network: int | None
@@ -493,17 +510,6 @@ class WorkspaceSubagentRow(TypedDict):
     display_order: int
     created_at: str
     created_by: str | None
-
-
-class WorkenvTemplateRow(TypedDict):
-    """A row from ``workenv_templates``."""
-
-    name: str
-    description: str | None
-    engine: str
-    config_json: dict[str, Any]
-    created_at: str
-    updated_at: str
 
 
 # ── Resource domain row shapes ─────────────────────────────────────────────

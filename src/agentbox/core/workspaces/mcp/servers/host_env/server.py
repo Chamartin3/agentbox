@@ -16,6 +16,7 @@ Required env vars:
 
 from __future__ import annotations
 
+from agentbox.core.data.constants import HOST_ENV_SERVER_NAME
 from agentbox.core.workspaces.mcp.servers.host_env.capabilities import (
     env,
     fs,
@@ -39,7 +40,7 @@ def _get_ctx() -> HostEnvContext:
 
 def build_server() -> FastMCP:
     mcp = FastMCP(
-        name="agentbox-host-env",
+        name=HOST_ENV_SERVER_NAME,
         instructions=(
             "Host-environment tools: read/write files, run commands, fetch URLs, "
             "read env vars, and query workspace metadata. Each tool requires a "

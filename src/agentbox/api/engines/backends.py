@@ -15,8 +15,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
-from agentbox.core.constants import BackendName
-from agentbox.core.data import BackendLabelsDict
+from agentbox.core.data.constants import BackendName
 
 router = APIRouter(prefix="/api/runner-backends", tags=["runner-backends"])
 
@@ -29,17 +28,6 @@ class BackendDescriptor(BaseModel):
     default_model: str | None = None
     compatible_providers: list[str] = Field(default_factory=list)
     accepts_no_provider: bool = True
-    """True when this backend can run without an explicit provider
-    (e.g. claude_code uses the host's OAuth session)."""
-
-
-_LABELS: dict[BackendName, str] = {
-    BackendName.CLAUDE_CODE: "Claude Code (CLI)",
-    BackendName.OPENCODE: "OpenCode (CLI)",
-    BackendName.CODEX: "OpenAI Codex (CLI)",
-    BackendName.PI: "pi.dev (CLI)",
-    BackendName.TOKEN: "Token / pydantic-ai (in-process)",
-}
 
 
 @router.get("")
@@ -54,7 +42,7 @@ def list_runner_backends(
         out.append(
             BackendDescriptor(
                 id=name,
-                label=_LABELS.get(name) or name,
+                label=BackendName.label_for(name),
                 default_model=getattr(cls, "default_model", None),
                 compatible_providers=compatible,
                 accepts_no_provider=True,

@@ -14,7 +14,7 @@ from typing import Any
 from agentbox.core.agents.composition.drift import (
     _build_snapshot,
 )
-from agentbox.core.constants import ValidatorKind
+from agentbox.core.data.constants import ValidatorKind
 from agentbox.core.data._util import now_iso
 from agentbox.core.db import (
     ActiveAgentVersionManager,

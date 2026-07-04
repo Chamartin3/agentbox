@@ -10,6 +10,13 @@ from this module; the reverse direction is forbidden.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import (
+    EnvDocRenderEntry,
+    PromptEmbedSnapshotEntry,
+    RunSnapshotEntry,
+    WorkspaceFileSnapshotEntry,
+)
+
 import json
 import logging
 import shutil
@@ -19,6 +26,7 @@ from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
+from agentbox.core.data.constants import MCP_FILENAME
 from agentbox.core.db import (
     AgentDefManager,
     AgentPromptResourceBindingManager,
@@ -34,14 +42,13 @@ from agentbox.core.db import (
     WorkspaceRuntimePermissionManager,
     WorkspaceSubagentManager,
 )
-from agentbox.core.resources.binding_materialize import materialize_workspace
+from agentbox.core.workspaces.generation import MaterializeOutcome
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
-from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.engines.backends.recipe_loader import (
-    backend_for_engine,
     list_recipes,
     load_recipe,
 )
+from agentbox.core.workspaces.construct import workspace_constructor
 from agentbox.core.workspaces.generation.workspace_files import (
     materialize_workspace_files,
 )
@@ -188,7 +195,7 @@ def render_env_doc(
     workspace_env_doc_versions: WorkspaceEnvDocVersionManager,
     workspace_id: str,
     workdir: Path,
-) -> list[dict]:
+) -> list[EnvDocRenderEntry]:
     """Render the active env doc into CLAUDE.md and AGENTS.md in ``workdir``."""
     if not workspace_id or workspace_id == "<ephemeral>":
         return []
@@ -228,7 +235,7 @@ def render_env_doc(
         if filename:
             filenames.add(filename)
 
-    snapshot_entries: list[dict] = []
+    snapshot_entries: list[EnvDocRenderEntry] = []
     for filename in sorted(filenames):
         dest = workdir / filename
         dest.write_text(body, encoding="utf-8")
@@ -249,9 +256,9 @@ def render_env_doc(
 # ---------------------------------------------------------------------------
 
 
-def workspace_outcomes_to_snapshot(outcomes: list) -> list[dict]:
+def workspace_outcomes_to_snapshot(outcomes: list[MaterializeOutcome]) -> list[WorkspaceFileSnapshotEntry]:
     """Convert MaterializeOutcome list to JSON-serializable snapshot entries."""
-    entries = []
+    entries: list[WorkspaceFileSnapshotEntry] = []
     for o in outcomes:
         entries.append(
             {
@@ -270,9 +277,9 @@ def workspace_outcomes_to_snapshot(outcomes: list) -> list[dict]:
     return entries
 
 
-def prompt_resolution_to_snapshot(resolution: Any) -> list[dict]:
+def prompt_resolution_to_snapshot(resolution: Any) -> list[PromptEmbedSnapshotEntry]:
     """Convert PromptResolution snapshot list to JSON-serializable entries."""
-    entries = []
+    entries: list[PromptEmbedSnapshotEntry] = []
     for rb in resolution.snapshot:
         entries.append(
             {
@@ -422,7 +429,7 @@ def prepare_run_workdir(
     workdir: Path,
     mcp_registry: Any = None,
     system_prompt: str | None = None,
-) -> tuple[Path, list[dict]]:
+) -> tuple[Path, list[RunSnapshotEntry]]:
     """Project workspace state into a fresh per-run run dir.
 
     Steps:
@@ -442,7 +449,11 @@ def prepare_run_workdir(
     - ``execution/prepare/resources.py:prepare_run_resources`` (resource side)
     """
 
-    resource_snapshot_entries: list[dict] = []
+    resource_snapshot_entries: list[RunSnapshotEntry] = []
+
+    # One constructor drives both disk-writers across every engine recipe:
+    # resource bindings into the persistent workdir, native config into run_dir.
+    constructor = workspace_constructor()
 
     # ── 1. Workspace resources, env-doc, subagents ────────────────────────
     if workspace_id and workspace_id != "<ephemeral>":
@@ -455,7 +466,7 @@ def prepare_run_workdir(
                 workspace_id,
             )
             if ws_bindings:
-                outcomes = materialize_workspace(
+                outcomes = constructor.materialize(
                     workdir,
                     ws_bindings,
                     cache_root=settings.resource_cache_dir,
@@ -504,18 +515,12 @@ def prepare_run_workdir(
         settings=settings,
         permissions=None,
     )
-    for engine in list_recipes():
-        recipe = load_recipe(engine)
-        try:
-            extra = backend_for_engine(engine).build_workspace_items(config)
-        except KeyError:
-            extra = []
-        render(run_dir, config, recipe, system_prompt=system_prompt, extra_items=extra)
+    constructor.generate(run_dir, config, system_prompt=system_prompt)
 
     # Claude runs with `--mcp-config .mcp.json --strict-mcp-config`, which
     # errors if the file is absent; render only emits it when servers exist.
     # ponytail: guarantee an empty one so a server-less run still launches.
-    mcp_json = run_dir / ".mcp.json"
+    mcp_json = run_dir / MCP_FILENAME
     if not mcp_json.exists():
         mcp_json.write_text('{\n  "mcpServers": {}\n}\n', encoding="utf-8")
 

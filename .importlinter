@@ -60,8 +60,6 @@ ignore_imports =
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.payload
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.policy
-    # cli → core.resources
-    agentbox.cli.ops.resource.repo -> agentbox.core.resources.legacy_composition
     # cli → core.workspaces
     agentbox.cli.ops.cfg -> agentbox.core.workspaces
     agentbox.cli.ops.shell -> agentbox.core.workspaces.prep
@@ -373,3 +371,25 @@ ignore_imports =
     agentbox.core.resources -> agentbox.core.db.resources.models
     agentbox.core.service.lifecycle.startup -> agentbox.core.db.engines.seeds
     agentbox.core.workspaces.generation.builders.from_db -> agentbox.core.db.system.config
+
+
+# ─── core.data is the leaf — no upward imports (plan 117) ────────────────────
+# core.data is the dependency graph leaf: enums, constants, events, shapes.
+# It must never import from any domain layer or sqlalchemy. The guard test
+# tests/data/test_data_is_pure.py enforces the same rule at the AST level.
+[importlinter:contract:data-is-leaf]
+name = core.data imports nothing above the leaf layer
+type = forbidden
+source_modules =
+    agentbox.core.data
+forbidden_modules =
+    agentbox.core.db
+    agentbox.core.engines
+    agentbox.core.workspaces
+    agentbox.core.service
+    agentbox.core.execution
+    agentbox.api
+    agentbox.cli
+allow_indirect_imports = True
+unmatched_ignore_imports_alerting = warn
+ignore_imports =

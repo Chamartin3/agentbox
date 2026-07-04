@@ -1,4 +1,4 @@
-"""Unit tests for core/resources/materializer.py — materialize_blobs."""
+"""Unit tests for core/workspaces/generation/blobs.py — materialize_blobs."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from agentbox.core.resources.materializer import materialize_blobs
+from agentbox.core.workspaces.generation.blobs import materialize_blobs
 
 
 # ---------------------------------------------------------------------------

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from agentbox.core.events import DoneEvent, RunEvent, TextEvent
+from agentbox.core.data.events import DoneEvent, RunEvent, TextEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 
 

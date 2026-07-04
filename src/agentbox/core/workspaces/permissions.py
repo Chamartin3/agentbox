@@ -8,6 +8,9 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
+from typing import TypedDict
+
+from agentbox.core.data.payload_types import GrantConfig
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES
 
@@ -28,8 +31,8 @@ def _deep_merge(base: dict | None, overrides: dict | None) -> dict:
 
 
 def resolve_grants(
-    profile_grants: dict | None, workspace_overrides: dict | None
-) -> dict:
+    profile_grants: dict[str, GrantConfig] | None, workspace_overrides: dict[str, GrantConfig] | None
+) -> dict[str, GrantConfig]:
     """Effective grants = profile ⊕ workspace overrides + default-granted caps.
 
     Always-granted capabilities (``Capability.default_granted=True``) are
@@ -58,7 +61,18 @@ def _path_within_allowlist(path: str, allowed: list[str]) -> bool:
     return False
 
 
-def check_capability(grants: dict, capability: str, params: dict | None = None) -> None:
+class CapabilityParams(TypedDict, total=False):
+    """Per-call parameters checked against a capability grant."""
+
+    path: str
+    size_hint: int
+    cmd: str
+    url: str
+    method: str
+    name: str
+
+
+def check_capability(grants: dict[str, GrantConfig], capability: str, params: CapabilityParams | None = None) -> None:
     """Raise ``GrantViolation`` if ``capability`` is not allowed by ``grants``.
 
     Validates per-capability constraints (path scoping, command allowlist,

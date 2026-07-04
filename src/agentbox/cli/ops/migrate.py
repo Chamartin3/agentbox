@@ -7,7 +7,6 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_db
-from agentbox.core.constants import BackendName
 from agentbox.core.service.system.service import SystemService  # TODO(cli-arch): SystemService → facade (plan 095)
 # TODO(cli-arch): SystemService.run_migration (core gap, plan 095)
 from agentbox.core.db.system.seeds import backfill as _backfill_prompt_versions
@@ -195,28 +194,3 @@ def migrate_prompt_versions(ctx: typer.Context) -> None:
     obj: CLIContext = ctx.obj
     n = _backfill_prompt_versions(get_db())
     obj.render.ops.success(f"backfilled {n} run(s) with prompt_version_id")
-
-
-@migrate_app.command("workenv-engine")
-def migrate_workenv_engine(ctx: typer.Context) -> None:
-    """Rename the old ``claude`` workenv-template engine to ``claude_code``.
-
-    The recipe engine name now matches the backend entry-point name. Rows
-    seeded before the rename still carry ``engine='claude'``; this updates
-    them in place. Idempotent.
-    """
-    obj: CLIContext = ctx.obj
-    renamed = 0
-    for tmpl in obj.workspaces.list_templates():
-        if tmpl.get("engine") == "claude":
-            obj.workspaces.upsert_template(
-                tmpl["name"],
-                engine=BackendName.CLAUDE_CODE,
-                config_json=tmpl["config_json"],
-                description=tmpl.get("description"),
-            )
-            renamed += 1
-    obj.render.ops.success(
-        f"updated {renamed} template(s) "
-        f"claude → {BackendName.CLAUDE_CODE}"
-    )

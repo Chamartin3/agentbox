@@ -7,7 +7,7 @@ from typing import Literal, Never
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 
 
 def _raise_not_found(detail: str = "resource not found") -> Never:

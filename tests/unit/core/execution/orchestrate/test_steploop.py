@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from agentbox.core.constants import RunStatus
+from agentbox.core.data.constants import RunStatus
 from agentbox.core.execution.orchestrate.steploop import classify_terminal_error
 
 # Convenience alias so assert statements read clearly.

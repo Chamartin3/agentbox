@@ -9,6 +9,22 @@ since it's a presentation concern.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import (
+    AgentSkillsResult,
+    GeneratedConfigsResult,
+    GeneratedSkillsResult,
+    PermissionsPatch,
+    PermissionsSetResult,
+    PermissionsView,
+    SkillContentResult,
+    SkillsListResult,
+    WorkspaceDeleteResult,
+    WorkspaceFileRead,
+    WorkspaceFileWrite,
+    WorkspaceListItem,
+    WorkspaceMcpToolsResult,
+)
+
 from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,7 +38,7 @@ from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.service import AgentService
 from agentbox.core.service.workspaces.files import is_user_file
 from agentbox.core.service.workspaces.service import WorkspaceService
-from agentbox.core.service.workspaces.errors import (
+from agentbox.core.data.errors import (
     WorkspaceExists,
     WorkspaceNotFound,
     WorkspacePathEscape,
@@ -65,7 +81,7 @@ def list_workspaces(
     order: str = "asc",
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-) -> list[dict] | PaginatedEnvelope:
+) -> list[WorkspaceListItem] | PaginatedEnvelope:
     result = svc.list_workspaces(settings=settings)
     if paginated:
         return paginate_list(
@@ -107,7 +123,7 @@ def delete_workspace_registry(
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
     purge_disk: bool = False,
-) -> dict:
+) -> WorkspaceDeleteResult:
     try:
         return svc.delete_workspace(
             name,
@@ -159,7 +175,7 @@ def get_workspace_by_name(
 def get_permissions_by_name(
     name: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> PermissionsView:
     try:
         return svc.get_permissions(name)
     except WorkspaceNotFound:
@@ -167,7 +183,7 @@ def get_permissions_by_name(
 
 
 class PermissionsBody(BaseModel):
-    permissions: dict
+    permissions: PermissionsPatch
 
 
 @router.put("/by-name/{name}/permissions")
@@ -176,7 +192,7 @@ def set_permissions_by_name(
     body: PermissionsBody,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> PermissionsSetResult:
     try:
         return svc.set_permissions(
             name,
@@ -192,7 +208,7 @@ def set_permissions_by_name(
 def get_workspace_mcp_tools(
     name: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> WorkspaceMcpToolsResult:
     try:
         return svc.get_workspace_mcp_tools(name)
     except WorkspaceNotFound:
@@ -209,7 +225,7 @@ def generate_configs_by_name(
     name: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> GeneratedConfigsResult:
     try:
         return svc.generate_configs(name, settings=settings)
     except WorkspaceNotFound:
@@ -221,7 +237,7 @@ def generate_skills_by_name(
     name: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> GeneratedSkillsResult:
     try:
         return svc.generate_skills(name, settings=settings)
     except WorkspaceNotFound:
@@ -233,7 +249,7 @@ def list_skills_by_name(
     name: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> SkillsListResult:
     try:
         return svc.list_skills(name, settings=settings)
     except WorkspaceNotFound:
@@ -246,7 +262,7 @@ def get_skill_content_by_name(
     skill_name: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> SkillContentResult:
     try:
         payload = svc.get_skill_content(name, skill_name, settings=settings)
     except WorkspaceNotFound:
@@ -272,7 +288,7 @@ def read_file_by_name(
     path: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> WorkspaceFileRead:
     try:
         payload = svc.read_workspace_file(name, path, settings=settings)
     except WorkspaceNotFound:
@@ -290,7 +306,7 @@ def write_file_by_name(
     body: FileBody,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> WorkspaceFileWrite:
     try:
         return svc.write_workspace_file(
             name,
@@ -346,7 +362,7 @@ def create_workspace(
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
-    path = ws.ensure(agent, settings, None, scaffold=True)
+    path = ws.ensure(agent, settings, None)
     return {"path": str(path)}
 
 
@@ -369,7 +385,7 @@ def generate_configs(
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> dict:
+) -> GeneratedConfigsResult:
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
@@ -392,7 +408,7 @@ def list_skills(
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> dict:
+) -> AgentSkillsResult:
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
@@ -417,7 +433,7 @@ def read_file(
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> dict:
+) -> WorkspaceFileRead:
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
@@ -442,7 +458,7 @@ def write_file(
     settings: Annotated[Settings, Depends(get_settings)],
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> dict:
+) -> WorkspaceFileWrite:
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)

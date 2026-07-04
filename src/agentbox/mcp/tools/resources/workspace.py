@@ -7,7 +7,6 @@ import logging
 from fastmcp import FastMCP
 
 from agentbox.core.data.payload_types import WorkspaceBindingSpec
-from agentbox.core.data.payload_types import WorkspaceBindingSpec
 from agentbox.core.data.rows import EnvDocRow, WorkspaceHostEnvGrantRow
 from agentbox.core.service import render_env_doc_preview
 from agentbox.mcp.context import MCPContext

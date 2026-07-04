@@ -42,6 +42,49 @@ class BackendName(CatalogEnum):
     CODEX = "codex"
     PI = "pi"
 
+    @property
+    def label(self) -> str:
+        """Human-readable display label."""
+        return _BACKEND_LABELS[self]
+
+    @property
+    def runner_kind(self) -> str:
+        """RunnerKind string passed to ``_launch_session``."""
+        return _BACKEND_RUNNER_MAP[self]
+
+    @classmethod
+    def label_for(cls, name: str, /) -> str:
+        """Human-readable label for *name*, falling back to *name* itself."""
+        try:
+            return cls(name).label
+        except ValueError:
+            return name
+
+    @classmethod
+    def runner_for(cls, name: str, /) -> str:
+        """RunnerKind for *name*, falling back to *name* itself."""
+        try:
+            return cls(name).runner_kind
+        except ValueError:
+            return name
+
+
+_BACKEND_LABELS: dict[BackendName, str] = {
+    BackendName.CLAUDE_CODE: "Claude Code (CLI)",
+    BackendName.OPENCODE: "OpenCode (CLI)",
+    BackendName.CODEX: "OpenAI Codex (CLI)",
+    BackendName.PI: "pi.dev (CLI)",
+    BackendName.TOKEN: "Token / pydantic-ai (in-process)",
+}
+
+_BACKEND_RUNNER_MAP: dict[BackendName, str] = {
+    BackendName.CLAUDE_CODE: "claude",
+    BackendName.OPENCODE: "opencode",
+    BackendName.CODEX: "codex",
+    BackendName.PI: "pi",
+    BackendName.TOKEN: "token",
+}
+
 
 class SessionMode(StrEnum):
     """Session lifetime modes."""
@@ -279,3 +322,24 @@ class RunnerKind(CatalogEnum):
     CODEX = "codex"
     PI = "pi"
     SHELL = "shell"
+
+
+# ── MCP server names ──────────────────────────────────────────────────────────
+
+HOST_ENV_SERVER_NAME: str = "agentbox-host-env"
+"""Canonical name for the host-env stdio MCP server.
+
+Every consumer (Claude's .mcp.json, the token backend's pydantic-ai toolset)
+spawns the same server under this name.
+"""
+
+AGENT_TOOLS_SERVER_NAME: str = "agentbox-agent-tools"
+"""Canonical name for the agent-tools stdio MCP server."""
+
+MCP_FILENAME: str = ".mcp.json"
+"""Canonical filename for Claude's native MCP server config in a run dir.
+
+Cross-domain constant: consumed by both the claude_code engine adapter and
+the workspaces layer. Lives here (the leaf) so neither domain imports the
+other.
+"""

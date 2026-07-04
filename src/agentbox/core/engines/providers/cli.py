@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from agentbox.core.constants import BackendName
+from agentbox.core.data.constants import BackendName
 from agentbox.core.data.payload_types import CodexModelRow
 from agentbox.core.engines.providers.base import (
     Provider,

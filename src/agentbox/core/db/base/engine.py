@@ -18,7 +18,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, func
 from sqlalchemy.engine import Engine
 
-from agentbox.core.constants import RunStatus
+from agentbox.core.data.constants import RunStatus
 from agentbox.core.db.schema import runs
 from agentbox.core.db.utils import now_iso
 

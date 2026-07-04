@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.data import RepoResourceRow
 from agentbox.core.data.payload_types import ResourceDetailResult, ResourceVersionsResult
 from agentbox.core.data.rows import ResourceVersionRow

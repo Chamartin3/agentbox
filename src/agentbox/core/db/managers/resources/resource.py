@@ -10,7 +10,7 @@ from typing import cast
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.engine import Connection
 
-from agentbox.core.constants import ImportSource, ResourceType
+from agentbox.core.data.constants import ImportSource, ResourceType
 from agentbox.core.data.rows import RepoResourceRow, ResourceBlobRow, ResourceVersionRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.resource import (

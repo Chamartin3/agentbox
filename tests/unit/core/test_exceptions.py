@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-from agentbox.core.exceptions import (
+from agentbox.core.data.errors import (
     AgentboxError,
-    AgentNotFoundError,
-    BackendSelectionError,
-    ConfigurationError,
-    InconsistentSchemaError,
-    PromptVersionError,
-    ResourceSchemaError,
-    RunSetupError,
-    SnapshotError,
-    WebhookDeliveryError,
     WorkspaceError,
+    WorkspaceExists,
+    WorkspaceNotFound,
+    WorkspacePathEscape,
 )
 
 
@@ -21,46 +15,23 @@ def test_base_exception_is_exception_subclass() -> None:
     assert issubclass(AgentboxError, Exception)
 
 
-def test_all_errors_extend_base() -> None:
-    for cls in (
-        ConfigurationError,
-        ResourceSchemaError,
-        InconsistentSchemaError,
-        BackendSelectionError,
-        RunSetupError,
-        SnapshotError,
-        WebhookDeliveryError,
-        WorkspaceError,
-        PromptVersionError,
-        AgentNotFoundError,
-    ):
-        assert issubclass(cls, AgentboxError), f"{cls.__name__} not a subclass of AgentboxError"
+def test_workspace_error_extends_base() -> None:
+    assert issubclass(WorkspaceError, AgentboxError)
 
 
-def test_configuration_errors_are_configuration_subclass() -> None:
-    assert issubclass(ResourceSchemaError, ConfigurationError)
-    assert issubclass(InconsistentSchemaError, ConfigurationError)
+def test_workspace_not_found_has_name() -> None:
+    err = WorkspaceNotFound("default")
+    assert "default" in str(err)
+    assert err.name == "default"
 
 
-def test_agent_not_found_is_direct_subclass_of_base() -> None:
-    assert AgentNotFoundError.__bases__ == (AgentboxError,)
+def test_workspace_exists_has_name() -> None:
+    err = WorkspaceExists("default")
+    assert "default" in str(err)
+    assert err.name == "default"
 
 
-def test_backend_selection_error_has_message() -> None:
-    err = BackendSelectionError("no backend for agent-1")
-    assert "agent-1" in str(err)
-
-
-def test_run_setup_error_is_agentbox_subclass() -> None:
-    err = RunSetupError("workdir missing")
-    assert isinstance(err, AgentboxError)
-
-
-def test_webhook_delivery_error() -> None:
-    err = WebhookDeliveryError("POST failed")
-    assert isinstance(err, AgentboxError)
-
-
-def test_snapshot_error() -> None:
-    err = SnapshotError("failed to persist")
-    assert isinstance(err, AgentboxError)
+def test_workspace_path_escape_has_path() -> None:
+    err = WorkspacePathEscape("/etc/passwd")
+    assert "path escapes workspace" in str(err)
+    assert err.path == "/etc/passwd"

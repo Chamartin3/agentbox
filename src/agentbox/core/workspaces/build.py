@@ -36,14 +36,8 @@ from agentbox.core.db import (
     WorkspaceManager,
     WorkspaceSubagentManager,
 )
-from agentbox.core.resources.binding_materialize import materialize_workspace
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
-from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.engines.backends.recipe_loader import (
-    backend_for_engine,
-    list_recipes,
-    load_recipe,
-)
+from agentbox.core.workspaces.construct import workspace_constructor
 from agentbox.core.workspaces.prep import (
     render_env_doc,
     resolve_workspace_resources,
@@ -133,6 +127,8 @@ def build_workspace(
     previous_meta = _read_previous_meta(workdir)
     previous_paths: set[str] = set(previous_meta.get("materialized_paths") or [])
 
+    constructor = workspace_constructor()
+
     try:
         ws_bindings = resolve_workspace_resources(
             workspace_file_resource_bindings,
@@ -148,7 +144,7 @@ def build_workspace(
             for b in ws_bindings:
                 if b.get("on_conflict", "error") != "skip":
                     b["on_conflict"] = "overwrite"
-            outcomes = materialize_workspace(
+            outcomes = constructor.materialize(
                 workdir,
                 ws_bindings,
                 cache_root=settings.resource_cache_dir,
@@ -192,17 +188,14 @@ def build_workspace(
         subagents = [a for a in config.agents if a.role != "main"]
         with tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)
-            for engine in list_recipes():
-                recipe = load_recipe(engine)
-                if not recipe.layout.get("subagent"):
-                    continue
-                try:
-                    extra = backend_for_engine(engine).build_workspace_items(config)
-                except KeyError:
-                    extra = []
-                render(tmp_dir, config, recipe, extra_items=extra)
+            # Render every engine's full config into a throwaway dir, then
+            # copy just the subagent files into the persistent workdir.
+            constructor.generate(tmp_dir, config)
+            for recipe in constructor.recipes:
                 for a in subagents:
                     rel = recipe.resolve_layout("subagent", name=a.id)
+                    if not rel:
+                        continue
                     src = tmp_dir / rel
                     if src.is_file():
                         dst = workdir / rel

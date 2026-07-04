@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from agentbox.core.constants import SessionMode
+from agentbox.core.data.constants import SessionMode
 from agentbox.core.data.manifests.engines import RunnerManifest, RunnerSpec
 from agentbox.core.data.rows import AgentVersionRow
 
@@ -46,6 +46,21 @@ class SharedRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class RefEntry(BaseModel):
+    """User-authored reference entry in a composition ``references`` list.
+
+    Each entry points to a file and optionally specifies a section heading.
+    """
+
+    path: str
+    """Bundle-relative path or ``shared://`` URI."""
+
+    heading: str | None = None
+    """Section heading; falls back to the file stem at runtime."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CompositionConfig(BaseModel):
     """Prompt-composition recipe for an agent bundle.
 
@@ -60,7 +75,7 @@ class CompositionConfig(BaseModel):
     system: str | SharedRef = "prompts/system.md"
     """System prompt: bundle-relative path, shared:// path, or SharedRef."""
 
-    references: list[str | dict | SharedRef] = Field(default_factory=list)
+    references: list[str | RefEntry | SharedRef] = Field(default_factory=list)
     """Reference files. Each entry can be a path string, a dict with ``path``
     and optional ``heading``, or a SharedRef."""
 

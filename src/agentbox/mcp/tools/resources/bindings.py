@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 from agentbox.core.data.payload_types import PromptBindingSpec
-from agentbox.core.data.payload_types import PromptBindingSpec
 from agentbox.core.data.rows import AgentPromptBindingRow
 from agentbox.mcp.context import MCPContext
 

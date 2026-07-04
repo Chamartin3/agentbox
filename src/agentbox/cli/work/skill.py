@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.core.service.workspaces.errors import WorkspaceNotFound
+from agentbox.core.data.errors import WorkspaceNotFound
 
 skills_app = typer.Typer(
     name="skills",

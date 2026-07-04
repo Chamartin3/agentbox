@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.constants import (
+from agentbox.core.data.constants import (
     BackendName,
     ConfiguredValidationMode,
     ValidationMode,

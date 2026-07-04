@@ -31,17 +31,10 @@ import websockets
 from agentbox.cli.ops.launch import _launch_session
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.context import Renderers
-from agentbox.core.data import BackendToRunnerDict
+from agentbox.core.data.constants import BackendName
 
 # Mapping from BackendName values to RunnerKind strings used by _launch_session.
 # "token" passes through and is rejected by _launch_session with a clear message.
-_BACKEND_NAME_TO_RUNNER: dict[BackendName, str] = {
-    "claude_code": "claude",
-    "opencode": "opencode",
-    "codex": "codex",
-    "pi": "pi",
-    "token": "token",
-}
 
 
 async def _stream(renderers: Renderers, api: str, run_id: str) -> None:
@@ -175,7 +168,7 @@ def run_cmd(
             renders.ops.error(f"Unknown agent: {agent!r}")
             raise typer.Exit(1)
         raw_kind = agent_def.runner.kind
-        runner = _BACKEND_NAME_TO_RUNNER.get(raw_kind, raw_kind)
+        runner = BackendName.runner_for(raw_kind)
     else:
         renders.ops.error(
             "No agent or --backend specified. "

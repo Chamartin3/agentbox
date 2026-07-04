@@ -29,7 +29,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, Field
 
 from agentbox.core.data.payload_types import JsonSchemaDict, AgentMetaDict
-from agentbox.core.events import DoneEvent, LogEvent, RunEvent
+from agentbox.core.data.events import DoneEvent, LogEvent, RunEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, HasAgentConfig, RenderedConfig
 from agentbox.core.engines.contracts.views import PythonAgentConfigView
 from agentbox.core.engines.backends.token.run_direct import run_direct_agent_mode

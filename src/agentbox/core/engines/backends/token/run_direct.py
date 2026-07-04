@@ -27,9 +27,9 @@ from pydantic_ai import Agent, NativeOutput, PromptedOutput, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from agentbox.core.data.payload_types import GrantConfig, JsonSchemaDict, ModelParams
-from agentbox.core.constants import LogLevel, MessageRole, RunStatus
-from agentbox.core.events import (
+from agentbox.core.data.payload_types import GrantConfig, JsonSchemaDict, ModelParams, RefSection
+from agentbox.core.data.constants import LogLevel, MessageRole, RunStatus
+from agentbox.core.data.events import (
     DoneEvent,
     LogEvent,
     RunEvent,
@@ -91,7 +91,7 @@ async def run_direct_agent_mode(
     api_key: str | None,
     base_url: str | None,
     output_retries: Any,
-    references: list[dict[str, Any]],
+    references: list[RefSection],
     input_data: Any,
     host_env_grants: dict[str, GrantConfig] | None = None,
     agent_tool_grants: set[str] | None = None,

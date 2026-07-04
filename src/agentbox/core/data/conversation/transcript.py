@@ -12,7 +12,7 @@ import json as _json
 from contextlib import suppress
 from pathlib import Path
 
-from agentbox.core.constants import ContentBlockType, MessageRole
+from agentbox.core.data.constants import ContentBlockType, MessageRole
 from agentbox.core.data.records import RunRecord
 from agentbox.core.data.transcripts import read_transcript
 from agentbox.core.data.conversation.base import ConversationSource

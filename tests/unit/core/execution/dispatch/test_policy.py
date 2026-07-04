@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from agentbox.core.constants import RunStatus
+from agentbox.core.data.constants import RunStatus
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult
 from agentbox.core.execution.dispatch.policy import (
     DispatchPolicy,

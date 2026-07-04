@@ -10,7 +10,7 @@ import json as _json
 from typing import Any, cast
 
 from agentbox.core.agents.config import build_config_json_payload
-from agentbox.core.constants import SessionMode
+from agentbox.core.data.constants import SessionMode
 from agentbox.core.data import AgentDef, AgentVersionRow
 from agentbox.core.data._util import now_iso
 from agentbox.core.db import (

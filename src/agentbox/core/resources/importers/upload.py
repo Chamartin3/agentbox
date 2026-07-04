@@ -10,7 +10,7 @@ from __future__ import annotations
 import mimetypes
 from dataclasses import dataclass
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.resources.importers.base import (
     ImporterContext,
     ImporterResult,

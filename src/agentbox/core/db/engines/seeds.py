@@ -11,7 +11,7 @@ import json as _json
 import logging
 
 from agentbox.core.config import load_settings
-from agentbox.core.constants import BackendName
+from agentbox.core.data.constants import BackendName
 from agentbox.core.db.database import get_database
 from agentbox.core.data import RunnerProfileCreate
 from agentbox.core.db.utils import now_iso

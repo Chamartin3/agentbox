@@ -3,7 +3,7 @@
 **Import from this package, not its submodules.**
 """
 
-from agentbox.core.events import (
+from agentbox.core.data.events import (
     DoneEvent,
     LogEvent,
     RetryEvent,

@@ -5,6 +5,8 @@ Delegates to ``WorkspaceService``.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import AgentSkillsResult, GeneratedSkillsResult, SkillContentResult, SkillsListResult
+
 from agentbox.core import workspaces as ws
 from agentbox.core.config import Settings
 from agentbox.core.db import AgentDefManager
@@ -28,7 +30,7 @@ def generate_skills_by_name(
     name: str,
     *,
     settings: Settings,
-) -> dict:
+) -> GeneratedSkillsResult:
     return _ws().generate_skills(name, settings=settings)
 
 
@@ -36,7 +38,7 @@ def list_skills_by_name(
     name: str,
     *,
     settings: Settings,
-) -> dict:
+) -> SkillsListResult:
     return _ws().list_skills(name, settings=settings)
 
 
@@ -45,7 +47,7 @@ def get_skill_content_by_name(
     skill_name: str,
     *,
     settings: Settings,
-) -> dict | None:
+) -> SkillContentResult | None:
     return _ws().get_skill_content(name, skill_name, settings=settings)
 
 
@@ -54,7 +56,7 @@ def list_skills_for_agent(
     *,
     agent_defs: AgentDefManager,
     settings: Settings,
-) -> dict:
+) -> AgentSkillsResult:
     agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
     workspace_path, _ = ws.resolve_path(agent, settings, None)
     workspace_name = (

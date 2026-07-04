@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from fastmcp import FastMCP
 
-from agentbox.core.constants import RunStatus
+from agentbox.core.data.constants import RunStatus
 from agentbox.mcp.context import MCPContext
 
 

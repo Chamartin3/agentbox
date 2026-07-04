@@ -16,7 +16,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from agentbox.core.events import (
+from agentbox.core.data.events import (
     DoneEvent,
     LogEvent,
     TextEvent,

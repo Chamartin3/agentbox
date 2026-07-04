@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agentbox.core.data.payload_types import JsonSchemaDict
-from agentbox.core.constants import BundleFile
+from agentbox.core.data.constants import BundleFile
 from agentbox.core.agents.composition.bundle._helpers import (
     _append_input_schema, _append_schema, _format_template,
     _read_text, _ref_heading_fallback, _sha256,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.data.payload_types import SkillBindingsResult, WorkspaceBindingItemsResult
+from agentbox.core.data.payload_types import EnrichedSubagentRow, SkillBindingsResult, SubagentItemsResult, SubagentRowsResult, SubagentSpec, WorkspaceBindingItemsResult
 
 import contextlib
 from typing import Any
@@ -24,10 +24,10 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
-def list_workspace_subagents(workspace_id: str, *, agent_defs: AgentDefManager) -> dict:
+def list_workspace_subagents(workspace_id: str, *, agent_defs: AgentDefManager) -> SubagentItemsResult:
     svc = WorkspaceService()
     items = svc.list_workspace_subagents_raw(workspace_id)
-    enriched = []
+    enriched: list[EnrichedSubagentRow] = []
     for s in items:
         agent = agent_defs.get(s["agent_id"])
         enriched.append(
@@ -44,12 +44,12 @@ def list_workspace_subagents(workspace_id: str, *, agent_defs: AgentDefManager) 
 
 def replace_workspace_subagents(
     workspace_id: str,
-    subagents: list[dict],
+    subagents: list[SubagentSpec],
     *,
     actor: str | None = None,
     settings: Any = None,
     sync_cb: Any = None,
-) -> dict:
+) -> SubagentRowsResult:
     svc = WorkspaceService()
     try:
         items = svc.replace_workspace_subagents(workspace_id, subagents, actor=actor)

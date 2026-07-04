@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import GrantConfig, ResolvedHostEnv
+
 import json as _json
 from collections.abc import Sequence
 
@@ -263,7 +265,7 @@ class SystemRenderer(Renderer):
         self.print(table)
 
     def host_env_grants_view(
-        self, workspace_id: str, row: WorkspaceHostEnvGrantRow, resolved: dict[str, object]
+        self, workspace_id: str, row: WorkspaceHostEnvGrantRow, resolved: ResolvedHostEnv
     ) -> None:
         """Render host-env grants for a workspace."""
         meta = Table.grid(padding=(0, 2))
@@ -278,7 +280,7 @@ class SystemRenderer(Renderer):
         )
 
         grants_raw = resolved.get("grants")
-        grants: dict[str, object] = grants_raw if isinstance(grants_raw, dict) else {}
+        grants: dict[str, GrantConfig] = grants_raw if isinstance(grants_raw, dict) else {}
         if grants:
             gtable = self.table("Capability", "Value")
             gtable.title = None

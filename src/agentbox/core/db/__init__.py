@@ -42,7 +42,6 @@ from agentbox.core.db.managers import (
     AgentVersionRatingManager,
     PromptVersionManager,
     # workspaces
-    WorkenvTemplateManager,
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
     WorkspaceHostEnvGrantManager,
@@ -93,7 +92,6 @@ __all__ = [
     "AgentVersionRatingManager",
     "PromptVersionManager",
     # workspaces
-    "WorkenvTemplateManager",
     "WorkspaceEnvDocManager",
     "WorkspaceEnvDocVersionManager",
     "WorkspaceHostEnvGrantManager",

@@ -54,7 +54,6 @@ from agentbox.core.db.schema.system import (
 )
 
 from agentbox.core.db.schema.workspaces import (
-    workenv_templates,
     workspace_env_doc_versions,
     workspace_env_docs,
     workspace_host_env_grants,
@@ -105,7 +104,6 @@ __all__ = [
     "mcp_tool_discovery_cache",
     "settings",
     # workspaces
-    "workenv_templates",
     "workspace_env_doc_versions",
     "workspace_env_docs",
     "workspace_host_env_grants",

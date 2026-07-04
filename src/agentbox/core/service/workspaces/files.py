@@ -6,6 +6,8 @@ operations route through the service.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import AgentWorkspaceDetail, WorkspaceFileInfo, WorkspaceFileRead, WorkspaceFileWrite, WorkspacePathResult
+
 from pathlib import Path
 
 from agentbox.core import workspaces as ws
@@ -15,7 +17,7 @@ from agentbox.core.db import AgentDefManager
 from agentbox.core.service.agents.prompts import AgentNotFound
 from agentbox.core.service.workspaces.service import WorkspaceService
 
-from .errors import WorkspacePathEscape
+from agentbox.core.data.errors import WorkspacePathEscape
 
 __all__ = [
     "is_user_file",
@@ -80,7 +82,7 @@ def read_file_by_name(
     path: str,
     *,
     settings: Settings,
-) -> dict | None:
+) -> WorkspaceFileRead | None:
     return _ws().read_workspace_file(name, path, settings=settings)
 
 
@@ -90,7 +92,7 @@ def write_file_by_name(
     content: str,
     *,
     settings: Settings,
-) -> dict:
+) -> WorkspaceFileWrite:
     return _ws().write_workspace_file(name, path, content, settings=settings)
 
 
@@ -104,10 +106,10 @@ def get_workspace_for_agent(
     *,
     agent_defs: AgentDefManager,
     settings: Settings,
-) -> dict:
+) -> AgentWorkspaceDetail:
     agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
     info = ws.info(agent, settings, None)
-    files: list[dict] = []
+    files: list[WorkspaceFileInfo] = []
     if info.exists:
         for p in sorted(info.path.rglob("*")):
             if p.is_file():
@@ -130,9 +132,9 @@ def create_workspace_for_agent(
     *,
     agent_defs: AgentDefManager,
     settings: Settings,
-) -> dict:
+) -> WorkspacePathResult:
     agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
-    path = ws.ensure(agent, settings, None, scaffold=True)
+    path = ws.ensure(agent, settings, None)
     return {"path": str(path)}
 
 
@@ -141,7 +143,7 @@ def reset_workspace_for_agent(
     *,
     agent_defs: AgentDefManager,
     settings: Settings,
-) -> dict:
+) -> WorkspacePathResult:
     agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
     path = ws.reset(agent, settings, None)
     return {"path": str(path)}
@@ -153,7 +155,7 @@ def read_file_for_agent(
     *,
     agent_defs: AgentDefManager,
     settings: Settings,
-) -> dict | None:
+) -> WorkspaceFileRead | None:
     agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
     ws_path, _ = ws.resolve_path(agent, settings, None)
     target = _safe_resolve(ws_path, path)
@@ -169,9 +171,9 @@ def write_file_for_agent(
     *,
     agent_defs: AgentDefManager,
     settings: Settings,
-) -> dict:
+) -> WorkspaceFileWrite:
     agent = _resolve_agent_or_raise(agent_id, agent_defs=agent_defs)
-    ws_path = ws.ensure(agent, settings, None, scaffold=False)
+    ws_path = ws.ensure(agent, settings, None)
     target = _safe_resolve(ws_path, path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")

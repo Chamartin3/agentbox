@@ -10,7 +10,7 @@ from agentbox.cli.shared import CLIContext
 # TODO(cli-arch): WorkspaceService (plan 089)
 from agentbox.core.service import workspaces as workspaces_service
 # TODO(cli-arch): move to facade export
-from agentbox.core.service.workspaces.errors import WorkspaceNotFound
+from agentbox.core.data.errors import WorkspaceNotFound
 
 file_app = typer.Typer(
     name="file",

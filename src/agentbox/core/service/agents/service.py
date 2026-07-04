@@ -29,7 +29,7 @@ from agentbox.core.agents.composition.preview import (
 )
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.config import load_settings
-from agentbox.core.constants import SessionMode
+from agentbox.core.data.constants import SessionMode
 from agentbox.core.data import (
     AgentConfigEventRow,
     AgentDef,
@@ -238,7 +238,7 @@ class AgentService(Service):
                 "created_at": now,
                 "updated_at": now,
                 column: now,
-            }
+            })
             self._meta.insert(**payload)
         if column == "deleted_at":
             self._active.delete_for_agent(agent_id)

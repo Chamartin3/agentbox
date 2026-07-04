@@ -1,7 +1,12 @@
-"""Workspace CRUD operations — resolve, info, ensure, reset.
+"""Workspace directory resolution.
 
-Pure operations on workspace paths; no DB writes, no deprecated config paths.
-Deprecated shims live in ``manager.py`` for backward compatibility.
+Locates the workdir an agent runs in (``resolve_path``), inspects it
+(``info``), creates the directory (``ensure``), and wipes it (``reset``).
+Pure filesystem/path operations — no DB writes, no content generation.
+
+The instruction file an agent reads is engine-specific (Claude → CLAUDE.md,
+OpenCode/Codex → AGENTS.md); the names come from each backend's recipe via
+``recipe_loader.context_filenames`` — never hardcoded here.
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ from pathlib import Path
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
 from agentbox.core.db import WorkspaceManager
+from agentbox.core.engines.backends.recipe_loader import context_filenames
 from agentbox.core.resources.skills import discover_skills
 
 
@@ -24,7 +30,9 @@ class WorkspaceInfo:
     ephemeral: bool
     """True if the agent is configured to use a tmp dir per run."""
 
-    has_claude_md: bool
+    has_context_doc: bool
+    """True if any engine's instruction file (CLAUDE.md / AGENTS.md) exists."""
+
     skill_count: int
 
 
@@ -59,45 +67,33 @@ def info(
     agent: AgentDef, settings: Settings, store: WorkspaceManager | None = None
 ) -> WorkspaceInfo:
     path, ephemeral = resolve_path(agent, settings, store)
-    has_claude_md = (path / "CLAUDE.md").exists() if path.exists() else False
-    skill_count = len(discover_skills(path)) if path.exists() else 0
+    exists = path.exists()
+    has_context_doc = exists and any((path / n).exists() for n in context_filenames())
+    skill_count = len(discover_skills(path)) if exists else 0
     return WorkspaceInfo(
         agent_id=agent.id,
         path=path,
-        exists=path.exists(),
+        exists=exists,
         ephemeral=ephemeral,
-        has_claude_md=has_claude_md,
+        has_context_doc=has_context_doc,
         skill_count=skill_count,
     )
-
-
-_STARTER_CLAUDE_MD = """\
-# {agent_id} workspace
-
-This directory is the working directory the agent sees when it runs.
-
-Add anything the agent should be able to read here:
-- Edit this `CLAUDE.md` to set persistent guidance / project context.
-- Drop reference files (data, notes, examples) at any path.
-- Put reusable instructions under `skills/<skill-name>/SKILL.md`.
-
-Edit freely — changes take effect on the next run.
-"""
 
 
 def ensure(
     agent: AgentDef,
     settings: Settings,
     store: WorkspaceManager | None = None,
-    scaffold: bool = True,
 ) -> Path:
-    """Create the workspace if missing. Optionally scaffold a starter CLAUDE.md."""
+    """Create the workspace directory if missing, and return its path.
+
+    Instruction files (CLAUDE.md / AGENTS.md) are NOT written here: they are
+    render artifacts produced from the workspace's env-doc by
+    ``build_workspace`` on every run, so a starter written here would just be
+    overwritten. This only guarantees the directory exists.
+    """
     path, _ = resolve_path(agent, settings, store)
     path.mkdir(parents=True, exist_ok=True)
-    if scaffold and not (path / "CLAUDE.md").exists():
-        (path / "CLAUDE.md").write_text(
-            _STARTER_CLAUDE_MD.format(agent_id=agent.id), encoding="utf-8"
-        )
     return path
 
 
@@ -106,4 +102,4 @@ def reset(agent: AgentDef, settings: Settings, store: WorkspaceManager | None = 
     path, _ = resolve_path(agent, settings, store)
     if path.exists():
         shutil.rmtree(path)
-    return ensure(agent, settings, store, scaffold=True)
+    return ensure(agent, settings, store)

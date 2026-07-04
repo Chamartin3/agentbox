@@ -19,11 +19,34 @@ from collections.abc import Iterator
 from typing import Any
 
 from agentbox.core.config import Settings, load_settings
-from agentbox.core.constants import BackendName, McpPolicy
+from agentbox.core.data.constants import McpPolicy
 from agentbox.core.data import EnvDocPreviewResult, EnvDocRow
+from agentbox.core.data.payload_types import (
+    EffectivePermissions,
+    PermissionFileEntry,
+    EnvDocRenderEntry,
+    GeneratedConfigsResult,
+    GeneratedSkillsResult,
+    McpDiscoveryRefreshResult,
+    McpServerConfigView,
+    McpToolGroup,
+    PermissionsPatch,
+    PermissionsSetResult,
+    PermissionsView,
+    ResolvedHostEnv,
+    ResolvedMcpServer,
+    ResolvedWorkspaceMcp,
+    SkillContentResult,
+    SkillsListResult,
+    SubagentSpec,
+    WorkspaceDeleteResult,
+    WorkspaceFileRead,
+    WorkspaceFileWrite,
+    WorkspaceListItem,
+    WorkspaceMcpToolsResult,
+)
 from agentbox.core.data.rows import (
     HostEnvProfileRow,
-    WorkenvTemplateRow,
     WorkspaceMcpOverrideRow,
     WorkspaceMcpToolOverrideRow,
     WorkspaceRuntimePermissionRow,
@@ -39,21 +62,23 @@ from agentbox.core.service.base import Service
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.workspaces.build import build_workspace_by_name, WorkspaceSyncResult
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv as _load_workenv_from_db
-from agentbox.core.workspaces.generation.presets import load_seed_templates
 from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.data.workenv import RenderedFile
 from agentbox.core.workspaces.generation.payload import RenderedDir
 from agentbox.core.workspaces.generation.recipe import Recipe
 from agentbox.core.engines.backends.recipe_loader import (
-    backend_for_engine,
     list_recipes,
     load_recipe,
+)
+from agentbox.core.workspaces.construct import (
+    native_extra_items,
+    workspace_constructor,
 )
 from agentbox.core.workspaces.permissions import resolve_grants
 from agentbox.core.workspaces.prep import render_env_doc as _render_env_doc
 
-from .errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
+from agentbox.core.data.errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +106,8 @@ def _validate_changelog(s: str) -> str:
     return s.strip()
 
 
-def _shallow_merge(base: dict | None, overrides: dict | None) -> dict:
-    out = dict(base or {})
-    out.update(overrides or {})
+def _shallow_merge(base: McpServerConfigView | None, overrides: McpServerConfigView | None) -> McpServerConfigView:
+    out: McpServerConfigView = {**(base or {}), **(overrides or {})}
     return out
 
 
@@ -127,7 +151,6 @@ class WorkspaceService(Service):
         self._runtime_permissions = self._db.workspace_runtime_permissions
         self._host_env_grants = self._db.workspace_host_env_grants
         self._subagents = self._db.workspace_subagents
-        self._templates = self._db.workenv_templates
         self._discovery_cache = self._db.mcp_tool_discovery_cache
         self._subagents = self._db.workspace_subagents
 
@@ -149,7 +172,7 @@ class WorkspaceService(Service):
         self,
         *,
         settings: Settings | None = None,
-    ) -> list[dict]:
+    ) -> list[WorkspaceListItem]:
         _s = settings or self._settings
         registry = self._workspaces.list_all()
         ws_root = _s.workspaces_root
@@ -163,7 +186,7 @@ class WorkspaceService(Service):
 
         resource_counts = self._get_resource_counts()
 
-        result: list[dict] = []
+        result: list[WorkspaceListItem] = []
         for ws_row in registry:
             name = ws_row["name"]
             rel_path = ws_row.get("path")
@@ -242,7 +265,7 @@ class WorkspaceService(Service):
         *,
         settings: Settings | None = None,
         purge_disk: bool = False,
-    ) -> dict:
+    ) -> WorkspaceDeleteResult:
         existing = self._workspaces.get_by_name(name)
         if existing is None:
             raise WorkspaceNotFound(name)
@@ -274,7 +297,7 @@ class WorkspaceService(Service):
     def get_active_env_doc(self, workspace_id: str) -> EnvDocRow | None:
         return self._env_doc_versions.get_active(workspace_id)
 
-    def render_env_doc(self, workspace_id: str, workdir: Path) -> list[dict]:
+    def render_env_doc(self, workspace_id: str, workdir: Path) -> list[EnvDocRenderEntry]:
         """Render the active env doc's instruction files for a workspace."""
         return _render_env_doc(self._env_doc_versions, workspace_id, workdir)
 
@@ -386,39 +409,6 @@ class WorkspaceService(Service):
         )
 
     # ═══════════════════════════════════════════════════════════════════
-    # Workenv templates (from WorkenvTemplatesMixin)
-    # ═══════════════════════════════════════════════════════════════════
-
-    def list_templates(self) -> list[WorkenvTemplateRow]:
-        return self._templates.list_all()
-
-    def get_template(self, name: str) -> WorkenvTemplateRow | None:
-        return self._templates.get_by_name(name)
-
-    def upsert_template(
-        self,
-        name: str,
-        *,
-        engine: str = "claude_code",
-        config_json: dict,
-        description: str | None = None,
-    ) -> WorkenvTemplateRow:
-        return self._templates.upsert(
-            name, engine=engine, config_json=config_json, description=description
-        )
-
-    def delete_template(self, name: str) -> bool:
-        return self._templates.delete_by_name(name)
-
-    def seed_templates(
-        self,
-        templates: list[dict],
-        *,
-        clobber: bool = False,
-    ) -> int:
-        return self._templates.seed(templates, clobber=clobber)
-
-    # ═══════════════════════════════════════════════════════════════════
     # MCP policy + overrides (from McpOverridesMixin + mcp.py)
     # ═══════════════════════════════════════════════════════════════════
 
@@ -475,7 +465,7 @@ class WorkspaceService(Service):
         *,
         discovered_tools: dict[str, list[str]] | None = None,
         settings: Settings | None = None,
-    ) -> dict:
+    ) -> ResolvedWorkspaceMcp:
         if manifest_servers is None:
             _s = settings or self._settings
             servers = SystemService().get_project_mcp_servers()
@@ -499,7 +489,7 @@ class WorkspaceService(Service):
             if n not in manifest_by_name:
                 all_names.append(n)
 
-        out_servers = []
+        out_servers: list[ResolvedMcpServer] = []
         for name in all_names:
             manifest_entry = manifest_by_name.get(name)
             override = server_overrides.get(name)
@@ -529,7 +519,7 @@ class WorkspaceService(Service):
             )
         return {"servers": out_servers, "policy": policy}
 
-    def refresh_mcp_discovery(self, workspace_id: str) -> dict:
+    def refresh_mcp_discovery(self, workspace_id: str) -> McpDiscoveryRefreshResult:
         resolved = self.resolve_workspace_mcp(workspace_id)
         removed = 0
         for s in resolved.get("servers", []):
@@ -574,7 +564,7 @@ class WorkspaceService(Service):
         workspace_id: str,
         *,
         allowed_builtin_tools: list[str] | None = None,
-        files: list[dict] | None = None,
+        files: list[PermissionFileEntry] | None = None,
         max_tokens: int | None = None,
         allow_file_write: bool | None = None,
         allow_network: bool | None = None,
@@ -641,7 +631,7 @@ class WorkspaceService(Service):
             actor=actor,
         )
 
-    def resolve_workspace_host_env(self, workspace_id: str) -> dict:
+    def resolve_workspace_host_env(self, workspace_id: str) -> ResolvedHostEnv:
         row = self._host_env_grants.get_grant(workspace_id)
         if not row:
             return {"grants": resolve_grants(None, None), "profile_id": None}
@@ -709,7 +699,7 @@ class WorkspaceService(Service):
     def replace_subagents(
         self,
         workspace_id: str,
-        subagents: list[dict],
+        subagents: list[SubagentSpec],
         *,
         actor: str | None = None,
     ) -> list[WorkspaceSubagentRow]:
@@ -751,7 +741,7 @@ class WorkspaceService(Service):
         path: str,
         *,
         settings: Settings | None = None,
-    ) -> dict | None:
+    ) -> WorkspaceFileRead | None:
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
         target = self._safe_resolve(ws_path, path)
         if not target.is_file():
@@ -765,7 +755,7 @@ class WorkspaceService(Service):
         content: str,
         *,
         settings: Settings | None = None,
-    ) -> dict:
+    ) -> WorkspaceFileWrite:
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
         target = self._safe_resolve(ws_path, path)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -823,15 +813,8 @@ class WorkspaceService(Service):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)
             rels: set[str] = set()
-            for engine in list_recipes():
-                recipe_obj = load_recipe(engine)
-                try:
-                    extra = backend_for_engine(engine).build_workspace_items(config)
-                except KeyError:
-                    extra = []
-                for p in render(
-                    tmp_dir, config, recipe_obj, extra_items=extra
-                ).written_paths:
+            for rendered in workspace_constructor().generate(tmp_dir, config):
+                for p in rendered.written_paths:
                     rels.add(str(p.relative_to(tmp_dir)))
             for rel in rels:
                 dst = workspace_path / rel
@@ -852,7 +835,7 @@ class WorkspaceService(Service):
         self,
         workspace_path: Path,
         workspace_id: str,
-    ) -> dict:
+    ) -> dict[str, str]:
         perms = self.load_effective_permissions(workspace_id)
         config = _load_workenv_from_db(
             self._workspaces,
@@ -868,13 +851,7 @@ class WorkspaceService(Service):
             permissions=perms,
         )
         paths: dict[str, str] = {}
-        for engine in list_recipes():
-            recipe = load_recipe(engine)
-            try:
-                extra = backend_for_engine(engine).build_workspace_items(config)
-            except KeyError:
-                extra = []
-            result = render(workspace_path, config, recipe, extra_items=extra)
+        for result in workspace_constructor().generate(workspace_path, config):
             for p in result.written_paths:
                 try:
                     key = str(p.relative_to(workspace_path))
@@ -888,7 +865,7 @@ class WorkspaceService(Service):
         name: str,
         *,
         settings: Settings | None = None,
-    ) -> dict:
+    ) -> GeneratedConfigsResult:
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
         paths = self._generate_into(ws_path, name)
         return {"workspace": str(ws_path), "generated": paths}
@@ -905,10 +882,7 @@ class WorkspaceService(Service):
         Dispatches to the backend's ``build_workspace_items`` for
         engine-specific files and passes them as *extra_items*.
         """
-        try:
-            extra = backend_for_engine(recipe.engine).build_workspace_items(config)
-        except KeyError:
-            extra = []
+        extra = native_extra_items(recipe.engine, config)
         return render(dir_path, config=config, recipe=recipe, extra_items=extra)
 
     def preview_workenv(
@@ -934,32 +908,12 @@ class WorkspaceService(Service):
         """Load the recipe for *engine*. Raises ``FileNotFoundError`` if absent."""
         return load_recipe(engine)
 
-    def list_presets(self) -> list[WorkenvTemplateRow]:
-        """List all WorkenvConfig presets stored in the DB."""
-        return self._templates.list_all()
-
-    def seed_presets(self) -> int:
-        """Seed built-in presets into the DB (idempotent). Returns count seeded."""
-        return self._templates.seed(load_seed_templates())
-
-    def workenv_from_preset(self, name: str) -> WorkenvConfig | None:
-        """Load a ``WorkenvConfig`` from a named preset. Returns ``None`` if not found."""
-        row = self._templates.get_by_name(name)
-        if row is None:
-            return None
-        raw = row.get("config_json")
-        if isinstance(raw, str):
-            raw = json.loads(raw)
-        if not isinstance(raw, dict):
-            return None
-        return WorkenvConfig._from_dict({str(k): v for k, v in raw.items()})
-
     def load_workenv(
         self,
         workspace_id: str,
         *,
         settings: Settings | None = None,
-        permissions: dict[str, Any] | None = None,
+        permissions: EffectivePermissions | None = None,
     ) -> WorkenvConfig:
         """Load a ``WorkenvConfig`` for *workspace_id* from the DB."""
         return _load_workenv_from_db(
@@ -974,23 +928,6 @@ class WorkspaceService(Service):
             workspace_id,
             settings=settings or self._settings,
             permissions=permissions,
-        )
-
-    def save_workenv_as_preset(
-        self,
-        name: str,
-        config: WorkenvConfig,
-        *,
-        engine: str = BackendName.CLAUDE_CODE,
-        description: str | None = None,
-    ) -> WorkenvTemplateRow:
-        """Persist a ``WorkenvConfig`` as a named preset in the DB."""
-        config_json = json.loads(json.dumps(config._to_dict()))
-        return self._templates.upsert(
-            name,
-            engine=engine,
-            config_json=config_json,
-            description=description or config.description,
         )
 
     # ═══════════════════════════════════════════════════════════════════
@@ -1015,7 +952,7 @@ class WorkspaceService(Service):
         name: str,
         *,
         settings: Settings | None = None,
-    ) -> dict:
+    ) -> GeneratedSkillsResult:
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
         skills = discover_skills(ws_path)
         claude_dir = self._generate_skills_dir(skills, ws_path, ".claude")
@@ -1034,7 +971,7 @@ class WorkspaceService(Service):
         name: str,
         *,
         settings: Settings | None = None,
-    ) -> dict:
+    ) -> SkillsListResult:
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
         skills = discover_skills(ws_path)
         return {
@@ -1056,7 +993,7 @@ class WorkspaceService(Service):
         skill_name: str,
         *,
         settings: Settings | None = None,
-    ) -> dict | None:
+    ) -> SkillContentResult | None:
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
         skill_md = find_skill(ws_path, skill_name)
         if skill_md is None:
@@ -1130,8 +1067,8 @@ class WorkspaceService(Service):
     def load_effective_permissions(
         self,
         workspace_id: str,
-    ) -> dict:
-        perms: dict = {
+    ) -> EffectivePermissions:
+        perms: EffectivePermissions = {
             "allowed_tools": [],
             "allowed_builtin_tools": [],
             "files": [],
@@ -1144,10 +1081,12 @@ class WorkspaceService(Service):
 
         overlay = self._runtime_permissions.get_for_workspace(workspace_id)
         if overlay:
-            if overlay.get("allowed_builtin_tools") is not None:
-                perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
-            if overlay.get("files") is not None:
-                perms["files"] = overlay["files"]
+            builtin_tools = overlay["allowed_builtin_tools"]
+            if builtin_tools is not None:
+                perms["allowed_builtin_tools"] = builtin_tools
+            file_entries = overlay["files"]
+            if file_entries is not None:
+                perms["files"] = file_entries
             if overlay.get("max_tokens") is not None:
                 perms["max_tokens"] = overlay["max_tokens"]
             if overlay.get("allow_file_write") is not None:
@@ -1161,7 +1100,7 @@ class WorkspaceService(Service):
     def get_permissions(
         self,
         name: str,
-    ) -> dict:
+    ) -> PermissionsView:
         ws_path, _ = self.resolve_workspace_path(name)
         permissions = self.load_effective_permissions(name)
         return {
@@ -1173,11 +1112,11 @@ class WorkspaceService(Service):
     def set_permissions(
         self,
         name: str,
-        permissions: dict,
+        permissions: PermissionsPatch,
         *,
         settings: Settings | None = None,
         sync_cb: Any = None,
-    ) -> dict:
+    ) -> PermissionsSetResult:
         _s = settings or self._settings
         ws_path, _ = self.resolve_workspace_path(name, settings=_s)
 
@@ -1213,14 +1152,14 @@ class WorkspaceService(Service):
     def get_workspace_mcp_tools(
         self,
         name: str,
-    ) -> dict:
+    ) -> WorkspaceMcpToolsResult:
         servers = SystemService().get_project_mcp_servers()
         mcp_server_name = servers[0].name if servers else "mcp"
         claude_prefix = f"mcp__{mcp_server_name}__"
         opencode_prefix = f"{mcp_server_name}_"
 
         tool_manifest = self._load_tool_manifest()
-        groups: list[dict] = []
+        groups: list[McpToolGroup] = []
         for group_name, tools in tool_manifest.items():
             claude_tools = [f"{claude_prefix}{t}" for t in tools]
             opencode_tools = [f"{opencode_prefix}{t}" for t in tools]
@@ -1273,7 +1212,7 @@ class WorkspaceService(Service):
     def replace_workspace_subagents(
         self,
         workspace_id: str,
-        subagents: list[dict],
+        subagents: list[SubagentSpec],
         *,
         actor: str | None = None,
     ) -> list[WorkspaceSubagentRow]:
@@ -1284,7 +1223,7 @@ class WorkspaceService(Service):
 # ── helpers ────────────────────────────────────────────────────────────
 
 
-def _write_capabilities_artifact(ws_path: Path, permissions: dict) -> None:
+def _write_capabilities_artifact(ws_path: Path, permissions: EffectivePermissions) -> None:
     perm_dir = ws_path / "permissions"
     perm_dir.mkdir(parents=True, exist_ok=True)
     perm_file = perm_dir / "capabilities.json"

@@ -4,6 +4,11 @@
 (not in ``workspaces.generation.recipe``) because they need the backend
 registry. ``workspaces.*`` callers (build.py, prep.py, service) import
 directly from this module; the CLI routes through ``WorkspaceService``.
+
+The workspace constructor factory (``workspace_constructor``,
+``native_extra_items``) lives in ``core.workspaces.construct`` — that
+module is in the workspaces layer and may import both engines and
+workspaces.generation without layering violations.
 """
 
 from __future__ import annotations
@@ -53,3 +58,15 @@ def list_recipes() -> list[str]:
         if recipe_path is not None and recipe_path.is_file():
             engines.append(backend_name)
     return sorted(engines)
+
+
+def context_filenames() -> list[str]:
+    """Instruction-file names each registered engine reads (``layout.context``).
+
+    Claude → ``CLAUDE.md``, OpenCode/Codex → ``AGENTS.md``. Sourced from the
+    recipes so the set is never hardcoded.
+    """
+    names = {load_recipe(e).layout.get("context") for e in list_recipes()}
+    return sorted(n for n in names if n)
+
+

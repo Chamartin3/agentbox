@@ -3,24 +3,14 @@
 from __future__ import annotations
 
 import typer
-
 from agentbox.cli.shared import CLIContext
-from agentbox.core.constants import BackendName
-from agentbox.core.data import BackendLabelsDict
+from agentbox.core.data.constants import BackendName
 
 app = typer.Typer(
     name="backends",
     help="List registered backend adapters and compatible providers.",
     no_args_is_help=True,
 )
-
-_LABELS: dict[BackendName, str] = {
-    BackendName.CLAUDE_CODE: "Claude Code (CLI)",
-    BackendName.OPENCODE: "OpenCode (CLI)",
-    BackendName.CODEX: "OpenAI Codex (CLI)",
-    BackendName.PI: "pi.dev (CLI)",
-    BackendName.TOKEN: "Token / pydantic-ai (in-process)",
-}
 
 
 @app.command("ls")
@@ -39,10 +29,9 @@ def backend_ls(
         compatible: list[str] = [p.id for p in providers if name in (p.compatible_backends or [])]
         default_model: str | None = getattr(cls, "default_model", None)
         compat_str: str | None = ", ".join(compatible) if compatible else None
-        label = _LABELS[name] if name in _LABELS else name
         rows.append((
             name,
-            label,
+            BackendName.label_for(name),
             default_model,
             compat_str,
         ))

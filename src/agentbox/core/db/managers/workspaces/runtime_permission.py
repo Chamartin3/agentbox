@@ -5,7 +5,7 @@ from typing import cast
 
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from agentbox.core.data.rows import WorkspaceRuntimePermissionRow
+from agentbox.core.data.rows import PermissionFileEntry, WorkspaceRuntimePermissionRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.runtime_permission import WorkspaceRuntimePermission
 from agentbox.core.db.schema import workspace_runtime_permissions
@@ -41,7 +41,7 @@ class WorkspaceRuntimePermissionManager(Manager[WorkspaceRuntimePermission]):
         workspace_id: str,
         *,
         allowed_builtin_tools: list[str] | None = None,
-        files: list[dict] | None = None,
+        files: list[PermissionFileEntry] | None = None,
         max_tokens: int | None = None,
         allow_file_write: bool | None = None,
         allow_network: bool | None = None,

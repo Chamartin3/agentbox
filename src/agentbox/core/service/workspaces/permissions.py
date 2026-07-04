@@ -5,6 +5,8 @@ Delegates to ``WorkspaceService`` for core permission operations.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import EffectivePermissions, PermissionsPatch, PermissionsSetResult, PermissionsView, WorkspaceMcpToolsResult
+
 import json
 from pathlib import Path
 from typing import Any
@@ -37,11 +39,11 @@ def load_effective_permissions(
     *,
     settings: Settings,
     mcp_manifest: Any | None = None,
-) -> dict:
+) -> EffectivePermissions:
     return _ws().load_effective_permissions(name or "")
 
 
-def _write_capabilities_artifact(ws_path: Path, permissions: dict) -> None:
+def _write_capabilities_artifact(ws_path: Path, permissions: EffectivePermissions) -> None:
     perm_dir = ws_path / "permissions"
     perm_dir.mkdir(parents=True, exist_ok=True)
     perm_file = perm_dir / "capabilities.json"
@@ -56,18 +58,18 @@ def get_permissions(
     *,
     settings: Settings,
     mcp_manifest: Any | None = None,
-) -> dict:
+) -> PermissionsView:
     return _ws().get_permissions(name)
 
 
 def set_permissions(
     name: str,
-    permissions: dict,
+    permissions: PermissionsPatch,
     *,
     settings: Settings,
     mcp_manifest: Any | None = None,
     sync_cb: Any = None,
-) -> dict:
+) -> PermissionsSetResult:
     svc = _ws()
     return svc.set_permissions(name, permissions, settings=settings, sync_cb=sync_cb)
 
@@ -77,5 +79,5 @@ def get_workspace_mcp_tools(
     *,
     settings: Settings,
     mcp_manifest: Any | None = None,
-) -> dict:
+) -> WorkspaceMcpToolsResult:
     return _ws().get_workspace_mcp_tools(name)

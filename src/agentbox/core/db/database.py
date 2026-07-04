@@ -59,7 +59,6 @@ from agentbox.core.db.managers.system import (
     SettingManager,
 )
 from agentbox.core.db.managers.workspaces import (
-    WorkenvTemplateManager,
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
     WorkspaceHostEnvGrantManager,
@@ -88,7 +87,6 @@ class Database:
             db.workspace_mcp_overrides, db.workspace_mcp_tool_overrides,
             db.workspace_mcp_policies, db.workspace_host_env_grants,
             db.workspace_runtime_permissions, db.workspace_subagents,
-            db.workenv_templates
         db.resources, db.resource_versions, db.resource_blobs,
             db.active_resource_versions, db.shared_resources,
             db.agent_prompt_resource_bindings, db.workspace_file_resource_bindings
@@ -138,7 +136,6 @@ class Database:
         self.workspace_host_env_grants = WorkspaceHostEnvGrantManager(self._engine)
         self.workspace_runtime_permissions = WorkspaceRuntimePermissionManager(self._engine)
         self.workspace_subagents = WorkspaceSubagentManager(self._engine)
-        self.workenv_templates = WorkenvTemplateManager(self._engine)
 
         # Resources domain
         self.resources = ResourceManager(self._engine)

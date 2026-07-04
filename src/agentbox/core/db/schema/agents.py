@@ -18,7 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.db._metadata import metadata
 
 _RESOURCE_TYPES_SQL = ", ".join(f"'{t.value}'" for t in ResourceType)

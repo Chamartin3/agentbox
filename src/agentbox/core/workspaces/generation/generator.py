@@ -9,6 +9,7 @@ import json
 import string
 from pathlib import Path
 
+from agentbox.core.workspaces.generation._paths import safe_dest
 from agentbox.core.workspaces.generation.config import McpRef, ResourceRef, WorkenvConfig
 from agentbox.core.workspaces.generation.payload import Item, RenderedDir, Role
 from agentbox.core.workspaces.generation.recipe import Recipe
@@ -44,7 +45,7 @@ def render(
         layout_path = recipe.resolve_layout(item.role, name=item.name)
         if not layout_path:
             continue
-        file_path = target_dir / layout_path
+        file_path = safe_dest(target_dir, layout_path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(item.content, encoding="utf-8")
         written.append(file_path)
@@ -106,14 +107,9 @@ def _build_items(
             )
         )
 
-    for skill in config.skills:
-        items.append(
-            Item(
-                role=Role.skill,
-                name=skill.id,
-                content=f"# {skill.id}\n",
-            )
-        )
+    # Skills are resource-backed: the materializer is the single writer of
+    # their real blob body (per-engine layout from each recipe). The generator
+    # deliberately emits no skill stub — a stub would be a second, empty writer.
 
     return items
 

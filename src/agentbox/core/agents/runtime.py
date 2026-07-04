@@ -48,7 +48,7 @@ from agentbox.core.agents.config import (
     ValidatorConfig,
     resolve_output_config as _resolve_output_config,
 )
-from agentbox.core.data.payload_types import JsonSchemaDict, ResolvedBindingView
+from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
 from agentbox.core.data.rows import AgentPromptBindingRow
 from agentbox.core.data import AgentDef
 from agentbox.core.db import PromptVersionManager
@@ -168,7 +168,7 @@ class ComposedPrompt:
     validation_mode: str | None = None
     composition_result: ComposeResult | None = None
     prompt_bindings: list[ResolvedBindingView] = field(default_factory=list)
-    snapshot_entries: list[dict[str, object]] = field(default_factory=list)
+    snapshot_entries: list[PromptEmbedSnapshotEntry] = field(default_factory=list)
     runtime_view: AgentRuntimeView | None = None
 
 
@@ -244,7 +244,7 @@ def compose_prompt(
     internals for any of the returned data.
     """
     store = _DbStoreAdapter(db)
-    snapshot_entries: list[dict[str, object]] = []
+    snapshot_entries: list[PromptEmbedSnapshotEntry] = []
     agent_copied = False
 
     # ---- Stage 1: composition ------------------------------------------

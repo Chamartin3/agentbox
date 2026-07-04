@@ -9,7 +9,7 @@ import zipfile
 
 from fastmcp import FastMCP
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.mcp.context import MCPContext
 
 

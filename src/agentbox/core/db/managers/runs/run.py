@@ -15,7 +15,7 @@ from sqlalchemy import (
     update as sa_update,
 )
 
-from agentbox.core.constants import RunStatus as RS
+from agentbox.core.data.constants import RunStatus as RS
 from agentbox.core.data.rows import (
     ActivitySummaryRow,
     RichRunRow,

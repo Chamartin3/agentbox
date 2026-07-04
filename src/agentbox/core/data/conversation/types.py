@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from agentbox.core.constants import ContentBlockType, MessageRole
+from agentbox.core.data.constants import ContentBlockType, MessageRole
 
 
 @dataclass

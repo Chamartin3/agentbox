@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from agentbox.core.config import SETTINGS
-from agentbox.core.constants import BackendName
+from agentbox.core.data.constants import BackendName
 from agentbox.core.engines.credentials.methods import Method
 from agentbox.core.engines.credentials.registry import (
     CredentialMethod,

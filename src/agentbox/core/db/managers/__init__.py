@@ -35,7 +35,6 @@ from agentbox.core.db.managers.agents import (
 
 # Workspaces domain
 from agentbox.core.db.managers.workspaces import (
-    WorkenvTemplateManager,
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
     WorkspaceHostEnvGrantManager,
@@ -95,7 +94,6 @@ __all__ = [
     "AgentVersionRatingManager",
     "PromptVersionManager",
     # workspaces
-    "WorkenvTemplateManager",
     "WorkspaceEnvDocManager",
     "WorkspaceEnvDocVersionManager",
     "WorkspaceHostEnvGrantManager",

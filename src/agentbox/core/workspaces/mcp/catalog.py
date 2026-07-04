@@ -7,7 +7,7 @@ own manager instances and McpRegistry; no HTTP involved.
 
 from __future__ import annotations
 
-from agentbox.core.constants import McpPolicy
+from agentbox.core.data.constants import McpPolicy
 from agentbox.core.db import (
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,

@@ -9,6 +9,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from agentbox.core.workspaces.generation._paths import safe_dest
+
 
 def materialize_workspace_files(
     workspace_path: Path,
@@ -34,7 +36,7 @@ def materialize_workspace_files(
         src = (project_root / src_rel).resolve()
         if not src.exists():
             raise FileNotFoundError(f"workspace files: source does not exist: {src}")
-        dst = workspace_path / dst_rel
+        dst = safe_dest(workspace_path, dst_rel)
         if dst.is_symlink() or dst.exists():
             if dst.is_dir() and not dst.is_symlink():
                 shutil.rmtree(dst)

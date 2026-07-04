@@ -16,9 +16,9 @@ from agentbox.core.engines import get_provider as get_provider
 from agentbox.core.engines import list_providers as list_providers
 
 # ── Constants ─────────────────────────────────────────────────────────
-from agentbox.core.constants import EventType as EventType
-from agentbox.core.constants import ResourceType as ResourceType
-from agentbox.core.constants import RunStatus as RunStatus
+from agentbox.core.data.constants import EventType as EventType
+from agentbox.core.data.constants import ResourceType as ResourceType
+from agentbox.core.data.constants import RunStatus as RunStatus
 from agentbox.core.data import read_transcript as read_transcript
 from agentbox.core.data import AgentDef as AgentDef
 from agentbox.core.data import AgentSource as AgentSource
@@ -150,11 +150,9 @@ from agentbox.core.service.workspaces.admin import set_workspace_mcp_policy as s
 from agentbox.core.service.workspaces.admin import set_workspace_mcp_server_override as set_workspace_mcp_server_override
 
 # ── Workspace ─────────────────────────────────────────────────────────
-from agentbox.core.workspaces.manager import WorkspaceInfo as WorkspaceInfo
-from agentbox.core.workspaces.manager import claude_agents_path as claude_agents_path
-from agentbox.core.workspaces.manager import claude_settings_path as claude_settings_path
-from agentbox.core.workspaces.manager import ensure as ensure
-from agentbox.core.workspaces.manager import info as info
+from agentbox.core.workspaces.workdir import WorkspaceInfo as WorkspaceInfo
+from agentbox.core.workspaces.workdir import ensure as ensure
+from agentbox.core.workspaces.workdir import info as info
 from agentbox.core.service.workspaces.registry import (
     list_all_workspaces as list_all_workspaces,
 )
@@ -162,9 +160,8 @@ from agentbox.core.service.workspaces import (
     get_workspace_mcp_tools as get_workspace_mcp_tools,
     launch_runner_configs as launch_runner_configs,
 )
-from agentbox.core.workspaces.manager import opencode_config_path as opencode_config_path
-from agentbox.core.workspaces.manager import reset as reset
-from agentbox.core.workspaces.manager import resolve_path as resolve_path
+from agentbox.core.workspaces.workdir import reset as reset
+from agentbox.core.workspaces.workdir import resolve_path as resolve_path
 from agentbox.core.workspaces.mcp.client import McpRegistry as McpRegistry
 from agentbox.core.workspaces.build import build_workspace as build_workspace
 from agentbox.core.workspaces.build import build_workspace_by_name as build_workspace_by_name

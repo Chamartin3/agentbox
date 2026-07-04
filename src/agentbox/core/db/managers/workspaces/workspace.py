@@ -17,7 +17,6 @@ from agentbox.core.db.models.workspaces.mcp_override import (
 )
 from agentbox.core.db.models.workspaces.runtime_permission import WorkspaceRuntimePermission
 from agentbox.core.db.models.workspaces.subagent import WorkspaceSubagent
-from agentbox.core.db.models.workspaces.template import WorkenvTemplate
 from agentbox.core.db.models.workspaces.workspace import Workspace
 from agentbox.core.db.schema import workspaces as workspaces_schema
 from agentbox.core.db.utils import now_iso
@@ -147,7 +146,6 @@ class WorkspaceManager(Manager[Workspace]):
             WorkspaceHostEnvGrant.__table__,
             WorkspaceRuntimePermission.__table__,
             WorkspaceFileResourceBinding.__table__,
-            WorkenvTemplate.__table__,
         ]
         with self._engine.begin() as conn:
             for table in cascade_tables:

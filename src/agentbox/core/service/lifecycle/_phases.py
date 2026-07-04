@@ -16,9 +16,6 @@ from agentbox.core.resources.boot import (
     import_repo_resources,
     sweep_workspace_skill_bindings,
 )
-from agentbox.core.resources.legacy_composition import (
-    migrate_composition_to_bindings,
-)
 from agentbox.core.resources.migration import (
     migrate_shared_resources_to_repo,
 )
@@ -120,24 +117,4 @@ def _phase_composition_refs(
     )
 
 
-def _phase_composition_migration(
-    db: Any, settings: Settings
-) -> StartupReport:
-    try:
-        report = migrate_composition_to_bindings(
-            db.resources,
-            db.resource_versions,
-            db.agent_prompt_resource_bindings,
-            db.agent_version_files,
-            db.agent_versions,
-            project_root=settings.project_root,
-        )
-        summary = report.summary()
-    except Exception as exc:
-        _log.exception("composition→bindings migration failed")
-        return _error("migrate_composition_to_bindings", exc)
-    if summary["bindings_created"] or summary["failed"]:
-        _log.info("composition→bindings migration: %s", summary)
-    else:
-        _log.debug("composition→bindings migration: %s", summary)
-    return StartupReport()
+

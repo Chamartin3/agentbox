@@ -7,7 +7,6 @@ any CLI launcher invoke during boot.
 from agentbox.core.service.lifecycle.report import StartupReport as StartupReport
 from agentbox.core.service.lifecycle.startup import (
     ENV_IMPORT_ON_START as ENV_IMPORT_ON_START,
-    ENV_MIGRATE_COMPOSITION as ENV_MIGRATE_COMPOSITION,
     ENV_SKIP_DEFAULT_PROFILES as ENV_SKIP_DEFAULT_PROFILES,
     ENV_SKIP_RESOURCE_IMPORT as ENV_SKIP_RESOURCE_IMPORT,
     boot_import_resources as boot_import_resources,
@@ -35,5 +34,4 @@ __all__ = [
     "ENV_IMPORT_ON_START",
     "ENV_SKIP_DEFAULT_PROFILES",
     "ENV_SKIP_RESOURCE_IMPORT",
-    "ENV_MIGRATE_COMPOSITION",
 ]

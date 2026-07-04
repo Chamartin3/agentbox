@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from agentbox.core.agents.composition.resolver import PromptResolution, ResolvedBinding
-from agentbox.core.resources.binding_materialize import MaterializeOutcome
+from agentbox.core.workspaces.generation.materialize import MaterializeOutcome
 from agentbox.core.workspaces.prep import (
     prompt_resolution_to_snapshot,
     render_env_doc,

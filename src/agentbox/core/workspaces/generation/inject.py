@@ -19,15 +19,9 @@ import logging
 import sys
 from pathlib import Path
 
+from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME, HOST_ENV_SERVER_NAME, MCP_FILENAME
+
 logger = logging.getLogger(__name__)
-
-# Claude reads MCP servers from .mcp.json in the run cwd (native discovery).
-_MCP_FILENAME = ".mcp.json"
-
-# Canonical name for the host-env stdio MCP server. Shared so every consumer
-# (Claude's .mcp.json, the token backend's pydantic-ai toolset) spawns the same
-# server under the same name.
-HOST_ENV_SERVER_NAME = "agentbox-host-env"
 
 
 def host_env_server_spec(
@@ -56,7 +50,7 @@ def host_env_server_spec(
 
 
 def _load_mcp(run_dir: Path) -> tuple[Path, dict]:
-    mcp_path = run_dir / _MCP_FILENAME
+    mcp_path = run_dir / MCP_FILENAME
     if mcp_path.exists():
         data = json.loads(mcp_path.read_text())
     else:
@@ -108,7 +102,7 @@ def inject_agent_tools_mcp(
 ) -> None:
     """Add the agentbox agent-tools stdio MCP server to ``.mcp.json``."""
     mcp_path, mcp_data = _load_mcp(run_dir)
-    mcp_data["mcpServers"]["agentbox-agent-tools"] = {
+    mcp_data["mcpServers"][AGENT_TOOLS_SERVER_NAME] = {
         "command": sys.executable,
         "args": ["-m", "agentbox.core.workspaces.mcp.servers.agent_tools"],
         "env": {

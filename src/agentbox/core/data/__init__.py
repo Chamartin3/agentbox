@@ -1,16 +1,63 @@
 """Neutral data-shape leaf package.
 
-Pure value types / TypedDicts / light helpers with no upward domain
-dependencies. These were relocated from ``core.db`` to break the
-cross-domain dependency on the persistence package.
+Single home for every globally-shared, logic-free shape: enums/constants,
+pydantic models, TypedDicts, dataclasses, protocols, and type aliases.
 
-``core.data`` may import only stdlib, third-party (pydantic, sqlalchemy
-types), and ``core.constants``. It must NOT import ``core.db.*`` or any
-domain package.
+``core.data`` is the leaf of the dependency graph. It may import only
+stdlib and third-party libraries (pydantic, yaml). It must NOT import
+from ``core.db``, ``core.engines``, ``core.workspaces``, ``core.service``,
+``core.execution``, ``agentbox.api``, ``agentbox.cli``, or ``sqlalchemy``.
 """
 
 from __future__ import annotations
 
+from agentbox.core.data.events import (
+    DoneEvent,
+    LogEvent,
+    RetryEvent,
+    RunEvent,
+    TextEvent,
+    ThinkingEvent,
+    TimeoutEvent,
+    ToolCallEvent,
+    ToolResultEvent,
+    UsageEvent,
+    ValidationEvent,
+)
+from agentbox.core.data.constants import (
+    AGENT_TOOLS_SERVER_NAME,
+    ActivityStateFilter,
+    BackendName,
+    BundleFile,
+    CatalogEnum,
+    ConfiguredValidationMode,
+    ContentBlockType,
+    EventType,
+    HOST_ENV_SERVER_NAME,
+    ImportSource,
+    LogLevel,
+    MaterializeMode,
+    McpPolicy,
+    MessageRole,
+    OnConflict,
+    PromptMode,
+    PromptSlot,
+    ResourceType,
+    RunnerKind,
+    RunStatus,
+    SessionMode,
+    TerminalRunStatus,
+    ValidationCheckMode,
+    ValidationMode,
+    ValidatorKind,
+)
+from agentbox.core.data.errors import (
+    AgentboxError,
+    WorkspaceError,
+    WorkspaceExists,
+    WorkspaceNotFound,
+    WorkspacePathEscape,
+)
 from agentbox.core.data._util import hash_blobs, now_iso
 from agentbox.core.data.payload_types import (
     AgentDiffResult,
@@ -64,7 +111,7 @@ from agentbox.core.data.profiles import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.data.records import RunRecord, SharedResourceRecord, row_to_run
+from agentbox.core.data.records import RunRecord, SharedResourceRecord
 from agentbox.core.data.rows import (
     AgentConfigEventRow,
     AgentMetaRow,
@@ -113,6 +160,43 @@ from agentbox.core.data.snapshots import (
 from agentbox.core.data.transcripts import read_transcript, resolve_transcript_path
 
 __all__ = [
+    "AGENT_TOOLS_SERVER_NAME",
+    "ActivityStateFilter",
+    "AgentboxError",
+    "BackendName",
+    "BundleFile",
+    "CatalogEnum",
+    "ConfiguredValidationMode",
+    "ContentBlockType",
+    "EventType",
+    "HOST_ENV_SERVER_NAME",
+    "ImportSource",
+    "LogLevel",
+    "MaterializeMode",
+    "McpPolicy",
+    "MessageRole",
+    "OnConflict",
+    "PromptMode",
+    "PromptSlot",
+    "ResourceType",
+    "RunnerKind",
+    "RunStatus",
+    "SessionMode",
+    "TerminalRunStatus",
+    "ValidationCheckMode",
+    "ValidationMode",
+    "ValidatorKind",
+    "DoneEvent",
+    "LogEvent",
+    "RetryEvent",
+    "RunEvent",
+    "TextEvent",
+    "ThinkingEvent",
+    "TimeoutEvent",
+    "ToolCallEvent",
+    "ToolResultEvent",
+    "UsageEvent",
+    "ValidationEvent",
     "AgentConfigEventRow",
     "AgentDef",
     "AgentDiffResult",
@@ -193,6 +277,10 @@ __all__ = [
     "WorkspaceMcpToolOverrideRow",
     "WorkspaceRow",
     "WebhookChannelConfig",
+    "WorkspaceError",
+    "WorkspaceExists",
+    "WorkspaceNotFound",
+    "WorkspacePathEscape",
     "WorkspaceSource",
     "find_session_log",
     "hash_blobs",
@@ -200,7 +288,6 @@ __all__ = [
     "parse_session_log",
     "read_transcript",
     "resolve_transcript_path",
-    "row_to_run",
     "_AgentConfigEventFields",
     "_AgentMetaFields",
     "_AgentMetaPatchFields",

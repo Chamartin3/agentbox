@@ -6,8 +6,6 @@ import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from sqlalchemy.engine import Row
-
 
 @dataclass
 class RunRecord:
@@ -65,6 +63,9 @@ class SharedResourceRecord:
     tags: tuple[str, ...] = ()
 
 
+__all__ = ["RunRecord", "SharedResourceRecord", "row_to_shared_resource"]
+
+
 def row_to_shared_resource(
     row: Mapping[str, Any] | Any | None,
 ) -> SharedResourceRecord | None:
@@ -97,34 +98,4 @@ def row_to_shared_resource(
     )
 
 
-def row_to_run(row: Row) -> RunRecord:
-    m = row._mapping
-    return RunRecord(
-        id=m["id"],
-        agent_id=m["agent_id"],
-        session_id=m["session_id"],
-        status=m["status"],
-        input=m["input"],
-        output=m["output"],
-        error=m["error"],
-        workdir=m["workdir"],
-        transcript_path=m["transcript_path"],
-        created_at=m["created_at"],
-        finished_at=m["finished_at"],
-        config_digest=m.get("config_digest"),
-        agent_version_id=m.get("agent_version_id"),
-        composition_snapshot=m.get("composition_snapshot"),
-        rendered_prompt=m.get("rendered_prompt"),
-        variables=m.get("variables"),
-        validation_status=m.get("validation_status"),
-        validation_errors=m.get("validation_errors"),
-        schema_validated_via=m.get("schema_validated_via"),
-        post_status=m.get("post_status"),
-        post_errors=m.get("post_errors"),
-        conversation_format=m.get("conversation_format"),
-        conversation_uri=m.get("conversation_uri"),
-        runner_profile_id=m.get("runner_profile_id"),
-        resource_snapshot=m.get("resource_snapshot"),
-        mcp_snapshot=m.get("mcp_snapshot"),
-        runner_snapshot=m.get("runner_snapshot"),
-    )
+

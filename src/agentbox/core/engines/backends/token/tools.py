@@ -29,11 +29,9 @@ from typing import Any
 from fastmcp.client.transports import StdioTransport
 from pydantic_ai.mcp import MCPToolset
 
+from agentbox.core.data.constants import HOST_ENV_SERVER_NAME
 from agentbox.core.tools.canonical import CanonicalTool
-from agentbox.core.workspaces.generation.inject import (
-    HOST_ENV_SERVER_NAME,
-    host_env_server_spec,
-)
+from agentbox.core.workspaces.generation.inject import host_env_server_spec
 from agentbox.core.workspaces.permissions import GrantViolation, check_capability
 
 logger = logging.getLogger(__name__)

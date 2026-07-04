@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from agentbox.core.data.payload_types import JsonSchemaDict
-from agentbox.core.constants import ConfiguredValidationMode, ValidationMode
+from agentbox.core.data.constants import ConfiguredValidationMode, ValidationMode
 from agentbox.core.tools.canonical import CanonicalTool
 
 _CONFIGURED_ENGINES = frozenset(

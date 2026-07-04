@@ -10,6 +10,8 @@ endpoint is the sole authorization surface; effective permissions are
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import ResolvedHostEnv
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -101,7 +103,7 @@ def delete_profile(profile_id: str, ws: Annotated[WorkspaceService, Depends(get_
 @router.get("/api/workspaces/{workspace_id}/host-env")
 def get_workspace_host_env(
     workspace_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
-) -> dict:
+) -> ResolvedHostEnv:
     """Read the host-env provisioning config for *workspace_id*."""
     return ws.resolve_workspace_host_env(workspace_id)
 
@@ -111,7 +113,7 @@ def set_workspace_host_env(
     workspace_id: str,
     body: WorkspaceHostEnvBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> ResolvedHostEnv:
     try:
         ws.set_workspace_host_env(
             workspace_id,

@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from agentbox.api.deps import get_resource_service
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.service.resources.service import ResourceService
 
 list_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])

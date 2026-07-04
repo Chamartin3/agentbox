@@ -19,7 +19,7 @@ import shlex
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from agentbox.core.constants import BackendName
+from agentbox.core.data.constants import BackendName
 from agentbox.core.data import AgentDef
 from agentbox.core.db import PromptVersionManager
 

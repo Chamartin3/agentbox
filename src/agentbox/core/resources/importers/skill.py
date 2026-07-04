@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from agentbox.core.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.resources.importers.base import ImporterContext, ImporterResult
 from agentbox.core.resources.importers.host_path import HostPathImporter
 

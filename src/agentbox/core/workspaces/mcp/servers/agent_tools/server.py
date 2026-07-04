@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 import logging
+from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME
 from agentbox.core.tools import SharedToolRegistry
 from agentbox.core.data import StubResult
 from agentbox.core.tools.registry import ToolSpec
@@ -24,7 +25,7 @@ def build_server(ctx: AgentToolsContext | None = None) -> FastMCP:
         ctx = AgentToolsContext.from_env()
 
     mcp = FastMCP(
-        name="agentbox-agent-tools",
+        name=AGENT_TOOLS_SERVER_NAME,
         instructions=(
             "Consumer-registered shared tools. "
             "Only tools whose names appear in the active grant set are callable."

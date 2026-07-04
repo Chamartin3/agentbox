@@ -11,8 +11,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.core.constants import LogLevel, RunStatus
-from agentbox.core.events import (
+from agentbox.core.data.constants import LogLevel, MCP_FILENAME, RunStatus
+from agentbox.core.data.events import (
     DoneEvent,
     LogEvent,
     RunEvent,
@@ -94,7 +94,7 @@ class ClaudeCodeBackend(BackendAdapter):
         # via --allowedTools, so no settings file is needed.
         argv += [
             "--mcp-config",
-            ".mcp.json",
+            MCP_FILENAME,
             "--strict-mcp-config",
         ]
 

@@ -6,6 +6,8 @@ Delegates to ``WorkspaceService``. The ``store`` parameter has been removed
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import WorkspaceDeleteResult, WorkspaceDetail, WorkspaceFileInfo, WorkspaceListItem
+
 from pathlib import Path
 
 from agentbox.core.config import Settings
@@ -14,9 +16,9 @@ from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.db.database import get_database
 from agentbox.core.resources.skills import discover_skills
 from agentbox.core.service.workspaces.service import WorkspaceService
-from agentbox.core.workspaces.crud import info as _workspace_info
+from agentbox.core.workspaces.workdir import info as _workspace_info
 
-from .errors import WorkspaceExists
+from agentbox.core.data.errors import WorkspaceExists
 from .files import is_user_file
 
 __all__ = [
@@ -35,16 +37,16 @@ def _ws() -> WorkspaceService:
 def list_workspaces_enriched(
     *,
     settings: Settings,
-) -> list[dict]:
+) -> list[WorkspaceListItem]:
     """Return all named workspaces with agent assignments + summary stats."""
     svc = _ws()
     registry = svc.list_workspaces(settings=settings)
 
-    result: list[dict] = []
+    result: list[WorkspaceListItem] = []
     for ws_row in registry:
         name = ws_row["name"]
         ws_path = Path(ws_row["path"])
-        agents = []
+        agents: list[str] = []
         file_count = 0
         skill_count = 0
         if ws_path.exists():
@@ -90,7 +92,7 @@ def delete_workspace_registry(
     *,
     settings: Settings,
     purge_disk: bool = False,
-) -> dict:
+) -> WorkspaceDeleteResult:
     return _ws().delete_workspace(name, settings=settings, purge_disk=purge_disk)
 
 
@@ -98,10 +100,10 @@ def get_workspace_by_name(
     name: str,
     *,
     settings: Settings,
-) -> dict:
+) -> WorkspaceDetail:
     svc = _ws()
     ws_path, _ = svc.resolve_workspace_path(name, settings=settings)
-    files: list[dict] = []
+    files: list[WorkspaceFileInfo] = []
     if ws_path.exists():
         for p in sorted(ws_path.rglob("*")):
             if p.is_file():

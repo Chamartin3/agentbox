@@ -33,7 +33,7 @@ from .configs import (
     generate_configs_for_agent,
     launch_runner_configs,
 )
-from .errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
+from agentbox.core.data.errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
 from .files import (
     create_workspace_for_agent,
     get_workspace_for_agent,

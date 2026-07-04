@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Any
 
-from agentbox.core.constants import BackendName
+from agentbox.core.data.constants import BackendName
 import agentbox.core.engines.providers.anthropic as anthropic
 import agentbox.core.engines.providers.cli as cli
 import agentbox.core.engines.providers.google as google
