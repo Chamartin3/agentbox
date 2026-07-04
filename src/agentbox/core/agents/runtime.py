@@ -48,6 +48,8 @@ from agentbox.core.agents.config import (
     ValidatorConfig,
     resolve_output_config as _resolve_output_config,
 )
+from agentbox.core.data.payload_types import JsonSchemaDict, ResolvedBindingView
+from agentbox.core.data.rows import AgentPromptBindingRow
 from agentbox.core.data import AgentDef
 from agentbox.core.db import PromptVersionManager
 from agentbox.core.db.system.config import load_project_shared_assets
@@ -74,7 +76,7 @@ class _DbStoreAdapter:
     def __init__(self, db: Any) -> None:
         self._db = db
 
-    def list_prompt_bindings(self, agent_id: str) -> list[dict]:
+    def list_prompt_bindings(self, agent_id: str) -> list[AgentPromptBindingRow]:
         return self._db.agent_prompt_resource_bindings.list_for_agent(agent_id)
 
     def get_repo_resource(self, resource_id: str) -> dict | None:
@@ -116,7 +118,7 @@ class AgentRuntimeView:
     max_error_retries: int = 0
     output_validation_engine: str = "both"
     output_schema_path: str | None = None
-    json_schema: dict[str, object] | None = None
+    json_schema: JsonSchemaDict | None = None
     validators: tuple[ValidatorConfig, ...] = ()
 
     @classmethod
@@ -156,8 +158,8 @@ class ComposedPrompt:
 
     system_text: str | None = None
     system_base: str | None = None
-    composed_schema: dict[str, object] | None = None
-    composed_input_schema: dict[str, object] | None = None
+    composed_schema: JsonSchemaDict | None = None
+    composed_input_schema: JsonSchemaDict | None = None
     composed_user: str | None = None
     agent: AgentDef | None = None
     input_: str = ""
@@ -165,7 +167,7 @@ class ComposedPrompt:
     composed_bundle_sha: str | None = None
     validation_mode: str | None = None
     composition_result: ComposeResult | None = None
-    prompt_bindings: list[dict[str, object]] = field(default_factory=list)
+    prompt_bindings: list[ResolvedBindingView] = field(default_factory=list)
     snapshot_entries: list[dict[str, object]] = field(default_factory=list)
     runtime_view: AgentRuntimeView | None = None
 
@@ -173,12 +175,12 @@ class ComposedPrompt:
 # ── facade functions ──────────────────────────────────────────────────
 
 
-def _resolve_prompt_bindings(store: Any, agent_id: str) -> list[dict]:
+def _resolve_prompt_bindings(store: Any, agent_id: str) -> list[ResolvedBindingView]:
     """Hydrate agent prompt bindings from duck-typed store methods."""
     raw = store.list_prompt_bindings(agent_id)
     if not raw:
         return []
-    resolved: list[dict] = []
+    resolved: list[ResolvedBindingView] = []
     for b in raw:
         resource = store.get_repo_resource(b["resource_id"])
         if not resource:
@@ -212,6 +214,7 @@ def _resolve_prompt_bindings(store: Any, agent_id: str) -> list[dict]:
                 "slot": b.get("slot"),
                 "attach_as_reference": bool(b.get("attach_as_reference")),
                 "resource_id": b["resource_id"],
+                "resource_slug": resource["slug"],
                 "version_id": version_id,
                 "content_hash": version["content_hash"],
                 "type": resource["type"],
@@ -248,8 +251,8 @@ def compose_prompt(
     composition_result = None
     system_text: str | None = None
     system_base: str | None = None
-    composed_schema: dict[str, object] | None = None
-    composed_input_schema: dict[str, object] | None = None
+    composed_schema: JsonSchemaDict | None = None
+    composed_input_schema: JsonSchemaDict | None = None
     composed_user: str | None = None
     composed_references: tuple[ComposedReference, ...] | None = None
     composed_bundle_sha: str | None = None
@@ -285,7 +288,7 @@ def compose_prompt(
         validation_mode = agent.composition.output_validation
 
     # ---- Stage 2: prompt-resource binding substitution ------------------
-    prompt_bindings: list[dict[str, object]] = []
+    prompt_bindings: list[ResolvedBindingView] = []
     try:
         prompt_bindings = _resolve_prompt_bindings(store, agent.id)
         if prompt_bindings:
@@ -326,7 +329,7 @@ def compose_prompt(
 
     # ---- Stage 3: output-contract assembly ------------------------------
     out_cfg = _resolve_output_config(store, agent)
-    if composed_schema is None and isinstance(out_cfg.json_schema, dict):
+    if composed_schema is None and out_cfg.json_schema is not None:
         composed_schema = out_cfg.json_schema
 
     if out_cfg.validators or isinstance(out_cfg.json_schema, dict):
@@ -352,7 +355,7 @@ def compose_prompt(
                 if not _raw:
                     continue
                 try:
-                    _schema = json.loads(_raw)
+                    _schema: JsonSchemaDict | None = json.loads(_raw)
                 except (json.JSONDecodeError, TypeError):
                     logger.warning(
                         "executor: failed to parse output_schema binding for agent %r",
@@ -367,7 +370,7 @@ def compose_prompt(
     # ---- Stage 5: fail-fast schema consistency check --------------------
     if isinstance(composed_schema, dict):
         try:
-            assert_schema_consistent(composed_schema)
+            assert_schema_consistent(dict(composed_schema))
         except InconsistentSchema as exc:
             msg = (
                 f"output schema for agent {agent.id!r} is internally "

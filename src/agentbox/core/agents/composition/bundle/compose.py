@@ -6,7 +6,8 @@ import json
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+
+from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.constants import BundleFile
 from agentbox.core.agents.composition.bundle._helpers import (
     _append_input_schema, _append_schema, _format_template,
@@ -44,12 +45,12 @@ class ComposeResult:
 
     system: str
     user: str
-    schema: dict[str, Any] | None
+    schema: JsonSchemaDict | None
     schema_sha: str | None
     bundle_sha: str
     system_base: str = ""
     references: tuple[ComposedReference, ...] = ()
-    input_schema: dict[str, Any] | None = None
+    input_schema: JsonSchemaDict | None = None
 
 
 def compose(
@@ -146,7 +147,7 @@ def compose(
     # Resolve from explicit [composition].output_schema, or auto-detect
     # output_schema.json / schema.json at the bundle root so agents get
     # structured-output instructions without per-bundle wiring.
-    schema: dict[str, Any] | None = None
+    schema: JsonSchemaDict | None = None
     schema_sha: str | None = None
     output_schema_path = composition.get("output_schema")
     schema_file: Path | None = None
@@ -163,9 +164,10 @@ def compose(
                 output_schema_path = fallback
                 break
     if schema_file is not None:
-        schema = json.loads(_read_text(schema_file))
-        schema_sha = _sha256(json.dumps(schema, sort_keys=True, separators=(",", ":")))
-        if isinstance(schema, dict):
+        loaded: JsonSchemaDict | None = json.loads(_read_text(schema_file))
+        schema_sha = _sha256(json.dumps(loaded, sort_keys=True, separators=(",", ":")))
+        if isinstance(loaded, dict):
+            schema = loaded
             system_rendered = _append_schema(system_rendered, schema)
 
     # -- bundle sha ----------------------------------------------------
@@ -229,7 +231,7 @@ def compose_from_source(
     system_rendered = system_base
 
     input_schema_info = source.read_input_schema()
-    input_schema: dict[str, Any] | None = None
+    input_schema: JsonSchemaDict | None = None
     if input_schema_info is not None:
         input_schema = input_schema_info.schema
         system_rendered = _append_input_schema(system_rendered, input_schema)
@@ -256,7 +258,7 @@ def compose_from_source(
         user_rendered = variables.get("user_message", "") if render else ""
 
     schema_info = source.read_output_schema()
-    schema: dict[str, Any] | None = None
+    schema: JsonSchemaDict | None = None
     schema_sha: str | None = None
     if schema_info is not None:
         schema = schema_info.schema

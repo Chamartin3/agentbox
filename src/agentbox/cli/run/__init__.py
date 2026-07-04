@@ -31,10 +31,11 @@ import websockets
 from agentbox.cli.ops.launch import _launch_session
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.context import Renderers
+from agentbox.core.data import BackendToRunnerDict
 
 # Mapping from BackendName values to RunnerKind strings used by _launch_session.
 # "token" passes through and is rejected by _launch_session with a clear message.
-_BACKEND_NAME_TO_RUNNER: dict[str, str] = {
+_BACKEND_NAME_TO_RUNNER: dict[BackendName, str] = {
     "claude_code": "claude",
     "opencode": "opencode",
     "codex": "codex",

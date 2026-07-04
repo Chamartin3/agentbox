@@ -10,10 +10,10 @@ push their slices in; this module owns only the type and the algebra.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass(frozen=True)

@@ -11,11 +11,10 @@ Endpoints:
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
 from agentbox.api.deps import get_db
+from agentbox.core.data.payload_types import RefreshProvidersResult
 from agentbox.core.service.engines import ProviderDescriptor, ProviderModel
 from agentbox.core.service.engines import providers as svc
 from agentbox.core.service.engines.providers import (
@@ -37,7 +36,7 @@ async def list_runner_providers(
 
 
 @router.post("/refresh")
-async def refresh_providers(backend: str | None = Query(None)) -> dict[str, Any]:
+async def refresh_providers(backend: str | None = Query(None)) -> RefreshProvidersResult:
     """Re-run dynamic provider discovery and invalidate all model caches."""
     return svc.refresh_providers()
 

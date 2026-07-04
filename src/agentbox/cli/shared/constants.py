@@ -12,6 +12,7 @@ from enum import StrEnum
 from typing import Final
 
 from agentbox.core.constants import EventType
+from agentbox.core.data import EventStylesDict
 
 # ---------------------------------------------------------------------------
 # Canonical recursive JSON value alias.
@@ -63,7 +64,7 @@ CLI_SOURCE: Final[str] = "cli"
 RUNNER_CLEAR: Final[str] = "clear"
 
 # Event-type → rich style, the single lookup used by streaming/log renderers.
-EVENT_STYLES: Final[dict[str, str]] = {
+EVENT_STYLES: Final[dict[EventType | str, str]] = {
     EventType.TEXT: "white",
     EventType.LOG: "dim",
     EventType.TOOL_CALL: "cyan",

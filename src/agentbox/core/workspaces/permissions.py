@@ -1,11 +1,11 @@
 """Grant resolution + per-call permission checks for host-env capabilities."""
 
 from __future__ import annotations
+from typing import Any
 
 import os
 import re
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlparse
 
 from agentbox.core.tools.canonical import CanonicalTool

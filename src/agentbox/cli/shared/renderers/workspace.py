@@ -15,6 +15,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from agentbox.core.data.payload_types import MaterializeConflict, MaterializeDryRunEntry
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.service import (
     WorkspaceFileBindingRow,
@@ -321,10 +322,10 @@ class WorkspaceRenderer(Renderer):
 
     def resources_resolution_table(
         self,
-        entries: Sequence[dict[str, object]],
+        entries: Sequence[MaterializeDryRunEntry],
         workspace_id: str,
         *,
-        conflicts: Sequence[dict[str, object]] | None = None,
+        conflicts: Sequence[MaterializeConflict] | None = None,
     ) -> None:
         """Render dry-run resource resolution table."""
         if not entries:

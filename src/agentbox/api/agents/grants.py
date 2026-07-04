@@ -49,7 +49,7 @@ def _catalog_tool_names(
     # Resource bindings are included but only by resource_id / target_path.
     rsvc = get_resource_service()
     for b in rsvc.list_workspace_resources(workspace_id).get("items", []):
-        names.add(b.get("target_path", b.get("resource_id", "")))
+        names.add(b["target_path"] or b["resource_id"])
 
     return names
 

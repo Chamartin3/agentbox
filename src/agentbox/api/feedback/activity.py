@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from agentbox.api.context import APIContext
+from agentbox.core.data.payload_types import EnrichedRunsResult
 from agentbox.api.deps import get_api_context
 from agentbox.core.constants import ActivityStateFilter
 from agentbox.core.data.rows import ActivitySummaryRow
@@ -31,7 +32,7 @@ def recent_runs(
     state: ActivityStateFilter | None = Query(default=None),
     limit: int = Query(default=50, le=200),
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> EnrichedRunsResult:
     return ctx.evaluation.list_runs_enriched(
         range_=range,
         agent=action,

@@ -8,11 +8,12 @@ runtime.
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import JsonSchemaDict
+
 import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Any
 
 
 def _read_text(path: Path) -> str:
@@ -57,7 +58,7 @@ _OUTPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "output_schema.md").read_text(
 _INPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "input_schema.md").read_text(encoding="utf-8")
 
 
-def _append_input_schema(text: str, schema: dict[str, Any]) -> str:
+def _append_input_schema(text: str, schema: JsonSchemaDict) -> str:
     """Append an input-format instruction block describing ``schema``.
 
     Goes on the system prompt so the agent learns the shape of the
@@ -68,7 +69,7 @@ def _append_input_schema(text: str, schema: dict[str, Any]) -> str:
     return f"{base}\n\n{block}" if base else block
 
 
-def _append_schema(text: str, schema: dict[str, Any]) -> str:
+def _append_schema(text: str, schema: JsonSchemaDict) -> str:
     """Append a structured-output instruction block referencing ``schema``.
 
     Agents that declare an output_schema expect their final reply to be a

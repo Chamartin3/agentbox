@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from agentbox.core.constants import ContentBlockType, MessageRole
 
@@ -22,7 +23,7 @@ class Turn:
     role: MessageRole
     ts: str | None = None
     stop_reason: str | None = None
-    usage: dict | None = None
+    usage: dict[str, Any] | None = None
     content: list[ContentPart] = field(default_factory=list)
 
 

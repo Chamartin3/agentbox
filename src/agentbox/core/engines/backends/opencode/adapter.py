@@ -141,7 +141,7 @@ class OpenCodeBackend(BackendAdapter):
             rendered.argv,
             rendered.cwd,
             dict(rendered.env),
-            timeout=rendered.agent_meta["timeout_seconds"],
+            timeout=rendered.agent_meta.get("timeout_seconds"),
             stdin_data=stdin_data,
         ):
             yield ev

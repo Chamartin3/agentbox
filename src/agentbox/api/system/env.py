@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
+from agentbox.core.data.payload_types import EnvDocPreviewResult
 from agentbox.core.data.rows import EnvDocRow
 from agentbox.core.service import render_env_doc_preview
 
@@ -60,7 +61,7 @@ def preview_env_doc(
     workspace_id: str,
     body: PreviewEnvDocBody,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> EnvDocPreviewResult:
     if body.content is not None:
         content: object = body.content
     else:

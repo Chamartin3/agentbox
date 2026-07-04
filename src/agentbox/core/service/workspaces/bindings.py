@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import SkillBindingsResult, WorkspaceBindingItemsResult
+
 import contextlib
 from typing import Any
 
@@ -64,7 +66,7 @@ def replace_workspace_subagents(
 # ---------------------------------------------------------------------------
 
 
-def list_workspace_skill_bindings(workspace_id: str) -> dict:
+def list_workspace_skill_bindings(workspace_id: str) -> SkillBindingsResult:
     return ResourceService().list_workspace_skill_bindings(workspace_id)
 
 
@@ -76,7 +78,7 @@ def replace_workspace_skill_bindings(
     actor: str | None = None,
     settings: Any = None,
     sync_cb: Any = None,
-) -> dict:
+) -> WorkspaceBindingItemsResult:
     svc = ResourceService()
     try:
         result = svc.replace_workspace_skill_bindings(

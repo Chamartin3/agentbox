@@ -13,7 +13,19 @@ from typing import Any, NotRequired, TypedDict
 
 from agentbox.core.agents.validation import extract_json
 from agentbox.core.data import RunRecord
+from agentbox.core.data.payload_types import UsagePayload
 from agentbox.core.execution.dispatch.policy import DispatchStore
+
+
+class AgentEventPayload(TypedDict):
+    """Payload for agent lifecycle event webhooks (publish/rollback)."""
+
+    event: str
+    agent_id: str
+    version: int
+    version_id: int
+    reason: str
+    published_at: str
 
 
 class CompletionPayload(TypedDict):
@@ -27,7 +39,7 @@ class CompletionPayload(TypedDict):
     started_at: str
     finished_at: str | None
     duration_ms: int | None
-    usage: dict[str, Any] | None
+    usage: UsagePayload | None
     validation_status: str | None
     schema_validated_via: str | None
     # Extra fields added by future channels without invalidating the shape.
@@ -53,7 +65,7 @@ def _parsed_output_structured(run: RunRecord) -> dict[str, Any] | list | None:
 def completion_payload(
     run: RunRecord,
     *,
-    usage: dict[str, Any] | None,
+    usage: UsagePayload | None,
     duration_ms: int | None,
 ) -> CompletionPayload:
     """Build a channel-agnostic completion payload for ``run``."""

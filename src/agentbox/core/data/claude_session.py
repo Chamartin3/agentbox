@@ -82,7 +82,7 @@ class Turn:
     role: str
     ts: str | None
     stop_reason: str | None = None
-    usage: dict | None = None
+    usage: dict[str, Any] | None = None
     content: list[ContentPart] = field(default_factory=list)
 
 
@@ -91,7 +91,7 @@ class ConversationSummary:
     session_id: str | None
     log_path: str
     turns: list[Turn]
-    totals: dict
+    totals: dict[str, Any]
 
 
 def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:

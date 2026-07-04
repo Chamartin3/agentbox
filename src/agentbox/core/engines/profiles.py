@@ -13,6 +13,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from agentbox.core.data.payload_types import ModelParams
+from agentbox.core.data.payload_types import RunnerProfileRow
 from agentbox.core.engines.backends.registry import get_backend as resolve_engine_by_name
 from agentbox.core.engines.providers import get_provider
 from agentbox.core.db import RunnerProfileManager
@@ -56,7 +58,7 @@ class EffectiveRunnerConfig(BaseModel):
     ``auto`` (current tool-call behavior), ``tool``, ``prompted``, or
     ``native``. Only the token backend reads this."""
 
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: ModelParams = Field(default_factory=ModelParams)
     """Provider-specific parameters (merged from profile + per-run)."""
 
     headers: dict[str, str] = Field(default_factory=dict)
@@ -187,7 +189,7 @@ class RunnerProfileResolver:
 
     def _build_from_profile(
         self,
-        profile: dict[str, Any] | Any,
+        profile: RunnerProfileRow | Any,
         source: SourceType,
         backend_override: str | None = None,
         timeout_override: int | None = None,

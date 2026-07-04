@@ -1,10 +1,9 @@
 """Build the immutable runner snapshot attached to a run row."""
 
 from __future__ import annotations
-
-import logging
 from typing import Any
 
+import logging
 from agentbox.core.data import AgentDef, RunnerSnapshot, now_iso
 from agentbox.core.db import RunnerProfileManager
 from agentbox.core.engines.profiles import EffectiveRunnerConfig

@@ -7,9 +7,9 @@ pure value types live here.
 
 from __future__ import annotations
 
-from typing import Any
-
+from agentbox.core.data.payload_types import ModelParams
 from pydantic import BaseModel, Field
+
 
 
 class RunnerProfile(BaseModel):
@@ -25,7 +25,7 @@ class RunnerProfile(BaseModel):
     api_key_env: str | None = None
     api_token_id: str | None = None
     output_mode: str = "auto"
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: ModelParams = Field(default_factory=ModelParams)
     headers: dict[str, str] = Field(default_factory=dict)
     extra_args: list[str] = Field(default_factory=list)
     is_enabled: bool = True
@@ -47,7 +47,7 @@ class RunnerProfileCreate(BaseModel):
     api_key_env: str | None = None
     api_token_id: str | None = None
     output_mode: str = "auto"
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: ModelParams = Field(default_factory=ModelParams)
     headers: dict[str, str] = Field(default_factory=dict)
     extra_args: list[str] = Field(default_factory=list)
     is_enabled: bool = True
@@ -66,7 +66,7 @@ class RunnerProfilePatch(BaseModel):
     api_key_env: str | None = None
     api_token_id: str | None = None
     output_mode: str | None = None
-    params: dict[str, Any] | None = None
+    params: ModelParams | None = None
     headers: dict[str, str] | None = None
     extra_args: list[str] | None = None
     is_enabled: bool | None = None

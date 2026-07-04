@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 
+from agentbox.core.data.payload_types import CredentialContext
 from agentbox.cli.shared import CLIContext, EngineRenderer  # TODO(cli-arch): transitional renderer import — plan 095
 from agentbox.core.config import Settings
 from agentbox.core.service.engines import (
@@ -136,7 +137,7 @@ def _apply_method(
     render: EngineRenderer,
     settings: Settings,
 ) -> None:
-    ctx = {
+    ctx: CredentialContext = {
         "creds_base": str(settings.creds_dir),
         "env_file": str(settings.creds_env_file),
     }

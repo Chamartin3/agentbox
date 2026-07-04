@@ -5,12 +5,12 @@ Composed into ``SessionStore``. Reads ``self.engine`` and operates on
 """
 
 from __future__ import annotations
+from typing import Any
 
 import json as _json
 import re
 import uuid
 import warnings
-from typing import Any
 
 from sqlalchemy import insert, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert

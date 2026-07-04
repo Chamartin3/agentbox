@@ -18,7 +18,7 @@ from typing import Any, cast
 
 from agentbox.core.config import load_settings
 from agentbox.core.constants import RunStatus
-from agentbox.core.data import now_iso, read_transcript, RunnerSnapshot
+from agentbox.core.data import now_iso, read_transcript, RunnerSnapshot, UsagePayload
 from agentbox.core.data.rows import (
     RunCommentRow,
     SessionRow,
@@ -172,14 +172,14 @@ class ExecutionService(Service):
     # Usage
     # ══════════════════════════════════════════════════════════════════
 
-    def record_usage(self, run_id: str, payload: dict) -> None:
+    def record_usage(self, run_id: str, payload: UsagePayload) -> None:
         """Upsert usage stats (tokens, cost) for a run (accumulates on conflict)."""
-        self._usage.record(run_id, payload)
+        self._usage.record(run_id, cast(dict[str, Any], payload))
 
-    def get_usage(self, run_id: str) -> dict | None:
+    def get_usage(self, run_id: str) -> UsagePayload | None:
         """Fetch usage row for a run_id, return as dict or None."""
         result = self._usage.get_dict(run_id)
-        return cast(dict | None, result)
+        return cast(UsagePayload | None, result)
 
     # ══════════════════════════════════════════════════════════════════
     # Comments

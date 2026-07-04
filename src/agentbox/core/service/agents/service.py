@@ -40,6 +40,8 @@ from agentbox.core.data import (
     AgentVersionFileRow,
     AgentVersionRatingRow,
     AgentVersionRow,
+    PromptBindingSpec,
+    PromptPreviewResult,
     PromptVersionRow,
     VersionFileUploadRow,
     _AgentMetaFields,
@@ -227,8 +229,7 @@ class AgentService(Service):
         if self._meta.get_meta(agent_id) is not None:
             self._meta.patch(agent_id, **cast(_AgentMetaPatchFields, {column: now, "updated_at": now}))
         else:
-            # cast: runtime-chosen timestamp column (deleted_at / disabled_at)
-            payload: dict[str, str | int | None] = {
+            payload: _AgentMetaFields = cast(_AgentMetaFields, {
                 "agent_id": agent_id,
                 "sync_mode": "off",
                 "export_to_disk": 0,
@@ -238,7 +239,7 @@ class AgentService(Service):
                 "updated_at": now,
                 column: now,
             }
-            self._meta.insert(**cast(_AgentMetaFields, payload))
+            self._meta.insert(**payload)
         if column == "deleted_at":
             self._active.delete_for_agent(agent_id)
         return self._meta.get_meta(agent_id)
@@ -962,8 +963,8 @@ class AgentService(Service):
         *,
         agent_id: str,
         template: str,
-        bindings_override: list[dict] | None = None,
-    ) -> dict:
+        bindings_override: list[PromptBindingSpec] | None = None,
+    ) -> PromptPreviewResult:
         """Render the composed prompt preview for an agent.
 
         Thin delegator to the free-function in ``core.agents.composition.preview``.

@@ -13,6 +13,7 @@ from typing import cast
 
 from agentbox.core.constants import ResourceType
 from agentbox.core.data import RepoResourceRow
+from agentbox.core.data.payload_types import ResourceDetailResult, ResourceVersionsResult
 from agentbox.core.data.rows import ResourceVersionRow
 from agentbox.core.service.resources.service import (
     InvalidResource,
@@ -73,7 +74,7 @@ def create_resource(
     ))
 
 
-def get_resource(resource_id: str) -> dict:
+def get_resource(resource_id: str) -> ResourceDetailResult:
     return _svc().get_resource(resource_id)
 
 
@@ -84,7 +85,7 @@ def update_resource(resource_id: str, *, display_name: str | None = None, descri
     ))
 
 
-def list_versions(resource_id: str) -> dict:
+def list_versions(resource_id: str) -> ResourceVersionsResult:
     return _svc().list_versions(resource_id)
 
 

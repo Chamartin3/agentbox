@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings
+from agentbox.core.data import UsagePayload
 from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef, RunRecord
@@ -108,7 +109,7 @@ class _RunDispatchAdapter:
     def set_run_status(self, run_id: str, status: str) -> None:
         self._db.runs.set_status(run_id, status)
 
-    def get_usage(self, run_id: str) -> dict | None:
+    def get_usage(self, run_id: str) -> UsagePayload | None:
         return self._db.usage.get_dict(run_id)
 
     def record_webhook_delivery(
@@ -116,7 +117,7 @@ class _RunDispatchAdapter:
         run_id: str,
         attempt: int,
         url: str,
-        payload: dict | None = None,
+        payload: dict[str, Any] | None = None,
         response_status: int | None = None,
         response_body: str | None = None,
         latency_ms: int | None = None,

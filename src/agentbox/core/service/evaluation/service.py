@@ -17,8 +17,7 @@ from __future__ import annotations
 
 import json as _json
 from datetime import datetime
-from typing import Any
-
+from agentbox.core.data.payload_types import EnrichedRunRow, EnrichedRunsResult, RunnerProfileRow
 from agentbox.core.data.profiles import RunnerProfileStats
 from agentbox.core.data.rows import (
     ActivitySummaryRow,
@@ -131,7 +130,7 @@ class EvaluationService(Service):
         executor: str | None = None,
         state: str | None = None,
         limit: int = 50,
-    ) -> dict[str, Any]:
+    ) -> EnrichedRunsResult:
         """Recent runs with backend/model enrichment from runner snapshots.
 
         Resolves backend + configured_model for each run from:
@@ -144,7 +143,7 @@ class EvaluationService(Service):
             since_iso(range_), agent, state, executor, limit
         )
 
-        profile_cache: dict[str, Any] = {}
+        profile_cache: dict[str, RunnerProfileRow | None] = {}
 
         def _profile_backend_model(profile_id: str | None) -> tuple[str | None, str | None]:
             if not profile_id:
@@ -161,7 +160,7 @@ class EvaluationService(Service):
                 status_val, status_val
             )
 
-        out: list[dict[str, Any]] = []
+        out: list[EnrichedRunRow] = []
         for r in rows:
             started = r["created_at"]
             finished = r["finished_at"]

@@ -1,14 +1,14 @@
 """RenderedConfig — immutable run config dataclass."""
 
 from __future__ import annotations
+from typing import Any
 
 import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
-
+from agentbox.core.data.payload_types import AgentMetaDict
 from agentbox.core.resources.skills import SkillPack
 from agentbox.core.tools.canonical import CanonicalTool
 from ._mcp_types import McpToolSpec
@@ -38,7 +38,7 @@ class RenderedConfig:
     cwd: Path = Path(".")
     """Working directory relative to the run workdir root."""
 
-    agent_meta: dict[str, Any] = field(default_factory=dict)
+    agent_meta: AgentMetaDict = field(default_factory=AgentMetaDict)
     """Backend-specific agent metadata (e.g. agent_module, prompt for pydantic_ai
     in-process agents). Included in the digest computation."""
 

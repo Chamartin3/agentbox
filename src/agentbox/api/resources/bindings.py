@@ -15,6 +15,18 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_agent_service, get_resource_service, get_workspace_service
 from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
+from agentbox.core.data.payload_types import (
+    MaterializeDryRunResult,
+    PromptBindingItemsResult,
+    PromptBindingSpec,
+    PromptPreviewResult,
+    PromptResourcesResult,
+    ResourcePreviewModesResult,
+    SkillBindingsResult,
+    WorkspaceBindingItemsResult,
+    WorkspaceBindingSpec,
+    WorkspaceResourcesResult,
+)
 from agentbox.core.service.resources.service import (
     AgentVersionMissing,
     BindingError,
@@ -87,11 +99,35 @@ class ReplaceSkillBindings(BaseModel):
 # --- prompt bindings ---
 
 
+def _prompt_spec(b: PromptBindingIn) -> PromptBindingSpec:
+    return {
+        "resource_id": b.resource_id,
+        "marker": b.marker,
+        "mode": b.mode,
+        "slot": b.slot,
+        "attach_as_reference": b.attach_as_reference,
+        "pinned_version_id": b.pinned_version_id,
+        "required": b.required,
+        "display_order": b.display_order,
+    }
+
+
+def _workspace_spec(b: WorkspaceBindingIn) -> WorkspaceBindingSpec:
+    return {
+        "resource_id": b.resource_id,
+        "target_path": b.target_path,
+        "materialize_mode": b.materialize_mode,
+        "on_conflict": b.on_conflict,
+        "pinned_version_id": b.pinned_version_id,
+        "display_order": b.display_order,
+    }
+
+
 @router.get("/api/agents/{agent_id}/prompt-resources")
 def list_prompt_resources(
     agent_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict:
+) -> PromptResourcesResult:
     return svc.list_prompt_resources(agent_id)
 
 
@@ -100,11 +136,11 @@ def replace_prompt_resources(
     agent_id: str,
     body: ReplacePromptBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict:
+) -> PromptBindingItemsResult:
     try:
         return svc.replace_prompt_resources(
             agent_id,
-            [b.model_dump() for b in body.bindings],
+            [_prompt_spec(b) for b in body.bindings],
             reason=body.reason,
             actor=body.actor,
         )
@@ -117,9 +153,9 @@ def preview_prompt(
     agent_id: str,
     body: PreviewPromptBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict:
+) -> PromptPreviewResult:
     override = (
-        [b.model_dump() for b in body.bindings] if body.bindings is not None else None
+        [_prompt_spec(b) for b in body.bindings] if body.bindings is not None else None
     )
     try:
         return svc.preview_prompt(
@@ -140,7 +176,7 @@ def preview_prompt(
 def list_workspace_resources(
     workspace_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict:
+) -> WorkspaceResourcesResult:
     return svc.list_workspace_resources(workspace_id)
 
 
@@ -150,11 +186,11 @@ def replace_workspace_resources(
     body: ReplaceWorkspaceBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> WorkspaceBindingItemsResult:
     try:
         result = svc.replace_workspace_resources(
             workspace_id,
-            [b.model_dump() for b in body.bindings],
+            [_workspace_spec(b) for b in body.bindings],
             reason=body.reason,
             actor=body.actor,
         )
@@ -170,7 +206,7 @@ def replace_workspace_resources(
 def dry_run_workspace_resources(
     workspace_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict:
+) -> MaterializeDryRunResult:
     return svc.dry_run_workspace_resources(workspace_id)
 
 
@@ -181,7 +217,7 @@ def dry_run_workspace_resources(
 def preview_modes(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict:
+) -> ResourcePreviewModesResult:
     try:
         return svc.preview_modes(resource_id)
     except ResourceNotFound as exc:
@@ -239,7 +275,7 @@ def replace_workspace_subagents(
 def list_workspace_skill_bindings(
     workspace_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict:
+) -> SkillBindingsResult:
     return svc.list_workspace_skill_bindings(workspace_id)
 
 
@@ -249,7 +285,7 @@ def replace_workspace_skill_bindings(
     body: ReplaceSkillBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> WorkspaceBindingItemsResult:
     try:
         result = svc.replace_workspace_skill_bindings(
             workspace_id,

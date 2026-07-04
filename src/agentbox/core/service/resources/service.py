@@ -23,6 +23,30 @@ from jsonschema import Draft202012Validator
 
 from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.constants import ResourceType
+from agentbox.core.data.payload_types import (
+    EnrichedPromptBindingRow,
+    EnrichedWorkspaceBindingRow,
+    MaterializeConflict,
+    MaterializeDryRunEntry,
+    MaterializeDryRunResult,
+    PromptBindingItemsResult,
+    PromptBindingSpec,
+    PromptPreviewResult,
+    PromptResourcesResult,
+    RenderedResourceResult,
+    ResourceDetailResult,
+    ResourcePreviewMode,
+    ResourcePreviewModesResult,
+    ResourceTreeResult,
+    ResourceVersionsResult,
+    SchemaValidationErrorView,
+    ScriptSampleValidationResult,
+    SkillBindingsResult,
+    SkillCatalogItem,
+    WorkspaceBindingItemsResult,
+    WorkspaceBindingSpec,
+    WorkspaceResourcesResult,
+)
 from agentbox.core.data.records import SharedResourceRecord
 from agentbox.core.data.rows import (
     AgentPromptBindingRow,
@@ -205,7 +229,7 @@ class ResourceService(Service):
         except ValueError as exc:
             raise InvalidResource(str(exc)) from exc
 
-    def get_resource(self, resource_id: str) -> dict:
+    def get_resource(self, resource_id: str) -> ResourceDetailResult:
         """Return {resource, active_version} for a repo resource."""
         rid = self._resolve_or_raise(resource_id)
         r = self._resources.get_resource(rid)
@@ -241,7 +265,7 @@ class ResourceService(Service):
             raise ResourceNotFound(resource_id)
         return updated
 
-    def list_versions(self, resource_id: str) -> dict:
+    def list_versions(self, resource_id: str) -> ResourceVersionsResult:
         """Return {items: [...]} of all versions for a repo resource."""
         rid = self._resolve_or_raise(resource_id)
         return {"items": self._resource_versions.list_versions(rid)}
@@ -430,27 +454,35 @@ class ResourceService(Service):
 
     def render_resource(
         self, resource_id: str, *, version_id: str | None = None
-    ) -> dict:
+    ) -> RenderedResourceResult:
         """Render a resource as text (inline / manifest / skill_primer)."""
         rid = self._resolve_or_raise(resource_id)
         resource = self._require_resource(rid)
         vid: str = version_id or self._active_version_or_raise(rid)["id"]
         blobs = list(self._resource_blobs.iter_blobs(vid))
-        return {"resource_id": rid, "version_id": vid, **render_for_type(resource["type"], blobs)}
+        rendered = render_for_type(resource["type"], blobs)
+        return {
+            "resource_id": rid,
+            "version_id": vid,
+            "text": rendered["text"],
+            "metadata": rendered["metadata"],
+        }
 
-    def get_tree(self, resource_id: str, *, version_id: str | None = None) -> dict:
+    def get_tree(self, resource_id: str, *, version_id: str | None = None) -> ResourceTreeResult:
         """Return the file tree for a versioned resource."""
         rid = self._resolve_or_raise(resource_id)
         vid: str = version_id or self._active_version_or_raise(rid)["id"]
-        entries = [
-            {
-                "relative_path": b.get("relative_path") or "",
-                "size_bytes": b.get("size_bytes"),
-                "mime_type": b.get("mime_type"),
-            }
-            for b in self._resource_blobs.iter_blobs(vid)
-        ]
-        return {"version_id": vid, "entries": entries}
+        return {
+            "version_id": vid,
+            "entries": [
+                {
+                    "relative_path": b.get("relative_path") or "",
+                    "size_bytes": b.get("size_bytes"),
+                    "mime_type": b.get("mime_type"),
+                }
+                for b in self._resource_blobs.iter_blobs(vid)
+            ],
+        }
 
     def export_pydantic(
         self,
@@ -479,7 +511,7 @@ class ResourceService(Service):
         *,
         sample: Any,
         direction: Literal["input", "output"] = "input",
-    ) -> dict:
+    ) -> ScriptSampleValidationResult:
         """Validate a sample against the script's bound schema."""
         resource = self._require_resource(resource_id)
         if resource["type"] != "script":
@@ -499,7 +531,7 @@ class ResourceService(Service):
             raise InvalidResource("schema blob missing")
         schema_doc = json.loads(schema_blob.get("content_text") or schema_blob["content"])
         validator = Draft202012Validator(schema_doc)
-        errors = [
+        errors: list[SchemaValidationErrorView] = [
             {"path": list(e.absolute_path), "message": e.message}
             for e in validator.iter_errors(sample)
         ]
@@ -523,7 +555,7 @@ class ResourceService(Service):
         filename = f"{resource['slug'].replace(':', '_')}.zip"
         return buf.getvalue(), filename
 
-    def preview_modes(self, resource_id: str) -> dict:
+    def preview_modes(self, resource_id: str) -> ResourcePreviewModesResult:
         """Return available preview modes for a resource."""
         resource = self._resources.get_resource(resource_id)
         if not resource:
@@ -533,13 +565,18 @@ class ResourceService(Service):
             return {"modes": []}
         blobs = list(self._resource_blobs.iter_blobs(active["id"]))
         rtype = resource["type"]
-        modes: list[dict] = []
+
+        def _mode(mode: str) -> ResourcePreviewMode:
+            rendered = render_for_type(rtype, blobs)
+            return {"mode": mode, "text": rendered["text"], "metadata": rendered["metadata"]}
+
+        modes: list[ResourcePreviewMode] = []
         if rtype == "document":
-            modes.append({"mode": "inline", **render_for_type("document", blobs)})
+            modes.append(_mode("inline"))
         if rtype == "folder":
-            modes.append({"mode": "manifest", **render_for_type("folder", blobs)})
+            modes.append(_mode("manifest"))
         if rtype == "skill":
-            modes.append({"mode": "skill_primer", **render_for_type("skill", blobs)})
+            modes.append(_mode("skill_primer"))
             modes.append(
                 {"mode": "name_only", "text": f"- {resource['display_name']}", "metadata": {"role": "name_only"}}
             )
@@ -553,7 +590,7 @@ class ResourceService(Service):
         return self._prompt_bindings.list_for_agent(agent_id)
 
     def replace_prompt_bindings(
-        self, agent_id: str, bindings: list[dict], *, reason: str, actor: str | None = None
+        self, agent_id: str, bindings: list[PromptBindingSpec], *, reason: str, actor: str | None = None
     ) -> list[AgentPromptBindingRow]:
         return self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)
 
@@ -561,14 +598,14 @@ class ResourceService(Service):
         return self._file_bindings.list_for_workspace(workspace_id)
 
     def replace_workspace_file_bindings(
-        self, workspace_id: str, bindings: list[dict[str, object]], *, reason: str, actor: str | None = None
+        self, workspace_id: str, bindings: list[WorkspaceBindingSpec], *, reason: str, actor: str | None = None
     ) -> list[WorkspaceFileBindingRow]:
         return self._file_bindings.replace_for_workspace(workspace_id, bindings, reason=reason, actor=actor)
 
-    def list_prompt_resources(self, agent_id: str) -> dict:
+    def list_prompt_resources(self, agent_id: str) -> PromptResourcesResult:
         """Return enriched prompt bindings for an agent."""
         bindings = self._prompt_bindings.list_for_agent(agent_id)
-        enriched = []
+        enriched: list[EnrichedPromptBindingRow] = []
         for b in bindings:
             resource = self._resources.get_resource(b["resource_id"])
             active = (
@@ -578,8 +615,19 @@ class ResourceService(Service):
             )
             enriched.append(
                 {
-                    **b,
+                    "id": b["id"],
+                    "agent_id": b["agent_id"],
+                    "resource_id": b["resource_id"],
+                    "marker": b["marker"],
+                    "mode": b["mode"],
+                    "slot": b["slot"],
                     "attach_as_reference": bool(b.get("attach_as_reference")),
+                    "pinned_version_id": b["pinned_version_id"],
+                    "display_order": b["display_order"],
+                    "required": b["required"],
+                    "changelog": b["changelog"],
+                    "created_at": b["created_at"],
+                    "created_by": b["created_by"],
                     "resource_slug": resource["slug"] if resource else None,
                     "resource_type": resource["type"] if resource else None,
                     "resource_display_name": resource["display_name"] if resource else None,
@@ -591,11 +639,11 @@ class ResourceService(Service):
     def replace_prompt_resources(
         self,
         agent_id: str,
-        bindings: list[dict],
+        bindings: list[PromptBindingSpec],
         *,
         reason: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> PromptBindingItemsResult:
         """Atomically replace all prompt bindings for an agent."""
         try:
             return {"items": self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)}
@@ -607,8 +655,8 @@ class ResourceService(Service):
         agent_id: str,
         *,
         template: str | None = None,
-        bindings_override: list[dict] | None = None,
-    ) -> dict:
+        bindings_override: list[PromptBindingSpec] | None = None,
+    ) -> PromptPreviewResult:
         """Render a preview of the agent prompt with resource bindings resolved.
 
         Delegates to ``AgentService.render_agent_prompt_preview`` which owns
@@ -631,10 +679,10 @@ class ResourceService(Service):
     # Workspace file resource bindings
     # -----------------------------------------------------------------------
 
-    def list_workspace_resources(self, workspace_id: str) -> dict:
+    def list_workspace_resources(self, workspace_id: str) -> WorkspaceResourcesResult:
         """Return enriched workspace file bindings."""
         bindings = self._file_bindings.list_for_workspace(workspace_id)
-        enriched = []
+        enriched: list[EnrichedWorkspaceBindingRow] = []
         for b in bindings:
             resource = self._resources.get_resource(b["resource_id"])
             active = (
@@ -655,11 +703,11 @@ class ResourceService(Service):
     def replace_workspace_resources(
         self,
         workspace_id: str,
-        bindings: list[dict],
+        bindings: list[WorkspaceBindingSpec],
         *,
         reason: str,
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceBindingItemsResult:
         """Atomically replace workspace file bindings."""
         try:
             items = self._file_bindings.replace_for_workspace(
@@ -669,12 +717,12 @@ class ResourceService(Service):
             raise BindingError(str(exc)) from exc
         return {"items": items}
 
-    def dry_run_workspace_resources(self, workspace_id: str) -> dict:
+    def dry_run_workspace_resources(self, workspace_id: str) -> MaterializeDryRunResult:
         """Compute the materialization plan without writing anything."""
         bindings = self._file_bindings.list_for_workspace(workspace_id)
-        entries: list[dict] = []
+        entries: list[MaterializeDryRunEntry] = []
         seen_paths: dict[str, str] = {}
-        conflicts: list[dict] = []
+        conflicts: list[MaterializeConflict] = []
         for b in bindings:
             resource = self._resources.get_resource(b["resource_id"])
             if not resource:
@@ -718,7 +766,7 @@ class ResourceService(Service):
     # Workspace skill bindings
     # -----------------------------------------------------------------------
 
-    def list_workspace_skill_bindings(self, workspace_id: str) -> dict:
+    def list_workspace_skill_bindings(self, workspace_id: str) -> SkillBindingsResult:
         """Return all skill resources with a 'bound' flag for the workspace."""
         catalog = self._resources.list_resources(type="skill", limit=500)
         current = self._file_bindings.list_for_workspace(workspace_id)
@@ -727,7 +775,7 @@ class ResourceService(Service):
             resource = self._resources.get_resource(b["resource_id"])
             if resource and resource.get("type") == "skill":
                 bound_ids.add(b["resource_id"])
-        items = [{**r, "bound": r["id"] in bound_ids} for r in catalog]
+        items: list[SkillCatalogItem] = [{**r, "bound": r["id"] in bound_ids} for r in catalog]
         return {"items": items}
 
     def replace_workspace_skill_bindings(
@@ -737,7 +785,7 @@ class ResourceService(Service):
         *,
         reason: str = "skill bindings update",
         actor: str | None = None,
-    ) -> dict:
+    ) -> WorkspaceBindingItemsResult:
         """Replace only the skill-type bindings for a workspace."""
         try:
             items = self._file_bindings.replace_skill_bindings(

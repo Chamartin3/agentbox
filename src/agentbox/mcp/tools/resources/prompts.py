@@ -4,8 +4,17 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
+from typing import NotRequired, TypedDict
+
+from agentbox.core.data.payload_types import PromptPreviewResult
 from agentbox.core.service.agents import PreviewError
 from agentbox.mcp.context import MCPContext
+
+
+class PreviewToolError(TypedDict):
+    error: str
+    detail: NotRequired[str]
+    agent_id: NotRequired[str]
 
 
 def register_prompts(mcp: FastMCP, ctx: MCPContext) -> None:
@@ -13,7 +22,7 @@ def register_prompts(mcp: FastMCP, ctx: MCPContext) -> None:
     def preview_prompt(
         agent_id: str,
         template_override: str | None = None,
-    ) -> dict:
+    ) -> PromptPreviewResult | PreviewToolError:
         """Render the agent's fully composed prompt with all bindings applied.
 
         Returns the final ``rendered_prompt`` plus a ``char_breakdown``

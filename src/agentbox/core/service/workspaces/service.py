@@ -20,7 +20,7 @@ from typing import Any
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.constants import BackendName, McpPolicy
-from agentbox.core.data import EnvDocRow
+from agentbox.core.data import EnvDocPreviewResult, EnvDocRow
 from agentbox.core.data.rows import (
     HostEnvProfileRow,
     WorkenvTemplateRow,
@@ -1304,7 +1304,7 @@ def env_doc_body(content: Any) -> str:
     return ""
 
 
-def render_env_doc_preview(content: Any) -> dict[str, str]:
+def render_env_doc_preview(content: Any) -> EnvDocPreviewResult:
     """Preview the instruction files. Identical body for every engine."""
     body = env_doc_body(content)
     return {"claude_md": body, "agents_md": body}

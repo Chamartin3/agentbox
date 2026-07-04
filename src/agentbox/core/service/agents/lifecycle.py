@@ -4,8 +4,6 @@ import difflib
 import hashlib
 import json
 import uuid
-from typing import Any
-
 from agentbox.core.data import (
     AgentDef,
     AgentMetaRow,
@@ -16,6 +14,7 @@ from agentbox.core.data import (
     PromptVersionRow,
 )
 from agentbox.core.data._util import now_iso
+from agentbox.core.data.payload_types import AgentDiffResult, JsonDiffResult
 from agentbox.core.db import (
     ActiveAgentVersionManager,
     AgentDefManager,
@@ -42,7 +41,7 @@ def _text_diff(a: str, b: str) -> str:
     )
 
 
-def _json_diff(a: str, b: str) -> dict:
+def _json_diff(a: str, b: str) -> JsonDiffResult:
     try:
         obj_a = json.loads(a) if a else {}
         obj_b = json.loads(b) if b else {}
@@ -458,7 +457,7 @@ def diff_versions(
     agent_id: str,
     a: int,
     b: int,
-) -> dict[str, Any]:
+) -> AgentDiffResult:
     """Diff two agent versions."""
     va = agent_versions.get_by_number(agent_id, a)
     vb = agent_versions.get_by_number(agent_id, b)

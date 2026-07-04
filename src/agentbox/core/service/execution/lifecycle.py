@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import UsagePayload
+
 import logging
 from typing import Any
 
@@ -27,7 +29,7 @@ def complete_run(
     ok: bool,
     output: str | None,
     error: str | None,
-    usage: dict | None,
+    usage: UsagePayload | None,
     schedule_webhook_cb: Any = None,
 ) -> dict:
     """Finalize a run from an external worker."""

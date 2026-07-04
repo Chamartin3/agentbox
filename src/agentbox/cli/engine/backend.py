@@ -6,6 +6,7 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.core.constants import BackendName
+from agentbox.core.data import BackendLabelsDict
 
 app = typer.Typer(
     name="backends",
@@ -13,7 +14,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-_LABELS: dict[str, str] = {
+_LABELS: dict[BackendName, str] = {
     BackendName.CLAUDE_CODE: "Claude Code (CLI)",
     BackendName.OPENCODE: "OpenCode (CLI)",
     BackendName.CODEX: "OpenAI Codex (CLI)",

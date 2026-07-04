@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+
 from ._mcp_types import McpToolSpec  # noqa: F401  # re-export
 
 

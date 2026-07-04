@@ -10,6 +10,7 @@ from rich.table import Table
 from rich.text import Text
 
 from agentbox.cli.shared.constants import JsonValue
+from agentbox.core.data.payload_types import EnrichedRunRow, UsagePayload
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.service import RunCommentRow, UsageSummaryRow
 
@@ -68,7 +69,7 @@ class RunRenderer(Renderer):
     # history show -- run detail panels
     # ------------------------------------------------------------------
 
-    def run_detail(self, run_dict: Mapping[str, JsonValue], usage: Mapping[str, JsonValue] | None) -> None:
+    def run_detail(self, run_dict: Mapping[str, JsonValue], usage: UsagePayload | None) -> None:
         """Render the 'history show' run detail panels."""
         meta = Table.grid(padding=(0, 2))
         meta.add_column(style="dim", justify="right")
@@ -113,7 +114,7 @@ class RunRenderer(Renderer):
     # history stat runs -- enriched runs table
     # ------------------------------------------------------------------
 
-    def stats_table(self, results: Sequence[Mapping[str, JsonValue]]) -> None:
+    def stats_table(self, results: Sequence[EnrichedRunRow]) -> None:
         """Render the 'history stat runs' table."""
         table = Table(title="Recent Runs", header_style="bold cyan", padding=(0, 1))
         table.add_column("Run ID", style="bold")

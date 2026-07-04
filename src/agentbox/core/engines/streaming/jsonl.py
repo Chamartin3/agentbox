@@ -11,6 +11,7 @@ parsing lives in the caller.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import asyncio
 import contextlib
@@ -18,8 +19,6 @@ import json
 import time
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
-from typing import Any
-
 from agentbox.core.constants import LogLevel, RunStatus
 from agentbox.core.events import (
     DoneEvent,
@@ -46,7 +45,7 @@ async def stream_jsonl_subprocess(
     argv: list[str],
     cwd: Path,
     env: dict[str, str],
-    timeout: int,
+    timeout: int | None,
     parse_event: EventParser,
     stdin_data: bytes | None = None,
     cli_label: str = "subprocess",
@@ -162,7 +161,7 @@ async def stream_jsonl_subprocess(
         yield (
             TimeoutEvent(
                 run_id=run_id,
-                timeout_seconds=timeout,
+                timeout_seconds=timeout or 0,
                 error=f"timeout after {timeout}s",
             ),
             captured_session_id,

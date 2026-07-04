@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+
+from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.agents.config import ExecutionConfig, resolve_output_config
 
 from agentbox.core.agents.validation.gates import (
@@ -22,7 +24,7 @@ from agentbox.core.agents.validation.schema import (
 
 
 def _run_gates(
-    json_schema: dict[str, Any] | None,
+    json_schema: JsonSchemaDict | None,
     validators: Iterable[Any],
     output: str,
 ) -> ValidationResult:
@@ -35,7 +37,7 @@ def _run_gates(
     view-based entrypoints run identical gate logic.
     """
     if json_schema is not None:
-        result = run_json_schema(json_schema, output)
+        result = run_json_schema(dict(json_schema), output)
         if not result.ok:
             return result
 

@@ -28,6 +28,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
+from agentbox.core.data.payload_types import JsonSchemaDict, AgentMetaDict
 from agentbox.core.events import DoneEvent, LogEvent, RunEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, HasAgentConfig, RenderedConfig
 from agentbox.core.engines.contracts.views import PythonAgentConfigView
@@ -104,7 +105,7 @@ class TokenBackend(BackendAdapter):
         model = getattr(runner_config, "model", None) or self.default_model
 
         # Effective tools = agent ∩ workspace (canonical).
-        effective_tools: set = set()
+        effective_tools: set[CanonicalTool] = set()
         if runtime_config is not None:
             effective_tools = intersect_allowed_tools(
                 set(runtime_config.allowed_tools),
@@ -112,9 +113,9 @@ class TokenBackend(BackendAdapter):
             )
 
         # Load output schema …
-        output_schema: dict[str, Any] | None = None
+        output_schema: JsonSchemaDict | None = None
         composed_schema = composed.schema if composed is not None else None
-        if isinstance(composed_schema, dict):
+        if composed_schema is not None:
             output_schema = composed_schema
         elif python_cfg.output_schema_path:
             schema_path = workdir / python_cfg.output_schema_path
@@ -143,20 +144,20 @@ class TokenBackend(BackendAdapter):
         references = (composed.references if composed is not None else ()) or ()
         input_schema = composed.input_schema if composed is not None else None
 
-        agent_meta: dict[str, Any] = {
+        agent_meta: AgentMetaDict = {
             "agent_module": python_cfg.agent_module,
             "prompt": prompt,
             "agent_id": agent.id,
             "model": model,
             "output_schema": output_schema,
-            "input_schema": input_schema if isinstance(input_schema, dict) else None,
+            "input_schema": input_schema,
             "references": [
                 {"heading": r.heading, "content": r.content} for r in references
             ],
             "timeout_seconds": getattr(
                 getattr(agent, "runner", None), "timeout_seconds", None
             ),
-            "effective_tools": sorted(effective_tools),
+            "effective_tools": sorted(str(t) for t in effective_tools),
         }
 
         # Store provider routing info from runner_config if present.

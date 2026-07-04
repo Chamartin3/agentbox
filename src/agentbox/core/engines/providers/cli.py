@@ -10,6 +10,7 @@ import subprocess
 from typing import Any
 
 from agentbox.core.constants import BackendName
+from agentbox.core.data.payload_types import CodexModelRow
 from agentbox.core.engines.providers.base import (
     Provider,
     ProviderDescriptor,
@@ -85,16 +86,16 @@ def discover_opencode_providers() -> list[str]:
     return sorted(prefixes)
 
 
-def _compact_codex_raw(item: dict[str, Any]) -> dict[str, Any]:
-    keep = (
-        "slug",
-        "display_name",
-        "description",
-        "visibility",
-        "supported_in_api",
-        "priority",
-    )
-    return {key: item[key] for key in keep if key in item}
+def _compact_codex_raw(item: dict[str, Any]) -> CodexModelRow:
+    priority = item.get("priority")
+    return {
+        "slug": str(item.get("slug", "")),
+        "display_name": str(item.get("display_name", "")),
+        "description": str(item.get("description", "")),
+        "visibility": str(item.get("visibility", "")),
+        "supported_in_api": bool(item.get("supported_in_api", False)),
+        "priority": priority if isinstance(priority, int) else None,
+    }
 
 
 class CodexCLIAdapter:
@@ -129,7 +130,7 @@ class CodexCLIAdapter:
                 ProviderModel(
                     id=slug,
                     name=item.get("display_name") or slug,
-                    raw=_compact_codex_raw(item),
+                    raw=dict(_compact_codex_raw(item)),
                 )
             )
         return models

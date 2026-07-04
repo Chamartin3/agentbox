@@ -488,7 +488,7 @@ class ResourceBlobManager(Manager[ResourceBlob]):
             ).first()
             return cast(ResourceBlobRow, dict(row._mapping)) if row else None
 
-    def iter_blobs(self, version_id: str) -> Iterator[dict]:
+    def iter_blobs(self, version_id: str) -> Iterator[ResourceBlobRow]:
         """Yield all blobs for a version ordered by relative_path."""
         with self._engine.connect() as conn:
             rows = conn.execute(
@@ -497,7 +497,7 @@ class ResourceBlobManager(Manager[ResourceBlob]):
                 .order_by(resource_blobs.c.relative_path)
             )
             for r in rows:
-                yield dict(r._mapping)
+                yield cast(ResourceBlobRow, dict(r._mapping))
 
 
 # ---------------------------------------------------------------------------

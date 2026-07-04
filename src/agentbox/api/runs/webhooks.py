@@ -16,7 +16,7 @@ from typing import Any
 from agentbox.api.deps import get_settings
 from agentbox.core.config import Settings
 from agentbox.core.execution.dispatch import deliver_webhook, dispatch_completion
-from agentbox.core.execution.dispatch.payload import build_completion_payload
+from agentbox.core.execution.dispatch.payload import AgentEventPayload, build_completion_payload
 from agentbox.core.execution.dispatch.policy import apply_delivery_outcome
 from agentbox.core.service import AgentDef, ExecutionService, RunRecord
 
@@ -73,7 +73,7 @@ async def resend_webhook(
         return False, "no webhook_url configured"
     exec_svc = ExecutionService()
     payload = build_completion_payload(run, exec_svc)
-    delivered = await deliver_webhook(url, dict(payload))
+    delivered = await deliver_webhook(url, payload)
     apply_delivery_outcome(exec_svc, run.id, delivered)
     return delivered, None if delivered else "delivery failed; see server logs"
 
@@ -88,7 +88,7 @@ def schedule_agent_event_webhook(
     reason: str,
 ) -> None:
     """Best-effort: schedule an agent event webhook."""
-    payload = {
+    payload: AgentEventPayload = {
         "event": event,
         "agent_id": agent_id,
         "version": version,

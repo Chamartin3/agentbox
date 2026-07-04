@@ -143,7 +143,7 @@ class ClaudeCodeBackend(BackendAdapter):
             list(rendered.argv),
             rendered.cwd,
             dict(rendered.env),
-            rendered.agent_meta["timeout_seconds"],
+            rendered.agent_meta.get("timeout_seconds"),
             stdin_data=input.encode("utf-8"),
         ):
             yield ev
@@ -159,7 +159,7 @@ async def _run_claude(
     argv: list[str],
     cwd: Path,
     env: dict[str, str],
-    timeout: int,
+    timeout: int | None,
     stdin_data: bytes | None = None,
 ) -> AsyncIterator[RunEvent]:
     try:
@@ -245,7 +245,7 @@ async def _run_claude(
             await wait_task
         stderr_task.cancel()
         yield TimeoutEvent(
-            run_id=run_id, timeout_seconds=timeout, error=f"timeout after {timeout}s"
+            run_id=run_id, timeout_seconds=timeout or 0, error=f"timeout after {timeout}s"
         )
         yield DoneEvent(
             run_id=run_id, ok=False, error=f"timeout after {timeout}s", status=RunStatus.TIMEOUT

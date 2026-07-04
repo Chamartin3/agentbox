@@ -10,6 +10,7 @@ import json as _json
 from typing import Any
 
 
+
 def _read_agent_config_json(agent: Any) -> dict[str, Any]:
     """Read the ``config_json`` dict attached to an agent, if any.
 

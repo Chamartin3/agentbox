@@ -48,7 +48,7 @@ async def _run_opencode_stream(
     argv: list[str],
     cwd: Path,
     env: dict[str, str],
-    timeout: int = 1200,
+    timeout: int | None = 1200,
     stdin_data: bytes | None = None,
 ) -> AsyncIterator[RunEvent]:
     try:
@@ -283,7 +283,7 @@ async def _run_opencode_stream(
         for sl in stderr_lines:
             if sl.strip():
                 yield LogEvent(run_id=run_id, level=LogLevel.WARN, message=sl)
-        yield TimeoutEvent(run_id=run_id, timeout_seconds=timeout, error=f"timeout after {timeout}s")
+        yield TimeoutEvent(run_id=run_id, timeout_seconds=timeout or 0, error=f"timeout after {timeout}s")
         yield DoneEvent(run_id=run_id, ok=False, error=f"timeout after {timeout}s", status=RunStatus.TIMEOUT)
         return
 

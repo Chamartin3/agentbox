@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
 
 from agentbox.core.agents.config import (
     HttpValidatorConfig,
@@ -13,6 +12,17 @@ from agentbox.core.agents.config import (
 from agentbox.core.agents.composition.bundle import _append_input_schema, _append_schema
 from agentbox.core.agents.composition.output_contract import render as _render_output_contract
 from agentbox.core.agents.composition.rendering import render_for_type
+from agentbox.core.data.payload_types import (
+    CharBreakdownPart,
+    JsonSchemaDict,
+    HttpValidatorView,
+    PromptBindingSpec,
+    ReferenceMetaView,
+    ResolvedBindingView,
+    SchemaSlotView,
+    ScriptValidatorView,
+    ValidationView,
+)
 from agentbox.core.db import (
     AgentVersionManager,
     ResourceBlobManager,
@@ -34,9 +44,9 @@ def _resolve_binding(
     resources: ResourceManager,
     resource_versions: ResourceVersionManager,
     resource_blobs: ResourceBlobManager,
-    b: Mapping[str, object],
-) -> dict:
-    resource_id = str(b["resource_id"])
+    b: PromptBindingSpec,
+) -> ResolvedBindingView:
+    resource_id = b["resource_id"]
     resource = resources.get_resource(resource_id)
     if not resource:
         raise PreviewError(
@@ -76,11 +86,11 @@ def _resolve_binding(
 
 
 def _render_references_block(
-    resolved: list[dict],
-) -> tuple[str, list[dict], list[dict]]:
+    resolved: list[ResolvedBindingView],
+) -> tuple[str, list[ReferenceMetaView], list[CharBreakdownPart]]:
     parts: list[str] = []
-    refs_meta: list[dict] = []
-    per_ref_chars: list[dict] = []
+    refs_meta: list[ReferenceMetaView] = []
+    per_ref_chars: list[CharBreakdownPart] = []
     for b in resolved:
         if not b.get("attach_as_reference") or b.get("slot"):
             continue
@@ -116,7 +126,7 @@ def _render_references_block(
     return "## References\n\n" + "\n\n".join(parts), refs_meta, per_ref_chars
 
 
-def _schema_for_slot(resolved: list[dict], slot: str) -> dict | None:
+def _schema_for_slot(resolved: list[ResolvedBindingView], slot: str) -> SchemaSlotView | None:
     for b in resolved:
         if b.get("slot") == slot and b.get("attach_as_reference"):
             rendered = render_for_type(b["type"], b.get("blobs") or [])
@@ -135,7 +145,7 @@ def _validation_block_for_preview(
     agent_versions: AgentVersionManager,
     resources: ResourceManager,
     agent_id: str,
-) -> tuple[str, dict | None]:
+) -> tuple[str, ValidationView | None]:
     """Render the validators hint block from the agent's inline
     ``config_json["output"].validators`` on the active version.
 
@@ -163,8 +173,8 @@ def _validation_block_for_preview(
     )
     if not isinstance(entries, list) or not entries:
         return "", None
-    validators_meta: list[dict] = []
-    runtime_validators: list = []
+    validators_meta: list[HttpValidatorView | ScriptValidatorView] = []
+    runtime_validators: list[HttpValidatorConfig | ScriptValidatorConfig] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -176,7 +186,7 @@ def _validation_block_for_preview(
             validators_meta.append(
                 {
                     "kind": "http",
-                    "endpoint": entry.get("endpoint", ""),
+                    "endpoint": str(entry.get("endpoint", "")),
                     "timeout_seconds": int(entry.get("timeout_seconds", 5)),
                     "description": description,
                 }
@@ -190,14 +200,14 @@ def _validation_block_for_preview(
                 )
             )
         elif kind == "script":
-            rid = entry.get("resource_id", "")
+            rid = str(entry.get("resource_id", ""))
             resource = resources.get_resource(rid) if rid else None
             validators_meta.append(
                 {
                     "kind": "script",
                     "resource_id": rid,
-                    "resource_slug": (resource or {}).get("slug"),
-                    "resource_display_name": (resource or {}).get("display_name"),
+                    "resource_slug": resource["slug"] if resource else None,
+                    "resource_display_name": resource["display_name"] if resource else None,
                     "pinned_version_id": entry.get("pinned_version_id"),
                     "description": description,
                 }
@@ -219,16 +229,17 @@ def _validation_block_for_preview(
             validators=tuple(runtime_validators),
         )
     )
-    view = {
+    view: ValidationView = {
         "validators": validators_meta,
     }
     return rendered, view
 
 
-def _schema_block(slot: str, schema_view: dict | None) -> str:
+def _schema_block(slot: str, schema_view: SchemaSlotView | None) -> str:
     if not schema_view or not schema_view.get("text"):
         return ""
     text = schema_view["text"]
+    parsed: JsonSchemaDict | None
     try:
         parsed = json.loads(text)
     except (TypeError, ValueError):

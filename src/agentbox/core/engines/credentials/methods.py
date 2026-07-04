@@ -8,9 +8,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
 from agentbox.core.config import SETTINGS
+from agentbox.core.data.payload_types import CredentialContext
 
 
 @dataclass
@@ -24,7 +23,7 @@ class Method:
     container_target: str | None = None
     provider: str | None = None
 
-    def apply(self, ctx: dict[str, Any]) -> None:
+    def apply(self, ctx: CredentialContext) -> None:
         if self.key == "import_host" and self.host_source and self.container_target:
             _import_host_credential(self.host_source, self.container_target)
         elif self.key == "login" and self.command:

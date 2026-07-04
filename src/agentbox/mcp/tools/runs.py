@@ -8,6 +8,7 @@ from typing import Any
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
+from agentbox.core.data import NotFoundResult, UsagePayload
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -187,10 +188,12 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         return {"run_id": run_id, "items": items, "total": len(items)}
 
     @mcp.tool
-    def get_run_usage(run_id: str) -> dict:
+    def get_run_usage(run_id: str) -> UsagePayload | NotFoundResult:
         """Token + cost breakdown for a single run."""
         usage = ctx.execution.get_usage(run_id)
-        return usage or {"error": "not_found", "run_id": run_id}
+        if usage is None:
+            return {"error": "not_found", "run_id": run_id}
+        return usage
 
     @mcp.tool
     def get_run_output(run_id: str) -> dict:

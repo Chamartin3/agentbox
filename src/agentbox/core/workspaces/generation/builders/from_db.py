@@ -1,7 +1,6 @@
 """Load a WorkenvConfig from the authoritative DB state."""
 
 from __future__ import annotations
-
 from typing import Any
 
 from agentbox.core.config import Settings

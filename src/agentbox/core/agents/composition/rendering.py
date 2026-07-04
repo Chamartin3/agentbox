@@ -16,14 +16,17 @@ the text goes.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+
+from agentbox.core.data.payload_types import RenderedBlob
+from agentbox.core.data.rows import ResourceBlobRow
 
 SKILL_ENTRY = "SKILL.md"
 
 
-def _blob_text(blob: dict) -> str:
-    if blob.get("content_text"):
-        return blob["content_text"]
+def _blob_text(blob: ResourceBlobRow) -> str:
+    text = blob.get("content_text")
+    if text:
+        return text
     content = blob.get("content")
     if isinstance(content, (bytes, bytearray)):
         try:
@@ -35,13 +38,13 @@ def _blob_text(blob: dict) -> str:
     return ""
 
 
-def render_document(blobs: Iterable[dict]) -> dict[str, Any]:
+def render_document(blobs: Iterable[ResourceBlobRow]) -> RenderedBlob:
     blobs = list(blobs)
     body = _blob_text(blobs[0]) if blobs else ""
     return {"text": body, "metadata": {"role": "document"}}
 
 
-def render_folder_manifest(blobs: Iterable[dict]) -> dict[str, Any]:
+def render_folder_manifest(blobs: Iterable[ResourceBlobRow]) -> RenderedBlob:
     blobs = list(blobs)
     paths = [b["relative_path"] for b in blobs if b.get("relative_path")]
     text = "\n".join(f"- {p}" for p in sorted(paths))
@@ -51,7 +54,7 @@ def render_folder_manifest(blobs: Iterable[dict]) -> dict[str, Any]:
     }
 
 
-def render_skill_primer(blobs: Iterable[dict]) -> dict[str, Any]:
+def render_skill_primer(blobs: Iterable[ResourceBlobRow]) -> RenderedBlob:
     blobs = list(blobs)
     entry = next((b for b in blobs if b.get("relative_path") == SKILL_ENTRY), None)
     if entry is None:
@@ -66,19 +69,19 @@ def render_skill_primer(blobs: Iterable[dict]) -> dict[str, Any]:
     }
 
 
-def render_schema(blobs: Iterable[dict]) -> dict[str, Any]:
+def render_schema(blobs: Iterable[ResourceBlobRow]) -> RenderedBlob:
     blobs = list(blobs)
     body = _blob_text(blobs[0]) if blobs else ""
     return {"text": body, "metadata": {"role": "schema"}}
 
 
-def render_script(blobs: Iterable[dict]) -> dict[str, Any]:
+def render_script(blobs: Iterable[ResourceBlobRow]) -> RenderedBlob:
     blobs = list(blobs)
     body = _blob_text(blobs[0]) if blobs else ""
     return {"text": body, "metadata": {"role": "script"}}
 
 
-def render_for_type(type: str, blobs: Iterable[dict]) -> dict[str, Any]:
+def render_for_type(type: str, blobs: Iterable[ResourceBlobRow]) -> RenderedBlob:
     if type == "document":
         return render_document(blobs)
     if type == "folder":

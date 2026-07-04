@@ -11,7 +11,7 @@ directly from ``agentbox.core.events``; there are no re-export shims.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class _EventBase(BaseModel):
 class ToolCallEvent(_EventBase):
     type: Literal[EventType.TOOL_CALL] = EventType.TOOL_CALL
     tool: str
-    arguments: dict
+    arguments: dict[str, Any]
     call_id: str | None = None
 
 

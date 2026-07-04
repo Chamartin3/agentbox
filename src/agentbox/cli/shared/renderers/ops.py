@@ -12,6 +12,8 @@ from rich.text import Text
 from rich.tree import Tree
 
 from agentbox.cli.shared.constants import JsonValue
+from agentbox.core.data.payload_types import EnrichedPromptBindingRow
+from agentbox.core.data.rows import ResourceVersionRow
 from agentbox.cli.shared.render import Renderer
 
 from agentbox.core.config import Settings
@@ -173,7 +175,7 @@ class OpsRenderer(Renderer):
         self,
         slug: str,
         resource: RepoResourceRow,
-        versions: Sequence[Mapping[str, JsonValue]],
+        versions: Sequence[ResourceVersionRow],
     ) -> None:
         """Render resource metadata + version history."""
         meta = self.grid()
@@ -189,7 +191,7 @@ class OpsRenderer(Renderer):
             return
         self.version_table(versions)
 
-    def version_table(self, versions: Sequence[Mapping[str, JsonValue]]) -> None:
+    def version_table(self, versions: Sequence[ResourceVersionRow]) -> None:
         """Render a version list table."""
         vtable = RichTable(header_style="bold green", padding=(0, 1))
         vtable.add_column("#", style="dim")
@@ -219,7 +221,7 @@ class OpsRenderer(Renderer):
     # ------------------------------------------------------------------
 
     def bindings_table(
-        self, agent_id: str, rows: Sequence[Mapping[str, JsonValue]]
+        self, agent_id: str, rows: Sequence[EnrichedPromptBindingRow]
     ) -> None:
         """Render the prompt bindings list table."""
         table = RichTable(

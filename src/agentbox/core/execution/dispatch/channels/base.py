@@ -6,8 +6,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
 
+from agentbox.core.data.payload_types import ChannelConfig
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult
-from agentbox.core.execution.dispatch.payload import CompletionPayload
+from agentbox.core.execution.dispatch.payload import AgentEventPayload, CompletionPayload
 from agentbox.core.execution.dispatch.policy import DispatchPolicy, DispatchStore
 
 
@@ -24,8 +25,8 @@ class DispatchChannel(ABC):
     @abstractmethod
     async def deliver(
         self,
-        payload: CompletionPayload,
-        config: dict[str, Any],
+        payload: CompletionPayload | AgentEventPayload,
+        config: ChannelConfig,
         policy: DispatchPolicy,
         *,
         run_id: str,

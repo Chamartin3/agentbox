@@ -12,6 +12,17 @@ import contextlib
 from typing import Any
 
 from agentbox.core.constants import PromptMode, PromptSlot
+from agentbox.core.data.payload_types import (
+    MaterializeDryRunResult,
+    PromptBindingItemsResult,
+    PromptBindingSpec,
+    PromptPreviewResult,
+    PromptResourcesResult,
+    ResourcePreviewModesResult,
+    WorkspaceBindingItemsResult,
+    WorkspaceBindingSpec,
+    WorkspaceResourcesResult,
+)
 from agentbox.core.service.resources.service import (
     AgentVersionMissing,
     BindingError,
@@ -37,23 +48,23 @@ def _svc() -> ResourceService:
     return ResourceService()
 
 
-def list_prompt_resources(agent_id: str) -> dict:
+def list_prompt_resources(agent_id: str) -> PromptResourcesResult:
     return _svc().list_prompt_resources(agent_id)
 
 
-def replace_prompt_resources(agent_id: str, bindings: list[dict], *, reason: str, actor: str | None = None) -> dict:
+def replace_prompt_resources(agent_id: str, bindings: list[PromptBindingSpec], *, reason: str, actor: str | None = None) -> PromptBindingItemsResult:
     return _svc().replace_prompt_resources(agent_id, bindings, reason=reason, actor=actor)
 
 
-def preview_prompt(agent_id: str, *, template: str | None = None, bindings_override: list[dict] | None = None) -> dict:
+def preview_prompt(agent_id: str, *, template: str | None = None, bindings_override: list[PromptBindingSpec] | None = None) -> PromptPreviewResult:
     return _svc().preview_prompt(agent_id, template=template, bindings_override=bindings_override)
 
 
-def list_workspace_resources(workspace_id: str) -> dict:
+def list_workspace_resources(workspace_id: str) -> WorkspaceResourcesResult:
     return _svc().list_workspace_resources(workspace_id)
 
 
-def replace_workspace_resources(workspace_id: str, bindings: list[dict], *, reason: str, actor: str | None = None, settings: Any = None, sync_cb: Any = None) -> dict:
+def replace_workspace_resources(workspace_id: str, bindings: list[WorkspaceBindingSpec], *, reason: str, actor: str | None = None, settings: Any = None, sync_cb: Any = None) -> WorkspaceBindingItemsResult:
     try:
         items = _svc().replace_workspace_resources(workspace_id, bindings, reason=reason, actor=actor)["items"]
     except ValueError as exc:
@@ -64,9 +75,9 @@ def replace_workspace_resources(workspace_id: str, bindings: list[dict], *, reas
     return {"items": items}
 
 
-def dry_run_workspace_resources(workspace_id: str) -> dict:
+def dry_run_workspace_resources(workspace_id: str) -> MaterializeDryRunResult:
     return _svc().dry_run_workspace_resources(workspace_id)
 
 
-def preview_modes(resource_id: str) -> dict:
+def preview_modes(resource_id: str) -> ResourcePreviewModesResult:
     return _svc().preview_modes(resource_id)

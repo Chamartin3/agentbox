@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+
 from agentbox.core.agents.config import PythonAgentConfig
 
 # Engine label for the validator that produced the verdict. ``off`` means

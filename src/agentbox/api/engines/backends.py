@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
 from agentbox.core.constants import BackendName
+from agentbox.core.data import BackendLabelsDict
 
 router = APIRouter(prefix="/api/runner-backends", tags=["runner-backends"])
 
@@ -32,7 +33,7 @@ class BackendDescriptor(BaseModel):
     (e.g. claude_code uses the host's OAuth session)."""
 
 
-_LABELS: dict[str, str] = {
+_LABELS: dict[BackendName, str] = {
     BackendName.CLAUDE_CODE: "Claude Code (CLI)",
     BackendName.OPENCODE: "OpenCode (CLI)",
     BackendName.CODEX: "OpenAI Codex (CLI)",

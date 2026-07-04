@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import JsonSchemaDict
+
 from dataclasses import dataclass
 from typing import Any, Protocol
+
 
 
 @dataclass(frozen=True)
@@ -23,7 +26,7 @@ class ReferenceSpec:
 class OutputSchemaInfo:
     """Resolved output schema (parsed JSON + the relative path it came from)."""
 
-    schema: dict[str, Any]
+    schema: JsonSchemaDict
     relative_path: str
 
 

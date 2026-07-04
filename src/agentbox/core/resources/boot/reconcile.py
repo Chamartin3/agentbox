@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
+from agentbox.core.data.payload_types import PromptBindingSpec, WorkspaceBindingSpec
 from agentbox.core.constants import ResourceType
 from agentbox.core.data.manifests.system import ProjectManifest
 from agentbox.core.db import (
@@ -112,7 +113,7 @@ def sweep_workspace_skill_bindings(
         existing = file_bindings.list_for_workspace(ws.name)
         if existing:
             continue
-        bindings = []
+        bindings: list[WorkspaceBindingSpec] = []
         for skill_name in skills:
             res = resources.get_by_slug(f"skill:{skill_name}")
             if res is None:
@@ -171,7 +172,7 @@ def import_composition_references(
         source_path: str | None = getattr(agent, "source_path", None)
         if source_path:
             bundle_dir = Path(source_path).parent
-        bindings: list[dict] = []
+        bindings: list[PromptBindingSpec] = []
         for idx, ref in enumerate(comp.references):
             if isinstance(ref, str):
                 path_str = ref
@@ -209,7 +210,8 @@ def import_composition_references(
             res = resources.get_by_slug(slug)
             if res is None:
                 continue
-            bindings.append({"resource_id": res["id"], "marker": f"ref_{idx}", "mode": "inline", "attach_as_reference": True, "required": False, "display_order": idx})
+            binding: PromptBindingSpec = {"resource_id": res["id"], "marker": f"ref_{idx}", "mode": "inline", "attach_as_reference": True, "required": False, "display_order": idx}
+            bindings.append(binding)
         if not bindings:
             continue
         try:

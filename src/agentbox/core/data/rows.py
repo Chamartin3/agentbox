@@ -4,14 +4,14 @@ These are the row-level contracts for query results, not SQLAlchemy models.
 """
 
 from enum import StrEnum
-from typing import TypedDict
+from typing import Any, TypedDict
 
 
 class EnvDocRow(TypedDict):
     id: str
     workspace_id: str
     version_number: int
-    content_json: dict
+    content_json: dict[str, Any]
     is_draft: int
     changelog: str
     created_at: str
@@ -441,7 +441,7 @@ class WorkspaceMcpOverrideRow(TypedDict):
     workspace_id: str
     server_name: str
     enabled: int
-    config_overrides: dict | None
+    config_overrides: dict[str, Any] | None
     changelog: str
     created_at: str
     created_by: str | None
@@ -464,7 +464,7 @@ class WorkspaceHostEnvGrantRow(TypedDict):
 
     workspace_id: str
     profile_id: str | None
-    overrides: dict | None
+    overrides: dict[str, Any] | None
     changelog: str
     created_at: str
     created_by: str | None
@@ -501,7 +501,7 @@ class WorkenvTemplateRow(TypedDict):
     name: str
     description: str | None
     engine: str
-    config_json: dict
+    config_json: dict[str, Any]
     created_at: str
     updated_at: str
 
@@ -604,7 +604,7 @@ class HostEnvProfileRow(TypedDict):
     id: str
     name: str
     description: str | None
-    grants: dict
+    grants: dict[str, Any]
     created_at: str
     created_by: str | None
 
@@ -616,7 +616,7 @@ class HostEnvCallLogRow(TypedDict):
     run_id: str
     workspace_id: str
     capability: str
-    params: dict | None
+    params: dict[str, Any] | None
     status: str
     error: str | None
     surface: str

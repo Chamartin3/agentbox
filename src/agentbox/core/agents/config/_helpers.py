@@ -5,6 +5,8 @@ from __future__ import annotations
 import json as _json
 from typing import Any
 
+from agentbox.core.data.payload_types import ConfigJsonPayload, JsonSchemaDict
+
 from agentbox.core.agents.config._types import (
     ExecutionConfig,
     HttpValidatorConfig,
@@ -97,7 +99,7 @@ def resolve_output_config(store: Any, agent: Any) -> OutputConfig:
     Either may be absent.
     """
     agent_id = getattr(agent, "id", None)
-    schema: dict[str, Any] | None = None
+    schema: JsonSchemaDict | None = None
     validators_raw: list[dict] = []
 
     if store is not None and agent_id:
@@ -146,13 +148,14 @@ def resolve_output_config(store: Any, agent: Any) -> OutputConfig:
         _normalize_validator_entries(store, validators_raw) if validators_raw else []
     )
 
+    typed_schema: JsonSchemaDict | None = schema if isinstance(schema, dict) else None
     return OutputConfig(
-        json_schema=schema if isinstance(schema, dict) else None,
+        json_schema=typed_schema,
         validators=tuple(validators),
     )
 
 
-def build_config_json_payload(agent: Any) -> dict[str, Any]:
+def build_config_json_payload(agent: Any) -> ConfigJsonPayload:
     """Project an AgentDef into the structured ``config_json`` payload.
 
     Used by the backfill migration and by ``create_version`` going
@@ -162,7 +165,7 @@ def build_config_json_payload(agent: Any) -> dict[str, Any]:
     exec_cfg = ExecutionConfig.from_agent(agent)
     runtime_cfg = RuntimeConfig.from_agent(agent)
     python_cfg = PythonAgentConfig.from_agent(agent)
-    payload: dict[str, Any] = {
+    payload: ConfigJsonPayload = {
         "execution": {
             "max_validation_retries": exec_cfg.max_validation_retries,
             "max_error_retries": exec_cfg.max_error_retries,

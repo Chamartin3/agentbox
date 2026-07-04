@@ -7,12 +7,13 @@ them without creating a cycle through ``workspaces.generation``.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
+
 
 import yaml
 

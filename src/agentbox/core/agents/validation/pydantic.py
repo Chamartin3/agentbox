@@ -6,9 +6,9 @@ so there is exactly one JSON-Schema→pydantic transform in the codebase.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import json
-from typing import Any
 
 from agentbox.core.agents.validation.errors import extract_json
 from agentbox.core.engines.contracts.schema_to_model.translate import (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typer
 
+from agentbox.core.data.payload_types import PromptBindingSpec
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_resource_service
 
@@ -58,8 +59,21 @@ def pb_set(
 
     existing = svc.list_prompt_resources(agent_id).get("items", [])
     # Upsert: remove any existing binding for this marker, append new one.
-    kept = [b for b in existing if b["marker"] != marker]
-    new_binding = {
+    kept: list[PromptBindingSpec] = [
+        {
+            "resource_id": b["resource_id"],
+            "marker": b["marker"],
+            "mode": b["mode"],
+            "slot": b["slot"],
+            "attach_as_reference": b["attach_as_reference"],
+            "pinned_version_id": b["pinned_version_id"],
+            "required": b["required"],
+            "display_order": b["display_order"],
+        }
+        for b in existing
+        if b["marker"] != marker
+    ]
+    new_binding: PromptBindingSpec = {
         "resource_id": resource["id"],
         "marker": marker,
         "mode": mode,

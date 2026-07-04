@@ -6,6 +6,8 @@ import logging
 
 from fastmcp import FastMCP
 
+from agentbox.core.data.payload_types import WorkspaceBindingSpec
+from agentbox.core.data.payload_types import WorkspaceBindingSpec
 from agentbox.core.data.rows import EnvDocRow, WorkspaceHostEnvGrantRow
 from agentbox.core.service import render_env_doc_preview
 from agentbox.mcp.context import MCPContext
@@ -37,7 +39,7 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
         if err:
             return err
         # Normalize loose field names from MCP callers to canonical schema.
-        normalized = [
+        normalized: list[WorkspaceBindingSpec] = [
             {
                 "resource_id": b["resource_id"],
                 "target_path": b.get("target_path") or b.get("dest_path"),

@@ -6,9 +6,9 @@ of truth the API, grant resolver, and MCP implementations agree on.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from dataclasses import dataclass
-from typing import Any
 
 from agentbox.core.tools.canonical import CanonicalTool
 

@@ -11,6 +11,12 @@ from agentbox.core.agents.composition.preview._helpers import (
     _validation_block_for_preview,
 )
 from agentbox.core.agents.composition.resolver import resolve_prompt
+from agentbox.core.data.payload_types import (
+    CharBreakdownPart,
+    PromptBindingSpec,
+    PromptPreviewResult,
+)
+from agentbox.core.data.rows import AgentPromptBindingRow
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,
     AgentVersionManager,
@@ -18,6 +24,20 @@ from agentbox.core.db import (
     ResourceManager,
     ResourceVersionManager,
 )
+
+
+def _spec_from_row(row: AgentPromptBindingRow) -> PromptBindingSpec:
+    return {
+        "id": row["id"],
+        "resource_id": row["resource_id"],
+        "marker": row["marker"],
+        "mode": row["mode"],
+        "slot": row["slot"],
+        "attach_as_reference": row["attach_as_reference"],
+        "pinned_version_id": row["pinned_version_id"],
+        "display_order": row["display_order"],
+        "required": row["required"],
+    }
 
 
 def render_agent_prompt_preview(
@@ -29,8 +49,8 @@ def render_agent_prompt_preview(
     *,
     agent_id: str,
     template: str | None = None,
-    bindings_override: list[dict] | None = None,
-) -> dict:
+    bindings_override: list[PromptBindingSpec] | None = None,
+) -> PromptPreviewResult:
     """Render the full composed prompt for an agent.
 
     If ``bindings_override`` is provided, use it instead of the live
@@ -54,12 +74,15 @@ def render_agent_prompt_preview(
         template = row.get("prompt_content") or ""
 
     if bindings_override is not None:
-        raw = [
+        raw: list[PromptBindingSpec] = [
             {**b, "id": b.get("id") or f"preview-{i}"}
             for i, b in enumerate(bindings_override)
         ]
     else:
-        raw = agent_prompt_resource_bindings.list_for_agent(agent_id)
+        raw = [
+            _spec_from_row(row)
+            for row in agent_prompt_resource_bindings.list_for_agent(agent_id)
+        ]
 
     resolved = [_resolve_binding(resources, resource_versions, resource_blobs, b) for b in raw]
 
@@ -97,7 +120,7 @@ def render_agent_prompt_preview(
     if validation_block:
         composed = composed.rstrip() + "\n\n" + validation_block
 
-    parts: list[dict] = [
+    parts: list[CharBreakdownPart] = [
         {"label": "prompt template", "chars": len(base_prompt)},
     ]
     if input_schema_block and input_schema is not None:

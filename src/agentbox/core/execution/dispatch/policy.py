@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from agentbox.core.constants import RunStatus
+from agentbox.core.data.payload_types import UsagePayload
 
 from agentbox.core.execution.dispatch.channels.types import DeliveryResult
 
@@ -39,7 +40,7 @@ class DispatchStore(Protocol):
 
     def set_run_status(self, run_id: str, status: str) -> None: ...
 
-    def get_usage(self, run_id: str) -> dict | None: ...
+    def get_usage(self, run_id: str) -> UsagePayload | None: ...
 
     def record_webhook_delivery(
         self,

@@ -5,6 +5,7 @@ import json
 from collections.abc import Callable
 from typing import Any, TypedDict
 
+
 import httpx
 
 MCP_PROTOCOL_VERSION = "2024-11-05"

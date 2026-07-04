@@ -27,6 +27,7 @@ from pydantic_ai import Agent, NativeOutput, PromptedOutput, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
+from agentbox.core.data.payload_types import GrantConfig, JsonSchemaDict, ModelParams
 from agentbox.core.constants import LogLevel, MessageRole, RunStatus
 from agentbox.core.events import (
     DoneEvent,
@@ -83,8 +84,8 @@ async def run_direct_agent_mode(
     run_id: str,
     prompt: str,
     model_str: str,
-    output_schema: dict[str, Any] | None,
-    input_schema: dict[str, Any] | None,
+    output_schema: JsonSchemaDict | None,
+    input_schema: JsonSchemaDict | None,
     output_mode: str,
     provider: str | None,
     api_key: str | None,
@@ -92,12 +93,12 @@ async def run_direct_agent_mode(
     output_retries: Any,
     references: list[dict[str, Any]],
     input_data: Any,
-    host_env_grants: dict[str, Any] | None = None,
+    host_env_grants: dict[str, GrantConfig] | None = None,
     agent_tool_grants: set[str] | None = None,
     workspace_id: str | None = None,
     workdir: str | None = None,
     db_path: str | None = None,
-    model_params: dict[str, Any] | None = None,
+    model_params: ModelParams | None = None,
 ) -> AsyncIterator[RunEvent]:
     """Drive a directly-constructed ``pydantic_ai.Agent`` to completion."""
     # Build result_type from output schema when present. The strict
@@ -112,7 +113,7 @@ async def run_direct_agent_mode(
     if output_schema:
         try:
             result_type = json_schema_to_pydantic_model(
-                output_schema,
+                dict(output_schema),
                 model_name="AgentOutput",
             )
         except UnsupportedSchema as exc:
@@ -127,7 +128,7 @@ async def run_direct_agent_mode(
             )
             try:
                 result_type = _json_schema_to_pydantic_model(
-                    output_schema,
+                    dict(output_schema),
                     model_name="AgentOutput",
                 )
             except Exception as fallback_exc:
@@ -152,7 +153,7 @@ async def run_direct_agent_mode(
     if isinstance(input_schema, dict) and isinstance(input_data, dict):
         try:
             input_model = json_schema_to_pydantic_model(
-                input_schema,
+                dict(input_schema),
                 model_name="AgentInput",
             )
             input_model.model_validate(input_data)

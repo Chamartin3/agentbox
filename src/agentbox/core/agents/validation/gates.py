@@ -7,6 +7,7 @@ import hmac
 import json
 from typing import Any
 
+
 import httpx
 import jsonschema as _jsonschema
 
@@ -134,7 +135,7 @@ def call_script_validator(validator_cfg: Any, output: str) -> ValidationResult:
             ),
             engine="script",
         )
-    namespace: dict[str, Any] = {"__name__": "agentbox_script_validator"}
+    namespace = {"__name__": "agentbox_script_validator"}
     try:
         exec(compile(src, "<script_validator>", "exec"), namespace)
     except Exception as exc:

@@ -1,11 +1,11 @@
 """Build the agent_tools FastMCP server from the SharedToolRegistry."""
 
 from __future__ import annotations
-
-import logging
 from typing import Any
 
+import logging
 from agentbox.core.tools import SharedToolRegistry
+from agentbox.core.data import StubResult
 from agentbox.core.tools.registry import ToolSpec
 from agentbox.core.workspaces.mcp.servers.agent_tools.context import AgentToolsContext
 from fastmcp import FastMCP
@@ -62,7 +62,7 @@ def _register_granted_tool(mcp: FastMCP, spec: ToolSpec, ctx: AgentToolsContext)
 def _register_ungranted_stub(mcp: FastMCP, spec: ToolSpec) -> None:
     """Register a stub that returns a not-granted error for an ungranted tool."""
 
-    def _stub() -> dict[str, str]:
+    def _stub() -> StubResult:
         return {"error": _NOT_GRANTED, "tool": spec.name}
 
     _stub.__name__ = spec.name.replace(".", "_") + "_stub"

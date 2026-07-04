@@ -20,6 +20,7 @@ from typing import Any, Union
 from pydantic import create_model
 
 
+
 def _json_schema_to_pydantic_model(
     schema: dict[str, Any],
     *,

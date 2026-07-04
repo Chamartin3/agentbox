@@ -18,11 +18,10 @@ Domain errors raised here:
 from __future__ import annotations
 
 import logging
-from typing import Any
-
 import httpx
 
 from agentbox.core.data import RunnerProfile
+from agentbox.core.data.payload_types import RefreshProvidersResult
 from agentbox.core.db import RunnerProfileManager
 from agentbox.core.engines import (
     EffectiveRunnerConfig,
@@ -76,7 +75,7 @@ def list_runner_providers(
     return [p for p in providers if backend in (p.compatible_backends or [])]
 
 
-def refresh_providers() -> dict[str, Any]:
+def refresh_providers() -> RefreshProvidersResult:
     """Re-run dynamic provider discovery and invalidate model caches."""
     discovered = refresh_opencode_providers()
     # refresh_opencode_providers() already clears _MODEL_CACHE internally.

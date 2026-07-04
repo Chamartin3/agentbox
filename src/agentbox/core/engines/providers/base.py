@@ -24,6 +24,7 @@ from typing import Any, ClassVar, Protocol
 import httpx
 from pydantic import BaseModel, Field
 
+
 logger = logging.getLogger(__name__)
 
 

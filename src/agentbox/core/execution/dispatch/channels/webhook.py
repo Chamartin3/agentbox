@@ -13,9 +13,10 @@ from typing import Any
 import httpx
 
 from agentbox.core.constants import LogLevel
+from agentbox.core.data.payload_types import ChannelConfig
 from agentbox.core.events import LogEvent, RunEvent
 from agentbox.core.execution.dispatch.channels.base import DeliveryResult, DispatchChannel
-from agentbox.core.execution.dispatch.payload import CompletionPayload
+from agentbox.core.execution.dispatch.payload import AgentEventPayload, CompletionPayload
 from agentbox.core.execution.dispatch.policy import DispatchPolicy, DispatchStore
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ def _record_delivery(
     run_id: str,
     attempt: int,
     url: str,
-    payload: CompletionPayload | None,
+    payload: CompletionPayload | AgentEventPayload | None,
     status: int | None = None,
     body: str | None = None,
     latency: int | None = None,
@@ -86,7 +87,7 @@ def _emit(
             pass
 
 
-def _payload_to_json(payload: CompletionPayload) -> str:
+def _payload_to_json(payload: CompletionPayload | AgentEventPayload) -> str:
     return json.dumps(payload, default=str)
 
 
@@ -97,8 +98,8 @@ class WebhookChannel(DispatchChannel):
 
     async def deliver(
         self,
-        payload: CompletionPayload,
-        config: dict[str, Any],
+        payload: CompletionPayload | AgentEventPayload,
+        config: ChannelConfig,
         policy: DispatchPolicy,
         *,
         run_id: str,

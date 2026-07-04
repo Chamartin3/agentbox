@@ -1,10 +1,11 @@
 """Request/response models for the /runs API."""
 
 from __future__ import annotations
-
 from typing import Any
 
+from agentbox.core.data.payload_types import UsagePayload
 from pydantic import BaseModel
+
 
 
 class CreateRunBody(BaseModel):
@@ -26,7 +27,7 @@ class CompleteRunBody(BaseModel):
     ok: bool
     output: str | None = None
     error: str | None = None
-    usage: dict | None = None
+    usage: UsagePayload | None = None
 
 
 class SnapshotBody(BaseModel):

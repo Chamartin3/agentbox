@@ -15,6 +15,7 @@ import json as _json
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
+from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.constants import ConfiguredValidationMode, ValidationMode
 from agentbox.core.tools.canonical import CanonicalTool
 
@@ -182,5 +183,5 @@ class OutputConfig:
       migration.
     """
 
-    json_schema: dict[str, Any] | None = None
+    json_schema: JsonSchemaDict | None = None
     validators: tuple[ValidatorConfig, ...] = ()

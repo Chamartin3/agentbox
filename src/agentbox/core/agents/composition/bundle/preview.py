@@ -5,7 +5,7 @@ import json
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.constants import BundleFile
 from agentbox.core.agents.composition.bundle._helpers import _read_text
 
@@ -29,8 +29,8 @@ class CompositionPreview:
     system: str
     user_template: str | None
     references: list[ReferencePreview]
-    output_schema: dict[str, Any] | None
-    input_schema: dict[str, Any] | None = None
+    output_schema: JsonSchemaDict | None
+    input_schema: JsonSchemaDict | None = None
 
 
 def preview(
@@ -95,7 +95,7 @@ def preview(
             )
         )
 
-    schema: dict[str, Any] | None = None
+    schema: JsonSchemaDict | None = None
     output_schema_rel = composition.get("output_schema")
     schema_file: Path | None = None
     if output_schema_rel:
@@ -112,7 +112,7 @@ def preview(
         except json.JSONDecodeError:
             schema = None
 
-    input_schema: dict[str, Any] | None = None
+    input_schema: JsonSchemaDict | None = None
     input_schema_file = bundle_path / BundleFile.INPUT_SCHEMA
     if input_schema_file.exists():
         try:

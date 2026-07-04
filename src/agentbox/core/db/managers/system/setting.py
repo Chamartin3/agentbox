@@ -1,5 +1,6 @@
 """SettingManager — application settings key-value CRUD (composite PK)."""
 from __future__ import annotations
+from typing import Any
 
 import json as _json
 
@@ -7,7 +8,6 @@ from sqlalchemy import select as sa_select, delete as sa_delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from agentbox.core.data.manifests.workspaces import McpServerSpec
-from agentbox.core.data.jsontypes import JsonDict
 from agentbox.core.data.rows import SettingKeyRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.system.setting import Setting
@@ -51,9 +51,9 @@ class SettingManager(Manager[Setting]):
                 for r in rows
             ]
 
-    def get_settings_section(self, section: str) -> JsonDict:
+    def get_settings_section(self, section: str) -> dict[str, Any]:
         """Return a section as ``{key: deserialised_value}``."""
-        out: JsonDict = {}
+        out: dict[str, Any] = {}
         for r in self.get_section(section):
             try:
                 out[r["key"]] = _json.loads(r["value_json"])

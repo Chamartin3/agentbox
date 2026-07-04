@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from agentbox.core.tools.canonical import CanonicalTool
 
@@ -54,8 +55,8 @@ class ComposedView:
 
     system: str | None = None
     system_base: str | None = None
-    schema: dict | None = None
-    input_schema: dict | None = None
+    schema: dict[str, Any] | None = None
+    input_schema: dict[str, Any] | None = None
     user: str | None = None
     references: tuple[ComposedReferenceView, ...] = ()
     bundle_sha: str | None = None

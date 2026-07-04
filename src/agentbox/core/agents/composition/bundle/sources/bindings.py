@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+
 from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.agents.composition.bundle.sources._types import (
     OutputSchemaInfo,

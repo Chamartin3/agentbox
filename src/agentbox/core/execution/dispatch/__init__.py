@@ -11,13 +11,14 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef, RunRecord
+from agentbox.core.data.payload_types import ChannelSpec
 
 from agentbox.core.execution.dispatch.channels.webhook import WebhookChannel
-from agentbox.core.execution.dispatch.payload import CompletionPayload, build_completion_payload
+from agentbox.core.execution.dispatch.payload import AgentEventPayload, CompletionPayload, build_completion_payload
 from agentbox.core.execution.dispatch.policy import DispatchPolicy, DispatchStore, on_delivery_done
 from agentbox.core.execution.dispatch.registry import get_channel
 
@@ -28,7 +29,7 @@ def resolve_channels(
     run: RunRecord,
     agent: AgentDef | None,
     settings: Settings | None = None,
-) -> list[dict[str, Any]]:
+) -> list[ChannelSpec]:
     """Resolve the list of dispatch channel specs for a completed run.
 
     Today this preserves the single-``webhook_url`` schema: the agent's
@@ -43,7 +44,8 @@ def resolve_channels(
         url = getattr(settings, "completion_webhook_url", None) or None
     if not url:
         return []
-    return [{"name": "webhook", "config": {"url": url}}]
+    spec: ChannelSpec = {"name": "webhook", "config": {"url": url}}
+    return [spec]
 
 
 def dispatch_completion(
@@ -97,7 +99,7 @@ def dispatch_completion(
         task.add_done_callback(lambda t, rid=run.id: on_delivery_done(t, rid, store))
 
 
-async def deliver_webhook(url: str, payload: dict[str, Any]) -> bool:
+async def deliver_webhook(url: str, payload: CompletionPayload | AgentEventPayload) -> bool:
     """Backward-compatible helper: deliver one payload to one URL.
 
     Used by agent-event webhooks and the resend endpoint, which are not
@@ -105,11 +107,12 @@ async def deliver_webhook(url: str, payload: dict[str, Any]) -> bool:
     so casting to ``CompletionPayload`` is safe at runtime.
     """
     channel = WebhookChannel()
+    run_id = payload["run_id"] if "run_id" in payload else ""
     result = await channel.deliver(
-        cast(CompletionPayload, payload),
+        payload,
         {"url": url},
         DispatchPolicy(),
-        run_id=payload.get("run_id", ""),
+        run_id=run_id,
     )
     return result.ok
 

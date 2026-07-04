@@ -9,6 +9,13 @@ from fastapi.responses import Response
 
 from agentbox.api.deps import get_resource_service
 from agentbox.core.data.rows import RepoResourceRow, ResourceVersionRow
+from agentbox.core.data.payload_types import (
+    RenderedResourceResult,
+    ResourceDetailResult,
+    ResourceTreeResult,
+    ResourceVersionsResult,
+    ScriptSampleValidationResult,
+)
 from agentbox.core.service.resources.service import (
     InvalidResource,
     NoActiveVersion,
@@ -30,7 +37,7 @@ inspect_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"]
 def get_resource(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict | None:
+) -> ResourceDetailResult:
     try:
         return svc.get_resource(resource_id)
     except ResourceNotFound:
@@ -58,7 +65,7 @@ def update_resource(
 def list_versions(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict | None:
+) -> ResourceVersionsResult:
     try:
         return svc.list_versions(resource_id)
     except ResourceNotFound:
@@ -128,7 +135,7 @@ def render_resource(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
-) -> dict | None:
+) -> RenderedResourceResult:
     try:
         return svc.render_resource(resource_id, version_id=version_id)
     except ResourceNotFound:
@@ -142,7 +149,7 @@ def get_tree(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
-) -> dict | None:
+) -> ResourceTreeResult:
     try:
         return svc.get_tree(resource_id, version_id=version_id)
     except ResourceNotFound:
@@ -174,7 +181,7 @@ def validate_script_sample(
     resource_id: str,
     body: ValidateBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-) -> dict | None:
+) -> ScriptSampleValidationResult:
     try:
         return svc.validate_script_sample(
             resource_id,

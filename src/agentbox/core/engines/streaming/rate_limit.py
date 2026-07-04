@@ -21,6 +21,7 @@ import json
 import re
 from typing import Any
 
+
 _FATAL_HTTP_STATUSES: frozenset[int] = frozenset({401, 402, 403, 429})
 
 # Error ``name`` / ``type`` strings that opencode emits for unrecoverable

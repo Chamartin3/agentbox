@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typer
 
+from agentbox.core.data.payload_types import WorkspaceBindingSpec
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_resource_service
 
@@ -54,8 +55,17 @@ def wr_set(
         raise typer.Exit(2)
 
     existing = obj.resources.list_workspace_file_bindings(workspace_id)
-    kept: list[dict[str, object]] = [
-        dict(b) for b in existing if b.get("target_path") != dest_path
+    kept: list[WorkspaceBindingSpec] = [
+        {
+            "resource_id": b["resource_id"],
+            "target_path": b["target_path"],
+            "pinned_version_id": b["pinned_version_id"],
+            "materialize_mode": b["materialize_mode"],
+            "on_conflict": b["on_conflict"],
+            "display_order": b["display_order"],
+        }
+        for b in existing
+        if b.get("target_path") != dest_path
     ]
     kept.append({
         "resource_id": resource["id"],

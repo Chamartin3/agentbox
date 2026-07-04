@@ -5,7 +5,7 @@ Pagination envelope is shared across all ``list_*`` / ``search_*`` tools.
 
 from __future__ import annotations
 
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -56,6 +56,3 @@ class RunFilter(BaseModel):
     until: str | None = None
     limit: int = 20
     offset: int = 0
-
-
-JsonDict = dict[str, Any]

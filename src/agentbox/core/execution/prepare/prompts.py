@@ -34,6 +34,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from agentbox.core.data.payload_types import JsonSchemaDict, ResolvedBindingView
 from agentbox.core.agents import compose_prompt
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
@@ -58,8 +59,8 @@ class ComposedState:
 
     system: str | None = None
     system_base: str | None = None
-    schema: dict | None = None
-    input_schema: dict | None = None
+    schema: JsonSchemaDict | None = None
+    input_schema: JsonSchemaDict | None = None
     user: str | None = None
     references: Any = None
     bundle_sha: str | None = None
@@ -96,14 +97,14 @@ class ResolvedPrompt:
     input_: str
     system_text: str | None
     system_base: str | None
-    composed_schema: dict | None
-    composed_input_schema: dict | None
+    composed_schema: JsonSchemaDict | None
+    composed_input_schema: JsonSchemaDict | None
     composed_user: str | None
     composed_references: Any
     composed_bundle_sha: str | None
     validation_mode: str | None
     composition_result: Any
-    prompt_bindings: list[dict] = field(default_factory=list)
+    prompt_bindings: list[ResolvedBindingView] = field(default_factory=list)
     snapshot_entries: list[dict] = field(default_factory=list)
 
     def to_composed_state(self) -> ComposedState:

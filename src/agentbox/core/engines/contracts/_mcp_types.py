@@ -5,9 +5,8 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 
-class McpToolSpec(TypedDict, total=False):
-    """Minimal MCP tool descriptor consumed by ``render()``."""
 
+class McpToolSpec(TypedDict, total=False):
     name: str
     description: str
     inputSchema: dict[str, Any]

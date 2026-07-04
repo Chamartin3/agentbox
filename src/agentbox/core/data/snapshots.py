@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, NotRequired, TypedDict
 
 
+
 class RunnerSnapshot(TypedDict):
     """Append-only snapshot of the runner config that executed a run."""
 

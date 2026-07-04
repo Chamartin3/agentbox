@@ -176,7 +176,7 @@ class PiBackend(BackendAdapter):
             message=f"$ {' '.join(rendered.argv)} (cwd={rendered.cwd})",
         )
 
-        timeout = rendered.agent_meta["timeout_seconds"]
+        timeout = rendered.agent_meta.get("timeout_seconds")
 
         async for ev, sid in stream_jsonl_subprocess(
             run_id=run_id,

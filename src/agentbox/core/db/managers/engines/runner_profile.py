@@ -12,6 +12,8 @@ from __future__ import annotations
 import json as _json
 from typing import Any
 
+from agentbox.core.data.payload_types import RunnerProfileRow, RunnerProfileStatsRow
+
 from sqlalchemy import ColumnElement, Integer, cast, func, select, update as sa_update, delete as sa_delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -57,7 +59,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _row_to_dict(row: Any) -> dict[str, Any]:
+    def _row_to_dict(row: Any) -> RunnerProfileRow:
         """Convert a SQLAlchemy Core Row to a flat dict with Python types.
 
         JSON columns (``params_json``, ``headers_json``, ``extra_args_json``)
@@ -94,7 +96,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         backend: str | None = None,
         provider: str | None = None,
         enabled: bool | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[RunnerProfileRow]:
         """Return all runner profiles (optionally filtered), ordered by creation time."""
         stmt = select(runner_profiles)
         if backend is not None:
@@ -107,14 +109,14 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         with self._engine.connect() as conn:
             return [self._row_to_dict(r) for r in conn.execute(stmt)]
 
-    def get_by_id(self, profile_id: str) -> dict[str, Any] | None:
+    def get_by_id(self, profile_id: str) -> RunnerProfileRow | None:
         """Return a single profile dict, or None."""
         stmt = select(runner_profiles).where(runner_profiles.c.id == profile_id)
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
             return self._row_to_dict(row) if row else None
 
-    def create_one(self, **fields: Any) -> dict[str, Any]:
+    def create_one(self, **fields: Any) -> RunnerProfileRow:
         """Insert a new runner profile. Returns the created row as a dict.
 
         All columns must be provided (caller handles id derivation and
@@ -128,7 +130,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
             raise RuntimeError(f"Failed to read back created profile {fields['id']}")
         return row
 
-    def update_one(self, profile_id: str, **values: Any) -> dict[str, Any] | None:
+    def update_one(self, profile_id: str, **values: Any) -> RunnerProfileRow | None:
         """Partial-update a runner profile. Returns the updated profile dict.
 
         Only the supplied columns are changed. Returns None if the
@@ -157,7 +159,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
     # Compound atomic operations (invariant: only one system_default)
     # ------------------------------------------------------------------
 
-    def create_with_default_clear(self, **fields: Any) -> dict[str, Any]:
+    def create_with_default_clear(self, **fields: Any) -> RunnerProfileRow:
         """Create a profile *and* clear ``is_system_default`` on every other
         profile — all within the same transaction so the invariant holds.
 
@@ -177,7 +179,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
 
     def update_with_default_clear(
         self, profile_id: str, **values: Any
-    ) -> dict[str, Any] | None:
+    ) -> RunnerProfileRow | None:
         """Partial-update a profile. If ``is_system_default`` is being set to
         ``1``, atomically clear that flag on all other profiles first.
 
@@ -204,7 +206,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
     # System default
     # ------------------------------------------------------------------
 
-    def get_system_default(self) -> dict[str, Any] | None:
+    def get_system_default(self) -> RunnerProfileRow | None:
         """Return the system-default runner profile as a dict, or None.
 
         Looks for the single row where ``is_system_default == 1`` (no
@@ -224,7 +226,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         profile_id: str,
         since: str | None = None,
         until: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> RunnerProfileStatsRow:
         """Aggregate run statistics for a single runner profile.
 
         Returns a plain dict with keys: profile_id, runs, succeeded, failed,
@@ -271,7 +273,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         self,
         since: str | None = None,
         until: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[RunnerProfileStatsRow]:
         """Aggregate run statistics for every runner profile that has runs.
 
         Returns a list of plain dicts; profiles without any runs are excluded.
@@ -323,7 +325,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
     # Agent ↔ profile binding — agent_runner_profiles
     # ------------------------------------------------------------------
 
-    def get_agent_profile(self, agent_id: str) -> dict[str, Any] | None:
+    def get_agent_profile(self, agent_id: str) -> RunnerProfileRow | None:
         """Return the runner profile bound to *agent_id*, or None.
 
         Joins ``agent_runner_profiles`` + ``runner_profiles`` so the

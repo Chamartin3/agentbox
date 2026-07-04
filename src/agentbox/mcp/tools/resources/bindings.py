@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
+from agentbox.core.data.payload_types import PromptBindingSpec
+from agentbox.core.data.payload_types import PromptBindingSpec
 from agentbox.core.data.rows import AgentPromptBindingRow
 from agentbox.mcp.context import MCPContext
 
@@ -33,7 +35,7 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def set_prompt_resources(
         agent_id: str,
-        bindings: list[dict],
+        bindings: list[PromptBindingSpec],
         reason: str,
     ) -> dict:
         """Replace all prompt resource bindings for an agent (atomic).
@@ -81,7 +83,7 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
             return err
         svc = ctx.resources
         current = svc.list_prompt_bindings(agent_id)
-        existing = [
+        existing: list[PromptBindingSpec] = [
             {
                 "resource_id": b["resource_id"],
                 "marker": b.get("marker"),
@@ -97,9 +99,9 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
         next_order = (
             display_order
             if display_order is not None
-            else (max((b["display_order"] for b in existing), default=-1) + 1)
+            else (max((b.get("display_order", 0) for b in existing), default=-1) + 1)
         )
-        new_binding = {
+        new_binding: PromptBindingSpec = {
             "resource_id": resource_id,
             "marker": marker,
             "mode": mode,
@@ -172,7 +174,7 @@ def register_bindings(mcp: FastMCP, ctx: MCPContext) -> None:
         if not removed:
             return {"error": "not_found", "agent_id": agent_id, "removed": []}
 
-        keep = [
+        keep: list[PromptBindingSpec] = [
             {
                 "resource_id": b["resource_id"],
                 "marker": b.get("marker"),

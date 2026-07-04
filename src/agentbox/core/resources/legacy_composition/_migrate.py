@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import PromptBindingSpec
+
 import hashlib
 import json
 import logging
@@ -56,7 +58,7 @@ def _migrate_one_agent(
         if b.get("marker") and not b.get("slot")
     }
 
-    new_inputs = [binding_to_input(b) for b in existing_bindings]
+    new_inputs: list[PromptBindingSpec] = [binding_to_input(b) for b in existing_bindings]
     next_order = (
         max((b.get("display_order", 0) for b in existing_bindings), default=-1) + 1
     )

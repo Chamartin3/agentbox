@@ -8,6 +8,7 @@ from typing import cast
 from sqlalchemy import func, select
 
 from agentbox.core.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
+from agentbox.core.data.payload_types import PromptBindingSpec, WorkspaceBindingSpec
 from agentbox.core.data.rows import AgentPromptBindingRow, WorkspaceFileBindingRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.binding import (
@@ -54,7 +55,7 @@ class AgentPromptResourceBindingManager(Manager[AgentPromptResourceBinding]):
     def replace_for_agent(
         self,
         agent_id: str,
-        bindings: Iterable[dict],
+        bindings: Iterable[PromptBindingSpec],
         *,
         reason: str,
         actor: str | None = None,
@@ -149,7 +150,7 @@ class WorkspaceFileResourceBindingManager(Manager[WorkspaceFileResourceBinding])
     def replace_for_workspace(
         self,
         workspace_id: str,
-        bindings: Iterable[dict],
+        bindings: Iterable[WorkspaceBindingSpec],
         *,
         reason: str,
         actor: str | None = None,
@@ -229,7 +230,7 @@ class WorkspaceFileResourceBindingManager(Manager[WorkspaceFileResourceBinding])
     ) -> list[WorkspaceFileBindingRow]:
         """Replace ONLY skill-type bindings, preserving other binding types."""
         current = self.list_for_workspace(workspace_id)
-        merged: list[dict] = []
+        merged: list[WorkspaceBindingSpec] = []
         order = 0
         for b in current:
             # Check if this binding is for a skill resource
