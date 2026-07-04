@@ -11,11 +11,13 @@ sort can be added per-endpoint later without changing the contract.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, TypedDict
+from typing import Any, Generic, TypedDict, TypeVar
+
+T = TypeVar("T")
 
 
-class PaginatedEnvelope(TypedDict):
-    items: list[object]
+class PaginatedEnvelope(TypedDict, Generic[T]):
+    items: list[T]
     total: int
     offset: int
     limit: int
@@ -30,7 +32,7 @@ def _coerce_sort_key(value: Any) -> Any:
 
 
 def paginate_list(
-    items: Sequence[object],
+    items: Sequence[T],
     *,
     q: str | None = None,
     q_fields: Iterable[str] = (),
@@ -39,7 +41,7 @@ def paginate_list(
     limit: int = 50,
     offset: int = 0,
     sort_key: Callable[[Any, str], Any] | None = None,
-) -> PaginatedEnvelope:
+) -> PaginatedEnvelope[T]:
     """Apply search/sort/pagination to an in-memory list of dicts.
 
     `q` is matched case-insensitively against `q_fields` (dotted paths NOT
@@ -56,7 +58,7 @@ def paginate_list(
             return item.get(field)
         return getattr(item, field, None)
 
-    filtered: list[object] = list(items)
+    filtered: list[T] = list(items)
     if q:
         needle = q.lower()
         filtered = [
