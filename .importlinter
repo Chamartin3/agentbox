@@ -73,6 +73,15 @@ ignore_imports =
     # cli renderers → core.engines (render layer touches domain types to
     # produce formatted output; real fix: shared value types below both layers)
     # cli renderers → core.workspaces (same rationale)
+    # api/cli DI wiring constructs the executor + MCP client directly
+    # (burned when DI routes through core.service — UNIFIED / 113_04)
+    agentbox.api.deps -> agentbox.core.execution.orchestrate.executor
+    agentbox.cli.shared.deps -> agentbox.core.execution.orchestrate.executor
+    agentbox.api.deps -> agentbox.core.workspaces.mcp.client
+    agentbox.cli.shared.deps -> agentbox.core.workspaces.mcp.client
+    agentbox.api.agents.grants -> agentbox.core.workspaces.mcp.client.registry
+    agentbox.api.workspaces.catalog -> agentbox.core.workspaces.mcp.client.registry
+    agentbox.cli.ops.launch -> agentbox.core.workspaces.mcp.client
 
 
 # ─── Resources is the foundation ─────────────────────────────────────────
@@ -229,7 +238,6 @@ ignore_imports =
     # db → workspaces (host-env grant resolution reaches into the
     # permissions artifact; real fix: move the shared permission types
     # down, or resolve grants in the workspaces domain instead)
-    agentbox.core.db.workspaces.host_env -> agentbox.core.workspaces.permissions
 
 
 # ─── core.service intra-domain layering (plan 110) ───────────────────────────
@@ -302,7 +310,6 @@ ignore_imports =
     agentbox.api.deps -> agentbox.core.db.database
     agentbox.cli.shared.deps -> agentbox.core.db.database
     agentbox.mcp.deps -> agentbox.core.db.database
-    agentbox.cli.ops.shell -> agentbox.core.db.database
     # migration tooling: always-tolerated deep submodule path
     agentbox.cli.ops.migrate -> agentbox.core.db.system.seeds
     # cli renderers touch core.db types to render domain objects
@@ -346,12 +353,10 @@ ignore_imports =
     # ── Permanent allowlist (composition root — Database lifecycle) ──────
     agentbox.core.service.base -> agentbox.core.db.database
     # ── Transitional: burned by plans 111/112 ────────────────────────────
-    agentbox.core.engines.profiles -> agentbox.core.db.database
-    agentbox.core.execution.observability.snapshot.runner -> agentbox.core.db.database
     agentbox.core.execution.orchestrate.executor -> agentbox.core.db.database
     agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.schema
+    agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.database
     agentbox.core.service.agents.crud -> agentbox.core.db.schema
-    agentbox.core.service.engines.providers -> agentbox.core.db.database
     agentbox.core.service.lifecycle.startup -> agentbox.core.db.database
     agentbox.core.service.workspaces.registry -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
