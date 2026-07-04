@@ -18,7 +18,7 @@ def soft_delete_resource(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     reason: Annotated[str, Query(min_length=3)],
-):
+) -> Response:
     try:
         svc.soft_delete_resource(resource_id, reason=reason)
     except ResourceNotFound:

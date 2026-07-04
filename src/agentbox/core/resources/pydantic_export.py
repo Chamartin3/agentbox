@@ -11,7 +11,7 @@ from pathlib import Path
 
 from datamodel_code_generator import InputFileType, generate
 from datamodel_code_generator.enums import DataModelType
-from datamodel_code_generator.format import Formatter
+from datamodel_code_generator.format import Formatter, PythonVersion
 
 
 def schema_to_pydantic(schema_json: str, class_name: str = "Model") -> str:
@@ -28,7 +28,7 @@ def schema_to_pydantic(schema_json: str, class_name: str = "Model") -> str:
             use_field_description=True,
             use_standard_collections=True,
             use_union_operator=True,
-            target_python_version="3.12",  # type: ignore[arg-type]
+            target_python_version=PythonVersion.PY_312,
             formatters=[Formatter.BLACK, Formatter.ISORT],
         )
         return out.read_text(encoding="utf-8")

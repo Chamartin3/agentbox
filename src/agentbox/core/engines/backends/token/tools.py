@@ -74,7 +74,7 @@ def build_host_env_toolsets(
     workspace_id: str | None,
     workdir: str | Path | None,
     db_path: str | Path | None,
-) -> list[Any]:
+) -> list[MCPToolset]:
     """Connect to the host-env stdio MCP server as pydantic-ai toolset(s).
 
     This is the parity path: it spawns the *same* host-env server (same spec as

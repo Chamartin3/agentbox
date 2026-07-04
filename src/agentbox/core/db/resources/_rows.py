@@ -10,6 +10,8 @@ import hashlib
 import json
 from collections.abc import Iterable
 
+from sqlalchemy.engine import Row
+
 from agentbox.core.db.resources.models import (
     Resource,
     ResourceBlob,
@@ -54,7 +56,7 @@ def tags_from_db(raw: str | None) -> tuple[str, ...]:
     return tuple(t for t in (s.strip() for s in raw.split(",")) if t)
 
 
-def row_to_resource(row) -> Resource:
+def row_to_resource(row: Row) -> Resource:
     m = row._mapping
     return Resource(
         id=m["id"],
@@ -71,7 +73,7 @@ def row_to_resource(row) -> Resource:
     )
 
 
-def row_to_version(row) -> ResourceVersion:
+def row_to_version(row: Row) -> ResourceVersion:
     m = row._mapping
     return ResourceVersion(
         id=m["id"],
@@ -91,7 +93,7 @@ def row_to_version(row) -> ResourceVersion:
     )
 
 
-def row_to_blob(row) -> ResourceBlob:
+def row_to_blob(row: Row) -> ResourceBlob:
     m = row._mapping
     return ResourceBlob(
         id=m["id"],

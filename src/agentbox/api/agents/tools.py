@@ -11,11 +11,13 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from agentbox.core.tools import BUILTIN_TOOLS, SharedToolRegistry
+from agentbox.core.tools.builtin import BuiltinToolSpec
+from agentbox.core.tools.registry import ToolSpec
 
 router = APIRouter(prefix="/api/agent_tools", tags=["agent-tools-discovery"])
 
 
-def _builtin_to_dict(spec) -> dict:
+def _builtin_to_dict(spec: BuiltinToolSpec) -> dict:
     return {
         "name": spec.name,
         "description": spec.description,
@@ -25,7 +27,7 @@ def _builtin_to_dict(spec) -> dict:
     }
 
 
-def _spec_to_dict(spec) -> dict:
+def _spec_to_dict(spec: ToolSpec) -> dict:
     return {
         "name": spec.name,
         "description": spec.description,
@@ -38,7 +40,7 @@ def _spec_to_dict(spec) -> dict:
 
 
 @router.get("")
-def list_agent_tools(tag: str | None = None):
+def list_agent_tools(tag: str | None = None) -> dict:
     builtins = [_builtin_to_dict(t) for t in BUILTIN_TOOLS]
 
     specs = SharedToolRegistry.all()
@@ -50,7 +52,7 @@ def list_agent_tools(tag: str | None = None):
 
 
 @router.get("/{tool_name:path}")
-def get_agent_tool(tool_name: str):
+def get_agent_tool(tool_name: str) -> dict:
     spec = SharedToolRegistry.get(tool_name)
     if spec is None:
         raise HTTPException(404, f"Tool {tool_name!r} not found in registry")

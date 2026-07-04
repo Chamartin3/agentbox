@@ -12,7 +12,7 @@ from __future__ import annotations
 import json as _json
 from typing import Any
 
-from sqlalchemy import Integer, cast, func, select, update as sa_update, delete as sa_delete
+from sqlalchemy import ColumnElement, Integer, cast, func, select, update as sa_update, delete as sa_delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from agentbox.core.db.base.manager import Manager
@@ -231,7 +231,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         input_tokens, output_tokens, cost_usd, avg_duration_ms, last_run_at.
         """
         duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
-        conds: list[Any] = [runs.c.runner_profile_id == profile_id]
+        conds: list[ColumnElement[bool]] = [runs.c.runner_profile_id == profile_id]
         if since:
             conds.append(runs.c.created_at >= since)
         if until:
@@ -277,7 +277,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         Returns a list of plain dicts; profiles without any runs are excluded.
         """
         duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
-        conds: list[Any] = [runs.c.runner_profile_id.isnot(None)]
+        conds: list[ColumnElement[bool]] = [runs.c.runner_profile_id.isnot(None)]
         if since:
             conds.append(runs.c.created_at >= since)
         if until:

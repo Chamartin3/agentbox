@@ -29,7 +29,7 @@ inspect_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"]
 def get_resource(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict | None:
     try:
         return svc.get_resource(resource_id)
     except ResourceNotFound:
@@ -41,7 +41,7 @@ def update_resource(
     resource_id: str,
     body: UpdateResourceBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict | None:
     try:
         return svc.update_resource(
             resource_id,
@@ -57,7 +57,7 @@ def update_resource(
 def list_versions(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict | None:
     try:
         return svc.list_versions(resource_id)
     except ResourceNotFound:
@@ -70,7 +70,7 @@ def publish_version(
     version_id: str,
     body: PublishBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict | None:
     try:
         return svc.publish_version(
             resource_id,
@@ -89,7 +89,7 @@ def rollback_resource(
     resource_id: str,
     body: RollbackBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict | None:
     try:
         return svc.rollback_resource(
             resource_id,
@@ -109,7 +109,7 @@ def get_blob(
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     path: str = "",
     version_id: str | None = None,
-):
+) -> Response:
     try:
         blob = svc.get_blob(resource_id, path=path, version_id=version_id)
     except ResourceNotFound as exc:
@@ -127,7 +127,7 @@ def render_resource(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
-):
+) -> dict | None:
     try:
         return svc.render_resource(resource_id, version_id=version_id)
     except ResourceNotFound:
@@ -141,7 +141,7 @@ def get_tree(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
-):
+) -> dict | None:
     try:
         return svc.get_tree(resource_id, version_id=version_id)
     except ResourceNotFound:
@@ -156,7 +156,7 @@ def export_pydantic(
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     class_name: str = "Model",
     version_id: str | None = None,
-):
+) -> Response:
     try:
         code = svc.export_pydantic(resource_id, class_name=class_name, version_id=version_id)
     except ResourceNotFound as exc:
@@ -173,7 +173,7 @@ def validate_script_sample(
     resource_id: str,
     body: ValidateBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict | None:
     try:
         return svc.validate_script_sample(
             resource_id,
@@ -193,7 +193,7 @@ def export_zip(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     version_id: str | None = None,
-):
+) -> Response:
     try:
         content, filename = svc.export_zip(resource_id, version_id=version_id)
     except ResourceNotFound:

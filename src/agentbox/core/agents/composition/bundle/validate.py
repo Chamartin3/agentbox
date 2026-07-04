@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
+from types import ModuleType
 from typing import Any
 
+_jsonschema: ModuleType | None
 try:
     import jsonschema as _jsonschema
 except ImportError:  # pragma: no cover
-    _jsonschema = None  # type: ignore[assignment]
+    _jsonschema = None
 
 logger = logging.getLogger(__name__)
 

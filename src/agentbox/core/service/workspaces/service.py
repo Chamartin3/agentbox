@@ -15,6 +15,7 @@ import shutil
 import tempfile
 from contextlib import contextmanager, suppress
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Any
 
 from agentbox.core.config import Settings, load_settings
@@ -797,7 +798,7 @@ class WorkspaceService(Service):
         *,
         servers: list[dict] | None = None,
         keep: bool = False,
-    ):
+    ) -> Iterator[Path]:
         """Place native runner config in *workspace_path* for interactive launch.
 
         Context manager; yields workspace_path. Renders into temp dir first,
@@ -940,7 +941,7 @@ class WorkspaceService(Service):
             raw = json.loads(raw)
         if not isinstance(raw, dict):
             return None
-        return WorkenvConfig._from_dict(raw)  # pyright: ignore[reportArgumentType]
+        return WorkenvConfig._from_dict({str(k): v for k, v in raw.items()})
 
     def load_workenv(
         self,

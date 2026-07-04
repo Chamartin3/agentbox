@@ -26,11 +26,10 @@ from agentbox.core.service.workspaces.errors import (
     WorkspaceNotFound,
     WorkspacePathEscape,
 )
-
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
 
-def _try_get_mcp_manifest():
+def _try_get_mcp_manifest() -> object | None:
     try:
         return get_mcp_registry().manifest
     except Exception:

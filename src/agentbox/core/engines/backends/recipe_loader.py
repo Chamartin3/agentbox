@@ -11,10 +11,10 @@ from __future__ import annotations
 import yaml
 
 from agentbox.core.data.workenv import Recipe
-from agentbox.core.engines.backends import get_backend, list_backends
+from agentbox.core.engines.backends import BackendAdapter, get_backend, list_backends
 
 
-def backend_for_engine(engine: str):
+def backend_for_engine(engine: str) -> BackendAdapter:
     """Return the registered backend instance for *engine*.
 
     Recipe engine names match backend entry-point names directly.

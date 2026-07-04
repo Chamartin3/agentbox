@@ -21,6 +21,8 @@ import typer
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
 from agentbox.cli.shared.deps import get_db
+from agentbox.core.config import Settings
+from agentbox.core.data import AgentDef
 from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 
@@ -87,9 +89,9 @@ def shell_cmd(
 
 def _render_env_doc(
     obj: CLIContext,
-    settings,
+    settings: Settings,
     workspace_override: str | None,
-    agent_def,
+    agent_def: AgentDef,
     workspace_path: Path,
 ) -> bool:
     """Best-effort env-doc render. Returns True if a doc was written."""

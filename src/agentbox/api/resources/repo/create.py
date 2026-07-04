@@ -21,7 +21,7 @@ create_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])
 def create_resource(
     body: CreateResourceBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     try:
         return svc.create_resource(
             slug=body.slug,
@@ -42,7 +42,7 @@ async def upload_version(
     changelog: Annotated[str, Query(min_length=3)],
     draft: bool = False,
     actor: str | None = None,
-):
+) -> dict | None:
     content = await file.read()
     try:
         return svc.import_upload_version(
@@ -65,7 +65,7 @@ def host_path_version(
     resource_id: str,
     body: HostPathImportBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict | None:
     try:
         return svc.import_host_path_version(
             resource_id,
@@ -90,7 +90,7 @@ async def upload_zip_version(
     changelog: Annotated[str, Query(min_length=3)],
     draft: bool = False,
     actor: str | None = None,
-):
+) -> dict | None:
     content = await file.read()
     try:
         return svc.import_zip_version(
@@ -115,7 +115,7 @@ async def upload_schema_version(
     changelog: Annotated[str, Query(min_length=3)],
     draft: bool = False,
     actor: str | None = None,
-):
+) -> dict | None:
     content = await file.read()
     try:
         return svc.import_schema_version(
@@ -143,7 +143,7 @@ async def upload_script_version(
     output_schema_resource_id: str | None = None,
     draft: bool = False,
     actor: str | None = None,
-):
+) -> dict | None:
     content = await file.read()
     try:
         return svc.import_script_version(

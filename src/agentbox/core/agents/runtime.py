@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -85,7 +86,7 @@ class _DbStoreAdapter:
     def get_repo_version(self, version_id: str) -> dict | None:
         return self._db.resource_versions.get_version(version_id)
 
-    def iter_repo_blobs(self, version_id: str):  # type: ignore[return]
+    def iter_repo_blobs(self, version_id: str) -> Iterator[dict]:
         return self._db.resource_blobs.iter_blobs(version_id)
 
     def read_repo_blob(self, version_id: str, relative_path: str = "") -> Any:

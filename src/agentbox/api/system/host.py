@@ -44,7 +44,7 @@ class WorkspaceHostEnvBody(BaseModel):
 
 
 @router.get("/api/host-env/capabilities")
-def list_capabilities():
+def list_capabilities() -> dict:
     return {
         "capabilities": [
             {
@@ -59,14 +59,14 @@ def list_capabilities():
 
 
 @router.get("/api/host-env/profiles")
-def list_profiles(ws: Annotated[WorkspaceService, Depends(get_workspace_service)]):
+def list_profiles(ws: Annotated[WorkspaceService, Depends(get_workspace_service)]) -> dict:
     return {"items": ws.list_host_env_profiles()}
 
 
 @router.post("/api/host-env/profiles", status_code=201)
 def create_profile(
     body: ProfileBody, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
-):
+) -> dict:
     return ws.upsert_host_env_profile(
         name=body.name,
         description=body.description,
@@ -80,7 +80,7 @@ def update_profile(
     profile_id: str,
     body: ProfileBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     if not ws.get_host_env_profile(profile_id):
         raise HTTPException(status_code=404, detail="profile not found")
     return ws.upsert_host_env_profile(
@@ -93,14 +93,14 @@ def update_profile(
 
 
 @router.delete("/api/host-env/profiles/{profile_id}", status_code=204)
-def delete_profile(profile_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]):
+def delete_profile(profile_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]) -> None:
     ws.delete_host_env_profile(profile_id)
 
 
 @router.get("/api/workspaces/{workspace_id}/host-env")
 def get_workspace_host_env(
     workspace_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
-):
+) -> dict:
     """Read the host-env provisioning config for *workspace_id*."""
     return ws.resolve_workspace_host_env(workspace_id)
 
@@ -110,7 +110,7 @@ def set_workspace_host_env(
     workspace_id: str,
     body: WorkspaceHostEnvBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     try:
         ws.set_workspace_host_env(
             workspace_id,

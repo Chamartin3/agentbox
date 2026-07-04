@@ -5,6 +5,7 @@ Delegates to ``WorkspaceService`` for config generation.
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,7 @@ def launch_runner_configs(
     settings: Settings,
     servers: list[dict] | None = None,
     keep: bool = False,
-):
+) -> AbstractContextManager[Path]:
     """Context manager — delegates to WorkspaceService."""
     return _ws().launch_runner_configs(
         workspace_path, servers=servers, keep=keep

@@ -241,7 +241,7 @@ class CaptureSession(RunStreamSession):
         )
         self.captured: list[RunEvent] = []
 
-    def __enter__(self) -> CaptureSession:  # type: ignore[override]
+    def __enter__(self) -> CaptureSession:
         # Skip the file open — captures live in memory only.
         return self
 
@@ -253,7 +253,7 @@ class CaptureSession(RunStreamSession):
     ) -> None:
         return None
 
-    def emit(self, ev: RunEvent) -> None:  # type: ignore[override]
+    def emit(self, ev: RunEvent) -> None:
         if self._done_emitted:
             raise DoneAlreadyEmittedError(
                 f"event {type(ev).__name__} emitted after DoneEvent for "

@@ -9,7 +9,7 @@ from pathlib import Path
 from agentbox.core.constants import ResourceType
 from agentbox.core.data import hash_blobs
 from agentbox.core.db import ResourceManager, ResourceVersionManager
-from agentbox.core.resources.importers.base import ImporterContext
+from agentbox.core.resources.importers.base import ImporterContext, ResourceImporter
 from agentbox.core.resources.importers.skill import SkillImporter
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ def _import_one(
     type_: ResourceType | str,
     display_name: str,
     description: str,
-    importer,
+    importer: ResourceImporter,
     tags: Iterable[str] = (),
     metadata_extra: dict | None = None,
 ) -> tuple[str, str]:

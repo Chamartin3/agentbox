@@ -18,14 +18,21 @@ logger = logging.getLogger(__name__)
 _LOAD_FAILURES: dict[str, dict[str, str]] = {}
 
 
-def _load_group(group: str) -> dict[str, type]:
-    out: dict[str, type] = {}
+def _load_group(group: str, base: type[T]) -> dict[str, type[T]]:
+    out: dict[str, type[T]] = {}
     failures: dict[str, str] = {}
     for ep in entry_points(group=group):
         try:
             cls = ep.load()
         except Exception as exc:
             reason = f"{type(exc).__name__}: {exc}"
+            failures[ep.name] = reason
+            logger.warning(
+                "agentbox: plugin %s:%s failed to load (%s)", group, ep.name, reason
+            )
+            continue
+        if not (isinstance(cls, type) and issubclass(cls, base)):
+            reason = f"not a {base.__name__} subclass"
             failures[ep.name] = reason
             logger.warning(
                 "agentbox: plugin %s:%s failed to load (%s)", group, ep.name, reason
@@ -52,7 +59,7 @@ _BACKEND_CLASSES: dict[str, type[BackendAdapter]] | None = None
 def backends() -> dict[str, type[BackendAdapter]]:
     global _BACKEND_CLASSES
     if _BACKEND_CLASSES is None:
-        _BACKEND_CLASSES = _load_group("agentbox.backends")  # type: ignore[assignment]
+        _BACKEND_CLASSES = _load_group("agentbox.backends", BackendAdapter)
     return _BACKEND_CLASSES or {}
 
 

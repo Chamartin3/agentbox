@@ -59,7 +59,7 @@ def list_available_tools(
     workspace_id: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     mcp_registry: Annotated[McpRegistry, Depends(get_mcp_registry)],
-):
+) -> dict:
     """Return every tool, capability, and resource *installed* in this workspace.
 
     The agent's authorization pick-list is drawn from this catalog.

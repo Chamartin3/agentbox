@@ -29,7 +29,7 @@ class PreviewEnvDocBody(BaseModel):
 def get_env_doc(
     workspace_id: str,
     ctx: APIContext = Depends(get_api_context),
-):
+) -> dict:
     active = ctx.workspaces.get_active_env_doc(workspace_id)
     if not active:
         return {"active": None}
@@ -41,7 +41,7 @@ def save_env_doc(
     workspace_id: str,
     body: SaveEnvDocBody,
     ctx: APIContext = Depends(get_api_context),
-):
+) -> dict:
     """Save and publish the workspace env-doc, then re-sync on-disk renders."""
     try:
         return ctx.workspaces.save_and_sync_env_doc(
@@ -59,7 +59,7 @@ def preview_env_doc(
     workspace_id: str,
     body: PreviewEnvDocBody,
     ctx: APIContext = Depends(get_api_context),
-):
+) -> dict:
     if body.content is not None:
         content: object = body.content
     else:

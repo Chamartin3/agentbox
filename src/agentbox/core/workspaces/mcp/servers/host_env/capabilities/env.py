@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
+from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 from agentbox.core.workspaces.permissions import GrantViolation, check_capability
 from fastmcp import FastMCP
 
 
-def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
+def register(mcp: FastMCP, ctx_factory: Callable[[], HostEnvContext]) -> None:
     @mcp.tool(
         name="env.get",
         description="Read an allowlisted environment variable. Requires env.get grant.",

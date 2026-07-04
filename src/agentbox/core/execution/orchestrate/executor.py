@@ -51,7 +51,7 @@ class RunExecutor:
         db: Database,
         settings: Settings,
         mcp_registry: "McpRegistry | None" = None,
-    ):
+    ) -> None:
         self.db = db
         self.settings = settings
         self._mcp_registry = mcp_registry

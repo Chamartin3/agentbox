@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from agentbox.core.tools import SharedToolRegistry
+from agentbox.core.tools.registry import ToolSpec
 from agentbox.core.workspaces.mcp.servers.agent_tools.context import AgentToolsContext
 from fastmcp import FastMCP
 
@@ -39,7 +40,7 @@ def build_server(ctx: AgentToolsContext | None = None) -> FastMCP:
     return mcp
 
 
-def _register_granted_tool(mcp: FastMCP, spec, ctx: AgentToolsContext) -> None:
+def _register_granted_tool(mcp: FastMCP, spec: ToolSpec, ctx: AgentToolsContext) -> None:
     """Register a tool whose name is in the active grant set."""
     input_model = spec.input_model
 
@@ -58,7 +59,7 @@ def _register_granted_tool(mcp: FastMCP, spec, ctx: AgentToolsContext) -> None:
     mcp.tool(name=spec.name, description=spec.description)(_tool)
 
 
-def _register_ungranted_stub(mcp: FastMCP, spec) -> None:
+def _register_ungranted_stub(mcp: FastMCP, spec: ToolSpec) -> None:
     """Register a stub that returns a not-granted error for an ungranted tool."""
 
     def _stub() -> dict[str, str]:

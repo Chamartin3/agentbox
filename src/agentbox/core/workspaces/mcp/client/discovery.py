@@ -168,6 +168,6 @@ async def discover_tools(
             _log.warning("mcp-discovery: gather error for %r: %s", name, result)
             out[name] = []
         else:
-            name, tools = result  # type: ignore[misc]
+            name, tools = result
             out[name] = tools
     return out

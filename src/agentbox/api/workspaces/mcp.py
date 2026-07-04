@@ -41,7 +41,7 @@ class PolicyBody(BaseModel):
 def get_effective_mcp(
     workspace_id: str,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     return ws.resolve_workspace_mcp(workspace_id)
 
 
@@ -49,7 +49,7 @@ def get_effective_mcp(
 def get_effective_servers(
     workspace_id: str,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     """Effective per-workspace MCP servers — union of manifest + overrides."""
     return ws.resolve_workspace_mcp(workspace_id)
 
@@ -57,7 +57,7 @@ def get_effective_servers(
 @router.get("/api/workspaces/{workspace_id}/mcp/policy")
 def get_policy(
     workspace_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
-):
+) -> dict:
     return {"policy": ws.get_mcp_policy(workspace_id)}
 
 
@@ -66,7 +66,7 @@ def set_policy(
     workspace_id: str,
     body: PolicyBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     try:
         return {
             "policy": ws.set_mcp_policy(workspace_id, body.default_policy)
@@ -81,7 +81,7 @@ def set_server_override(
     server_name: str,
     body: ServerOverrideBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     try:
         return ws.set_mcp_server_override(
             workspace_id,
@@ -104,7 +104,7 @@ def set_tool_override(
     tool_name: str,
     body: ToolOverrideBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     return ws.set_mcp_tool_override(
         workspace_id,
         server_name,
@@ -118,7 +118,7 @@ def set_tool_override(
 def refresh_workspace_mcp_discovery(
     workspace_id: str,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     """Invalidate the MCP tool discovery cache for this workspace's servers.
 
     Returns count of cache entries removed.

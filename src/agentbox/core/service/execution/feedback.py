@@ -10,7 +10,7 @@ def _svc() -> ExecutionService:
     return ExecutionService()
 
 
-def list_comments(run_id: str, *, store=None) -> dict:
+def list_comments(run_id: str, *, store: object | None = None) -> dict:
     svc = _svc()
     if svc.get_run(run_id) is None:
         raise RunNotFound(run_id)
@@ -18,7 +18,7 @@ def list_comments(run_id: str, *, store=None) -> dict:
 
 
 def add_comment(
-    run_id: str, *, store=None, author: str, body: str
+    run_id: str, *, store: object | None = None, author: str, body: str
 ) -> dict:
     svc = _svc()
     if svc.get_run(run_id) is None:

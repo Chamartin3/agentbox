@@ -30,6 +30,7 @@ import websockets
 
 from agentbox.cli.ops.launch import _launch_session
 from agentbox.cli.shared import CLIContext
+from agentbox.cli.shared.context import Renderers
 
 # Mapping from BackendName values to RunnerKind strings used by _launch_session.
 # "token" passes through and is rejected by _launch_session with a clear message.
@@ -42,7 +43,7 @@ _BACKEND_NAME_TO_RUNNER: dict[str, str] = {
 }
 
 
-async def _stream(renderers, api: str, run_id: str) -> None:
+async def _stream(renderers: Renderers, api: str, run_id: str) -> None:
     ws_url = api.replace("http", "ws") + f"/api/runs/{run_id}/stream"
     async with websockets.connect(ws_url) as ws:
         async for msg in ws:

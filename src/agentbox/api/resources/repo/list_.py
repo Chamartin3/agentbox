@@ -21,7 +21,7 @@ def list_resources(
     include_deleted: bool = False,
     limit: int = 50,
     offset: int = 0,
-):
+) -> dict:
     return svc.list_resources(
         type=type,
         query=q,

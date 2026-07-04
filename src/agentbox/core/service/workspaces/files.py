@@ -10,6 +10,7 @@ from pathlib import Path
 
 from agentbox.core import workspaces as ws
 from agentbox.core.config import Settings
+from agentbox.core.data.manifests.agents import AgentDef
 from agentbox.core.db import AgentDefManager
 from agentbox.core.service.agents.prompts import AgentNotFound
 from agentbox.core.service.workspaces.service import WorkspaceService
@@ -33,7 +34,7 @@ def _ws() -> WorkspaceService:
     return WorkspaceService()
 
 
-def _resolve_agent_or_raise(agent_id: str, *, agent_defs: AgentDefManager):
+def _resolve_agent_or_raise(agent_id: str, *, agent_defs: AgentDefManager) -> AgentDef:
     agent = agent_defs.get(agent_id)
     if agent is None:
         raise AgentNotFound(agent_id)

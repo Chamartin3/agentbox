@@ -14,6 +14,7 @@ from typing import Any, ClassVar
 
 from agentbox.core.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
+from agentbox.core.data.workenv import Item
 from agentbox.core.engines.backends.codex.render import build_codex_items
 from agentbox.core.engines.backends.codex.tools import NATIVE_TOOLS as _CODEX_TOOLS
 from agentbox.core.engines.streaming.jsonl import stream_jsonl_subprocess
@@ -98,8 +99,10 @@ def parse_codex_event(
 
 
 def _int_or_zero(v: object) -> int:
+    if not isinstance(v, (int, float, str, bytes)):
+        return 0
     try:
-        return int(v)  # type: ignore[arg-type]
+        return int(v)
     except (TypeError, ValueError):
         return 0
 
@@ -119,7 +122,7 @@ class CodexBackend(BackendAdapter):
     ) -> str | None:
         return self._session_id
 
-    def build_workspace_items(self, config: Any) -> list[Any]:
+    def build_workspace_items(self, config: Any) -> list[Item]:
         return build_codex_items(config)
 
     def render(

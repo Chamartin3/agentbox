@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Iterator
 
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.engine import Connection
 
 from agentbox.core.constants import ImportSource, ResourceType
 from agentbox.core.db.base.manager import Manager
@@ -219,7 +220,7 @@ class ResourceManager(Manager[Resource]):
                 .values(status="deleted", updated_at=now_iso())
             )
 
-    def _set_active_version(self, conn, resource_id: str, version_id: str, *, now: str) -> None:
+    def _set_active_version(self, conn: Connection, resource_id: str, version_id: str, *, now: str) -> None:
         """Update the active_version_id on the resources row (called within an open conn)."""
         conn.execute(
             resources_table.update()
@@ -272,7 +273,7 @@ class ResourceVersionManager(Manager[ResourceVersion]):
 
     def _activate_in_conn(
         self,
-        conn,
+        conn: Connection,
         resource_id: str,
         version_id: str,
         *,

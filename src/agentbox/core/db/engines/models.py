@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json as _json
 
+from sqlalchemy.engine import Row
+
 from agentbox.core.data.profiles import RunnerProfile
 
 
-def _row_to_profile(row) -> RunnerProfile:
+def _row_to_profile(row: Row) -> RunnerProfile:
     """Convert a database row to a RunnerProfile model."""
 
     m = row._mapping

@@ -31,10 +31,11 @@ from agentbox.core.events import (
     ToolResultEvent,
 )
 
+_UnexpectedModelBehavior: type[BaseException] | None
 try:
     from pydantic_ai.exceptions import UnexpectedModelBehavior as _UnexpectedModelBehavior
 except Exception:
-    _UnexpectedModelBehavior = None  # type: ignore[assignment,misc]
+    _UnexpectedModelBehavior = None
 
 
 @dataclass(frozen=True)

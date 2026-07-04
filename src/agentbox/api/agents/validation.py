@@ -68,7 +68,7 @@ class AgentValidationPut(BaseModel):
 def get_agent_validation(
     agent_id: str,
     ctx: APIContext = Depends(get_api_context),
-):
+) -> dict:
     """Return the active version's inline validators per direction."""
     return ctx.agents.get_agent_validation(agent_id)
 
@@ -78,7 +78,7 @@ def put_agent_validation(
     agent_id: str,
     body: AgentValidationPut,
     ctx: APIContext = Depends(get_api_context),
-):
+) -> dict:
     """Write inline validators by minting a new active version.
 
     Omitting a direction in the body leaves it unchanged on the new

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from agentbox.core.service import AgentVersionRow
+from agentbox.core.service import AgentService, AgentVersionRow
 from agentbox.core.service import composition_preview as preview_composition
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
@@ -35,7 +35,7 @@ def _version_meta(version: AgentVersionRow) -> dict:
     }
 
 
-def _resolve_active(svc, agent_id: str) -> AgentVersionRow | None:
+def _resolve_active(svc: AgentService, agent_id: str) -> AgentVersionRow | None:
     """Active version with ``latest_version`` fallback (mirrors the API)."""
     return svc.active_version(agent_id) or svc.latest_version(agent_id)
 

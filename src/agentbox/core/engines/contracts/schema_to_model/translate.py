@@ -69,20 +69,20 @@ def json_schema_to_pydantic_model(
         for key in ("anyOf", "oneOf"):
             if key in field_schema:
                 branches = field_schema[key]
-                branch_types: list[Any] = []
+                branch_types: list[type[Any]] = []
                 for i, branch in enumerate(branches):
                     t = type_for(branch, name_hint=f"{name_hint}{key.title()}{i}")
                     branch_types.append(t)
                 if len(branch_types) == 1:
                     return branch_types[0]
-                return Union[tuple(branch_types)]  # type: ignore[return-value]  # noqa: UP007
+                return Union[tuple(branch_types)]  # noqa: UP007
 
         if "const" in field_schema:
-            return Literal[field_schema["const"]]  # type: ignore[valid-type]
+            return Literal[field_schema["const"]]
 
         if "enum" in field_schema:
             values = tuple(field_schema["enum"])
-            return Literal[values]  # type: ignore[valid-type]
+            return Literal[values]
 
         typ = field_schema.get("type")
         if isinstance(typ, list):
@@ -91,7 +91,7 @@ def json_schema_to_pydantic_model(
                 inner = type_for(
                     {**field_schema, "type": non_null[0]}, name_hint=name_hint
                 )
-                return inner | None  # type: ignore[operator]
+                return inner | None
             raise UnsupportedSchema(f"union type {typ!r} not supported")
 
         if typ == "string":
@@ -112,7 +112,7 @@ def json_schema_to_pydantic_model(
             if items is None:
                 return list
             inner = type_for(items, name_hint=f"{name_hint}Item")
-            return list[inner]  # type: ignore[valid-type]
+            return list[inner]
         if typ == "object":
             if "properties" in field_schema or "required" in field_schema:
                 return build_object(field_schema, name=name_hint)
@@ -176,7 +176,7 @@ def json_schema_to_pydantic_model(
             is_required = prop_name in required
             py_type = type_for(prop_schema, name_hint=_capitalize(prop_name))
             if not is_required:
-                py_type = py_type | None  # type: ignore[operator]
+                py_type = py_type | None
             field_default = field_for(prop_schema, required=is_required)
             fields[prop_name] = (py_type, field_default)
 
@@ -200,7 +200,7 @@ def json_schema_to_pydantic_model(
                 {union_key: schema[union_key]},
                 name_hint=model_name,
             )
-            root_cls: type[BaseModel] = RootModel[wrapper]  # type: ignore[valid-type]
+            root_cls: type[BaseModel] = RootModel[wrapper]
             root_cls.__name__ = model_name
             return root_cls
 

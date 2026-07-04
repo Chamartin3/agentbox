@@ -365,6 +365,8 @@ ignore_imports =
     agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.database
     agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.system.config
     # ── Pre-existing deep imports (no manager API yet): ──────────────────
+    # Run model used as return type; fix: RunManager.get() → RunRecord (plan 112+)
+    agentbox.core.service.execution.service -> agentbox.core.db.models.runs.run
     agentbox.core.agents.runtime -> agentbox.core.db.system.config
     agentbox.core.engines.defaults -> agentbox.core.db.system.config
     agentbox.core.execution.observability.snapshot.mcp -> agentbox.core.db.system.config

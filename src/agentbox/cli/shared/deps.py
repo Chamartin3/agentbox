@@ -12,11 +12,15 @@ command group can call it without recreating heavy objects.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db.database import Database  # ponytail: transitional — 113_04 routes DI through Services
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.mcp.client import McpRegistry
+
+if TYPE_CHECKING:
+    from agentbox.core.service.workspaces.service import WorkspaceService
 
 
 @lru_cache(maxsize=1)
@@ -89,7 +93,7 @@ def get_resource_service() -> ResourceService:
 
 
 @lru_cache(maxsize=1)
-def get_workspace_service():
+def get_workspace_service() -> WorkspaceService:
     """Workspace-domain service. Cached — self-wires from settings."""
     from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
     return WorkspaceService()

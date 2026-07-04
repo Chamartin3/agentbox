@@ -58,8 +58,8 @@ def _catalog_tool_names(
 def list_grants(
     agent_id: str,
     include_revoked: bool = False,
-    svc: Annotated[AgentService, Depends(get_agent_service)] = ...,  # pyright: ignore[reportArgumentType]
-):
+    svc: AgentService = Depends(get_agent_service),
+) -> dict:
     return {"items": svc.list_tool_grants(agent_id, include_revoked=include_revoked)}
 
 
@@ -69,8 +69,8 @@ def grant_tool(
     body: GrantBody,
     ws_svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     mcp_registry: Annotated[McpRegistry, Depends(get_mcp_registry)],
-    svc: Annotated[AgentService, Depends(get_agent_service)] = ...,  # pyright: ignore[reportArgumentType]
-):
+    svc: AgentService = Depends(get_agent_service),
+) -> dict:
     try:
         result = svc.grant_tool(
             agent_id=agent_id,
@@ -99,8 +99,8 @@ def revoke_tool(
     agent_id: str,
     tool_name: str,
     body: RevokeBody,
-    svc: Annotated[AgentService, Depends(get_agent_service)] = ...,  # pyright: ignore[reportArgumentType]
-):
+    svc: AgentService = Depends(get_agent_service),
+) -> None:
     try:
         svc.revoke_tool(
             agent_id=agent_id,

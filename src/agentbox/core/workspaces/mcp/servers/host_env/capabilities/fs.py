@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 from agentbox.core.workspaces.permissions import GrantViolation, check_capability
 from fastmcp import FastMCP
 
 
-def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
+def register(mcp: FastMCP, ctx_factory: Callable[[], HostEnvContext]) -> None:
     @mcp.tool(
         name=CanonicalTool.FS_READ.value,
         description="Read a file. Requires fs.read grant.",

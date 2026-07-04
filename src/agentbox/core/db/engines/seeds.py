@@ -85,7 +85,7 @@ DEFAULT_PROFILES: list[RunnerProfileCreate] = [
 ]
 
 
-def seed_default_runner_profiles(store=None) -> int:  # store param kept for backward compat
+def seed_default_runner_profiles(store: object | None = None) -> int:  # store param kept for backward compat
     """Insert default runner profiles that don't already exist.
 
     Returns the number of profiles inserted. Errors on a single profile

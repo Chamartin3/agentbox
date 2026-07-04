@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlalchemy import insert, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, Row
 
 from agentbox.core.data.profiles import (
     RunnerProfile,
@@ -26,7 +26,7 @@ from agentbox.core.db.utils import now_iso
 from agentbox.core.db.schema import agent_runner_profiles, runner_profiles
 
 
-def _row_to_profile(row) -> RunnerProfile:
+def _row_to_profile(row: Row) -> RunnerProfile:
     """Convert a database row to a RunnerProfile model."""
     m = row._mapping
     return RunnerProfile(

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 
+from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 from agentbox.core.workspaces.permissions import GrantViolation, check_capability
 from fastmcp import FastMCP
 
@@ -21,7 +23,7 @@ def _run_git(args: list[str], cwd: str) -> str:
     return result.stdout
 
 
-def register(mcp: FastMCP, ctx_factory) -> None:  # type: ignore[type-arg]
+def register(mcp: FastMCP, ctx_factory: Callable[[], HostEnvContext]) -> None:
     @mcp.tool(
         name="git.status",
         description="git status in a repo directory. Requires git.status grant.",

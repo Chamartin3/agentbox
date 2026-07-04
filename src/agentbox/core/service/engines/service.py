@@ -22,6 +22,7 @@ import uuid
 from typing import Any
 
 from agentbox.core.agents.resolve import list_engines, resolve_engine_by_name
+from agentbox.core.engines.backends import BackendAdapter
 from agentbox.core.data import (
     RunnerProfile,
     RunnerProfileCreate,
@@ -42,6 +43,7 @@ from agentbox.core.engines import (
     refresh_opencode_providers,
 )
 from agentbox.core.engines.credentials import CredentialMethod
+from agentbox.core.engines.providers.registry import ProviderAdapter
 from agentbox.core.engines.credentials import builtin as _cred_builtin  # noqa: F401 (registers credential methods on import)
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines.profile_validation import validate_create, validate_patch
@@ -293,7 +295,7 @@ class EngineService(Service):
             return providers
         return [p for p in providers if backend in (p.compatible_backends or [])]
 
-    def get_runner_provider(self, provider_id: str):
+    def get_runner_provider(self, provider_id: str) -> ProviderAdapter | None:
         """Return the provider adapter for *provider_id*, or ``None``."""
         return get_provider(provider_id)
 
@@ -325,7 +327,7 @@ class EngineService(Service):
         """Return all registered backends (engine registry)."""
         return list_engines()
 
-    def get_backend(self, name: str):
+    def get_backend(self, name: str) -> type[BackendAdapter]:
         """Resolve a backend by name."""
         return resolve_engine_by_name(name)
 
@@ -338,7 +340,7 @@ class EngineService(Service):
         """All runner provider descriptors."""
         return list_providers()
 
-    def get_provider(self, provider_id: str):
+    def get_provider(self, provider_id: str) -> ProviderAdapter | None:
         """Return the provider adapter for *provider_id*, or ``None``."""
         return get_provider(provider_id)
 
@@ -348,7 +350,7 @@ class EngineService(Service):
         """List a provider's models via the registry with a resolved config."""
         return await list_models(provider_id, config, refresh=refresh)
 
-    def refresh_opencode_providers(self):
+    def refresh_opencode_providers(self) -> list[str]:
         """Re-discover opencode providers; returns the discovered descriptors."""
         return refresh_opencode_providers()
 

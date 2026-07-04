@@ -10,12 +10,12 @@ sort can be added per-endpoint later without changing the contract.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any, TypedDict
 
 
 class PaginatedEnvelope(TypedDict):
-    items: list[Any]
+    items: list[object]
     total: int
     offset: int
     limit: int
@@ -30,7 +30,7 @@ def _coerce_sort_key(value: Any) -> Any:
 
 
 def paginate_list(
-    items: list[Any],
+    items: Sequence[object],
     *,
     q: str | None = None,
     q_fields: Iterable[str] = (),
@@ -56,7 +56,7 @@ def paginate_list(
             return item.get(field)
         return getattr(item, field, None)
 
-    filtered = items
+    filtered: list[object] = list(items)
     if q:
         needle = q.lower()
         filtered = [

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from agentbox.core.constants import ResourceType
+from agentbox.core.data.manifests.system import ProjectManifest
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,
     ResourceManager,
@@ -33,7 +35,7 @@ def import_repo_resources(
         return {"created": 0, "updated": 0, "skipped": 0, "failed": 0}
     created = updated = skipped = failed = 0
 
-    def _safe(slug: str, fn) -> None:
+    def _safe(slug: str, fn: Callable[[], tuple[str, str]]) -> None:
         nonlocal created, updated, skipped, failed
         try:
             action, _ = fn()
@@ -97,7 +99,7 @@ def import_repo_resources(
 def sweep_workspace_skill_bindings(
     resources: ResourceManager,
     file_bindings: WorkspaceFileResourceBindingManager,
-    manifest,
+    manifest: ProjectManifest | None,
 ) -> dict:
     if manifest is None or not getattr(manifest, "workspaces", None):
         return {"workspaces_wired": 0, "bindings_added": 0}
@@ -151,7 +153,7 @@ def import_composition_references(
     resource_versions: ResourceVersionManager,
     prompt_bindings: AgentPromptResourceBindingManager,
     root: Path,
-    manifest,
+    manifest: ProjectManifest | None,
 ) -> dict:
     if manifest is None or not getattr(manifest, "agents", None):
         return {"agents_wired": 0, "resources_created": 0, "bindings_added": 0}
@@ -166,8 +168,9 @@ def import_composition_references(
         if existing:
             continue
         bundle_dir: Path | None = None
-        if getattr(agent, "source_path", None):
-            bundle_dir = Path(agent.source_path).parent
+        source_path: str | None = getattr(agent, "source_path", None)
+        if source_path:
+            bundle_dir = Path(source_path).parent
         bindings: list[dict] = []
         for idx, ref in enumerate(comp.references):
             if isinstance(ref, str):
@@ -194,7 +197,7 @@ def import_composition_references(
                 continue
             display_name = fpath.stem.replace("_", " ").replace("-", " ").title()
 
-            def _do_doc(p=fpath, s=slug, dn=display_name):
+            def _do_doc(p: Path = fpath, s: str = slug, dn: str = display_name) -> tuple[str, str]:
                 return _import_one(resources, resource_versions, slug=s, type_=ResourceType.DOCUMENT, display_name=dn, description=f"Imported from {p.relative_to(root)}" if root in p.parents else f"Imported from {p}", importer=HostPathImporter(root=p), tags=("reference",))
             try:
                 action, _ = _do_doc()

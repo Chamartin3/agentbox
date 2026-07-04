@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from agentbox.core.data.records import SharedResourceRecord
 from agentbox.core.db import (
     ResourceManager,
     ResourceVersionManager,
@@ -52,7 +53,7 @@ class MigrationReport:
         }
 
 
-def _slug_for(record) -> str:
+def _slug_for(record: SharedResourceRecord) -> str:
     return f"legacy:{record.kind}:{record.id}"
 
 

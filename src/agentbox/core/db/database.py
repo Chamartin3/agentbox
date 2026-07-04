@@ -15,6 +15,8 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from sqlalchemy.engine import Engine
+
 from agentbox.core.db.base.engine import init_engine
 from agentbox.core.db.managers.agents import (
     ActiveAgentVersionManager,
@@ -96,7 +98,7 @@ class Database:
     """
 
     @property
-    def engine(self):
+    def engine(self) -> Engine:
         """The shared SQLAlchemy engine (read-only access for stats bridges)."""
         return self._engine
 

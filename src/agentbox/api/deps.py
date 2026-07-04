@@ -55,7 +55,7 @@ def get_system_service() -> SystemService:
 
 # ── Stubs for services not yet migrated (plans 089–092) ──────────────────
 
-def get_engine_service():
+def get_engine_service() -> EngineService:
     """TODO: plan 091 — EngineService. Lazy import to avoid circular import."""
     from agentbox.core.service.engines.service import EngineService  # noqa: PLC0415
     return EngineService()
@@ -66,7 +66,7 @@ def get_resource_service() -> ResourceService:
     return ResourceService()
 
 
-def get_workspace_service():
+def get_workspace_service() -> WorkspaceService:
     """Workspace-domain service. Uncached — self-wires from settings."""
     from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
     return WorkspaceService()

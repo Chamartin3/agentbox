@@ -97,7 +97,7 @@ def agent_tool(
             output_model=output_model,
         )
         SharedToolRegistry.register(spec)
-        fn._agent_tool_spec = spec  # type: ignore[attr-defined]
+        setattr(fn, "_agent_tool_spec", spec)
         return fn
 
     return decorator

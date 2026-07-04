@@ -12,7 +12,7 @@ import agentbox.core.engines.providers.ollama as ollama
 import agentbox.core.engines.providers.openai as openai
 import agentbox.core.engines.providers.openrouter as openrouter
 import agentbox.core.engines.providers.xai as xai
-from agentbox.core.engines.providers.base import ProviderAdapter, ProviderDescriptor
+from agentbox.core.engines.providers.base import ProviderAdapter, ProviderDescriptor, ProviderModel
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ def get_provider(provider_id: str) -> ProviderAdapter | None:
 
 async def list_models(
     provider_id: str, config: Any, refresh: bool = False
-) -> list[Any]:
+) -> list[ProviderModel]:
     """List models from a provider with short TTL cache.
 
     Args:

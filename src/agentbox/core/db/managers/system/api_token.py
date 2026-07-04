@@ -1,7 +1,8 @@
 """ApiTokenManager — API credential token CRUD."""
 from __future__ import annotations
 
-from sqlalchemy import select as sa_select, update as sa_update, delete as sa_delete
+from sqlalchemy import Executable, select as sa_select, update as sa_update, delete as sa_delete
+from sqlalchemy.engine import Row
 
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.system.api_token import ApiToken
@@ -136,13 +137,13 @@ class ApiTokenManager(Manager[ApiToken]):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _one_raw(self, stmt):
+    def _one_raw(self, stmt: Executable) -> Row | None:
         """Execute a statement and return a single Row, or None."""
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
         return row
 
-    def _list_raw(self, stmt) -> list:
+    def _list_raw(self, stmt: Executable) -> list:
         """Execute a statement and return a list of Row objects."""
         with self._engine.connect() as conn:
             rows = conn.execute(stmt).all()

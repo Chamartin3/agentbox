@@ -91,7 +91,7 @@ class ReplaceSkillBindings(BaseModel):
 def list_prompt_resources(
     agent_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     return svc.list_prompt_resources(agent_id)
 
 
@@ -100,7 +100,7 @@ def replace_prompt_resources(
     agent_id: str,
     body: ReplacePromptBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     try:
         return svc.replace_prompt_resources(
             agent_id,
@@ -117,7 +117,7 @@ def preview_prompt(
     agent_id: str,
     body: PreviewPromptBody,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     override = (
         [b.model_dump() for b in body.bindings] if body.bindings is not None else None
     )
@@ -140,7 +140,7 @@ def preview_prompt(
 def list_workspace_resources(
     workspace_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     return svc.list_workspace_resources(workspace_id)
 
 
@@ -150,7 +150,7 @@ def replace_workspace_resources(
     body: ReplaceWorkspaceBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     try:
         result = svc.replace_workspace_resources(
             workspace_id,
@@ -170,7 +170,7 @@ def replace_workspace_resources(
 def dry_run_workspace_resources(
     workspace_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     return svc.dry_run_workspace_resources(workspace_id)
 
 
@@ -181,7 +181,7 @@ def dry_run_workspace_resources(
 def preview_modes(
     resource_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     try:
         return svc.preview_modes(resource_id)
     except ResourceNotFound as exc:
@@ -196,7 +196,7 @@ def list_workspace_subagents(
     workspace_id: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     agent_svc: Annotated[AgentService, Depends(get_agent_service)],
-):
+) -> dict:
     # Enrichment with agent info is done here at the API layer
     items = svc.list_workspace_subagents_raw(workspace_id)
     enriched = []
@@ -217,7 +217,7 @@ def replace_workspace_subagents(
     workspace_id: str,
     body: ReplaceSubagents,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     try:
         items = svc.replace_workspace_subagents(
             workspace_id,
@@ -239,7 +239,7 @@ def replace_workspace_subagents(
 def list_workspace_skill_bindings(
     workspace_id: str,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
-):
+) -> dict:
     return svc.list_workspace_skill_bindings(workspace_id)
 
 
@@ -249,7 +249,7 @@ def replace_workspace_skill_bindings(
     body: ReplaceSkillBindings,
     svc: Annotated[ResourceService, Depends(get_resource_service)],
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-):
+) -> dict:
     try:
         result = svc.replace_workspace_skill_bindings(
             workspace_id,

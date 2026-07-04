@@ -81,7 +81,7 @@ def _json_schema_to_pydantic_model(
     ) -> Any:
         union_branches = schema_obj.get("oneOf") or schema_obj.get("anyOf")
         if union_branches:
-            branch_types: list[Any] = []
+            branch_types: list[type[Any]] = []
             for i, branch in enumerate(union_branches):
                 if "$ref" in branch:
                     resolved = _resolve_ref(branch["$ref"])
@@ -96,7 +96,7 @@ def _json_schema_to_pydantic_model(
                     )
             if len(branch_types) == 1:
                 return branch_types[0]
-            return Union[tuple(branch_types)]  # type: ignore[return-value]  # noqa: UP007
+            return Union[tuple(branch_types)]  # noqa: UP007
 
         properties = schema_obj.get("properties", {})
         required = set(schema_obj.get("required", []))

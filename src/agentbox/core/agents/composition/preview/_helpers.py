@@ -23,7 +23,7 @@ from agentbox.core.db import (
 class PreviewError(Exception):
     """Raised when a binding cannot be resolved (missing resource/version)."""
 
-    def __init__(self, code: str, detail: str):
+    def __init__(self, code: str, detail: str) -> None:
         super().__init__(detail)
         self.code = code
         self.detail = detail

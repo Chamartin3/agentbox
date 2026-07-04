@@ -42,6 +42,7 @@ from agentbox.core.data import (
     AgentVersionRow,
     PromptVersionRow,
     VersionFileUploadRow,
+    _AgentMetaFields,
     _AgentMetaPatchFields,
     _AgentSyncPatchFields,
     _AgentToolGrantPatchFields,
@@ -226,16 +227,18 @@ class AgentService(Service):
         if self._meta.get_meta(agent_id) is not None:
             self._meta.patch(agent_id, **cast(_AgentMetaPatchFields, {column: now, "updated_at": now}))
         else:
-            self._meta.insert(
-                agent_id=agent_id,
-                sync_mode="off",
-                export_to_disk=0,
-                source_path=None,
-                source_format=None,
-                created_at=now,
-                updated_at=now,
-                **cast(Any, {column: now}),  # type: ignore[reportCallIssue] — dynamic column name
-            )
+            # cast: runtime-chosen timestamp column (deleted_at / disabled_at)
+            payload: dict[str, str | int | None] = {
+                "agent_id": agent_id,
+                "sync_mode": "off",
+                "export_to_disk": 0,
+                "source_path": None,
+                "source_format": None,
+                "created_at": now,
+                "updated_at": now,
+                column: now,
+            }
+            self._meta.insert(**cast(_AgentMetaFields, payload))
         if column == "deleted_at":
             self._active.delete_for_agent(agent_id)
         return self._meta.get_meta(agent_id)

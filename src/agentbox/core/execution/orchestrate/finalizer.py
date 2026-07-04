@@ -26,7 +26,7 @@ from typing import Any
 
 from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.data import AgentDef, RunRecord
-
+from agentbox.core.engines.backends import BackendAdapter
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 from agentbox.core.execution.orchestrate.steploop import StepResult
@@ -103,7 +103,7 @@ class RunFinalizer:
         *,
         run_id: str,
         agent: AgentDef,
-        adapter,
+        adapter: BackendAdapter,
         transcript_path: Path,
         broadcaster: RunBroadcaster,
         workdir: Path,
