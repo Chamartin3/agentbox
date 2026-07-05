@@ -66,6 +66,7 @@ from agentbox.core.db.managers.workspaces import (
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
     WorkspaceMcpToolOverrideManager,
+    WorkspaceReadManager,
     WorkspaceRuntimePermissionManager,
     WorkspaceSubagentManager,
 )
@@ -136,6 +137,7 @@ class Database:
         self.workspace_host_env_grants = WorkspaceHostEnvGrantManager(self._engine)
         self.workspace_runtime_permissions = WorkspaceRuntimePermissionManager(self._engine)
         self.workspace_subagents = WorkspaceSubagentManager(self._engine)
+        self.workspace_read = WorkspaceReadManager(self._engine)
 
         # Resources domain
         self.resources = ResourceManager(self._engine)

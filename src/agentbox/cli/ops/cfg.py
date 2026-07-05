@@ -23,7 +23,6 @@ def cfg_show(ctx: typer.Context) -> None:
 
     s_table = obj.render.ops.grid()
     for field in (
-        "manifest_path",
         "data_dir",
         "db_path",
         "port",

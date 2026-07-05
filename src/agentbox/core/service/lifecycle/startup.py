@@ -13,8 +13,7 @@ import logging
 from typing import Final
 
 from agentbox.core.config import SETTINGS, Settings
-from agentbox.core.agents.composition.drift import startup_sweep as _startup_sweep
-from agentbox.core.data import ProjectManifest, RunRecord
+from agentbox.core.data import RunRecord
 from agentbox.core.db.database import Database
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.db.engines.seeds import seed_default_runner_profiles
@@ -22,12 +21,9 @@ from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.tools import discover_tools
-from agentbox.core.workspaces.mcp.client import McpRegistry
+from agentbox.core.mcp.client import McpRegistry
 from agentbox.core.service.lifecycle._phases import (
-    _phase_composition_refs,
     _phase_import_repo,
-    _phase_legacy_migration,
-    _phase_workspace_bindings,
 )
 from agentbox.core.service.lifecycle._utils import (
     _error,
@@ -78,36 +74,6 @@ def sync_project_mcp_servers(
     return StartupReport(mcp_servers_synced=len(specs_models))
 
 
-def import_on_start_sweep(
-    manifest: ProjectManifest | None,
-    db: Database,
-    settings: Settings,
-) -> StartupReport:
-    """Filesystem → DB import for agent versions. Opt-in via env flag."""
-    if not SETTINGS.import_on_start:
-        return StartupReport()
-    if manifest is None or not manifest.agents:
-        return StartupReport()
-    try:
-        project_root = settings.project_root
-        shared_roots = {
-            k: (project_root / v).resolve()
-            for k, v in SystemService().get_project_shared_assets().items()
-        }
-        _startup_sweep(
-            manifest.agents,
-            db.agent_versions,
-            db.prompt_versions,
-            db.runner_profiles,
-            project_root=project_root,
-            shared_roots=shared_roots,
-        )
-    except Exception as exc:
-        _log.exception("startup drift sweep failed")
-        return _error("import_on_start_sweep", exc)
-    return StartupReport(drift_sweep_ran=True)
-
-
 def seed_runner_profiles(db: Database) -> StartupReport:
     """Idempotent seed of the default runner profiles."""
     if SETTINGS.skip_default_profiles:
@@ -125,28 +91,18 @@ def seed_runner_profiles(db: Database) -> StartupReport:
 def boot_import_resources(
     db: Database,
     settings: Settings,
-    manifest: ProjectManifest | None,
 ) -> StartupReport:
-    """Populate the central resource repository from on-disk manifest layout."""
+    """Populate the central resource repository from on-disk layout."""
     if SETTINGS.skip_resource_import:
         return StartupReport()
 
-    out = _phase_import_repo(db, settings)
-    out = _merge(out, _phase_legacy_migration(db))
-    out = _merge(out, _phase_workspace_bindings(db, manifest))
-    out = _merge(out, _phase_composition_refs(db, settings, manifest))
-    return out
+    return _phase_import_repo(db, settings)
 
 
-def sync_workspace_registry(
-    db: Database, manifest: ProjectManifest | None
-) -> StartupReport:
+def sync_workspace_registry(db: Database) -> StartupReport:
     """Prune phantom workspace rows that no real subsystem references."""
     try:
-        keep: set[str] = {"default"}
-        if manifest is not None:
-            keep |= {a.workspace or "default" for a in manifest.agents}
-        pruned = WorkspaceService().prune_phantoms(keep=keep)
+        pruned = WorkspaceService().prune_phantoms(keep={"default"})
     except Exception as exc:
         _log.exception("workspaces registry sync failed")
         return _error("sync_workspace_registry", exc)
@@ -204,17 +160,19 @@ def dispatch_orphan_webhooks(
 def run_startup_tasks(
     db: Database,
     settings: Settings,
-    manifest: ProjectManifest | None,
+    manifest: object = None,
 ) -> StartupReport:
-    """Run every boot-time phase in canonical order."""
-    settings.check_runtime_sources()
+    """Run every boot-time phase in canonical order.
+
+    The ``manifest`` parameter is accepted for backward compatibility but
+    ignored — the DB is the sole source of truth.
+    """
     report = StartupReport()
     report = _merge(report, discover_agent_tools())
     report = _merge(report, sync_project_mcp_servers(db, settings))
-    report = _merge(report, import_on_start_sweep(manifest, db, settings))
     report = _merge(report, seed_runner_profiles(db))
-    report = _merge(report, boot_import_resources(db, settings, manifest))
-    report = _merge(report, sync_workspace_registry(db, manifest))
+    report = _merge(report, boot_import_resources(db, settings))
+    report = _merge(report, sync_workspace_registry(db))
     report = _merge(report, reap_orphan_runs(db))
     report = _merge(report, dispatch_orphan_webhooks(db, settings))
     return report

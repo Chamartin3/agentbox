@@ -29,7 +29,7 @@ from agentbox.core.service.system.service import SystemService
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.workspaces import launch_runner_configs
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.workspaces.mcp.client import McpRegistry
+from agentbox.core.mcp.client import McpRegistry
 
 # Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
 # ``$SHELL`` (falling back to /bin/bash) and never needs a runner binary.

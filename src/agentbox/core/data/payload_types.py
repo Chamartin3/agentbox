@@ -608,6 +608,27 @@ class SkillBindingsResult(TypedDict):
 # ── Prompt-preview result shapes ────────────────────────────────────────────
 
 
+class ResolvedPromptBinding(TypedDict):
+    """A prompt binding resolved to its resource/version/blobs.
+
+    Returned by ``resolve_agent_prompt_bindings`` for consumption by
+    ``resolve_prompt`` and similar callers.
+    """
+
+    binding_id: str
+    marker: str | None
+    slot: str | None
+    attach_as_reference: bool
+    resource_id: str
+    version_id: str
+    content_hash: str
+    type: str
+    mode: str | None
+    display_name: str
+    required: bool
+    blobs: list[ResourceBlobRow]
+
+
 class ResolvedBindingView(TypedDict):
     """A prompt binding resolved to its resource/version/blobs for preview."""
 

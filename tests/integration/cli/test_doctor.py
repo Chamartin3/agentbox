@@ -18,14 +18,12 @@ def _clear_deps_caches() -> None:
         fn.cache_clear()
 
 
-def test_doctor_with_minimal_manifest(monkeypatch, tmp_path: Path) -> None:
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text("project = 'test'\n")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
+def test_doctor_basic(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
     _clear_deps_caches()
 
     result = runner.invoke(app, ["system", "doctor"])
     # doctor should exit with number of failures (capped at 1)
     assert result.exit_code in (0, 1)
-    assert "Manifest exists" in result.output
+    assert "Database" in result.output

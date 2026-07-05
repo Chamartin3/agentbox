@@ -1,9 +1,9 @@
-"""Tests for manifest-free startup (Phase 13e).
+"""Tests for manifest-free startup.
 
 Verify that agentbox can start and serve requests when:
-- No manifest.toml exists on disk
+- No agentbox.toml / manifest file exists on disk
 - Agents exist only in the DB (created via API)
-- Or when both manifest and DB are empty (bootstrap mode)
+- Or when the DB is empty (bootstrap mode)
 """
 
 from __future__ import annotations
@@ -14,18 +14,15 @@ import pytest
 
 import agentbox.api.deps as _deps
 from agentbox.api.app import create_app
-from agentbox.core.config import load_settings
 from fastapi.testclient import TestClient
-from agentbox.core.service.agents.service import AgentService
 
 
 def test_startup_with_no_manifest_and_empty_db(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """App starts successfully with no manifest and no DB agents."""
-    # Set up env for manifest-free mode: nonexistent manifest, isolated data dir
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
 
     # Clear caches so the next call reads the new env vars
     for fn in (
@@ -55,62 +52,12 @@ def test_startup_with_no_manifest_and_empty_db(
         fn.cache_clear()
 
 
-def test_check_runtime_sources_allows_empty_db(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """check_runtime_sources() returns True when both manifest and DB are empty."""
-    monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
-
-    settings = load_settings()
-
-    # Should always return True
-    assert settings.check_runtime_sources() is True
-
-
-def test_check_runtime_sources_detects_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """check_runtime_sources() returns True when manifest exists."""
-    manifest_path = tmp_path / "manifest.toml"
-    manifest_path.write_text("# test manifest\n")
-
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest_path))
-
-    settings = load_settings()
-
-    # Should return True because manifest exists
-    assert settings.check_runtime_sources() is True
-
-
-def test_check_runtime_sources_detects_db_agents(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """check_runtime_sources() returns True when DB has agents."""
-    monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
-    nonexistent = str(tmp_path / "nonexistent.toml")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", nonexistent)
-
-    settings = load_settings()
-
-    # Create a DB agent
-    AgentService().create_agent(
-        agent_id="test-agent",
-        config_json={"id": "test-agent"},
-        author="test",
-        changelog="test agent",
-    )
-
-    # Should return True because DB has agents
-    assert settings.check_runtime_sources() is True
-
-
 def test_agents_list_endpoint_empty_in_manifest_free_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """GET /api/agents returns empty list in manifest-free mode with no DB agents."""
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "nonexistent.toml"))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
 
     # Clear caches
     for fn in (

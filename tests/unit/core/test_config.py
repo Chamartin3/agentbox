@@ -1,4 +1,4 @@
-"""Tests for the Plan-08 Settings layout (manifest-only host contract)."""
+"""Tests for the Settings layout."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 from agentbox.core.config import Settings, _optional_dir, load_settings
 
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
 def make_settings(
-    manifest_path: Path,
     data_dir: Path | None = None,
     agents_dir: Path | None = None,
     prompts_dir: Path | None = None,
@@ -22,7 +22,6 @@ def make_settings(
 ) -> Settings:
     dd = data_dir or Path("/data")
     return Settings(
-        manifest_path=manifest_path,
         data_dir=dd,
         db_path=dd / "agentbox.sqlite",
         port=8765,
@@ -37,41 +36,31 @@ def make_settings(
 
 
 # ---------------------------------------------------------------------------
-# check_manifest
+# project_root — env-var backed
 # ---------------------------------------------------------------------------
 
 
-def test_check_manifest_raises_when_missing(tmp_path: Path) -> None:
-    s = make_settings(tmp_path / "nonexistent.toml")
-    with pytest.raises(RuntimeError, match="agentbox cannot start"):
-        s.check_manifest()
-
-
-def test_check_manifest_message_contains_env_var(tmp_path: Path) -> None:
-    s = make_settings(tmp_path / "nonexistent.toml")
-    with pytest.raises(RuntimeError, match="AGENTBOX_MANIFEST"):
-        s.check_manifest()
-
-
-def test_check_manifest_passes_when_present(tmp_path: Path) -> None:
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text('project = "test"\n')
-    s = make_settings(manifest)
-    s.check_manifest()  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# Derived properties
-# ---------------------------------------------------------------------------
-
-
-def test_project_root_is_manifest_parent(tmp_path: Path) -> None:
-    s = make_settings(tmp_path / "manifest.toml")
+def test_project_root_reads_agentbox_root_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
+    s = make_settings()
     assert s.project_root == tmp_path
 
 
-def test_workspaces_root_derived_from_project_root(tmp_path: Path) -> None:
-    s = make_settings(tmp_path / "manifest.toml")
+def test_project_root_defaults_to_agentbox(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AGENTBOX_ROOT_DIR", raising=False)
+    s = make_settings()
+    assert s.project_root == Path("/agentbox")
+
+
+def test_workspaces_root_derived_from_project_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
+    s = make_settings()
     assert s.workspaces_root == tmp_path / "workspaces"
 
 
@@ -105,26 +94,9 @@ def test_optional_dirs_set_when_valid_path(
 # ---------------------------------------------------------------------------
 
 
-def test_load_settings_manifest_from_env(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "my.toml"))
-    # Clear optional dir env vars so defaults don't create Path("/agentbox/...")
-    for var in (
-        "AGENTBOX_AGENTS_DIR",
-        "AGENTBOX_PROMPTS_DIR",
-        "AGENTBOX_SKILLS_DIR",
-        "AGENTBOX_OUTPUTS_DIR",
-    ):
-        monkeypatch.setenv(var, "/dev/null")
-    s = load_settings()
-    assert s.manifest_path == tmp_path / "my.toml"
-
-
 def test_load_settings_all_optional_unset(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "manifest.toml"))
     for var in (
         "AGENTBOX_AGENTS_DIR",
         "AGENTBOX_PROMPTS_DIR",
@@ -142,7 +114,6 @@ def test_load_settings_all_optional_unset(
 def test_load_settings_all_optional_set(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(tmp_path / "manifest.toml"))
     monkeypatch.setenv("AGENTBOX_AGENTS_DIR", str(tmp_path / "agents.d"))
     monkeypatch.setenv("AGENTBOX_PROMPTS_DIR", str(tmp_path / "prompts.d"))
     monkeypatch.setenv("AGENTBOX_SKILLS_DIR", str(tmp_path / "skills.d"))

@@ -102,10 +102,8 @@ def test_creds_clear_unknown_backend() -> None:
 def test_doctor_includes_credentials(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text("# test\n")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
     _clear_deps_caches()
 
     result = runner.invoke(app, ["system", "doctor"])

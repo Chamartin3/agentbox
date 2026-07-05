@@ -63,8 +63,7 @@ def test_ops_help() -> None:
     assert result.exit_code == 0
     assert "serve" in result.output
     assert "cfg" in result.output
-    assert "migrate" in result.output
-    # launch has been removed — it lives under `agentbox run`
+    # migrate has been removed — all toml-era migrations are done
     assert "resource" in result.output
 
 

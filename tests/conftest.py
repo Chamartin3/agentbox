@@ -76,11 +76,9 @@ def pytest_collection_modifyitems(
 def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point ``AGENTBOX_DATA_DIR`` at a per-test tmp dir."""
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text("# test manifest\n")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
 
     for fn in (
         deps.get_settings,

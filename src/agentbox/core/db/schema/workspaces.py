@@ -158,7 +158,7 @@ workspaces = Table(
     Column("name", String, primary_key=True),
     Column("description", String, nullable=True),
     Column("path", String, nullable=True),
-    # 'manifest' = declared in agentbox.toml, 'db' = created via API only
+    # 'manifest' = legacy (imported from agentbox.toml era), 'db' = created via API
     Column("source", String, nullable=False, server_default="db"),
     Column("created_at", String, nullable=False),
     Column("created_by", String, nullable=True),

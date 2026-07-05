@@ -41,7 +41,6 @@ from agentbox.core.workspaces.construct import workspace_constructor
 from agentbox.core.workspaces.prep import (
     render_env_doc,
     resolve_workspace_resources,
-    workspace_outcomes_to_snapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -156,7 +155,6 @@ def build_workspace(
                     result.bindings_materialized += 1
                 if o.target_path:
                     result.materialized_paths.append(o.target_path)
-            workspace_outcomes_to_snapshot(outcomes)
     except Exception as e:
         logger.exception(
             "workspace_build: resource materialization failed for %r", workspace_id

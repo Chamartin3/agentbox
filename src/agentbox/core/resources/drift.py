@@ -1,9 +1,7 @@
-"""Resource migration sweeps.
+"""Resource drift detection and prompt-binding proposal utilities.
 
-Boot-time sweeps that import existing on-disk content into the resource
-repository and propose bindings for prompt markers. Designed to be called
-once at startup from the executor or app factory — all operations are
-idempotent.
+Boot-time and on-demand utilities for detecting prompt marker references
+and proposing resource bindings. All operations are idempotent.
 """
 
 from __future__ import annotations
@@ -13,7 +11,6 @@ import logging
 import re
 from pathlib import Path
 
-from agentbox.core.data.constants import ResourceType
 from agentbox.core.db import ResourceManager, ResourceVersionManager
 
 logger = logging.getLogger(__name__)
@@ -33,123 +30,6 @@ def _blobs_hash(filename: str, data: bytes) -> str:
     h.update(hashlib.sha256(data).digest())
     h.update(b"\x00")
     return h.hexdigest()
-
-
-def _blob_tuple(
-    filename: str, data: bytes
-) -> tuple[str, bytes, str | None, str | None]:
-    mime = "text/plain" if filename.endswith((".md", ".txt")) else None
-    try:
-        text = data.decode("utf-8")
-    except UnicodeDecodeError:
-        text = None
-    return (filename, data, mime, text)
-
-
-def import_manifest_documents(
-    resources: ResourceManager,
-    resource_versions: ResourceVersionManager,
-    documents_dir: Path,
-) -> int:
-    """Import every file under ``documents_dir`` as a document resource version.
-
-    Idempotent: skips files whose content hash already matches the active
-    version. Returns the number of new versions created.
-    """
-    if not documents_dir.exists():
-        return 0
-
-    imported = 0
-    for path in sorted(documents_dir.rglob("*")):
-        if not path.is_file():
-            continue
-        slug = path.stem
-        data = path.read_bytes()
-        content_hash = _blobs_hash(path.name, data)
-
-        existing = resources.get_by_slug(slug)
-        if existing is not None:
-            active = resource_versions.get_active_version(existing["id"])
-            if active is not None and active.get("content_hash") == content_hash:
-                continue
-            resource_versions.import_version(
-                existing["id"],
-                [_blob_tuple(path.name, data)],
-                import_source="toml_migration",
-                changelog="updated from manifest documents",
-            )
-            imported += 1
-            logger.info("resource-drift: updated document resource %r", slug)
-        else:
-            row = resources.create_resource(
-                slug=slug,
-                type=ResourceType.DOCUMENT,
-                display_name=slug,
-                description=f"Imported from {path.name}",
-            )
-            resource_versions.import_version(
-                row["id"],
-                [_blob_tuple(path.name, data)],
-                import_source="toml_migration",
-                changelog="imported from manifest documents",
-            )
-            imported += 1
-            logger.info("resource-drift: imported document resource %r", slug)
-
-    return imported
-
-
-def import_manifest_skills(
-    resources: ResourceManager,
-    resource_versions: ResourceVersionManager,
-    skills_dir: Path,
-) -> int:
-    """Import *.md files from ``skills_dir`` as skill resources.
-
-    Same idempotency logic as :func:`import_manifest_documents`.
-    Returns the number of new versions created.
-    """
-    if not skills_dir.exists():
-        return 0
-
-    imported = 0
-    for path in sorted(skills_dir.rglob("*.md")):
-        if not path.is_file():
-            continue
-        slug = f"skill/{path.stem}"
-        data = path.read_bytes()
-        content_hash = _blobs_hash(path.name, data)
-
-        existing = resources.get_by_slug(slug)
-        if existing is not None:
-            active = resource_versions.get_active_version(existing["id"])
-            if active is not None and active.get("content_hash") == content_hash:
-                continue
-            resource_versions.import_version(
-                existing["id"],
-                [_blob_tuple(path.name, data)],
-                import_source="toml_migration",
-                changelog="updated from manifest skills",
-            )
-            imported += 1
-            logger.info("resource-drift: updated skill resource %r", slug)
-        else:
-            row = resources.create_resource(
-                slug=slug,
-                type=ResourceType.SKILL,
-                display_name=path.stem,
-                description=f"Imported from {path.name}",
-            )
-            resource_versions.import_version(
-                row["id"],
-                [_blob_tuple(path.name, data)],
-                import_source="toml_migration",
-                changelog="imported from manifest skills",
-            )
-            imported += 1
-            logger.info("resource-drift: imported skill resource %r", slug)
-
-    return imported
 
 
 def extract_prompt_markers(prompt_text: str) -> list[str]:
@@ -227,26 +107,3 @@ def detect_resource_hash_mismatches(
                 }
             )
     return mismatches
-
-
-def run_all_sweeps(
-    resources: ResourceManager,
-    resource_versions: ResourceVersionManager,
-    *,
-    documents_dir: Path | None = None,
-    skills_dir: Path | None = None,
-) -> dict:
-    """Run all boot-time resource sweeps and return a summary dict."""
-    docs_imported = 0
-    skills_imported = 0
-
-    if documents_dir is not None:
-        docs_imported = import_manifest_documents(resources, resource_versions, documents_dir)
-
-    if skills_dir is not None:
-        skills_imported = import_manifest_skills(resources, resource_versions, skills_dir)
-
-    return {
-        "docs_imported": docs_imported,
-        "skills_imported": skills_imported,
-    }

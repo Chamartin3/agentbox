@@ -13,8 +13,8 @@ _AGENTBOX_ROOT = Path("/agentbox")
 class Settings:
     """Runtime configuration derived from AGENTBOX_* environment variables.
 
-    Required mount (must exist at startup):
-        manifest_path      →  /agentbox/manifest.toml  (AGENTBOX_MANIFEST)
+    Required mounts (default to well-known paths when unset):
+        project_root       →  /agentbox                    (AGENTBOX_ROOT_DIR)
 
     Optional mounts (default /dev/null when unset — missing is fine):
         agents_dir         →  /agentbox/agents.d        (AGENTBOX_AGENTS_DIR)
@@ -58,7 +58,6 @@ class Settings:
 
     # Static mount config — snapshotted at import (load_settings). These are
     # the fields the test helpers construct directly.
-    manifest_path: Path
     data_dir: Path
     db_path: Path
     port: int
@@ -76,6 +75,13 @@ class Settings:
     # frozen field) so per-test monkeypatch.setenv / runtime overrides take
     # effect. The env name + default still live here once — call sites read
     # SETTINGS.<name> and never re-spell the env var.
+
+    # Project root — the directory containing project-level config.
+    # Defaults to /agentbox (the standard container mount point).
+    @property
+    def project_root(self) -> Path:
+        """Directory used as the project root for workspace/config resolution."""
+        return Path(os.environ.get("AGENTBOX_ROOT_DIR", str(_AGENTBOX_ROOT)))
 
     # Credentials
     @property
@@ -153,11 +159,6 @@ class Settings:
         return Path(os.environ.get("AGENTBOX_PROJECT_ROOT", "/project"))
 
     @property
-    def project_root(self) -> Path:
-        """Directory containing the manifest — /agentbox when using the standard mount."""
-        return self.manifest_path.parent
-
-    @property
     def workspaces_root(self) -> Path:
         """Per-agent workspace directories, backed by the agentbox-workspaces named volume."""
         return self.project_root / "workspaces"
@@ -186,46 +187,6 @@ class Settings:
     def mcp_cache_dir(self) -> Path:
         return self.data_dir / "mcp_cache"
 
-    def check_manifest(self) -> None:
-        """Raise RuntimeError with a clear message if the manifest is missing.
-
-        Called at app startup so operators learn immediately when the required
-        bind mount is absent or misconfigured.
-
-        Deprecated: Use check_runtime_sources() instead to allow manifest-free
-        startup when DB-backed agents exist.
-        """
-        if not self.manifest_path.exists():
-            raise RuntimeError(
-                f"agentbox cannot start: manifest not found at {self.manifest_path}.\n"
-                "Ensure AGENTBOX_MANIFEST points to an agentbox.toml on the host and\n"
-                "is bind-mounted into the container:\n"
-                "  volumes:\n"
-                "    - ${AGENTBOX_MANIFEST}:/agentbox/manifest.toml:ro"
-            )
-
-    def check_runtime_sources(self) -> bool:
-        """Check if AgentBox can start, allowing manifest-free operation.
-
-        Returns True if any of the following are true:
-        1. A manifest file exists at manifest_path.
-        2. Neither condition is met (startup proceeds with empty state).
-
-        Returns:
-            True if startup should proceed, False never returned (always True).
-
-        Note:
-            Manifest-free startup is always allowed. If the DB is empty and no
-            manifest exists, the operator can create agents via the API.
-        """
-        # Check if manifest exists
-        if self.manifest_path.exists():
-            return True
-
-        # Always allow startup — empty state is valid. Operator can create agents
-        # via API or load a manifest later.
-        return True
-
 
 def _optional_dir(env: str, default: str | None = None) -> Path | None:
     val = os.environ.get(env, default)
@@ -240,9 +201,6 @@ def _bool_env(env: str, default: bool = False) -> bool:
 
 
 def load_settings() -> Settings:
-    manifest_path = Path(
-        os.environ.get("AGENTBOX_MANIFEST", str(_AGENTBOX_ROOT / "manifest.toml"))
-    )
     data_dir = Path(os.environ.get("AGENTBOX_DATA_DIR", "/data"))
     db_path = data_dir / "agentbox.sqlite"
     port = int(os.environ.get("AGENTBOX_PORT", "8765"))
@@ -256,7 +214,6 @@ def load_settings() -> Settings:
     outputs_dir = _optional_dir("AGENTBOX_OUTPUTS_DIR")
 
     return Settings(
-        manifest_path=manifest_path,
         data_dir=data_dir,
         db_path=db_path,
         port=port,

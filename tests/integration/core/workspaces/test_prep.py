@@ -13,13 +13,15 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from agentbox.core.agents.composition.resolver import PromptResolution, ResolvedBinding
-from agentbox.core.workspaces.generation.materialize import MaterializeOutcome
-from agentbox.core.workspaces.prep import (
+from agentbox.core.data.snapshots import (
     prompt_resolution_to_snapshot,
-    render_env_doc,
-    resolve_agent_prompt_bindings,
-    resolve_workspace_resources,
     workspace_outcomes_to_snapshot,
+)
+from agentbox.core.data.workenv import MaterializeOutcome
+from agentbox.core.agents.composition.bindings import resolve_agent_prompt_bindings
+from agentbox.core.workspaces.prep import (
+    render_env_doc,
+    resolve_workspace_resources,
 )
 
 # ---------------------------------------------------------------------------

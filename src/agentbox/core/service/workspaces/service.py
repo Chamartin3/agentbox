@@ -56,7 +56,7 @@ from agentbox.core.data.rows import (
 )
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.catalog import resolve_host_env_callables, resolve_workspace_callables
-from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
+from agentbox.core.mcp.catalog import resolve_mcp_callables
 from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
 from agentbox.core.service.system.service import SystemService
@@ -75,7 +75,7 @@ from agentbox.core.workspaces.construct import (
     native_extra_items,
     workspace_constructor,
 )
-from agentbox.core.workspaces.permissions import resolve_grants
+from agentbox.core.tools.grants import resolve_grants
 from agentbox.core.workspaces.prep import render_env_doc as _render_env_doc
 
 from agentbox.core.data.errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape

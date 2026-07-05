@@ -83,7 +83,7 @@ from agentbox.core.execution.orchestrate.setup import NoBackendAvailable as NoBa
 from agentbox.core.execution.orchestrate.executor import RunExecutor as RunExecutor
 from agentbox.core.execution.observability.conversation import get as get_conversation  # noqa: F401
 from agentbox.core.workspaces.prep import render_env_doc as render_env_doc
-from agentbox.core.workspaces.prep import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
+from agentbox.core.agents.composition.bindings import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
 from agentbox.core.workspaces.prep import resolve_workspace_resources as resolve_workspace_resources
 
 # ── Cross-cutting agents service ──────────────────────────────────────
@@ -162,7 +162,7 @@ from agentbox.core.service.workspaces import (
 )
 from agentbox.core.workspaces.workdir import reset as reset
 from agentbox.core.workspaces.workdir import resolve_path as resolve_path
-from agentbox.core.workspaces.mcp.client import McpRegistry as McpRegistry
+from agentbox.core.mcp.client import McpRegistry as McpRegistry
 from agentbox.core.workspaces.build import build_workspace as build_workspace
 from agentbox.core.workspaces.build import build_workspace_by_name as build_workspace_by_name
 

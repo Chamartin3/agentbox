@@ -57,9 +57,7 @@ from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,
     assert_schema_consistent,
 )
-from agentbox.core.workspaces.prep import (
-    prompt_resolution_to_snapshot,
-)
+from agentbox.core.data.snapshots import prompt_resolution_to_snapshot
 
 logger = logging.getLogger(__name__)
 

@@ -14,22 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from agentbox.core.data.constants import ResourceType
+from agentbox.core.data.constants import ResourceType
 from agentbox.core.data.workenv import Recipe
+from agentbox.core.data.workenv import MaterializeOutcome as MaterializeOutcome
 from agentbox.core.workspaces.generation.blobs import materialize_blobs
 from agentbox.core.workspaces.generation._paths import safe_dest
-
-
-@dataclass(frozen=True)
-class MaterializeOutcome:
-    binding_id: str
-    resource_id: str
-    version_id: str
-    content_hash: str
-    target_path: str
-    files_written: int
-    mode: str
-    skipped: bool = False
-    skipped_reason: str | None = None
 
 
 def _resolve_single_file_name(

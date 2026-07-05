@@ -49,6 +49,7 @@ from agentbox.core.db.managers import (
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
     WorkspaceMcpToolOverrideManager,
+    WorkspaceReadManager,
     WorkspaceRuntimePermissionManager,
     WorkspaceSubagentManager,
     # resources
@@ -99,6 +100,7 @@ __all__ = [
     "WorkspaceMcpOverrideManager",
     "WorkspaceMcpPolicyManager",
     "WorkspaceMcpToolOverrideManager",
+    "WorkspaceReadManager",
     "WorkspaceRuntimePermissionManager",
     "WorkspaceSubagentManager",
     # resources

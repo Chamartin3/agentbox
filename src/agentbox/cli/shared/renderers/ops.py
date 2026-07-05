@@ -65,7 +65,6 @@ class OpsRenderer(Renderer):
             else:
                 parent.add(f"[dim]{lbl}[/dim] · missing")
 
-        _add(settings.manifest_path, tree, "manifest.toml")
         if settings.agents_dir:
             _add(settings.agents_dir, tree, "agents.d/")
         if settings.prompts_dir:

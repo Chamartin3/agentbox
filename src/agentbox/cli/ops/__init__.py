@@ -1,4 +1,4 @@
-"""Operational CLI commands: serve, shell, cfg, migrate, resources.
+"""Operational CLI commands: serve, shell, cfg, resources.
 
 Credentials moved to the ``engine`` branch (``engine cred``).
 Interactive launch moved to ``agentbox run`` (use ``agentbox run --backend <backend>``
@@ -10,7 +10,6 @@ from __future__ import annotations
 import typer
 
 from agentbox.cli.ops.cfg import cfg_app as _cfg_app
-from agentbox.cli.ops.migrate import migrate_app as _migrate_app
 from agentbox.cli.ops.resource import app as _resource_app
 from agentbox.cli.ops.serve import serve
 from agentbox.cli.ops.shell import shell_cmd
@@ -19,7 +18,7 @@ from agentbox.cli.shared import group_callback
 
 app = typer.Typer(
     name="ops",
-    help="Operational commands: serve, shell, cfg, migrate, resources.",
+    help="Operational commands: serve, shell, cfg, resources.",
     no_args_is_help=True,
 )
 app.callback()(group_callback)
@@ -28,8 +27,6 @@ app.command(name="serve")(serve)
 app.command(name="shell")(shell_cmd)
 app.add_typer(_cfg_app, name="cfg")
 _cfg_app.callback()(group_callback)
-app.add_typer(_migrate_app, name="migrate")
-_migrate_app.callback()(group_callback)
 app.add_typer(_resource_app, name="resource")
 # ponytail: workenv still a separate group; fold into `cfg` in a later cleanup.
 app.add_typer(_workenv_app, name="workenv")

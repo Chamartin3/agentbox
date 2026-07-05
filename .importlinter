@@ -75,11 +75,11 @@ ignore_imports =
     # (burned when DI routes through core.service — UNIFIED plan)
     agentbox.api.deps -> agentbox.core.execution.orchestrate.executor
     agentbox.cli.shared.deps -> agentbox.core.execution.orchestrate.executor
-    agentbox.api.deps -> agentbox.core.workspaces.mcp.client
-    agentbox.cli.shared.deps -> agentbox.core.workspaces.mcp.client
-    agentbox.api.agents.grants -> agentbox.core.workspaces.mcp.client.registry
-    agentbox.api.workspaces.catalog -> agentbox.core.workspaces.mcp.client.registry
-    agentbox.cli.ops.launch -> agentbox.core.workspaces.mcp.client
+    agentbox.api.deps -> agentbox.core.mcp.client
+    agentbox.cli.shared.deps -> agentbox.core.mcp.client
+    agentbox.api.agents.grants -> agentbox.core.mcp.client.registry
+    agentbox.api.workspaces.catalog -> agentbox.core.mcp.client.registry
+    agentbox.cli.ops.launch -> agentbox.core.mcp.client
 
 
 # ─── Resources is the foundation ─────────────────────────────────────────
@@ -127,8 +127,7 @@ ignore_imports =
     agentbox.cli.ops.resource.repo -> agentbox.cli.shared.deps
     agentbox.cli.work.res -> agentbox.cli.shared.deps
     # ops composition-root commands legitimately open a Database via get_db
-    # (migrate bootstraps alembic; shell is a debug REPL)
-    agentbox.cli.ops.migrate -> agentbox.cli.shared.deps
+    # (shell is a debug REPL)
     agentbox.cli.ops.shell -> agentbox.cli.shared.deps
 
 # ─── CLI architecture: only render layer touches Rich ────────────────────
@@ -173,12 +172,11 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # engines.backends.token.tools reaches into workspaces for the in-process
-    # host-env MCP toolset (inject.py) and grant checks (permissions.py).
+    # engines.backends.token.tools reaches into core.mcp for the in-process
+    # host-env MCP toolset (inject.py) and grant checks (grants.py).
     # These are intentional: the token backend must spawn the same host-env
     # server as the MCP-aware backends.
-    agentbox.core.engines.backends.token.tools -> agentbox.core.workspaces.generation.inject
-    agentbox.core.engines.backends.token.tools -> agentbox.core.workspaces.permissions
+    agentbox.core.engines.backends.token.tools -> agentbox.core.mcp.inject
 
 
 # ─── Agents ⟂ Workspace (peer rule) ──────────────────────────────────────
@@ -196,8 +194,8 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # agents.runtime prepares workspaces during agent execution
-    agentbox.core.agents.runtime -> agentbox.core.workspaces.prep
+    # agents.runtime imports snapshot converters from core.data.snapshots
+    agentbox.core.agents.runtime -> agentbox.core.data.snapshots
 
 
 [importlinter:contract:workspace-peer]
@@ -308,8 +306,6 @@ ignore_imports =
     agentbox.api.deps -> agentbox.core.db.database
     agentbox.cli.shared.deps -> agentbox.core.db.database
     agentbox.mcp.deps -> agentbox.core.db.database
-    # migration tooling: always-tolerated deep submodule path
-    agentbox.cli.ops.migrate -> agentbox.core.db.system.seeds
     # cli renderers touch core.db types to render domain objects
     # (real fix: shared value types below both layers)
     # api/mcp transitional direct db access (TODO: route through Services)
@@ -358,10 +354,10 @@ ignore_imports =
     agentbox.core.service.lifecycle.startup -> agentbox.core.db.database
     agentbox.core.service.workspaces.registry -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
-    agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.database
-    agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.system.config
-    agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.database
-    agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.system.config
+    agentbox.core.mcp.servers.agent_tools.context -> agentbox.core.db.database
+    agentbox.core.mcp.servers.agent_tools.context -> agentbox.core.db.system.config
+    agentbox.core.mcp.servers.host_env.context -> agentbox.core.db.database
+    agentbox.core.mcp.servers.host_env.context -> agentbox.core.db.system.config
     # ── Pre-existing deep imports (no manager API yet): ──────────────────
     # Run model used as return type; fix: RunManager.get() → RunRecord (plan 112+)
     agentbox.core.service.execution.service -> agentbox.core.db.models.runs.run

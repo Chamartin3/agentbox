@@ -6,6 +6,7 @@ events from the OpenCode subprocess directly.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from collections.abc import AsyncIterator
@@ -37,6 +38,57 @@ __all__ = [
 
 _NAME = "opencode"
 _DEFAULT_OPENCODE_MODEL = "opencode/deepseek-v4-flash-free"
+
+
+def _normalize_model_id(model: str, provider: str | None) -> str:
+    """agentbox stores ``ollama:qwen3:8b``; opencode addresses ``ollama/qwen3:8b``.
+
+    Only rewrite when a provider is set and the id is ``provider:...`` shaped.
+    An already ``provider/model`` id (contains ``/``) is left untouched.
+    """
+    if provider and ":" in model and "/" not in model:
+        return f"{provider}/{model.split(':', 1)[1]}"
+    return model
+
+
+def _build_provider_block(runner_config: Any, model: str) -> dict | None:
+    """opencode provider entry derived from the runner profile.
+
+    ponytail: ollama only — the one keyless local provider the QA suite runs.
+    Add openrouter/openai here (they need api_key_env wiring) when a profile
+    actually asks for them.
+    """
+    provider = getattr(runner_config, "provider", None)
+    base_url = getattr(runner_config, "base_url", None)
+    if provider != "ollama" or not base_url:
+        return None
+    # ollama-ai-provider-v2 talks to the native /api endpoint; profiles store
+    # the OpenAI-compatible /v1 base_url, so swap the suffix.
+    api_url = base_url[: -len("/v1")] + "/api" if base_url.endswith("/v1") else base_url
+    model_id = model.split("/", 1)[1] if "/" in model else model
+    return {
+        "ollama": {
+            "npm": "ollama-ai-provider-v2",
+            "options": {"baseURL": api_url},
+            "models": {model_id: {}},
+        }
+    }
+
+
+def _merge_opencode_json(path: Path, provider_block: dict) -> None:
+    """Deep-merge ``{provider: ...}`` into an existing/new opencode.json.
+
+    The workspace generator already wrote the base config; we only add the
+    provider field. agentbox's block wins on conflict. Idempotent.
+    """
+    data: dict = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    data.setdefault("provider", {}).update(provider_block)
+    path.write_text(json.dumps(data, indent=2) + "\n")
 
 
 class OpenCodeBackend(BackendAdapter):
@@ -82,6 +134,16 @@ class OpenCodeBackend(BackendAdapter):
             or getattr(agent_runner, "model", None)
             or self.default_model
         )
+
+        provider = getattr(runner_config, "provider", None)
+        model = _normalize_model_id(model, provider)
+
+        # Inject a per-run provider block so opencode can reach a local
+        # (non-cloud) provider like ollama. Merges into the workspace
+        # opencode.json the generator already wrote at workdir root.
+        provider_block = _build_provider_block(runner_config, model)
+        if provider_block:
+            _merge_opencode_json(workdir / "opencode.json", provider_block)
 
         argv: list[str] = [
             "opencode",

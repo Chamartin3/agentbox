@@ -58,6 +58,33 @@ def test_render_includes_effective_extra_args() -> None:
     assert "test-agent" in rendered.argv
 
 
+def test_render_injects_ollama_provider(tmp_path: Path) -> None:
+    import json
+
+    agent = _make_agent()
+    adapter = OpenCodeBackend()
+    rendered = adapter.render(
+        agent,
+        tmp_path,
+        runner_config=EffectiveRunnerConfig(
+            backend="opencode",
+            provider="ollama",
+            model="ollama:qwen3:8b",
+            base_url="http://ollama-sample:11434/v1",
+        ),
+    )
+
+    # model id translated ollama:qwen3:8b -> ollama/qwen3:8b for --model
+    assert rendered.argv[rendered.argv.index("--model") + 1] == "ollama/qwen3:8b"
+
+    # provider block merged into opencode.json at workdir root
+    cfg = json.loads((tmp_path / "opencode.json").read_text())
+    ollama = cfg["provider"]["ollama"]
+    assert ollama["npm"] == "ollama-ai-provider-v2"
+    assert ollama["options"]["baseURL"] == "http://ollama-sample:11434/api"
+    assert "qwen3:8b" in ollama["models"]
+
+
 def test_render_applies_default_model_when_missing() -> None:
     agent = _make_agent(runner=RunnerSpec(kind="opencode", extra_args=[]))
     adapter = OpenCodeBackend()

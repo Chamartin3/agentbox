@@ -12,18 +12,15 @@ from agentbox.core.workspaces.workdir import (
     WorkspaceInfo as WorkspaceInfo,
     resolve_path as resolve_path,
 )
-from agentbox.core.workspaces.mcp.client.registry import (
+from agentbox.core.mcp.client.registry import (
     McpRegistry as McpRegistry,
 )
 from agentbox.core.workspaces.prep import (
     load_workspace_permissions as load_workspace_permissions,
     prepare_run_workdir as prepare_run_workdir,
-    prompt_resolution_to_snapshot as prompt_resolution_to_snapshot,
     render_env_doc as render_env_doc,
-    resolve_agent_prompt_bindings as resolve_agent_prompt_bindings,
     resolve_workspace_resources as resolve_workspace_resources,
     resolve_workspace_subagents as resolve_workspace_subagents,
-    workspace_outcomes_to_snapshot as workspace_outcomes_to_snapshot,
     write_secrets as write_secrets,
 )
 
@@ -34,12 +31,10 @@ __all__ = [
     "load_workspace_permissions",
     "materialize_workspace",
     "prepare_run_workdir",
-    "prompt_resolution_to_snapshot",
     "render_env_doc",
     "resolve_agent_prompt_bindings",
     "resolve_path",
     "resolve_workspace_resources",
     "resolve_workspace_subagents",
-    "workspace_outcomes_to_snapshot",
     "write_secrets",
 ]

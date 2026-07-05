@@ -7,13 +7,14 @@ them without creating a cycle through ``workspaces.generation``.
 """
 
 from __future__ import annotations
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
+from agentbox.core.data.rows import ResourceBlobRow
 
 import yaml
 
@@ -234,6 +235,92 @@ class RenderedFile:
 
 
 # ── Recipe value type ─────────────────────────────────────────────────────────
+
+
+# ── Composition / Blueprint contracts ────────────────────────────────────────
+
+
+class SourceMetadata(TypedDict):
+    """Metadata carried by imported resource versions, used by materialize.py."""
+
+    filename: NotRequired[str]
+    host_path: NotRequired[str]
+
+
+@dataclass(frozen=True)
+class ResolvedBinding:
+    """A fully resolved workspace file binding, ready for materialization."""
+
+    binding_id: str
+    resource_id: str
+    version_id: str
+    content_hash: str
+    type: str
+    slug: str
+    display_name: str
+    target_path: str | None
+    materialize_mode: str
+    on_conflict: str
+    blobs: tuple[ResourceBlobRow, ...]
+    skill_meta: None = None
+    source_metadata: SourceMetadata | None = None
+
+
+@dataclass(frozen=True)
+class ResolvedSubagent:
+    """A fully resolved workspace subagent, ready for generation."""
+
+    workspace_id: str
+    agent_id: str
+    alias: str
+    description: str | None
+    prompt_content: str
+
+
+class EffectivePermissionsOverlay(TypedDict):
+    """Optional permission overrides resolved for a workspace run.
+
+    Mirrors the keys built in ``prep.load_workspace_permissions``.
+    """
+
+    allowed_builtin_tools: NotRequired[list[str]]
+    files: NotRequired[list[dict]]
+    max_tokens: NotRequired[int]
+    allow_file_write: NotRequired[bool]
+    allow_network: NotRequired[bool]
+
+
+@dataclass(frozen=True)
+class WorkspaceBlueprint:
+    """Immutable contract between ``WorkspaceComposer`` and ``WorkspaceRenderer``.
+
+    Produced by ``compose()``, consumed by ``render()``.  Never mutated
+    after creation.
+    """
+
+    workspace_id: str
+    workdir: Path
+    recipes: tuple[Recipe, ...]
+    agents: tuple[ResolvedSubagent, ...]
+    bindings: tuple[ResolvedBinding, ...]
+    env_doc_body: str | None
+    permissions: EffectivePermissionsOverlay | None
+    secrets_keys: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class MaterializeOutcome:
+    """Outcome of materializing one workspace file binding into a workdir."""
+
+    binding_id: str
+    resource_id: str
+    version_id: str
+    content_hash: str
+    target_path: str
+    files_written: int
+    mode: str
+    skipped: bool = False
+    skipped_reason: str | None = None
 
 
 @dataclass(frozen=True)

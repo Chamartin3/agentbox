@@ -9,7 +9,7 @@ was handed, so callers stop hand-rolling the ``for engine in recipes`` loop.
 It never imports the backend registry: recipes and the optional per-engine
 ``extra_items`` provider are injected by the caller. That keeps this module
 free of the engines↔generation import cycle (``engines.backends`` already
-imports ``generation.inject``).
+imports ``mcp.inject``).
 """
 
 from __future__ import annotations

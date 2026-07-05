@@ -43,11 +43,9 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     Also clears ``agentbox.cli.shared.deps`` caches explicitly since
     commands under ``ops resource`` import from ``agentbox.cli.shared``.
     """
-    manifest = tmp_path / "agentbox.toml"
-    manifest.write_text("# test manifest\n")
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     _clear_shared_deps_caches()
     store = _get_store()

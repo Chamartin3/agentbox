@@ -28,12 +28,6 @@ def doctor(ctx: typer.Context) -> None:
         failures += 1
         checks.append((check, False, detail))
 
-    path = obj.settings.manifest_path
-    if path.exists():
-        ok("Manifest exists", str(path))
-    else:
-        fail("Manifest exists", f"not found at {path}")
-
     try:
         rows = [
             ws_workspaces.info(a, obj.settings)

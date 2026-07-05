@@ -20,10 +20,7 @@ from agentbox.core.service.agents.service import AgentService
 
 
 def _make_settings(tmp_path: Path) -> Settings:
-    manifest = tmp_path / "agentbox.toml"
-    manifest.write_text("", encoding="utf-8")
     return Settings(
-        manifest_path=manifest,
         data_dir=tmp_path / "data",
         db_path=tmp_path / "data" / "agentbox.sqlite",
         port=8765,

@@ -29,10 +29,8 @@ from agentbox.core.service.engines.service import EngineService
 def test_build_ctx_service_fields(tmp_path: Path, monkeypatch) -> None:
     """build_ctx() populates the five service fields with correct types."""
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text("project = 'test'\n")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
 
     # Clear all relevant caches
@@ -75,10 +73,8 @@ def test_build_ctx_service_fields(tmp_path: Path, monkeypatch) -> None:
 def test_build_ctx_render_registry(tmp_path: Path, monkeypatch) -> None:
     """build_ctx() populates render as a Renderers registry with six typed components."""
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text("project = 'test'\n")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
 
     for fn in (get_settings,):

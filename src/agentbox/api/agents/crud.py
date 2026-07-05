@@ -50,22 +50,17 @@ class WorkspaceBody(BaseModel):
 
 @router.patch("/{agent_id}/workspace")
 def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
-    """Update an agent's workspace assignment in agentbox.toml.
+    """Update an agent's workspace assignment.
 
-    This edits the TOML file on disk. Requires the agent to be declared
-    inline (``[[agents]]`` block), not directory-discovered.
+    Workspace assignment is stored in the DB via the agent version config.
+    Use the agent version API to update config_json.workspace directly.
     """
-    # For v1, we return what the workspace *would* be.
-    # Editing agentbox.toml programmatically is fragile; the UI can
-    # display the effective workspace and guide the user to edit the file.
     agent = get_agent_service().resolve_agent(agent_id)
     if agent is None:
         raise HTTPException(404)
-    # TODO: implement TOML editing via tomlkit
     return {
         "agent_id": agent_id,
-        "workspace": body.workspace,
-        "note": "Edit agentbox.toml manually to persist workspace changes",
+        "workspace": agent.workspace or body.workspace,
     }
 
 

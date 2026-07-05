@@ -58,11 +58,9 @@ def isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     ``create_app()`` uses the fresh data directory.
     """
     monkeypatch.setenv("AGENTBOX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("AGENTBOX_ROOT_DIR", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
-    manifest = tmp_path / "manifest.toml"
-    manifest.write_text("# test manifest\n")
-    monkeypatch.setenv("AGENTBOX_MANIFEST", str(manifest))
 
     for fn in (
         api_deps.get_settings,
