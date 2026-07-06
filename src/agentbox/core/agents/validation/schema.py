@@ -3,41 +3,14 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
-
+from typing import Any
 
 from agentbox.core.agents.config import PythonAgentConfig
-
-# Engine label for the validator that produced the verdict. ``off`` means
-# no schema is configured and validation was skipped; ``none`` means a
-# schema was expected but the input was unrunnable (empty / unparseable).
-ValidationEngine = Literal[
-    "jsonschema",
-    "pydantic",
-    "both",
-    "json-schema",
-    "http-callback",
-    "script",
-    "json-schema+http-callback",
-    "json-schema+script",
-    "none",
-    "off",
-]
-
-
-@dataclass(frozen=True)
-class ValidationResult:
-    """Outcome of validating a backend run's output.
-
-    ``ok=True, engine="off"`` is the no-schema-configured case — the
-    executor should treat it as "validation skipped", not "passed".
-    """
-
-    ok: bool
-    error: str = ""
-    engine: ValidationEngine = "off"
+from agentbox.core.data.composition import (
+    ValidationEngine,
+    ValidationResult,
+)
 
 
 def resolve_schema(

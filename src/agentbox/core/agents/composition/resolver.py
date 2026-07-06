@@ -11,34 +11,16 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
 
 from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.data.payload_types import ResolvedBindingView
 from agentbox.core.data.rows import ResourceBlobRow
+from agentbox.core.data.composition import (
+    ResolvedBinding,
+    PromptResolution,
+)
 
 _MARKER_RE = re.compile(r"\{\{resource:([a-zA-Z0-9_\-]+)\}\}")
-
-
-@dataclass(frozen=True)
-class ResolvedBinding:
-    binding_id: str
-    marker: str
-    resource_id: str
-    version_id: str
-    content_hash: str
-    type: str
-    mode: str
-    rendered: str
-    required: bool
-
-
-@dataclass(frozen=True)
-class PromptResolution:
-    rendered_prompt: str
-    snapshot: list[ResolvedBinding]
-    unresolved_markers: list[str]
-    warnings: list[str]
 
 
 def _render_for_mode(type: str, mode: str, blobs: list[ResourceBlobRow], display_name: str) -> str:

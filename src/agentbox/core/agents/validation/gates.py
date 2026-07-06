@@ -17,7 +17,7 @@ from agentbox.core.agents.validation.errors import (
     format_jsonschema_error,
 )
 from agentbox.core.agents.validation.pydantic import validate_with_pydantic
-from agentbox.core.agents.validation.schema import ValidationResult
+from agentbox.core.data.composition import ValidationResult
 
 
 def validate_jsonschema(output: str, schema: dict[str, Any]) -> ValidationResult:

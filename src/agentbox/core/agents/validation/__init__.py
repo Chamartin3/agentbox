@@ -17,9 +17,11 @@ from agentbox.core.agents.validation.gates import (
 from agentbox.core.agents.validation.orchestrate import validate_output
 from agentbox.core.agents.validation.pydantic import validate_with_pydantic
 from agentbox.core.agents.validation.schema import (
+    resolve_schema,
+)
+from agentbox.core.data.composition import (
     ValidationEngine,
     ValidationResult,
-    resolve_schema,
 )
 
 __all__ = [

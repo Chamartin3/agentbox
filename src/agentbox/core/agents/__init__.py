@@ -22,25 +22,28 @@ from agentbox.core.agents.composition.resolver import (
 )
 from agentbox.core.agents.config import (
     ExecutionConfig as ExecutionConfig,
-    HttpValidatorConfig as HttpValidatorConfig,
     OutputConfig as OutputConfig,
     PythonAgentConfig as PythonAgentConfig,
     RuntimeConfig as RuntimeConfig,
-    ScriptValidatorConfig as ScriptValidatorConfig,
     build_config_json_payload as build_config_json_payload,
     resolve_output_config as resolve_output_config,
 )
 from agentbox.core.agents.runtime import (
-    AgentRuntimeView as AgentRuntimeView,
-    ComposedPrompt as ComposedPrompt,
+    build_runtime_view as build_runtime_view,
     capture_fragments as capture_fragments,
     compose_prompt as compose_prompt,
 )
 from agentbox.core.agents.validation import (
-    ValidationEngine as ValidationEngine,
-    ValidationResult as ValidationResult,
     resolve_schema as resolve_schema,
     validate_output as validate_output,
+)
+from agentbox.core.data.composition import (
+    AgentRuntimeView as AgentRuntimeView,
+    ComposedPrompt as ComposedPrompt,
+    HttpValidatorConfig as HttpValidatorConfig,
+    ScriptValidatorConfig as ScriptValidatorConfig,
+    ValidationEngine as ValidationEngine,
+    ValidationResult as ValidationResult,
 )
 
 __all__ = [
@@ -56,6 +59,7 @@ __all__ = [
     "ValidationResult",
     "build_config_json_payload",
     "build_fragments",
+    "build_runtime_view",
     "capture_fragments",
     "compose_prompt",
     "fragments_to_json",

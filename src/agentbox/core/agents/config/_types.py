@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import json as _json
 from dataclasses import dataclass
-from typing import Any, Literal, cast
+from typing import Any, cast
 
+from agentbox.core.data.composition import ValidatorConfig
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data.constants import ConfiguredValidationMode, ValidationMode
 from agentbox.core.tools.canonical import CanonicalTool
@@ -117,51 +118,6 @@ class PythonAgentConfig:
             deps_factory=sub.get("deps_factory"),
             output_schema_path=sub.get("output_schema_path"),
         )
-
-
-@dataclass(frozen=True)
-class HttpValidatorConfig:
-    """HTTP callback validator — POSTs output, expects {ok, error}.
-
-    ``description`` is the human-readable constraint this validator
-    enforces. It's rendered into the system prompt as a bullet under
-    ``## Constraints`` so the model sees both the rule and knows it's
-    enforced. Validators own their constraint text.
-    """
-
-    kind: Literal["http"] = "http"
-    endpoint: str = ""
-    timeout_seconds: int = 5
-    description: str = ""
-
-
-@dataclass(frozen=True)
-class ScriptValidatorConfig:
-    """Python script validator — runs operator-uploaded code in-process.
-
-    The script (loaded from a versioned ``repo_resource`` of type
-    ``'script'``) must define::
-
-        def validate(output: str) -> dict:
-            # return {"ok": True} or {"ok": False, "error": "..."}
-
-    Resolved upstream by ``resolve_output_config`` so the runtime
-    receives the source code directly and does not need DB access.
-
-    ``description`` mirrors ``HttpValidatorConfig.description`` —
-    human-readable constraint text rendered into the system prompt.
-    """
-
-    kind: Literal["script"] = "script"
-    resource_id: str = ""
-    resource_version_id: str | None = None
-    source_code: str = ""
-    description: str = ""
-
-
-# Discriminated union — extend by adding a new dataclass + a kind
-# branch in resolve_output_config + a dispatch in core/run/validation.
-ValidatorConfig = HttpValidatorConfig | ScriptValidatorConfig
 
 
 @dataclass(frozen=True)

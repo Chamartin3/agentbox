@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +23,6 @@ from agentbox.core.agents.composition.bundle import (
 )
 from agentbox.core.agents.composition.bundle.compose import (
     ComposedReference,
-    ComposeResult,
 )
 from agentbox.core.agents.composition.bundle.loader import (
     load_bundle_from_bindings,
@@ -45,7 +43,6 @@ from agentbox.core.agents.config import (
     ExecutionConfig,
     OutputConfig as _OutputConfig,
     PythonAgentConfig,
-    ValidatorConfig,
     resolve_output_config as _resolve_output_config,
 )
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
@@ -58,6 +55,10 @@ from agentbox.core.engines.contracts.schema_to_model import (
     assert_schema_consistent,
 )
 from agentbox.core.data.snapshots import prompt_resolution_to_snapshot
+from agentbox.core.data.composition import (
+    AgentRuntimeView,
+    ComposedPrompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,72 +103,23 @@ class _DbStoreAdapter:
         return self._db.agent_version_files.list_for_version(version_id)
 
 
-@dataclass(frozen=True)
-class AgentRuntimeView:
-    """Execution's typed view of per-run agent configuration.
+def build_runtime_view(agent: AgentDef, *, store: Any = None) -> AgentRuntimeView:
+    """Build AgentRuntimeView from agent definition and store.
 
-    Built once by the Agents domain; consumed by the executor, step-loop,
-    and validation.  No execution code should call ``.from_agent()``
-    directly — the compose-prompt facade returns this as part of
-    :class:`ComposedPrompt`.
+    Reads execution and python agent config, resolves output contract via store,
+    and constructs the runtime view for execution and validation.
     """
-
-    max_validation_retries: int = 0
-    max_error_retries: int = 0
-    output_validation_engine: str = "both"
-    output_schema_path: str | None = None
-    json_schema: JsonSchemaDict | None = None
-    validators: tuple[ValidatorConfig, ...] = ()
-
-    @classmethod
-    def from_agent(
-        cls, agent: AgentDef, *, store: Any = None
-    ) -> AgentRuntimeView:
-        exec_cfg = ExecutionConfig.from_agent(agent)
-        python_cfg = PythonAgentConfig.from_agent(agent)
-        out_cfg = _resolve_output_config(store, agent)
-        return cls(
-            max_validation_retries=exec_cfg.max_validation_retries,
-            max_error_retries=exec_cfg.max_error_retries,
-            output_validation_engine=exec_cfg.output_validation_engine,
-            output_schema_path=python_cfg.output_schema_path,
-            json_schema=out_cfg.json_schema,
-            validators=out_cfg.validators,
-        )
-
-    @property
-    def has_schema(self) -> bool:
-        return (
-            self.output_schema_path is not None
-            or self.json_schema is not None
-            or bool(self.validators)
-        )
-
-
-@dataclass(frozen=True)
-class ComposedPrompt:
-    """Composed prompt state produced by ``compose_prompt()``.
-
-    Contains everything the executor needs from the composition
-    pipeline: prompt texts, schemas, validation hints, and the
-    agent's runtime view.  No execution code reaches into
-    ``core.agents.composition.*`` internals to build this.
-    """
-
-    system_text: str | None = None
-    system_base: str | None = None
-    composed_schema: JsonSchemaDict | None = None
-    composed_input_schema: JsonSchemaDict | None = None
-    composed_user: str | None = None
-    agent: AgentDef | None = None
-    input_: str = ""
-    composed_references: tuple[ComposedReference, ...] | None = None
-    composed_bundle_sha: str | None = None
-    validation_mode: str | None = None
-    composition_result: ComposeResult | None = None
-    prompt_bindings: list[ResolvedBindingView] = field(default_factory=list)
-    snapshot_entries: list[PromptEmbedSnapshotEntry] = field(default_factory=list)
-    runtime_view: AgentRuntimeView | None = None
+    exec_cfg = ExecutionConfig.from_agent(agent)
+    python_cfg = PythonAgentConfig.from_agent(agent)
+    out_cfg = _resolve_output_config(store, agent)
+    return AgentRuntimeView(
+        max_validation_retries=exec_cfg.max_validation_retries,
+        max_error_retries=exec_cfg.max_error_retries,
+        output_validation_engine=exec_cfg.output_validation_engine,
+        output_schema_path=python_cfg.output_schema_path,
+        json_schema=out_cfg.json_schema,
+        validators=out_cfg.validators,
+    )
 
 
 # ── facade functions ──────────────────────────────────────────────────
@@ -294,7 +246,7 @@ def compose_prompt(
                 resolution = resolve_prompt(system_text, prompt_bindings)
                 system_text = resolution.rendered_prompt
                 snapshot_entries.extend(
-                    prompt_resolution_to_snapshot(resolution)
+                    prompt_resolution_to_snapshot(resolution.snapshot)
                 )
                 for marker in resolution.unresolved_markers:
                     logger.warning(
@@ -311,7 +263,7 @@ def compose_prompt(
                     )
                     agent_copied = True
                     snapshot_entries.extend(
-                        prompt_resolution_to_snapshot(resolution)
+                        prompt_resolution_to_snapshot(resolution.snapshot)
                     )
                     for marker in resolution.unresolved_markers:
                         logger.warning(
@@ -388,7 +340,7 @@ def compose_prompt(
         agent = agent.model_copy(deep=True)
 
     # Build the runtime view from the resolved config.
-    runtime_view = AgentRuntimeView.from_agent(agent, store=store)
+    runtime_view = build_runtime_view(agent, store=store)
 
     return ComposedPrompt(
         agent=agent,
@@ -438,6 +390,7 @@ def capture_fragments(
 __all__ = [
     "AgentRuntimeView",
     "ComposedPrompt",
+    "build_runtime_view",
     "capture_fragments",
     "compose_prompt",
 ]

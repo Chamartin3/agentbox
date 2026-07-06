@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from agentbox.core.agents.composition.resolver import PromptResolution, ResolvedBinding
+from agentbox.core.data.composition import PromptResolution, ResolvedBinding
 from agentbox.core.data.snapshots import (
     prompt_resolution_to_snapshot,
     workspace_outcomes_to_snapshot,
@@ -389,7 +389,7 @@ class TestSnapshotHelpers:
             unresolved_markers=[],
             warnings=[],
         )
-        entries = prompt_resolution_to_snapshot(resolution)
+        entries = prompt_resolution_to_snapshot(resolution.snapshot)
         assert len(entries) == 1
         e = entries[0]
         assert e["role"] == "prompt_embed"

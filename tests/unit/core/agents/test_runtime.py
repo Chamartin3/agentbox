@@ -9,8 +9,11 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 
-from agentbox.core.agents.runtime import (
+from agentbox.core.agents import (
     AgentRuntimeView,
+    build_runtime_view,
+)
+from agentbox.core.agents.runtime import (
     capture_fragments,
 )
 
@@ -18,7 +21,7 @@ from agentbox.core.agents.runtime import (
 class TestAgentRuntimeView:
     def test_from_agent_basic(self, make_agent_def) -> None:
         agent = make_agent_def(id="test.from_agent_basic")
-        view = AgentRuntimeView.from_agent(agent, store=None)
+        view = build_runtime_view(agent, store=None)
         assert view.max_validation_retries == 0
         assert view.max_error_retries == 0
         assert view.output_validation_engine == "both"
@@ -37,7 +40,7 @@ class TestAgentRuntimeView:
     def test_from_agent_with_store(self, make_agent_def, mock_store) -> None:
         mock_store.list_prompt_bindings.return_value = []
         agent = make_agent_def(id="test.from_agent_with_store")
-        view = AgentRuntimeView.from_agent(agent, store=mock_store)
+        view = build_runtime_view(agent, store=mock_store)
         assert view.max_validation_retries == 0
 
 

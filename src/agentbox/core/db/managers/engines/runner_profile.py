@@ -12,13 +12,12 @@ from __future__ import annotations
 import json as _json
 from typing import Any
 
-from agentbox.core.data.payload_types import RunnerProfileRow, RunnerProfileStatsRow
-
 from sqlalchemy import ColumnElement, Integer, cast, func, select, update as sa_update, delete as sa_delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.engines.runner_profile import RunnerProfile
+from agentbox.core.db.models.engines.runner_profile import RunnerProfile as RunnerProfileORM
+from agentbox.core.data.profiles import RunnerProfile, RunnerProfileStats
 from agentbox.core.db.schema import agent_runner_profiles, runner_profiles, runs, usage
 
 
@@ -29,63 +28,63 @@ def _duration_ms_expr(c_started: object, c_finished: object) -> object:
     return (epoch_finished - epoch_started) * 1000
 
 
-class RunnerProfileManager(Manager[RunnerProfile]):
+class RunnerProfileManager(Manager[RunnerProfileORM]):
     """Manager for the ``runner_profiles`` and ``agent_runner_profiles`` tables."""
 
-    model = RunnerProfile
+    model = RunnerProfileORM
 
     # ------------------------------------------------------------------
     # Legacy ORM helpers (kept for existing callers until Phase C)
     # ------------------------------------------------------------------
 
-    def get_default(self) -> RunnerProfile | None:
+    def get_default(self) -> RunnerProfileORM | None:
         """Return the system-default runner profile, or None."""
         stmt = (
-            select(RunnerProfile)
+            select(RunnerProfileORM)
             .where(
-                getattr(RunnerProfile, "is_system_default") == 1,
-                getattr(RunnerProfile, "is_enabled") == 1,
+                getattr(RunnerProfileORM, "is_system_default") == 1,
+                getattr(RunnerProfileORM, "is_enabled") == 1,
             )
             .limit(1)
         )
         return self._scalar(stmt)
 
-    def find_by_backend(self, backend: str) -> list[RunnerProfile]:
+    def find_by_backend(self, backend: str) -> list[RunnerProfileORM]:
         """Return all enabled profiles for a given backend name."""
         return self.find(backend=backend, is_enabled=1)
 
     # ------------------------------------------------------------------
-    # Row → dict conversion
+    # Row → Pydantic model conversion
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _row_to_dict(row: Any) -> RunnerProfileRow:
-        """Convert a SQLAlchemy Core Row to a flat dict with Python types.
+    def _row_to_model(row: Any) -> RunnerProfile:
+        """Convert a SQLAlchemy Core Row to a RunnerProfile Pydantic model.
 
         JSON columns (``params_json``, ``headers_json``, ``extra_args_json``)
         are deserialised; integer booleans (``is_enabled``,
         ``is_system_default``) are converted to Python bool.
         """
         m = row._mapping
-        return {
-            "id": m["id"],
-            "name": m["name"],
-            "description": m.get("description"),
-            "backend": m["backend"],
-            "provider": m.get("provider"),
-            "model": m.get("model"),
-            "base_url": m.get("base_url"),
-            "api_key_env": m.get("api_key_env"),
-            "api_token_id": m.get("api_token_id"),
-            "output_mode": m.get("output_mode") or "auto",
-            "params": _json.loads(m.get("params_json") or "{}"),
-            "headers": _json.loads(m.get("headers_json") or "{}"),
-            "extra_args": _json.loads(m.get("extra_args_json") or "[]"),
-            "is_enabled": bool(m.get("is_enabled", 1)),
-            "is_system_default": bool(m.get("is_system_default", 0)),
-            "created_at": m["created_at"],
-            "updated_at": m["updated_at"],
-        }
+        return RunnerProfile(
+            id=m["id"],
+            name=m["name"],
+            description=m.get("description"),
+            backend=m["backend"],
+            provider=m.get("provider"),
+            model=m.get("model"),
+            base_url=m.get("base_url"),
+            api_key_env=m.get("api_key_env"),
+            api_token_id=m.get("api_token_id"),
+            output_mode=m.get("output_mode") or "auto",
+            params=_json.loads(m.get("params_json") or "{}"),
+            headers=_json.loads(m.get("headers_json") or "{}"),
+            extra_args=_json.loads(m.get("extra_args_json") or "[]"),
+            is_enabled=bool(m.get("is_enabled", 1)),
+            is_system_default=bool(m.get("is_system_default", 0)),
+            created_at=m["created_at"],
+            updated_at=m["updated_at"],
+        )
 
     # ------------------------------------------------------------------
     # Pure-DB CRUD — runner_profiles
@@ -96,7 +95,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         backend: str | None = None,
         provider: str | None = None,
         enabled: bool | None = None,
-    ) -> list[RunnerProfileRow]:
+    ) -> list[RunnerProfile]:
         """Return all runner profiles (optionally filtered), ordered by creation time."""
         stmt = select(runner_profiles)
         if backend is not None:
@@ -109,15 +108,15 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         with self._engine.connect() as conn:
             return [self._row_to_dict(r) for r in conn.execute(stmt)]
 
-    def get_by_id(self, profile_id: str) -> RunnerProfileRow | None:
-        """Return a single profile dict, or None."""
+    def get_by_id(self, profile_id: str) -> RunnerProfile | None:
+        """Return a single profile model, or None."""
         stmt = select(runner_profiles).where(runner_profiles.c.id == profile_id)
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
-            return self._row_to_dict(row) if row else None
+            return self._row_to_model(row) if row else None
 
-    def create_one(self, **fields: Any) -> RunnerProfileRow:
-        """Insert a new runner profile. Returns the created row as a dict.
+    def create_one(self, **fields: Any) -> RunnerProfile:
+        """Insert a new runner profile. Returns the created profile model.
 
         All columns must be provided (caller handles id derivation and
         defaults). JSON fields should already be serialised strings;
@@ -125,13 +124,13 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         """
         with self._engine.begin() as conn:
             conn.execute(runner_profiles.insert().values(**fields))
-        row = self.get_by_id(str(fields["id"]))
-        if row is None:
+        result = self.get_by_id(str(fields["id"]))
+        if result is None:
             raise RuntimeError(f"Failed to read back created profile {fields['id']}")
-        return row
+        return result
 
-    def update_one(self, profile_id: str, **values: Any) -> RunnerProfileRow | None:
-        """Partial-update a runner profile. Returns the updated profile dict.
+    def update_one(self, profile_id: str, **values: Any) -> RunnerProfile | None:
+        """Partial-update a runner profile. Returns the updated profile model.
 
         Only the supplied columns are changed. Returns None if the
         profile does not exist.
@@ -172,10 +171,10 @@ class RunnerProfileManager(Manager[RunnerProfile]):
                 .values(is_system_default=0)
             )
             conn.execute(runner_profiles.insert().values(**fields))
-        row = self.get_by_id(str(fields["id"]))
-        if row is None:
+        result = self.get_by_id(str(fields["id"]))
+        if result is None:
             raise RuntimeError(f"Failed to read back created profile {fields['id']}")
-        return row
+        return result
 
     def update_with_default_clear(
         self, profile_id: str, **values: Any
@@ -206,8 +205,8 @@ class RunnerProfileManager(Manager[RunnerProfile]):
     # System default
     # ------------------------------------------------------------------
 
-    def get_system_default(self) -> RunnerProfileRow | None:
-        """Return the system-default runner profile as a dict, or None.
+    def get_system_default(self) -> RunnerProfile | None:
+        """Return the system-default runner profile model, or None.
 
         Looks for the single row where ``is_system_default == 1`` (no
         ``is_enabled`` filter — config resolution needs the default even if
@@ -215,7 +214,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         stmt = select(runner_profiles).where(runner_profiles.c.is_system_default == 1).limit(1)
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
-            return self._row_to_dict(row) if row else None
+            return self._row_to_model(row) if row else None
 
     # ------------------------------------------------------------------
     # Aggregate stats — read-only cross-table queries (plan 093)
@@ -226,10 +225,10 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         profile_id: str,
         since: str | None = None,
         until: str | None = None,
-    ) -> RunnerProfileStatsRow:
+    ) -> RunnerProfileStats:
         """Aggregate run statistics for a single runner profile.
 
-        Returns a plain dict with keys: profile_id, runs, succeeded, failed,
+        Returns a RunnerProfileStats model with keys: profile_id, runs, succeeded, failed,
         input_tokens, output_tokens, cost_usd, avg_duration_ms, last_run_at.
         """
         duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
@@ -257,7 +256,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
         m = row._mapping if row else {}
-        return {
+        stats_dict = {
             "profile_id": profile_id,
             "runs": int(m.get("runs") or 0),
             "succeeded": int(m.get("succeeded") or 0),
@@ -268,15 +267,16 @@ class RunnerProfileManager(Manager[RunnerProfile]):
             "avg_duration_ms": float(m.get("avg_duration_ms") or 0.0) if m.get("avg_duration_ms") else None,
             "last_run_at": m.get("last_run_at"),
         }
+        return RunnerProfileStats.model_validate(stats_dict)
 
     def stats_all_profiles(
         self,
         since: str | None = None,
         until: str | None = None,
-    ) -> list[RunnerProfileStatsRow]:
+    ) -> list[RunnerProfileStats]:
         """Aggregate run statistics for every runner profile that has runs.
 
-        Returns a list of plain dicts; profiles without any runs are excluded.
+        Returns a list of RunnerProfileStats models; profiles without any runs are excluded.
         """
         duration_ms = _duration_ms_expr(runs.c.created_at, runs.c.finished_at)
         conds: list[ColumnElement[bool]] = [runs.c.runner_profile_id.isnot(None)]
@@ -308,7 +308,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         result = []
         for row in rows:
             m = row._mapping
-            result.append({
+            stats_dict = {
                 "profile_id": m.get("profile_id") or "unknown",
                 "runs": int(m.get("runs") or 0),
                 "succeeded": int(m.get("succeeded") or 0),
@@ -318,14 +318,15 @@ class RunnerProfileManager(Manager[RunnerProfile]):
                 "cost_usd": float(m.get("cost_usd") or 0.0) or None,
                 "avg_duration_ms": float(m.get("avg_duration_ms") or 0.0) if m.get("avg_duration_ms") else None,
                 "last_run_at": m.get("last_run_at"),
-            })
+            }
+            result.append(RunnerProfileStats.model_validate(stats_dict))
         return result
 
     # ------------------------------------------------------------------
     # Agent ↔ profile binding — agent_runner_profiles
     # ------------------------------------------------------------------
 
-    def get_agent_profile(self, agent_id: str) -> RunnerProfileRow | None:
+    def get_agent_profile(self, agent_id: str) -> RunnerProfile | None:
         """Return the runner profile bound to *agent_id*, or None.
 
         Joins ``agent_runner_profiles`` + ``runner_profiles`` so the
@@ -343,7 +344,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         )
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
-            return self._row_to_dict(row) if row else None
+            return self._row_to_model(row) if row else None
 
     def set_agent_profile(
         self, agent_id: str, profile_id: str, created_at: str, updated_at: str

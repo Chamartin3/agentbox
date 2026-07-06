@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import tomllib
-from dataclasses import dataclass
 from pathlib import Path
 
 from agentbox.core.data.payload_types import JsonSchemaDict
@@ -14,43 +13,10 @@ from agentbox.core.agents.composition.bundle._helpers import (
     _read_text, _ref_heading_fallback, _sha256,
 )
 from agentbox.core.agents.composition.bundle.sources import BundleSource
-
-@dataclass(frozen=True)
-class ComposedReference:
-    """One reference section as composed (raw, rendered text)."""
-
-    path: str
-    heading: str
-    content: str
-
-
-@dataclass(frozen=True)
-class ComposeResult:
-    """Result of composing a prompt bundle.
-
-    ``system`` is the fully-composed system prompt (base + input schema
-    block + references + output schema block) — what file-based backends
-    (claude_code, opencode, codex, pi) need.
-
-    ``system_base`` is the raw rendered system prompt **without** the
-    auto-appended schema/reference blocks. The token backend uses this
-    because pydantic-ai injects its own schema description and the
-    reference content goes via deps; appending the schema again would
-    duplicate (and potentially conflict with) what pydantic-ai sends.
-
-    ``references`` and ``input_schema`` are likewise the structured
-    pieces, available so backends can route them to native channels
-    instead of string-concatenation.
-    """
-
-    system: str
-    user: str
-    schema: JsonSchemaDict | None
-    schema_sha: str | None
-    bundle_sha: str
-    system_base: str = ""
-    references: tuple[ComposedReference, ...] = ()
-    input_schema: JsonSchemaDict | None = None
+from agentbox.core.data.composition import (
+    ComposedReference,
+    ComposeResult,
+)
 
 
 def compose(

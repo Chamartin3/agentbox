@@ -16,40 +16,13 @@ from __future__ import annotations
 import contextlib
 import json
 import shlex
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 
 from agentbox.core.data.constants import BackendName
 from agentbox.core.data import AgentDef
 from agentbox.core.db import PromptVersionManager
-
-
-@dataclass
-class PromptFragment:
-    name: str
-    """Short label, e.g. 'user_input', 'agent_system_prompt'."""
-
-    source: str
-    """'user', 'agent_def', 'project', 'agentbox', 'claude_cli'."""
-
-    injected_by: str
-    """Which layer pushes this text into the model: 'agentbox', 'claude_cli', 'token'."""
-
-    content: str
-    """The actual text. May be a note for things we cannot inspect."""
-
-    inspectable: bool = True
-    """False = we describe what's there but don't have the bytes (e.g. Claude CLI envelope)."""
-
-    shared_resource_id: str | None = None
-    """Optional: id of the shared resource this fragment came from."""
-
-    shared_resource_version: int | None = None
-    """Optional: version of the shared resource (None = active version was used)."""
-
-    @property
-    def size_bytes(self) -> int:
-        return len(self.content.encode("utf-8"))
+from agentbox.core.data.composition import PromptFragment
 
 
 def build_fragments(

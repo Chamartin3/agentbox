@@ -14,7 +14,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from agentbox.core.data.payload_types import ModelParams
-from agentbox.core.data.payload_types import RunnerProfileRow
 from agentbox.core.engines.backends.registry import get_backend as resolve_engine_by_name
 from agentbox.core.engines.providers import get_provider
 from agentbox.core.db import RunnerProfileManager
@@ -189,15 +188,15 @@ class RunnerProfileResolver:
 
     def _build_from_profile(
         self,
-        profile: RunnerProfileRow | Any,
+        profile: RunnerProfile,
         source: SourceType,
         backend_override: str | None = None,
         timeout_override: int | None = None,
     ) -> EffectiveRunnerConfig:
-        """Build EffectiveRunnerConfig from a profile dict or object.
+        """Build EffectiveRunnerConfig from a RunnerProfile model.
 
         Args:
-            profile: Profile data dict or Pydantic model with backend, model, etc.
+            profile: RunnerProfile Pydantic model with backend, model, etc.
             source: Attribution source.
             backend_override: Per-run backend override (applied last).
             timeout_override: Per-run timeout override (applied last).
@@ -205,27 +204,17 @@ class RunnerProfileResolver:
         Returns:
             Fully populated EffectiveRunnerConfig.
         """
-        # Convert Pydantic model to dict if needed
-        if isinstance(profile, dict):
-            profile_dict = profile
-        elif hasattr(profile, "model_dump"):
-            profile_dict = profile.model_dump(exclude_none=False)
-        elif hasattr(profile, "dict"):
-            profile_dict = profile.dict()
-        else:
-            profile_dict = dict(profile)
-
         config = EffectiveRunnerConfig(
-            backend=profile_dict.get("backend"),
-            provider=profile_dict.get("provider"),
-            model=profile_dict.get("model"),
-            base_url=profile_dict.get("base_url"),
-            api_key_env=profile_dict.get("api_key_env"),
-            output_mode=profile_dict.get("output_mode") or "auto",
-            params=profile_dict.get("params", {}),
-            headers=profile_dict.get("headers", {}),
-            extra_args=profile_dict.get("extra_args", []),
-            profile_id=profile_dict.get("id"),
+            backend=profile.backend,
+            provider=profile.provider,
+            model=profile.model,
+            base_url=profile.base_url,
+            api_key_env=profile.api_key_env,
+            output_mode=profile.output_mode or "auto",
+            params=profile.params,
+            headers=profile.headers,
+            extra_args=profile.extra_args,
+            profile_id=profile.id,
             source=source,
         )
 

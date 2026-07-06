@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import json as _json
 from datetime import datetime
-from agentbox.core.data.payload_types import EnrichedRunRow, EnrichedRunsResult, RunnerProfileRow
-from agentbox.core.data.profiles import RunnerProfileStats
+from agentbox.core.data.payload_types import EnrichedRunRow, EnrichedRunsResult
+from agentbox.core.data.profiles import RunnerProfile, RunnerProfileStats
 from agentbox.core.data.rows import (
     ActivitySummaryRow,
     RichRunRow,
@@ -143,7 +143,7 @@ class EvaluationService(Service):
             since_iso(range_), agent, state, executor, limit
         )
 
-        profile_cache: dict[str, RunnerProfileRow | None] = {}
+        profile_cache: dict[str, RunnerProfile | None] = {}
 
         def _profile_backend_model(profile_id: str | None) -> tuple[str | None, str | None]:
             if not profile_id:
@@ -153,7 +153,7 @@ class EvaluationService(Service):
             p = profile_cache[profile_id]
             if p is None:
                 return None, None
-            return p.get("backend"), p.get("model")
+            return p.backend, p.model
 
         def _state_label(status_val: str) -> str:
             return {"ok": "succeeded", "error": "failed", "running": "running"}.get(

@@ -6,15 +6,16 @@ import json as _json
 from typing import Any
 
 from agentbox.core.data.payload_types import ConfigJsonPayload, JsonSchemaDict
-
+from agentbox.core.data.composition import (
+    HttpValidatorConfig,
+    ScriptValidatorConfig,
+    ValidatorConfig,
+)
 from agentbox.core.agents.config._types import (
     ExecutionConfig,
-    HttpValidatorConfig,
     OutputConfig,
     PythonAgentConfig,
     RuntimeConfig,
-    ScriptValidatorConfig,
-    ValidatorConfig,
     _config_section,
 )
 
