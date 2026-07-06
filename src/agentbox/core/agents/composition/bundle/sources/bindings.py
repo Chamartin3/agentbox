@@ -4,14 +4,32 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
-
+from typing import Any, TypedDict
 
 from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.agents.composition.bundle.sources._types import (
     OutputSchemaInfo,
     ReferenceSpec,
 )
+
+
+class _ResolvedBinding(TypedDict):
+    """Internal shape of a resolved prompt resource binding in memory."""
+
+    binding_id: str
+    marker: str | None
+    slot: str | None
+    attach_as_reference: bool
+    resource_id: str
+    resource_slug: str
+    version_id: str
+    content_hash: str
+    type: str
+    mode: str | None
+    display_name: str
+    display_order: int
+    required: bool
+    blobs: list[Any]  # ResourceBlobRow instances from iter_repo_blobs
 
 # Pseudo paths used in the synthesized ``composition`` dict so the rest
 # of the composer (which still treats the composition as a TOML-shaped
@@ -52,7 +70,7 @@ class BindingsBundleSource:
     def __post_init__(self) -> None:
         # Resolve once; downstream methods reuse the same view so we
         # don't re-query for every read_*.
-        self._resolved: list[dict] = []
+        self._resolved: list[_ResolvedBinding] = []
         bindings = self.store.list_prompt_bindings(self.agent_id)
         for b in bindings:
             resource = self.store.get_repo_resource(b["resource_id"])
@@ -159,17 +177,17 @@ class BindingsBundleSource:
 
     # --- internal lookup helpers ---
 
-    def _find_slot(self, slot: str) -> dict | None:
+    def _find_slot(self, slot: str) -> _ResolvedBinding | None:
         for b in self._resolved:
             if b.get("slot") == slot:
                 return b
         return None
 
-    def _find_active_slot(self, slot: str) -> dict | None:
+    def _find_active_slot(self, slot: str) -> _ResolvedBinding | None:
         b = self._find_slot(slot)
         return b if (b and b.get("attach_as_reference")) else None
 
-    def _find_user_template(self) -> dict | None:
+    def _find_user_template(self) -> _ResolvedBinding | None:
         # Slot wins over marker if both exist.
         slot_b = self._find_slot("user_template")
         if slot_b is not None:
@@ -179,7 +197,7 @@ class BindingsBundleSource:
                 return b
         return None
 
-    def _reference_bindings(self) -> list[dict]:
+    def _reference_bindings(self) -> list[_ResolvedBinding]:
         refs = [
             b
             for b in self._resolved
@@ -202,7 +220,7 @@ class BindingsBundleSource:
             for b in self._reference_bindings()
         ]
 
-    def _render_blob_text(self, b: dict) -> str:
+    def _render_blob_text(self, b: _ResolvedBinding) -> str:
         rendered = render_for_type(b["type"], b.get("blobs") or [])
         return rendered.get("text") or ""
 

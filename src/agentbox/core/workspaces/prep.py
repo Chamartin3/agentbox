@@ -15,6 +15,10 @@ from agentbox.core.data.payload_types import (
     RunSnapshotEntry,
 )
 from agentbox.core.data.snapshots import workspace_outcomes_to_snapshot
+from agentbox.core.workspaces._types import (
+    WorkspaceSubagentBinding,
+    WorkspacePermissions,
+)
 
 import json
 import logging
@@ -73,7 +77,7 @@ def resolve_workspace_resources(
     if not bindings:
         return []
 
-    resolved: list[dict] = []
+    resolved: list = []
     for b in bindings:
         resource = resources.get_resource(b["resource_id"])
         if not resource:
@@ -143,7 +147,7 @@ def resolve_workspace_subagents(
     agent_versions: AgentVersionManager,
     agent_defs: AgentDefManager,
     workspace_id: str,
-) -> list[dict]:
+) -> list[WorkspaceSubagentBinding]:
     """Hydrate workspace subagent rows into renderer-ready dicts."""
     if not workspace_id or workspace_id == "<ephemeral>":
         return []
@@ -152,7 +156,7 @@ def resolve_workspace_subagents(
     if not rows:
         return []
 
-    resolved: list[dict] = []
+    resolved: list = []
     for r in rows:
         agent_id = r["agent_id"]
         active = agent_versions.get_active(agent_id)
@@ -260,7 +264,7 @@ def load_workspace_permissions(
     agent: AgentDef,
     settings: Settings,
     workspace_runtime_permissions: WorkspaceRuntimePermissionManager | None = None,
-) -> dict:
+) -> WorkspacePermissions:
     """Resolve effective workspace permissions from the DB overlay.
 
     ``workspace_runtime_permissions`` is the single source of truth for
@@ -269,16 +273,20 @@ def load_workspace_permissions(
     callers downstream treat that as "no constraints declared".
     """
     if not agent.workspace or agent.workspace == "<ephemeral>":
-        return {}
+        empty: WorkspacePermissions = {}
+        return empty
     if workspace_runtime_permissions is None:
-        return {}
+        empty = {}
+        return empty
     try:
         overlay = workspace_runtime_permissions.get_for_workspace(agent.workspace)
     except Exception:
-        return {}
+        empty = {}
+        return empty
     if not overlay:
-        return {}
-    perms: dict = {}
+        empty = {}
+        return empty
+    perms: WorkspacePermissions = {}
     if overlay.get("allowed_builtin_tools") is not None:
         perms["allowed_builtin_tools"] = overlay["allowed_builtin_tools"]
     if overlay.get("files") is not None:

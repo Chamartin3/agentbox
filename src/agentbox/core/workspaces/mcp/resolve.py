@@ -15,6 +15,10 @@ from agentbox.core.db import (
     WorkspaceMcpToolOverrideManager,
 )
 from agentbox.core.tools.grants import resolve_grants
+from agentbox.core.workspaces._types import (
+    WorkspaceMcpConfigResult,
+    WorkspaceHostEnvGrantsResult,
+)
 
 
 def _shallow_merge(
@@ -32,7 +36,7 @@ def resolve_workspace_mcp_helper(
     manifest_servers: list[dict],
     *,
     discovered_tools: dict[str, list[str]] | None = None,
-) -> dict:
+) -> WorkspaceMcpConfigResult:
     """Return the workspace's effective MCP server configuration.
 
     Caller supplies ``manifest_servers`` (project-level MCP server list)
@@ -53,7 +57,7 @@ def resolve_workspace_mcp_helper(
         if n not in manifest_by_name:
             all_names.append(n)
 
-    out_servers = []
+    out_servers: list = []
     for name in all_names:
         manifest_entry = manifest_by_name.get(name)
         override = server_overrides.get(name)
@@ -81,17 +85,19 @@ def resolve_workspace_mcp_helper(
                 "source": source,
             }
         )
-    return {"servers": out_servers, "policy": policy}
+    result: WorkspaceMcpConfigResult = {"servers": out_servers, "policy": policy}
+    return result
 
 
 def resolve_workspace_host_env_helper(
     workspace_host_env_grants: "WorkspaceHostEnvGrantManager",
     workspace_id: str,
-) -> dict:
+) -> WorkspaceHostEnvGrantsResult:
     """Return the workspace's effective host-env grant configuration."""
     row = workspace_host_env_grants.get_grant(workspace_id)
     if not row:
-        return {"grants": resolve_grants(None, None), "profile_id": None}
+        result: WorkspaceHostEnvGrantsResult = {"grants": resolve_grants(None, None), "profile_id": None}
+        return result
     profile_id = row.get("profile_id")
     profile = (
         workspace_host_env_grants.get_profile(profile_id)
@@ -101,11 +107,12 @@ def resolve_workspace_host_env_helper(
     grants = resolve_grants(
         profile["grants"] if profile else None, row.get("overrides")
     )
-    return {
+    result = {
         "grants": grants,
         "profile_id": row.get("profile_id"),
         "overrides": row.get("overrides"),
     }
+    return result
 
 
 __all__ = ["resolve_workspace_host_env_helper", "resolve_workspace_mcp_helper"]

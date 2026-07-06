@@ -36,13 +36,13 @@ def build_mcp_snapshot(
             }
             for s in load_project_mcp_servers()
         ]
-        raw = resolve_workspace_mcp_helper(
+        raw = dict(resolve_workspace_mcp_helper(
             workspace_mcp_policies,
             workspace_mcp_overrides,
             workspace_mcp_tool_overrides,
             workspace_id,
             manifest_servers,
-        )
+        ))
         if host_env_grants:
             raw["host_env_grants"] = list(host_env_grants.keys())
             raw["host_env_injected"] = True

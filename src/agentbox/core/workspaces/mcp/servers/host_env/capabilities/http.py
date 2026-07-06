@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 from agentbox.core.tools.grants import GrantViolation, check_capability
+from agentbox.core.workspaces._types import HttpFetchResult
 from fastmcp import FastMCP
 
 
@@ -21,7 +22,7 @@ def register(mcp: FastMCP, ctx_factory: Callable[[], HostEnvContext]) -> None:
         method: str = "GET",
         body: str | None = None,
         headers: dict | None = None,
-    ) -> dict:
+    ) -> HttpFetchResult:
         ctx = ctx_factory()
         try:
             check_capability(ctx.grants, "http.fetch", {"url": url, "method": method})
@@ -44,9 +45,11 @@ def register(mcp: FastMCP, ctx_factory: Callable[[], HostEnvContext]) -> None:
                 text = resp.read().decode(errors="replace")
         except urllib.error.HTTPError as exc:
             ctx.audit("http.fetch", {"url": url}, outcome="http_error", error=str(exc))
-            return {"status": exc.code, "body": exc.read().decode(errors="replace")}
+            result: HttpFetchResult = {"status": exc.code, "body": exc.read().decode(errors="replace")}
+            return result
         except Exception as exc:
             ctx.audit("http.fetch", {"url": url}, outcome="error", error=str(exc))
             raise
         ctx.audit("http.fetch", {"url": url, "status": status}, outcome="ok")
-        return {"status": status, "body": text}
+        result = {"status": status, "body": text}
+        return result

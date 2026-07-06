@@ -19,7 +19,7 @@ class GrantViolation(Exception):
     """Raised when a capability call violates the effective grant."""
 
 
-def _deep_merge(base: dict | None, overrides: dict | None) -> dict:
+def _deep_merge(base: dict[str, Any] | None, overrides: dict[str, Any] | None) -> dict[str, Any]:
     """Recursive merge: lists in overrides replace lists in base; dicts merge."""
     out: dict[str, Any] = dict(base or {})
     for k, v in (overrides or {}).items():

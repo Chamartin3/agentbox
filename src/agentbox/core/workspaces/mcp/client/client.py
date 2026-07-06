@@ -8,6 +8,7 @@ from typing import Any, TypedDict
 
 import httpx
 
+
 MCP_PROTOCOL_VERSION = "2024-11-05"
 _CLIENT_INFO = {"name": "agentbox", "version": "0.1.0"}
 

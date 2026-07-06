@@ -18,7 +18,7 @@ import json
 import shutil
 import subprocess
 from contextlib import suppress
-from typing import Final
+from typing import Any, Final, TypedDict
 
 from agentbox.core.data.constants import ContentBlockType, MessageRole
 from agentbox.core.data import RunRecord
@@ -32,6 +32,36 @@ from agentbox.core.data.conversation.types import (
 
 
 _VALID_ROLES_OC: Final = frozenset(MessageRole)
+
+
+class _OpencodeTokenCache(TypedDict, total=False):
+    """Token cache info in OpenCode session export."""
+
+    read: int | None
+    write: int | None
+
+
+class _OpencodeTokenInfo(TypedDict, total=False):
+    """Token info in OpenCode session export."""
+
+    input: int | None
+    output: int | None
+    cache: _OpencodeTokenCache | None
+
+
+class _OpencodeSessionInfo(TypedDict, total=False):
+    """Info section of OpenCode session export."""
+
+    model: str | None
+    tokens: _OpencodeTokenInfo | None
+    cost: float | None
+
+
+class _OpencodeSessionExport(TypedDict, total=False):
+    """Root structure of OpenCode session export."""
+
+    info: _OpencodeSessionInfo | None
+    messages: list[dict[str, Any]] | None
 
 
 class OpencodeSessionSource(ConversationSource):
@@ -60,7 +90,7 @@ class OpencodeSessionSource(ConversationSource):
         wd = getattr(run, "workdir", None)
         return cls(session_id=sid, workdir=wd)
 
-    def _export_session(self) -> dict | None:
+    def _export_session(self) -> _OpencodeSessionExport | None:
         """Run ``opencode export <session_id>`` and return parsed JSON.
 
         Synchronous: this source is called from FastMCP / FastAPI handlers

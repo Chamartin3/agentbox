@@ -8,6 +8,7 @@ from collections.abc import Callable
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 from agentbox.core.tools.grants import GrantViolation, check_capability
+from agentbox.core.workspaces._types import ShellExecResult
 from fastmcp import FastMCP
 
 
@@ -16,7 +17,7 @@ def register(mcp: FastMCP, ctx_factory: Callable[[], HostEnvContext]) -> None:
         name=CanonicalTool.SHELL_EXEC.value,
         description="Run an allowlisted shell command. Requires shell.exec grant.",
     )
-    def shell_exec(cmd: str, cwd: str | None = None, timeout: int = 30) -> dict:
+    def shell_exec(cmd: str, cwd: str | None = None, timeout: int = 30) -> ShellExecResult:
         ctx = ctx_factory()
         try:
             check_capability(ctx.grants, CanonicalTool.SHELL_EXEC, {"cmd": cmd})
@@ -41,8 +42,9 @@ def register(mcp: FastMCP, ctx_factory: Callable[[], HostEnvContext]) -> None:
             ctx.audit(CanonicalTool.SHELL_EXEC, {"cmd": cmd}, outcome="timeout", error="timed out")
             raise
         ctx.audit(CanonicalTool.SHELL_EXEC, {"cmd": cmd}, outcome=outcome, error=error)
-        return {
+        return_val: ShellExecResult = {
             "returncode": result.returncode,
             "stdout": result.stdout,
             "stderr": result.stderr,
         }
+        return return_val

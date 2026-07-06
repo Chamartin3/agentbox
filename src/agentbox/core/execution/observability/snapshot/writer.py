@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any, cast
 
+
 from agentbox.core.data import McpSnapshot, RunnerSnapshot
 
 from .mcp import build_mcp_snapshot
@@ -39,7 +40,7 @@ class SnapshotWriter:
         self,
         *,
         workspace_id: str | None,
-        host_env_grants: dict | None,
+        host_env_grants: dict[str, Any] | None,
     ) -> McpSnapshot | None:
         """Resolve the workspace's effective MCP server list."""
         return build_mcp_snapshot(
@@ -68,6 +69,6 @@ class SnapshotWriter:
                 "executor: failed to persist snapshots for run %s", run_id
             )
 
-    def resolve_host_env_grants(self, workspace_id: str | None) -> dict | None:
+    def resolve_host_env_grants(self, workspace_id: str | None) -> dict[str, Any] | None:
         """Return the workspace's non-default host-env grants, or ``None``."""
         return resolve_host_env_grants(self._db.workspace_host_env_grants, workspace_id)

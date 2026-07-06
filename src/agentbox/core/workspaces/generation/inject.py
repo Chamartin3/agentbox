@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME, HOST_ENV_SERVER_NAME, MCP_FILENAME
+from agentbox.core.workspaces._types import McpServerSpec
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +31,14 @@ def host_env_server_spec(
     workspace_id: str,
     workdir: Path,
     db_path: Path,
-) -> dict:
+) -> McpServerSpec:
     """Return the stdio MCP server spec (``{command, args, env}``) for host-env.
 
     Single source of truth for *how* to spawn the host-env server: both the
     .mcp.json injection (MCP-aware backends) and the token backend's pydantic-ai
     MCP toolset build their connection from this.
     """
-    return {
+    spec: McpServerSpec = {
         "command": sys.executable,
         "args": ["-m", "agentbox.core.workspaces.mcp.servers.host_env"],
         "env": {
@@ -47,6 +48,7 @@ def host_env_server_spec(
             "AGENTBOX_DB_PATH": str(db_path),
         },
     }
+    return spec
 
 
 def _load_mcp(run_dir: Path) -> tuple[Path, dict]:

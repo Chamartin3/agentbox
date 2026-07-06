@@ -49,7 +49,7 @@ from agentbox.core.agents.config import (
     resolve_output_config as _resolve_output_config,
 )
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
-from agentbox.core.data.rows import AgentPromptBindingRow
+from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
 from agentbox.core.data import AgentDef
 from agentbox.core.db import PromptVersionManager
 from agentbox.core.db.system.config import load_project_shared_assets
@@ -77,16 +77,16 @@ class _DbStoreAdapter:
     def list_prompt_bindings(self, agent_id: str) -> list[AgentPromptBindingRow]:
         return self._db.agent_prompt_resource_bindings.list_for_agent(agent_id)
 
-    def get_repo_resource(self, resource_id: str) -> dict | None:
+    def get_repo_resource(self, resource_id: str) -> RepoResourceRow | None:
         return self._db.resources.get_resource(resource_id)
 
-    def get_active_repo_version(self, resource_id: str) -> dict | None:
+    def get_active_repo_version(self, resource_id: str) -> ResourceVersionRow | None:
         return self._db.resource_versions.get_active_version(resource_id)
 
-    def get_repo_version(self, version_id: str) -> dict | None:
+    def get_repo_version(self, version_id: str) -> ResourceVersionRow | None:
         return self._db.resource_versions.get_version(version_id)
 
-    def iter_repo_blobs(self, version_id: str) -> Iterator[dict]:
+    def iter_repo_blobs(self, version_id: str) -> Iterator[ResourceBlobRow]:
         return self._db.resource_blobs.iter_blobs(version_id)
 
     def read_repo_blob(self, version_id: str, relative_path: str = "") -> Any:

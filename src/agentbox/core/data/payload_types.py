@@ -14,9 +14,14 @@ from __future__ import annotations
 from typing import Literal, NotRequired, TypedDict
 
 from agentbox.core.data.rows import (
+    AgentPromptBindingRow,
+    AgentToolGrantRow,
+    ApiTokenRow,
+    EnvDocRow,
+    HostEnvCallLogRow,
+    HostEnvProfileRow,
     McpServerConfigView,
     PermissionFileEntry,
-    AgentPromptBindingRow,
     RepoResourceRow,
     ResourceBlobRow,
     ResourceVersionRow,
@@ -92,6 +97,19 @@ class NotFoundResult(TypedDict):
 
     error: str
     run_id: str
+
+
+class McpError(TypedDict):
+    """Generic MCP-tool error envelope — the error arm of a tool's
+    ``<Success> | McpError`` return. ``error`` is the code/message; the
+    optional keys are context an individual tool attaches alongside it."""
+
+    error: str
+    agent_id: NotRequired[str]
+    run_id: NotRequired[str]
+    workspace_id: NotRequired[str]
+    version: NotRequired[int]
+    detail: NotRequired[str]
 
 
 class EventStylesDict(TypedDict):
@@ -1080,7 +1098,403 @@ type RunSnapshotEntry = EnvDocRenderEntry | WorkspaceFileSnapshotEntry | PromptE
 """Any JSON-serializable resource snapshot row captured during run prep."""
 
 
+# ── 114: Area 2 (API routes) ───────────────────────────────────────────────
+
+
+class EnrichedAgentListItem(TypedDict, total=False):
+    """One enriched agent from list_agents_enriched()."""
+
+    # Fields from AgentDef.model_dump()
+    id: NotRequired[str]
+    name: NotRequired[str]
+    description: NotRequired[str | None]
+    session_mode: NotRequired[str | None]
+    workspace: NotRequired[str | None]
+    tags: NotRequired[list[str]]
+    tools: NotRequired[list[str]]
+    webhook_url: NotRequired[str | None]
+    headless: NotRequired[bool]
+    runner: NotRequired[dict | None]
+    composition: NotRequired[dict | None]
+    # Enriched fields
+    resolved_workspace: NotRequired[str]
+    run_count: NotRequired[int]
+    last_run_at: NotRequired[str | None]
+    runner_profile_id: NotRequired[str | None]
+    model: NotRequired[str | None]
+    model_provider: NotRequired[str | None]
+    updated_at: NotRequired[str | None]
+    version: NotRequired[int | None]
+    last_activity_at: NotRequired[str | None]
+    disabled_at: NotRequired[str | None]
+
+
+class AgentDetailWorkspace(TypedDict):
+    """Workspace info nested in agent detail."""
+
+    path: str
+    ephemeral: bool
+    generated_configs: dict[str, str]
+
+
+class AgentVersionDetailItem(TypedDict):
+    """One version in agent detail's versions list."""
+
+    id: str
+    version: int
+    author: str | None
+    changelog: str
+    is_legacy: bool
+    created_at: str
+    has_comments: bool
+    rating: int | None
+    config_json: dict | None
+
+
+class AgentDetailResult(TypedDict):
+    """Return shape of get_agent_detail()."""
+
+    agent: dict
+    prompt: str
+    composed_system: str | None
+    composed_user: str | None
+    runner_profile_id: str | None
+    model: str | None
+    model_provider: str | None
+    workspace: AgentDetailWorkspace
+    current_version: int | None
+    versions: list[AgentVersionDetailItem]
+    disabled_at: str | None
+
+
+class SetWorkspaceResult(TypedDict):
+    """Return shape of set_workspace() endpoint."""
+
+    agent_id: str
+    workspace: str | None
+
+
+class PublishVersionResult(TypedDict):
+    """Return shape of publish_version() endpoint."""
+
+    active_version: int
+    version_id: str | int | None
+    version: int | None
+    author: str | None
+    changelog: str | None
+
+
+class BranchDraftResult(TypedDict, total=False):
+    """Return shape of branch_draft() endpoint."""
+
+    version: int | str | None
+    version_id: int | str | None
+    author: str | None
+    changelog: str | None
+
+
+class DisableAgentResult(TypedDict):
+    """Return shape of disable_agent() and enable_agent() endpoints."""
+
+    agent_id: str
+    disabled_at: str | None
+
+
+class RollbackVersionResult(TypedDict, total=False):
+    """Return shape of rollback_version() endpoint."""
+
+    version: int | str | None
+    version_id: int | str | None
+    active_version: int | str | None
+    author: str | None
+    changelog: str | None
+
+
+class BuiltinToolView(TypedDict):
+    """Built-in tool entry in agent tools list."""
+
+    name: str
+    description: str
+    capability: str | None
+    params: list[str]
+    kind: str
+
+
+class SharedToolView(TypedDict):
+    """Shared (registered) tool entry in agent tools list."""
+
+    name: str
+    description: str
+    capability: str
+    tags: list[str]
+    input_schema: dict
+    output_schema: dict
+    kind: str
+
+
+type AgentToolView = BuiltinToolView | SharedToolView
+"""Union of builtin and shared tool views."""
+
+
+class AgentToolsListResult(TypedDict):
+    """Return shape of list_agent_tools() endpoint."""
+
+    items: list[AgentToolView]
+
+
+class ToolGrantResult(TypedDict, total=False):
+    """Return shape of grant_tool() endpoint."""
+
+    id: str
+    agent_id: str | None
+    tool_name: str
+    granted_at: str | None
+    granted_by: str | None
+    revoked_at: str | None
+    revoked_by: str | None
+    changelog: str | None
+    warning: str
+
+
+class ToolGrantsResult(TypedDict):
+    """Return shape of list_grants() endpoint."""
+
+    items: list[AgentToolGrantRow]
+
+
+class PatchAgentResult(TypedDict):
+    """Return shape of patch_agent() endpoint."""
+
+    agent: dict
+
+
+class McpPolicyResult(TypedDict):
+    """Return shape of get_policy() and set_policy() endpoints."""
+
+    policy: str
+
+
+class WorkspaceCatalogItem(TypedDict, total=False):
+    """One item in available_tools() catalog."""
+
+    name: str
+    description: str
+    kind: str
+    server: str
+    input_schema: dict | None
+    grant_schema: dict | None
+    resource_id: str
+    target_path: str
+
+
+class WorkspaceCatalogResult(TypedDict):
+    """Return shape of list_available_tools() endpoint."""
+
+    items: list[WorkspaceCatalogItem]
+
+
+class HostCapabilityEntry(TypedDict):
+    """One host capability in the capabilities list."""
+
+    name: str
+    description: str
+    grant_schema: dict | None
+    default_granted: bool
+
+
+class HostCapabilitiesResult(TypedDict):
+    """Return shape of list_capabilities() endpoint."""
+
+    capabilities: list[HostCapabilityEntry]
+
+
+class HostEnvProfilesResult(TypedDict):
+    """Return shape of list_profiles() endpoint."""
+
+    items: list[HostEnvProfileRow]
+
+
+class HostEnvCallsResult(TypedDict):
+    """Return shape of list_run_calls() endpoint."""
+
+    items: list[HostEnvCallLogRow]
+
+
+class SettingsSectionsResult(TypedDict):
+    """Return shape of list_sections() endpoint."""
+
+    known: list[str]
+    present: list[str]
+
+
+class SettingsSectionResult(TypedDict):
+    """Return shape of get_section() endpoint."""
+
+    section: str
+    values: dict
+    defaults: dict
+    overrides: dict
+
+
+class SettingsSectionPatchResult(TypedDict):
+    """Return shape of patch_section() endpoint."""
+
+    section: str
+    values: dict
+
+
+class ProjectMcpServersResult(TypedDict):
+    """Return shape of list_project_mcp_servers() endpoint."""
+
+    servers: list[dict]
+
+
+class ProjectMcpServerDeleteResult(TypedDict):
+    """Return shape of delete_project_mcp_server() endpoint."""
+
+    deleted: str
+
+
+class McpServersListResult(TypedDict):
+    """Return shape of list_mcp_servers() endpoint."""
+
+    servers: list
+    overall_status: str
+
+
+class McpServerToolEntry(TypedDict):
+    """Tool entry in get_server_tools()."""
+
+    name: str
+    description: str
+    input_schema: dict | None
+
+
+class McpServerToolsResult(TypedDict):
+    """Return shape of get_server_tools() endpoint."""
+
+    server: str
+    status: dict[str, str | int | bool | float | None | dict | list]
+    tools: list[McpServerToolEntry]
+    tool_count: int
+
+
+class McpServerGroupEntry(TypedDict):
+    """Group entry in get_server_groups()."""
+
+    name: str
+    tools: list[str]
+    tool_count: int
+
+
+class McpServerGroupsResult(TypedDict):
+    """Return shape of get_server_groups() endpoint."""
+
+    server: str
+    groups: list[McpServerGroupEntry]
+    group_count: int
+
+
+class ApiTokensListResult(TypedDict):
+    """Return shape of list_tokens() endpoint."""
+
+    items: list[ApiTokenRow]
+    total: int
+
+
+class ApiTokenRotateResult(TypedDict, total=False):
+    """Return shape of rotate_token() endpoint."""
+
+    id: str
+    environment: str | None
+    name: str | None
+    secret_suffix: str | None
+
+
+class EnvDocResult(TypedDict):
+    """Return shape of get_env_doc() endpoint."""
+
+    active: EnvDocRow | None
+
+
+class SubagentDetailItem(TypedDict):
+    """One enriched subagent in list."""
+
+    id: str
+    workspace_id: str | None
+    agent_id: str
+    alias: str
+    display_order: int
+    created_at: str | None
+    created_by: str | None
+    agent_name: str | None
+    agent_description: str | None
+
+
+class SubagentListResult(TypedDict):
+    """Return shape of list_workspace_subagents() endpoint."""
+
+    items: list[SubagentDetailItem]
+
+
+class SubagentReplaceResult(TypedDict):
+    """Return shape of replace_workspace_subagents() endpoint."""
+
+    items: list[WorkspaceSubagentRow]
+
+
+class HealthReport(TypedDict, total=False):
+    """Health status returned by health() endpoint."""
+
+    ok: bool
+    version: str
+    mcp_servers: dict | None
+    status: str | None
+    mcp_error: NotRequired[str]
+
+
 __all__ = [
+    "AgentDetailResult",
+    "AgentDetailWorkspace",
+    "AgentToolsListResult",
+    "AgentToolView",
+    "AgentVersionDetailItem",
+    "ApiTokenRotateResult",
+    "ApiTokensListResult",
+    "BranchDraftResult",
+    "BuiltinToolView",
+    "DisableAgentResult",
+    "EnrichedAgentListItem",
+    "EnvDocResult",
+    "HealthReport",
+    "HostCapabilitiesResult",
+    "HostCapabilityEntry",
+    "HostEnvCallsResult",
+    "HostEnvProfilesResult",
+    "McpPolicyResult",
+    "McpServerGroupEntry",
+    "McpServerGroupsResult",
+    "McpServerToolEntry",
+    "McpServerToolsResult",
+    "McpServersListResult",
+    "PatchAgentResult",
+    "ProjectMcpServerDeleteResult",
+    "ProjectMcpServersResult",
+    "PublishVersionResult",
+    "RollbackVersionResult",
+    "SetWorkspaceResult",
+    "SettingsSectionPatchResult",
+    "SettingsSectionResult",
+    "SettingsSectionsResult",
+    "SharedToolView",
+    "SubagentDetailItem",
+    "SubagentListResult",
+    "SubagentReplaceResult",
+    "ToolGrantResult",
+    "ToolGrantsResult",
+    "WorkspaceCatalogItem",
+    "WorkspaceCatalogResult",
+    "WorkspacePathResult",
     "RunSnapshotEntry",
     "PromptEmbedSnapshotEntry",
     "WorkspaceFileSnapshotEntry",

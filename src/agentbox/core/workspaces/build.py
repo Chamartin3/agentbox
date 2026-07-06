@@ -36,6 +36,7 @@ from agentbox.core.db import (
     WorkspaceManager,
     WorkspaceSubagentManager,
 )
+from agentbox.core.workspaces._types import WorkspaceSyncMeta
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv
 from agentbox.core.workspaces.construct import workspace_constructor
 from agentbox.core.workspaces.prep import (
@@ -59,14 +60,18 @@ class WorkspaceSyncResult:
     errors: list[str] = field(default_factory=list)
 
 
-def _read_previous_meta(workdir: Path) -> dict:
+def _read_previous_meta(workdir: Path) -> WorkspaceSyncMeta:
     meta_path = workdir / ".agentbox" / "meta.json"
     if not meta_path.exists():
-        return {}
+        empty: WorkspaceSyncMeta = {}
+        return empty
     try:
-        return json.loads(meta_path.read_text(encoding="utf-8"))
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+        result: WorkspaceSyncMeta = data
+        return result
     except Exception:
-        return {}
+        empty = {}
+        return empty
 
 
 def _remove_orphan(workdir: Path, rel_path: str) -> bool:

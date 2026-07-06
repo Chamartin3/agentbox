@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from agentbox.core.db import WorkspaceHostEnvGrantManager
 from agentbox.core.tools.capabilities import (
@@ -16,8 +17,12 @@ logger = logging.getLogger(__name__)
 def resolve_host_env_grants(
     workspace_host_env_grants: "WorkspaceHostEnvGrantManager",
     workspace_id: str | None,
-) -> dict | None:
-    """Return the workspace's non-default host-env grants, or ``None``."""
+) -> dict[str, Any] | None:
+    """Return the workspace's non-default host-env grants, or ``None``.
+
+    The returned dict maps capability names to their grant configurations.
+    Each grant config is a TypedDict-shaped dict with capability-specific settings.
+    """
     if not workspace_id:
         return None
     try:

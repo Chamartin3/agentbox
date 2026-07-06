@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypedDict
 
 from agentbox.core.data.constants import ResourceType
 from agentbox.core.db import (
@@ -22,11 +23,20 @@ DEFAULT_AGENTS_DIR = "agents"
 DEFAULT_SHARED_DIR = "shared"
 
 
+class _ImportSummary(TypedDict):
+    """Summary of bulk import results."""
+
+    created: int
+    updated: int
+    skipped: int
+    failed: int
+
+
 def import_repo_resources(
     resources: ResourceManager,
     resource_versions: ResourceVersionManager,
     root: Path,
-) -> dict:
+) -> _ImportSummary:
     if not root.exists():
         return {"created": 0, "updated": 0, "skipped": 0, "failed": 0}
     created = updated = skipped = failed = 0
@@ -87,6 +97,6 @@ def import_repo_resources(
             slug = f"shared:{scope_dir.name}"
             _safe(slug, lambda d=scope_dir, s=slug: _import_one(resources, resource_versions, slug=s, type_=ResourceType.FOLDER, display_name=d.name, description=f"Imported from {d.relative_to(root)}", importer=HostPathImporter(root=d), tags=("reference", d.name)))
 
-    summary = {"created": created, "updated": updated, "skipped": skipped, "failed": failed}
+    summary: _ImportSummary = {"created": created, "updated": updated, "skipped": skipped, "failed": failed}
     logger.info("boot-import repo_resources: %s", summary)
     return summary
