@@ -51,28 +51,54 @@ def test_build_pi_argv_skips_default_when_extra_args_has_model() -> None:
 
 
 def test_parse_pi_event_text() -> None:
-    events, sid = parse_pi_event({"type": "text", "text": "hello"}, "rid")
+    events, sid = parse_pi_event(
+        {"type": "message_update",
+         "assistantMessageEvent": {"type": "text_delta", "delta": "hello"}},
+        "rid",
+    )
     assert sid is None
     assert isinstance(events[0], TextEvent) and events[0].text == "hello"
 
 
 def test_parse_pi_event_thinking() -> None:
-    events, _sid = parse_pi_event({"type": "thinking", "text": "..."}, "rid")
+    events, _sid = parse_pi_event(
+        {"type": "message_update",
+         "assistantMessageEvent": {"type": "thinking_delta", "delta": "..."}},
+        "rid",
+    )
     assert any(isinstance(e, ThinkingEvent) for e in events)
 
 
 def test_parse_pi_event_usage() -> None:
     events, _sid = parse_pi_event(
-        {
-            "type": "usage",
-            "model": "pi-1",
-            "input_tokens": 5,
-            "output_tokens": 9,
-        },
+        {"type": "turn_end",
+         "message": {"role": "assistant", "model": "pi-1",
+                     "usage": {"input": 5, "output": 9}}},
         "rid",
     )
     usage = [e for e in events if isinstance(e, UsageEvent)]
     assert usage and usage[0].input_tokens == 5 and usage[0].output_tokens == 9
+
+
+def test_parse_pi_event_tool_call_and_result() -> None:
+    from agentbox.core.data.events import ToolCallEvent, ToolResultEvent
+
+    call, _ = parse_pi_event(
+        {"type": "tool_execution_start", "toolCallId": "c1",
+         "toolName": "read", "args": {"path": "note.txt"}},
+        "rid",
+    )
+    assert isinstance(call[0], ToolCallEvent)
+    assert call[0].tool == "read" and call[0].arguments == {"path": "note.txt"}
+
+    res, _ = parse_pi_event(
+        {"type": "tool_execution_end", "toolCallId": "c1", "toolName": "read",
+         "result": {"content": [{"type": "text", "text": "secret WIDGET"}]},
+         "isError": False},
+        "rid",
+    )
+    assert isinstance(res[0], ToolResultEvent)
+    assert res[0].ok and "WIDGET" in res[0].result_excerpt
 
 
 def test_parse_pi_event_session_id() -> None:

@@ -19,6 +19,8 @@ from agentbox.core.data.events import (
     TextEvent,
     ThinkingEvent,
     TimeoutEvent,
+    ToolCallEvent,
+    ToolResultEvent,
 )
 from agentbox.core.engines.backends.opencode.session import (
     parse_event_stream_with_thinking,
@@ -40,6 +42,45 @@ class _SessionCarrier(Protocol):
 
 
 _HEARTBEAT_INTERVAL_SECONDS = 30.0
+_TOOL_RESULT_EXCERPT = 500
+
+
+def _tool_events(run_id: str, part: dict) -> list[RunEvent]:
+    """opencode tool ``part`` -> ToolCallEvent (+ ToolResultEvent if resolved).
+
+    Shape: ``{tool, callID, state:{status, input, output}}``. The call event
+    fires as soon as the part is seen; the result event only once ``state`` has
+    completed/errored (input/output land together in the completed part).
+    """
+    name = part.get("tool")
+    if not isinstance(name, str) or not name:
+        return []
+    call_id = part.get("callID")
+    state = part.get("state") if isinstance(part.get("state"), dict) else {}
+    args = state.get("input")
+    events: list[RunEvent] = [
+        ToolCallEvent(
+            run_id=run_id,
+            tool=name,
+            arguments=args if isinstance(args, dict) else {},
+            call_id=call_id,
+        )
+    ]
+    status = state.get("status")
+    if status in ("completed", "error"):
+        output = state.get("output")
+        events.append(
+            ToolResultEvent(
+                run_id=run_id,
+                tool=name,
+                call_id=call_id,
+                ok=status == "completed",
+                result_excerpt=(
+                    output[:_TOOL_RESULT_EXCERPT] if isinstance(output, str) else None
+                ),
+            )
+        )
+    return events
 
 
 async def _run_opencode_stream(
@@ -254,6 +295,14 @@ async def _run_opencode_stream(
                                 )
                             elif ptype in ("thinking", "reasoning"):
                                 yield ThinkingEvent(run_id=run_id, text=text)
+                elif evt.get("type") in ("tool_use", "tool"):
+                    # opencode tool invocation:
+                    #   part.type=="tool", part.tool==<name>, part.callID,
+                    #   part.state.{status,input,output}
+                    part = evt.get("part")
+                    if isinstance(part, dict) and part.get("type") == "tool":
+                        for ev in _tool_events(run_id, part):
+                            yield ev
             await proc.wait()
     except TimeoutError:
         with contextlib.suppress(ProcessLookupError):

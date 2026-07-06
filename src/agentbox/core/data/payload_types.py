@@ -20,6 +20,7 @@ from agentbox.core.data.rows import (
     RepoResourceRow,
     ResourceBlobRow,
     ResourceVersionRow,
+    RunCommentRow,
     WorkspaceFileBindingRow,
     WorkspaceSubagentRow,
 )
@@ -191,6 +192,38 @@ class AgentDiffResult(TypedDict):
     to_version: int
     prompt_diff: str
     content_diff: JsonDiffResult
+
+
+class PromptVersionSummary(TypedDict):
+    """One entry in ``PromptVersionListResult.versions``."""
+
+    version: int
+    is_draft: bool
+    created_at: str
+    author: str
+    changelog: str
+    size: int
+
+
+class PromptVersionListResult(TypedDict):
+    """Return shape of ``prompts.list_versions()``."""
+
+    agent_id: str
+    active_version: int | None
+    draft_version: int | None
+    versions: list[PromptVersionSummary]
+
+
+class PromptVersionDetail(TypedDict):
+    """Return shape of ``prompts.get_version()``."""
+
+    version: int
+    is_draft: bool
+    created_at: str
+    author: str
+    changelog: str
+    content: str
+    size: int
 
 
 JsonSchemaScalar = str | int | float | bool | None
@@ -465,6 +498,15 @@ class ResourceVersionsResult(TypedDict):
     items: list[ResourceVersionRow]
 
 
+class ResourceListResult(TypedDict):
+    """Return shape of ``ResourceService.list_resources()``."""
+
+    items: list[RepoResourceRow]
+    total: int
+    limit: int
+    offset: int
+
+
 class RenderedResourceResult(TypedDict):
     """Return shape of ``ResourceService.render_resource()``."""
 
@@ -706,6 +748,15 @@ class ValidationView(TypedDict):
     validators: list[HttpValidatorView | ScriptValidatorView]
 
 
+class AgentValidationResult(TypedDict):
+    """Return shape of ``get_agent_validation()`` and ``put_agent_validation()``."""
+
+    agent_id: str
+    agent_version_id: int | None
+    input: ValidationView | None
+    output: ValidationView | None
+
+
 class PromptPreviewResult(TypedDict):
     """Return shape of ``render_agent_prompt_preview()``."""
 
@@ -722,6 +773,42 @@ class PromptPreviewResult(TypedDict):
     char_breakdown: list[CharBreakdownPart]
     total_chars: int
     snapshot: list[SnapshotEntryView]
+
+
+# ── Execution-service result shapes ─────────────────────────────────────────
+
+
+class RunCommentsResult(TypedDict):
+    """Return shape of ``list_comments()``."""
+
+    run_id: str
+    comments: list[RunCommentRow]
+
+
+class RunFacetsResult(TypedDict):
+    """Return shape of ``run_facets()``."""
+
+    agents: list[str]
+    executors: list[str]
+    statuses: list[str]
+
+
+class LogEntry(TypedDict):
+    """One log-event row from ``ExecutionService.get_logs()``."""
+
+    ts: str | None
+    level: str
+    message: str
+
+
+class RunLogsResult(TypedDict):
+    """Return shape of ``ExecutionService.get_logs()``."""
+
+    items: list[LogEntry]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
 
 
 # ── Workspace-service result shapes ─────────────────────────────────────────
@@ -1081,6 +1168,15 @@ __all__ = [
     "SkillCatalogItem",
     "SnapshotEntryView",
     "UsagePayload",
+    "AgentValidationResult",
+    "LogEntry",
+    "PromptVersionDetail",
+    "PromptVersionListResult",
+    "PromptVersionSummary",
+    "ResourceListResult",
+    "RunCommentsResult",
+    "RunFacetsResult",
+    "RunLogsResult",
     "ValidationView",
     "WebhookChannelConfig",
     "WorkspaceBindingItemsResult",

@@ -5,6 +5,7 @@ Mirrors :mod:`agentbox.core.engines.backends.codex`.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from collections.abc import AsyncIterator
@@ -19,6 +20,8 @@ from agentbox.core.data.events import (
     RunEvent,
     TextEvent,
     ThinkingEvent,
+    ToolCallEvent,
+    ToolResultEvent,
     UsageEvent,
 )
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
@@ -27,6 +30,41 @@ from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 
 _NAME = "pi"
+
+
+def _normalize_pi_model_id(model: str | None, provider: str | None) -> str | None:
+    """agentbox stores ``ollama:qwen3:8b``; pi addresses ``ollama/qwen3:8b``."""
+    if model and provider and ":" in model and "/" not in model:
+        return f"{provider}/{model.split(':', 1)[1]}"
+    return model
+
+
+def _build_pi_models_json(runner_config: Any, model: str | None) -> dict | None:
+    """pi custom-provider block (``~/.pi/agent/models.json`` schema).
+
+    ponytail: ollama only — the one keyless local provider the QA suite runs.
+    pi speaks to it OpenAI-compatibly; ``apiKey`` is required but ignored.
+    ``compat`` flags keep reasoning models working on ollama's OpenAI shim.
+    """
+    provider = getattr(runner_config, "provider", None)
+    base_url = getattr(runner_config, "base_url", None)
+    if provider != "ollama" or not base_url or not model:
+        return None
+    model_id = model.split("/", 1)[1] if "/" in model else model
+    return {
+        "providers": {
+            "ollama": {
+                "baseUrl": base_url,
+                "api": "openai-completions",
+                "apiKey": "ollama",
+                "compat": {
+                    "supportsDeveloperRole": False,
+                    "supportsReasoningEffort": False,
+                },
+                "models": [{"id": model_id}],
+            }
+        }
+    }
 
 
 def build_pi_argv(
@@ -45,54 +83,90 @@ def build_pi_argv(
 def parse_pi_event(
     evt: dict[str, Any], run_id: str
 ) -> tuple[list[RunEvent], str | None]:
-    """Parse one ``pi --mode json`` event line.
+    """Parse one ``pi --mode json`` event line (pi v3 schema).
 
-    pi's event schema is documented loosely; accept the common shapes:
-
-      - ``{"type":"session","id":"..."}`` / ``{"type":"session.started",...}``
-      - ``{"type":"text"|"message"|"assistant","text":"..."}``
-      - ``{"type":"delta","text":"..."}``
-      - ``{"type":"thinking"|"reasoning","text":"..."}``
-      - ``{"type":"usage","model":"...","input_tokens":N,"output_tokens":N}``
+    pi v3 streams:
+      - ``{"type":"session","id":"...","cwd":"..."}``
+      - ``{"type":"message_update","assistantMessageEvent":{"type":"text_delta"|
+        "thinking_delta","delta":"..."}}``
+      - ``{"type":"tool_execution_start","toolCallId":"...","toolName":"...",
+        "args":{...}}``
+      - ``{"type":"tool_execution_end","toolCallId":"...","toolName":"...",
+        "result":{"content":[{"type":"text","text":"..."}]},"isError":false}``
+      - ``{"type":"turn_end","message":{"role":"assistant","usage":{...}}}``
     """
     events: list[RunEvent] = []
     session_id: str | None = None
 
     etype = evt.get("type")
 
-    if etype in ("session", "session.started", "thread.started"):
-        sid = evt.get("id") or evt.get("session_id") or evt.get("thread_id")
+    if etype == "session":
+        sid = evt.get("id")
         if isinstance(sid, str) and sid:
             session_id = sid
 
-    text = evt.get("text")
-    if etype in ("text", "delta", "message", "assistant", "assistant_message"):
-        if isinstance(text, str) and text:
-            events.append(TextEvent(run_id=run_id, text=text, delta=True))
-        else:
-            content = evt.get("content")
-            if isinstance(content, str) and content:
-                events.append(TextEvent(run_id=run_id, text=content, delta=True))
+    elif etype == "message_update":
+        ame = evt.get("assistantMessageEvent")
+        if isinstance(ame, dict):
+            delta = ame.get("delta")
+            if isinstance(delta, str) and delta:
+                if ame.get("type") == "text_delta":
+                    events.append(TextEvent(run_id=run_id, text=delta, delta=True))
+                elif ame.get("type") == "thinking_delta":
+                    events.append(ThinkingEvent(run_id=run_id, text=delta))
 
-    if etype in ("thinking", "reasoning") and isinstance(text, str) and text:
-        events.append(ThinkingEvent(run_id=run_id, text=text))
-
-    if etype in ("usage", "turn.completed", "completion"):
-        usage_raw = evt.get("usage")
-        usage: dict[str, Any] = usage_raw if isinstance(usage_raw, dict) else evt
-        model_raw = evt.get("model")
-        model = model_raw if isinstance(model_raw, str) else None
-        events.append(
-            UsageEvent(
-                run_id=run_id,
-                model=model,
-                input_tokens=_int_or_zero(usage.get("input_tokens")),
-                output_tokens=_int_or_zero(usage.get("output_tokens")),
-                cache_read_tokens=_int_or_zero(usage.get("cache_read_tokens")),
+    elif etype == "tool_execution_start":
+        name = evt.get("toolName")
+        if isinstance(name, str) and name:
+            args = evt.get("args")
+            events.append(
+                ToolCallEvent(
+                    run_id=run_id,
+                    tool=name,
+                    arguments=args if isinstance(args, dict) else {},
+                    call_id=evt.get("toolCallId"),
+                )
             )
-        )
+
+    elif etype == "tool_execution_end":
+        name = evt.get("toolName")
+        if isinstance(name, str) and name:
+            events.append(
+                ToolResultEvent(
+                    run_id=run_id,
+                    tool=name,
+                    call_id=evt.get("toolCallId"),
+                    ok=not evt.get("isError", False),
+                    result_excerpt=_pi_result_text(evt.get("result")),
+                )
+            )
+
+    elif etype in ("turn_end", "message_end"):
+        msg = evt.get("message")
+        usage = msg.get("usage") if isinstance(msg, dict) else None
+        if isinstance(usage, dict):
+            events.append(
+                UsageEvent(
+                    run_id=run_id,
+                    model=msg.get("model") if isinstance(msg, dict) else None,
+                    input_tokens=_int_or_zero(usage.get("input")),
+                    output_tokens=_int_or_zero(usage.get("output")),
+                    cache_read_tokens=_int_or_zero(usage.get("cacheRead")),
+                )
+            )
 
     return events, session_id
+
+
+def _pi_result_text(result: object, limit: int = 500) -> str | None:
+    """Pull the first text chunk out of a pi ``tool_execution_end`` result."""
+    if isinstance(result, dict):
+        content = result.get("content")
+        if isinstance(content, list):
+            for c in content:
+                if isinstance(c, dict) and isinstance(c.get("text"), str):
+                    return c["text"][:limit]
+    return None
 
 
 def _int_or_zero(v: object) -> int:
@@ -136,9 +210,25 @@ class PiBackend(BackendAdapter):
         model = getattr(runner_config, "model", None) or SETTINGS.pi_model
         extra_args = list(getattr(runner_config, "extra_args", None) or [])
 
+        provider = getattr(runner_config, "provider", None)
+        model = _normalize_pi_model_id(model, provider)
+
         argv = build_pi_argv(model, extra_args, SETTINGS.pi_model)
 
         env = dict(os.environ)
+
+        # Inject a per-run custom-provider config so pi can reach a local
+        # (non-cloud) provider like ollama. pi reads models.json from its agent
+        # dir; PI_CODING_AGENT_DIR relocates that to the run workdir for
+        # isolation instead of clobbering shared ~/.pi/agent.
+        models_json = _build_pi_models_json(runner_config, model)
+        if models_json:
+            agent_dir = workdir / ".pi-agent"
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            (agent_dir / "models.json").write_text(
+                json.dumps(models_json, indent=2) + "\n"
+            )
+            env["PI_CODING_AGENT_DIR"] = str(agent_dir)
 
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 

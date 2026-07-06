@@ -58,6 +58,31 @@ def test_render_includes_effective_extra_args() -> None:
     assert "test-agent" in rendered.argv
 
 
+def test_tool_events_from_opencode_part() -> None:
+    # Real opencode part shape captured from a qwen3 `read` tool call.
+    from agentbox.core.engines.backends.opencode.stream import _tool_events
+
+    part = {
+        "type": "tool",
+        "tool": "read",
+        "callID": "call_hzf9by9w",
+        "state": {
+            "status": "completed",
+            "input": {"filePath": "note.txt"},
+            "output": "The secret word is WIDGET.",
+        },
+    }
+    evs = _tool_events("run1", part)
+    assert [e.type for e in evs] == ["tool_call", "tool_result"]
+    assert evs[0].tool == "read" and evs[0].arguments == {"filePath": "note.txt"}
+    assert evs[0].call_id == "call_hzf9by9w"
+    assert evs[1].ok and "WIDGET" in evs[1].result_excerpt
+
+    # A still-running part yields only the call, no result yet.
+    running = {"type": "tool", "tool": "read", "callID": "c1", "state": {"status": "running"}}
+    assert [e.type for e in _tool_events("run1", running)] == ["tool_call"]
+
+
 def test_render_injects_ollama_provider(tmp_path: Path) -> None:
     import json
 
