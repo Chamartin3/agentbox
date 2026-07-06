@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from agentbox.core.data.rows import ResourceBlobRow
+from agentbox.core.data.rows import PermissionFileEntry, ResourceBlobRow
 
 import yaml
 
@@ -284,7 +284,7 @@ class EffectivePermissionsOverlay(TypedDict):
     """
 
     allowed_builtin_tools: NotRequired[list[str]]
-    files: NotRequired[list[dict]]
+    files: NotRequired[list[PermissionFileEntry]]
     max_tokens: NotRequired[int]
     allow_file_write: NotRequired[bool]
     allow_network: NotRequired[bool]
@@ -299,13 +299,14 @@ class WorkspaceBlueprint:
     """
 
     workspace_id: str
-    workdir: Path
+    config: WorkenvConfig
     recipes: tuple[Recipe, ...]
-    agents: tuple[ResolvedSubagent, ...]
     bindings: tuple[ResolvedBinding, ...]
+    subagents: tuple[ResolvedSubagent, ...]
     env_doc_body: str | None
+    env_doc_version_id: str | None
     permissions: EffectivePermissionsOverlay | None
-    secrets_keys: tuple[str, ...]
+    secret_keys: tuple[str, ...]
 
 
 @dataclass(frozen=True)

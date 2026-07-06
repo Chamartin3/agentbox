@@ -362,6 +362,7 @@ ignore_imports =
     agentbox.core.resources -> agentbox.core.db.resources.models
     agentbox.core.service.lifecycle.startup -> agentbox.core.db.engines.seeds
     agentbox.core.workspaces.generation.builders.from_db -> agentbox.core.db.system.config
+    agentbox.core.workspaces.compose -> agentbox.core.db.system.config
 
 
 # ─── core.data is the leaf — no upward imports (plan 117) ────────────────────
