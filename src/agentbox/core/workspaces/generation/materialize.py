@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from agentbox.core.data.constants import ResourceType
 from agentbox.core.data.constants import ResourceType
 from agentbox.core.data.workenv import Recipe
 from agentbox.core.data.workenv import MaterializeOutcome as MaterializeOutcome

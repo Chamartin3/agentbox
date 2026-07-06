@@ -133,6 +133,7 @@ class OpenCodeBackend(BackendAdapter):
             getattr(runner_config, "model", None)
             or getattr(agent_runner, "model", None)
             or self.default_model
+            or _DEFAULT_OPENCODE_MODEL
         )
 
         provider = getattr(runner_config, "provider", None)
