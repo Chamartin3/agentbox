@@ -224,8 +224,7 @@ class EvaluationService(Service):
         until: str | None = None,
     ) -> RunnerProfileStats:
         """Aggregate stats for a single runner profile."""
-        d = self._profiles.stats_for_profile(profile_id, since=since, until=until)
-        return RunnerProfileStats(**d)
+        return self._profiles.stats_for_profile(profile_id, since=since, until=until)
 
     def list_runner_profile_stats(
         self,
@@ -233,4 +232,4 @@ class EvaluationService(Service):
         until: str | None = None,
     ) -> list[RunnerProfileStats]:
         """Aggregate stats for all runner profiles."""
-        return [RunnerProfileStats(**d) for d in self._profiles.stats_all_profiles(since=since, until=until)]
+        return list(self._profiles.stats_all_profiles(since=since, until=until))

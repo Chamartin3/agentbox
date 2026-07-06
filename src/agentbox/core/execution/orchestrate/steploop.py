@@ -20,7 +20,7 @@ from typing import Any, Final, cast
 
 from agentbox.core.data.events import UsageEvent
 from agentbox.core.config import Settings
-from agentbox.core.agents import AgentRuntimeView
+from agentbox.core.agents import build_runtime_view
 from agentbox.core.agents.runtime import _DbStoreAdapter
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
@@ -126,7 +126,7 @@ class RunStepLoop:
         composed: Any | None,
     ) -> StepResult:
         store = _DbStoreAdapter(self._db)
-        view = AgentRuntimeView.from_agent(agent, store=store)
+        view = build_runtime_view(agent, store=store)
 
         error_retries_left = view.max_error_retries or 0
         validation_retries_left = view.max_validation_retries or 0

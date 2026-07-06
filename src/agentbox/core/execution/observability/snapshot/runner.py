@@ -29,7 +29,7 @@ def build_runner_snapshot(
         try:
             row = runner_profiles.get_by_id(effective.profile_id)
             if row is not None:
-                profile_name = row.get("name")
+                profile_name = row.name
         except Exception:
             logger.debug(
                 "could not resolve profile name for %s", effective.profile_id

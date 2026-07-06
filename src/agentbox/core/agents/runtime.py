@@ -246,7 +246,7 @@ def compose_prompt(
                 resolution = resolve_prompt(system_text, prompt_bindings)
                 system_text = resolution.rendered_prompt
                 snapshot_entries.extend(
-                    prompt_resolution_to_snapshot(resolution.snapshot)
+                    prompt_resolution_to_snapshot(resolution)
                 )
                 for marker in resolution.unresolved_markers:
                     logger.warning(
@@ -263,7 +263,7 @@ def compose_prompt(
                     )
                     agent_copied = True
                     snapshot_entries.extend(
-                        prompt_resolution_to_snapshot(resolution.snapshot)
+                        prompt_resolution_to_snapshot(resolution)
                     )
                     for marker in resolution.unresolved_markers:
                         logger.warning(

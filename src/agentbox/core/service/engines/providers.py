@@ -20,7 +20,6 @@ from __future__ import annotations
 import logging
 import httpx
 
-from agentbox.core.data import RunnerProfile
 from agentbox.core.data.payload_types import RefreshProvidersResult
 from agentbox.core.db import RunnerProfileManager
 from agentbox.core.engines import (
@@ -122,7 +121,7 @@ async def list_provider_models(
         row = runner_profiles.get_by_id(profile_id)
         if not row:
             raise InvalidProviderRequest(f"Runner profile not found: {profile_id}")
-        profile = RunnerProfile(**row)
+        profile = row
         config = EffectiveRunnerConfig(
             backend=profile.backend,
             provider=profile.provider,

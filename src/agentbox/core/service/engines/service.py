@@ -106,7 +106,7 @@ class EngineService(Service):
         rows = self._db.runner_profiles.list_all(
             backend=backend, provider=provider, enabled=enabled,
         )
-        return [RunnerProfile(**r) for r in rows]
+        return list(rows)
 
     def create_profile(self, data: RunnerProfileCreate) -> RunnerProfile:
         """Create a new runner profile.
@@ -120,7 +120,7 @@ class EngineService(Service):
         if data.id:
             profile_id = data.id
         else:
-            existing_ids = {p["id"] for p in self._db.runner_profiles.list_all()}
+            existing_ids = {p.id for p in self._db.runner_profiles.list_all()}
             profile_id = _derive_profile_id(data.name, existing_ids)
 
         now = now_iso()
@@ -149,14 +149,14 @@ class EngineService(Service):
         else:
             row = self._db.runner_profiles.create_one(**fields)
 
-        return RunnerProfile(**row)
+        return row
 
     def get_profile(self, profile_id: str) -> RunnerProfile:
         """Return a single profile, raising ``ProfileNotFound`` if missing."""
         row = self._db.runner_profiles.get_by_id(profile_id)
         if row is None:
             raise ProfileNotFound(profile_id)
-        return RunnerProfile(**row)
+        return row
 
     def update_profile(
         self, profile_id: str, patch: RunnerProfilePatch
@@ -213,7 +213,7 @@ class EngineService(Service):
 
         if row is None:
             raise ProfileNotFound(profile_id)
-        return RunnerProfile(**row)
+        return row
 
     def delete_profile(self, profile_id: str) -> None:
         """Delete a runner profile. Raises ``ProfileNotFound`` if missing."""
@@ -228,7 +228,7 @@ class EngineService(Service):
     def get_system_default_profile(self) -> RunnerProfile | None:
         """Return the system-default runner profile, or None."""
         row = self._db.runner_profiles.get_system_default()
-        return RunnerProfile(**row) if row else None
+        return row if row else None
 
     # ------------------------------------------------------------------
     # Agent ↔ profile binding
@@ -237,7 +237,7 @@ class EngineService(Service):
     def get_agent_runner_profile(self, agent_id: str) -> RunnerProfile | None:
         """Return the profile bound to *agent_id*, or None."""
         row = self._db.runner_profiles.get_agent_profile(agent_id)
-        return RunnerProfile(**row) if row else None
+        return row if row else None
 
     def set_agent_runner_profile(
         self, agent_id: str, profile_id: str

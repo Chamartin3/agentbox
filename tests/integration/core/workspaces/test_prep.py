@@ -389,7 +389,7 @@ class TestSnapshotHelpers:
             unresolved_markers=[],
             warnings=[],
         )
-        entries = prompt_resolution_to_snapshot(resolution.snapshot)
+        entries = prompt_resolution_to_snapshot(resolution)
         assert len(entries) == 1
         e = entries[0]
         assert e["role"] == "prompt_embed"

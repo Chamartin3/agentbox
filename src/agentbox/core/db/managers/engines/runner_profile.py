@@ -106,7 +106,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
             stmt = stmt.where(runner_profiles.c.is_enabled == int(enabled))
         stmt = stmt.order_by(runner_profiles.c.created_at.asc())
         with self._engine.connect() as conn:
-            return [self._row_to_dict(r) for r in conn.execute(stmt)]
+            return [self._row_to_model(r) for r in conn.execute(stmt)]
 
     def get_by_id(self, profile_id: str) -> RunnerProfile | None:
         """Return a single profile model, or None."""
@@ -158,7 +158,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
     # Compound atomic operations (invariant: only one system_default)
     # ------------------------------------------------------------------
 
-    def create_with_default_clear(self, **fields: Any) -> RunnerProfileRow:
+    def create_with_default_clear(self, **fields: Any) -> RunnerProfile:
         """Create a profile *and* clear ``is_system_default`` on every other
         profile — all within the same transaction so the invariant holds.
 
@@ -178,7 +178,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
 
     def update_with_default_clear(
         self, profile_id: str, **values: Any
-    ) -> RunnerProfileRow | None:
+    ) -> RunnerProfile | None:
         """Partial-update a profile. If ``is_system_default`` is being set to
         ``1``, atomically clear that flag on all other profiles first.
 

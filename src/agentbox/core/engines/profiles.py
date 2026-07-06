@@ -142,7 +142,7 @@ class RunnerProfileResolver:
             row = runner_profiles.get_by_id(runner_profile_id)
             if not row:
                 raise ValueError(f"runner profile {runner_profile_id!r} not found")
-            profile = RunnerProfile(**row)
+            profile = row
             is_enabled = profile.is_enabled
             if not is_enabled:
                 raise ValueError(f"runner profile {runner_profile_id!r} is disabled")
@@ -158,7 +158,7 @@ class RunnerProfileResolver:
         if hasattr(agent, "id"):
             row = runner_profiles.get_agent_profile(agent.id)
             if row:
-                profile = RunnerProfile(**row)
+                profile = row
                 is_enabled = profile.is_enabled
                 if is_enabled:
                     config = self._build_from_profile(
@@ -173,7 +173,7 @@ class RunnerProfileResolver:
         # Rule 4: System default runner profile
         row = runner_profiles.get_system_default()
         if row:
-            profile = RunnerProfile(**row)
+            profile = row
             config = self._build_from_profile(
                 profile,
                 source="system_default",
