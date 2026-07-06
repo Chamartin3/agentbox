@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, NotRequired, TypedDict
 
-from agentbox.core.data.payload_types import GrantConfig
+from agentbox.core.data.payload_types import GrantConfig, McpStdioServerSpec
 
 
 # ── MCP Client responses ──
@@ -81,29 +81,6 @@ class WorkspaceHostEnvGrantsResult(TypedDict):
 # ── Host-env tools ──
 
 
-class WorkspaceInfoResult(TypedDict):
-    """agentbox.workspace_info tool result."""
-
-    workspace_id: str
-    run_id: str
-    workdir: str
-
-
-class ShellExecResult(TypedDict):
-    """shell.exec tool result."""
-
-    returncode: int
-    stdout: str
-    stderr: str
-
-
-class HttpFetchResult(TypedDict):
-    """http.fetch tool result."""
-
-    status: int
-    body: str
-
-
 # ── Workspace resource resolution ──
 
 
@@ -148,31 +125,10 @@ class WorkspacePermissions(TypedDict, total=False):
 # ── MCP server specs for injection ──
 
 
-class McpServerEnv(TypedDict):
-    """Environment variables for an MCP server."""
-
-    AGENTBOX_HOST_ENV_GRANTS_JSON: NotRequired[str]
-    AGENTBOX_HOST_ENV_WORKSPACE_ID: NotRequired[str]
-    AGENTBOX_HOST_ENV_WORKDIR: NotRequired[str]
-    AGENTBOX_AGENT_TOOLS_GRANTS_JSON: NotRequired[str]
-    AGENTBOX_AGENT_TOOLS_AGENT_ID: NotRequired[str]
-    AGENTBOX_AGENT_TOOLS_RUN_ID: NotRequired[str]
-    AGENTBOX_AGENT_TOOLS_WORKDIR: NotRequired[str]
-    AGENTBOX_DB_PATH: str
-
-
-class McpServerSpec(TypedDict):
-    """Stdio MCP server specification."""
-
-    command: str
-    args: list[str]
-    env: McpServerEnv
-
-
 class McpConfigData(TypedDict, total=False):
     """MCP configuration file data."""
 
-    mcpServers: dict[str, McpServerSpec]
+    mcpServers: dict[str, McpStdioServerSpec]
 
 
 # ── Workspace build/sync ──

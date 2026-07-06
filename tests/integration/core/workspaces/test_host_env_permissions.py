@@ -21,8 +21,8 @@ from pathlib import Path as _Path
 from unittest.mock import patch
 
 import pytest
-from agentbox.core.workspaces.generation.inject import inject_host_env_mcp
-from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
+from agentbox.core.tools.mcp_servers.inject import inject_host_env_mcp
+from agentbox.core.tools.mcp_servers.host_env.context import HostEnvContext
 
 from agentbox.core.tools.grants import (  # noqa: E402
     GrantViolation,
@@ -353,7 +353,7 @@ class TestAuditLog:
         fs_read, _, _ = _make_fs_fns(lambda: ctx)
 
         with patch(
-            "agentbox.core.workspaces.mcp.servers.host_env.context.record_host_env_call"
+            "agentbox.core.tools.mcp_servers.host_env.context.record_host_env_call"
         ) as rec:
             fs_read(str(target))
 
@@ -371,7 +371,7 @@ class TestAuditLog:
         fs_read, _, _ = _make_fs_fns(lambda: ctx)
 
         with patch(
-            "agentbox.core.workspaces.mcp.servers.host_env.context.record_host_env_call"
+            "agentbox.core.tools.mcp_servers.host_env.context.record_host_env_call"
         ) as rec:
             with pytest.raises(GrantViolation):
                 fs_read(str(tmp_path / "any.txt"))
@@ -405,7 +405,7 @@ class TestExecutorInjection:
         updated = json.loads(mcp_path.read_text())
         assert "agentbox-host-env" in updated["mcpServers"]
         entry = updated["mcpServers"]["agentbox-host-env"]
-        assert entry["args"] == ["-m", "agentbox.core.workspaces.mcp.servers.host_env"]
+        assert entry["args"] == ["-m", "agentbox.core.tools.mcp_servers.host_env"]
         env = entry["env"]
         assert json.loads(env["AGENTBOX_HOST_ENV_GRANTS_JSON"]) == grants
         assert env["AGENTBOX_HOST_ENV_WORKSPACE_ID"] == "ws1"

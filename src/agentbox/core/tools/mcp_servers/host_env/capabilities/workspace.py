@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
+from agentbox.core.tools.mcp_servers.host_env.context import HostEnvContext
 from agentbox.core.tools.grants import GrantViolation, check_capability
-from agentbox.core.workspaces._types import WorkspaceInfoResult
+from agentbox.core.data.payload_types import WorkspaceInfoResult
 from fastmcp import FastMCP
 
 

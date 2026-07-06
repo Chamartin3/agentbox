@@ -6,9 +6,9 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 
-from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
+from agentbox.core.tools.mcp_servers.host_env.context import HostEnvContext
 from agentbox.core.tools.grants import GrantViolation, check_capability
-from agentbox.core.workspaces._types import HttpFetchResult
+from agentbox.core.data.payload_types import HttpFetchResult
 from fastmcp import FastMCP
 
 

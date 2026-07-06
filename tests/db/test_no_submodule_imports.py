@@ -56,8 +56,8 @@ ALLOWED = {
     # Transitional cli commands:
     REPO_ROOT / "src" / "agentbox" / "cli" / "ops" / "shell.py",
     # Transitional mcp/server contexts (burned by plan 110):
-    REPO_ROOT / "src" / "agentbox" / "core" / "workspaces" / "mcp" / "servers" / "agent_tools" / "context.py",
-    REPO_ROOT / "src" / "agentbox" / "core" / "workspaces" / "mcp" / "servers" / "host_env" / "context.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "tools" / "mcp_servers" / "agent_tools" / "context.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "tools" / "mcp_servers" / "host_env" / "context.py",
     # Transitional core domain users (burned by plans 111/112):
     REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "orchestrate" / "executor.py",
     REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "observability" / "snapshot" / "runner.py",

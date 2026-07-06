@@ -1060,7 +1060,61 @@ type RunSnapshotEntry = EnvDocRenderEntry | WorkspaceFileSnapshotEntry | PromptE
 # ── 114: Area 2 (API routes) ───────────────────────────────────────────────
 
 
+# ── Intrinsic MCP servers: host-env tool results + stdio spawn spec ──────────
+# (consumed by core/tools/mcp_servers — kept here on the data leaf so tools
+# stays workspace-clean.)
+
+
+class WorkspaceInfoResult(TypedDict):
+    """agentbox.workspace_info tool result."""
+
+    workspace_id: str
+    run_id: str
+    workdir: str
+
+
+class ShellExecResult(TypedDict):
+    """shell.exec tool result."""
+
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+class HttpFetchResult(TypedDict):
+    """http.fetch tool result."""
+
+    status: int
+    body: str
+
+
+class McpServerEnv(TypedDict):
+    """Environment variables for a stdio MCP server."""
+
+    AGENTBOX_HOST_ENV_GRANTS_JSON: NotRequired[str]
+    AGENTBOX_HOST_ENV_WORKSPACE_ID: NotRequired[str]
+    AGENTBOX_HOST_ENV_WORKDIR: NotRequired[str]
+    AGENTBOX_AGENT_TOOLS_GRANTS_JSON: NotRequired[str]
+    AGENTBOX_AGENT_TOOLS_AGENT_ID: NotRequired[str]
+    AGENTBOX_AGENT_TOOLS_RUN_ID: NotRequired[str]
+    AGENTBOX_AGENT_TOOLS_WORKDIR: NotRequired[str]
+    AGENTBOX_DB_PATH: str
+
+
+class McpStdioServerSpec(TypedDict):
+    """Stdio MCP server spawn specification (written into ``.mcp.json``)."""
+
+    command: str
+    args: list[str]
+    env: McpServerEnv
+
+
 __all__ = [
+    "HttpFetchResult",
+    "McpServerEnv",
+    "McpStdioServerSpec",
+    "ShellExecResult",
+    "WorkspaceInfoResult",
     "WorkspacePathResult",
     "RunSnapshotEntry",
     "PromptEmbedSnapshotEntry",

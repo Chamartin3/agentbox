@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from agentbox.core.tools.registry import agent_tool
 from agentbox.core.tools.registry import SharedToolRegistry
-from agentbox.core.workspaces.generation.inject import (
+from agentbox.core.tools.mcp_servers.inject import (
     inject_agent_tools_mcp,
 )
 from pydantic import BaseModel
@@ -53,7 +53,7 @@ def test_agent_tools_mcp_injected_when_grants_exist(tmp_path: Path):
     assert env["AGENTBOX_AGENT_TOOLS_AGENT_ID"] == "agent-1"
     assert entry["args"] == [
         "-m",
-        "agentbox.core.workspaces.mcp.servers.agent_tools",
+        "agentbox.core.tools.mcp_servers.agent_tools",
     ]
 
 

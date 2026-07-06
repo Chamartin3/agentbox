@@ -172,11 +172,6 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # engines.backends.token.tools reaches into core.workspaces.mcp for the in-process
-    # host-env MCP toolset (inject.py) and grant checks (grants.py).
-    # These are intentional: the token backend must spawn the same host-env
-    # server as the MCP-aware backends.
-    agentbox.core.engines.backends.token.tools -> agentbox.core.workspaces.generation.inject
 
 
 # ─── Agents ⟂ Workspace (peer rule) ──────────────────────────────────────
@@ -354,10 +349,10 @@ ignore_imports =
     agentbox.core.service.lifecycle.startup -> agentbox.core.db.database
     agentbox.core.service.workspaces.registry -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
-    agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.database
-    agentbox.core.workspaces.mcp.servers.agent_tools.context -> agentbox.core.db.system.config
-    agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.database
-    agentbox.core.workspaces.mcp.servers.host_env.context -> agentbox.core.db.system.config
+    agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.database
+    agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.system.config
+    agentbox.core.tools.mcp_servers.host_env.context -> agentbox.core.db.database
+    agentbox.core.tools.mcp_servers.host_env.context -> agentbox.core.db.system.config
     # ── Pre-existing deep imports (no manager API yet): ──────────────────
     # Run model used as return type; fix: RunManager.get() → RunRecord (plan 112+)
     agentbox.core.service.execution.service -> agentbox.core.db.models.runs.run
