@@ -23,7 +23,9 @@ from agentbox.api.runs.schemas import (
 from agentbox.api.runs.webhooks import schedule_webhook
 from agentbox.core.data.payload_types import (
     CancelRunResult,
+    RunCommentsResult,
     RunCreatedResult,
+    RunFacetsResult,
     RunLifecycleResult,
 )
 from agentbox.core.data.rows import RunCommentRow, RunStatsRow
@@ -221,7 +223,7 @@ async def rerun(run_id: str) -> RunCreatedResult:
 
 
 @router.get("/{run_id}/comments")
-def list_comments(run_id: str) -> dict:
+def list_comments(run_id: str) -> RunCommentsResult:
     try:
         return _svc_list_comments(run_id)
     except RunNotFound as exc:
@@ -248,7 +250,7 @@ async def cancel_run(run_id: str) -> CancelRunResult:
 
 
 @router.get("/_facets")
-def run_facets() -> dict:
+def run_facets() -> RunFacetsResult:
     """Distinct values for filter dropdowns (agents, executors, statuses)."""
     return _svc_run_facets()
 

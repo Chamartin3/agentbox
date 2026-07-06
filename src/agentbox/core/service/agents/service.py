@@ -33,13 +33,16 @@ from agentbox.core.data.constants import SessionMode
 from agentbox.core.data import (
     AgentConfigEventRow,
     AgentDef,
+    AgentDiffResult,
     AgentMetaRow,
     AgentSyncRow,
     AgentToolGrantRow,
+    AgentValidationResult,
     AgentVersionCommentRow,
     AgentVersionFileRow,
     AgentVersionRatingRow,
     AgentVersionRow,
+    JsonDiffResult,
     PromptBindingSpec,
     PromptPreviewResult,
     PromptVersionRow,
@@ -138,13 +141,13 @@ def _text_diff(a: str, b: str) -> str:
     )
 
 
-def _json_diff(a: str, b: str) -> dict:
+def _json_diff(a: str, b: str) -> JsonDiffResult:
     try:
         obj_a = json.loads(a) if a else {}
         obj_b = json.loads(b) if b else {}
     except json.JSONDecodeError:
-        return {"from": a, "to": b, "note": "invalid JSON"}
-    return {
+        return cast(JsonDiffResult, {"from": a, "to": b, "note": "invalid JSON"})
+    return cast(JsonDiffResult, {
         "added": {k: obj_b[k] for k in obj_b if k not in obj_a},
         "removed": {k: obj_a[k] for k in obj_a if k not in obj_b},
         "changed": {
@@ -152,7 +155,7 @@ def _json_diff(a: str, b: str) -> dict:
             for k in obj_a
             if k in obj_b and obj_a[k] != obj_b[k]
         },
-    }
+    })
 
 
 class AgentService(Service):
@@ -204,7 +207,7 @@ class AgentService(Service):
     def list_versions(self, agent_id: str) -> list[AgentVersionRow]:
         return self._versions.list_for_agent(agent_id)
 
-    def diff_versions(self, agent_id: str, a: int, b: int) -> dict:
+    def diff_versions(self, agent_id: str, a: int, b: int) -> AgentDiffResult:
         """Diff two versions' prompt + config snapshots. Raises if either missing."""
         va = self.get_version(agent_id, a)
         vb = self.get_version(agent_id, b)
@@ -1259,7 +1262,7 @@ class AgentService(Service):
         """Validate + canonicalize inline validator entries for a direction."""
         return _normalize_validator_entries_free(direction, entries)
 
-    def get_agent_validation(self, agent_id: str) -> dict:
+    def get_agent_validation(self, agent_id: str) -> AgentValidationResult:
         """Read the active version's inline validators for both directions."""
         active = self.active_version(agent_id)
         if not active or active.get("id") is None:
@@ -1286,7 +1289,7 @@ class AgentService(Service):
         reason: str,
         actor: str | None,
         settings: Any = None,
-    ) -> dict:
+    ) -> AgentValidationResult:
         """Write inline validators by minting + activating a new version."""
         if settings is None:
             settings = load_settings()

@@ -19,6 +19,7 @@ from typing import Any, cast
 from agentbox.core.config import load_settings
 from agentbox.core.data.constants import RunStatus
 from agentbox.core.data import now_iso, read_transcript, RunnerSnapshot, UsagePayload
+from agentbox.core.data.payload_types import LogEntry, RunLogsResult
 from agentbox.core.data.rows import (
     RunCommentRow,
     SessionRow,
@@ -257,7 +258,7 @@ class ExecutionService(Service):
 
     def get_logs(
         self, run_id: str, level: str | None, limit: int, offset: int
-    ) -> dict:
+    ) -> RunLogsResult:
         """Log events from the transcript for a run.
 
         Filters to ``type == "log"`` events, optionally further filtered by
@@ -279,12 +280,12 @@ class ExecutionService(Service):
             logs = [e for e in logs if e.get("level") == level]
         total = len(logs)
         page = logs[offset : offset + limit]
-        items = [
-            {
+        items: list[LogEntry] = [
+            cast(LogEntry, {
                 "ts": e.get("ts"),
                 "level": e.get("level", "info"),
                 "message": e.get("message", ""),
-            }
+            })
             for e in page
         ]
         return {

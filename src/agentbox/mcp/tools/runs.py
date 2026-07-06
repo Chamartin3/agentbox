@@ -8,7 +8,7 @@ from typing import Any
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-from agentbox.core.data import NotFoundResult, RunErrorResult, RunOutputResult, UsagePayload
+from agentbox.core.data import NotFoundResult, RunErrorResult, RunLogsResult, RunOutputResult, UsagePayload
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -162,7 +162,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         level: str | None = None,
         limit: int = 200,
         offset: int = 0,
-    ) -> dict:
+    ) -> RunLogsResult:
         """Log events emitted during a run.
 
         Filters the transcript to ``type == "log"`` events (the

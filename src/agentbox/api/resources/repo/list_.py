@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 
 from agentbox.api.deps import get_resource_service
 from agentbox.core.data.constants import ResourceType
+from agentbox.core.data.payload_types import ResourceListResult
 from agentbox.core.service.resources.service import ResourceService
 
 list_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])
@@ -21,7 +22,7 @@ def list_resources(
     include_deleted: bool = False,
     limit: int = 50,
     offset: int = 0,
-) -> dict:
+) -> ResourceListResult:
     return svc.list_resources(
         type=type,
         query=q,

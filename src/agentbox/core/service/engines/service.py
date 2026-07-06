@@ -323,7 +323,7 @@ class EngineService(Service):
             refresh=refresh,
         )
 
-    def backends(self) -> dict:
+    def backends(self) -> dict[str, type[BackendAdapter]]:
         """Return all registered backends (engine registry)."""
         return list_engines()
 

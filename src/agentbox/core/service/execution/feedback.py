@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from agentbox.core.data.payload_types import RunCommentsResult
 from agentbox.core.data.rows import RunCommentRow
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.service.execution.types import RunNotFound
@@ -11,7 +12,7 @@ def _svc() -> ExecutionService:
     return ExecutionService()
 
 
-def list_comments(run_id: str, *, store: object | None = None) -> dict:
+def list_comments(run_id: str, *, store: object | None = None) -> RunCommentsResult:
     svc = _svc()
     if svc.get_run(run_id) is None:
         raise RunNotFound(run_id)

@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json as _json
 import logging
-from typing import Any
+from typing import Any, cast
 
 from agentbox.core.agents.composition.drift import (
     _build_snapshot,
@@ -20,6 +20,12 @@ from agentbox.core.db import (
     ActiveAgentVersionManager,
     AgentDefManager,
     AgentVersionManager,
+)
+from agentbox.core.data.payload_types import (
+    AgentValidationResult,
+    HttpValidatorView,
+    ScriptValidatorView,
+    ValidationView,
 )
 from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.agents.prompt_patch import (
@@ -104,14 +110,14 @@ def normalize_validator_entries(direction: str, entries: list[dict]) -> list[dic
     return out
 
 
-def _validators_view(cfg: dict, direction: str) -> dict | None:
+def _validators_view(cfg: dict, direction: str) -> ValidationView | None:
     section = cfg.get(direction)
     if not isinstance(section, dict):
         return None
     entries = section.get("validators")
     if not isinstance(entries, list) or not entries:
         return None
-    cleaned: list[dict] = []
+    cleaned: list[HttpValidatorView | ScriptValidatorView] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -119,7 +125,7 @@ def _validators_view(cfg: dict, direction: str) -> dict | None:
             ValidatorKind.coerce(entry.get("kind", ""), label="validator kind")
         except ValueError:
             continue
-        cleaned.append(dict(entry))
+        cleaned.append(cast(HttpValidatorView | ScriptValidatorView, dict(entry)))
     if not cleaned:
         return None
     return {"validators": cleaned}
@@ -128,7 +134,7 @@ def _validators_view(cfg: dict, direction: str) -> dict | None:
 def get_agent_validation(
     agent_versions: AgentVersionManager,
     agent_id: str,
-) -> dict:
+) -> AgentValidationResult:
     active = agent_versions.get_active(agent_id)
     if not active or active.get("id") is None:
         return {
@@ -157,7 +163,7 @@ def put_agent_validation(
     output_validators: list[dict] | None,
     reason: str,
     actor: str | None,
-) -> dict:
+) -> AgentValidationResult:
     current = resolve_agent(agent_id, agent_defs=agent_defs)
     if current is None:
         raise AgentServiceError(404, "unknown_agent", agent_id)

@@ -13,7 +13,7 @@ from typing import cast
 
 from agentbox.core.data.constants import ResourceType
 from agentbox.core.data import RepoResourceRow
-from agentbox.core.data.payload_types import ResourceDetailResult, ResourceVersionsResult
+from agentbox.core.data.payload_types import ResourceDetailResult, ResourceListResult, ResourceVersionsResult
 from agentbox.core.data.rows import ResourceVersionRow
 from agentbox.core.service.resources.service import (
     InvalidResource,
@@ -53,7 +53,7 @@ def list_resources(
     include_deleted: bool = False,
     limit: int = 50,
     offset: int = 0,
-) -> dict:
+) -> ResourceListResult:
     return _svc().list_resources(
         type=type, query=query, include_deleted=include_deleted,
         limit=limit, offset=offset,

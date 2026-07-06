@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from agentbox.api.deps import get_db, get_settings
+from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult
 from agentbox.core.service.agents import prompts as prompts_service
 from agentbox.core.service.agents.prompts import AgentNotFound, PromptError
 
@@ -74,7 +75,7 @@ def put_prompt(agent_id: str, body: PromptBody) -> dict:
 
 
 @router.get("/agents/{agent_id}/prompt/versions")
-def list_versions(agent_id: str) -> dict:
+def list_versions(agent_id: str) -> PromptVersionListResult:
     try:
         db = get_db()
         return prompts_service.list_versions(
@@ -87,7 +88,7 @@ def list_versions(agent_id: str) -> dict:
 
 
 @router.get("/agents/{agent_id}/prompt/versions/{version}")
-def get_version(agent_id: str, version: int) -> dict:
+def get_version(agent_id: str, version: int) -> PromptVersionDetail | None:
     try:
         db = get_db()
         payload = prompts_service.get_version(

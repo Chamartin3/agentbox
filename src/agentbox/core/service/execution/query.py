@@ -5,6 +5,7 @@ from __future__ import annotations
 import json as _json
 from collections.abc import Mapping
 
+from agentbox.core.data.payload_types import RunFacetsResult
 from agentbox.core.db import AgentVersionManager
 from agentbox.core.service.evaluation.service import EvaluationService
 from agentbox.core.service.execution.service import ExecutionService
@@ -99,7 +100,7 @@ def run_stats(
     )
 
 
-def run_facets() -> dict:
+def run_facets() -> RunFacetsResult:
     return {
         "agents": EvaluationService().distinct_agent_ids(),
         "executors": EvaluationService().distinct_executors(),

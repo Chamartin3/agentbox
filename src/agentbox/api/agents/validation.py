@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
+from agentbox.core.data.payload_types import AgentValidationResult
 from agentbox.core.service.agents import AgentServiceError
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,7 @@ class AgentValidationPut(BaseModel):
 def get_agent_validation(
     agent_id: str,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> AgentValidationResult:
     """Return the active version's inline validators per direction."""
     return ctx.agents.get_agent_validation(agent_id)
 
@@ -78,7 +79,7 @@ def put_agent_validation(
     agent_id: str,
     body: AgentValidationPut,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> AgentValidationResult:
     """Write inline validators by minting a new active version.
 
     Omitting a direction in the body leaves it unchanged on the new

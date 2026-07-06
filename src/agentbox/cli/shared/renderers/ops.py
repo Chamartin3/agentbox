@@ -11,7 +11,6 @@ from rich.table import Table as RichTable
 from rich.text import Text
 from rich.tree import Tree
 
-from agentbox.cli.shared.constants import JsonValue
 from agentbox.core.data.payload_types import EnrichedPromptBindingRow
 from agentbox.core.data.rows import ResourceVersionRow
 from agentbox.cli.shared.render import Renderer
@@ -148,7 +147,7 @@ class OpsRenderer(Renderer):
     # resources: repo
     # ------------------------------------------------------------------
 
-    def resource_table(self, rows: Sequence[Mapping[str, JsonValue]]) -> None:
+    def resource_table(self, rows: Sequence[RepoResourceRow]) -> None:
         """Render the resources list table."""
         table = RichTable(
             title="Resources", title_style="bold", header_style="bold cyan", padding=(0, 1)

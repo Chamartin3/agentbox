@@ -35,6 +35,7 @@ from agentbox.core.data.payload_types import (
     PromptResourcesResult,
     RenderedResourceResult,
     ResourceDetailResult,
+    ResourceListResult,
     ResourcePreviewMode,
     ResourcePreviewModesResult,
     ResourceTreeResult,
@@ -190,7 +191,7 @@ class ResourceService(Service):
         include_deleted: bool = False,
         limit: int = 50,
         offset: int = 0,
-    ) -> dict:
+    ) -> ResourceListResult:
         """Paginated list of repo resources."""
         type_str = type.value if isinstance(type, ResourceType) else type
         items = self._resources.list_resources(

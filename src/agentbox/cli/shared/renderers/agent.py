@@ -15,6 +15,7 @@ from rich.table import Table
 
 from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
+from agentbox.core.data.payload_types import AgentDiffResult, AgentValidationResult
 from agentbox.core.service import AgentDef, McpServerSpec, ToolSpec
 
 
@@ -208,7 +209,7 @@ class AgentRenderer(Renderer):
                 )
             self.print(Panel(ct, title="Comments"))
 
-    def version_diff(self, diff: dict[str, object]) -> None:
+    def version_diff(self, diff: AgentDiffResult) -> None:
         """Render version diff as JSON."""
         self.syntax(_json.dumps(diff, indent=2, default=str), "json")
 
@@ -321,7 +322,7 @@ class AgentRenderer(Renderer):
     # Validation
     # ------------------------------------------------------------------
 
-    def validation_report(self, result: dict[str, object]) -> None:
+    def validation_report(self, result: AgentValidationResult) -> None:
         """Render inline validator config for both directions."""
         for direction in ("input", "output"):
             raw = result.get(direction)

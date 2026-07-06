@@ -21,6 +21,7 @@ from agentbox.core.agents.composition import prompts as _prompts
 from agentbox.core.agents.composition.prompts import PromptDoc, PromptError
 from agentbox.core.data import AgentDef
 from agentbox.core.data._util import now_iso
+from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult, PromptVersionSummary
 from agentbox.core.db import AgentDefManager, AgentVersionManager, PromptVersionManager
 
 __all__ = [
@@ -80,28 +81,29 @@ def list_versions(
     *,
     agent_defs: AgentDefManager,
     prompt_versions: PromptVersionManager,
-) -> dict:
+) -> PromptVersionListResult:
     """Return the version-list payload for the prompt-versions endpoint."""
     _resolve_or_raise(agent_id, agent_defs=agent_defs)
     versions = prompt_versions.list_for_agent(agent_id)
     committed = [v for v in versions if not v["is_draft"]]
     drafts = [v for v in versions if v["is_draft"]]
-    return {
-        "agent_id": agent_id,
-        "active_version": committed[0]["version"] if committed else None,
-        "draft_version": drafts[0]["version"] if drafts else None,
-        "versions": [
-            {
-                "version": v["version"],
-                "is_draft": bool(v["is_draft"]),
-                "created_at": v["created_at"],
-                "author": v["author"],
-                "changelog": v["changelog"],
-                "size": len(v["content"].encode("utf-8")),
-            }
-            for v in versions
-        ],
-    }
+    version_summaries: list[PromptVersionSummary] = [
+        PromptVersionSummary(
+            version=v["version"],
+            is_draft=bool(v["is_draft"]),
+            created_at=v["created_at"],
+            author=v["author"],
+            changelog=v["changelog"],
+            size=len(v["content"].encode("utf-8")),
+        )
+        for v in versions
+    ]
+    return PromptVersionListResult(
+        agent_id=agent_id,
+        active_version=committed[0]["version"] if committed else None,
+        draft_version=drafts[0]["version"] if drafts else None,
+        versions=version_summaries,
+    )
 
 
 def get_version(
@@ -110,21 +112,21 @@ def get_version(
     *,
     agent_defs: AgentDefManager,
     prompt_versions: PromptVersionManager,
-) -> dict | None:
+) -> PromptVersionDetail | None:
     """Return a single prompt version payload, or ``None`` if missing."""
     _resolve_or_raise(agent_id, agent_defs=agent_defs)
     v = prompt_versions.get_by_number(agent_id, version)
     if v is None:
         return None
-    return {
-        "version": v["version"],
-        "is_draft": bool(v["is_draft"]),
-        "created_at": v["created_at"],
-        "author": v["author"],
-        "changelog": v["changelog"],
-        "content": v["content"],
-        "size": len(v["content"].encode("utf-8")),
-    }
+    return PromptVersionDetail(
+        version=v["version"],
+        is_draft=bool(v["is_draft"]),
+        created_at=v["created_at"],
+        author=v["author"],
+        changelog=v["changelog"],
+        content=v["content"],
+        size=len(v["content"].encode("utf-8")),
+    )
 
 
 # ---------------------------------------------------------------------------

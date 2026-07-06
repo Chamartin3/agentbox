@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from agentbox.api.deps import get_agent_service
+from agentbox.core.data.payload_types import AgentDiffResult
 from agentbox.core.service import (
     AgentVersionCommentRow,
     AgentVersionRatingRow,
@@ -94,7 +95,7 @@ def get_agent_version(agent_id: str, version: int) -> dict:
 
 
 @router.get("/{a}/diff/{b}")
-def diff_agent_versions(agent_id: str, a: int, b: int) -> dict:
+def diff_agent_versions(agent_id: str, a: int, b: int) -> AgentDiffResult:
     _require_agent(agent_id)
     try:
         return get_agent_service().diff_versions(agent_id, a, b)

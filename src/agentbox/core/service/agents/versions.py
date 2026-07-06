@@ -11,7 +11,7 @@ from typing import Any, cast
 
 from agentbox.core.agents.config import build_config_json_payload
 from agentbox.core.data.constants import SessionMode
-from agentbox.core.data import AgentDef, AgentVersionRow
+from agentbox.core.data import AgentDef, AgentVersionRow, VersionFileUploadRow
 from agentbox.core.data._util import now_iso
 from agentbox.core.db import (
     AgentDefManager,
@@ -192,7 +192,7 @@ def upload_version_file(
     kind: str,
     name: str,
     content: str,
-) -> dict:
+) -> VersionFileUploadRow:
     version_record = agent_versions.get_by_number(agent_id, version)
     if version_record is None:
         raise VersionNotFound(f"version {version} not found")

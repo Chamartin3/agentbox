@@ -56,7 +56,8 @@ def _tool_events(run_id: str, part: dict) -> list[RunEvent]:
     if not isinstance(name, str) or not name:
         return []
     call_id = part.get("callID")
-    state = part.get("state") if isinstance(part.get("state"), dict) else {}
+    raw_state = part.get("state")
+    state = raw_state if isinstance(raw_state, dict) else {}
     args = state.get("input")
     events: list[RunEvent] = [
         ToolCallEvent(
