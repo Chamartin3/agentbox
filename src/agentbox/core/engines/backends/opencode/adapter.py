@@ -13,6 +13,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
+from agentbox.core.config import SETTINGS
+
 from agentbox.core.engines.backends.opencode.stream import _run_opencode_stream
 
 from agentbox.core.data.events import (
@@ -37,7 +39,6 @@ __all__ = [
 ]
 
 _NAME = "opencode"
-_DEFAULT_OPENCODE_MODEL = "opencode/deepseek-v4-flash-free"
 
 
 def _normalize_model_id(model: str, provider: str | None) -> str:
@@ -94,7 +95,6 @@ def _merge_opencode_json(path: Path, provider_block: dict) -> None:
 class OpenCodeBackend(BackendAdapter):
     name = _NAME
     conversation_format: ClassVar[str | None] = "opencode-session"
-    default_model = _DEFAULT_OPENCODE_MODEL
 
     def __init__(self) -> None:
         self._session_id: str | None = None
@@ -132,8 +132,7 @@ class OpenCodeBackend(BackendAdapter):
         model = (
             getattr(runner_config, "model", None)
             or getattr(agent_runner, "model", None)
-            or self.default_model
-            or _DEFAULT_OPENCODE_MODEL
+            or SETTINGS.opencode_model
         )
 
         provider = getattr(runner_config, "provider", None)

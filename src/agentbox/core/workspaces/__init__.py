@@ -32,7 +32,6 @@ __all__ = [
     "materialize_workspace",
     "prepare_run_workdir",
     "render_env_doc",
-    "resolve_agent_prompt_bindings",
     "resolve_path",
     "resolve_workspace_resources",
     "resolve_workspace_subagents",

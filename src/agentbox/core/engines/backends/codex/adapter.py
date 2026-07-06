@@ -12,6 +12,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
+from agentbox.core.config import SETTINGS
+
 from agentbox.core.data.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.data.workenv import Item
@@ -25,7 +27,6 @@ from agentbox.core.tools.translation import (
 )
 
 _NAME = "codex"
-_DEFAULT_CODEX_MODEL: str | None = None  # let codex pick its own default
 
 
 def build_codex_argv(
@@ -110,7 +111,6 @@ def _int_or_zero(v: object) -> int:
 class CodexBackend(BackendAdapter):
     name = _NAME
     conversation_format: ClassVar[str | None] = "codex-session"
-    default_model = _DEFAULT_CODEX_MODEL
 
     def __init__(self) -> None:
         self._session_id: str | None = None
@@ -140,10 +140,10 @@ class CodexBackend(BackendAdapter):
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
-        model = getattr(runner_config, "model", None) or self.default_model
+        model = getattr(runner_config, "model", None) or SETTINGS.codex_model
         extra_args = list(getattr(runner_config, "extra_args", None) or [])
 
-        argv = build_codex_argv(model, extra_args, self.default_model)
+        argv = build_codex_argv(model, extra_args, SETTINGS.codex_model)
 
         if runtime_config is not None:
             effective_tools = intersect_allowed_tools(

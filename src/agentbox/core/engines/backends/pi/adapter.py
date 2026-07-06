@@ -11,6 +11,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
+from agentbox.core.config import SETTINGS
+
 from agentbox.core.data.events import (
     DoneEvent,
     LogEvent,
@@ -25,7 +27,6 @@ from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 
 _NAME = "pi"
-_DEFAULT_PI_MODEL: str | None = None
 
 
 def build_pi_argv(
@@ -106,7 +107,6 @@ def _int_or_zero(v: object) -> int:
 class PiBackend(BackendAdapter):
     name = _NAME
     conversation_format: ClassVar[str | None] = "pi-session"
-    default_model = _DEFAULT_PI_MODEL
 
     def __init__(self) -> None:
         self._session_id: str | None = None
@@ -133,10 +133,10 @@ class PiBackend(BackendAdapter):
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
-        model = getattr(runner_config, "model", None) or self.default_model
+        model = getattr(runner_config, "model", None) or SETTINGS.pi_model
         extra_args = list(getattr(runner_config, "extra_args", None) or [])
 
-        argv = build_pi_argv(model, extra_args, self.default_model)
+        argv = build_pi_argv(model, extra_args, SETTINGS.pi_model)
 
         env = dict(os.environ)
 

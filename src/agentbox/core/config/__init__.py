@@ -131,6 +131,21 @@ class Settings:
     def skip_resource_import(self) -> bool:
         return bool(os.environ.get("AGENTBOX_SKIP_RESOURCE_IMPORT"))
 
+    # Backend default models — the fallback model a backend uses when the
+    # runner config omits one. Overridable per backend via AGENTBOX_*_MODEL.
+    # ``None`` means "let the backend's own CLI/SDK pick its default".
+    @property
+    def opencode_model(self) -> str:
+        return os.environ.get("AGENTBOX_OPENCODE_MODEL", "opencode/deepseek-v4-flash-free")
+
+    @property
+    def codex_model(self) -> str | None:
+        return os.environ.get("AGENTBOX_CODEX_MODEL") or None
+
+    @property
+    def pi_model(self) -> str | None:
+        return os.environ.get("AGENTBOX_PI_MODEL") or None
+
     # Misc
     @property
     def extra_skill_roots(self) -> str:
