@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agentbox.core.mcp.client.types import Tool
+from agentbox.core.workspaces.mcp.client.types import Tool
 
 _READ_PREFIXES = ("get_", "list_", "search_", "check_", "select_", "find_")
 

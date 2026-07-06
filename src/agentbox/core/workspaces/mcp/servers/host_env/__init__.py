@@ -1,7 +1,7 @@
 """Host-environment FastMCP server.
 
 Run as a stdio subprocess via the executor:
-    python -m agentbox.core.mcp.servers.host_env
+    python -m agentbox.core.workspaces.mcp.servers.host_env
 
 Env vars injected by the executor:
     AGENTBOX_HOST_ENV_GRANTS_JSON  — JSON dict of effective grants

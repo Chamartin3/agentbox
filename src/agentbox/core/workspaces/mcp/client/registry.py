@@ -5,13 +5,13 @@ import time
 from pathlib import Path
 from typing import Any, TypedDict
 
-from agentbox.core.mcp.client.client import McpClient
-from agentbox.core.mcp.client.health import (
+from agentbox.core.workspaces.mcp.client.client import McpClient
+from agentbox.core.workspaces.mcp.client.health import (
     McpHealthReport,
     ServerHealth,
     ServerStatus,
 )
-from agentbox.core.mcp.client.tool_manifest import McpToolManifest, Tool
+from agentbox.core.workspaces.mcp.client.tool_manifest import McpToolManifest, Tool
 
 
 class CachedTool(TypedDict):

@@ -1,6 +1,6 @@
 """FastMCP server exposing agentbox runs, prompts, and agent metadata.
 
-This is the MCP **server** surface — distinct from ``agentbox.core.mcp.client``
+This is the MCP **server** surface — distinct from ``agentbox.core.workspaces.mcp.client``
 which is the MCP **client** registry that runners use to discover tools.
 
 Entry point:

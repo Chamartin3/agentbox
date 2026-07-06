@@ -162,7 +162,7 @@ from agentbox.core.service.workspaces import (
 )
 from agentbox.core.workspaces.workdir import reset as reset
 from agentbox.core.workspaces.workdir import resolve_path as resolve_path
-from agentbox.core.mcp.client import McpRegistry as McpRegistry
+from agentbox.core.workspaces.mcp.client import McpRegistry as McpRegistry
 from agentbox.core.workspaces.build import build_workspace as build_workspace
 from agentbox.core.workspaces.build import build_workspace_by_name as build_workspace_by_name
 

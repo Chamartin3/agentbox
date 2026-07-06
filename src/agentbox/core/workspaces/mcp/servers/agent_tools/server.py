@@ -8,7 +8,7 @@ from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME
 from agentbox.core.tools import SharedToolRegistry
 from agentbox.core.data import StubResult
 from agentbox.core.tools.registry import ToolSpec
-from agentbox.core.mcp.servers.agent_tools.context import AgentToolsContext
+from agentbox.core.workspaces.mcp.servers.agent_tools.context import AgentToolsContext
 from fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from agentbox.core.mcp.client.grouping import derive_groups
-from agentbox.core.mcp.client.types import Tool
+from agentbox.core.workspaces.mcp.client.grouping import derive_groups
+from agentbox.core.workspaces.mcp.client.types import Tool
 
 
 class McpToolManifest:

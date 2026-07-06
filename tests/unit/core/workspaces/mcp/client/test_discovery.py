@@ -1,4 +1,4 @@
-"""Unit tests for agentbox.core.mcp.client.discovery.discover_tools."""
+"""Unit tests for agentbox.core.workspaces.mcp.client.discovery.discover_tools."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import httpx
 
-from agentbox.core.mcp.client.discovery import (
+from agentbox.core.workspaces.mcp.client.discovery import (
     _extract_tool_names,
     discover_tools,
 )
@@ -57,7 +57,7 @@ def test_stdio_failure_returns_empty_list_for_server() -> None:
 
     # Patch asyncio.create_subprocess_exec to raise immediately
     with patch(
-        "agentbox.core.mcp.client.discovery.asyncio.create_subprocess_exec",
+        "agentbox.core.workspaces.mcp.client.discovery.asyncio.create_subprocess_exec",
         side_effect=FileNotFoundError("no such file"),
     ):
         result = _run(discover_tools([server], timeout=2.0))
@@ -70,7 +70,7 @@ def test_http_failure_returns_empty_list_for_server() -> None:
     server = {"name": "broken-http", "url": "http://localhost:19999"}
 
     with patch(
-        "agentbox.core.mcp.client.discovery.httpx.AsyncClient",
+        "agentbox.core.workspaces.mcp.client.discovery.httpx.AsyncClient",
         side_effect=httpx.ConnectError("refused"),
     ):
         result = _run(discover_tools([server], timeout=2.0))
@@ -87,11 +87,11 @@ def test_mixed_servers_partial_failure() -> None:
 
     with (
         patch(
-            "agentbox.core.mcp.client.discovery.httpx.AsyncClient",
+            "agentbox.core.workspaces.mcp.client.discovery.httpx.AsyncClient",
             side_effect=httpx.ConnectError("refused"),
         ),
         patch(
-            "agentbox.core.mcp.client.discovery.asyncio.create_subprocess_exec",
+            "agentbox.core.workspaces.mcp.client.discovery.asyncio.create_subprocess_exec",
             side_effect=FileNotFoundError("no such file"),
         ),
     ):

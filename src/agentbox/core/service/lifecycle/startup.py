@@ -21,7 +21,7 @@ from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.tools import discover_tools
-from agentbox.core.mcp.client import McpRegistry
+from agentbox.core.workspaces.mcp.client import McpRegistry
 from agentbox.core.service.lifecycle._phases import (
     _phase_import_repo,
 )

@@ -12,7 +12,7 @@ from agentbox.core.workspaces.workdir import (
     WorkspaceInfo as WorkspaceInfo,
     resolve_path as resolve_path,
 )
-from agentbox.core.mcp.client.registry import (
+from agentbox.core.workspaces.mcp.client.registry import (
     McpRegistry as McpRegistry,
 )
 from agentbox.core.workspaces.prep import (

@@ -17,7 +17,7 @@ from agentbox.core.service import (
     WorkspaceService,
 )
 from agentbox.core.execution.orchestrate.executor import RunExecutor
-from agentbox.core.mcp.client import McpRegistry
+from agentbox.core.workspaces.mcp.client import McpRegistry
 
 
 @lru_cache(maxsize=1)

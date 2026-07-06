@@ -4,7 +4,7 @@ Spawned by the executor as a subprocess when a run's workspace has
 host-env grants. Communicates over stdio (MCP protocol).
 
 Usage (executor):
-    python -m agentbox.core.mcp.servers.host_env
+    python -m agentbox.core.workspaces.mcp.servers.host_env
 
 Required env vars:
     AGENTBOX_HOST_ENV_GRANTS_JSON  — JSON dict of effective grants
@@ -17,7 +17,7 @@ Required env vars:
 from __future__ import annotations
 
 from agentbox.core.data.constants import HOST_ENV_SERVER_NAME
-from agentbox.core.mcp.servers.host_env.capabilities import (
+from agentbox.core.workspaces.mcp.servers.host_env.capabilities import (
     env,
     fs,
     git,
@@ -25,7 +25,7 @@ from agentbox.core.mcp.servers.host_env.capabilities import (
     shell,
     workspace,
 )
-from agentbox.core.mcp.servers.host_env.context import HostEnvContext
+from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 from fastmcp import FastMCP
 
 _ctx: HostEnvContext | None = None

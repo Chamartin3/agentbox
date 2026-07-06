@@ -12,7 +12,7 @@ from agentbox.core.db import (
     WorkspaceMcpToolOverrideManager,
 )
 from agentbox.core.db.system.config import load_project_mcp_servers
-from agentbox.core.mcp.resolve import resolve_workspace_mcp_helper
+from agentbox.core.workspaces.mcp.resolve import resolve_workspace_mcp_helper
 
 logger = logging.getLogger(__name__)
 

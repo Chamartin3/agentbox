@@ -8,7 +8,7 @@ from agentbox.core.db import WorkspaceHostEnvGrantManager
 from agentbox.core.tools.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
-from agentbox.core.mcp.resolve import resolve_workspace_host_env_helper
+from agentbox.core.workspaces.mcp.resolve import resolve_workspace_host_env_helper
 
 logger = logging.getLogger(__name__)
 

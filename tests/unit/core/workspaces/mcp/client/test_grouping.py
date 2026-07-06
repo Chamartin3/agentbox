@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.mcp.client.grouping import derive_groups, resolve_group_ref
-from agentbox.core.mcp.client.tool_manifest import Tool
+from agentbox.core.workspaces.mcp.client.grouping import derive_groups, resolve_group_ref
+from agentbox.core.workspaces.mcp.client.tool_manifest import Tool
 
 
 def _tool(name: str) -> Tool:

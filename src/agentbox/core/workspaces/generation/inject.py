@@ -39,7 +39,7 @@ def host_env_server_spec(
     """
     return {
         "command": sys.executable,
-        "args": ["-m", "agentbox.core.mcp.servers.host_env"],
+        "args": ["-m", "agentbox.core.workspaces.mcp.servers.host_env"],
         "env": {
             "AGENTBOX_HOST_ENV_GRANTS_JSON": json.dumps(grants),
             "AGENTBOX_HOST_ENV_WORKSPACE_ID": workspace_id,
@@ -104,7 +104,7 @@ def inject_agent_tools_mcp(
     mcp_path, mcp_data = _load_mcp(run_dir)
     mcp_data["mcpServers"][AGENT_TOOLS_SERVER_NAME] = {
         "command": sys.executable,
-        "args": ["-m", "agentbox.core.mcp.servers.agent_tools"],
+        "args": ["-m", "agentbox.core.workspaces.mcp.servers.agent_tools"],
         "env": {
             "AGENTBOX_AGENT_TOOLS_GRANTS_JSON": json.dumps(sorted(grants)),
             "AGENTBOX_AGENT_TOOLS_AGENT_ID": agent_id,

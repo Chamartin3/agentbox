@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Callable
 
 from agentbox.core.tools.canonical import CanonicalTool
-from agentbox.core.mcp.servers.host_env.context import HostEnvContext
+from agentbox.core.workspaces.mcp.servers.host_env.context import HostEnvContext
 from agentbox.core.tools.grants import GrantViolation, check_capability
 from fastmcp import FastMCP
 

@@ -35,7 +35,7 @@ from agentbox.core.workspaces import (
     prepare_run_workdir,
 )
 from agentbox.core.workspaces import McpRegistry
-from agentbox.core.mcp.inject import (
+from agentbox.core.workspaces.generation.inject import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
 )
