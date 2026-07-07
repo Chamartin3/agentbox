@@ -76,7 +76,7 @@ from agentbox.core.engines.backends.recipe_loader import (
     list_recipes,
     load_recipe,
 )
-from agentbox.core.workspaces.construct import (
+from agentbox.core.workspaces.factory import (
     native_extra_items,
     workspace_constructor,
 )

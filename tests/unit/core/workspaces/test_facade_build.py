@@ -18,7 +18,7 @@ import pytest
 from agentbox.core.config import Settings
 from agentbox.core.db import WorkspaceReadManager
 from agentbox.core.db.database import Database
-from agentbox.core.workspaces.facade import Workspaces
+from agentbox.core.workspaces import Workspaces
 
 
 @pytest.fixture

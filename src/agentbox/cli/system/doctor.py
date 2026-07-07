@@ -7,7 +7,7 @@ import typer
 from agentbox.cli.shared import CLIContext
 
 # TODO(cli-arch): SystemService.doctor_checks (core gap)
-from agentbox.core import workspaces as ws_workspaces
+from agentbox.core import service as ws_workspaces
 from agentbox.core.service.engines import CredentialState
 
 

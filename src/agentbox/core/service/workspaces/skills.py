@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from agentbox.core.data.payload_types import AgentSkillsResult, GeneratedSkillsResult, SkillContentResult, SkillsListResult
 
-from agentbox.core import workspaces as ws
+from agentbox.core.workspaces import workdir as ws
 from agentbox.core.config import Settings
 from agentbox.core.db import AgentDefManager
 from agentbox.core.service.workspaces.service import WorkspaceService

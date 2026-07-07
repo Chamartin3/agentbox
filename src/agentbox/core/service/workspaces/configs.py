@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings
-from agentbox.core import workspaces as ws
+from agentbox.core.workspaces import workdir as ws
 from agentbox.core.service.agents.service import AgentService
 from agentbox.core.service.workspaces.service import WorkspaceService
 

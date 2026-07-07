@@ -28,7 +28,7 @@ from agentbox.core.data.payload_types import EnvDocRenderEntry, RunSnapshotEntry
 from agentbox.core.data.snapshots import workspace_outcomes_to_snapshot
 from agentbox.core.data.workenv import Recipe, ResolvedBinding, WorkspaceBlueprint
 from agentbox.core.workspaces._types import WorkspaceSyncMeta
-from agentbox.core.workspaces.construct import native_extra_items
+from agentbox.core.workspaces.factory import native_extra_items
 from agentbox.core.workspaces.generation import WorkspaceConstructor
 from agentbox.core.workspaces.generation.workspace_files import (
     materialize_workspace_files,
@@ -202,7 +202,7 @@ class WorkspaceRenderer:
             previous_paths = set(previous_meta.get("materialized_paths") or [])
 
         # The blueprint already selected the engine recipes; build the
-        # constructor from them (NOT workspace_constructor(), which reloads all).
+        # constructor from them (NOT factory.workspace_constructor(), which reloads all).
         constructor = WorkspaceConstructor(
             list(blueprint.recipes), extra_items=native_extra_items
         )

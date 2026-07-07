@@ -32,7 +32,7 @@ from pydantic import BaseModel
 
 from agentbox.api.schemas import PaginatedEnvelope, paginate_list
 from agentbox.api.deps import get_agent_service, get_mcp_registry, get_settings, get_workspace_service
-from agentbox.core import workspaces as ws
+from agentbox.core import service as ws
 from agentbox.core.config import Settings
 from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.service import AgentService

@@ -6,7 +6,7 @@ registry. ``workspaces.*`` callers (build.py, prep.py, service) import
 directly from this module; the CLI routes through ``WorkspaceService``.
 
 The workspace constructor factory (``workspace_constructor``,
-``native_extra_items``) lives in ``core.workspaces.construct`` — that
+``native_extra_items``) lives in ``core.workspaces.factory`` — that
 module is in the workspaces layer and may import both engines and
 workspaces.generation without layering violations.
 """

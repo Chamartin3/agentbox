@@ -10,7 +10,7 @@ from agentbox.core.data.payload_types import AgentWorkspaceDetail, WorkspaceFile
 
 from pathlib import Path
 
-from agentbox.core import workspaces as ws
+from agentbox.core.workspaces import workdir as ws
 from agentbox.core.config import Settings
 from agentbox.core.data.manifests.agents import AgentDef
 from agentbox.core.db import AgentDefManager

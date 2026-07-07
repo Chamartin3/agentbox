@@ -51,8 +51,6 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # api → core.workspaces (reads filesystem workspace info via the `ws` helper)
-    agentbox.api.workspaces.crud -> agentbox.core.workspaces
     # cli render layer touches workspace domain types to format output
     # (real fix: shared value types below both layers)
     agentbox.cli.shared.renderers.workspace -> agentbox.core.workspaces
@@ -60,13 +58,8 @@ ignore_imports =
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.payload
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.policy
-    # cli → core.workspaces
-    agentbox.cli.ops.cfg -> agentbox.core.workspaces
-    agentbox.cli.system.doctor -> agentbox.core.workspaces
-    agentbox.cli.work.ws -> agentbox.core.workspaces
     # cli renderers → core.engines (render layer touches domain types to
     # produce formatted output; real fix: shared value types below both layers)
-    # cli renderers → core.workspaces (same rationale)
     # api/cli DI wiring constructs the executor + MCP client directly
     # (burned when DI routes through core.service — UNIFIED plan)
     agentbox.api.deps -> agentbox.core.execution.orchestrate.executor
