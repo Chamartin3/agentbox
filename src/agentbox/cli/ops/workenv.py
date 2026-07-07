@@ -15,12 +15,12 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
+from agentbox.cli.shared.renderers.ops import OpsRenderer
 from agentbox.core.config import Settings
 from agentbox.core.data.constants import BackendName
 from agentbox.core.service import WorkspaceService
-from agentbox.core.data.workenv import WorkenvConfig
+from agentbox.core.data.workenv import Permissions, WorkenvConfig
 from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
-from agentbox.core.workspaces.generation.builders.interactive import build_interactive
 
 workenv_app = typer.Typer(
     name="workenv",
@@ -93,6 +93,7 @@ def workenv_generate(
             interactive=interactive,
             svc=svc,
             settings=settings,
+            render=obj.render.ops,
         )
     except ValueError as exc:
         obj.render.ops.error(str(exc))
@@ -136,6 +137,7 @@ def _resolve_source(
     interactive: bool,
     svc: WorkspaceService,
     settings: Settings,
+    render: OpsRenderer,
 ) -> _ResolvedSource:
     """Resolve config, engine, and target dir from CLI inputs.
 
@@ -150,10 +152,13 @@ def _resolve_source(
         return _ResolvedSource(config, engine, out_dir, "yaml")
 
     if interactive or name is None:
-        config, chosen_engine, chosen_dir = build_interactive(
-            available_engines=svc.list_recipe_engines()
+        ws_name, description, chosen_engine, chosen_dir = render.workenv_interactive_prompt(
+            svc.list_recipe_engines()
         )
-        return _ResolvedSource(config, chosen_engine, chosen_dir, "interactive")
+        config = WorkenvConfig(
+            name=ws_name, description=description, permissions=Permissions(data={})
+        )
+        return _ResolvedSource(config, chosen_engine, Path(chosen_dir), "interactive")
 
     perms = svc.load_effective_permissions(name)
     config = svc.load_workenv(name, settings=settings, permissions=perms)

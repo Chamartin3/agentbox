@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from rich.panel import Panel
+from rich.prompt import Prompt
 from rich.syntax import Syntax
 from rich.table import Table as RichTable
 from rich.text import Text
@@ -330,6 +331,35 @@ class OpsRenderer(Renderer):
     # ------------------------------------------------------------------
     # workenv
     # ------------------------------------------------------------------
+
+    def workenv_interactive_prompt(
+        self, available_engines: Sequence[str]
+    ) -> tuple[str, str, str, str]:
+        """Interactively prompt for a new workenv.
+
+        Returns ``(name, description, engine, target_dir)`` — the command
+        assembles the ``WorkenvConfig``; the render layer only prompts.
+        """
+        self.con.print("\n[bold]WorkenvConfig Interactive Builder[/bold]\n")
+        name = Prompt.ask("[bold]Workspace name[/bold]", default="my-workspace")
+        description = Prompt.ask("[bold]Description[/bold]", default="")
+        engine = self._prompt_engine(available_engines)
+        target_dir = Prompt.ask("[bold]Target directory[/bold]", default="./workenv-out")
+        return name, description, engine, target_dir
+
+    def _prompt_engine(self, available: Sequence[str]) -> str:
+        if not available:
+            self.con.print("[red]No recipes found — cannot generate[/red]")
+            raise SystemExit(1)
+        self.con.print("[bold]Engine:[/bold]")
+        for i, eng in enumerate(available, 1):
+            self.con.print(f"  {i}) {eng}")
+        choice = Prompt.ask("  Choose", default="1")
+        try:
+            return available[int(choice) - 1]
+        except (ValueError, IndexError):
+            self.con.print(f"[red]Invalid choice, using {available[0]}[/red]")
+            return available[0]
 
     def workenv_preview(self, files: Sequence[RenderedFile]) -> None:
         """Print rendered workenv files to stdout instead of writing to disk."""
