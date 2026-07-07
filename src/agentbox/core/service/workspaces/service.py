@@ -13,6 +13,7 @@ import json
 import logging
 import shutil
 import tempfile
+from dataclasses import replace
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from collections.abc import Iterator
@@ -61,12 +62,16 @@ from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.workspaces import BuildResult, Workspaces
-from agentbox.core.workspaces.generation.builders.from_db import load_workenv as _load_workenv_from_db
-from agentbox.core.data.workenv import McpRef, WorkenvConfig
+from agentbox.core.workspaces.compose import WorkspaceComposer
+from agentbox.core.data.workenv import (
+    McpRef,
+    Permissions,
+    Recipe,
+    RenderedDir,
+    RenderedFile,
+    WorkenvConfig,
+)
 from agentbox.core.workspaces.generation.generator import render
-from agentbox.core.data.workenv import RenderedFile
-from agentbox.core.data.workenv import RenderedDir
-from agentbox.core.data.workenv import Recipe
 from agentbox.core.engines.backends.recipe_loader import (
     list_recipes,
     load_recipe,
@@ -809,19 +814,7 @@ class WorkspaceService(Service):
         workspace_id: str,
     ) -> dict[str, str]:
         perms = self.load_effective_permissions(workspace_id)
-        config = _load_workenv_from_db(
-            self._workspaces,
-            self._db.agent_defs,
-            self._subagents,
-            self._db.agent_versions,
-            self._db.workspace_file_resource_bindings,
-            self._mcp_overrides,
-            self._mcp_tool_overrides,
-            self._env_doc_versions,
-            workspace_id,
-            settings=self._settings,
-            permissions=perms,
-        )
+        config = self.load_workenv(workspace_id, permissions=perms)
         paths: dict[str, str] = {}
         for result in workspace_constructor().generate(workspace_path, config):
             for p in result.written_paths:
@@ -887,20 +880,17 @@ class WorkspaceService(Service):
         settings: Settings | None = None,
         permissions: EffectivePermissions | None = None,
     ) -> WorkenvConfig:
-        """Load a ``WorkenvConfig`` for *workspace_id* from the DB."""
-        return _load_workenv_from_db(
-            self._workspaces,
-            self._db.agent_defs,
-            self._subagents,
-            self._db.agent_versions,
-            self._db.workspace_file_resource_bindings,
-            self._mcp_overrides,
-            self._mcp_tool_overrides,
-            self._env_doc_versions,
-            workspace_id,
-            settings=settings or self._settings,
-            permissions=permissions,
-        )
+        """Load a ``WorkenvConfig`` for *workspace_id* from the DB.
+
+        The engine-agnostic config is built by ``WorkspaceComposer`` (the same
+        producer the run path uses). When *permissions* is supplied it replaces
+        the composer's sparse overlay — callers pass the full effective
+        permissions so the rendered permissions file carries ``allowed_tools``.
+        """
+        config = WorkspaceComposer(self._db.workspace_read).compose(workspace_id).config
+        if permissions is not None:
+            config = replace(config, permissions=Permissions(data=dict(permissions)))
+        return config
 
     # ═══════════════════════════════════════════════════════════════════
     # Skill discovery (from skills.py)
