@@ -20,14 +20,6 @@ from agentbox.core.workspaces.workdir import (
 from agentbox.core.workspaces.mcp.client.registry import (
     McpRegistry as McpRegistry,
 )
-from agentbox.core.workspaces.prep import (
-    load_workspace_permissions as load_workspace_permissions,
-    prepare_run_workdir as prepare_run_workdir,
-    render_env_doc as render_env_doc,
-    resolve_workspace_resources as resolve_workspace_resources,
-    resolve_workspace_subagents as resolve_workspace_subagents,
-    write_secrets as write_secrets,
-)
 
 __all__ = [
     "BuildResult",
@@ -36,12 +28,6 @@ __all__ = [
     "WorkspaceInspection",
     "Workspaces",
     "discover_skills",
-    "load_workspace_permissions",
     "materialize_workspace",
-    "prepare_run_workdir",
-    "render_env_doc",
     "resolve_path",
-    "resolve_workspace_resources",
-    "resolve_workspace_subagents",
-    "write_secrets",
 ]

@@ -1,76 +1,34 @@
-"""Tests for workspace prep helpers (previously in execution/prepare/envdoc).
+"""Tests for prompt-binding resolution + run-snapshot helpers.
 
-Covers the helper functions now consolidated into workspaces/prep.py:
-- resolve_workspace_resources: returns hydrated binding dicts
-- resolve_agent_prompt_bindings: returns hydrated binding dicts
-- render_env_doc: writes CLAUDE.md + AGENTS.md and returns snapshot entries
+The old workspace-prep helpers (``resolve_workspace_resources`` /
+``render_env_doc``) moved into ``WorkspaceComposer`` / ``WorkspaceRenderer``
+(plan 118 Phase E) — those are covered by ``test_compose.py`` and
+``test_facade_build.py``. What remains here tests the still-standalone
+functions: ``resolve_agent_prompt_bindings`` (agents domain) and the
+``core.data.snapshots`` converters.
 """
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from unittest.mock import MagicMock
 
+from agentbox.core.agents.composition.bindings import resolve_agent_prompt_bindings
 from agentbox.core.data.composition import PromptResolution, ResolvedBinding
 from agentbox.core.data.snapshots import (
     prompt_resolution_to_snapshot,
     workspace_outcomes_to_snapshot,
 )
 from agentbox.core.data.workenv import MaterializeOutcome
-from agentbox.core.agents.composition.bindings import resolve_agent_prompt_bindings
-from agentbox.core.workspaces.prep import (
-    render_env_doc,
-    resolve_workspace_resources,
-)
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
-def _make_store(
-    *,
-    workspace_bindings: list[dict] | None = None,
-    prompt_bindings: list[dict] | None = None,
-    resource: dict | None = None,
-    active_version: dict | None = None,
-    version: dict | None = None,
-    blobs: list[dict] | None = None,
-    active_env_doc: dict | None = None,
-) -> MagicMock:
+def _make_store(*, prompt_bindings: list[dict] | None = None) -> MagicMock:
     store = MagicMock()
-    # Workspace file resource bindings manager
-    store.workspace_file_resource_bindings.list_for_workspace.return_value = workspace_bindings or []
-    # Prompt bindings manager
     store.agent_prompt_resource_bindings.list_for_agent.return_value = prompt_bindings or []
-    # Resource manager
-    store.resources.get_resource.return_value = resource
-    # Resource versions manager
-    store.resource_versions.get_active_version.return_value = active_version
-    store.resource_versions.get_version.return_value = version or {"content_hash": "abc123"}
-    # Resource blobs manager
-    store.resource_blobs.iter_blobs.return_value = iter(blobs or [])
-    # Workspace env doc versions manager
-    store.workspace_env_doc_versions.get_active.return_value = active_env_doc
+    store.resources.get_resource.return_value = None
+    store.resource_versions.get_active_version.return_value = None
+    store.resource_versions.get_version.return_value = {"content_hash": "abc123"}
+    store.resource_blobs.iter_blobs.return_value = iter([])
     return store
-
-
-def _simple_binding(
-    bid: str = "b1",
-    resource_id: str = "r1",
-    target_path: str | None = None,
-    mode: str = "copy",
-    on_conflict: str = "error",
-) -> dict:
-    return {
-        "id": bid,
-        "resource_id": resource_id,
-        "target_path": target_path,
-        "materialize_mode": mode,
-        "on_conflict": on_conflict,
-        "pinned_version_id": None,
-    }
 
 
 def _simple_prompt_binding(bid: str = "pb1", resource_id: str = "r1") -> dict:
@@ -82,136 +40,6 @@ def _simple_prompt_binding(bid: str = "pb1", resource_id: str = "r1") -> dict:
         "pinned_version_id": None,
         "required": 1,
     }
-
-
-# ---------------------------------------------------------------------------
-# resolve_workspace_resources
-# ---------------------------------------------------------------------------
-
-
-class TestResolveWorkspaceResources:
-    def test_ephemeral_workspace_returns_empty(self):
-        store = _make_store()
-        assert resolve_workspace_resources(
-            store.workspace_file_resource_bindings,
-            store.resources,
-            store.resource_versions,
-            store.resource_blobs,
-            "<ephemeral>",
-        ) == []
-        store.workspace_file_resource_bindings.list_for_workspace.assert_not_called()
-
-    def test_none_workspace_returns_empty(self):
-        store = _make_store()
-        assert resolve_workspace_resources(
-            store.workspace_file_resource_bindings,
-            store.resources,
-            store.resource_versions,
-            store.resource_blobs,
-            "",
-        ) == []
-
-    def test_no_bindings_returns_empty(self):
-        store = _make_store(workspace_bindings=[])
-        result = resolve_workspace_resources(
-            store.workspace_file_resource_bindings,
-            store.resources,
-            store.resource_versions,
-            store.resource_blobs,
-            "ws1",
-        )
-        assert result == []
-
-    def test_hydrates_binding_with_active_version(self):
-        binding = _simple_binding(target_path="docs/")
-        resource = {
-            "id": "r1",
-            "slug": "my-doc",
-            "type": "document",
-            "display_name": "my-doc",
-        }
-        active_v = {"id": "v1"}
-        version = {"content_hash": "deadbeef"}
-        blobs = [{"path": "README.md", "content": b"hello"}]
-        store = _make_store(
-            workspace_bindings=[binding],
-            resource=resource,
-            active_version=active_v,
-            version=version,
-            blobs=blobs,
-        )
-
-        result = resolve_workspace_resources(
-            store.workspace_file_resource_bindings,
-            store.resources,
-            store.resource_versions,
-            store.resource_blobs,
-            "ws1",
-        )
-
-        assert len(result) == 1
-        r = result[0]
-        assert r["binding_id"] == "b1"
-        assert r["resource_id"] == "r1"
-        assert r["version_id"] == "v1"
-        assert r["content_hash"] == "deadbeef"
-        assert r["type"] == "document"
-        assert r["target_path"] == "docs/"
-        assert r["blobs"] == blobs
-
-    def test_skips_binding_with_missing_resource(self):
-        store = _make_store(workspace_bindings=[_simple_binding()], resource=None)
-        result = resolve_workspace_resources(
-            store.workspace_file_resource_bindings,
-            store.resources,
-            store.resource_versions,
-            store.resource_blobs,
-            "ws1",
-        )
-        assert result == []
-
-    def test_skips_binding_with_no_active_version(self):
-        resource = {"id": "r1", "slug": "x", "type": "document", "display_name": "x"}
-        store = _make_store(
-            workspace_bindings=[_simple_binding()],
-            resource=resource,
-            active_version=None,
-        )
-        result = resolve_workspace_resources(
-            store.workspace_file_resource_bindings,
-            store.resources,
-            store.resource_versions,
-            store.resource_blobs,
-            "ws1",
-        )
-        assert result == []
-
-    def test_uses_pinned_version_id(self):
-        binding = {**_simple_binding(), "pinned_version_id": "pinned-v99"}
-        resource = {"id": "r1", "slug": "x", "type": "document", "display_name": "x"}
-        version = {"content_hash": "pinnedhash"}
-        store = _make_store(
-            workspace_bindings=[binding],
-            resource=resource,
-            version=version,
-            blobs=[],
-        )
-
-        result = resolve_workspace_resources(
-            store.workspace_file_resource_bindings,
-            store.resources,
-            store.resource_versions,
-            store.resource_blobs,
-            "ws1",
-        )
-        assert len(result) == 1
-        assert result[0]["version_id"] == "pinned-v99"
-        store.resource_versions.get_active_version.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# resolve_agent_prompt_bindings
-# ---------------------------------------------------------------------------
 
 
 class TestResolveAgentPromptBindings:
@@ -233,16 +61,12 @@ class TestResolveAgentPromptBindings:
             "type": "document",
             "display_name": "My Docs",
         }
-        active_v = {"id": "v2"}
-        version = {"content_hash": "cafebabe"}
         blobs = [{"path": "content.md", "content": b"# Hello"}]
-        store = _make_store(
-            prompt_bindings=[binding],
-            resource=resource,
-            active_version=active_v,
-            version=version,
-            blobs=blobs,
-        )
+        store = _make_store(prompt_bindings=[binding])
+        store.resources.get_resource.return_value = resource
+        store.resource_versions.get_active_version.return_value = {"id": "v2"}
+        store.resource_versions.get_version.return_value = {"content_hash": "cafebabe"}
+        store.resource_blobs.iter_blobs.return_value = iter(blobs)
 
         result = resolve_agent_prompt_bindings(
             store.agent_prompt_resource_bindings,
@@ -262,7 +86,8 @@ class TestResolveAgentPromptBindings:
         assert r["required"] is True
 
     def test_skips_missing_resource(self):
-        store = _make_store(prompt_bindings=[_simple_prompt_binding()], resource=None)
+        store = _make_store(prompt_bindings=[_simple_prompt_binding()])
+        store.resources.get_resource.return_value = None
         assert resolve_agent_prompt_bindings(
             store.agent_prompt_resource_bindings,
             store.resources,
@@ -272,12 +97,14 @@ class TestResolveAgentPromptBindings:
         ) == []
 
     def test_skips_no_active_version(self):
-        resource = {"id": "r1", "slug": "x", "type": "document", "display_name": "x"}
-        store = _make_store(
-            prompt_bindings=[_simple_prompt_binding()],
-            resource=resource,
-            active_version=None,
-        )
+        store = _make_store(prompt_bindings=[_simple_prompt_binding()])
+        store.resources.get_resource.return_value = {
+            "id": "r1",
+            "slug": "x",
+            "type": "document",
+            "display_name": "x",
+        }
+        store.resource_versions.get_active_version.return_value = None
         assert resolve_agent_prompt_bindings(
             store.agent_prompt_resource_bindings,
             store.resources,
@@ -285,69 +112,6 @@ class TestResolveAgentPromptBindings:
             store.resource_blobs,
             "agent1",
         ) == []
-
-
-# ---------------------------------------------------------------------------
-# render_env_doc
-# ---------------------------------------------------------------------------
-
-
-class TestRenderEnvDoc:
-    def test_ephemeral_workspace_skips(self, tmp_path: Path):
-        store = _make_store()
-        result = render_env_doc(store.workspace_env_doc_versions, "<ephemeral>", tmp_path)
-        assert result == []
-        assert not (tmp_path / "CLAUDE.md").exists()
-
-    def test_no_active_doc_skips(self, tmp_path: Path):
-        store = _make_store(active_env_doc=None)
-        result = render_env_doc(store.workspace_env_doc_versions, "ws1", tmp_path)
-        assert result == []
-
-    def test_renders_both_files(self, tmp_path: Path):
-        doc_content = {"body": "# Test Project\n\nAn overview."}
-        env_doc = {"id": "ver1", "content_json": json.dumps(doc_content)}
-        store = _make_store(active_env_doc=env_doc)
-
-        entries = render_env_doc(store.workspace_env_doc_versions, "ws1", tmp_path)
-
-        claude_md = tmp_path / "CLAUDE.md"
-        agents_md = tmp_path / "AGENTS.md"
-        assert claude_md.exists()
-        assert agents_md.exists()
-        # Both files get the identical raw body.
-        assert claude_md.read_text() == doc_content["body"]
-        assert agents_md.read_text() == doc_content["body"]
-
-        assert len(entries) == 2
-        roles = {e["role"] for e in entries}
-        assert roles == {"env_doc"}
-        files = {e["file"] for e in entries}
-        assert files == {"CLAUDE.md", "AGENTS.md"}
-        for e in entries:
-            assert e["workspace_id"] == "ws1"
-            assert e["env_doc_version_id"] == "ver1"
-            assert e["bytes"] > 0
-
-    def test_invalid_content_json_returns_empty(self, tmp_path: Path):
-        env_doc = {"id": "ver2", "content_json": "not-json{{{"}
-        store = _make_store(active_env_doc=env_doc)
-        result = render_env_doc(store.workspace_env_doc_versions, "ws1", tmp_path)
-        assert result == []
-
-    def test_dict_content_json(self, tmp_path: Path):
-        doc_content = {"body": "# Dict Project"}
-        env_doc = {"id": "ver3", "content_json": doc_content}
-        store = _make_store(active_env_doc=env_doc)
-
-        entries = render_env_doc(store.workspace_env_doc_versions, "ws1", tmp_path)
-        assert len(entries) == 2
-        assert "Dict Project" in (tmp_path / "CLAUDE.md").read_text()
-
-
-# ---------------------------------------------------------------------------
-# snapshot helpers
-# ---------------------------------------------------------------------------
 
 
 class TestSnapshotHelpers:

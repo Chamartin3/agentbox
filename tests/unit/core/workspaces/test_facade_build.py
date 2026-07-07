@@ -109,3 +109,38 @@ def test_no_env_doc_persistent_still_writes_provenance(
     # so an (empty) instruction file is emitted even without an env-doc body.
     # (Old build_workspace never wrote native config into the persistent dir.)
     assert (workdir / ".agentbox" / "meta.json").exists()
+
+
+# ── render_env_doc: env-doc-only render into an arbitrary dir ────────────────
+
+
+def test_render_env_doc_writes_both_files_and_entries(
+    db: Database, settings: Settings, tmp_path: Path
+) -> None:
+    _seed_workspace(db, "default")
+    _save_env_doc(db, "default")
+    out = tmp_path / "preview"
+
+    entries = _workspaces(db, settings).render_env_doc("default", out)
+
+    body = "# Test Workspace\n\nIntegration testing"
+    assert (out / "CLAUDE.md").read_text() == body
+    assert (out / "AGENTS.md").read_text() == body
+    # env-doc-only: no native config written into the target dir.
+    assert not (out / ".mcp.json").exists()
+    assert {e["file"] for e in entries} == {"CLAUDE.md", "AGENTS.md"}
+    assert {e["role"] for e in entries} == {"env_doc"}
+    assert all(e["workspace_id"] == "default" and e["bytes"] > 0 for e in entries)
+
+
+def test_render_env_doc_ephemeral_is_empty(
+    db: Database, settings: Settings, tmp_path: Path
+) -> None:
+    assert _workspaces(db, settings).render_env_doc("<ephemeral>", tmp_path) == []
+
+
+def test_render_env_doc_no_active_doc_is_empty(
+    db: Database, settings: Settings, tmp_path: Path
+) -> None:
+    _seed_workspace(db, "nodoc")
+    assert _workspaces(db, settings).render_env_doc("nodoc", tmp_path) == []

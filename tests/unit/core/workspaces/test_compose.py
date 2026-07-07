@@ -68,3 +68,41 @@ class TestComposeBindings:
         assert len(binding.blobs) >= 1
         # also surfaces as an id-only ResourceRef in the engine-agnostic config
         assert any(ref.id == rid for ref in bp.config.resources)
+
+    def test_binding_no_active_version_skipped(self, db: Database) -> None:
+        # A resource with no imported version has no active version → skipped.
+        ws = db.workspaces.insert(name=f"ws-{uuid.uuid4().hex[:8]}")
+        wsid = ws["name"]
+        resource = db.resources.create_resource(
+            slug=f"res-{uuid.uuid4().hex[:8]}", type="document", display_name="Doc"
+        )
+        db.workspace_file_resource_bindings.replace_for_workspace(
+            wsid, [{"resource_id": resource["id"]}], reason="test"
+        )
+
+        bp = _composer(db).compose(wsid)
+
+        assert bp.bindings == ()
+
+    def test_binding_uses_pinned_version(self, db: Database) -> None:
+        ws = db.workspaces.insert(name=f"ws-{uuid.uuid4().hex[:8]}")
+        wsid = ws["name"]
+        resource = db.resources.create_resource(
+            slug=f"res-{uuid.uuid4().hex[:8]}", type="document", display_name="Doc"
+        )
+        rid = resource["id"]
+        v1 = db.resource_versions.import_version(
+            rid, [("doc.md", b"one", None, None)], import_source="upload", changelog="first"
+        )
+        # A newer version becomes active; the binding pins the older one.
+        db.resource_versions.import_version(
+            rid, [("doc.md", b"two", None, None)], import_source="upload", changelog="second"
+        )
+        db.workspace_file_resource_bindings.replace_for_workspace(
+            wsid, [{"resource_id": rid, "pinned_version_id": v1["id"]}], reason="test"
+        )
+
+        bp = _composer(db).compose(wsid)
+
+        assert len(bp.bindings) == 1
+        assert bp.bindings[0].version_id == v1["id"]
