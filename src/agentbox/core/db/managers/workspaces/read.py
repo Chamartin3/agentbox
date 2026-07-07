@@ -61,13 +61,6 @@ class WorkspaceReadManager:
 
     # ── Workspace ─────────────────────────────────────────────────────────────
 
-    def get_workspace(self, workspace_id: str) -> WorkspaceRow | None:
-        with self._engine.connect() as conn:
-            row = conn.execute(
-                workspaces.select().where(workspaces.c.id == workspace_id)
-            ).first()
-            return cast(WorkspaceRow, dict(row._mapping)) if row else None
-
     def get_workspace_by_name(self, name: str) -> WorkspaceRow | None:
         with self._engine.connect() as conn:
             row = conn.execute(
