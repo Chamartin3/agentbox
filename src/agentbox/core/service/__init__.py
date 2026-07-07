@@ -52,7 +52,7 @@ from agentbox.core.engines.providers.base import ProviderDescriptor as ProviderD
 from agentbox.core.engines.providers.base import ProviderModel as ProviderModel
 from agentbox.core.engines.credentials.registry import CredentialMethod as CredentialMethod
 from agentbox.core.engines.credentials.state import CredentialState as CredentialState
-from agentbox.core.data.workenv import WorkenvConfig as WorkenvConfig
+from agentbox.core.data.workenv import WorkspaceConfig as WorkspaceConfig
 from agentbox.core.data.workenv import Recipe as Recipe
 
 # ── Infra ─────────────────────────────────────────────────────────────

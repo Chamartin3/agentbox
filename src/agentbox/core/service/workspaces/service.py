@@ -69,7 +69,7 @@ from agentbox.core.data.workenv import (
     Recipe,
     RenderedDir,
     RenderedFile,
-    WorkenvConfig,
+    WorkspaceConfig,
 )
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.engines.backends.recipe_loader import (
@@ -783,7 +783,7 @@ class WorkspaceService(Service):
         copies only files that don't already exist, then removes on exit
         (unless *keep*). Never overwrites or deletes a user file.
         """
-        config = WorkenvConfig(
+        config = WorkspaceConfig(
             name="project", mcp_servers=self._project_mcp_refs(servers)
         )
         created: list[Path] = []
@@ -839,10 +839,10 @@ class WorkspaceService(Service):
         self,
         dir_path: Path,
         *,
-        config: WorkenvConfig,
+        config: WorkspaceConfig,
         recipe: Recipe,
     ) -> RenderedDir:
-        """Render a WorkenvConfig to disk against a Recipe.
+        """Render a WorkspaceConfig to disk against a Recipe.
 
         Dispatches to the backend's ``build_workspace_items`` for
         engine-specific files and passes them as *extra_items*.
@@ -853,10 +853,10 @@ class WorkspaceService(Service):
     def preview_workenv(
         self,
         *,
-        config: WorkenvConfig,
+        config: WorkspaceConfig,
         recipe: Recipe,
     ) -> list[RenderedFile]:
-        """Render a WorkenvConfig to a throwaway dir and return the file contents."""
+        """Render a WorkspaceConfig to a throwaway dir and return the file contents."""
         with tempfile.TemporaryDirectory() as td:
             dir_path = Path(td)
             result = self.render_workenv(dir_path, config=config, recipe=recipe)
@@ -879,8 +879,8 @@ class WorkspaceService(Service):
         *,
         settings: Settings | None = None,
         permissions: EffectivePermissions | None = None,
-    ) -> WorkenvConfig:
-        """Load a ``WorkenvConfig`` for *workspace_id* from the DB.
+    ) -> WorkspaceConfig:
+        """Load a ``WorkspaceConfig`` for *workspace_id* from the DB.
 
         The engine-agnostic config is built by ``WorkspaceComposer`` (the same
         producer the run path uses). When *permissions* is supplied it replaces

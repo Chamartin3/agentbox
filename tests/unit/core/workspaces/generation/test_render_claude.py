@@ -11,13 +11,13 @@ from agentbox.core.data.workenv import (
     McpRef,
     Permissions,
     ResourceRef,
-    WorkenvConfig,
+    WorkspaceConfig,
 )
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.engines.backends.recipe_loader import load_recipe, backend_for_engine
 
 
-def _get_extra_items(engine: str, config: WorkenvConfig) -> list:
+def _get_extra_items(engine: str, config: WorkspaceConfig) -> list:
     """Helper to get extra_items for rendering."""
     try:
         return backend_for_engine(engine).build_workspace_items(config)
@@ -25,7 +25,7 @@ def _get_extra_items(engine: str, config: WorkenvConfig) -> list:
         return []
 
 
-def _make_fixture_config(**overrides: object) -> WorkenvConfig:
+def _make_fixture_config(**overrides: object) -> WorkspaceConfig:
     kwargs: dict = {
         "name": "test-workspace",
         "description": "A test workspace",
@@ -49,12 +49,12 @@ def _make_fixture_config(**overrides: object) -> WorkenvConfig:
         "env": {"KEY": "VAL"},
     }
     kwargs.update(overrides)
-    return WorkenvConfig(**kwargs)
+    return WorkspaceConfig(**kwargs)
 
 
 class TestRenderClaude:
     def test_render_minimal(self) -> None:
-        config = WorkenvConfig(name="minimal")
+        config = WorkspaceConfig(name="minimal")
         recipe = load_recipe("claude_code")
         with tempfile.TemporaryDirectory() as td:
             result = render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
@@ -91,7 +91,7 @@ class TestRenderClaude:
     def test_subagent_carries_description_and_prompt(self) -> None:
         # Native .claude/agents/*.md must hold real content, not empty
         # placeholders — the format the Claude engine reads.
-        config = WorkenvConfig(
+        config = WorkspaceConfig(
             name="ws",
             agents=[
                 AgentRef(
@@ -172,7 +172,7 @@ class TestRenderClaude:
     def test_yaml_round_trip_to_render(self) -> None:
         original = _make_fixture_config()
         yaml_text = original.to_yaml()
-        restored = WorkenvConfig.from_yaml(yaml_text)
+        restored = WorkspaceConfig.from_yaml(yaml_text)
         assert original == restored
 
         recipe = load_recipe("claude_code")

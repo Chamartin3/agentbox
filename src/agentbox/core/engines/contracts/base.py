@@ -29,7 +29,7 @@ from ._mcp_types import McpToolSpec
 from .rendered import RenderedConfig
 from .views import ComposedView, RuntimeConfigView
 
-from agentbox.core.data.workenv import Item, WorkenvConfig
+from agentbox.core.data.workenv import Item, WorkspaceConfig
 
 
 class HasAgentConfig(Protocol):
@@ -94,7 +94,7 @@ class BackendAdapter(ABC):
         candidate = Path(inspect.getfile(self.__class__)).parent / "recipe.yaml"
         return candidate if candidate.exists() else None
 
-    def build_workspace_items(self, config: "WorkenvConfig") -> "list[Item]":
+    def build_workspace_items(self, config: "WorkspaceConfig") -> "list[Item]":
         """Engine-specific workspace config files, as generator ``Item``s.
 
         The generic generator builds everything a ``recipe.yaml`` can

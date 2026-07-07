@@ -10,7 +10,7 @@ from agentbox.core.data.workenv import (
     McpRef,
     Permissions,
     ResourceRef,
-    WorkenvConfig,
+    WorkspaceConfig,
 )
 from agentbox.core.workspaces.generation.construct import (
     ExtraItemsFn,
@@ -36,5 +36,5 @@ __all__ = [
     "RenderedDir",
     "ResourceRef",
     "Role",
-    "WorkenvConfig",
+    "WorkspaceConfig",
 ]

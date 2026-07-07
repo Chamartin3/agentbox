@@ -11,13 +11,13 @@ from agentbox.core.data.workenv import (
     McpRef,
     Permissions,
     ResourceRef,
-    WorkenvConfig,
+    WorkspaceConfig,
 )
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.engines.backends.recipe_loader import list_recipes, load_recipe, backend_for_engine
 
 
-def _get_extra_items(engine: str, config: WorkenvConfig) -> list:
+def _get_extra_items(engine: str, config: WorkspaceConfig) -> list:
     """Helper to get extra_items for rendering."""
     try:
         return backend_for_engine(engine).build_workspace_items(config)
@@ -25,7 +25,7 @@ def _get_extra_items(engine: str, config: WorkenvConfig) -> list:
         return []
 
 
-def _make_fixture_config(**overrides: object) -> WorkenvConfig:
+def _make_fixture_config(**overrides: object) -> WorkspaceConfig:
     kwargs: dict = {
         "name": "test-workspace",
         "description": "A test workspace",
@@ -48,7 +48,7 @@ def _make_fixture_config(**overrides: object) -> WorkenvConfig:
         "env": {"KEY": "VAL"},
     }
     kwargs.update(overrides)
-    return WorkenvConfig(**kwargs)
+    return WorkspaceConfig(**kwargs)
 
 
 class TestRecipeDiscovered:
@@ -63,7 +63,7 @@ class TestRecipeDiscovered:
 
 class TestRenderOpenCode:
     def test_render_minimal(self) -> None:
-        config = WorkenvConfig(name="minimal")
+        config = WorkspaceConfig(name="minimal")
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
             result = render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
@@ -127,7 +127,7 @@ class TestRenderOpenCode:
             assert data.get("mcp") == {}
 
     def test_render_no_agents_in_json(self) -> None:
-        config = WorkenvConfig(name="no-agents")
+        config = WorkspaceConfig(name="no-agents")
         recipe = load_recipe("opencode")
         with tempfile.TemporaryDirectory() as td:
             render(Path(td), config, recipe, extra_items=_get_extra_items("opencode", config))
@@ -156,7 +156,7 @@ class TestRenderOpenCode:
             assert not (Path(td) / ".claude").exists()
 
     def test_mcp_local_command(self) -> None:
-        config = WorkenvConfig(
+        config = WorkspaceConfig(
             name="local-mcp",
             mcp_servers=[
                 McpRef(
@@ -178,7 +178,7 @@ class TestRenderOpenCode:
     def test_yaml_round_trip_to_render(self) -> None:
         original = _make_fixture_config()
         yaml_text = original.to_yaml()
-        restored = WorkenvConfig.from_yaml(yaml_text)
+        restored = WorkspaceConfig.from_yaml(yaml_text)
         assert original == restored
 
         recipe = load_recipe("opencode")

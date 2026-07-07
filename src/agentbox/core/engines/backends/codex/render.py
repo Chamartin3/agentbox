@@ -13,7 +13,7 @@ Ref: https://developers.openai.com/codex/subagents
 
 from __future__ import annotations
 
-from agentbox.core.data.workenv import Item, Role, WorkenvConfig
+from agentbox.core.data.workenv import Item, Role, WorkspaceConfig
 
 
 def _toml_basic_string(s: str) -> str:
@@ -28,7 +28,7 @@ def _toml_basic_string(s: str) -> str:
     return f'"{out}"'
 
 
-def build_codex_items(config: "WorkenvConfig") -> list[Item]:
+def build_codex_items(config: "WorkspaceConfig") -> list[Item]:
     """Return one TOML ``Item`` per subagent (routed by the recipe layout)."""
     items: list[Item] = []
     for agent in config.agents:

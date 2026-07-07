@@ -16,12 +16,12 @@ from agentbox.core.engines.backends.recipe_loader import (
 )
 from agentbox.core.workspaces.generation import (
     Item,
-    WorkenvConfig,
+    WorkspaceConfig,
     WorkspaceConstructor,
 )
 
 
-def native_extra_items(engine: str, config: WorkenvConfig) -> list[Item]:
+def native_extra_items(engine: str, config: WorkspaceConfig) -> list[Item]:
     """Per-engine native config items (opencode.json, codex TOML, …).
 
     Needs the backend registry; lives here (workspaces layer) so that

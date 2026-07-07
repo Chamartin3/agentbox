@@ -10,15 +10,15 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from agentbox.core.data.workenv import WorkenvConfig
+from agentbox.core.data.workenv import WorkspaceConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.engines.backends.recipe_loader import load_recipe, backend_for_engine
 
 _BODY = "# Acme\n\nDo the thing. Then verify it.\n"
 
 
-def _config() -> WorkenvConfig:
-    return WorkenvConfig(name="ws", env_doc=_BODY)
+def _config() -> WorkspaceConfig:
+    return WorkspaceConfig(name="ws", env_doc=_BODY)
 
 
 def test_claude_context_is_raw_body() -> None:

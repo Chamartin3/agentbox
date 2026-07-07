@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from agentbox.core.data.workenv import WorkenvConfig
+from agentbox.core.data.workenv import WorkspaceConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.workspaces.generation.materialize import (
     MaterializeOutcome,
@@ -28,7 +28,7 @@ from agentbox.core.data.workenv import Recipe
 
 # (engine, config) -> extra native config items for that engine. Supplied by
 # the caller because building them needs the backend registry.
-ExtraItemsFn = Callable[[str, WorkenvConfig], list[Item]]
+ExtraItemsFn = Callable[[str, WorkspaceConfig], list[Item]]
 
 
 class WorkspaceConstructor:
@@ -50,7 +50,7 @@ class WorkspaceConstructor:
     def generate(
         self,
         target_dir: Path,
-        config: WorkenvConfig,
+        config: WorkspaceConfig,
         *,
         system_prompt: str | None = None,
     ) -> list[RenderedDir]:

@@ -1,6 +1,6 @@
 """Copy declared workspace files into a run/workspace dir.
 
-Engine-agnostic: ``WorkenvConfig`` declares host paths to project into the
+Engine-agnostic: ``WorkspaceConfig`` declares host paths to project into the
 run cwd; this materializes them. Was ``engine_config/_common.py``.
 """
 

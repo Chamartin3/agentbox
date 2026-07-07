@@ -2,7 +2,7 @@
 
 Pure in-memory composition: reads everything through a single
 ``WorkspaceReadManager``, resolves subagents / bindings / env-doc /
-permissions, builds the engine-agnostic ``WorkenvConfig``, loads recipes,
+permissions, builds the engine-agnostic ``WorkspaceConfig``, loads recipes,
 and returns the immutable blueprint. No disk I/O, no network.
 """
 
@@ -21,7 +21,7 @@ from agentbox.core.data.workenv import (
     ResolvedSubagent,
     ResourceRef,
     SourceMetadata,
-    WorkenvConfig,
+    WorkspaceConfig,
     WorkspaceBlueprint,
 )
 from agentbox.core.db import WorkspaceReadManager
@@ -211,11 +211,11 @@ class WorkspaceComposer:
             result["allow_network"] = bool(allow_network)
         return result or None
 
-    # ── engine-agnostic config (WorkenvConfig) ───────────────────────────
+    # ── engine-agnostic config (WorkspaceConfig) ───────────────────────────
 
     def _config(
         self, workspace_id: str, permissions: EffectivePermissionsOverlay | None
-    ) -> WorkenvConfig:
+    ) -> WorkspaceConfig:
         agents: list[AgentRef] = []
         if self._read.get_agent_def(workspace_id) is not None:
             agents.append(AgentRef(id=workspace_id, role="main"))
@@ -273,7 +273,7 @@ class WorkspaceComposer:
 
         env_doc_body, _ = self._env_doc(workspace_id)
 
-        return WorkenvConfig(
+        return WorkspaceConfig(
             name=workspace_id,
             # ponytail: workspace row exposes no description today (the old
             # loader read it via getattr on a dict row → always ""); keep "".

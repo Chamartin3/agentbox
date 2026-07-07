@@ -1,4 +1,4 @@
-"""CLI commands for WorkenvConfig generation.
+"""CLI commands for WorkspaceConfig generation.
 
 Usage:
     agentbox ops workenv generate --engine opencode --target-dir /tmp/my-env
@@ -19,18 +19,18 @@ from agentbox.cli.shared.renderers.ops import OpsRenderer
 from agentbox.core.config import Settings
 from agentbox.core.data.constants import BackendName
 from agentbox.core.service import WorkspaceService
-from agentbox.core.data.workenv import Permissions, WorkenvConfig
+from agentbox.core.data.workenv import Permissions, WorkspaceConfig
 
 workenv_app = typer.Typer(
     name="workenv",
-    help="Generate workspace config files from WorkenvConfig.",
+    help="Generate workspace config files from WorkspaceConfig.",
     no_args_is_help=True,
 )
 
 
 @dataclass
 class _ResolvedSource:
-    config: WorkenvConfig
+    config: WorkspaceConfig
     engine: str
     target_dir: Path
     source_label: str
@@ -58,7 +58,7 @@ def workenv_generate(
         None,
         "--config-file",
         "-f",
-        help="Path to a YAML WorkenvConfig file (skips DB loading)",
+        help="Path to a YAML WorkspaceConfig file (skips DB loading)",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -146,7 +146,7 @@ def _resolve_source(
         config_path = Path(config_file)
         if not config_path.is_file():
             raise ValueError(f"config file not found: {config_file}")
-        config = WorkenvConfig.from_yaml(config_path.read_text(encoding="utf-8"))
+        config = WorkspaceConfig.from_yaml(config_path.read_text(encoding="utf-8"))
         out_dir = _resolve_target_dir(target_dir, name, svc, settings)
         return _ResolvedSource(config, engine, out_dir, "yaml")
 
@@ -154,7 +154,7 @@ def _resolve_source(
         ws_name, description, chosen_engine, chosen_dir = render.workenv_interactive_prompt(
             svc.list_recipe_engines()
         )
-        config = WorkenvConfig(
+        config = WorkspaceConfig(
             name=ws_name, description=description, permissions=Permissions(data={})
         )
         return _ResolvedSource(config, chosen_engine, Path(chosen_dir), "interactive")

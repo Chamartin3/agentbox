@@ -16,10 +16,10 @@ from agentbox.core.engines.backends.opencode.schema import (
     McpRemote,
     OpenCodeConfig,
 )
-from agentbox.core.data.workenv import Item, McpRef, Role, WorkenvConfig
+from agentbox.core.data.workenv import Item, McpRef, Role, WorkspaceConfig
 
 
-def build_opencode_items(config: WorkenvConfig) -> list[Item]:
+def build_opencode_items(config: WorkspaceConfig) -> list[Item]:
     """Return the ``opencode.json`` Item for *config* (placed via recipe layout)."""
     oc = OpenCodeConfig(
         tools={"skill": True},

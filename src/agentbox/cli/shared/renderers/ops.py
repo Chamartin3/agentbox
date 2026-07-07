@@ -338,9 +338,9 @@ class OpsRenderer(Renderer):
         """Interactively prompt for a new workenv.
 
         Returns ``(name, description, engine, target_dir)`` — the command
-        assembles the ``WorkenvConfig``; the render layer only prompts.
+        assembles the ``WorkspaceConfig``; the render layer only prompts.
         """
-        self.con.print("\n[bold]WorkenvConfig Interactive Builder[/bold]\n")
+        self.con.print("\n[bold]WorkspaceConfig Interactive Builder[/bold]\n")
         name = Prompt.ask("[bold]Workspace name[/bold]", default="my-workspace")
         description = Prompt.ask("[bold]Description[/bold]", default="")
         engine = self._prompt_engine(available_engines)

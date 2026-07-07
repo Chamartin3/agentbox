@@ -64,7 +64,7 @@ class Permissions:
 
 
 @dataclass(frozen=True)
-class WorkenvConfig:
+class WorkspaceConfig:
     """Engine-agnostic workspace configuration.
 
     This is the primordial input to config-file generation.  It carries
@@ -89,31 +89,31 @@ class WorkenvConfig:
         seen_agent_ids: set[str] = set()
         for agent in self.agents:
             if not agent.id:
-                raise ValueError("WorkenvConfig agent ref missing id")
+                raise ValueError("WorkspaceConfig agent ref missing id")
             if agent.id in seen_agent_ids:
-                raise ValueError(f"Duplicate agent id in WorkenvConfig: {agent.id}")
+                raise ValueError(f"Duplicate agent id in WorkspaceConfig: {agent.id}")
             seen_agent_ids.add(agent.id)
 
         seen_resource_ids: set[str] = set()
         for resource in self.resources:
             if not resource.id:
-                raise ValueError("WorkenvConfig resource ref missing id")
+                raise ValueError("WorkspaceConfig resource ref missing id")
             if resource.id in seen_resource_ids:
                 raise ValueError(
-                    f"Duplicate resource id in WorkenvConfig: {resource.id}"
+                    f"Duplicate resource id in WorkspaceConfig: {resource.id}"
                 )
             seen_resource_ids.add(resource.id)
 
         for skill in self.skills:
             if not skill.id:
-                raise ValueError("WorkenvConfig skill ref missing id")
+                raise ValueError("WorkspaceConfig skill ref missing id")
 
     def to_yaml(self) -> str:
         """Serialize to a YAML string (identity round-trip with ``from_yaml``)."""
         return yaml.dump(self._to_dict(), sort_keys=False, default_flow_style=False)
 
     @classmethod
-    def from_yaml(cls, text: str) -> WorkenvConfig:
+    def from_yaml(cls, text: str) -> WorkspaceConfig:
         """Deserialize from a YAML string produced by ``to_yaml()``."""
         data = yaml.safe_load(text) or {}
         return cls._from_dict(data)
@@ -152,7 +152,7 @@ class WorkenvConfig:
         }
 
     @classmethod
-    def _from_dict(cls, data: dict[str, Any]) -> WorkenvConfig:
+    def _from_dict(cls, data: dict[str, Any]) -> WorkspaceConfig:
         raw_env_doc = data.get("env_doc")
         env_doc: str | ResourceRef | None = None
         if isinstance(raw_env_doc, dict) and raw_env_doc.get("__ref__") == "resource":
@@ -299,7 +299,7 @@ class WorkspaceBlueprint:
     """
 
     workspace_id: str
-    config: WorkenvConfig
+    config: WorkspaceConfig
     recipes: tuple[Recipe, ...]
     bindings: tuple[ResolvedBinding, ...]
     subagents: tuple[ResolvedSubagent, ...]

@@ -1,4 +1,4 @@
-"""Generator — renders a WorkenvConfig to disk against a Recipe.
+"""Generator — renders a WorkspaceConfig to disk against a Recipe.
 
 Pure function. No DB. No globals. Writes files and returns a RenderedDir.
 """
@@ -10,20 +10,20 @@ import string
 from pathlib import Path
 
 from agentbox.core.workspaces.generation._paths import safe_dest
-from agentbox.core.data.workenv import McpRef, ResourceRef, WorkenvConfig
+from agentbox.core.data.workenv import McpRef, ResourceRef, WorkspaceConfig
 from agentbox.core.data.workenv import Item, RenderedDir, Role
 from agentbox.core.data.workenv import Recipe
 
 
 def render(
     target_dir: Path,
-    config: WorkenvConfig,
+    config: WorkspaceConfig,
     recipe: Recipe,
     *,
     system_prompt: str | None = None,
     extra_items: list[Item] | None = None,
 ) -> RenderedDir:
-    """Render a ``WorkenvConfig`` to disk against a ``Recipe``.
+    """Render a ``WorkspaceConfig`` to disk against a ``Recipe``.
 
     Builds a list of :class:`Item` objects, then writes each to the path
     the recipe layout prescribes. Engine-specific config blobs (e.g.
@@ -54,7 +54,7 @@ def render(
 
 
 def _build_items(
-    config: WorkenvConfig,
+    config: WorkspaceConfig,
     recipe: Recipe,
     *,
     system_prompt: str | None = None,
@@ -115,7 +115,7 @@ def _build_items(
 
 
 def _build_context(
-    config: WorkenvConfig,
+    config: WorkspaceConfig,
     recipe: Recipe,
     *,
     system_prompt: str | None = None,
@@ -126,7 +126,7 @@ def _build_context(
     return Item(role=Role.context, name=config.name, content=content)
 
 
-def _resolve_env_doc(config: WorkenvConfig) -> str:
+def _resolve_env_doc(config: WorkspaceConfig) -> str:
     if isinstance(config.env_doc, str):
         return config.env_doc
     if isinstance(config.env_doc, ResourceRef):

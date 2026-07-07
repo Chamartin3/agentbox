@@ -14,19 +14,19 @@ from agentbox.core.data.workenv import (
     McpRef,
     Permissions,
     ResourceRef,
-    WorkenvConfig,
+    WorkspaceConfig,
 )
 
 
 @pytest.fixture
 def make_workenv_config():
-    """Factory returning a fully-populated ``WorkenvConfig``.
+    """Factory returning a fully-populated ``WorkspaceConfig``.
 
     Pass keyword overrides to swap any field (e.g.
     ``make_workenv_config(mcp_servers=[])``).
     """
 
-    def _make(**overrides: object) -> WorkenvConfig:
+    def _make(**overrides: object) -> WorkspaceConfig:
         kwargs: dict = {
             "name": "test-workspace",
             "description": "A test workspace",
@@ -50,7 +50,7 @@ def make_workenv_config():
             "env": {"KEY": "VAL"},
         }
         kwargs.update(overrides)
-        return WorkenvConfig(**kwargs)
+        return WorkspaceConfig(**kwargs)
 
     return _make
 
