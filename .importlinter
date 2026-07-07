@@ -62,7 +62,6 @@ ignore_imports =
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.policy
     # cli → core.workspaces
     agentbox.cli.ops.cfg -> agentbox.core.workspaces
-    agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.from_yaml
     agentbox.cli.system.doctor -> agentbox.core.workspaces
     agentbox.cli.work.ws -> agentbox.core.workspaces
     # cli renderers → core.engines (render layer touches domain types to

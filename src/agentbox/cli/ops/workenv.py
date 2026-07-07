@@ -20,7 +20,6 @@ from agentbox.core.config import Settings
 from agentbox.core.data.constants import BackendName
 from agentbox.core.service import WorkspaceService
 from agentbox.core.data.workenv import Permissions, WorkenvConfig
-from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
 
 workenv_app = typer.Typer(
     name="workenv",
@@ -147,7 +146,7 @@ def _resolve_source(
         config_path = Path(config_file)
         if not config_path.is_file():
             raise ValueError(f"config file not found: {config_file}")
-        config = load_from_yaml(config_path)
+        config = WorkenvConfig.from_yaml(config_path.read_text(encoding="utf-8"))
         out_dir = _resolve_target_dir(target_dir, name, svc, settings)
         return _ResolvedSource(config, engine, out_dir, "yaml")
 
