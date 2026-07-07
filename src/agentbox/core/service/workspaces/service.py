@@ -60,7 +60,7 @@ from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
 from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
 from agentbox.core.service.system.service import SystemService
-from agentbox.core.workspaces.build import build_workspace_by_name, WorkspaceSyncResult
+from agentbox.core.workspaces import BuildResult, Workspaces
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv as _load_workenv_from_db
 from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
@@ -76,7 +76,6 @@ from agentbox.core.workspaces.construct import (
     workspace_constructor,
 )
 from agentbox.core.tools.grants import resolve_grants
-from agentbox.core.workspaces.prep import render_env_doc as _render_env_doc
 
 from agentbox.core.data.errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
 
@@ -153,6 +152,7 @@ class WorkspaceService(Service):
         self._subagents = self._db.workspace_subagents
         self._discovery_cache = self._db.mcp_tool_discovery_cache
         self._subagents = self._db.workspace_subagents
+        self._ws_facade = Workspaces(self._db.workspace_read, self._settings)
 
     @property
     def _settings(self) -> Settings:
@@ -299,7 +299,7 @@ class WorkspaceService(Service):
 
     def render_env_doc(self, workspace_id: str, workdir: Path) -> list[EnvDocRenderEntry]:
         """Render the active env doc's instruction files for a workspace."""
-        return _render_env_doc(self._env_doc_versions, workspace_id, workdir)
+        return self._ws_facade.render_env_doc(workspace_id, workdir)
 
     def list_env_doc_versions(self, workspace_id: str) -> list[EnvDocRow]:
         return self._env_doc_versions.list_for_workspace(workspace_id)
@@ -363,50 +363,22 @@ class WorkspaceService(Service):
         result = self.save_env_doc(
             workspace_id, {"body": body}, changelog=reason, publish=True, actor=actor
         )
-        _s = settings or self._settings
         try:
-            build_workspace_by_name(
-                self._workspaces,
-                self._db.agent_defs,
-                self._subagents,
-                self._db.agent_versions,
-                self._db.workspace_file_resource_bindings,
-                self._db.resources,
-                self._db.resource_versions,
-                self._db.resource_blobs,
-                self._mcp_overrides,
-                self._mcp_tool_overrides,
-                self._env_doc_versions,
-                _s,
-                workspace_id,
-            )
+            self._ws_facade.build(workspace_id)
         except Exception:
             logger.exception(
-                "env_doc save: build_workspace_by_name failed for %s", workspace_id
+                "env_doc save: workspace build failed for %s", workspace_id
             )
         return result
 
-    def build_workspace(self, workspace_id: str) -> WorkspaceSyncResult | None:
-        """Trigger a workspace build. Thin wrapper over ``build_workspace_by_name``.
+    def build_workspace(self, workspace_id: str) -> BuildResult:
+        """Render the persistent workspace workdir.
 
-        Returns ``None`` when the workspace has no resolvable workdir
-        (unknown name, ephemeral, or path missing on disk).
+        For an ephemeral/unknown/path-missing workspace the facade returns a
+        no-op ``BuildResult`` (empty ``target_dir``, no errors) instead of the
+        old ``None``.
         """
-        return build_workspace_by_name(
-            self._workspaces,
-            self._db.agent_defs,
-            self._subagents,
-            self._db.agent_versions,
-            self._db.workspace_file_resource_bindings,
-            self._db.resources,
-            self._db.resource_versions,
-            self._db.resource_blobs,
-            self._mcp_overrides,
-            self._mcp_tool_overrides,
-            self._env_doc_versions,
-            self._settings,
-            workspace_id,
-        )
+        return self._ws_facade.build(workspace_id)
 
     # ═══════════════════════════════════════════════════════════════════
     # MCP policy + overrides (from McpOverridesMixin + mcp.py)

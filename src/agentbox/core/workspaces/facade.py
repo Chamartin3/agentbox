@@ -17,6 +17,7 @@ from collections.abc import Mapping
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
+from agentbox.core.data.payload_types import EnvDocRenderEntry
 from agentbox.core.data.workenv import EffectivePermissionsOverlay
 from agentbox.core.db import WorkspaceReadManager
 from agentbox.core.workspaces._types import WorkspaceSyncMeta
@@ -25,6 +26,7 @@ from agentbox.core.workspaces.render import (
     BuildResult,
     WorkspaceRenderer,
     _read_previous_meta,
+    write_env_doc_files,
 )
 
 _EPHEMERAL = "<ephemeral>"
@@ -104,6 +106,27 @@ class Workspaces:
             binding_count=len(blueprint.bindings),
             has_env_doc=blueprint.env_doc_body is not None,
             last_build=meta or None,
+        )
+
+    def render_env_doc(
+        self, workspace_id: str, into: Path
+    ) -> list[EnvDocRenderEntry]:
+        """Render ONLY the env-doc instruction files (CLAUDE.md / AGENTS.md)
+        into ``into`` and return the snapshot entries. Unlike ``build`` this
+        writes no native config — used for previews and shell-side env-doc
+        rendering into an arbitrary directory.
+        """
+        blueprint = self._composer.compose(workspace_id)
+        if blueprint.env_doc_body is None:
+            return []
+        into = Path(into)
+        into.mkdir(parents=True, exist_ok=True)
+        return write_env_doc_files(
+            into,
+            blueprint.env_doc_body,
+            blueprint.recipes,
+            workspace_id=workspace_id,
+            env_doc_version_id=blueprint.env_doc_version_id,
         )
 
     def permissions(self, agent: AgentDef) -> EffectivePermissionsOverlay | None:

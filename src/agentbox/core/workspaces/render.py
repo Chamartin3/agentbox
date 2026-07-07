@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,7 +26,7 @@ from agentbox.core.config import Settings
 from agentbox.core.data.constants import MCP_FILENAME
 from agentbox.core.data.payload_types import EnvDocRenderEntry, RunSnapshotEntry
 from agentbox.core.data.snapshots import workspace_outcomes_to_snapshot
-from agentbox.core.data.workenv import ResolvedBinding, WorkspaceBlueprint
+from agentbox.core.data.workenv import Recipe, ResolvedBinding, WorkspaceBlueprint
 from agentbox.core.workspaces._types import WorkspaceSyncMeta
 from agentbox.core.workspaces.construct import native_extra_items
 from agentbox.core.workspaces.generation import WorkspaceConstructor
@@ -83,6 +83,38 @@ def _binding_to_dict(b: ResolvedBinding, *, persistent: bool) -> dict:
         "skill_meta": b.skill_meta,
         "source_metadata": dict(b.source_metadata) if b.source_metadata else {},
     }
+
+
+def write_env_doc_files(
+    target_dir: Path,
+    body: str,
+    recipes: Iterable[Recipe],
+    *,
+    workspace_id: str,
+    env_doc_version_id: str | None,
+) -> list[EnvDocRenderEntry]:
+    """Write the env-doc body to each engine's context file (CLAUDE.md /
+    AGENTS.md) and return one snapshot entry per file. Engine-agnostic: the
+    same body goes to every recipe's ``context`` layout filename.
+    """
+    filenames: set[str] = set()
+    for recipe in recipes:
+        filename = recipe.resolve_layout("context")
+        if filename:
+            filenames.add(filename)
+    entries: list[EnvDocRenderEntry] = []
+    for filename in sorted(filenames):
+        (target_dir / filename).write_text(body, encoding="utf-8")
+        entries.append(
+            {
+                "role": "env_doc",
+                "file": filename,
+                "workspace_id": workspace_id,
+                "env_doc_version_id": env_doc_version_id or "",
+                "bytes": len(body.encode()),
+            }
+        )
+    return entries
 
 
 def write_secrets(workdir: Path, secrets: Mapping[str, str]) -> None:
@@ -204,22 +236,15 @@ class WorkspaceRenderer:
         # ── 2. Env-doc (CLAUDE.md / AGENTS.md, one per engine context file) ─
         if blueprint.env_doc_body is not None:
             try:
-                body = blueprint.env_doc_body
-                filenames: set[str] = set()
-                for recipe in blueprint.recipes:
-                    filename = recipe.resolve_layout("context")
-                    if filename:
-                        filenames.add(filename)
-                for filename in sorted(filenames):
-                    (target_dir / filename).write_text(body, encoding="utf-8")
-                    env_doc_files.append(filename)
-                    entry: EnvDocRenderEntry = {
-                        "role": "env_doc",
-                        "file": filename,
-                        "workspace_id": blueprint.workspace_id,
-                        "env_doc_version_id": blueprint.env_doc_version_id or "",
-                        "bytes": len(body.encode()),
-                    }
+                entries = write_env_doc_files(
+                    target_dir,
+                    blueprint.env_doc_body,
+                    blueprint.recipes,
+                    workspace_id=blueprint.workspace_id,
+                    env_doc_version_id=blueprint.env_doc_version_id,
+                )
+                for entry in entries:
+                    env_doc_files.append(entry["file"])
                     snapshot_entries.append(entry)
             except Exception as e:
                 logger.exception(

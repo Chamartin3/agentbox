@@ -20,11 +20,9 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
-from agentbox.cli.shared.deps import get_db
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
 from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.workspaces.prep import render_env_doc  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 
 
 def shell_cmd(
@@ -102,12 +100,7 @@ def _render_env_doc(
         ws = obj.workspaces.get_workspace(ws_name)
         if not ws:
             return False
-        db = get_db()
-        entries = render_env_doc(
-            db.workspace_env_doc_versions,
-            ws.get("id") or ws_name,
-            workspace_path,
-        )
+        entries = obj.workspaces.render_env_doc(ws_name, workspace_path)
         return bool(entries)
     except Exception as exc:
         obj.render.ops.warn(f"env-doc render skipped: {exc}")

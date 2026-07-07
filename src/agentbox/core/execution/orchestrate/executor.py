@@ -31,10 +31,7 @@ from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 from agentbox.core.execution.prepare.prompts import resolve_run_prompt
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
 from agentbox.core.engines.contracts.rendered import RenderedConfig
-from agentbox.core.workspaces import (
-    prepare_run_workdir,
-)
-from agentbox.core.workspaces import McpRegistry
+from agentbox.core.workspaces import McpRegistry, Workspaces
 from agentbox.core.tools.mcp_servers.inject import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,
@@ -55,6 +52,7 @@ class RunExecutor:
         self.db = db
         self.settings = settings
         self._mcp_registry = mcp_registry
+        self._workspaces = Workspaces(db.workspace_read, settings)
         self._broadcasters: dict[str, RunBroadcaster] = {}
         self._tasks: set[asyncio.Task[None]] = set()
         self._run_tasks: dict[str, asyncio.Task[None]] = {}
@@ -144,26 +142,22 @@ class RunExecutor:
         )
 
         # ── Workspace materialization + run_dir creation ──────────────────
-        run_dir, _workspace_snapshot_entries = prepare_run_workdir(
-            workspace_file_resource_bindings=self.db.workspace_file_resource_bindings,
-            resources=self.db.resources,
-            resource_versions=self.db.resource_versions,
-            resource_blobs=self.db.resource_blobs,
-            workspace_env_doc_versions=self.db.workspace_env_doc_versions,
-            workspace_runtime_permissions=self.db.workspace_runtime_permissions,
-            workspaces=self.db.workspaces,
-            agent_defs=self.db.agent_defs,
-            workspace_subagents=self.db.workspace_subagents,
-            agent_versions=self.db.agent_versions,
-            workspace_mcp_overrides=self.db.workspace_mcp_overrides,
-            workspace_mcp_tool_overrides=self.db.workspace_mcp_tool_overrides,
-            settings=self.settings,
-            workspace_id=_workspace_id,
-            agent=agent,
-            workdir=workdir,
-            mcp_registry=self._mcp_registry,
+        # No bound workspace → the agent itself acts as a single-agent
+        # workspace so its own config still renders into the run dir
+        # (parity with the old prep.py:400 `else agent.id` fallback).
+        _wsid = (
+            _workspace_id
+            if _workspace_id and _workspace_id != "<ephemeral>"
+            else agent.id
+        )
+        run_dir = self.settings.runs_tmpfs_dir / uuid.uuid4().hex
+        run_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
+        _build = self._workspaces.build(
+            _wsid,
+            into=run_dir,
             system_prompt=composed.system if composed else None,
         )
+        _workspace_snapshot_entries = _build.snapshot_entries
         # ── Resolve cwd relative to run_dir ───────────────────────────────
         _raw_cwd = rendered.cwd
         if not _raw_cwd.is_absolute():

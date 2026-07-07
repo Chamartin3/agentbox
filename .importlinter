@@ -62,7 +62,6 @@ ignore_imports =
     agentbox.api.runs.webhooks -> agentbox.core.execution.dispatch.policy
     # cli → core.workspaces
     agentbox.cli.ops.cfg -> agentbox.core.workspaces
-    agentbox.cli.ops.shell -> agentbox.core.workspaces.prep
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.from_yaml
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.builders.interactive
     agentbox.cli.ops.workenv -> agentbox.core.workspaces.generation.config
@@ -126,9 +125,6 @@ ignore_imports =
     agentbox.cli.ops.resource.bind -> agentbox.cli.shared.deps
     agentbox.cli.ops.resource.repo -> agentbox.cli.shared.deps
     agentbox.cli.work.res -> agentbox.cli.shared.deps
-    # ops composition-root commands legitimately open a Database via get_db
-    # (shell is a debug REPL)
-    agentbox.cli.ops.shell -> agentbox.cli.shared.deps
 
 # ─── CLI architecture: only render layer touches Rich ────────────────────
 # The Rich console library must only be imported by the render layer

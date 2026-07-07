@@ -5,6 +5,11 @@ Re-exports the names execution/ callers need so they never import from
 """
 
 from agentbox.core.resources.skills import discover_skills as discover_skills
+from agentbox.core.workspaces.facade import (
+    BuildResult as BuildResult,
+    WorkspaceInspection as WorkspaceInspection,
+    Workspaces as Workspaces,
+)
 from agentbox.core.workspaces.generation.materialize import (
     materialize_workspace as materialize_workspace,
 )
@@ -25,8 +30,11 @@ from agentbox.core.workspaces.prep import (
 )
 
 __all__ = [
+    "BuildResult",
     "McpRegistry",
     "WorkspaceInfo",
+    "WorkspaceInspection",
+    "Workspaces",
     "discover_skills",
     "load_workspace_permissions",
     "materialize_workspace",

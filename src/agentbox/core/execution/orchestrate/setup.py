@@ -27,7 +27,6 @@ from agentbox.core.execution.orchestrate.generator import (
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.workspaces import (
     McpRegistry,
-    load_workspace_permissions,
     resolve_path,
 )
 from agentbox.core.workspaces.catalog import resolve_workspace_callables
@@ -218,5 +217,4 @@ __all__ = [
     "NoBackendAvailable",
     "RunSetup",
     "fail_pre_run",
-    "load_workspace_permissions",
 ]
