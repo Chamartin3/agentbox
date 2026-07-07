@@ -13,7 +13,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.prompt import Prompt
 
-from agentbox.core.workspaces.generation.config import (
+from agentbox.core.data.workenv import (
     Permissions,
     WorkenvConfig,
 )

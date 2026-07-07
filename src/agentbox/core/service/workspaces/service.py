@@ -62,11 +62,11 @@ from agentbox.core.service.base import Service
 from agentbox.core.service.system.service import SystemService
 from agentbox.core.workspaces import BuildResult, Workspaces
 from agentbox.core.workspaces.generation.builders.from_db import load_workenv as _load_workenv_from_db
-from agentbox.core.workspaces.generation.config import McpRef, WorkenvConfig
+from agentbox.core.data.workenv import McpRef, WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.data.workenv import RenderedFile
-from agentbox.core.workspaces.generation.payload import RenderedDir
-from agentbox.core.workspaces.generation.recipe import Recipe
+from agentbox.core.data.workenv import RenderedDir
+from agentbox.core.data.workenv import Recipe
 from agentbox.core.engines.backends.recipe_loader import (
     list_recipes,
     load_recipe,

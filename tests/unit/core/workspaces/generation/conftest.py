@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from agentbox.core.workspaces.generation.config import (
+from agentbox.core.data.workenv import (
     AgentRef,
     McpRef,
     Permissions,

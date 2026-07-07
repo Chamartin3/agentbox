@@ -6,7 +6,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from agentbox.core.workspaces.generation.config import (
+from agentbox.core.data.workenv import (
     AgentRef,
     McpRef,
     Permissions,

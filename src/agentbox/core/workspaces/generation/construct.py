@@ -17,14 +17,14 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from agentbox.core.workspaces.generation.config import WorkenvConfig
+from agentbox.core.data.workenv import WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.workspaces.generation.materialize import (
     MaterializeOutcome,
     materialize_workspace,
 )
-from agentbox.core.workspaces.generation.payload import Item, RenderedDir
-from agentbox.core.workspaces.generation.recipe import Recipe
+from agentbox.core.data.workenv import Item, RenderedDir
+from agentbox.core.data.workenv import Recipe
 
 # (engine, config) -> extra native config items for that engine. Supplied by
 # the caller because building them needs the backend registry.

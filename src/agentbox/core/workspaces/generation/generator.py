@@ -10,9 +10,9 @@ import string
 from pathlib import Path
 
 from agentbox.core.workspaces.generation._paths import safe_dest
-from agentbox.core.workspaces.generation.config import McpRef, ResourceRef, WorkenvConfig
-from agentbox.core.workspaces.generation.payload import Item, RenderedDir, Role
-from agentbox.core.workspaces.generation.recipe import Recipe
+from agentbox.core.data.workenv import McpRef, ResourceRef, WorkenvConfig
+from agentbox.core.data.workenv import Item, RenderedDir, Role
+from agentbox.core.data.workenv import Recipe
 
 
 def render(

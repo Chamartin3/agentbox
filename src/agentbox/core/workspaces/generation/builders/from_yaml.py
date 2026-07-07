@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.workspaces.generation.config import WorkenvConfig
+from agentbox.core.data.workenv import WorkenvConfig
 
 
 def load_from_yaml(path: Path) -> WorkenvConfig:

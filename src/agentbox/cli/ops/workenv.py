@@ -18,7 +18,7 @@ from agentbox.cli.shared import CLIContext
 from agentbox.core.config import Settings
 from agentbox.core.data.constants import BackendName
 from agentbox.core.service import WorkspaceService
-from agentbox.core.workspaces.generation.config import WorkenvConfig
+from agentbox.core.data.workenv import WorkenvConfig
 from agentbox.core.workspaces.generation.builders.from_yaml import load_from_yaml
 from agentbox.core.workspaces.generation.builders.interactive import build_interactive
 

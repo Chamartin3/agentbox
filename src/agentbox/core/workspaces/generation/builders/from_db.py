@@ -16,7 +16,7 @@ from agentbox.core.db import (
     WorkspaceSubagentManager,
 )
 from agentbox.core.db.system.config import load_project_mcp_servers
-from agentbox.core.workspaces.generation.config import (
+from agentbox.core.data.workenv import (
     AgentRef,
     McpRef,
     Permissions,

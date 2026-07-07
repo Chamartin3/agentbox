@@ -5,7 +5,7 @@ recipes and it generates config files and materializes resource bindings
 onto a workdir, agnostic to which engines are involved.
 """
 
-from agentbox.core.workspaces.generation.config import (
+from agentbox.core.data.workenv import (
     AgentRef,
     McpRef,
     Permissions,
@@ -17,12 +17,12 @@ from agentbox.core.workspaces.generation.construct import (
     WorkspaceConstructor,
 )
 from agentbox.core.workspaces.generation.materialize import MaterializeOutcome
-from agentbox.core.workspaces.generation.payload import (
+from agentbox.core.data.workenv import (
     Item,
     RenderedDir,
     Role,
 )
-from agentbox.core.workspaces.generation.recipe import Recipe
+from agentbox.core.data.workenv import Recipe
 
 __all__ = [
     "WorkspaceConstructor",

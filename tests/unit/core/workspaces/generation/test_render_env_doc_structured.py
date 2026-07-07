@@ -10,7 +10,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from agentbox.core.workspaces.generation.config import WorkenvConfig
+from agentbox.core.data.workenv import WorkenvConfig
 from agentbox.core.workspaces.generation.generator import render
 from agentbox.core.engines.backends.recipe_loader import load_recipe, backend_for_engine
 
