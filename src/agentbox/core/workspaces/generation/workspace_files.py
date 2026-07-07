@@ -7,6 +7,7 @@ run cwd; this materializes them. Was ``engine_config/_common.py``.
 from __future__ import annotations
 
 import shutil
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from agentbox.core.workspaces.generation._paths import safe_dest
@@ -14,9 +15,14 @@ from agentbox.core.workspaces.generation._paths import safe_dest
 
 def materialize_workspace_files(
     workspace_path: Path,
-    files: list[dict],
+    files: Sequence[Mapping[str, object]],
     project_root: Path,
 ) -> int:
+    # ponytail: entries are copy-specs ({src, dst}); the workspace runtime
+    # permission overlay types its `files` as PermissionFileEntry ({path, mode,
+    # size}) — a pre-existing incoherence out of this plan's scope. Reads are
+    # defensive (isinstance-guarded) so a loose mapping type is honest here;
+    # upgrade path: split overlay grant-listings from file copy-specs.
     """Copy declared host paths into the workspace cwd.
 
     Each entry is ``{src, dst}`` where ``src`` is resolved relative to
