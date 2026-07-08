@@ -640,7 +640,6 @@ class WorkspaceService(Service):
         """Return every callable item (MCP, host-env, resource) installed in *workspace_id*."""
         return resolve_workspace_callables(
             workspace_id,
-            self._host_env_grants,
             self._db.workspace_file_resource_bindings,
             self._mcp_policies,
             self._mcp_overrides,
@@ -663,8 +662,8 @@ class WorkspaceService(Service):
         )
 
     def host_env_callables(self, workspace_id: str) -> list[CallableItem]:
-        """Return host-env CallableItems for *workspace_id*."""
-        return resolve_host_env_callables(workspace_id, self._host_env_grants)
+        """Return host-env CallableItems (availability — the full capability set)."""
+        return resolve_host_env_callables()
 
     # ═══════════════════════════════════════════════════════════════════
     # Subagent bindings (from bindings.py)

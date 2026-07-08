@@ -18,7 +18,6 @@ from __future__ import annotations
 from agentbox.core.data.constants import McpPolicy
 from agentbox.core.db import (
     WorkspaceFileResourceBindingManager,
-    WorkspaceHostEnvGrantManager,
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
     WorkspaceMcpToolOverrideManager,
@@ -29,7 +28,6 @@ from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES
 from agentbox.core.tools.catalog import CallableItem, enumerate_callables
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
-from agentbox.core.tools.grants import resolve_grants
 
 __all__ = [
     "resolve_workspace_callables",
@@ -38,46 +36,22 @@ __all__ = [
 ]
 
 
-def resolve_host_env_callables(
-    workspace_id: str,
-    host_env_grants: WorkspaceHostEnvGrantManager,
-) -> list[CallableItem]:
-    """Return CallableItems for host-env capabilities provisioned in *workspace_id*.
+def resolve_host_env_callables() -> list[CallableItem]:
+    """Return CallableItems for every host-env capability the server provides.
 
-    Reads resolved grants via the ``workspace_host_env_grants`` manager and
-    cross-references against the canonical ``CAPABILITIES`` registry.
-
-    ponytail: policy code (grants + CAPABILITIES) living in tooling/ — dies in
-    118_02 when host_env becomes an ordinary MCP server enumerated through the
-    manifest. The host_env_profiles / host_env_call_log table names and MCP
-    tool names are wire contracts and stay.
+    Availability only — lists the full ``CAPABILITIES`` taxonomy. Authorization
+    is agent territory: the calling agent's grants filter this at dispatch, not
+    here. (No workspace grant read — the workspace only owns availability.)
     """
-    row = host_env_grants.get_grant(workspace_id)
-    if not row:
-        effective_grants = resolve_grants(None, None)
-    else:
-        profile_id = row.get("profile_id")
-        profile = (
-            host_env_grants.get_profile(profile_id)
-            if profile_id is not None
-            else None
+    return [
+        CallableItem(
+            name=str(cap_name),
+            kind="host_env",
+            description=cap_def.description,
+            policy=dict(cap_def.grant_schema),
         )
-        effective_grants = resolve_grants(
-            profile["grants"] if profile else None, row.get("overrides")
-        )
-
-    items: list[CallableItem] = []
-    for cap_name, cap_def in CAPABILITIES.items():
-        if cap_name in effective_grants or cap_def.default_granted:
-            items.append(
-                CallableItem(
-                    name=str(cap_name),
-                    kind="host_env",
-                    description=cap_def.description,
-                    policy=dict(cap_def.grant_schema),
-                )
-            )
-    return items
+        for cap_name, cap_def in CAPABILITIES.items()
+    ]
 
 
 def _declared_tool_callables(declared: list[CanonicalTool] | None) -> list[CallableItem]:
@@ -108,7 +82,6 @@ def _builtin_complement_callables() -> list[CallableItem]:
 
 def resolve_workspace_callables(
     workspace_id: str,
-    host_env_grants: WorkspaceHostEnvGrantManager,
     workspace_file_resource_bindings: WorkspaceFileResourceBindingManager,
     mcp_policies: WorkspaceMcpPolicyManager,
     mcp_overrides: WorkspaceMcpOverrideManager,
@@ -128,7 +101,7 @@ def resolve_workspace_callables(
     return enumerate_callables([
         _declared_tool_callables(declared_tools),
         resolve_mcp_callables(workspace_id, mcp_policies, mcp_overrides, mcp_tool_overrides, mcp_registry),
-        resolve_host_env_callables(workspace_id, host_env_grants),
+        resolve_host_env_callables(),
         resolve_resource_callables(workspace_id, workspace_file_resource_bindings),
         _builtin_complement_callables(),
     ])

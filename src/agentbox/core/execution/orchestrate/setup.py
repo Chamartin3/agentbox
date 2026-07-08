@@ -166,7 +166,6 @@ class RunSetup:
             ws_callables = (
                 resolve_workspace_callables(
                     ws_id,
-                    self._db.workspace_host_env_grants,
                     self._db.workspace_file_resource_bindings,
                     self._db.workspace_mcp_policies,
                     self._db.workspace_mcp_overrides,
