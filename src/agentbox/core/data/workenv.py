@@ -218,12 +218,26 @@ class Item:
     content: str
 
 
+@dataclass(frozen=True)
+class WrittenItem:
+    """Metadata for one item the generator wrote to disk.
+
+    Lets callers derive snapshot/provenance entries from what was actually
+    written, instead of a parallel hardcoded write path.
+    """
+
+    role: str  # Role value, e.g. "context"
+    file: str  # relative layout path, e.g. "CLAUDE.md"
+    bytes: int
+
+
 @dataclass
 class RenderedDir:
     """Result of a render operation."""
 
     target_dir: Path
     written_paths: list[Path] = field(default_factory=list)
+    items: list[WrittenItem] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

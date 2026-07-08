@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,7 +26,7 @@ from agentbox.core.config import Settings
 from agentbox.core.data.constants import MCP_FILENAME
 from agentbox.core.data.payload_types import EnvDocRenderEntry, RunSnapshotEntry
 from agentbox.core.data.snapshots import workspace_outcomes_to_snapshot
-from agentbox.core.data.workenv import Recipe, ResolvedBinding, WorkspaceBlueprint
+from agentbox.core.data.workenv import ResolvedBinding, WorkspaceBlueprint
 from agentbox.core.workspaces._types import WorkspaceSyncMeta
 from agentbox.core.workspaces.factory import native_extra_items
 from agentbox.core.workspaces.generation import WorkspaceConstructor
@@ -83,38 +83,6 @@ def _binding_to_dict(b: ResolvedBinding, *, persistent: bool) -> dict:
         "skill_meta": b.skill_meta,
         "source_metadata": dict(b.source_metadata) if b.source_metadata else {},
     }
-
-
-def write_env_doc_files(
-    target_dir: Path,
-    body: str,
-    recipes: Iterable[Recipe],
-    *,
-    workspace_id: str,
-    env_doc_version_id: str | None,
-) -> list[EnvDocRenderEntry]:
-    """Write the env-doc body to each engine's context file (CLAUDE.md /
-    AGENTS.md) and return one snapshot entry per file. Engine-agnostic: the
-    same body goes to every recipe's ``context`` layout filename.
-    """
-    filenames: set[str] = set()
-    for recipe in recipes:
-        filename = recipe.resolve_layout("context")
-        if filename:
-            filenames.add(filename)
-    entries: list[EnvDocRenderEntry] = []
-    for filename in sorted(filenames):
-        (target_dir / filename).write_text(body, encoding="utf-8")
-        entries.append(
-            {
-                "role": "env_doc",
-                "file": filename,
-                "workspace_id": workspace_id,
-                "env_doc_version_id": env_doc_version_id or "",
-                "bytes": len(body.encode()),
-            }
-        )
-    return entries
 
 
 def write_secrets(workdir: Path, secrets: Mapping[str, str]) -> None:
@@ -233,35 +201,43 @@ class WorkspaceRenderer:
                 )
                 errors.append(f"resources: {e}")
 
-        # ── 2. Env-doc (CLAUDE.md / AGENTS.md, one per engine context file) ─
-        if blueprint.env_doc_body is not None:
-            try:
-                entries = write_env_doc_files(
-                    target_dir,
-                    blueprint.env_doc_body,
-                    blueprint.recipes,
-                    workspace_id=blueprint.workspace_id,
-                    env_doc_version_id=blueprint.env_doc_version_id,
-                )
-                for entry in entries:
-                    env_doc_files.append(entry["file"])
-                    snapshot_entries.append(entry)
-            except Exception as e:
-                logger.exception(
-                    "workspace render: env doc rendering failed for %r",
-                    blueprint.workspace_id,
-                )
-                errors.append(f"env_doc: {e}")
-
-        # ── 3. Native per-engine config (+ empty .mcp.json + workspace files) ─
+        # ── 2. Native per-engine config — the SOLE writer of every file,
+        # including the instruction/context file (CLAUDE.md / AGENTS.md). The
+        # env-doc snapshot entries are derived from what it actually wrote (no
+        # parallel raw-body write path). ────────────────────────────────────
         try:
-            constructor.generate(target_dir, blueprint.config, system_prompt=system_prompt)
+            rendered_dirs = constructor.generate(
+                target_dir, blueprint.config, system_prompt=system_prompt
+            )
         except Exception as e:
             logger.exception(
                 "workspace render: native config generation failed for %r",
                 blueprint.workspace_id,
             )
             errors.append(f"config: {e}")
+            rendered_dirs = []
+
+        # Env-doc provenance: only when the workspace actually has an env-doc
+        # body (parity with the old step-2 guard). When a per-run system_prompt
+        # replaced the body, the context file holds the prompt, NOT the env-doc
+        # version — so record no version id rather than a false one.
+        if blueprint.env_doc_body is not None:
+            version_id = (
+                blueprint.env_doc_version_id if system_prompt is None else ""
+            )
+            for rendered_dir in rendered_dirs:
+                for item in rendered_dir.items:
+                    if item.role != "context" or item.file in env_doc_files:
+                        continue
+                    env_doc_files.append(item.file)
+                    entry: EnvDocRenderEntry = {
+                        "role": "env_doc",
+                        "file": item.file,
+                        "workspace_id": blueprint.workspace_id,
+                        "env_doc_version_id": version_id or "",
+                        "bytes": item.bytes,
+                    }
+                    snapshot_entries.append(entry)
 
         # Claude runs with `--strict-mcp-config`, which errors if .mcp.json is
         # absent; render only emits it when servers exist.

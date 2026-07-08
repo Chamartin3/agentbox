@@ -144,3 +144,69 @@ def test_render_env_doc_no_active_doc_is_empty(
 ) -> None:
     _seed_workspace(db, "nodoc")
     assert _workspaces(db, settings).render_env_doc("nodoc", tmp_path) == []
+
+
+# ── Plan 118_01: the generator is the single writer of the context file ──────
+
+
+def test_context_file_written_exactly_once(
+    db: Database, settings: Settings, tmp_path: Path, monkeypatch
+) -> None:
+    """No double-write: CLAUDE.md is written once per build, not once by a raw
+    env-doc pass and again by the generator."""
+    _seed_workspace(db, "default")
+    _save_env_doc(db, "default")
+
+    writes: list[str] = []
+    real_write = Path.write_text
+
+    def _counting_write(self: Path, *a, **k):
+        writes.append(self.name)
+        return real_write(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", _counting_write)
+    _workspaces(db, settings).build("default")
+
+    # Only the claude recipe writes CLAUDE.md; with the old raw env-doc pass it
+    # was written twice (raw body, then generator). Now exactly once.
+    # (AGENTS.md is legitimately written once per engine that shares it.)
+    assert writes.count("CLAUDE.md") == 1
+
+
+def test_snapshot_bytes_match_written_file(
+    db: Database, settings: Settings, tmp_path: Path
+) -> None:
+    _seed_workspace(db, "default")
+    _save_env_doc(db, "default")
+
+    result = _workspaces(db, settings).build("default")
+    workdir = tmp_path / "workdir" / "default"
+
+    env_entries = [e for e in result.snapshot_entries if e["role"] == "env_doc"]
+    assert env_entries
+    for e in env_entries:
+        on_disk = (workdir / e["file"]).read_text().encode()
+        assert e["bytes"] == len(on_disk)
+        assert e["env_doc_version_id"]  # baseline: real version recorded
+
+
+def test_system_prompt_override_records_no_env_doc_version(
+    db: Database, settings: Settings, tmp_path: Path
+) -> None:
+    """When a per-run system_prompt replaces the env-doc body, the context file
+    holds the prompt and the snapshot must NOT claim the env-doc version."""
+    _seed_workspace(db, "default")
+    _save_env_doc(db, "default")
+    run_dir = tmp_path / "runs" / "sys"
+
+    result = _workspaces(db, settings).build(
+        "default", into=run_dir, system_prompt="SYSTEM PROMPT WINS"
+    )
+
+    assert "SYSTEM PROMPT WINS" in (run_dir / "CLAUDE.md").read_text()
+    env_entries = [e for e in result.snapshot_entries if e["role"] == "env_doc"]
+    assert env_entries
+    for e in env_entries:
+        # no false version claim; bytes reflect the prompt that was written
+        assert e["env_doc_version_id"] == ""
+        assert e["bytes"] == len((run_dir / e["file"]).read_text().encode())

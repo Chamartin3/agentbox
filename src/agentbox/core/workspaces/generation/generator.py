@@ -11,8 +11,24 @@ from pathlib import Path
 
 from agentbox.core.workspaces.generation._paths import safe_dest
 from agentbox.core.data.workenv import McpRef, ResourceRef, WorkspaceConfig
-from agentbox.core.data.workenv import Item, RenderedDir, Role
+from agentbox.core.data.workenv import Item, RenderedDir, Role, WrittenItem
 from agentbox.core.data.workenv import Recipe
+
+
+def _write_item(target_dir: Path, item: Item, recipe: Recipe) -> WrittenItem | None:
+    """Write one item to its recipe-resolved path; return its metadata.
+
+    Returns None when the recipe declares no layout for the item's role.
+    """
+    layout_path = recipe.resolve_layout(item.role, name=item.name)
+    if not layout_path:
+        return None
+    file_path = safe_dest(target_dir, layout_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(item.content, encoding="utf-8")
+    return WrittenItem(
+        role=item.role.value, file=layout_path, bytes=len(item.content.encode())
+    )
 
 
 def render(
@@ -41,16 +57,32 @@ def render(
         items += extra_items
 
     written: list[Path] = []
+    rendered: list[WrittenItem] = []
     for item in items:
-        layout_path = recipe.resolve_layout(item.role, name=item.name)
-        if not layout_path:
+        wi = _write_item(target_dir, item, recipe)
+        if wi is None:
             continue
-        file_path = safe_dest(target_dir, layout_path)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(item.content, encoding="utf-8")
-        written.append(file_path)
+        written.append(safe_dest(target_dir, wi.file))
+        rendered.append(wi)
 
-    return RenderedDir(target_dir=target_dir, written_paths=written)
+    return RenderedDir(target_dir=target_dir, written_paths=written, items=rendered)
+
+
+def render_context_only(
+    target_dir: Path, config: WorkspaceConfig, recipes: list[Recipe]
+) -> list[WrittenItem]:
+    """Write ONLY the instruction/context file (CLAUDE.md / AGENTS.md) for each
+    recipe — the env-doc preview path. Same writer + templating as ``render``,
+    no mcp/permissions/subagent items.
+    """
+    out: list[WrittenItem] = []
+    for recipe in recipes:
+        if not recipe.layout.get("context"):
+            continue
+        wi = _write_item(target_dir, _build_context(config, recipe), recipe)
+        if wi is not None:
+            out.append(wi)
+    return out
 
 
 def _build_items(

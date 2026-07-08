@@ -33,11 +33,11 @@ from agentbox.core.workspaces.generation.materialize import (
     materialize_workspace as materialize_workspace,
 )
 from agentbox.core.workspaces.mcp.client.registry import McpRegistry as McpRegistry
+from agentbox.core.workspaces.generation.generator import render_context_only
 from agentbox.core.workspaces.render import (
     BuildResult as BuildResult,
     WorkspaceRenderer,
     _read_previous_meta,
-    write_env_doc_files,
 )
 from agentbox.core.workspaces.workdir import (
     WorkspaceInfo as WorkspaceInfo,
@@ -145,13 +145,19 @@ class Workspaces:
             return []
         into = Path(into)
         into.mkdir(parents=True, exist_ok=True)
-        return write_env_doc_files(
-            into,
-            blueprint.env_doc_body,
-            blueprint.recipes,
-            workspace_id=workspace_id,
-            env_doc_version_id=blueprint.env_doc_version_id,
-        )
+        version_id = blueprint.env_doc_version_id or ""
+        entries: list[EnvDocRenderEntry] = []
+        for item in render_context_only(into, blueprint.config, list(blueprint.recipes)):
+            entries.append(
+                {
+                    "role": "env_doc",
+                    "file": item.file,
+                    "workspace_id": workspace_id,
+                    "env_doc_version_id": version_id,
+                    "bytes": item.bytes,
+                }
+            )
+        return entries
 
     def permissions(self, agent: AgentDef) -> EffectivePermissionsOverlay | None:
         """Resolve the workspace permission overlay for an agent's run."""
