@@ -146,6 +146,23 @@ def test_render_env_doc_no_active_doc_is_empty(
     assert _workspaces(db, settings).render_env_doc("nodoc", tmp_path) == []
 
 
+def test_build_merges_extra_mcp_servers(
+    db: Database, settings: Settings, tmp_path: Path
+) -> None:
+    """Run-scoped intrinsic servers are written into .mcp.json by build itself
+    (no post-render patch)."""
+    _seed_workspace(db, "default")
+    run_dir = tmp_path / "runs" / "mcp"
+    spec = {"command": "python", "args": ["-m", "x"], "env": {"K": "v"}}
+
+    _workspaces(db, settings).build(
+        "default", into=run_dir, extra_mcp_servers={"agentbox-host-env": spec}
+    )
+
+    data = json.loads((run_dir / ".mcp.json").read_text())
+    assert data["mcpServers"]["agentbox-host-env"] == spec
+
+
 # ── Plan 118_01: the generator is the single writer of the context file ──────
 
 

@@ -21,7 +21,7 @@ from pathlib import Path as _Path
 from unittest.mock import patch
 
 import pytest
-from agentbox.core.tools.mcp_servers.inject import inject_host_env_mcp
+from agentbox.core.tools.mcp_servers.specs import host_env_server_spec
 from agentbox.core.tools.mcp_servers.host_env.context import HostEnvContext
 
 from agentbox.core.tools.grants import (  # noqa: E402
@@ -383,44 +383,22 @@ class TestAuditLog:
 
 
 # ---------------------------------------------------------------------------
-# Executor injection test
+# Host-env spawn spec (the run-scoped intrinsic server, written into .mcp.json
+# by build(); the merge itself is covered in test_facade_build).
 # ---------------------------------------------------------------------------
 
 
-class TestExecutorInjection:
-    def test_injects_host_env_into_mcp_config(self, tmp_path: Path):
-        existing = {"mcpServers": {"existing-server": {"command": "other"}}}
-        mcp_path = tmp_path / ".mcp.json"
-        mcp_path.write_text(json.dumps(existing))
-
+class TestHostEnvSpec:
+    def test_spec_carries_command_grants_and_context(self, tmp_path: Path):
         grants = {"fs.read": {"allowed_paths": [str(tmp_path)]}}
-        inject_host_env_mcp(
-            run_dir=tmp_path,
+        spec = host_env_server_spec(
             grants=grants,
             workspace_id="ws1",
             workdir=tmp_path / "work",
             db_path=tmp_path / "agentbox.sqlite",
         )
-
-        updated = json.loads(mcp_path.read_text())
-        assert "agentbox-host-env" in updated["mcpServers"]
-        entry = updated["mcpServers"]["agentbox-host-env"]
-        assert entry["args"] == ["-m", "agentbox.core.tools.mcp_servers.host_env"]
-        env = entry["env"]
+        assert spec["args"] == ["-m", "agentbox.core.tools.mcp_servers.host_env"]
+        env = spec["env"]
         assert json.loads(env["AGENTBOX_HOST_ENV_GRANTS_JSON"]) == grants
         assert env["AGENTBOX_HOST_ENV_WORKSPACE_ID"] == "ws1"
-        # existing server preserved
-        assert "existing-server" in updated["mcpServers"]
-
-    def test_creates_mcp_config_when_missing(self, tmp_path: Path):
-        grants = {"agentbox.workspace_info": {}}
-        inject_host_env_mcp(
-            run_dir=tmp_path,
-            grants=grants,
-            workspace_id="ws2",
-            workdir=tmp_path,
-            db_path=tmp_path / "agentbox.sqlite",
-        )
-
-        updated = json.loads((tmp_path / ".mcp.json").read_text())
-        assert "agentbox-host-env" in updated["mcpServers"]
+        assert env["AGENTBOX_HOST_ENV_WORKDIR"] == str(tmp_path / "work")

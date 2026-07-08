@@ -17,7 +17,7 @@ from pathlib import Path
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.data.payload_types import EnvDocRenderEntry
+from agentbox.core.data.payload_types import EnvDocRenderEntry, McpStdioServerSpec
 from agentbox.core.data.workenv import EffectivePermissionsOverlay
 from agentbox.core.db import WorkspaceReadManager
 from agentbox.core.workspaces.build import (
@@ -63,6 +63,7 @@ class Workspaces:
         into: Path | None = None,
         system_prompt: str | None = None,
         secrets: Mapping[str, str] | None = None,
+        extra_mcp_servers: Mapping[str, McpStdioServerSpec] | None = None,
     ) -> BuildResult:
         """Render a workspace onto disk.
 
@@ -70,6 +71,8 @@ class Workspaces:
         reconcile + provenance). ``into=path`` renders a fresh per-run dir
         with identical content but no reconcile/provenance. An empty or
         ``<ephemeral>`` workspace with ``into=None`` never touches disk.
+        ``extra_mcp_servers`` are run-scoped intrinsic servers (host_env /
+        agent_tools) merged into the run dir's ``.mcp.json``.
         """
         if into is None:
             workdir = resolve_workspace_workdir(self._reads, self._settings, workspace_id)
@@ -89,6 +92,7 @@ class Workspaces:
             persistent=persistent,
             system_prompt=system_prompt,
             secrets=secrets,
+            extra_mcp_servers=extra_mcp_servers,
         )
 
     def inspect(self, workspace_id: str = "default") -> WorkspaceInspection:

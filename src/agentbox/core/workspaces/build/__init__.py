@@ -29,7 +29,7 @@ from pathlib import Path
 
 from agentbox.core.config import Settings
 from agentbox.core.data.constants import MCP_FILENAME
-from agentbox.core.data.payload_types import EnvDocRenderEntry, RunSnapshotEntry
+from agentbox.core.data.payload_types import EnvDocRenderEntry, McpStdioServerSpec, RunSnapshotEntry
 from agentbox.core.data.snapshots import workspace_outcomes_to_snapshot
 from agentbox.core.data.workenv import (
     Item,
@@ -244,6 +244,7 @@ class WorkspaceBuilder:
         persistent: bool,
         system_prompt: str | None = None,
         secrets: Mapping[str, str] | None = None,
+        extra_mcp_servers: Mapping[str, McpStdioServerSpec] | None = None,
     ) -> BuildResult:
         target_dir = Path(target_dir)
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -331,12 +332,22 @@ class WorkspaceBuilder:
                     }
                     snapshot_entries.append(entry)
 
-        # Claude runs with `--strict-mcp-config`, which errors if .mcp.json is
-        # absent; render only emits it when servers exist.
-        # ponytail: guarantee an empty one so a server-less run still launches.
+        # .mcp.json is the single MCP-config write: the generator emits it from
+        # the workspace's servers; here we guarantee it exists (Claude's
+        # --strict-mcp-config errors if absent) and merge in the run-scoped
+        # intrinsic servers (host_env / agent_tools) — one writer, no post-render
+        # patch.
         mcp_json = target_dir / MCP_FILENAME
-        if not mcp_json.exists():
-            mcp_json.write_text('{\n  "mcpServers": {}\n}\n', encoding="utf-8")
+        if mcp_json.exists():
+            mcp_data = json.loads(mcp_json.read_text(encoding="utf-8"))
+        else:
+            mcp_data = {"mcpServers": {}}
+        mcp_data.setdefault("mcpServers", {})
+        for name, spec in (extra_mcp_servers or {}).items():
+            mcp_data["mcpServers"][name] = spec
+        mcp_json.write_text(
+            json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
 
         perm_files = (
             blueprint.permissions.get("files") if blueprint.permissions else None

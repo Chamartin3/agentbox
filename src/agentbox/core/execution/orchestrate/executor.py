@@ -33,9 +33,11 @@ from agentbox.core.execution.retry import pump_into_session  # noqa: F401
 from agentbox.core.engines.contracts.rendered import RenderedConfig
 from agentbox.core.workspaces import Workspaces
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
-from agentbox.core.tools.mcp_servers.inject import (
-    inject_agent_tools_mcp,
-    inject_host_env_mcp,
+from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME, HOST_ENV_SERVER_NAME
+from agentbox.core.data.payload_types import McpStdioServerSpec
+from agentbox.core.tools.mcp_servers.specs import (
+    agent_tools_server_spec,
+    host_env_server_spec,
 )
 
 logger = logging.getLogger(__name__)
@@ -153,10 +155,34 @@ class RunExecutor:
         )
         run_dir = self.settings.runs_tmpfs_dir / uuid.uuid4().hex
         run_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
+
+        # Run-scoped intrinsic MCP servers: build their spawn specs from the
+        # resolved grants + run context, then let build() write them into the
+        # run dir's .mcp.json alongside every other server — one writer, no
+        # post-render patch.
+        _host_env_grants = self._snapshots.resolve_host_env_grants(_workspace_id)
+        _agent_tool_grants = self._setup.resolve_agent_tool_grants(agent.id)
+        _extra_mcp: dict[str, McpStdioServerSpec] = {}
+        if _host_env_grants:
+            _extra_mcp[HOST_ENV_SERVER_NAME] = host_env_server_spec(
+                grants=_host_env_grants,
+                workspace_id=_workspace_id or "",
+                workdir=workdir,
+                db_path=self.settings.db_path,
+            )
+        if _agent_tool_grants:
+            _extra_mcp[AGENT_TOOLS_SERVER_NAME] = agent_tools_server_spec(
+                grants=_agent_tool_grants,
+                agent_id=agent.id,
+                workdir=workdir,
+                db_path=self.settings.db_path,
+            )
+
         _build = self._workspaces.build(
             _wsid,
             into=run_dir,
             system_prompt=composed.system if composed else None,
+            extra_mcp_servers=_extra_mcp or None,
         )
         _workspace_snapshot_entries = _build.snapshot_entries
         # ── Resolve cwd relative to run_dir ───────────────────────────────
@@ -171,21 +197,6 @@ class RunExecutor:
             model=rendered.model,
         )
         _resource_snapshot_entries = _prompt_snapshot_entries + _workspace_snapshot_entries
-
-        _host_env_grants = self._snapshots.resolve_host_env_grants(_workspace_id)
-        _agent_tool_grants = self._setup.resolve_agent_tool_grants(agent.id)
-        if _host_env_grants:
-            inject_host_env_mcp(
-                run_dir=run_dir, grants=_host_env_grants,
-                workspace_id=_workspace_id or "", workdir=workdir,
-                db_path=self.settings.db_path,
-            )
-        if _agent_tool_grants:
-            inject_agent_tools_mcp(
-                run_dir=run_dir, grants=_agent_tool_grants,
-                agent_id=agent.id, workdir=workdir,
-                db_path=self.settings.db_path,
-            )
 
         if _host_env_grants:
             rendered.agent_meta["host_env_grants"] = _host_env_grants
