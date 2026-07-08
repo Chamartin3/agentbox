@@ -7,7 +7,7 @@ import logging
 from fastmcp import FastMCP
 
 from agentbox.core.data.payload_types import WorkspaceBindingSpec
-from agentbox.core.data.rows import EnvDocRow, WorkspaceHostEnvGrantRow
+from agentbox.core.data.rows import AgentHostEnvGrantRow, EnvDocRow
 from agentbox.core.service import render_env_doc_preview
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
@@ -116,20 +116,22 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
 
     @mcp.tool
     def set_host_env_grants(
-        workspace_id: str,
+        agent_id: str,
         grants: dict,
         reason: str,
-    ) -> WorkspaceHostEnvGrantRow | dict:
-        """Set host-env capability grants for a workspace.
+    ) -> AgentHostEnvGrantRow | dict:
+        """Set host-env capability grants for an AGENT.
 
-        grants is a dict of capability → config, e.g.
-        {'fs.read': {'allowed_paths': ['/tmp']}, 'shell.exec': {'command_allowlist': ['ls.*']}}.
-        ``reason`` must be ≥ 3 chars."""
+        Authorization is agent territory: grants are keyed on the agent, and the
+        run path enforces them for that agent. grants is a dict of capability →
+        config, e.g. {'fs.read': {'allowed_paths': ['/tmp']},
+        'shell.exec': {'command_allowlist': ['ls.*']}}. ``reason`` must be ≥ 3
+        chars."""
         err = _require_reason(reason)
         if err:
             return err
-        row = ctx.workspaces.set_workspace_host_env(
-            workspace_id, profile_id=None, overrides=grants, changelog=reason
+        row = ctx.workspaces.set_agent_host_env(
+            agent_id, profile_id=None, overrides=grants, changelog=reason
         )
         return row
 

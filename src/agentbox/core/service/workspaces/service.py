@@ -53,6 +53,7 @@ from agentbox.core.data.rows import (
     WorkspaceRuntimePermissionRow,
     WorkspaceRow,
     WorkspaceSubagentRow,
+    AgentHostEnvGrantRow,
     WorkspaceHostEnvGrantRow,
 )
 from agentbox.core.tools.catalog import CallableItem
@@ -587,6 +588,33 @@ class WorkspaceService(Service):
     def delete_host_env_profile(self, profile_id: str) -> None:
         self._host_env_grants.delete_profile(profile_id)
 
+    def get_agent_host_env(self, agent_id: str) -> AgentHostEnvGrantRow | None:
+        """Host-env grants for an agent (authorization is agent territory)."""
+        return self._db.agent_host_env_grants.get_grant(agent_id)
+
+    def set_agent_host_env(
+        self,
+        agent_id: str,
+        *,
+        profile_id: str | None,
+        overrides: dict | None,
+        changelog: str,
+        actor: str | None = None,
+    ) -> AgentHostEnvGrantRow:
+        changelog = _validate_changelog(changelog)
+        return self._db.agent_host_env_grants.set_grant(
+            agent_id,
+            profile_id=profile_id,
+            overrides=overrides,
+            changelog=changelog,
+            actor=actor,
+        )
+
+    # Transitional workspace-scoped grant surface. The run path reads AGENT
+    # grants (118_03 B); these remain only for the not-yet-migrated API/CLI UI
+    # and write the legacy workspace_host_env_grants table.
+    # ponytail: migrate the api/system/host + cli/system/host endpoints to the
+    # agent surface, then delete these + the workspace table (118_03 C3).
     def get_workspace_host_env(self, workspace_id: str) -> WorkspaceHostEnvGrantRow | None:
         return self._host_env_grants.get_grant(workspace_id)
 

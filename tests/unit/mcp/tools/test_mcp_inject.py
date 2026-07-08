@@ -155,15 +155,15 @@ class TestSetHostEnvGrants:
 
     def test_valid_grants_stored(self, tmp_path: Path):
         ctx = MagicMock()
-        ctx.workspaces.set_workspace_host_env.return_value = {"workspace_id": "ws1"}
+        ctx.workspaces.set_agent_host_env.return_value = {"agent_id": "agent1"}
         grants = {"fs.read": {"allowed_paths": ["/tmp"]}}
         mcp, ctx = _make_mcp(ctx)
         fn = _get_tool_fn(mcp, "set_host_env_grants")
-        result = fn("ws1", grants, "grant fs read")
-        ctx.workspaces.set_workspace_host_env.assert_called_once_with(
-            "ws1", profile_id=None, overrides=grants, changelog="grant fs read"
+        result = fn("agent1", grants, "grant fs read")
+        ctx.workspaces.set_agent_host_env.assert_called_once_with(
+            "agent1", profile_id=None, overrides=grants, changelog="grant fs read"
         )
-        assert result == {"workspace_id": "ws1"}
+        assert result == {"agent_id": "agent1"}
 
 
 # ---------------------------------------------------------------------------
