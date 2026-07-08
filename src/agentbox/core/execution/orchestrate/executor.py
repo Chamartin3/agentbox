@@ -31,7 +31,8 @@ from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 from agentbox.core.execution.prepare.prompts import resolve_run_prompt
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
 from agentbox.core.engines.contracts.rendered import RenderedConfig
-from agentbox.core.workspaces import McpRegistry, Workspaces
+from agentbox.core.workspaces import Workspaces
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 from agentbox.core.tools.mcp_servers.inject import (
     inject_agent_tools_mcp,
     inject_host_env_mcp,

@@ -17,9 +17,29 @@ from pathlib import Path
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.db import WorkspaceManager
+from agentbox.core.db import WorkspaceManager, WorkspaceReadManager
 from agentbox.core.engines.backends.recipe_loader import context_filenames
 from agentbox.core.resources.skills import discover_skills
+
+
+def resolve_workspace_workdir(
+    reads: WorkspaceReadManager, settings: Settings, workspace_id: str
+) -> Path | None:
+    """Resolve a workspace NAME → its on-disk persistent workdir path.
+
+    The workspace-scoped counterpart to ``resolve_path`` (which resolves an
+    agent's workdir). Returns None for empty/ephemeral ids or an unresolvable
+    name. Both live here — one module owns path resolution.
+    """
+    if not workspace_id or workspace_id == "<ephemeral>":
+        return None
+    record = reads.get_workspace_by_name(workspace_id)
+    if record is not None:
+        rel = record["path"]
+        if rel:
+            return (settings.project_root / rel).resolve()
+    candidate = settings.workspaces_root / workspace_id
+    return candidate if candidate.exists() else None
 
 
 @dataclass(frozen=True)

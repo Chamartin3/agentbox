@@ -25,10 +25,8 @@ from agentbox.core.execution.orchestrate.generator import (
     _read_agent_config_json,
 )
 from agentbox.core.tools.canonical import CanonicalTool
-from agentbox.core.workspaces import (
-    McpRegistry,
-    resolve_path,
-)
+from agentbox.core.workspaces import resolve_path
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
 
 logger = logging.getLogger(__name__)

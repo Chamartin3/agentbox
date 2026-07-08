@@ -1,24 +1,18 @@
 """Workspace domain — the ``Workspaces`` facade is the only public surface.
 
-Responsibilities are split by submodule:
+Responsibilities split by submodule (outsiders import only this package root):
 
-- ``compose``    — DB state → immutable ``WorkspaceBlueprint`` (no I/O).
-- ``render``     — blueprint → disk (``WorkspaceBuilder``, ``BuildResult``).
-- ``generation`` — the engine-agnostic write pipeline render delegates to.
-- ``factory``    — wires the engine recipe registry into that pipeline.
-- ``mcp``        — external MCP client + per-workspace server resolution.
-- ``catalog``    — tool-surface aggregation.
-- ``workdir``    — workspace path resolution + on-disk inspection.
+- ``compose``  — DB state → immutable ``WorkspaceBlueprint`` (+ ``WorkspaceInspection``). No I/O.
+- ``build``    — blueprint → disk (``WorkspaceBuilder``, ``BuildResult``, the write pipeline).
+- ``tooling``  — MCP servers: install / list / talk (zero policy).
+- ``workdir``  — path resolution (``resolve_path`` for agents, ``resolve_workspace_workdir`` for names).
 
-``Workspaces`` (defined here) composes ``compose`` → ``render`` behind
-``build`` / ``inspect`` / ``render_env_doc`` / ``permissions``. Outsiders
-import only from this package root, never the submodules.
+``Workspaces`` is pure delegation over ``compose`` → ``build``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 
 from agentbox.core.config import Settings
@@ -26,59 +20,41 @@ from agentbox.core.data import AgentDef
 from agentbox.core.data.payload_types import EnvDocRenderEntry
 from agentbox.core.data.workenv import EffectivePermissionsOverlay
 from agentbox.core.db import WorkspaceReadManager
-from agentbox.core.resources.skills import discover_skills as discover_skills
-from agentbox.core.workspaces._types import WorkspaceSyncMeta
-from agentbox.core.workspaces.compose import WorkspaceComposer
-from agentbox.core.workspaces.build.bindings import (
-    materialize_workspace as materialize_workspace,
-)
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry as McpRegistry
-from agentbox.core.workspaces.build.engine import render_context_only
 from agentbox.core.workspaces.build import (
     BuildResult as BuildResult,
     WorkspaceBuilder,
     _read_previous_meta,
 )
+from agentbox.core.workspaces.build.engine import render_context_only
+from agentbox.core.workspaces.compose import (
+    WorkspaceComposer,
+    WorkspaceInspection as WorkspaceInspection,
+)
 from agentbox.core.workspaces.workdir import (
     WorkspaceInfo as WorkspaceInfo,
     resolve_path as resolve_path,
+    resolve_workspace_workdir,
 )
 
 _EPHEMERAL = "<ephemeral>"
 
 __all__ = [
     "BuildResult",
-    "McpRegistry",
     "WorkspaceInfo",
     "WorkspaceInspection",
     "Workspaces",
-    "discover_skills",
-    "materialize_workspace",
     "resolve_path",
 ]
 
 
-@dataclass(frozen=True)
-class WorkspaceInspection:
-    """A read-only summary of a workspace's composed state + last build."""
-
-    workspace_id: str
-    workdir: Path | None
-    engines: tuple[str, ...]
-    agent_count: int
-    binding_count: int
-    has_env_doc: bool
-    last_build: WorkspaceSyncMeta | None
-
-
 class Workspaces:
-    """Facade over compose + render. Constructed once with a read manager."""
+    """Facade over compose + build. Constructed once with a read manager."""
 
     def __init__(self, reads: WorkspaceReadManager, settings: Settings) -> None:
         self._reads = reads
         self._settings = settings
         self._composer = WorkspaceComposer(reads)
-        self._renderer = WorkspaceBuilder(settings)
+        self._builder = WorkspaceBuilder(settings)
 
     def build(
         self,
@@ -96,7 +72,7 @@ class Workspaces:
         ``<ephemeral>`` workspace with ``into=None`` never touches disk.
         """
         if into is None:
-            workdir = self._resolve_workdir(workspace_id)
+            workdir = resolve_workspace_workdir(self._reads, self._settings, workspace_id)
             if workdir is None:
                 return BuildResult(workspace_id=workspace_id, target_dir=Path())
             target_dir = workdir
@@ -107,7 +83,7 @@ class Workspaces:
             persistent = False
 
         blueprint = self._composer.compose(workspace_id)
-        return self._renderer.render(
+        return self._builder.render(
             blueprint,
             target_dir,
             persistent=persistent,
@@ -118,7 +94,7 @@ class Workspaces:
     def inspect(self, workspace_id: str = "default") -> WorkspaceInspection:
         """Summarize composed state plus the last persistent build's provenance."""
         blueprint = self._composer.compose(workspace_id)
-        workdir = self._resolve_workdir(workspace_id)
+        workdir = resolve_workspace_workdir(self._reads, self._settings, workspace_id)
         meta = (
             _read_previous_meta(workdir)
             if workdir is not None and workdir.exists()
@@ -164,17 +140,3 @@ class Workspaces:
         if not agent.workspace or agent.workspace == _EPHEMERAL:
             return None
         return self._composer._permissions(agent.workspace)
-
-    # ── internal ──────────────────────────────────────────────────────────
-
-    def _resolve_workdir(self, workspace_id: str) -> Path | None:
-        """Resolve a workspace name → on-disk persistent workdir path."""
-        if not workspace_id or workspace_id == _EPHEMERAL:
-            return None
-        record = self._reads.get_workspace_by_name(workspace_id)
-        if record is not None:
-            rel = record["path"]
-            if rel:
-                return (self._settings.project_root / rel).resolve()
-        candidate = self._settings.workspaces_root / workspace_id
-        return candidate if candidate.exists() else None

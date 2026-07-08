@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
+from pathlib import Path
 
 from agentbox.core.data.workenv import (
     AgentRef,
@@ -27,10 +29,24 @@ from agentbox.core.data.workenv import (
 from agentbox.core.db import WorkspaceReadManager
 from agentbox.core.db.system.config import load_project_mcp_servers
 from agentbox.core.engines.backends.recipe_loader import list_recipes, load_recipe
+from agentbox.core.workspaces._types import WorkspaceSyncMeta
 
 logger = logging.getLogger(__name__)
 
 _EPHEMERAL = "<ephemeral>"
+
+
+@dataclass(frozen=True)
+class WorkspaceInspection:
+    """A read-only summary of a workspace's composed state + last build."""
+
+    workspace_id: str
+    workdir: Path | None
+    engines: tuple[str, ...]
+    agent_count: int
+    binding_count: int
+    has_env_doc: bool
+    last_build: WorkspaceSyncMeta | None
 
 
 def _parse_source_metadata(raw: str | None) -> SourceMetadata | None:
