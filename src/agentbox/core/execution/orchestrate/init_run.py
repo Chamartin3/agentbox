@@ -191,7 +191,7 @@ def init_run(
             variables=variables or {},
         )
 
-    host_env_grants = _snapshots.resolve_host_env_grants(workspace_id)
+    host_env_grants = _snapshots.resolve_host_env_grants(agent.id)
     _mcp_snapshot = _snapshots.build_mcp_snapshot(
         workspace_id=workspace_id, host_env_grants=host_env_grants
     )

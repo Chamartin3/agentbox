@@ -9,6 +9,7 @@ from __future__ import annotations
 from agentbox.core.data.rows import McpServerConfigView
 
 from agentbox.core.db import (
+    AgentHostEnvGrantManager,
     WorkspaceHostEnvGrantManager,
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
@@ -115,4 +116,41 @@ def resolve_workspace_host_env_helper(
     return result
 
 
-__all__ = ["resolve_workspace_host_env_helper", "resolve_workspace_mcp_helper"]
+def resolve_agent_host_env_helper(
+    agent_host_env_grants: "AgentHostEnvGrantManager",
+    agent_id: str,
+) -> WorkspaceHostEnvGrantsResult:
+    """Return the AGENT's effective host-env grant configuration.
+
+    Authorization is agent territory — the agent owns host-env grants; the
+    workspace only owns availability. Same profile ⊕ overrides resolution as
+    the workspace helper, keyed on the agent.
+    """
+    row = agent_host_env_grants.get_grant(agent_id)
+    if not row:
+        empty: WorkspaceHostEnvGrantsResult = {
+            "grants": resolve_grants(None, None),
+            "profile_id": None,
+        }
+        return empty
+    profile_id = row.get("profile_id")
+    profile = (
+        agent_host_env_grants.get_profile(profile_id)
+        if profile_id is not None
+        else None
+    )
+    grants = resolve_grants(
+        profile["grants"] if profile else None, row.get("overrides")
+    )
+    return {
+        "grants": grants,
+        "profile_id": row.get("profile_id"),
+        "overrides": row.get("overrides"),
+    }
+
+
+__all__ = [
+    "resolve_agent_host_env_helper",
+    "resolve_workspace_host_env_helper",
+    "resolve_workspace_mcp_helper",
+]

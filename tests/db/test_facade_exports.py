@@ -27,6 +27,7 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "AgentRunnerProfileManager",
         "AgentSyncManager",
         "AgentToolGrantManager",
+        "AgentHostEnvGrantManager",
         "AgentVersionCommentManager",
         "AgentVersionFileManager",
         "AgentVersionManager",

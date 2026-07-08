@@ -160,7 +160,7 @@ class RunExecutor:
         # resolved grants + run context, then let build() write them into the
         # run dir's .mcp.json alongside every other server — one writer, no
         # post-render patch.
-        _host_env_grants = self._snapshots.resolve_host_env_grants(_workspace_id)
+        _host_env_grants = self._snapshots.resolve_host_env_grants(agent.id)
         _agent_tool_grants = self._setup.resolve_agent_tool_grants(agent.id)
         _extra_mcp: dict[str, McpStdioServerSpec] = {}
         if _host_env_grants:

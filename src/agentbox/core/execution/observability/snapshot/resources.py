@@ -5,30 +5,28 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agentbox.core.db import WorkspaceHostEnvGrantManager
+from agentbox.core.db import AgentHostEnvGrantManager
 from agentbox.core.tools.capabilities import (
     CAPABILITIES as _HOST_ENV_CAPABILITIES,
 )
-from agentbox.core.workspaces.tooling.servers import resolve_workspace_host_env_helper
+from agentbox.core.workspaces.tooling.servers import resolve_agent_host_env_helper
 
 logger = logging.getLogger(__name__)
 
 
 def resolve_host_env_grants(
-    workspace_host_env_grants: "WorkspaceHostEnvGrantManager",
-    workspace_id: str | None,
+    agent_host_env_grants: "AgentHostEnvGrantManager",
+    agent_id: str | None,
 ) -> dict[str, Any] | None:
-    """Return the workspace's non-default host-env grants, or ``None``.
+    """Return the AGENT's non-default host-env grants, or ``None``.
 
-    The returned dict maps capability names to their grant configurations.
-    Each grant config is a TypedDict-shaped dict with capability-specific settings.
+    Authorization is agent territory: grants are resolved for the running
+    agent. The returned dict maps capability names to their grant configs.
     """
-    if not workspace_id:
+    if not agent_id:
         return None
     try:
-        resolved_he = resolve_workspace_host_env_helper(
-            workspace_host_env_grants, workspace_id
-        )
+        resolved_he = resolve_agent_host_env_helper(agent_host_env_grants, agent_id)
         grants = resolved_he.get("grants") or {}
         non_default = {
             k for k, v in _HOST_ENV_CAPABILITIES.items() if not v.default_granted
@@ -37,8 +35,8 @@ def resolve_host_env_grants(
             return grants
     except Exception:
         logger.exception(
-            "executor: host-env grant resolution failed for workspace %r",
-            workspace_id,
+            "executor: host-env grant resolution failed for agent %r",
+            agent_id,
         )
     return None
 

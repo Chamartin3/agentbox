@@ -69,6 +69,6 @@ class SnapshotWriter:
                 "executor: failed to persist snapshots for run %s", run_id
             )
 
-    def resolve_host_env_grants(self, workspace_id: str | None) -> dict[str, Any] | None:
-        """Return the workspace's non-default host-env grants, or ``None``."""
-        return resolve_host_env_grants(self._db.workspace_host_env_grants, workspace_id)
+    def resolve_host_env_grants(self, agent_id: str | None) -> dict[str, Any] | None:
+        """Return the AGENT's non-default host-env grants, or ``None``."""
+        return resolve_host_env_grants(self._db.agent_host_env_grants, agent_id)

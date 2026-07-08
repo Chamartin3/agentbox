@@ -167,16 +167,16 @@ class TestSaveResourceAndMcp:
 
 class TestResolveHostEnvGrants:
     def test_delegates_to_helper(self, mock_store: MagicMock) -> None:
-        """resolve_host_env_grants forwards workspace_host_env_grants manager and workspace_id to the helper."""
+        """resolve_host_env_grants forwards the agent_host_env_grants manager and agent_id."""
         writer = SnapshotWriter(mock_store)
 
         with patch(
             "agentbox.core.execution.observability.snapshot.writer.resolve_host_env_grants"
         ) as mock_helper:
             mock_helper.return_value = {"shell.exec": {"capability": "shell.exec"}}
-            result = writer.resolve_host_env_grants("ws-2")
+            result = writer.resolve_host_env_grants("agent-2")
 
-        mock_helper.assert_called_once_with(mock_store.workspace_host_env_grants, "ws-2")
+        mock_helper.assert_called_once_with(mock_store.agent_host_env_grants, "agent-2")
         assert result == {"shell.exec": {"capability": "shell.exec"}}
 
     def test_returns_none_when_no_workspace(self, mock_store: MagicMock) -> None:
