@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from agentbox.core.workspaces.generation.blobs import materialize_blobs
+from agentbox.core.workspaces.build.bindings import materialize_blobs
 
 
 # ---------------------------------------------------------------------------

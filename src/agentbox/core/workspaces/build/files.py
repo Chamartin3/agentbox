@@ -10,7 +10,7 @@ import shutil
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from agentbox.core.workspaces.generation._paths import safe_dest
+from agentbox.core.workspaces.build._paths import safe_dest
 
 
 def materialize_workspace_files(

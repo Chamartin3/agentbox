@@ -1,14 +1,14 @@
 """Recipe loader — bridges the backend registry and the Recipe value type.
 
 ``load_recipe``, ``list_recipes``, and ``backend_for_engine`` live here
-(not in ``workspaces.generation.recipe``) because they need the backend
+(not in ``core.data.workenv``) because they need the backend
 registry. ``workspaces.*`` callers (build.py, prep.py, service) import
 directly from this module; the CLI routes through ``WorkspaceService``.
 
 The workspace constructor factory (``workspace_constructor``,
-``native_extra_items``) lives in ``core.workspaces.factory`` — that
+``native_extra_items``) lives in ``core.workspaces.build`` — that
 module is in the workspaces layer and may import both engines and
-workspaces.generation without layering violations.
+core.workspaces.build without layering violations.
 """
 
 from __future__ import annotations

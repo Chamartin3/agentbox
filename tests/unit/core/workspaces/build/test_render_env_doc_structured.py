@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from agentbox.core.data.workenv import WorkspaceConfig
-from agentbox.core.workspaces.generation.generator import render
+from agentbox.core.workspaces.build.engine import render
 from agentbox.core.engines.backends.recipe_loader import load_recipe, backend_for_engine
 
 _BODY = "# Acme\n\nDo the thing. Then verify it.\n"

@@ -13,7 +13,7 @@ from agentbox.core.data.workenv import (
     ResourceRef,
     WorkspaceConfig,
 )
-from agentbox.core.workspaces.generation.generator import render
+from agentbox.core.workspaces.build.engine import render
 from agentbox.core.engines.backends.recipe_loader import list_recipes, load_recipe, backend_for_engine
 
 

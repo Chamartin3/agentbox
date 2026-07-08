@@ -3,7 +3,7 @@
 Responsibilities are split by submodule:
 
 - ``compose``    — DB state → immutable ``WorkspaceBlueprint`` (no I/O).
-- ``render``     — blueprint → disk (``WorkspaceRenderer``, ``BuildResult``).
+- ``render``     — blueprint → disk (``WorkspaceBuilder``, ``BuildResult``).
 - ``generation`` — the engine-agnostic write pipeline render delegates to.
 - ``factory``    — wires the engine recipe registry into that pipeline.
 - ``mcp``        — external MCP client + per-workspace server resolution.
@@ -29,14 +29,14 @@ from agentbox.core.db import WorkspaceReadManager
 from agentbox.core.resources.skills import discover_skills as discover_skills
 from agentbox.core.workspaces._types import WorkspaceSyncMeta
 from agentbox.core.workspaces.compose import WorkspaceComposer
-from agentbox.core.workspaces.generation.materialize import (
+from agentbox.core.workspaces.build.bindings import (
     materialize_workspace as materialize_workspace,
 )
 from agentbox.core.workspaces.mcp.client.registry import McpRegistry as McpRegistry
-from agentbox.core.workspaces.generation.generator import render_context_only
-from agentbox.core.workspaces.render import (
+from agentbox.core.workspaces.build.engine import render_context_only
+from agentbox.core.workspaces.build import (
     BuildResult as BuildResult,
-    WorkspaceRenderer,
+    WorkspaceBuilder,
     _read_previous_meta,
 )
 from agentbox.core.workspaces.workdir import (
@@ -78,7 +78,7 @@ class Workspaces:
         self._reads = reads
         self._settings = settings
         self._composer = WorkspaceComposer(reads)
-        self._renderer = WorkspaceRenderer(settings)
+        self._renderer = WorkspaceBuilder(settings)
 
     def build(
         self,

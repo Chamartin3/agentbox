@@ -1,12 +1,17 @@
-"""WorkspaceRenderer — projects a ``WorkspaceBlueprint`` onto disk.
+"""Workspace WRITE side — ``WorkspaceBuilder`` projects a blueprint onto disk.
 
-The renderer is the ONLY workspace component that touches the filesystem.
-It consumes an immutable blueprint (produced by ``WorkspaceComposer``) and
-writes the identical set of artifacts into any target directory — the
-persistent workspace workdir OR a fresh per-run run dir (decision 2: the
-rendered configuration is identical for every target; the two differ only
-in hygiene — a run dir is fresh, a persistent dir gets orphan-reconcile +
-provenance).
+The builder is the ONLY workspace component that touches the filesystem. It
+consumes an immutable ``WorkspaceBlueprint`` (produced by ``WorkspaceComposer``)
+and writes the identical set of artifacts into any target directory — the
+persistent workspace workdir OR a fresh per-run run dir (the rendered
+configuration is identical for every target; the two differ only in hygiene —
+a run dir is fresh, a persistent dir gets orphan-reconcile + provenance).
+
+This package owns the whole write pipeline: ``engine`` (recipe-driven config
+files), ``bindings`` (resource blobs), ``files`` (declared host-file copies),
+``_paths`` (safe destination resolution). ``WorkspaceConstructor`` +
+``workspace_constructor()`` (the recipe fan-out + registry wiring) live here
+too — engines never imports workspaces, so no bridge module is needed.
 
 Every step is best-effort: a failure is logged and appended to
 ``BuildResult.errors`` but never blocks the following step.
@@ -17,7 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,15 +31,102 @@ from agentbox.core.config import Settings
 from agentbox.core.data.constants import MCP_FILENAME
 from agentbox.core.data.payload_types import EnvDocRenderEntry, RunSnapshotEntry
 from agentbox.core.data.snapshots import workspace_outcomes_to_snapshot
-from agentbox.core.data.workenv import ResolvedBinding, WorkspaceBlueprint
-from agentbox.core.workspaces._types import WorkspaceSyncMeta
-from agentbox.core.workspaces.factory import native_extra_items
-from agentbox.core.workspaces.generation import WorkspaceConstructor
-from agentbox.core.workspaces.generation.workspace_files import (
-    materialize_workspace_files,
+from agentbox.core.data.workenv import (
+    Item,
+    RenderedDir,
+    Recipe,
+    ResolvedBinding,
+    WorkspaceBlueprint,
+    WorkspaceConfig,
 )
+from agentbox.core.data.workenv import MaterializeOutcome as MaterializeOutcome
+from agentbox.core.engines.backends.recipe_loader import (
+    backend_for_engine,
+    list_recipes,
+    load_recipe,
+)
+from agentbox.core.workspaces._types import WorkspaceSyncMeta
+from agentbox.core.workspaces.build.bindings import materialize_workspace
+from agentbox.core.workspaces.build.engine import render
+from agentbox.core.workspaces.build.files import materialize_workspace_files
 
 logger = logging.getLogger(__name__)
+
+
+# ── Recipe fan-out + registry wiring (dissolved from construct.py + factory.py) ─
+
+# (engine, config) -> extra native config items for that engine.
+ExtraItemsFn = Callable[[str, WorkspaceConfig], list[Item]]
+
+
+def native_extra_items(engine: str, config: WorkspaceConfig) -> list[Item]:
+    """Per-engine native config items (opencode.json, codex TOML, …)."""
+    try:
+        return backend_for_engine(engine).build_workspace_items(config)
+    except KeyError:
+        return []
+
+
+class WorkspaceConstructor:
+    """Generate + materialize a workenv across several engine recipes."""
+
+    def __init__(
+        self,
+        recipes: Iterable[Recipe],
+        *,
+        extra_items: ExtraItemsFn | None = None,
+    ) -> None:
+        self._recipes = list(recipes)
+        self._extra_items = extra_items
+
+    @property
+    def recipes(self) -> list[Recipe]:
+        return list(self._recipes)
+
+    def generate(
+        self,
+        target_dir: Path,
+        config: WorkspaceConfig,
+        *,
+        system_prompt: str | None = None,
+    ) -> list[RenderedDir]:
+        """Render *config* to *target_dir* once per recipe. Engine-agnostic."""
+        rendered: list[RenderedDir] = []
+        for recipe in self._recipes:
+            extra = self._extra_items(recipe.engine, config) if self._extra_items else []
+            rendered.append(
+                render(
+                    target_dir,
+                    config,
+                    recipe,
+                    system_prompt=system_prompt,
+                    extra_items=extra,
+                )
+            )
+        return rendered
+
+    def materialize(
+        self,
+        workdir: Path,
+        resolved_bindings: Iterable[dict],
+        *,
+        cache_root: Path | None = None,
+    ) -> list[MaterializeOutcome]:
+        """Materialize resource bindings; skills land per-recipe layout."""
+        return materialize_workspace(
+            workdir,
+            resolved_bindings,
+            recipes=self._recipes,
+            cache_root=cache_root,
+        )
+
+
+def workspace_constructor() -> WorkspaceConstructor:
+    """A ``WorkspaceConstructor`` wired to every registered engine recipe."""
+    return WorkspaceConstructor(
+        [load_recipe(e) for e in list_recipes()],
+        extra_items=native_extra_items,
+    )
 
 
 @dataclass(frozen=True)
@@ -138,7 +230,7 @@ def _remove_orphan(workdir: Path, rel_path: str) -> bool:
         return False
 
 
-class WorkspaceRenderer:
+class WorkspaceBuilder:
     """Writes a ``WorkspaceBlueprint`` to disk. The only FS-touching component."""
 
     def __init__(self, settings: Settings) -> None:

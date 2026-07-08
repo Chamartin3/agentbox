@@ -3,7 +3,7 @@
 Relocated from ``workspaces/generation/config.py``,
 ``workspaces/generation/payload.py``, and the ``Recipe`` class from
 ``workspaces/generation/recipe.py`` so that ``engines.backends`` can import
-them without creating a cycle through ``workspaces.generation``.
+them without creating a cycle through ``core.workspaces.build``.
 """
 
 from __future__ import annotations

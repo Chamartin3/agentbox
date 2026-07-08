@@ -1,7 +1,7 @@
-"""Materialize workspace file bindings into a run's workdir.
+"""Materialize workspace resource bindings into a run's workdir.
 
-Higher-level wrapper over :mod:`agentbox.core.workspaces.generation.blobs`
-that understands the binding metadata: ``target_path`` defaults,
+Owns both the low-level blob→file primitive (``materialize_blobs``) and the
+binding-aware wrapper that understands the metadata: ``target_path`` defaults,
 ``materialize_mode`` (copy / symlink), ``on_conflict`` policy, and
 ``role="workspace_file"`` snapshot entries.
 """
@@ -9,14 +9,71 @@ that understands the binding metadata: ``target_path`` defaults,
 from __future__ import annotations
 
 import os
+import shutil
 from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 
 from agentbox.core.data.constants import ResourceType
 from agentbox.core.data.workenv import Recipe
 from agentbox.core.data.workenv import MaterializeOutcome as MaterializeOutcome
-from agentbox.core.workspaces.generation.blobs import materialize_blobs
-from agentbox.core.workspaces.generation._paths import safe_dest
+from agentbox.core.workspaces.build._paths import safe_dest
+
+
+def materialize_blobs(
+    blobs: Iterable[dict],
+    target_root: Path,
+    *,
+    overwrite: bool = True,
+) -> list[Path]:
+    """Write ``iter_repo_blobs(version_id)`` output into ``target_root``.
+
+    Returns the list of paths actually written. Directories are created
+    as needed. ``relative_path == ""`` means "write the single document
+    blob to ``target_root`` itself" — for a folder/skill use the
+    sub-paths as-is.
+    """
+    target_root = Path(target_root)
+    target_root.parent.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    blobs = list(blobs)
+    is_single_doc = len(blobs) == 1 and blobs[0]["relative_path"] == ""
+    if is_single_doc:
+        # Document — target_root is the file path itself.
+        if target_root.exists() or target_root.is_symlink():
+            if not overwrite:
+                return []
+            # The target may have been a directory from a prior folder-
+            # type materialization; clear it before writing the file.
+            if target_root.is_symlink() or not target_root.is_dir():
+                target_root.unlink()
+            else:
+                shutil.rmtree(target_root)
+        target_root.parent.mkdir(parents=True, exist_ok=True)
+        target_root.write_bytes(blobs[0]["content"])
+        written.append(target_root)
+        return written
+
+    # Folder / skill — target_root is a directory.
+    # Clear file-where-folder-expected obstacles when overwriting (e.g.
+    # a prior sync materialized a single-doc into this exact path).
+    if (target_root.exists() and not target_root.is_dir()) or target_root.is_symlink():
+        if not overwrite:
+            return []
+        target_root.unlink()
+    target_root.mkdir(parents=True, exist_ok=True)
+    for blob in blobs:
+        rel = blob["relative_path"]
+        if not rel:
+            # Defensive: a folder version should never have an empty
+            # rel-path entry — skip rather than smash the directory.
+            continue
+        dest = target_root / rel
+        if dest.exists() and not overwrite:
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(blob["content"])
+        written.append(dest)
+    return written
 
 
 def _resolve_single_file_name(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.core.workspaces.generation.workspace_files import materialize_workspace_files
+from agentbox.core.workspaces.build.files import materialize_workspace_files
 
 
 def _materialize_files(

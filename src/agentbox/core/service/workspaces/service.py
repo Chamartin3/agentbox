@@ -71,12 +71,12 @@ from agentbox.core.data.workenv import (
     RenderedFile,
     WorkspaceConfig,
 )
-from agentbox.core.workspaces.generation.generator import render
+from agentbox.core.workspaces.build.engine import render
 from agentbox.core.engines.backends.recipe_loader import (
     list_recipes,
     load_recipe,
 )
-from agentbox.core.workspaces.factory import (
+from agentbox.core.workspaces.build import (
     native_extra_items,
     workspace_constructor,
 )
