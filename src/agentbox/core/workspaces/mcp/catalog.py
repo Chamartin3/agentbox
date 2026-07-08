@@ -14,7 +14,7 @@ from agentbox.core.db import (
     WorkspaceMcpToolOverrideManager,
 )
 from agentbox.core.tools.catalog import CallableItem
-from agentbox.core.workspaces.mcp.client.registry import McpRegistry
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 
 
 def resolve_mcp_callables(

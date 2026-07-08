@@ -32,7 +32,7 @@ from agentbox.core.workspaces.compose import WorkspaceComposer
 from agentbox.core.workspaces.build.bindings import (
     materialize_workspace as materialize_workspace,
 )
-from agentbox.core.workspaces.mcp.client.registry import McpRegistry as McpRegistry
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry as McpRegistry
 from agentbox.core.workspaces.build.engine import render_context_only
 from agentbox.core.workspaces.build import (
     BuildResult as BuildResult,

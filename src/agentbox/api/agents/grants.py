@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_agent_service, get_mcp_registry, get_resource_service, get_workspace_service
 from agentbox.core.service import AgentService
 from agentbox.core.service.workspaces.service import WorkspaceService
-from agentbox.core.workspaces.mcp.client.registry import McpRegistry
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 
 router = APIRouter(prefix="/api/agents", tags=["agent-tool-grants"])
 

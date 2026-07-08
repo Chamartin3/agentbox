@@ -26,7 +26,7 @@ from agentbox.core.resources.catalog import resolve_resource_callables
 from agentbox.core.tools.capabilities import CAPABILITIES
 from agentbox.core.tools.catalog import CallableItem, enumerate_callables
 from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
-from agentbox.core.workspaces.mcp.client.registry import McpRegistry
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 from agentbox.core.tools.grants import resolve_grants
 
 __all__ = [

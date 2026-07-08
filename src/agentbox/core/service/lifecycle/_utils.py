@@ -8,7 +8,7 @@ from dataclasses import replace
 
 from agentbox.core.data.manifests.workspaces import McpServerSpec
 from agentbox.core.service.lifecycle.report import StartupReport
-from agentbox.core.workspaces.mcp.client.registry import McpServerConfig
+from agentbox.core.workspaces.tooling.mcp.registry import McpServerConfig
 
 _log = logging.getLogger(__name__)
 

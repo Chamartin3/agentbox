@@ -15,7 +15,7 @@ from functools import lru_cache
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.db.database import Database  # ponytail: transitional — 113_04 routes DI through Services
 from agentbox.core.execution.orchestrate.executor import RunExecutor
-from agentbox.core.workspaces.mcp.client import McpRegistry
+from agentbox.core.workspaces.tooling.mcp import McpRegistry
 
 from agentbox.core.service.workspaces.service import WorkspaceService
 
