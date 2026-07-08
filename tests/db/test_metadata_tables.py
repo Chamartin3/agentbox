@@ -25,6 +25,7 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "agent_runner_profiles",
         "agent_sync",
         "agent_tool_grants",
+        "agent_host_env_grants",
         "agent_version_comments",
         "agent_version_files",
         "agent_version_ratings",

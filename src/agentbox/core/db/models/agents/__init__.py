@@ -5,6 +5,7 @@ from agentbox.core.db.models.agents.agent import Agent, ActiveAgentVersion, Agen
 from agentbox.core.db.models.agents.version import AgentVersion, AgentVersionFile, AgentVersionRating, AgentVersionComment
 from agentbox.core.db.models.agents.prompt import PromptVersion
 from agentbox.core.db.models.agents.grant import AgentToolGrant
+from agentbox.core.db.models.agents.host_env_grant import AgentHostEnvGrant
 from agentbox.core.db.models.agents.sync import AgentSync
 from agentbox.core.db.models.agents.config_event import AgentConfigEvent
 
@@ -16,6 +17,7 @@ __all__ = [
     "AgentRunnerProfile",
     "AgentSync",
     "AgentToolGrant",
+    "AgentHostEnvGrant",
     "AgentVersion",
     "AgentVersionComment",
     "AgentVersionFile",

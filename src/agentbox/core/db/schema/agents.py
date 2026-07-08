@@ -187,6 +187,30 @@ agent_tool_grants = Table(
     UniqueConstraint("agent_id", "tool_name", name="uq_agent_tool_grant"),
 )
 
+# Host-env grants are AGENT-scoped (authorization is agent territory; the
+# workspace only owns availability). Mirrors the workspace table's shape but
+# keyed on agent_id. Named grant bundles live in the shared host_env_profiles.
+agent_host_env_grants = Table(
+    "agent_host_env_grants",
+    metadata,
+    Column(
+        "agent_id",
+        String,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "profile_id",
+        String,
+        ForeignKey("host_env_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+    ),
+    Column("overrides", JSON, nullable=True),
+    Column("changelog", String, nullable=False),
+    Column("created_at", String, nullable=False),
+    Column("created_by", String, nullable=True),
+)
+
 agent_config_events = Table(
     "agent_config_events",
     metadata,

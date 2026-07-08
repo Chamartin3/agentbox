@@ -487,6 +487,17 @@ class WorkspaceHostEnvGrantRow(TypedDict):
     created_by: str | None
 
 
+class AgentHostEnvGrantRow(TypedDict):
+    """A row from ``agent_host_env_grants``."""
+
+    agent_id: str
+    profile_id: str | None
+    overrides: dict[str, Any] | None
+    changelog: str
+    created_at: str
+    created_by: str | None
+
+
 class WorkspaceRuntimePermissionRow(TypedDict):
     """A row from ``workspace_runtime_permissions``."""
 

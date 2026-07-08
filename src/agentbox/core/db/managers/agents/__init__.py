@@ -16,6 +16,7 @@ from agentbox.core.db.managers.agents.version import (
 )
 from agentbox.core.db.managers.agents.prompt import PromptVersionManager
 from agentbox.core.db.managers.agents.grant import AgentToolGrantManager
+from agentbox.core.db.managers.agents.host_env_grant import AgentHostEnvGrantManager
 from agentbox.core.db.managers.agents.sync import AgentSyncManager
 from agentbox.core.db.managers.agents.config_event import AgentConfigEventManager
 
@@ -28,6 +29,7 @@ __all__ = [
     "AgentRunnerProfileManager",
     "AgentSyncManager",
     "AgentToolGrantManager",
+    "AgentHostEnvGrantManager",
     "AgentVersionCommentManager",
     "AgentVersionFileManager",
     "AgentVersionManager",

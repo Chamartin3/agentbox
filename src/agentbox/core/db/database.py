@@ -27,6 +27,7 @@ from agentbox.core.db.managers.agents import (
     AgentRunnerProfileManager,
     AgentSyncManager,
     AgentToolGrantManager,
+    AgentHostEnvGrantManager,
     AgentVersionCommentManager,
     AgentVersionFileManager,
     AgentVersionManager,
@@ -123,6 +124,7 @@ class Database:
         self.agent_runner_profiles = AgentRunnerProfileManager(self._engine)
         self.prompt_versions = PromptVersionManager(self._engine)
         self.agent_tool_grants = AgentToolGrantManager(self._engine)
+        self.agent_host_env_grants = AgentHostEnvGrantManager(self._engine)
         self.agent_sync = AgentSyncManager(self._engine)
         self.agent_config_events = AgentConfigEventManager(self._engine)
         self.agent_defs = AgentDefManager(self._engine)
