@@ -56,8 +56,8 @@ from agentbox.core.data.rows import (
     WorkspaceHostEnvGrantRow,
 )
 from agentbox.core.tools.catalog import CallableItem
-from agentbox.core.workspaces.catalog import resolve_host_env_callables, resolve_workspace_callables
-from agentbox.core.workspaces.mcp.catalog import resolve_mcp_callables
+from agentbox.core.workspaces.tooling.catalog import resolve_host_env_callables, resolve_workspace_callables
+from agentbox.core.workspaces.tooling.catalog import resolve_mcp_callables
 from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
 from agentbox.core.service.system.service import SystemService

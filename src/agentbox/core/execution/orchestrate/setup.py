@@ -29,7 +29,7 @@ from agentbox.core.workspaces import (
     McpRegistry,
     resolve_path,
 )
-from agentbox.core.workspaces.catalog import resolve_workspace_callables
+from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
 
 logger = logging.getLogger(__name__)
 
