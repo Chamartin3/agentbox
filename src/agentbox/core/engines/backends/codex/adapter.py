@@ -125,6 +125,9 @@ class CodexBackend(BackendAdapter):
     def build_workspace_items(self, config: Any) -> list[Item]:
         return build_codex_items(config)
 
+    def declared_tools(self) -> list[CanonicalTool]:
+        return list(_CODEX_TOOLS.keys())
+
     def render(
         self,
         agent: Any,

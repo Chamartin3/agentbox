@@ -105,6 +105,17 @@ class BackendAdapter(ABC):
         """
         return []
 
+    def declared_tools(self) -> list[CanonicalTool]:
+        """Canonical tools this backend provides natively (built in to the engine).
+
+        The workspace tool surface is a merge: these adapter-declared tools
+        OVERRIDE same-named entries from the generic built-in complement
+        (``core.tools.builtin.BUILTIN_TOOLS``), and MCP-server tools are
+        additive. Backends without native tools (e.g. in-process runners that
+        rely entirely on MCP) return an empty list. Default: none.
+        """
+        return []
+
     @abstractmethod
     def render(
         self,

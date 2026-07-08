@@ -24,6 +24,7 @@ from agentbox.core.data.events import (
 )
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.backends.opencode.render import build_opencode_items
+from agentbox.core.engines.backends.opencode.tools import NATIVE_TOOLS as _OPENCODE_TOOLS
 from agentbox.core.engines.backends.opencode.session import (  # noqa: F401
     parse_event_stream_with_thinking,
     strip_code_fences,
@@ -108,6 +109,9 @@ class OpenCodeBackend(BackendAdapter):
 
     def build_workspace_items(self, config: WorkspaceConfig) -> list[Item]:
         return build_opencode_items(config)
+
+    def declared_tools(self) -> list[CanonicalTool]:
+        return list(_OPENCODE_TOOLS.keys())
 
     def render(
         self,

@@ -49,6 +49,9 @@ class ClaudeCodeBackend(BackendAdapter):
     name = _NAME
     conversation_format: ClassVar[str | None] = "claude-cli-jsonl"
 
+    def declared_tools(self) -> list[CanonicalTool]:
+        return list(_CLAUDE_TOOLS.keys())
+
     def conversation_uri(
         self,
         run_id: str,
