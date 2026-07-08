@@ -142,28 +142,7 @@ class RunSetup:
             output_schema_path=python_config_raw.get("output_schema_path"),
         )
 
-        # Resolve the workspace-tool catalog and extract canonical tool
-        # names for the agent ∩ workspace intersection.
         ws_id = agent.workspace
-        ws_callables = (
-            resolve_workspace_callables(
-                ws_id,
-                self._db.workspace_host_env_grants,
-                self._db.workspace_file_resource_bindings,
-                self._db.workspace_mcp_policies,
-                self._db.workspace_mcp_overrides,
-                self._db.workspace_mcp_tool_overrides,
-                self._mcp_registry,
-            )
-            if ws_id
-            else []
-        )
-        ws_allowed_tools: set[CanonicalTool] = set()
-        for item in ws_callables:
-            try:
-                ws_allowed_tools.add(CanonicalTool(item.name))
-            except ValueError:
-                pass  # non-canonical tools (MCP, resources) aren't intersected
 
         def _try_backend(name: str) -> "BackendAdapter | None":
             try:
@@ -179,17 +158,41 @@ class RunSetup:
 
         for name in candidates:
             adapter = _try_backend(name)
-            if adapter is not None:
-                rendered = adapter.render(
-                    agent,
-                    workdir,
-                    runner_config=runner_config,
-                    composed=_composed_view(composed),
-                    runtime_config=runtime_config_view,
-                    python_agent_config=python_agent_config_view,
-                    ws_allowed_tools=ws_allowed_tools,
+            if adapter is None:
+                continue
+            # Availability surface for the agent ∩ workspace intersection —
+            # computed per-backend so the engine's native declared_tools are
+            # folded into what the workspace makes available.
+            ws_callables = (
+                resolve_workspace_callables(
+                    ws_id,
+                    self._db.workspace_host_env_grants,
+                    self._db.workspace_file_resource_bindings,
+                    self._db.workspace_mcp_policies,
+                    self._db.workspace_mcp_overrides,
+                    self._db.workspace_mcp_tool_overrides,
+                    self._mcp_registry,
+                    declared_tools=adapter.declared_tools(),
                 )
-                return adapter, rendered
+                if ws_id
+                else []
+            )
+            ws_allowed_tools: set[CanonicalTool] = set()
+            for item in ws_callables:
+                try:
+                    ws_allowed_tools.add(CanonicalTool(item.name))
+                except ValueError:
+                    pass  # non-canonical (MCP, resources) aren't intersected
+            rendered = adapter.render(
+                agent,
+                workdir,
+                runner_config=runner_config,
+                composed=_composed_view(composed),
+                runtime_config=runtime_config_view,
+                python_agent_config=python_agent_config_view,
+                ws_allowed_tools=ws_allowed_tools,
+            )
+            return adapter, rendered
 
         raise NoBackendAvailable(agent_id=agent.id, attempted=candidates)
 

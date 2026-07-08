@@ -24,6 +24,8 @@ from agentbox.core.db import (
     WorkspaceMcpToolOverrideManager,
 )
 from agentbox.core.resources.catalog import resolve_resource_callables
+from agentbox.core.tools.builtin import BUILTIN_TOOLS, get_builtin
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES
 from agentbox.core.tools.catalog import CallableItem, enumerate_callables
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
@@ -78,6 +80,32 @@ def resolve_host_env_callables(
     return items
 
 
+def _declared_tool_callables(declared: list[CanonicalTool] | None) -> list[CallableItem]:
+    """The backend's natively-provided tools (highest precedence in the merge)."""
+    if not declared:
+        return []
+    out: list[CallableItem] = []
+    for tool in declared:
+        spec = get_builtin(tool.value)
+        out.append(
+            CallableItem(
+                name=tool.value,
+                kind="builtin",
+                description=spec.description if spec else "",
+            )
+        )
+    return out
+
+
+def _builtin_complement_callables() -> list[CallableItem]:
+    """The canonical built-in vocabulary — complements what the adapter / MCP
+    servers provide (dedup drops any already surfaced by a higher slice)."""
+    return [
+        CallableItem(name=s.name.value, kind="builtin", description=s.description)
+        for s in BUILTIN_TOOLS
+    ]
+
+
 def resolve_workspace_callables(
     workspace_id: str,
     host_env_grants: WorkspaceHostEnvGrantManager,
@@ -86,16 +114,23 @@ def resolve_workspace_callables(
     mcp_overrides: WorkspaceMcpOverrideManager,
     mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
     mcp_registry: McpRegistry | None = None,
+    declared_tools: list[CanonicalTool] | None = None,
 ) -> list[CallableItem]:
-    """Return every callable item installed in *workspace_id*.
+    """Return every callable item available in *workspace_id* — the availability
+    surface (what exists), never authorization (who may).
 
-    Gathers the three source slices (MCP, host-env, resources) and
-    de-duplicates by name.
+    The merge is precedence-ordered and deduped by name (first wins):
+    adapter-declared native tools OVERRIDE the same-named built-in complement;
+    MCP-server + host-env + resource tools are additive; the built-in
+    vocabulary fills any remaining gaps. Pass *declared_tools* (from the
+    selected backend's ``declared_tools()``) to fold in native engine tools.
     """
     return enumerate_callables([
+        _declared_tool_callables(declared_tools),
         resolve_mcp_callables(workspace_id, mcp_policies, mcp_overrides, mcp_tool_overrides, mcp_registry),
         resolve_host_env_callables(workspace_id, host_env_grants),
         resolve_resource_callables(workspace_id, workspace_file_resource_bindings),
+        _builtin_complement_callables(),
     ])
 
 

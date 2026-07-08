@@ -28,7 +28,7 @@ class CallableItem:
     """
 
     name: str
-    kind: str  # "mcp" | "host_env" | "resource"
+    kind: str  # "builtin" | "mcp" | "host_env" | "resource"
     description: str = ""
     server: str | None = None
     input_schema: dict[str, Any] | None = None
