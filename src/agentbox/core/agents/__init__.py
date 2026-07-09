@@ -7,10 +7,6 @@ import from one place instead of reaching into submodules.
 from agentbox.core.agents.composition.bundle.loader import (
     load_bundle_from_bindings as load_bundle_from_bindings,
 )
-from agentbox.core.agents.composition.capture import (
-    build_fragments as build_fragments,
-    fragments_to_json as fragments_to_json,
-)
 from agentbox.core.agents.composition.resolver import (
     resolve_prompt as resolve_prompt,
 )
@@ -28,7 +24,6 @@ from agentbox.core.agents.contract import (
 )
 from agentbox.core.agents.runtime import (
     build_runtime_view as build_runtime_view,
-    capture_fragments as capture_fragments,
     compose_prompt as compose_prompt,
 )
 from agentbox.core.data.composition import (
@@ -52,13 +47,10 @@ __all__ = [
     "ValidationEngine",
     "ValidationResult",
     "build_config_json_payload",
-    "build_fragments",
     "build_runtime_view",
-    "capture_fragments",
-    "compose_prompt",
-    "fragments_to_json",
-    "load_bundle_from_bindings",
     "check_output",
+    "compose_prompt",
+    "load_bundle_from_bindings",
     "resolve_output_config",
     "resolve_prompt",
     "resolve_schema",

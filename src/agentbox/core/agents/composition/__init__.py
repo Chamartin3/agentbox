@@ -4,11 +4,6 @@ Re-exports the names available from `core.agent.prompt.*` so external callers
 import from one place.
 """
 
-from agentbox.core.agents.composition.capture import (
-    PromptFragment as PromptFragment,
-    build_fragments as build_fragments,
-    fragments_to_json as fragments_to_json,
-)
 from agentbox.core.agents.composition.bundle import (
     ComposeResult as ComposeResult,
     ComposedReference as ComposedReference,
@@ -45,15 +40,12 @@ __all__ = [
     "ComposedReference",
     "CompositionPreview",
     "PreviewError",
-    "PromptFragment",
     "PromptResolution",
     "ReferencePreview",
     "ResolvedBinding",
     "append_output_contract",
-    "build_fragments",
     "compose",
     "compose_from_source",
-    "fragments_to_json",
     "preview",
     "render_agent_prompt_preview",
     "render_document",

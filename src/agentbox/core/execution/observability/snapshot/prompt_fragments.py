@@ -9,6 +9,9 @@ inspect directly).
 A fragment list is built before the runner executes and stored alongside the
 run. Each fragment records `source` (who supplied the text) and `injected_by`
 (what layer pushes it into the model context), so the UI can group them.
+
+Moved out of ``core/agents/composition/capture.py`` (plan 120): fragment
+capture is an execution-observability concern, not part of the agents domain.
 """
 
 from __future__ import annotations
@@ -19,10 +22,35 @@ import shlex
 from dataclasses import asdict
 from pathlib import Path
 
-from agentbox.core.data.constants import BackendName
 from agentbox.core.data import AgentDef
+from agentbox.core.data.composition import ComposedPrompt, PromptFragment
+from agentbox.core.data.constants import BackendName
 from agentbox.core.db import PromptVersionManager
-from agentbox.core.data.composition import PromptFragment
+
+
+def capture_fragments(
+    *,
+    agent: AgentDef,
+    user_input: str,
+    project_root: Path,
+    argv: list[str] | None = None,
+    prompt_versions: PromptVersionManager | None = None,
+    composed: ComposedPrompt | None = None,
+) -> str:
+    """Build prompt fragments and return them as a JSON string.
+
+    The single public entry point: execution code calls this once and stores
+    the result — it never imports the fragment-building internals directly.
+    """
+    frags = build_fragments(
+        agent=agent,
+        user_input=user_input,
+        project_root=project_root,
+        argv=argv,
+        prompt_versions=prompt_versions,
+        composed=composed,
+    )
+    return fragments_to_json(frags)
 
 
 def build_fragments(
@@ -214,3 +242,10 @@ def fragments_to_json(frags: list[PromptFragment]) -> str:
         [{**asdict(f), "size_bytes": f.size_bytes} for f in frags],
         ensure_ascii=False,
     )
+
+
+__all__ = [
+    "build_fragments",
+    "capture_fragments",
+    "fragments_to_json",
+]

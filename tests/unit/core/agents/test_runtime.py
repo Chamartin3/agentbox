@@ -13,7 +13,7 @@ from agentbox.core.agents import (
     AgentRuntimeView,
     build_runtime_view,
 )
-from agentbox.core.agents.runtime import (
+from agentbox.core.execution.observability.snapshot.prompt_fragments import (
     capture_fragments,
 )
 

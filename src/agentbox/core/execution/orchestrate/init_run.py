@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings
-from agentbox.core.agents import capture_fragments
 from agentbox.core.data.constants import LogLevel, RunStatus
 from agentbox.core.data.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef
@@ -21,6 +20,7 @@ from agentbox.core.execution.observability.stream.broadcaster import RunBroadcas
 from agentbox.core.execution.observability.snapshot import (
     SnapshotWriter,
     build_runner_snapshot,
+    capture_fragments,
 )
 
 logger = logging.getLogger(__name__)

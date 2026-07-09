@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings
@@ -23,12 +22,6 @@ from agentbox.core.agents.composition.bundle.compose import (
 )
 from agentbox.core.agents.composition.bundle.loader import (
     load_bundle_from_bindings,
-)
-from agentbox.core.agents.composition.capture import (
-    build_fragments as _build_fragments,
-)
-from agentbox.core.agents.composition.capture import (
-    fragments_to_json as _fragments_to_json,
 )
 from agentbox.core.agents.composition.resolver import (
     resolve_prompt,
@@ -48,7 +41,6 @@ from agentbox.core.agents.contract.render import (
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
 from agentbox.core.data import AgentDef
-from agentbox.core.db import PromptVersionManager
 from agentbox.core.db.system.config import load_project_shared_assets
 from agentbox.core.engines.contracts.schema_to_model import (
     InconsistentSchema,
@@ -360,37 +352,9 @@ def compose_prompt(
     )
 
 
-def capture_fragments(
-    *,
-    agent: AgentDef,
-    user_input: str,
-    project_root: Path,
-    argv: list[str] | None = None,
-    prompt_versions: PromptVersionManager | None = None,
-    composed: ComposedPrompt | None = None,
-) -> str:
-    """Build prompt fragments and return them as a JSON string.
-
-    This wraps ``build_fragments`` + ``fragments_to_json`` from
-    ``core.agents.composition.capture``.  Execution code calls this
-    once and stores the result — it should never import capture
-    internals directly.
-    """
-    frags = _build_fragments(
-        agent=agent,
-        user_input=user_input,
-        project_root=project_root,
-        argv=argv,
-        prompt_versions=prompt_versions,
-        composed=composed,
-    )
-    return _fragments_to_json(frags)
-
-
 __all__ = [
     "AgentRuntimeView",
     "ComposedPrompt",
     "build_runtime_view",
-    "capture_fragments",
     "compose_prompt",
 ]
