@@ -1,12 +1,7 @@
-"""Agents-domain runtime facade for the execution layer.
+"""Agents-domain prompt build pipeline.
 
-All types and functions the executor needs to compose prompts, capture
-fragments, and validate output live here.  Execution code imports from
-``core.agents`` (the top-level facade) — never from
-``core.agents.composition.*`` or ``core.agents.config`` internals.
-
-Mirrors the inversion pattern established for Engines in
-:mod:`agentbox.core.engines.contracts.views`.
+Composes prompts from agent definitions, resolves resource bindings,
+and assembles the complete prompt structure for the executor.
 """
 
 from __future__ import annotations
@@ -17,13 +12,13 @@ from collections.abc import Iterator
 from typing import Any
 
 from agentbox.core.config import Settings
-from agentbox.core.agents.composition.bundle.compose import (
+from agentbox.core.data.composition import (
     ComposedReference,
 )
-from agentbox.core.agents.composition.bundle.loader import (
+from agentbox.core.agents.prompt.bundle import (
     load_bundle_from_bindings,
 )
-from agentbox.core.agents.composition.resolver import (
+from agentbox.core.agents.prompt.resolver import (
     resolve_prompt,
 )
 from agentbox.core.agents.config import (
@@ -38,7 +33,7 @@ from agentbox.core.agents.contract import (
 from agentbox.core.agents.contract.render import (
     append as _append_output_contract,
 )
-from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
+from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView, ResolvedPromptBinding
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
 from agentbox.core.data import AgentDef
 from agentbox.core.db.system.config import load_project_shared_assets
@@ -50,6 +45,12 @@ from agentbox.core.data.snapshots import prompt_resolution_to_snapshot
 from agentbox.core.data.composition import (
     AgentRuntimeView,
     ComposedPrompt,
+)
+from agentbox.core.db import (
+    AgentPromptResourceBindingManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
 )
 
 logger = logging.getLogger(__name__)
@@ -114,6 +115,68 @@ def build_runtime_view(agent: AgentDef, *, store: Any = None) -> AgentRuntimeVie
     )
 
 
+def resolve_agent_prompt_bindings(
+    agent_prompt_resource_bindings: AgentPromptResourceBindingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    agent_id: str,
+) -> list[ResolvedPromptBinding]:
+    """Hydrate all active prompt bindings for an agent into resolver-ready dicts.
+
+    Returns the same shape as ``_resolve_binding_for_prompt`` in the API
+    route, so ``resolve_prompt`` can consume them directly.
+    """
+    bindings = agent_prompt_resource_bindings.list_for_agent(agent_id)
+    if not bindings:
+        return []
+
+    resolved: list[ResolvedPromptBinding] = []
+    for b in bindings:
+        resource = resources.get_resource(b["resource_id"])
+        if not resource:
+            logger.warning(
+                "workspace prep: prompt binding %s references missing resource %s — skipping",
+                b["id"],
+                b["resource_id"],
+            )
+            continue
+        version_id = b.get("pinned_version_id")
+        if version_id:
+            version_id = str(version_id)
+        if not version_id:
+            active = resource_versions.get_active_version(b["resource_id"])
+            if not active:
+                logger.warning(
+                    "workspace prep: resource %s has no active version — skipping prompt binding %s",
+                    resource["slug"],
+                    b["id"],
+                )
+                continue
+            version_id = str(active["id"])
+        version = resource_versions.get_version(version_id)
+        if version is None:
+            continue
+        blobs = list(resource_blobs.iter_blobs(version_id))
+        resolved.append(
+            {
+                "binding_id": b["id"],
+                "marker": b.get("marker"),
+                "slot": b.get("slot"),
+                "attach_as_reference": bool(b.get("attach_as_reference")),
+                "resource_id": b["resource_id"],
+                "version_id": version_id,
+                "content_hash": version["content_hash"],
+                "type": resource["type"],
+                "mode": b.get("mode"),
+                "display_name": resource["display_name"],
+                "required": bool(b.get("required", 1)),
+                "blobs": blobs,
+            }
+        )
+    return resolved
+
+
 # ── facade functions ──────────────────────────────────────────────────
 
 
@@ -169,7 +232,7 @@ def _resolve_prompt_bindings(store: Any, agent_id: str) -> list[ResolvedBindingV
     return resolved
 
 
-def compose_prompt(
+def build_prompt(
     *,
     db: Any,
     settings: Settings,
@@ -177,7 +240,7 @@ def compose_prompt(
     input_: str,
     variables: dict[str, str] | None,
 ) -> ComposedPrompt:
-    """Compose the agent's prompt bundle + resolve bindings + output contract.
+    """Build the agent's prompt bundle + resolve bindings + output contract.
 
     This is the single entry point for the composition pipeline.
 
@@ -356,5 +419,7 @@ __all__ = [
     "AgentRuntimeView",
     "ComposedPrompt",
     "build_runtime_view",
-    "compose_prompt",
+    "build_prompt",
+    "resolve_agent_prompt_bindings",
+    "_DbStoreAdapter",
 ]

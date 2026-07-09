@@ -23,7 +23,7 @@ import uuid
 from typing import Any, cast
 
 from agentbox.core.agents.composition.drift import _build_config_json, _build_snapshot
-from agentbox.core.agents.composition.preview import (
+from agentbox.core.agents import (
     PreviewError as PreviewError,
     render_agent_prompt_preview as _render_agent_prompt_preview,
 )

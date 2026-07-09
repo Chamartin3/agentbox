@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, NotRequired, TypedDict
 
-from agentbox.core.agents.composition.resolver import PromptResolution
+from agentbox.core.data.composition import PromptResolution
 from agentbox.core.data.payload_types import (
     PromptEmbedSnapshotEntry,
     WorkspaceFileSnapshotEntry,

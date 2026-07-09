@@ -175,8 +175,6 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # agents.runtime imports snapshot converters from core.data.snapshots
-    agentbox.core.agents.runtime -> agentbox.core.data.snapshots
 
 
 [importlinter:contract:workspace-peer]
@@ -342,7 +340,7 @@ ignore_imports =
     # ── Pre-existing deep imports (no manager API yet): ──────────────────
     # Run model used as return type; fix: RunManager.get() → RunRecord (plan 112+)
     agentbox.core.service.execution.service -> agentbox.core.db.models.runs.run
-    agentbox.core.agents.runtime -> agentbox.core.db.system.config
+    agentbox.core.agents.prompt.build -> agentbox.core.db.system.config
     agentbox.core.engines.defaults -> agentbox.core.db.system.config
     agentbox.core.execution.observability.snapshot.mcp -> agentbox.core.db.system.config
     agentbox.core.resources -> agentbox.core.db.resources.models

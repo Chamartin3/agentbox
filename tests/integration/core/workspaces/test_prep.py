@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from agentbox.core.agents.composition.bindings import resolve_agent_prompt_bindings
+from agentbox.core.agents import resolve_agent_prompt_bindings
 from agentbox.core.data.composition import PromptResolution, ResolvedBinding
 from agentbox.core.data.snapshots import (
     prompt_resolution_to_snapshot,

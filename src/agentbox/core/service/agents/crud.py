@@ -12,8 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
 from agentbox.core.workspaces import workdir as ws
-from agentbox.core.agents.composition.bundle import compose_from_source
-from agentbox.core.agents.composition.bundle.loader import load_bundle_from_bindings
+from agentbox.core.agents import compose_from_source, load_bundle_from_bindings
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
 from agentbox.core.db import (

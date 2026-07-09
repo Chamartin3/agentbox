@@ -21,7 +21,7 @@ from typing import Any, Final, cast
 from agentbox.core.data.events import UsageEvent
 from agentbox.core.config import Settings
 from agentbox.core.agents import build_runtime_view
-from agentbox.core.agents.runtime import _DbStoreAdapter
+from agentbox.core.agents.prompt.build import _DbStoreAdapter
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data.constants import RunStatus

@@ -93,3 +93,13 @@ def render_for_type(type: str, blobs: Iterable[ResourceBlobRow]) -> RenderedBlob
     if type == "script":
         return render_script(blobs)
     raise ValueError(f"Unknown resource type for rendering: {type!r}")
+
+
+__all__ = [
+    "render_document",
+    "render_folder_manifest",
+    "render_skill_primer",
+    "render_schema",
+    "render_script",
+    "render_for_type",
+]

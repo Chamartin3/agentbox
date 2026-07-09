@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
-from agentbox.core.agents import compose_prompt
+from agentbox.core.agents import build_prompt
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
 
@@ -131,11 +131,11 @@ def resolve_run_prompt(
 ) -> ResolvedPrompt:
     """Run the unified prompt-resolution pipeline via the Agents facade.
 
-    Delegates to :func:`agentbox.core.agents.compose_prompt` so that
+    Delegates to :func:`agentbox.core.agents.build_prompt` so that
     the execution layer never imports from ``core.agents.composition.*``
     or ``core.agents.config`` internals.
     """
-    composed = compose_prompt(
+    composed = build_prompt(
         db=db,
         settings=settings,
         agent=agent,

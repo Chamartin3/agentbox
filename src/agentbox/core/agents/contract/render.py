@@ -81,7 +81,7 @@ def append_input_schema(text: str, schema: JsonSchemaDict) -> str:
     Goes on the system prompt so the agent learns the shape of the
     incoming payload up-front, before the user message is processed.
     """
-    _PROMPTS_DIR = Path(__file__).parent.parent / "composition" / "bundle" / "prompts"
+    _PROMPTS_DIR = Path(__file__).parent / "prompts"
     _INPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "input_schema.md").read_text(
         encoding="utf-8"
     )
@@ -103,7 +103,7 @@ def append_schema(text: str, schema: JsonSchemaDict) -> str:
     The instruction text lives in ``prompts/output_schema.md`` so it can be
     edited without code changes.
     """
-    _PROMPTS_DIR = Path(__file__).parent.parent / "composition" / "bundle" / "prompts"
+    _PROMPTS_DIR = Path(__file__).parent / "prompts"
     _OUTPUT_SCHEMA_TEMPLATE = (_PROMPTS_DIR / "output_schema.md").read_text(
         encoding="utf-8"
     )

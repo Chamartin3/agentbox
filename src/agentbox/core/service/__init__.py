@@ -60,12 +60,12 @@ from agentbox.core.tools import CAPABILITIES as CAPABILITIES  # noqa: F401
 from agentbox.core.tools import ToolSpec as ToolSpec
 
 # ── Prompt / composition ──────────────────────────────────────────────
-from agentbox.core.agents.composition.bundle import compose_from_source as compose_from_source
-from agentbox.core.agents.composition.bundle import preview as composition_preview  # noqa: F401
-from agentbox.core.agents.composition.preview import PreviewError as PreviewError
-from agentbox.core.agents.composition.preview import render_agent_prompt_preview as render_agent_prompt_preview
-from agentbox.core.agents.composition.rendering import render_for_type as render_for_type
-from agentbox.core.agents.composition.resolver import resolve_prompt as resolve_prompt
+from agentbox.core.agents import compose_from_source as compose_from_source
+from agentbox.core.agents import preview as composition_preview  # noqa: F401
+from agentbox.core.agents import PreviewError as PreviewError
+from agentbox.core.agents import render_agent_prompt_preview as render_agent_prompt_preview
+from agentbox.core.agents import render_for_type as render_for_type
+from agentbox.core.agents import resolve_prompt as resolve_prompt
 from agentbox.core.resources.importers.base import ImporterContext as ImporterContext
 from agentbox.core.resources.importers.host_path import HostPathImporter as HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter as SchemaImporter
@@ -82,7 +82,7 @@ from agentbox.core.resources.skills import find_skill as find_skill
 from agentbox.core.execution.orchestrate.setup import NoBackendAvailable as NoBackendAvailable
 from agentbox.core.execution.orchestrate.executor import RunExecutor as RunExecutor
 from agentbox.core.execution.observability.conversation import get as get_conversation  # noqa: F401
-from agentbox.core.agents.composition.bindings import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
+from agentbox.core.agents import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
 
 # ── Cross-cutting agents service ──────────────────────────────────────
 from agentbox.core.service.agents.service import AgentService as AgentService

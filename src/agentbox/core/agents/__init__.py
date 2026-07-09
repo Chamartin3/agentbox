@@ -4,12 +4,6 @@ Re-exports the names available from `core.agent.*` so external callers can
 import from one place instead of reaching into submodules.
 """
 
-from agentbox.core.agents.composition.bundle.loader import (
-    load_bundle_from_bindings as load_bundle_from_bindings,
-)
-from agentbox.core.agents.composition.resolver import (
-    resolve_prompt as resolve_prompt,
-)
 from agentbox.core.agents.config import (
     ExecutionConfig as ExecutionConfig,
     PythonAgentConfig as PythonAgentConfig,
@@ -22,9 +16,34 @@ from agentbox.core.agents.contract import (
     resolve_output_config as resolve_output_config,
     resolve_schema as resolve_schema,
 )
-from agentbox.core.agents.runtime import (
+from agentbox.core.agents.prompt import (
+    BindingsBundleSource as BindingsBundleSource,
+    Bundle as Bundle,
+    BundleSource as BundleSource,
+    ComposedReference as ComposedReference,
+    ComposeResult as ComposeResult,
+    CompositionPreview as CompositionPreview,
+    OutputSchemaInfo as OutputSchemaInfo,
+    PreviewError as PreviewError,
+    ReferencePreview as ReferencePreview,
+    ReferenceSpec as ReferenceSpec,
+    build_prompt as build_prompt,
     build_runtime_view as build_runtime_view,
-    compose_prompt as compose_prompt,
+    compose as compose,
+    compose_from_source as compose_from_source,
+    load_bundle_from_bindings as load_bundle_from_bindings,
+    preview as preview,
+    precompose_check as precompose_check,
+    render_agent_prompt_preview as render_agent_prompt_preview,
+    render_document as render_document,
+    render_folder_manifest as render_folder_manifest,
+    render_for_type as render_for_type,
+    render_schema as render_schema,
+    render_script as render_script,
+    render_skill_primer as render_skill_primer,
+    resolve_agent_prompt_bindings as resolve_agent_prompt_bindings,
+    resolve_prompt as resolve_prompt,
+    validate_input as validate_input,
 )
 from agentbox.core.data.composition import (
     AgentRuntimeView as AgentRuntimeView,
@@ -37,21 +56,44 @@ from agentbox.core.data.composition import (
 
 __all__ = [
     "AgentRuntimeView",
+    "BindingsBundleSource",
+    "Bundle",
+    "BundleSource",
     "ComposedPrompt",
+    "ComposedReference",
+    "ComposeResult",
+    "CompositionPreview",
     "ExecutionConfig",
     "HttpValidatorConfig",
     "OutputConfig",
+    "OutputSchemaInfo",
+    "PreviewError",
     "PythonAgentConfig",
+    "ReferencePreview",
+    "ReferenceSpec",
     "RuntimeConfig",
     "ScriptValidatorConfig",
     "ValidationEngine",
     "ValidationResult",
     "build_config_json_payload",
+    "build_prompt",
     "build_runtime_view",
     "check_output",
-    "compose_prompt",
+    "compose",
+    "compose_from_source",
     "load_bundle_from_bindings",
+    "preview",
+    "precompose_check",
+    "render_agent_prompt_preview",
+    "render_document",
+    "render_folder_manifest",
+    "render_for_type",
+    "render_schema",
+    "render_script",
+    "render_skill_primer",
+    "resolve_agent_prompt_bindings",
     "resolve_output_config",
     "resolve_prompt",
     "resolve_schema",
+    "validate_input",
 ]

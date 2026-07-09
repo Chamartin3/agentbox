@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from agentbox.core.agents.composition.rendering import render_for_type
+from agentbox.core.agents.prompt.rendering import render_for_type
 from agentbox.core.data.payload_types import ResolvedBindingView
 from agentbox.core.data.rows import ResourceBlobRow
 from agentbox.core.data.composition import (
@@ -103,3 +103,9 @@ def resolve_prompt(
         unresolved_markers=unresolved,
         warnings=warnings,
     )
+
+
+__all__ = [
+    "resolve_prompt",
+    "PromptResolution",
+]

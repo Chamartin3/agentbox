@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from agentbox.core.agents.composition.resolver import (
+from agentbox.core.agents.prompt.resolver import (
+    resolve_prompt,
+)
+from agentbox.core.data.composition import (
     PromptResolution,
     ResolvedBinding,
-    resolve_prompt,
 )
 
 
