@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from agentbox.core.agents.validation import validate_with_pydantic
+from agentbox.core.agents.contract import validate_pydantic
 
 
 def _schema(name: str = "TestOutput") -> dict:
@@ -44,9 +44,9 @@ class TestValidateWithPydantic:
             "key_skills": ["Python", "Django"],
             "experience": [{"position_id": 1, "achievements": ["Built a thing"]}],
         }
-        ok, err = validate_with_pydantic(json.dumps(payload), _schema())
-        assert ok
-        assert err == ""
+        result = validate_pydantic(json.dumps(payload), _schema())
+        assert result.ok
+        assert result.error == ""
 
     def test_wrong_type_fails(self) -> None:
         payload = {
@@ -54,23 +54,23 @@ class TestValidateWithPydantic:
             "key_skills": ["Python"],
             "experience": [{"position_id": 1, "achievements": ["x"]}],
         }
-        ok, _err = validate_with_pydantic(json.dumps(payload), _schema())
-        assert not ok
+        result = validate_pydantic(json.dumps(payload), _schema())
+        assert not result.ok
 
     def test_missing_required_field_fails(self) -> None:
         payload = {"summary": "A valid summary with enough characters"}
-        ok, err = validate_with_pydantic(json.dumps(payload), _schema())
-        assert not ok
-        assert "key_skills" in err or "experience" in err or "Field required" in err
+        result = validate_pydantic(json.dumps(payload), _schema())
+        assert not result.ok
+        assert "key_skills" in result.error or "experience" in result.error or "Field required" in result.error
 
     def test_invalid_json_fails(self) -> None:
-        ok, err = validate_with_pydantic("not json", _schema())
-        assert not ok
-        assert "JSON" in err
+        result = validate_pydantic("not json", _schema())
+        assert not result.ok
+        assert "JSON" in result.error
 
     def test_empty_output_fails(self) -> None:
-        ok, _err = validate_with_pydantic("", _schema())
-        assert not ok
+        result = validate_pydantic("", _schema())
+        assert not result.ok
 
     def test_code_fence_stripped(self) -> None:
         payload = {
@@ -79,9 +79,9 @@ class TestValidateWithPydantic:
             "experience": [{"position_id": 1, "achievements": ["x"]}],
         }
         fenced = f"```json\n{json.dumps(payload)}\n```"
-        ok, err = validate_with_pydantic(fenced, _schema())
-        assert ok
-        assert err == ""
+        result = validate_pydantic(fenced, _schema())
+        assert result.ok
+        assert result.error == ""
 
     def test_nested_object_validation(self) -> None:
         """Nested objects in experience are validated for required fields."""
@@ -90,7 +90,7 @@ class TestValidateWithPydantic:
             "key_skills": ["Python"],
             "experience": [{"achievements": ["x"]}],  # missing position_id
         }
-        _ok, _err = validate_with_pydantic(json.dumps(payload), _schema())
+        _result = validate_pydantic(json.dumps(payload), _schema())
         # Note: pydantic's create_model may not enforce nested required fields
         # when the input is a dict rather than a model instance. The jsonschema
         # engine catches this; pydantic validates types but not nested dicts.
@@ -122,14 +122,14 @@ class TestValidateWithPydantic:
                 },
             },
         }
-        ok_success, _ = validate_with_pydantic(
+        result_success = validate_pydantic(
             json.dumps({"result": "done"}), schema
         )
-        assert ok_success
-        ok_failure, _ = validate_with_pydantic(
+        assert result_success.ok
+        result_failure = validate_pydantic(
             json.dumps({"error": "timeout", "code": 408}), schema
         )
-        assert ok_failure
+        assert result_failure.ok
 
     def test_discriminated_union_validates_branches(self) -> None:
         """Root-level oneOf with type discriminator — the canonical converter
@@ -154,17 +154,17 @@ class TestValidateWithPydantic:
                 },
             ],
         }
-        ok_text, _ = validate_with_pydantic(
+        result_text = validate_pydantic(
             json.dumps({"kind": "text", "value": "hello"}), schema
         )
-        assert ok_text
-        ok_number, _ = validate_with_pydantic(
+        assert result_text.ok
+        result_number = validate_pydantic(
             json.dumps({"kind": "number", "value": 42}), schema
         )
-        assert ok_number
+        assert result_number.ok
         # Mismatched branch should fail
-        ok_bad, err = validate_with_pydantic(
+        result_bad = validate_pydantic(
             json.dumps({"kind": "text", "value": 99}), schema
         )
-        assert not ok_bad
-        assert "value" in err
+        assert not result_bad.ok
+        assert "value" in result_bad.error

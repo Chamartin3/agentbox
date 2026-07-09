@@ -6,16 +6,16 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from agentbox.core.agents.validation import (
+from agentbox.core.agents.contract import (
     ValidationResult,
-    extract_json,
+    check_output,
     validate_jsonschema,
-    validate_output,
     validate_pydantic,
 )
+from agentbox.core.data._util import extract_json
 
 
-# Minimal fake agent — only the attributes validate_output() reads.
+# Minimal fake agent — only the attributes check_output() reads.
 class _FakeAgent:
     def __init__(
         self,
@@ -72,7 +72,7 @@ def test_validate_jsonschema_handles_bad_json() -> None:
 def test_validate_output_off_when_no_schema(tmp_path: Path) -> None:
     """No composed schema, no path → no validation, ok=True."""
     agent = _FakeAgent(output_schema_path=None)
-    result = validate_output(agent, tmp_path, '{"anything": 1}')
+    result = check_output(agent, tmp_path, '{"anything": 1}')
     assert result == ValidationResult(ok=True, engine="off")
 
 
@@ -80,7 +80,7 @@ def test_validate_output_empty_when_schema_required(tmp_path: Path) -> None:
     """A schema is configured but output is empty → reportable failure."""
     agent = _FakeAgent()
     composed = SimpleNamespace(schema=_SCHEMA)
-    result = validate_output(agent, tmp_path, "", composed=composed)
+    result = check_output(agent, tmp_path, "", composed=composed)
     assert not result.ok
     assert result.engine == "none"
     assert "empty" in result.error
@@ -90,7 +90,7 @@ def test_validate_output_uses_composed_schema(tmp_path: Path) -> None:
     """Composed schema beats reading from disk — works for DB-only agents."""
     agent = _FakeAgent(engine="jsonschema")
     composed = SimpleNamespace(schema=_SCHEMA)
-    result = validate_output(agent, tmp_path, '{"name": "x"}', composed=composed)
+    result = check_output(agent, tmp_path, '{"name": "x"}', composed=composed)
     assert result.ok
     assert result.engine == "jsonschema"
 
@@ -100,13 +100,13 @@ def test_validate_output_falls_back_to_disk_schema(tmp_path: Path) -> None:
     schema_file = tmp_path / "schema.json"
     schema_file.write_text(json.dumps(_SCHEMA))
     agent = _FakeAgent(output_schema_path="schema.json", engine="jsonschema")
-    result = validate_output(agent, tmp_path, '{"name": "x"}')
+    result = check_output(agent, tmp_path, '{"name": "x"}')
     assert result.ok
 
 
 def test_validate_output_missing_schema_file(tmp_path: Path) -> None:
     agent = _FakeAgent(output_schema_path="nope.json")
-    result = validate_output(agent, tmp_path, '{"name": "x"}')
+    result = check_output(agent, tmp_path, '{"name": "x"}')
     assert not result.ok
     assert result.engine == "none"
     assert "not found" in result.error
@@ -117,7 +117,7 @@ def test_validate_output_both_engines(tmp_path: Path) -> None:
     matters for the retry prompt."""
     agent = _FakeAgent(engine="both")
     composed = SimpleNamespace(schema=_SCHEMA)
-    result = validate_output(agent, tmp_path, '{"name": "x"}', composed=composed)
+    result = check_output(agent, tmp_path, '{"name": "x"}', composed=composed)
     assert result.ok
     assert result.engine == "both"
 

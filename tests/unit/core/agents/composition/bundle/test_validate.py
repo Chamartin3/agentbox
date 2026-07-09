@@ -13,7 +13,7 @@ from pathlib import Path
 
 import jsonschema
 import pytest
-from agentbox.core.agents.validation import validate_output
+from agentbox.core.agents.contract import check_output
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 
@@ -36,7 +36,7 @@ class _ValidatorShim:
     """Compatibility wrapper so tests can keep calling
     ``executor._validate_output(output, agent, workdir) -> (ok, err, via)``.
 
-    The real method moved to ``core.validation.validate_output`` (returns
+    The real method moved to ``core.agents.contract.check_output`` (returns
     a ``ValidationResult``). Rather than rewrite every assertion, this
     shim adapts the new shape to the old tuple.
     """
@@ -50,7 +50,7 @@ class _ValidatorShim:
             },
             "python": {"output_schema_path": agent.runner.output_schema_path},
         }
-        r = validate_output(agent, workdir, output)
+        r = check_output(agent, workdir, output)
         return r.ok, r.error, r.engine
 
 

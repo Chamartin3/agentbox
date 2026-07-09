@@ -30,7 +30,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.agents.validation import extract_json, validate_output
+from agentbox.core.agents.contract import check_output
+from agentbox.core.data._util import extract_json
 from agentbox.core.data.constants import LogLevel
 from agentbox.core.data.events import DoneEvent
 from agentbox.core.data.constants import RunStatus
@@ -277,7 +278,7 @@ class RetryOrchestrator:
 
             # --- Validation retry (output schema check) -----------
             if has_schema and validation_mode != "off":
-                result = validate_output(
+                result = check_output(
                     self.agent,
                     self.workdir,
                     output,

@@ -4,11 +4,6 @@ Re-exports public symbols from sub-modules. Import from here:
 ``from agentbox.core.agents.composition.bundle import compose, preview``.
 """
 
-from agentbox.core.agents.composition.bundle._helpers import (
-    _append_input_schema,
-    _append_schema,
-    _append_validation_engine_hint,
-)
 from agentbox.core.agents.composition.bundle.compose import (
     ComposeResult,
     ComposedReference,
@@ -32,9 +27,6 @@ __all__ = [
     "ComposedReference",
     "CompositionPreview",
     "ReferencePreview",
-    "_append_input_schema",
-    "_append_schema",
-    "_append_validation_engine_hint",
     "compose",
     "compose_from_source",
     "preview",

@@ -41,7 +41,7 @@ def precompose_check(
 
     This is **not** the runtime ``validate_output`` entrypoint — it is a
     composition-time helper for checking bundle output before the run starts.
-    Runtime validation lives in ``core.agents.validation.orchestrate``.
+    Runtime validation lives in ``core.agents.contract.check``.
 
     Args:
         response: raw output text (expected to be JSON).

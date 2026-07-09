@@ -18,9 +18,6 @@ from pathlib import Path
 from typing import Any
 
 from agentbox.core.config import Settings
-from agentbox.core.agents.composition.bundle import (
-    _append_validation_engine_hint,
-)
 from agentbox.core.agents.composition.bundle.compose import (
     ComposedReference,
 )
@@ -33,17 +30,20 @@ from agentbox.core.agents.composition.capture import (
 from agentbox.core.agents.composition.capture import (
     fragments_to_json as _fragments_to_json,
 )
-from agentbox.core.agents.composition.output_contract import (
-    append as _append_output_contract,
-)
 from agentbox.core.agents.composition.resolver import (
     resolve_prompt,
 )
 from agentbox.core.agents.config import (
     ExecutionConfig,
-    OutputConfig as _OutputConfig,
     PythonAgentConfig,
+)
+from agentbox.core.agents.contract import (
+    OutputConfig as _OutputConfig,
+    append_validation_engine_hint,
     resolve_output_config as _resolve_output_config,
+)
+from agentbox.core.agents.contract.render import (
+    append as _append_output_contract,
 )
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
 class _DbStoreAdapter:
     """Duck-typed shim satisfying the store interface used by prompt
     composition internals (``load_bundle_from_bindings``,
-    ``_resolve_output_config``, ``validate_output``).
+    ``_resolve_output_config``, ``check_output``).
     """
 
     def __init__(self, db: Any) -> None:
@@ -219,7 +219,7 @@ def compose_prompt(
         system_text = composition_result.system
         if composition_result.schema is not None:
             engine = ExecutionConfig.from_agent(agent).output_validation_engine
-            system_text = _append_validation_engine_hint(system_text, engine)
+            system_text = append_validation_engine_hint(system_text, engine)
 
         system_base = composition_result.system_base
         composed_schema = composition_result.schema

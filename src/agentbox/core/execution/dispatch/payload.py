@@ -11,7 +11,7 @@ import json
 from datetime import datetime
 from typing import Any, NotRequired, TypedDict
 
-from agentbox.core.agents.validation import extract_json
+from agentbox.core.data._util import extract_json
 from agentbox.core.data import RunRecord
 from agentbox.core.data.payload_types import UsagePayload
 from agentbox.core.execution.dispatch.policy import DispatchStore

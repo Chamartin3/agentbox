@@ -511,7 +511,7 @@ async def test_orchestrator_success_with_schema_sets_validation_status_ok(
     pass_result = _make_validation_result(ok=True, engine="both")
 
     # Act
-    with patch("agentbox.core.execution.retry.validate_output", return_value=pass_result):
+    with patch("agentbox.core.execution.retry.check_output", return_value=pass_result):
         outcome = await _execute(
             orchestrator,
             session,
@@ -638,7 +638,7 @@ async def test_orchestrator_validation_retry_succeeds_on_second_attempt(
 
     # Act
     with patch(
-        "agentbox.core.execution.retry.validate_output",
+        "agentbox.core.execution.retry.check_output",
         side_effect=[fail_result, pass_result],
     ):
         outcome = await _execute(
@@ -670,7 +670,7 @@ async def test_orchestrator_validation_exhausted_strict_mode_fails(
 
     # Act
     with patch(
-        "agentbox.core.execution.retry.validate_output",
+        "agentbox.core.execution.retry.check_output",
         return_value=fail_result,
     ):
         outcome = await _execute(
@@ -703,7 +703,7 @@ async def test_orchestrator_validation_exhausted_warn_mode_returns_ok(
 
     # Act
     with patch(
-        "agentbox.core.execution.retry.validate_output",
+        "agentbox.core.execution.retry.check_output",
         return_value=fail_result,
     ):
         outcome = await _execute(
@@ -739,7 +739,7 @@ async def test_orchestrator_validation_retry_uses_retry_prompt(
 
     # Act
     with patch(
-        "agentbox.core.execution.retry.validate_output",
+        "agentbox.core.execution.retry.check_output",
         side_effect=[fail_result, pass_result],
     ):
         await _execute(

@@ -8,9 +8,11 @@ from pathlib import Path
 
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data.constants import BundleFile
+from agentbox.core.agents.contract.render import (
+    append_input_schema, append_schema,
+)
 from agentbox.core.agents.composition.bundle._helpers import (
-    _append_input_schema, _append_schema, _format_template,
-    _read_text, _ref_heading_fallback, _sha256,
+    _format_template, _read_text, _ref_heading_fallback, _sha256,
 )
 from agentbox.core.agents.composition.bundle.sources import BundleSource
 from agentbox.core.data.composition import (
@@ -68,7 +70,7 @@ def compose(
         except json.JSONDecodeError:
             input_schema = None
         if input_schema is not None:
-            system_rendered = _append_input_schema(system_rendered, input_schema)
+            system_rendered = append_input_schema(system_rendered, input_schema)
 
     # -- references ----------------------------------------------------
     refs = composition.get("references", [])
@@ -134,7 +136,7 @@ def compose(
         schema_sha = _sha256(json.dumps(loaded, sort_keys=True, separators=(",", ":")))
         if isinstance(loaded, dict):
             schema = loaded
-            system_rendered = _append_schema(system_rendered, schema)
+            system_rendered = append_schema(system_rendered, schema)
 
     # -- bundle sha ----------------------------------------------------
     # Hash every file we read, in sorted order, as a simple manifest.
@@ -200,7 +202,7 @@ def compose_from_source(
     input_schema: JsonSchemaDict | None = None
     if input_schema_info is not None:
         input_schema = input_schema_info.schema
-        system_rendered = _append_input_schema(system_rendered, input_schema)
+        system_rendered = append_input_schema(system_rendered, input_schema)
 
     refs = source.references()
     composed_refs: list[ComposedReference] = []
@@ -229,7 +231,7 @@ def compose_from_source(
     if schema_info is not None:
         schema = schema_info.schema
         schema_sha = _sha256(json.dumps(schema, sort_keys=True, separators=(",", ":")))
-        system_rendered = _append_schema(system_rendered, schema)
+        system_rendered = append_schema(system_rendered, schema)
 
     files_to_hash = source.bundle_files()
     canonical = "\n".join(

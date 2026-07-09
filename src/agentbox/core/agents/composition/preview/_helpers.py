@@ -6,11 +6,14 @@ import json
 
 from agentbox.core.agents.config import (
     HttpValidatorConfig,
-    OutputConfig,
     ScriptValidatorConfig,
 )
-from agentbox.core.agents.composition.bundle import _append_input_schema, _append_schema
-from agentbox.core.agents.composition.output_contract import render as _render_output_contract
+from agentbox.core.agents.contract import OutputConfig
+from agentbox.core.agents.contract.render import (
+    append_input_schema,
+    append_schema,
+    render as _render_output_contract,
+)
 from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.data.payload_types import (
     CharBreakdownPart,
@@ -246,7 +249,7 @@ def _schema_block(slot: str, schema_view: SchemaSlotView | None) -> str:
         parsed = None
     if isinstance(parsed, dict):
         if slot == "input_schema":
-            return _append_input_schema("", parsed)
-        return _append_schema("", parsed)
+            return append_input_schema("", parsed)
+        return append_schema("", parsed)
     header = "# Input Format" if slot == "input_schema" else "# Required Output"
     return f"{header}\n\n## JSON Schema\n\n```json\n{text}\n```"

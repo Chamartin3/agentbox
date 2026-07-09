@@ -18,7 +18,7 @@ from agentbox.core.agents.composition.bundle import (
     compose_from_source as compose_from_source,
     preview as preview,
 )
-from agentbox.core.agents.composition.output_contract import (
+from agentbox.core.agents.contract.render import (
     append as append_output_contract,
     render as render_output_contract,
 )

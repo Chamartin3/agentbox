@@ -8,9 +8,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agentbox.core.agents.composition.bundle import _append_validation_engine_hint
+from agentbox.core.agents.contract import append_validation_engine_hint, check_output
 from agentbox.core.data import AgentDef, RunnerSpec
-from agentbox.core.agents.validation import validate_output
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +65,7 @@ def _validate(output: str, agent: AgentDef, workdir: Path) -> tuple[bool, str, s
         },
         "python": {"output_schema_path": agent.runner.output_schema_path},
     }
-    r = validate_output(agent, workdir, output)
+    r = check_output(agent, workdir, output)
     return r.ok, r.error, r.engine
 
 
@@ -195,31 +194,31 @@ class TestValidationEngineSelection:
 
 class TestAppendValidationEngineHint:
     def test_both_engine_hint(self) -> None:
-        result = _append_validation_engine_hint("## Role\n\nYou are a helper.", "both")
+        result = append_validation_engine_hint("## Role\n\nYou are a helper.", "both")
         assert "validated twice" in result
         assert "JSON Schema" in result
         assert "pydantic" in result
 
     def test_jsonschema_engine_hint(self) -> None:
-        result = _append_validation_engine_hint(
+        result = append_validation_engine_hint(
             "## Role\n\nYou are a helper.", "jsonschema"
         )
         assert "JSON Schema" in result
         assert "validated twice" not in result
 
     def test_pydantic_engine_hint(self) -> None:
-        result = _append_validation_engine_hint(
+        result = append_validation_engine_hint(
             "## Role\n\nYou are a helper.", "pydantic"
         )
         assert "pydantic" in result
         assert "validated twice" not in result
 
     def test_empty_text(self) -> None:
-        result = _append_validation_engine_hint("", "both")
+        result = append_validation_engine_hint("", "both")
         assert "## Validation" in result
 
     def test_unknown_engine_defaults_to_both(self) -> None:
-        result = _append_validation_engine_hint(
+        result = append_validation_engine_hint(
             "## Role\n\nYou are a helper.", "unknown"
         )
         assert "validated twice" in result

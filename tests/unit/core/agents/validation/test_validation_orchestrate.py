@@ -1,31 +1,30 @@
-"""Unit tests for ``core/agents/validation/orchestrate.py``."""
+"""Unit tests for output validation orchestration (now in contract)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from agentbox.core.agents.validation import orchestrate as _orch
-from agentbox.core.agents.validation.orchestrate import validate_output
+from agentbox.core.agents.contract import check_output
 
 
 class TestValidateOutput:
     def test_no_schema_skips(self, make_agent_def) -> None:
         agent = make_agent_def(id="test.no_schema")
-        result = validate_output(agent, Path("."), '{"ok": true}')
+        result = check_output(agent, Path("."), '{"ok": true}')
         assert result.ok is True
         assert result.engine == "off"
 
     def test_empty_payload_with_schema(self, make_agent_def) -> None:
         agent = make_agent_def(id="test.empty_payload")
-        result = validate_output(agent, Path("."), None)
+        result = check_output(agent, Path("."), None)
         # No schema configured → off
         assert result.ok is True
         assert result.engine == "off"
 
     def test_legacy_path_jsonschema_valid(self, make_agent_def) -> None:
         agent = make_agent_def(id="test.legacy_valid")
-        result = validate_output(agent, Path("."), '{"key": "val"}')
+        result = check_output(agent, Path("."), '{"key": "val"}')
         assert result.ok is True
         assert result.engine == "off"
 
@@ -34,6 +33,8 @@ class TestValidateOutput:
         is jsonschema first, then explicit validators, and the engine
         label reflects the combination.
         """
+        from agentbox.core.agents.contract import check as check_module
+
         mock_validator = MagicMock()
         mock_validator.kind = "http"
         mock_validator.endpoint = "http://example.com/validate"
@@ -42,9 +43,9 @@ class TestValidateOutput:
 
         agent = make_agent_def(id="test.gate_order")
 
-        # Patch resolve_output_config so we bypass the store entirely.
+        # Patch resolve_output_config where it's imported in check.py
         monkeypatch.setattr(
-            _orch,
+            check_module,
             "resolve_output_config",
             lambda _store, _agent: MagicMock(
                 json_schema={"type": "object"},
@@ -52,7 +53,7 @@ class TestValidateOutput:
             ),
         )
 
-        result = validate_output(agent, Path("."), '{"ok": true}', store=None)
+        result = check_output(agent, Path("."), '{"ok": true}', store=None)
         # Gate 1 passes; Gate 2 (http) will fail because the endpoint
         # is not reachable, producing an error result.
         assert result.ok is False

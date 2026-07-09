@@ -25,7 +25,7 @@ The function returns a :class:`ResolvedPrompt` carrying everything the
 caller needs. The composed prompt/schema fields are surfaced as a
 typed :class:`ComposedState` (``ResolvedPrompt.to_composed_state()``)
 which the executor threads explicitly through ``render``,
-``validate_output``, and capture — no ``agent.__dict__`` side-channel.
+``check_output``, and capture — no ``agent.__dict__`` side-channel.
 """
 
 from __future__ import annotations

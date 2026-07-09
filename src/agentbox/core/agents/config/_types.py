@@ -5,8 +5,6 @@ Three logical buckets extracted from ``agent_versions.config_json``:
 - ``ExecutionConfig`` — validation/retry semantics (executor-level).
 - ``RuntimeConfig`` — runtime/tooling knobs (MCP config, allowed tools).
 - ``PythonAgentConfig`` — pydantic-ai / token backend dispatch metadata.
-- ``HttpValidatorConfig`` / ``ScriptValidatorConfig`` / ``OutputConfig`` —
-  output-contract types used across execution and preview.
 """
 
 from __future__ import annotations
@@ -15,8 +13,6 @@ import json as _json
 from dataclasses import dataclass
 from typing import Any, cast
 
-from agentbox.core.data.composition import ValidatorConfig
-from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data.constants import ConfiguredValidationMode, ValidationMode
 from agentbox.core.tools.canonical import CanonicalTool
 
@@ -120,24 +116,3 @@ class PythonAgentConfig:
         )
 
 
-@dataclass(frozen=True)
-class OutputConfig:
-    """Resolved output validation surface for a single run.
-
-    Two independent pieces:
-
-    - ``json_schema`` — Gate-1 structural validation. Sourced from the
-      agent's ``slot='output_schema'`` resource binding. Its existence
-      *is* the implicit jsonschema validator — never listed in
-      ``validators``.
-    - ``validators`` — explicit polymorphic post-hoc checkers from the
-      bound validation contract. Each validator carries its own
-      ``description`` (rendered into the prompt as a constraint bullet)
-      and the actual check (HTTP endpoint, script resource, …). Today
-      ``kind='http'`` and ``kind='script'``; new kinds add a dispatch
-      branch in ``core/run/validation.validate_output`` with no DB
-      migration.
-    """
-
-    json_schema: JsonSchemaDict | None = None
-    validators: tuple[ValidatorConfig, ...] = ()
