@@ -10,7 +10,6 @@ from agentbox.core.data.rows import McpServerConfigView
 
 from agentbox.core.db import (
     AgentHostEnvGrantManager,
-    WorkspaceHostEnvGrantManager,
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
     WorkspaceMcpToolOverrideManager,
@@ -90,30 +89,6 @@ def resolve_workspace_mcp_helper(
     return result
 
 
-def resolve_workspace_host_env_helper(
-    workspace_host_env_grants: "WorkspaceHostEnvGrantManager",
-    workspace_id: str,
-) -> WorkspaceHostEnvGrantsResult:
-    """Return the workspace's effective host-env grant configuration."""
-    row = workspace_host_env_grants.get_grant(workspace_id)
-    if not row:
-        result: WorkspaceHostEnvGrantsResult = {"grants": resolve_grants(None, None), "profile_id": None}
-        return result
-    profile_id = row.get("profile_id")
-    profile = (
-        workspace_host_env_grants.get_profile(profile_id)
-        if profile_id is not None
-        else None
-    )
-    grants = resolve_grants(
-        profile["grants"] if profile else None, row.get("overrides")
-    )
-    result = {
-        "grants": grants,
-        "profile_id": row.get("profile_id"),
-        "overrides": row.get("overrides"),
-    }
-    return result
 
 
 def resolve_agent_host_env_helper(
@@ -151,6 +126,5 @@ def resolve_agent_host_env_helper(
 
 __all__ = [
     "resolve_agent_host_env_helper",
-    "resolve_workspace_host_env_helper",
     "resolve_workspace_mcp_helper",
 ]

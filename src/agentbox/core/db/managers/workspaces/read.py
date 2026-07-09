@@ -21,7 +21,6 @@ from agentbox.core.data.rows import (
     ResourceBlobRow,
     ResourceVersionRow,
     WorkspaceFileBindingRow,
-    WorkspaceHostEnvGrantRow,
     WorkspaceMcpOverrideRow,
     WorkspaceMcpToolOverrideRow,
     WorkspaceRow,
@@ -39,7 +38,6 @@ from agentbox.core.db.schema import (
     workspace_env_doc_versions,
     workspace_env_docs,
     workspace_file_resource_bindings,
-    workspace_host_env_grants,
     workspace_mcp_overrides,
     workspace_mcp_policies,
     workspace_mcp_tool_overrides,
@@ -156,15 +154,6 @@ class WorkspaceReadManager:
             return cast(WorkspaceRuntimePermissionRow, dict(row._mapping)) if row else None
 
     # ── Host-env grants ───────────────────────────────────────────────────────
-
-    def get_host_env_grant(self, workspace_id: str) -> WorkspaceHostEnvGrantRow | None:
-        with self._engine.connect() as conn:
-            row = conn.execute(
-                workspace_host_env_grants.select().where(
-                    workspace_host_env_grants.c.workspace_id == workspace_id
-                )
-            ).first()
-            return cast(WorkspaceHostEnvGrantRow, dict(row._mapping)) if row else None
 
     def list_host_env_profiles(self) -> list[HostEnvProfileRow]:
         with self._engine.connect() as conn:

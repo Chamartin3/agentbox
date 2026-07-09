@@ -54,7 +54,6 @@ from agentbox.core.data.rows import (
     WorkspaceRow,
     WorkspaceSubagentRow,
     AgentHostEnvGrantRow,
-    WorkspaceHostEnvGrantRow,
 )
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.tooling.catalog import resolve_host_env_callables, resolve_workspace_callables
@@ -154,7 +153,6 @@ class WorkspaceService(Service):
         self._mcp_overrides = self._db.workspace_mcp_overrides
         self._mcp_tool_overrides = self._db.workspace_mcp_tool_overrides
         self._runtime_permissions = self._db.workspace_runtime_permissions
-        self._host_env_grants = self._db.workspace_host_env_grants
         self._subagents = self._db.workspace_subagents
         self._discovery_cache = self._db.mcp_tool_discovery_cache
         self._subagents = self._db.workspace_subagents
@@ -563,10 +561,10 @@ class WorkspaceService(Service):
     # ═══════════════════════════════════════════════════════════════════
 
     def list_host_env_profiles(self) -> list[HostEnvProfileRow]:
-        return self._host_env_grants.list_profiles()
+        return self._db.host_env_profiles.list_profiles()
 
     def get_host_env_profile(self, profile_id: str) -> HostEnvProfileRow | None:
-        return self._host_env_grants.get_profile(profile_id)
+        return self._db.host_env_profiles.get_profile(profile_id)
 
     def upsert_host_env_profile(
         self,
@@ -577,7 +575,7 @@ class WorkspaceService(Service):
         actor: str | None = None,
         profile_id: str | None = None,
     ) -> HostEnvProfileRow:
-        return self._host_env_grants.upsert_profile(
+        return self._db.host_env_profiles.upsert_profile(
             name=name,
             grants=grants,
             description=description,
@@ -586,7 +584,7 @@ class WorkspaceService(Service):
         )
 
     def delete_host_env_profile(self, profile_id: str) -> None:
-        self._host_env_grants.delete_profile(profile_id)
+        self._db.host_env_profiles.delete_profile(profile_id)
 
     def get_agent_host_env(self, agent_id: str) -> AgentHostEnvGrantRow | None:
         """Host-env grants for an agent (authorization is agent territory)."""
@@ -610,39 +608,14 @@ class WorkspaceService(Service):
             actor=actor,
         )
 
-    # Transitional workspace-scoped grant surface. The run path reads AGENT
-    # grants (118_03 B); these remain only for the not-yet-migrated API/CLI UI
-    # and write the legacy workspace_host_env_grants table.
-    # ponytail: migrate the api/system/host + cli/system/host endpoints to the
-    # agent surface, then delete these + the workspace table (118_03 C3).
-    def get_workspace_host_env(self, workspace_id: str) -> WorkspaceHostEnvGrantRow | None:
-        return self._host_env_grants.get_grant(workspace_id)
-
-    def set_workspace_host_env(
-        self,
-        workspace_id: str,
-        *,
-        profile_id: str | None,
-        overrides: dict | None,
-        changelog: str,
-        actor: str | None = None,
-    ) -> WorkspaceHostEnvGrantRow:
-        changelog = _validate_changelog(changelog)
-        return self._host_env_grants.set_grant(
-            workspace_id,
-            profile_id=profile_id,
-            overrides=overrides,
-            changelog=changelog,
-            actor=actor,
-        )
-
-    def resolve_workspace_host_env(self, workspace_id: str) -> ResolvedHostEnv:
-        row = self._host_env_grants.get_grant(workspace_id)
+    def resolve_agent_host_env(self, agent_id: str) -> ResolvedHostEnv:
+        """Effective host-env grants for an agent (profile ⊕ overrides)."""
+        row = self._db.agent_host_env_grants.get_grant(agent_id)
         if not row:
             return {"grants": resolve_grants(None, None), "profile_id": None}
         profile_id = row.get("profile_id")
         profile = (
-            self._host_env_grants.get_profile(profile_id)
+            self._db.host_env_profiles.get_profile(profile_id)
             if profile_id is not None
             else None
         )

@@ -856,7 +856,7 @@ class McpDiscoveryRefreshResult(TypedDict):
 
 
 class ResolvedHostEnv(TypedDict):
-    """Return shape of ``WorkspaceService.resolve_workspace_host_env()``."""
+    """Return shape of ``WorkspaceService.resolve_agent_host_env()``."""
 
     grants: dict[str, GrantConfig]
     profile_id: str | None

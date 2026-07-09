@@ -22,16 +22,16 @@ def he_profiles(ctx: typer.Context) -> None:
 
 
 @host_env_app.command("grants")
-def he_grants(ctx: typer.Context, workspace_id: str) -> None:
-    """Show the resolved host-env grants for a workspace."""
+def he_grants(ctx: typer.Context, agent_id: str) -> None:
+    """Show the resolved host-env grants for an agent."""
     obj: CLIContext = ctx.obj
-    row = obj.workspaces.get_workspace_host_env(workspace_id)
+    row = obj.workspaces.get_agent_host_env(agent_id)
     if not row:
-        obj.render.system.host_env_no_grants(workspace_id)
+        obj.render.system.host_env_no_grants(agent_id)
         return
 
-    resolved = obj.workspaces.resolve_workspace_host_env(workspace_id)
-    obj.render.system.host_env_grants_view(workspace_id, row, resolved)
+    resolved = obj.workspaces.resolve_agent_host_env(agent_id)
+    obj.render.system.host_env_grants_view(agent_id, row, resolved)
 
 
 @host_env_app.command("audit")

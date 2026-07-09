@@ -100,23 +100,23 @@ def delete_profile(profile_id: str, ws: Annotated[WorkspaceService, Depends(get_
     ws.delete_host_env_profile(profile_id)
 
 
-@router.get("/api/workspaces/{workspace_id}/host-env")
-def get_workspace_host_env(
-    workspace_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
+@router.get("/api/agents/{agent_id}/host-env")
+def get_agent_host_env(
+    agent_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
 ) -> ResolvedHostEnv:
-    """Read the host-env provisioning config for *workspace_id*."""
-    return ws.resolve_workspace_host_env(workspace_id)
+    """Read the host-env grant config for *agent_id* (authorization = agent)."""
+    return ws.resolve_agent_host_env(agent_id)
 
 
-@router.put("/api/workspaces/{workspace_id}/host-env")
-def set_workspace_host_env(
-    workspace_id: str,
+@router.put("/api/agents/{agent_id}/host-env")
+def set_agent_host_env(
+    agent_id: str,
     body: WorkspaceHostEnvBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
 ) -> ResolvedHostEnv:
     try:
-        ws.set_workspace_host_env(
-            workspace_id,
+        ws.set_agent_host_env(
+            agent_id,
             profile_id=body.profile_id,
             overrides=body.overrides,
             changelog=body.reason,
@@ -124,7 +124,7 @@ def set_workspace_host_env(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return ws.resolve_workspace_host_env(workspace_id)
+    return ws.resolve_agent_host_env(agent_id)
 
 
 @router.get("/api/runs/{run_id}/host-env-calls")

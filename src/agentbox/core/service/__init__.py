@@ -45,7 +45,7 @@ from agentbox.core.data import RunCommentRow as RunCommentRow
 from agentbox.core.data import SharedResourceRecord as SharedResourceRecord
 from agentbox.core.data import UsageSummaryRow as UsageSummaryRow
 from agentbox.core.data import WorkspaceFileBindingRow as WorkspaceFileBindingRow
-from agentbox.core.data import WorkspaceHostEnvGrantRow as WorkspaceHostEnvGrantRow
+from agentbox.core.data import AgentHostEnvGrantRow as AgentHostEnvGrantRow
 from agentbox.core.data import WorkspaceMcpOverrideRow as WorkspaceMcpOverrideRow
 from agentbox.core.data import WorkspaceMcpToolOverrideRow as WorkspaceMcpToolOverrideRow
 from agentbox.core.engines.providers.base import ProviderDescriptor as ProviderDescriptor
@@ -134,14 +134,14 @@ from agentbox.core.service.resources.admin import replace_workspace_file_binding
 from agentbox.core.service.system.admin import list_host_env_calls_for_run as list_host_env_calls_for_run
 from agentbox.core.service.workspaces.admin import get_active_env_doc as get_active_env_doc
 from agentbox.core.service.workspaces.admin import get_workspace as get_workspace
-from agentbox.core.service.workspaces.admin import get_workspace_host_env as get_workspace_host_env
+from agentbox.core.service.workspaces.admin import get_agent_host_env as get_agent_host_env
 from agentbox.core.service.workspaces.admin import get_workspace_mcp_policy as get_workspace_mcp_policy
 from agentbox.core.service.workspaces.admin import list_env_doc_versions as list_env_doc_versions
 from agentbox.core.service.workspaces.admin import list_host_env_profiles as list_host_env_profiles
 from agentbox.core.service.workspaces.admin import list_workspace_mcp_server_overrides as list_workspace_mcp_server_overrides
 from agentbox.core.service.workspaces.admin import list_workspace_mcp_tool_overrides as list_workspace_mcp_tool_overrides
 from agentbox.core.service.workspaces.admin import publish_env_doc as publish_env_doc
-from agentbox.core.service.workspaces.admin import resolve_workspace_host_env as resolve_workspace_host_env
+from agentbox.core.service.workspaces.admin import resolve_agent_host_env as resolve_agent_host_env
 from agentbox.core.service.workspaces.admin import rollback_env_doc as rollback_env_doc
 from agentbox.core.service.workspaces.admin import save_env_doc as save_env_doc
 from agentbox.core.service.workspaces.admin import set_workspace_mcp_policy as set_workspace_mcp_policy

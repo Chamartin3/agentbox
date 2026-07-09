@@ -9,7 +9,6 @@ from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.binding import WorkspaceFileResourceBinding
 from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
-from agentbox.core.db.models.workspaces.host_env_grant import WorkspaceHostEnvGrant
 from agentbox.core.db.models.workspaces.mcp_override import (
     WorkspaceMcpOverride,
     WorkspaceMcpPolicy,
@@ -26,7 +25,6 @@ _SATELLITE_TABLES: tuple[str, ...] = (
     "workspace_mcp_overrides",
     "workspace_mcp_tool_overrides",
     "workspace_mcp_policies",
-    "workspace_host_env_grants",
     "workspace_env_docs",
     "workspace_env_doc_versions",
     "workspace_file_resource_bindings",
@@ -143,7 +141,6 @@ class WorkspaceManager(Manager[Workspace]):
             WorkspaceMcpOverride.__table__,
             WorkspaceMcpPolicy.__table__,
             WorkspaceSubagent.__table__,
-            WorkspaceHostEnvGrant.__table__,
             WorkspaceRuntimePermission.__table__,
             WorkspaceFileResourceBinding.__table__,
         ]

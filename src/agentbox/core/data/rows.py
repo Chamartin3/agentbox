@@ -476,15 +476,6 @@ class WorkspaceMcpToolOverrideRow(TypedDict):
     created_by: str | None
 
 
-class WorkspaceHostEnvGrantRow(TypedDict):
-    """A row from ``workspace_host_env_grants``."""
-
-    workspace_id: str
-    profile_id: str | None
-    overrides: dict[str, Any] | None
-    changelog: str
-    created_at: str
-    created_by: str | None
 
 
 class AgentHostEnvGrantRow(TypedDict):

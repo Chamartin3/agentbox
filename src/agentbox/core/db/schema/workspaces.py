@@ -106,21 +106,6 @@ workspace_mcp_policies = Table(
     ),
 )
 
-workspace_host_env_grants = Table(
-    "workspace_host_env_grants",
-    metadata,
-    Column("workspace_id", String, primary_key=True),
-    Column(
-        "profile_id",
-        String,
-        ForeignKey("host_env_profiles.id", ondelete="SET NULL"),
-        nullable=True,
-    ),
-    Column("overrides", JSON, nullable=True),
-    Column("changelog", String, nullable=False),
-    Column("created_at", String, nullable=False),
-    Column("created_by", String, nullable=True),
-)
 
 workspace_runtime_permissions = Table(
     "workspace_runtime_permissions",

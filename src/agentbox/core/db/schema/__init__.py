@@ -57,7 +57,6 @@ from agentbox.core.db.schema.system import (
 from agentbox.core.db.schema.workspaces import (
     workspace_env_doc_versions,
     workspace_env_docs,
-    workspace_host_env_grants,
     workspace_mcp_overrides,
     workspace_mcp_policies,
     workspace_mcp_tool_overrides,
@@ -108,7 +107,6 @@ __all__ = [
     # workspaces
     "workspace_env_doc_versions",
     "workspace_env_docs",
-    "workspace_host_env_grants",
     "workspace_mcp_overrides",
     "workspace_mcp_policies",
     "workspace_mcp_tool_overrides",

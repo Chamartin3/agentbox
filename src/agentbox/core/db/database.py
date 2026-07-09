@@ -62,7 +62,6 @@ from agentbox.core.db.managers.system import (
 from agentbox.core.db.managers.workspaces import (
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
-    WorkspaceHostEnvGrantManager,
     WorkspaceManager,
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
@@ -87,7 +86,7 @@ class Database:
             db.agent_sync, db.agent_config_events
         db.workspaces, db.workspace_env_docs, db.workspace_env_doc_versions,
             db.workspace_mcp_overrides, db.workspace_mcp_tool_overrides,
-            db.workspace_mcp_policies, db.workspace_host_env_grants,
+            db.workspace_mcp_policies,
             db.workspace_runtime_permissions, db.workspace_subagents,
         db.resources, db.resource_versions, db.resource_blobs,
             db.active_resource_versions, db.shared_resources,
@@ -136,7 +135,6 @@ class Database:
         self.workspace_mcp_overrides = WorkspaceMcpOverrideManager(self._engine)
         self.workspace_mcp_tool_overrides = WorkspaceMcpToolOverrideManager(self._engine)
         self.workspace_mcp_policies = WorkspaceMcpPolicyManager(self._engine)
-        self.workspace_host_env_grants = WorkspaceHostEnvGrantManager(self._engine)
         self.workspace_runtime_permissions = WorkspaceRuntimePermissionManager(self._engine)
         self.workspace_subagents = WorkspaceSubagentManager(self._engine)
         self.workspace_read = WorkspaceReadManager(self._engine)

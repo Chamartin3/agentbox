@@ -51,7 +51,6 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "workspace_env_doc_versions",
         "workspace_env_docs",
         "workspace_file_resource_bindings",
-        "workspace_host_env_grants",
         "workspace_mcp_overrides",
         "workspace_mcp_policies",
         "workspace_mcp_tool_overrides",

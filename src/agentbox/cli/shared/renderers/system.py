@@ -17,7 +17,7 @@ from agentbox.core.service import (
     HostEnvCallLogRow,
     HostEnvProfileRow,
     McpServerSpec,
-    WorkspaceHostEnvGrantRow,
+    AgentHostEnvGrantRow,
     ApiTokenRow,
 )
 
@@ -265,18 +265,18 @@ class SystemRenderer(Renderer):
         self.print(table)
 
     def host_env_grants_view(
-        self, workspace_id: str, row: WorkspaceHostEnvGrantRow, resolved: ResolvedHostEnv
+        self, agent_id: str, row: AgentHostEnvGrantRow, resolved: ResolvedHostEnv
     ) -> None:
-        """Render host-env grants for a workspace."""
+        """Render host-env grants for an agent."""
         meta = Table.grid(padding=(0, 2))
         meta.add_column(style="dim", justify="right")
         meta.add_column()
-        meta.add_row("workspace_id", workspace_id)
+        meta.add_row("agent_id", agent_id)
         meta.add_row("profile_id", row.get("profile_id") or self.na(""))
         meta.add_row("changelog", row.get("changelog") or self.na(""))
         meta.add_row("created_at", row.get("created_at") or self.na(""))
         self.print(
-            Panel(meta, title=f"Host-env grant — {workspace_id}", border_style="cyan")
+            Panel(meta, title=f"Host-env grant — {agent_id}", border_style="cyan")
         )
 
         grants_raw = resolved.get("grants")

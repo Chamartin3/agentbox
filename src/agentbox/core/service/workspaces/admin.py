@@ -15,7 +15,7 @@ from agentbox.core.data.rows import (
     WorkspaceMcpOverrideRow,
     WorkspaceMcpToolOverrideRow,
     WorkspaceRow,
-    WorkspaceHostEnvGrantRow,
+    AgentHostEnvGrantRow,
 )
 from agentbox.core.service.workspaces.service import WorkspaceService
 
@@ -80,12 +80,12 @@ def list_host_env_profiles() -> list[HostEnvProfileRow]:
     return _ws().list_host_env_profiles()
 
 
-def get_workspace_host_env(workspace_id: str) -> WorkspaceHostEnvGrantRow | None:
-    return _ws().get_workspace_host_env(workspace_id)
+def get_agent_host_env(agent_id: str) -> AgentHostEnvGrantRow | None:
+    return _ws().get_agent_host_env(agent_id)
 
 
-def resolve_workspace_host_env(workspace_id: str) -> ResolvedHostEnv:
-    return _ws().resolve_workspace_host_env(workspace_id)
+def resolve_agent_host_env(agent_id: str) -> ResolvedHostEnv:
+    return _ws().resolve_agent_host_env(agent_id)
 
 
 # ── Env docs ────────────────────────────────────────────────────────────

@@ -36,7 +36,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         # workspaces managers
         "WorkspaceEnvDocManager",
         "WorkspaceEnvDocVersionManager",
-        "WorkspaceHostEnvGrantManager",
         "WorkspaceManager",
         "WorkspaceReadManager",
         "WorkspaceMcpOverrideManager",
