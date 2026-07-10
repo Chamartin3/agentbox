@@ -232,13 +232,39 @@ class AgentRuntimeView:
 
 
 @dataclass(frozen=True)
+class ComposedState:
+    """Composed-prompt state for one run — the backend-facing view.
+
+    Single typed replacement for the seven ``agent.__dict__["_composed_*"]``
+    keys the executor and backends used to share. Produced by
+    :meth:`ComposedPrompt.to_composed_state` and threaded explicitly through
+    render / validate / capture so no hidden side-channel survives on the
+    AgentDef.
+
+    All fields are optional; ``None`` means "this aspect wasn't composed
+    for this run." Backends should treat a missing ``ComposedState`` (or
+    one with ``system is None``) as "no composition — fall back to the
+    agent's inline prompt and on-disk files."
+    """
+
+    system: str | None = None
+    system_base: str | None = None
+    schema: JsonSchemaDict | None = None
+    input_schema: JsonSchemaDict | None = None
+    user: str | None = None
+    references: tuple[ComposedReference, ...] | None = None
+    bundle_sha: str | None = None
+    validation_mode: str | None = None
+
+
+@dataclass(frozen=True)
 class ComposedPrompt:
-    """Composed prompt state produced by ``compose_prompt()``.
+    """Composed prompt state produced by ``build_prompt()``.
 
     Contains everything the executor needs from the composition
     pipeline: prompt texts, schemas, validation hints, and the
-    agent's runtime view.  No execution code reaches into
-    ``core.agents.composition.*`` internals to build this.
+    agent's runtime view. Composition is the agents domain's job — the
+    executor consumes this shape and never assembles a prompt itself.
     """
 
     system_text: str | None = None
@@ -256,11 +282,25 @@ class ComposedPrompt:
     snapshot_entries: list[PromptEmbedSnapshotEntry] = field(default_factory=list)
     runtime_view: AgentRuntimeView | None = None
 
+    def to_composed_state(self) -> ComposedState:
+        """Project the backend-facing subset of the composed prompt."""
+        return ComposedState(
+            system=self.system_text,
+            system_base=self.system_base,
+            schema=self.composed_schema,
+            input_schema=self.composed_input_schema,
+            user=self.composed_user,
+            references=self.composed_references,
+            bundle_sha=self.composed_bundle_sha,
+            validation_mode=self.validation_mode,
+        )
+
 
 __all__ = [
     "AgentRuntimeView",
     "ComposedPrompt",
     "ComposedReference",
+    "ComposedState",
     "ComposeResult",
     "HttpValidatorConfig",
     "PromptFragment",

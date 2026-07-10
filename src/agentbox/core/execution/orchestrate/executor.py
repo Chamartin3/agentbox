@@ -26,9 +26,9 @@ from agentbox.core.execution.orchestrate.setup import (
     NoBackendAvailable,
     RunSetup,
 )
+from agentbox.core.agents import build_prompt
 from agentbox.core.execution.observability.snapshot import SnapshotWriter
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
-from agentbox.core.execution.prepare.prompts import resolve_run_prompt
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
 from agentbox.core.engines.contracts.rendered import RenderedConfig
 from agentbox.core.workspaces import Workspaces
@@ -92,18 +92,19 @@ class RunExecutor:
         if webhook_url is not None:
             agent = agent.model_copy(update={"webhook_url": webhook_url})
 
-        # ── Prompt / composition resolution (agents domain) ───────────────
-        resolved = resolve_run_prompt(
+        # ── Prompt / composition resolution (agents domain owns this) ─────
+        composed_prompt = build_prompt(
             db=self.db,
             settings=self.settings,
             agent=agent,
             input_=input_,
             variables=variables,
         )
-        agent = resolved.agent
-        input_ = resolved.input_
-        composed = resolved.to_composed_state()
-        _prompt_snapshot_entries = resolved.snapshot_entries
+        assert composed_prompt.agent is not None
+        agent = composed_prompt.agent
+        input_ = composed_prompt.input_
+        composed = composed_prompt.to_composed_state()
+        _prompt_snapshot_entries = composed_prompt.snapshot_entries
         # Prefer the run-requested workspace (same source prepare_workdir used
         # for the workdir); fall back to the agent's bound workspace.
         _ws_from_agent = agent.workspace if agent.workspace != "<ephemeral>" else None
@@ -238,7 +239,7 @@ class RunExecutor:
             timeout_override=timeout_seconds,
             workspace_id=_workspace_id,
             resource_snapshot_entries=_resource_snapshot_entries,
-            prepared_composed_result=resolved.composition_result,
+            prepared_composed_result=composed_prompt.composition_result,
             variables=variables,
         )
 
