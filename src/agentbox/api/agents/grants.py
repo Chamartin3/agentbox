@@ -33,6 +33,12 @@ class RevokeBody(BaseModel):
     actor: str | None = None
 
 
+class ForbidBody(BaseModel):
+    tool_name: str = Field(..., min_length=1)
+    changelog: str = Field(..., min_length=3)
+    actor: str | None = None
+
+
 def _catalog_tool_names(
     workspace_id: str,
     svc: WorkspaceService,
@@ -108,5 +114,54 @@ def revoke_tool(
             changelog=body.changelog,
             actor=body.actor,
         )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/{agent_id}/forbidden_tools", status_code=201)
+def forbid_tool(
+    agent_id: str,
+    body: ForbidBody,
+    svc: AgentService = Depends(get_agent_service),
+) -> dict:
+    try:
+        svc.forbid_tool(
+            agent_id=agent_id,
+            tool_name=body.tool_name,
+            changelog=body.changelog,
+            actor=body.actor,
+        )
+        return {"forbidden": True, "tool_name": body.tool_name}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.delete("/{agent_id}/forbidden_tools/{tool_name}", status_code=204)
+def unforbid_tool(
+    agent_id: str,
+    tool_name: str,
+    body: RevokeBody,
+    svc: AgentService = Depends(get_agent_service),
+) -> None:
+    try:
+        svc.unforbid_tool(
+            agent_id=agent_id,
+            tool_name=tool_name,
+            changelog=body.changelog,
+            actor=body.actor,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/{agent_id}/effective_tools")
+def list_effective_tools(
+    agent_id: str,
+    workspace_id: str | None = None,
+    svc: AgentService = Depends(get_agent_service),
+) -> dict:
+    try:
+        tools = svc.list_effective_tools(agent_id, workspace_id)
+        return {"items": [dict(t) for t in tools]}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

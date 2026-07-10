@@ -98,3 +98,59 @@ def tool_revoke(
             actor=actor,
         )
     obj.render.agent.tool_revoked(tool_name, agent_id)
+
+
+@tool_app.command("forbid")
+def tool_forbid(
+    ctx: typer.Context,
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    tool_name: str = typer.Argument(..., help="Tool name to forbid"),
+    changelog: str = typer.Option(..., "--changelog", help="Reason (min 3 chars)"),
+    actor: str | None = typer.Option(None, "--actor", help="Actor identifier"),
+) -> None:
+    """Add a tool to an agent's deny-list."""
+    obj: CLIContext = ctx.obj
+    resolve_agent(agent_id)
+    with handle_cli_errors():
+        obj.agents.forbid_tool(
+            agent_id=agent_id,
+            tool_name=tool_name,
+            changelog=changelog,
+            actor=actor,
+        )
+    obj.render.agent.tool_forbidden(tool_name, agent_id)
+
+
+@tool_app.command("unforbid")
+def tool_unforbid(
+    ctx: typer.Context,
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    tool_name: str = typer.Argument(..., help="Tool name to unforbid"),
+    changelog: str = typer.Option(..., "--changelog", help="Reason (min 3 chars)"),
+    actor: str | None = typer.Option(None, "--actor", help="Actor identifier"),
+) -> None:
+    """Remove a tool from an agent's deny-list."""
+    obj: CLIContext = ctx.obj
+    resolve_agent(agent_id)
+    with handle_cli_errors():
+        obj.agents.unforbid_tool(
+            agent_id=agent_id,
+            tool_name=tool_name,
+            changelog=changelog,
+            actor=actor,
+        )
+    obj.render.agent.tool_unforbidden(tool_name, agent_id)
+
+
+@tool_app.command("effective")
+def tool_effective(
+    ctx: typer.Context,
+    agent_id: str = typer.Argument(..., help="Agent ID"),
+    workspace_id: str | None = typer.Option(None, "--workspace", help="Workspace ID (optional)"),
+) -> None:
+    """List effective tools for an agent (after applying grants/forbids)."""
+    obj: CLIContext = ctx.obj
+    resolve_agent(agent_id)
+    with handle_cli_errors():
+        tools = obj.agents.list_effective_tools(agent_id, workspace_id)
+    obj.render.agent.effective_tools_table(tools, agent_id, workspace_id)

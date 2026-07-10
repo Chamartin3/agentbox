@@ -73,3 +73,59 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
             return {"revoked": True}
         except ValueError as exc:
             return {"error": str(exc)}
+
+    @mcp.tool(
+        name="forbid_agent_tool",
+        description=(
+            "Add a canonical tool to an agent's deny-list. "
+            "The reason/changelog is mandatory (min 3 chars)."
+        ),
+    )
+    def forbid_agent_tool(
+        agent_id: str,
+        tool_name: str,
+        reason: str,
+        actor: str | None = None,
+    ) -> dict:
+        if len(reason.strip()) < 3:
+            return {"error": "reason must be at least 3 characters"}
+        try:
+            ctx.agents.forbid_tool(agent_id, tool_name, reason, actor)
+            return {"forbidden": True}
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool(
+        name="unforbid_agent_tool",
+        description="Remove a canonical tool from an agent's deny-list.",
+    )
+    def unforbid_agent_tool(
+        agent_id: str,
+        tool_name: str,
+        reason: str,
+        actor: str | None = None,
+    ) -> dict:
+        if len(reason.strip()) < 3:
+            return {"error": "reason must be at least 3 characters"}
+        try:
+            ctx.agents.unforbid_tool(agent_id, tool_name, reason, actor)
+            return {"unforbidden": True}
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+    @mcp.tool(
+        name="list_effective_tools",
+        description=(
+            "List the effective tools available to an agent on a workspace, "
+            "after applying grant/forbid filters."
+        ),
+    )
+    def list_effective_tools(
+        agent_id: str,
+        workspace_id: str | None = None,
+    ) -> dict:
+        try:
+            tools = ctx.agents.list_effective_tools(agent_id, workspace_id)
+            return {"items": [dict(t) for t in tools]}
+        except ValueError as exc:
+            return {"error": str(exc)}

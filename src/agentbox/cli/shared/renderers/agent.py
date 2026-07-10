@@ -15,7 +15,11 @@ from rich.table import Table
 
 from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
-from agentbox.core.data.payload_types import AgentDiffResult, AgentValidationResult
+from agentbox.core.data.payload_types import (
+    AgentDiffResult,
+    AgentValidationResult,
+    ToolInfo,
+)
 from agentbox.core.service import AgentDef, McpServerSpec, ToolSpec
 
 
@@ -430,6 +434,31 @@ class AgentRenderer(Renderer):
     def tool_revoked(self, tool_name: str, agent_id: str) -> None:
         """Print success message for tool revocation."""
         self.warn(f"revoked {tool_name!r} from {agent_id!r}")
+
+    def tool_forbidden(self, tool_name: str, agent_id: str) -> None:
+        """Print success message for adding a tool to deny-list."""
+        self.success(f"forbidden {tool_name!r} for {agent_id!r}")
+
+    def tool_unforbidden(self, tool_name: str, agent_id: str) -> None:
+        """Print success message for removing a tool from deny-list."""
+        self.warn(f"unforbidden {tool_name!r} for {agent_id!r}")
+
+    def effective_tools_table(
+        self, tools: Sequence[ToolInfo], agent_id: str, workspace_id: str | None = None
+    ) -> None:
+        """Render a table of effective tools for an agent."""
+        if not tools:
+            self.warn("No effective tools.")
+            return
+
+        ws_info = f" on workspace {workspace_id}" if workspace_id else ""
+        table = self.table(
+            f"Effective Tools for {agent_id}{ws_info}",
+            "Name", "Source", "Native",
+        )
+        for t in tools:
+            table.add_row(t["name"], t["source"], t["native"] or "")
+        self.print(table)
 
     def validation_updated(self, direction: str, version: JsonValue) -> None:
         """Print success message for validation update."""

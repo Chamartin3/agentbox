@@ -27,7 +27,8 @@ from agentbox.core.agents import (
     PreviewError as PreviewError,
     render_agent_prompt_preview as _render_agent_prompt_preview,
 )
-from agentbox.core.agents import build_config_json_payload
+from agentbox.core.agents import build_config_json_payload, available_tools, effective_tools, resolve_engine
+from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
 from agentbox.core.config import load_settings
 from agentbox.core.data.constants import SessionMode
 from agentbox.core.data import (
@@ -53,10 +54,13 @@ from agentbox.core.data import (
     _AgentToolGrantPatchFields,
     _AgentVersionFields,
 )
+from agentbox.core.data.payload_types import ToolInfo
+from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.data._util import now_iso
 from agentbox.core.service.agents.crud import (
     get_agent_detail as _get_agent_detail_free,
     list_agents_enriched as _list_agents_enriched_free,
+    resolve_agent as _resolve_agent_free,
 )
 from agentbox.core.service.agents.prompt_patch import (
     AgentServiceError as AgentServiceError,
@@ -557,6 +561,183 @@ class AgentService(Service):
     def active_grants(self, agent_id: str) -> set[str]:
         """Set of active tool names — used by the executor at run-start."""
         return {r["tool_name"] for r in self._grants.list_for_agent(agent_id)}
+
+    # ── tool deny-list ─────────────────────────────────────────────────
+    def forbid_tool(
+        self, agent_id: str, tool_name: str, changelog: str, actor: str | None = None
+    ) -> None:
+        """Add a canonical tool to the agent's deny-list (forbidden_tools).
+
+        Validates that tool_name is a known canonical tool. Writes the
+        modified config_json as a new version and activates it.
+        """
+        if len(changelog.strip()) < 3:
+            raise ValueError("changelog must be at least 3 characters")
+
+        # Validate that the tool is canonical
+        try:
+            CanonicalTool(tool_name)
+        except ValueError:
+            raise ValueError(f"tool_name {tool_name!r} is not a known canonical tool") from None
+
+        # Get the active version
+        active_row = self._versions.get_active(agent_id)
+        if active_row is None:
+            raise ValueError(f"Agent {agent_id!r} has no active version")
+
+        # Decode the current config_json
+        cfg = _decode_config_json_free((active_row or {}).get("config_json"))
+
+        # Ensure runtime section exists
+        cfg.setdefault("runtime", {})
+
+        # Get current forbidden_tools list
+        current_forbidden = set(cfg.get("runtime", {}).get("forbidden_tools", []))
+
+        # Add the tool
+        if tool_name in current_forbidden:
+            raise ValueError(f"Tool {tool_name!r} is already forbidden for agent {agent_id!r}")
+
+        current_forbidden.add(tool_name)
+
+        # Update the config
+        cfg["runtime"]["forbidden_tools"] = sorted(current_forbidden)
+
+        # Insert new version with the modified config_json
+        new_config_json = json.dumps(cfg, sort_keys=True)
+
+        carried_prompt_content = (active_row or {}).get("prompt_content")
+        carried_prompt_snapshot = (active_row or {}).get("prompt_snapshot") or ""
+
+        vid = self._versions.insert_version(
+            agent_id=agent_id,
+            version=self._versions.next_version(agent_id),
+            source_path=(active_row or {}).get("source_path") or "",
+            source_format=(active_row or {}).get("source_format") or "unknown",
+            content_snapshot=(active_row or {}).get("content_snapshot") or "",
+            prompt_snapshot=carried_prompt_snapshot,
+            content_hash=(active_row or {}).get("content_hash") or "",
+            author="api:forbid",
+            changelog=f"forbid tool: {changelog}",
+            config_json=new_config_json,
+            prompt_content=carried_prompt_content,
+            is_legacy=0,
+            created_at=now_iso(),
+            source="api",
+        )
+
+        new_version = self._versions.get_by_id(vid)
+        assert new_version is not None
+
+        # Activate the new version
+        self._active.set_pointer(agent_id, int(new_version["id"]), now_iso())
+
+    def unforbid_tool(
+        self, agent_id: str, tool_name: str, changelog: str, actor: str | None = None
+    ) -> None:
+        """Remove a canonical tool from the agent's deny-list.
+
+        Raises ValueError if the tool is not currently forbidden.
+        Writes a new version and activates it.
+        """
+        if len(changelog.strip()) < 3:
+            raise ValueError("changelog must be at least 3 characters")
+
+        # Validate that the tool is canonical
+        try:
+            CanonicalTool(tool_name)
+        except ValueError:
+            raise ValueError(f"tool_name {tool_name!r} is not a known canonical tool") from None
+
+        # Get the active version
+        active_row = self._versions.get_active(agent_id)
+        if active_row is None:
+            raise ValueError(f"Agent {agent_id!r} has no active version")
+
+        # Decode the current config_json
+        cfg = _decode_config_json_free((active_row or {}).get("config_json"))
+
+        # Get current forbidden_tools list
+        current_forbidden = set(cfg.get("runtime", {}).get("forbidden_tools", []))
+
+        # Remove the tool
+        if tool_name not in current_forbidden:
+            raise ValueError(f"Tool {tool_name!r} is not currently forbidden for agent {agent_id!r}")
+
+        current_forbidden.discard(tool_name)
+
+        # Update the config
+        cfg.setdefault("runtime", {})
+        cfg["runtime"]["forbidden_tools"] = sorted(current_forbidden)
+
+        # Insert new version with the modified config_json
+        new_config_json = json.dumps(cfg, sort_keys=True)
+
+        carried_prompt_content = (active_row or {}).get("prompt_content")
+        carried_prompt_snapshot = (active_row or {}).get("prompt_snapshot") or ""
+
+        vid = self._versions.insert_version(
+            agent_id=agent_id,
+            version=self._versions.next_version(agent_id),
+            source_path=(active_row or {}).get("source_path") or "",
+            source_format=(active_row or {}).get("source_format") or "unknown",
+            content_snapshot=(active_row or {}).get("content_snapshot") or "",
+            prompt_snapshot=carried_prompt_snapshot,
+            content_hash=(active_row or {}).get("content_hash") or "",
+            author="api:unforbid",
+            changelog=f"unforbid tool: {changelog}",
+            config_json=new_config_json,
+            prompt_content=carried_prompt_content,
+            is_legacy=0,
+            created_at=now_iso(),
+            source="api",
+        )
+
+        new_version = self._versions.get_by_id(vid)
+        assert new_version is not None
+
+        # Activate the new version
+        self._active.set_pointer(agent_id, int(new_version["id"]), now_iso())
+
+    def list_effective_tools(self, agent_id: str, workspace_id: str | None = None) -> list[ToolInfo]:
+        """Return the computed effective tool list for an agent on a workspace.
+
+        Applies the agent's allowed/forbidden configuration against the
+        workspace's availability surface. If workspace_id is None or empty,
+        uses an empty catalog.
+        """
+        # Resolve the agent
+        agent = _resolve_agent_free(agent_id, agent_defs=self._db.agent_defs)
+        if agent is None:
+            raise ValueError(f"Agent {agent_id!r} not found")
+
+        # Get the agent's backend and its native declared tools
+        backend = resolve_engine(agent.runner.kind)
+        declared_tools = backend.declared_tools()
+
+        # Resolve workspace availability catalog
+        workspace_catalog: list[ToolInfo] = []
+        if workspace_id:
+            callables = resolve_workspace_callables(
+                workspace_id,
+                self._db.workspace_file_resource_bindings,
+                self._db.workspace_mcp_policies,
+                self._db.workspace_mcp_overrides,
+                self._db.workspace_mcp_tool_overrides,
+                mcp_registry=None,
+                declared_tools=declared_tools,
+            )
+
+            workspace_catalog = [
+                ToolInfo(name=c.name, source=c.kind, native=None)
+                for c in callables
+            ]
+
+        # Build available tools
+        avail = available_tools(native=declared_tools, workspace_catalog=workspace_catalog)
+
+        # Return effective tools
+        return effective_tools(agent, avail)
 
     # ── prompts ────────────────────────────────────────────────────────
     def list_prompt_versions(self, agent_id: str) -> list[PromptVersionRow]:
