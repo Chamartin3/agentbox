@@ -314,6 +314,21 @@ class RuntimeSection(TypedDict):
 
     mcp_config_path: str | None
     allowed_tools: list[str]
+    forbidden_tools: list[str]
+
+
+class ToolInfo(TypedDict):
+    """One tool available (or effective) for an agent on a workspace.
+
+    ``name`` is the canonical name for built-ins (``fs.read``) or the raw
+    tool name for MCP/resource tools. ``source`` is where it comes from.
+    ``native`` is the target engine's native name when known (built-ins
+    only; ``None`` for MCP/resource tools whose name is already native).
+    """
+
+    name: str
+    source: str  # "builtin" | "mcp" | "host_env" | "resource"
+    native: str | None
 
 
 class PythonSection(TypedDict):

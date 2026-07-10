@@ -84,6 +84,7 @@ class RuntimeConfig:
 
     mcp_config_path: str | None = None
     allowed_tools: tuple[CanonicalTool, ...] = ()
+    forbidden_tools: tuple[CanonicalTool, ...] = ()
 
     @classmethod
     def from_agent(cls, agent: Any) -> RuntimeConfig:
@@ -91,6 +92,7 @@ class RuntimeConfig:
         return cls(
             mcp_config_path=sub.get("mcp_config_path"),
             allowed_tools=tuple(sub.get("allowed_tools") or ()),
+            forbidden_tools=tuple(sub.get("forbidden_tools") or ()),
         )
 
 
@@ -139,6 +141,7 @@ def build_config_json_payload(agent: Any) -> ConfigJsonPayload:
         "runtime": {
             "mcp_config_path": runtime_cfg.mcp_config_path,
             "allowed_tools": list(runtime_cfg.allowed_tools),
+            "forbidden_tools": list(runtime_cfg.forbidden_tools),
         },
         "python": {
             "agent_module": python_cfg.agent_module,

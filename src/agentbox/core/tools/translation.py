@@ -12,6 +12,8 @@ targeting.
 
 from __future__ import annotations
 
+from collections.abc import Collection
+
 from agentbox.core.tools.canonical import CanonicalTool
 
 
@@ -102,3 +104,26 @@ def intersect_allowed_tools(
     if not workspace_tools:
         return set(agent_tools)
     return agent_tools & workspace_tools
+
+
+def effective_tool_set(
+    *,
+    allowed: Collection[str],
+    forbidden: Collection[str],
+    available: Collection[str],
+) -> set[str]:
+    """The single tool-authorization formula (works on tool-name strings).
+
+        base      = available                if allowed is empty
+                  = allowed ∩ available       otherwise
+        effective = base − forbidden
+
+    ``available`` is the concrete availability surface (engine native
+    built-ins ∪ workspace catalog). Names are plain strings so MCP/resource
+    tools — which are not ``CanonicalTool`` members — pass through; the
+    allow/deny lists hold canonical names (a subset). ``forbidden`` entries
+    absent from ``available`` are simply a no-op.
+    """
+    a, f, av = set(allowed), set(forbidden), set(available)
+    base = av if not a else (a & av)
+    return base - f

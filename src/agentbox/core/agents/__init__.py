@@ -10,7 +10,9 @@ from agentbox.core.agents.definition import (
     ExecutionConfig as ExecutionConfig,
     PythonAgentConfig as PythonAgentConfig,
     RuntimeConfig as RuntimeConfig,
+    available_tools as available_tools,
     build_config_json_payload as build_config_json_payload,
+    effective_tools as effective_tools,
 )
 from agentbox.core.agents.runner import (
     engine_load_failure as engine_load_failure,
@@ -95,6 +97,7 @@ __all__ = [
     "ScriptValidatorConfig",
     "ValidationEngine",
     "ValidationResult",
+    "available_tools",
     "build_agent_snapshot",
     "build_config_json_payload",
     "build_config_json_str",
@@ -104,6 +107,7 @@ __all__ = [
     "check_output",
     "compose",
     "compose_from_source",
+    "effective_tools",
     "engine_load_failure",
     "list_engines",
     "load_bundle_from_bindings",
