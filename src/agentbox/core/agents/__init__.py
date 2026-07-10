@@ -27,13 +27,13 @@ from agentbox.core.agents.versioning import (
     check_drift as check_drift,
     startup_sweep as startup_sweep,
 )
-from agentbox.core.agents.contract import (
+from agentbox.core.agents.validation import (
     OutputConfig as OutputConfig,
     check_output as check_output,
     resolve_output_config as resolve_output_config,
     resolve_schema as resolve_schema,
 )
-from agentbox.core.agents.prompt import (
+from agentbox.core.agents.composition import (
     BindingsBundleSource as BindingsBundleSource,
     Bundle as Bundle,
     BundleSource as BundleSource,

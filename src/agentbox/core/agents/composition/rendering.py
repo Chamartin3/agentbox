@@ -11,7 +11,7 @@ Two families of renderers, both turning something into prompt text:
    ``append_input_schema`` / ``append_schema`` /
    ``append_validation_engine_hint``) — turn the *validation contract*
    (``OutputConfig`` / input+output schema / validation-engine hint) into
-   system-prompt text. ``core.agents.contract`` owns declaring and checking
+   system-prompt text. ``core.agents.validation`` owns declaring and checking
    that contract; rendering it INTO the prompt is a composition concern and
    lives here. One place so every backend produces byte-identical fragments.
 """
@@ -22,7 +22,7 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
-from agentbox.core.agents.contract.schema import OutputConfig
+from agentbox.core.agents.validation.schema import OutputConfig
 from agentbox.core.data.payload_types import JsonSchemaDict, RenderedBlob
 from agentbox.core.data.rows import ResourceBlobRow
 

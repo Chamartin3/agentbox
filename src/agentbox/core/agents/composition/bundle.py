@@ -19,14 +19,14 @@ from typing import Any, Protocol, TypedDict
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data.constants import BundleFile
 from agentbox.core.data import CompositionConfig
-from agentbox.core.agents.prompt.rendering import (
+from agentbox.core.agents.composition.rendering import (
     append_input_schema, append_schema,
 )
 from agentbox.core.data.composition import (
     ComposedReference,
     ComposeResult,
 )
-from agentbox.core.agents.prompt.rendering import render_for_type
+from agentbox.core.agents.composition.rendering import render_for_type
 
 _jsonschema: ModuleType | None
 try:
@@ -404,7 +404,7 @@ def precompose_check(
 
     This is **not** the runtime ``validate_output`` entrypoint — it is a
     composition-time helper for checking bundle output before the run starts.
-    Runtime validation lives in ``core.agents.contract.check``.
+    Runtime validation lives in ``core.agents.validation.check``.
 
     Args:
         response: raw output text (expected to be JSON).

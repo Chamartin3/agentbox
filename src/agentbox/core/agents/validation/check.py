@@ -14,7 +14,7 @@ import hmac
 import json
 import jsonschema as _jsonschema
 
-from agentbox.core.agents.contract.schema import (
+from agentbox.core.agents.validation.schema import (
     resolve_output_config,
     resolve_schema,
 )

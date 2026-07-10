@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.agents.contract import check_output
+from agentbox.core.agents.validation import check_output
 
 
 @pytest.fixture

@@ -15,21 +15,21 @@ from agentbox.core.config import Settings
 from agentbox.core.data.composition import (
     ComposedReference,
 )
-from agentbox.core.agents.prompt.bundle import (
+from agentbox.core.agents.composition.bundle import (
     load_bundle_from_bindings,
 )
-from agentbox.core.agents.prompt.resolver import (
+from agentbox.core.agents.composition.resolver import (
     resolve_prompt,
 )
 from agentbox.core.agents.definition import (
     ExecutionConfig,
     PythonAgentConfig,
 )
-from agentbox.core.agents.contract import (
+from agentbox.core.agents.validation import (
     OutputConfig as _OutputConfig,
     resolve_output_config as _resolve_output_config,
 )
-from agentbox.core.agents.prompt.rendering import (
+from agentbox.core.agents.composition.rendering import (
     append as _append_output_contract,
     append_validation_engine_hint,
 )

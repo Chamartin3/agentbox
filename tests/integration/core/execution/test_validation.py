@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from agentbox.core.agents.contract import (
+from agentbox.core.agents.validation import (
     ValidationResult,
     check_output,
     validate_jsonschema,

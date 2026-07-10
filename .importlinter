@@ -18,17 +18,17 @@ source_modules =
     agentbox.core.execution
     agentbox.core.service
 forbidden_modules =
-    agentbox.core.agents.contract
+    agentbox.core.agents.composition
     agentbox.core.agents.definition
-    agentbox.core.agents.prompt
     agentbox.core.agents.runner
+    agentbox.core.agents.validation
     agentbox.core.agents.versioning
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
     # steploop instantiates _DbStoreAdapter(db) — deleted in plan 121
     # (de-DB the step loop); until then it needs the private class.
-    agentbox.core.execution.orchestrate.steploop -> agentbox.core.agents.prompt.build
+    agentbox.core.execution.orchestrate.steploop -> agentbox.core.agents.composition.build
     # whole-module namespace import of the prompt-doc CRUD module (read/
     # write/publish/rollback accessed as prompts.<fn>) — not a symbol the
     # facade can re-export; the module is the unit.
@@ -350,7 +350,7 @@ ignore_imports =
     # ── Pre-existing deep imports (no manager API yet): ──────────────────
     # Run model used as return type; fix: RunManager.get() → RunRecord (plan 112+)
     agentbox.core.service.execution.service -> agentbox.core.db.models.runs.run
-    agentbox.core.agents.prompt.build -> agentbox.core.db.system.config
+    agentbox.core.agents.composition.build -> agentbox.core.db.system.config
     agentbox.core.engines.defaults -> agentbox.core.db.system.config
     agentbox.core.execution.observability.snapshot.mcp -> agentbox.core.db.system.config
     agentbox.core.resources -> agentbox.core.db.resources.models

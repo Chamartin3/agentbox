@@ -4,12 +4,12 @@ Public facade for the prompt pipeline: building composed prompts,
 resolving resource bindings, rendering previews, and validating output.
 """
 
-from agentbox.core.agents.prompt.build import (
+from agentbox.core.agents.composition.build import (
     build_prompt,
     build_runtime_view,
     resolve_agent_prompt_bindings,
 )
-from agentbox.core.agents.prompt.bundle import (
+from agentbox.core.agents.composition.bundle import (
     Bundle,
     BindingsBundleSource,
     BundleSource,
@@ -23,17 +23,17 @@ from agentbox.core.agents.prompt.bundle import (
     ReferenceSpec,
     OutputSchemaInfo,
 )
-from agentbox.core.agents.prompt.preview import (
+from agentbox.core.agents.composition.preview import (
     CompositionPreview,
     PreviewError,
     ReferencePreview,
     preview,
     render_agent_prompt_preview,
 )
-from agentbox.core.agents.prompt.resolver import (
+from agentbox.core.agents.composition.resolver import (
     resolve_prompt,
 )
-from agentbox.core.agents.prompt.rendering import (
+from agentbox.core.agents.composition.rendering import (
     render_document,
     render_folder_manifest,
     render_for_type,

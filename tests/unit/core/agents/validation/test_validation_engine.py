@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from agentbox.core.agents.contract import check_output
-from agentbox.core.agents.prompt.rendering import append_validation_engine_hint
+from agentbox.core.agents.validation import check_output
+from agentbox.core.agents.composition.rendering import append_validation_engine_hint
 from agentbox.core.data import AgentDef, RunnerSpec
 
 

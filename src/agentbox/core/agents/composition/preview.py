@@ -19,8 +19,8 @@ from agentbox.core.agents.definition import (
     HttpValidatorConfig,
     ScriptValidatorConfig,
 )
-from agentbox.core.agents.contract import OutputConfig
-from agentbox.core.agents.prompt.rendering import (
+from agentbox.core.agents.validation import OutputConfig
+from agentbox.core.agents.composition.rendering import (
     append_input_schema,
     append_schema,
     render as _render_output_contract,
@@ -46,8 +46,8 @@ from agentbox.core.db import (
 )
 from agentbox.core.data.payload_types import PromptPreviewResult
 from agentbox.core.data.constants import BundleFile
-from agentbox.core.agents.prompt.rendering import render_for_type
-from agentbox.core.agents.prompt.resolver import resolve_prompt
+from agentbox.core.agents.composition.rendering import render_for_type
+from agentbox.core.agents.composition.resolver import resolve_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -502,7 +502,7 @@ def render_agent_prompt_preview(
         composed = composed.rstrip() + "\n\n" + output_schema_block
 
     # Validation contract — rules + a short validators hint, mirroring
-    # what core.agents.prompt.rendering.append() does at runtime so the
+    # what core.agents.composition.rendering.append() does at runtime so the
     # preview reflects what the model actually sees. The schema piece is
     # intentionally omitted (already rendered above from the binding).
     validation_block, validation_view = _validation_block_for_preview(agent_versions, resources, agent_id)

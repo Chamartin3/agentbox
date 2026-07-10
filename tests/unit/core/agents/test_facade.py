@@ -4,7 +4,8 @@ Complements the ``agents-facade`` import-linter contract (which enforces the
 *import direction* — outside code must not deep-import ``core.agents.*``
 submodules). This test guards the facade's own health: no dangling ``__all__``
 entry, the load-bearing verbs stay present, and the mechanism-named packages
-retired by plan 120 (``composition`` / ``config``) do not come back.
+retired by plan 120 (``contract`` / ``prompt`` / ``config`` / ``runtime``) do
+not come back.
 """
 
 from __future__ import annotations
@@ -17,26 +18,27 @@ import agentbox.core.agents as agents
 
 # One verb per concept-component, so a rename that forgets the facade fails here.
 REQUIRED_SURFACE = (
-    "build_prompt",          # prompt/
-    "build_runtime_view",    # prompt/
-    "resolve_agent_prompt_bindings",  # prompt/
-    "check_output",          # contract/
-    "resolve_schema",        # contract/
-    "resolve_output_config",  # contract/
-    "ExecutionConfig",       # definition/
-    "RuntimeConfig",         # definition/
-    "build_config_json_payload",  # definition/
-    "resolve_engine",        # runner
-    "list_engines",          # runner
-    "check_drift",           # versioning/
-    "startup_sweep",         # versioning/
-    "PromptDoc",             # versioning/
+    "build_prompt",                   # composition/
+    "build_runtime_view",             # composition/
+    "resolve_agent_prompt_bindings",  # composition/
+    "check_output",                   # validation/
+    "resolve_schema",                 # validation/
+    "resolve_output_config",          # validation/
+    "ExecutionConfig",                # definition/
+    "RuntimeConfig",                  # definition/
+    "build_config_json_payload",      # definition/
+    "resolve_engine",                 # runner
+    "list_engines",                   # runner
+    "check_drift",                    # versioning/
+    "startup_sweep",                  # versioning/
+    "PromptDoc",                      # versioning/
 )
 
+# The mechanism-named packages plan 120 retired; renamed-away paths included.
 RETIRED_PACKAGES = (
-    "agentbox.core.agents.composition",
     "agentbox.core.agents.config",
-    "agentbox.core.agents.validation",
+    "agentbox.core.agents.contract",
+    "agentbox.core.agents.prompt",
     "agentbox.core.agents.runtime",
 )
 

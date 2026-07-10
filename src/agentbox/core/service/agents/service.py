@@ -970,7 +970,7 @@ class AgentService(Service):
     ) -> PromptPreviewResult:
         """Render the composed prompt preview for an agent.
 
-        Thin delegator to the free-function in ``core.agents.prompt.preview``.
+        Thin delegator to the free-function in ``core.agents.composition.preview``.
         Raises ``PreviewError`` when a binding cannot be resolved.
         """
         return _render_agent_prompt_preview(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from agentbox.core.agents.contract import check_output
+from agentbox.core.agents.validation import check_output
 
 
 class TestValidateOutput:
@@ -33,7 +33,7 @@ class TestValidateOutput:
         is jsonschema first, then explicit validators, and the engine
         label reflects the combination.
         """
-        from agentbox.core.agents.contract import check as check_module
+        from agentbox.core.agents.validation import check as check_module
 
         mock_validator = MagicMock()
         mock_validator.kind = "http"

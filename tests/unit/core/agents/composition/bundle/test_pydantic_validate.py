@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from agentbox.core.agents.contract import validate_pydantic
+from agentbox.core.agents.validation import validate_pydantic
 
 
 def _schema(name: str = "TestOutput") -> dict:
