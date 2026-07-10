@@ -245,7 +245,7 @@ def build_prompt(
     This is the single entry point for the composition pipeline.
 
     Returns a :class:`ComposedPrompt` with every field the executor
-    needs — it should *not* drill into ``core.agents.composition.*``
+    needs — it should *not* drill into ``core.agents`` submodule
     internals for any of the returned data.
     """
     store = _DbStoreAdapter(db)

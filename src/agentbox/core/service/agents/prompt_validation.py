@@ -11,7 +11,7 @@ import json as _json
 import logging
 from typing import Any, cast
 
-from agentbox.core.agents.composition.drift import (
+from agentbox.core.agents.versioning.drift import (
     _build_snapshot,
 )
 from agentbox.core.data.constants import ValidatorKind

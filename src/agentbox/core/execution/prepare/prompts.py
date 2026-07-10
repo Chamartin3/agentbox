@@ -132,7 +132,7 @@ def resolve_run_prompt(
     """Run the unified prompt-resolution pipeline via the Agents facade.
 
     Delegates to :func:`agentbox.core.agents.build_prompt` so that
-    the execution layer never imports from ``core.agents.composition.*``
+    the execution layer never imports from ``core.agents`` submodule
     or ``core.agents.definition`` internals.
     """
     composed = build_prompt(

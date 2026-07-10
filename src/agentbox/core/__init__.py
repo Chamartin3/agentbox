@@ -1,1 +1,1 @@
-from agentbox.core.agents.composition import prompts as prompts
+from agentbox.core.agents.versioning import prompts as prompts

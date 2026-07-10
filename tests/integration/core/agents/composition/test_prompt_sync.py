@@ -6,7 +6,7 @@ from pathlib import Path
 
 from agentbox.core.data import AgentDef, AgentSource, RunnerSpec
 from agentbox.core.db.schema import prompt_versions
-from agentbox.core.agents.composition.drift import startup_sweep
+from agentbox.core.agents.versioning.drift import startup_sweep
 from agentbox.core.service.agents.service import AgentService
 
 

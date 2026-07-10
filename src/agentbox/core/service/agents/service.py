@@ -22,7 +22,7 @@ import logging
 import uuid
 from typing import Any, cast
 
-from agentbox.core.agents.composition.drift import _build_config_json, _build_snapshot
+from agentbox.core.agents.versioning.drift import _build_config_json, _build_snapshot
 from agentbox.core.agents import (
     PreviewError as PreviewError,
     render_agent_prompt_preview as _render_agent_prompt_preview,
@@ -970,7 +970,7 @@ class AgentService(Service):
     ) -> PromptPreviewResult:
         """Render the composed prompt preview for an agent.
 
-        Thin delegator to the free-function in ``core.agents.composition.preview``.
+        Thin delegator to the free-function in ``core.agents.prompt.preview``.
         Raises ``PreviewError`` when a binding cannot be resolved.
         """
         return _render_agent_prompt_preview(

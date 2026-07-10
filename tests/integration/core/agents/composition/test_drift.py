@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 
 from agentbox.core.data import AgentDef, AgentSource, RunnerSpec
-from agentbox.core.agents.composition.drift import (
+from agentbox.core.agents.versioning.drift import (
     AgentDriftStatus,
     check_drift,
     startup_sweep,

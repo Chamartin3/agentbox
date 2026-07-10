@@ -24,7 +24,7 @@ removed — api/mcp use the Service methods; the functions live on in their
 submodules only as AgentService's internal delegates.
 """
 
-from agentbox.core.agents.composition.drift import (
+from agentbox.core.agents.versioning.drift import (
     _build_snapshot as build_agent_snapshot,  # noqa: F401  -- re-exported via core.service
 )
 from agentbox.core.service.agents.crud import (
