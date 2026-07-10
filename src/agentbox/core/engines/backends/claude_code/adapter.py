@@ -28,7 +28,7 @@ from agentbox.core.engines.backends.claude_code.tools import (
 )
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import (
-    intersect_allowed_tools,
+    render_allowed_tools,
     translate_tool,
 )
 from agentbox.core.engines.backends.claude_code.views import (
@@ -101,12 +101,16 @@ class ClaudeCodeBackend(BackendAdapter):
             "--strict-mcp-config",
         ]
 
-        effective_tools = intersect_allowed_tools(
-            set(runtime_config.allowed_tools),
-            ws_allowed_tools,
+        effective_tools = render_allowed_tools(
+            allowed=runtime_config.allowed_tools,
+            workspace=ws_allowed_tools,
+            forbidden=runtime_config.forbidden_tools,
+            native=_CLAUDE_TOOLS.keys(),
         )
         if effective_tools:
-            native_tools = [translate_tool(t, _CLAUDE_TOOLS) for t in effective_tools]
+            native_tools = sorted(
+                translate_tool(t, _CLAUDE_TOOLS) for t in effective_tools
+            )
             argv += ["--allowedTools", *native_tools]
 
         argv += ["--output-format", "json", "--permission-mode", "bypassPermissions"]

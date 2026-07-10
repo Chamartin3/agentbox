@@ -30,7 +30,7 @@ from agentbox.core.engines.backends.opencode.session import (  # noqa: F401
     strip_code_fences,
 )
 from agentbox.core.tools.canonical import CanonicalTool
-from agentbox.core.tools.translation import intersect_allowed_tools
+from agentbox.core.tools.translation import render_allowed_tools
 from agentbox.core.data.workenv import Item, WorkspaceConfig
 
 __all__ = [
@@ -165,12 +165,14 @@ class OpenCodeBackend(BackendAdapter):
 
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
-        # Effective tools = agent ∩ workspace (canonical).
-        effective_tools: set = set()
+        # Effective tools = (agent ∩ available) − forbidden (canonical).
+        effective_tools: set[str] = set()
         if runtime_config is not None:
-            effective_tools = intersect_allowed_tools(
-                set(runtime_config.allowed_tools),
-                ws_allowed_tools,
+            effective_tools = render_allowed_tools(
+                allowed=runtime_config.allowed_tools,
+                workspace=ws_allowed_tools,
+                forbidden=runtime_config.forbidden_tools,
+                native=_OPENCODE_TOOLS.keys(),
             )
 
         return RenderedConfig(

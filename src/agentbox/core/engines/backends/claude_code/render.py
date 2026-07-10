@@ -29,6 +29,7 @@ def _runtime_config_view_from_agent(agent: HasAgentConfig) -> RuntimeConfigView:
         return RuntimeConfigView()
     return RuntimeConfigView(
         allowed_tools=tuple(runtime_section.get("allowed_tools") or ()),
+        forbidden_tools=tuple(runtime_section.get("forbidden_tools") or ()),
     )
 
 

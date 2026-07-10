@@ -135,6 +135,9 @@ class RunSetup:
             allowed_tools=tuple(
                 agent_config_json.get("runtime", {}).get("allowed_tools") or ()
             ),
+            forbidden_tools=tuple(
+                agent_config_json.get("runtime", {}).get("forbidden_tools") or ()
+            ),
         )
         python_config_raw = agent_config_json.get("python", {}) or {}
         python_agent_config_view = PythonAgentConfigView(

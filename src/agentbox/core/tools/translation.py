@@ -127,3 +127,38 @@ def effective_tool_set(
     a, f, av = set(allowed), set(forbidden), set(available)
     base = av if not a else (a & av)
     return base - f
+
+
+def render_allowed_tools(
+    *,
+    allowed: Collection[CanonicalTool],
+    workspace: Collection[CanonicalTool] | None,
+    forbidden: Collection[CanonicalTool],
+    native: Collection[CanonicalTool],
+) -> set[str]:
+    """Canonical tool names to emit as a backend's explicit allow-list.
+
+    An empty result means "omit the flag" — the backend's default (all tools).
+
+    - **No deny-list** → unchanged behaviour: ``agent ∩ workspace`` (empty
+      side = no restriction), so an unconstrained agent still renders nothing.
+    - **With a deny-list** → the result can't stay "unrestricted" (you can't
+      subtract from *all*), so materialise ``available = native ∪ workspace``
+      and return ``(allowed ∩ available if allowed else available) − forbidden``.
+
+    ponytail: forbidding *every* available tool yields an empty set that reads
+    as "unrestricted" — the CLI can't express an empty allow-list. Realistic
+    deny-lists drop a few tools; add a sentinel deny only if "no tools" is ever
+    a real requirement.
+    """
+    if not forbidden:
+        eff = intersect_allowed_tools(
+            set(allowed), set(workspace) if workspace else None
+        )
+        return {str(t) for t in eff}
+    available = {str(t) for t in native} | {str(t) for t in (workspace or ())}
+    return effective_tool_set(
+        allowed={str(t) for t in allowed},
+        forbidden={str(t) for t in forbidden},
+        available=available,
+    )

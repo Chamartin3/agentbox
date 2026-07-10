@@ -10,7 +10,8 @@ from agentbox.core.tools.canonical import CanonicalTool
 
 @dataclass(frozen=True)
 class RuntimeConfigView:
-    """Engine-local view of agent runtime config (``allowed_tools``).
+    """Engine-local view of agent runtime config (``allowed_tools`` +
+    ``forbidden_tools``).
 
     This is the only slice of ``core.agents.definition.RuntimeConfig`` that
     backends consume.  Defining it here keeps engines free of Agents
@@ -18,6 +19,7 @@ class RuntimeConfigView:
     """
 
     allowed_tools: tuple[CanonicalTool, ...] = ()
+    forbidden_tools: tuple[CanonicalTool, ...] = ()
 
 
 @dataclass(frozen=True)
