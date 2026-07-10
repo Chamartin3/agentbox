@@ -22,7 +22,7 @@ import logging
 import uuid
 from typing import Any, cast
 
-from agentbox.core.agents.versioning.drift import _build_config_json, _build_snapshot
+from agentbox.core.agents import build_agent_snapshot, build_config_json_str
 from agentbox.core.agents import (
     PreviewError as PreviewError,
     render_agent_prompt_preview as _render_agent_prompt_preview,
@@ -1196,8 +1196,8 @@ class AgentService(Service):
                 prompt_text = updated.load_prompt(settings.project_root)
             except FileNotFoundError:
                 prompt_text = ""
-        snapshot = _build_snapshot(updated)
-        config_json = _build_config_json(updated)
+        snapshot = build_agent_snapshot(updated)
+        config_json = build_config_json_str(updated)
 
         active_row = self.active_version(agent_id)
 
@@ -1327,7 +1327,7 @@ class AgentService(Service):
                 prompt_text = current.load_prompt(settings.project_root)
             except FileNotFoundError:
                 prompt_text = ""
-        snapshot = _build_snapshot(current)
+        snapshot = build_agent_snapshot(current)
         carried_prompt_content = (
             active.get("prompt_content")
             or (current.prompt or "").strip()

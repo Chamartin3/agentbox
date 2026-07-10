@@ -11,9 +11,7 @@ import json as _json
 import logging
 from typing import Any, cast
 
-from agentbox.core.agents.versioning.drift import (
-    _build_snapshot,
-)
+from agentbox.core.agents import build_agent_snapshot
 from agentbox.core.data.constants import ValidatorKind
 from agentbox.core.data._util import now_iso
 from agentbox.core.db import (
@@ -194,7 +192,7 @@ def put_agent_validation(
             prompt_text = current.load_prompt(settings.project_root)
         except FileNotFoundError:
             prompt_text = ""
-    snapshot = _build_snapshot(current)
+    snapshot = build_agent_snapshot(current)
     carried_prompt_content = (
         active.get("prompt_content")
         or (current.prompt or "").strip()

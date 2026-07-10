@@ -16,13 +16,23 @@ source_modules =
     agentbox.cli
     agentbox.mcp
     agentbox.core.execution
+    agentbox.core.service
 forbidden_modules =
-    agentbox.core.agents.composition.bundle
-    agentbox.core.agents.composition.versioning
-    agentbox.core.agents.config
+    agentbox.core.agents.contract
+    agentbox.core.agents.definition
+    agentbox.core.agents.prompt
+    agentbox.core.agents.runner
+    agentbox.core.agents.versioning
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
+    # steploop instantiates _DbStoreAdapter(db) — deleted in plan 121
+    # (de-DB the step loop); until then it needs the private class.
+    agentbox.core.execution.orchestrate.steploop -> agentbox.core.agents.prompt.build
+    # whole-module namespace import of the prompt-doc CRUD module (read/
+    # write/publish/rollback accessed as prompts.<fn>) — not a symbol the
+    # facade can re-export; the module is the unit.
+    agentbox.core.service.agents.prompts -> agentbox.core.agents.versioning.prompts
 
 
 # ─── Interface boundary ──────────────────────────────────────────────────

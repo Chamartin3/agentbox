@@ -1,7 +1,9 @@
 """Public facade for the Agents domain.
 
-Re-exports the names available from `core.agent.*` so external callers can
-import from one place instead of reaching into submodules.
+Re-exports the public surface of the ``core.agents`` submodules
+(``definition`` / ``runner`` / ``contract`` / ``prompt`` / ``versioning``)
+so external callers import from this one place instead of reaching into
+submodules. The ``agents-facade`` import-linter contract enforces that.
 """
 
 from agentbox.core.agents.definition import (
@@ -20,6 +22,8 @@ from agentbox.core.agents.versioning import (
     AgentDriftStatus as AgentDriftStatus,
     PromptDoc as PromptDoc,
     PromptError as PromptError,
+    build_agent_snapshot as build_agent_snapshot,
+    build_config_json_str as build_config_json_str,
     check_drift as check_drift,
     startup_sweep as startup_sweep,
 )
@@ -91,7 +95,9 @@ __all__ = [
     "ScriptValidatorConfig",
     "ValidationEngine",
     "ValidationResult",
+    "build_agent_snapshot",
     "build_config_json_payload",
+    "build_config_json_str",
     "build_prompt",
     "build_runtime_view",
     "check_drift",

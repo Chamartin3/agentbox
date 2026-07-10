@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.agents.contract import check_output
+from agentbox.core.agents import check_output
 from agentbox.core.data._util import extract_json
 from agentbox.core.data.constants import LogLevel
 from agentbox.core.data.events import DoneEvent

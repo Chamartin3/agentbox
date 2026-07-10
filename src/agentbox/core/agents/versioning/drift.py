@@ -52,17 +52,17 @@ def check_drift(agent: AgentDef, agent_versions: AgentVersionManager) -> AgentDr
     return AgentDriftStatus.DRIFTED
 
 
-def _build_snapshot(agent: AgentDef) -> str:
+def build_agent_snapshot(agent: AgentDef) -> str:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         data = agent.model_dump(mode="python")
     return json.dumps(data, sort_keys=True, default=str)
 
 
-def _build_config_json(agent: AgentDef) -> str:
+def build_config_json_str(agent: AgentDef) -> str:
     """Serialize an ``AgentDef`` for the ``agent_versions.config_json`` column.
 
-    Distinct from ``_build_snapshot`` (which targets ``content_snapshot``):
+    Distinct from ``build_agent_snapshot`` (which targets ``content_snapshot``):
     ``config_json`` is the DB-as-source-of-truth payload consumed by
     ``AgentDef.from_db_row`` at runtime, so it MUST round-trip every
     runner field — defaults included — to prevent silent revert to the
@@ -323,13 +323,13 @@ def startup_sweep(
                     source_format=(
                         agent.source_format.value if agent.source_format else "unknown"
                     ),
-                    content_snapshot=_build_snapshot(agent),
+                    content_snapshot=build_agent_snapshot(agent),
                     prompt_snapshot=prompt_text,
                     content_hash=file_hash,
                     author="filesystem",
                     changelog="initial import",
                     prompt_content=prompt_text or None,
-                    config_json=_build_config_json(agent),
+                    config_json=build_config_json_str(agent),
                     files=_collect_version_files(agent),
                 )
                 logger.info("versioning: created v1 for new agent %r", agent.id)
@@ -347,7 +347,7 @@ def startup_sweep(
                     source_format=(
                         agent.source_format.value if agent.source_format else "unknown"
                     ),
-                    content_snapshot=_build_snapshot(agent),
+                    content_snapshot=build_agent_snapshot(agent),
                     prompt_snapshot="",
                     content_hash=file_hash,
                     author="filesystem",

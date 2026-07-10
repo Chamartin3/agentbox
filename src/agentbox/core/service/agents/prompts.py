@@ -18,7 +18,7 @@ import hashlib
 from pathlib import Path
 
 from agentbox.core.agents.versioning import prompts as _prompts
-from agentbox.core.agents.versioning.prompts import PromptDoc, PromptError
+from agentbox.core.agents import PromptDoc, PromptError
 from agentbox.core.data import AgentDef
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult, PromptVersionSummary

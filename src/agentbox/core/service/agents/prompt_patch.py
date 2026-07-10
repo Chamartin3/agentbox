@@ -10,9 +10,9 @@ import json as _json
 import logging
 from typing import Any
 
-from agentbox.core.agents.versioning.drift import (
-    _build_config_json,
-    _build_snapshot,
+from agentbox.core.agents import (
+    build_agent_snapshot,
+    build_config_json_str,
 )
 from agentbox.core.agents import engine_load_failure as backend_load_failure
 from agentbox.core.agents import list_engines
@@ -129,8 +129,8 @@ def patch_agent_config(
             prompt_text = updated.load_prompt(settings.project_root)
         except FileNotFoundError:
             prompt_text = ""
-    snapshot = _build_snapshot(updated)
-    config_json = _build_config_json(updated)
+    snapshot = build_agent_snapshot(updated)
+    config_json = build_config_json_str(updated)
 
     active_row = agent_versions.get_active(agent_id)
 

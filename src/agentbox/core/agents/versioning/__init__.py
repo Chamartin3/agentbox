@@ -6,6 +6,8 @@
 
 from agentbox.core.agents.versioning.drift import (
     AgentDriftStatus as AgentDriftStatus,
+    build_agent_snapshot as build_agent_snapshot,
+    build_config_json_str as build_config_json_str,
     check_drift as check_drift,
     startup_sweep as startup_sweep,
 )
@@ -18,6 +20,8 @@ __all__ = [
     "AgentDriftStatus",
     "PromptDoc",
     "PromptError",
+    "build_agent_snapshot",
+    "build_config_json_str",
     "check_drift",
     "startup_sweep",
 ]
