@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from agentbox.core.agents import HttpValidatorConfig
-from agentbox.core.agents.contract import OutputConfig, append, render
+from agentbox.core.agents.contract import OutputConfig
+from agentbox.core.agents.prompt.rendering import append, render
 
 
 def test_render_empty_returns_empty_string() -> None:

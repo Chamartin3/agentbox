@@ -19,7 +19,7 @@ from typing import Any, Protocol, TypedDict
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data.constants import BundleFile
 from agentbox.core.data import CompositionConfig
-from agentbox.core.agents.contract.render import (
+from agentbox.core.agents.prompt.rendering import (
     append_input_schema, append_schema,
 )
 from agentbox.core.data.composition import (

@@ -27,11 +27,11 @@ from agentbox.core.agents.definition import (
 )
 from agentbox.core.agents.contract import (
     OutputConfig as _OutputConfig,
-    append_validation_engine_hint,
     resolve_output_config as _resolve_output_config,
 )
-from agentbox.core.agents.contract.render import (
+from agentbox.core.agents.prompt.rendering import (
     append as _append_output_contract,
+    append_validation_engine_hint,
 )
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView, ResolvedPromptBinding
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow

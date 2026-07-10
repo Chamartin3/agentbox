@@ -1,7 +1,8 @@
-"""Output contract — schema resolution, prompt rendering, output checking.
+"""Output contract — validation only: schema resolution + output checking.
 
-Public surface for the Agents contract sub-package (pulled from validation,
-composition, and config).
+Public surface for the Agents contract sub-package. Rendering the contract
+INTO prompt text is a composition responsibility and lives in
+``core.agents.prompt.rendering``, not here.
 """
 
 from agentbox.core.agents.contract.check import (
@@ -12,13 +13,6 @@ from agentbox.core.agents.contract.check import (
     run_json_schema,
     validate_jsonschema,
     validate_pydantic,
-)
-from agentbox.core.agents.contract.render import (
-    append,
-    append_input_schema,
-    append_schema,
-    append_validation_engine_hint,
-    render,
 )
 from agentbox.core.agents.contract.schema import (
     OutputConfig,
@@ -34,15 +28,10 @@ __all__ = [
     "OutputConfig",
     "ValidationEngine",
     "ValidationResult",
-    "append",
-    "append_input_schema",
-    "append_schema",
-    "append_validation_engine_hint",
     "call_http_validator",
     "call_script_validator",
     "check_output",
     "format_jsonschema_error",
-    "render",
     "resolve_output_config",
     "resolve_schema",
     "run_json_schema",
