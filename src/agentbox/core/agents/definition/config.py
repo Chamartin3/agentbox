@@ -1,10 +1,13 @@
-"""Structured dataclasses for agent config sections.
+"""Structured dataclasses for agent config sections + config_json builder.
 
 Three logical buckets extracted from ``agent_versions.config_json``:
 
 - ``ExecutionConfig`` — validation/retry semantics (executor-level).
 - ``RuntimeConfig`` — runtime/tooling knobs (MCP config, allowed tools).
 - ``PythonAgentConfig`` — pydantic-ai / token backend dispatch metadata.
+
+``config_json`` is the sole source of truth — there is no legacy
+``agent.runner`` fallback.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from agentbox.core.data.constants import ConfiguredValidationMode, ValidationMode
+from agentbox.core.data.payload_types import ConfigJsonPayload
 from agentbox.core.tools.canonical import CanonicalTool
 
 _CONFIGURED_ENGINES = frozenset(
@@ -116,3 +120,30 @@ class PythonAgentConfig:
         )
 
 
+def build_config_json_payload(agent: Any) -> ConfigJsonPayload:
+    """Project an AgentDef into the structured ``config_json`` payload.
+
+    Used by the backfill migration and by ``create_version`` going
+    forward. Mirrors the runtime fallback so a freshly written
+    ``config_json`` round-trips identically to the legacy reader.
+    """
+    exec_cfg = ExecutionConfig.from_agent(agent)
+    runtime_cfg = RuntimeConfig.from_agent(agent)
+    python_cfg = PythonAgentConfig.from_agent(agent)
+    payload: ConfigJsonPayload = {
+        "execution": {
+            "max_validation_retries": exec_cfg.max_validation_retries,
+            "max_error_retries": exec_cfg.max_error_retries,
+            "output_validation_engine": exec_cfg.output_validation_engine,
+        },
+        "runtime": {
+            "mcp_config_path": runtime_cfg.mcp_config_path,
+            "allowed_tools": list(runtime_cfg.allowed_tools),
+        },
+        "python": {
+            "agent_module": python_cfg.agent_module,
+            "deps_factory": python_cfg.deps_factory,
+            "output_schema_path": python_cfg.output_schema_path,
+        },
+    }
+    return payload

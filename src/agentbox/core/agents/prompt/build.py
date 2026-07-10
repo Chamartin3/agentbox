@@ -21,7 +21,7 @@ from agentbox.core.agents.prompt.bundle import (
 from agentbox.core.agents.prompt.resolver import (
     resolve_prompt,
 )
-from agentbox.core.agents.config import (
+from agentbox.core.agents.definition import (
     ExecutionConfig,
     PythonAgentConfig,
 )

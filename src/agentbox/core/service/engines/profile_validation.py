@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from agentbox.core.agents.resolve import (
+from agentbox.core.agents import (
     engine_load_failure,
     list_engines,
     resolve_engine_by_name,

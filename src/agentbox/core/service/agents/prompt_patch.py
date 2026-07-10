@@ -14,8 +14,8 @@ from agentbox.core.agents.composition.drift import (
     _build_config_json,
     _build_snapshot,
 )
-from agentbox.core.agents.resolve import engine_load_failure as backend_load_failure
-from agentbox.core.agents.resolve import list_engines
+from agentbox.core.agents import engine_load_failure as backend_load_failure
+from agentbox.core.agents import list_engines
 from agentbox.core.data import AgentDef
 from agentbox.core.data._util import now_iso
 from agentbox.core.db import (

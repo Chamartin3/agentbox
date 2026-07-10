@@ -133,7 +133,7 @@ def resolve_run_prompt(
 
     Delegates to :func:`agentbox.core.agents.build_prompt` so that
     the execution layer never imports from ``core.agents.composition.*``
-    or ``core.agents.config`` internals.
+    or ``core.agents.definition`` internals.
     """
     composed = build_prompt(
         db=db,

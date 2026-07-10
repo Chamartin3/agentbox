@@ -27,7 +27,7 @@ from agentbox.core.agents import (
     PreviewError as PreviewError,
     render_agent_prompt_preview as _render_agent_prompt_preview,
 )
-from agentbox.core.agents.config import build_config_json_payload
+from agentbox.core.agents import build_config_json_payload
 from agentbox.core.config import load_settings
 from agentbox.core.data.constants import SessionMode
 from agentbox.core.data import (

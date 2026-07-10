@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.agents.resolve import (
+from agentbox.core.agents import (
     engine_load_failure as backend_load_failure,
     list_engines as backends,
 )

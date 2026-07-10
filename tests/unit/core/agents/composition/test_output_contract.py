@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.agents.config import HttpValidatorConfig
+from agentbox.core.agents import HttpValidatorConfig
 from agentbox.core.agents.contract import OutputConfig, append, render
 
 

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.agents.config import PythonAgentConfig
+from agentbox.core.agents.definition import PythonAgentConfig
 from agentbox.core.data.composition import (
     HttpValidatorConfig,
     ScriptValidatorConfig,

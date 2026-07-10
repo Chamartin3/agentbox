@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from agentbox.core.agents.resolve import resolve_engine
+from agentbox.core.agents import resolve_engine
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
 from agentbox.core.engines.contracts.base import (

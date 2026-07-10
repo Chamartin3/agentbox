@@ -18,7 +18,7 @@ from agentbox.core.agents.contract.schema import (
     resolve_output_config,
     resolve_schema,
 )
-from agentbox.core.agents.config import ExecutionConfig
+from agentbox.core.agents.definition import ExecutionConfig
 from agentbox.core.config import SETTINGS
 from agentbox.core.data.composition import ValidationResult
 from agentbox.core.data.payload_types import JsonSchemaDict

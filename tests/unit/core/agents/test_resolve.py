@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 import agentbox.core.engines.backends.registry as plugins
-from agentbox.core.agents.resolve import (
+from agentbox.core.agents import (
     engine_load_failure,
     list_engines,
     resolve_engine_by_name,

@@ -4,11 +4,17 @@ Re-exports the names available from `core.agent.*` so external callers can
 import from one place instead of reaching into submodules.
 """
 
-from agentbox.core.agents.config import (
+from agentbox.core.agents.definition import (
     ExecutionConfig as ExecutionConfig,
     PythonAgentConfig as PythonAgentConfig,
     RuntimeConfig as RuntimeConfig,
     build_config_json_payload as build_config_json_payload,
+)
+from agentbox.core.agents.runner import (
+    engine_load_failure as engine_load_failure,
+    list_engines as list_engines,
+    resolve_engine as resolve_engine,
+    resolve_engine_by_name as resolve_engine_by_name,
 )
 from agentbox.core.agents.contract import (
     OutputConfig as OutputConfig,
@@ -81,9 +87,13 @@ __all__ = [
     "check_output",
     "compose",
     "compose_from_source",
+    "engine_load_failure",
+    "list_engines",
     "load_bundle_from_bindings",
     "preview",
     "precompose_check",
+    "resolve_engine",
+    "resolve_engine_by_name",
     "render_agent_prompt_preview",
     "render_document",
     "render_folder_manifest",

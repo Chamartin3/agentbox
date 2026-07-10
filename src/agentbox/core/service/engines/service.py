@@ -21,7 +21,7 @@ import re
 import uuid
 from typing import Any
 
-from agentbox.core.agents.resolve import list_engines, resolve_engine_by_name
+from agentbox.core.agents import list_engines, resolve_engine_by_name
 from agentbox.core.engines.backends import BackendAdapter
 from agentbox.core.data import (
     RunnerProfile,

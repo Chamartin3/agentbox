@@ -76,13 +76,13 @@ class RenderedConfig:
     """Resolved runtime tooling config from the agent definition.
 
     Populated by the executor before ``render()`` so backends never
-    import ``core.agents.config`` directly."""
+    import ``core.agents.definition`` directly."""
 
     python_agent_config: PythonAgentConfigView | None = None
     """Resolved python agent config from the agent definition.
 
     Populated by the executor before ``render()`` so backends never
-    import ``core.agents.config`` directly."""
+    import ``core.agents.definition`` directly."""
 
     ws_allowed_tools: set[CanonicalTool] | None = None
     """Canonical tool names available in the workspace, pre-resolved via

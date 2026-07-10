@@ -13,7 +13,7 @@ import warnings
 from enum import StrEnum
 from pathlib import Path
 
-from agentbox.core.agents.config import build_config_json_payload
+from agentbox.core.agents.definition import build_config_json_payload
 from agentbox.core.data import AgentDef, RunnerProfileCreate, now_iso
 from agentbox.core.db import (
     AgentVersionManager,

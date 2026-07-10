@@ -12,7 +12,7 @@ from agentbox.core.tools.canonical import CanonicalTool
 class RuntimeConfigView:
     """Engine-local view of agent runtime config (``allowed_tools``).
 
-    This is the only slice of ``core.agents.config.RuntimeConfig`` that
+    This is the only slice of ``core.agents.definition.RuntimeConfig`` that
     backends consume.  Defining it here keeps engines free of Agents
     domain imports.
     """
@@ -24,7 +24,7 @@ class RuntimeConfigView:
 class PythonAgentConfigView:
     """Engine-local view of agent python config (``agent_module``, schema path).
 
-    This is the only slice of ``core.agents.config.PythonAgentConfig``
+    This is the only slice of ``core.agents.definition.PythonAgentConfig``
     that backends consume.
     """
 
