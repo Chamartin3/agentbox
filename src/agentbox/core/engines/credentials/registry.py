@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from dataclasses import dataclass, field
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Callable
 
@@ -38,6 +40,39 @@ def list_all() -> list[CredentialMethod]:
 
 def clear() -> None:
     _registry.clear()
+
+
+_loaded = False
+
+
+def _credential_modules() -> list[str]:
+    """Sibling ``.credentials`` module of every ``agentbox.backends`` entry
+    point, plus the providers key table. Modules that don't exist are
+    tolerated by ``load_all``."""
+    mods: list[str] = []
+    for ep in entry_points(group="agentbox.backends"):
+        pkg = ep.value.split(":", 1)[0]
+        mods.append(f"{pkg}.credentials")
+    mods.append("agentbox.core.engines.providers.credentials")
+    return mods
+
+
+def load_all(*, force: bool = False) -> None:
+    """Import every credential-registration module so its ``register()``
+    side effects populate the registry. Idempotent: repeated calls are a
+    no-op unless ``force`` is set (which reloads already-imported modules —
+    used by tests that ``clear()`` the registry between cases)."""
+    global _loaded
+    if _loaded and not force:
+        return
+    for name in _credential_modules():
+        try:
+            mod = importlib.import_module(name)
+        except ModuleNotFoundError:
+            continue
+        if force:
+            importlib.reload(mod)
+    _loaded = True
 
 
 _CREDS_BASE = SETTINGS.creds_dir

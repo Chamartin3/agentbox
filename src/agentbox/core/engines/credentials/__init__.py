@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 from agentbox.core.engines.credentials.methods import Method
-from agentbox.core.engines.credentials.registry import CredentialMethod, clear, get, list_all, register
+from agentbox.core.engines.credentials.registry import (
+    CredentialMethod,
+    clear,
+    get,
+    list_all,
+    load_all,
+    register,
+)
 from agentbox.core.engines.credentials.state import CredentialState
 
 __all__ = [
@@ -13,5 +20,6 @@ __all__ = [
     "clear",
     "get",
     "list_all",
+    "load_all",
     "register",
 ]

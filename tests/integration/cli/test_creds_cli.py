@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import importlib
 import subprocess
 from pathlib import Path
 
 import agentbox.cli.shared.deps as deps
-import agentbox.core.engines.credentials.builtin as reg
 import pytest
 from typer.testing import CliRunner
 
 from agentbox.cli import app
-from agentbox.core.engines.credentials import clear as creds_clear
+from agentbox.core.engines.credentials import clear as creds_clear, load_all as creds_load_all
 
 runner = CliRunner()
 
@@ -21,10 +19,10 @@ runner = CliRunner()
 def _clear_creds_registry() -> None:
     """Reset the credential registry so each test sees the built-in set."""
     creds_clear()
-    importlib.reload(reg)
+    creds_load_all(force=True)
     yield
     creds_clear()
-    importlib.reload(reg)
+    creds_load_all(force=True)
 
 
 # ---------------------------------------------------------------------------

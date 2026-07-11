@@ -42,15 +42,16 @@ from agentbox.core.engines import (
     list_providers,
     refresh_opencode_providers,
 )
-from agentbox.core.engines.credentials import CredentialMethod
+from agentbox.core.engines.credentials import CredentialMethod, load_all as _load_credentials
 from agentbox.core.engines.providers.registry import ProviderAdapter
-from agentbox.core.engines.credentials import builtin as _cred_builtin  # noqa: F401 (registers credential methods on import)
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines.profile_validation import validate_create, validate_patch
 from agentbox.core.service.evaluation.service import EvaluationService
 
 # ponytail bridge — temporary until a dedicated providers service emerges.
 from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
+
+_load_credentials()  # registers credential methods (backends + providers)
 
 
 def _slugify_id(name: str) -> str:
