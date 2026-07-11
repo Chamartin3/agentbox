@@ -13,7 +13,7 @@ import pytest
 
 from agentbox.core.service.evaluation import since_iso
 from agentbox.core.service.evaluation.service import EvaluationService
-from agentbox.core.service.execution.feedback import add_comment, list_comments
+from agentbox.core.service.execution import ExecutionService
 
 
 # ── since_iso ───────────────────────────────────────────────────────────
@@ -82,10 +82,10 @@ def test_evaluation_service_has_required_methods() -> None:
     assert callable(EvaluationService.list_runner_profile_stats)
 
 
-def test_execution_feedback_still_has_comment_functions() -> None:
-    """Comments (add/list) remain on execution.feedback, not evaluation."""
-    assert callable(add_comment)
-    assert callable(list_comments)
+def test_execution_service_has_comment_methods() -> None:
+    """Comments (add/list) live on ExecutionService, not evaluation."""
+    assert callable(ExecutionService.add_comment)
+    assert callable(ExecutionService.list_comments)
 
 
 def test_old_feedback_package_is_gone() -> None:

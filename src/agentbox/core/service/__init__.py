@@ -112,7 +112,7 @@ from agentbox.core.service.agents.lifecycle import set_rating as set_version_rat
 from agentbox.core.service.agents.lifecycle import soft_delete_agent as soft_delete_agent
 
 # ── Execution service (plan 088) ───────────────────────────────────────
-from agentbox.core.service.execution.service import ExecutionService as ExecutionService
+from agentbox.core.service.execution import ExecutionService as ExecutionService
 
 # ── Evaluation service (plan 093 — analytics) ──────────────────────────
 from agentbox.core.service.evaluation.service import EvaluationService as EvaluationService

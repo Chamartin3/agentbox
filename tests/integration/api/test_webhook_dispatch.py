@@ -22,7 +22,7 @@ import respx
 
 from agentbox.api.runs.webhooks import schedule_webhook
 from agentbox.core.data import AgentDef
-from agentbox.core.service.execution.service import ExecutionService
+from agentbox.core.service.execution import ExecutionService
 
 _WEBHOOK_URL = "https://webhook.example.com/hook"
 

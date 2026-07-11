@@ -13,7 +13,7 @@ from agentbox.core.config import load_settings
 from agentbox.core.db.database import Database
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable, RunExecutor
 import agentbox.core.service.execution as runs_service
-from agentbox.core.service.execution.service import ExecutionService
+from agentbox.core.service.execution import ExecutionService
 from agentbox.core.service.agents.service import AgentService
 from agentbox.core.service.execution import (
     AgentNotFound,
@@ -124,7 +124,7 @@ def store(tmp_path: Path) -> Database:
 
 async def test_create_run_raises_when_agent_unknown(store: Database) -> None:
     with pytest.raises(AgentNotFound):
-        await runs_service.create_run(
+        await ExecutionService().dispatch_run(
             "missing", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, _FakeExecutor()), variables={}
         )
 
@@ -134,7 +134,7 @@ async def test_create_run_raises_invalid_when_no_input_or_variables(
 ) -> None:
     _seed_agent(store)
     with pytest.raises(InvalidRunInput):
-        await runs_service.create_run(
+        await ExecutionService().dispatch_run(
             "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, _FakeExecutor())
         )
 
@@ -142,7 +142,7 @@ async def test_create_run_raises_invalid_when_no_input_or_variables(
 async def test_create_run_dispatches_legacy_input(store: Database) -> None:
     _seed_agent(store)
     ex = _FakeExecutor(store, load_settings())
-    result = await runs_service.create_run(
+    result = await ExecutionService().dispatch_run(
         "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, ex), input_="hi"
     )
     assert result == {"run_id": "new-run-id", "agent": "alpha"}
@@ -153,7 +153,7 @@ async def test_create_run_dispatches_legacy_input(store: Database) -> None:
 async def test_create_run_dispatches_with_variables(store: Database) -> None:
     _seed_agent(store)
     ex = _FakeExecutor(store, load_settings())
-    await runs_service.create_run(
+    await ExecutionService().dispatch_run(
         "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, ex), variables={"k": "v"}
     )
     assert ex.calls[0]["variables"] == {"k": "v"}
@@ -167,7 +167,7 @@ async def test_create_run_dispatches_with_variables(store: Database) -> None:
 
 def test_complete_run_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
-        runs_service.complete_run(
+        ExecutionService().complete_run(
             "no-such-run",
             agent_defs=store.agent_defs,
             ok=True,
@@ -187,7 +187,7 @@ def test_complete_run_marks_terminal_and_fires_callback(
     def cb(agent, refreshed):
         calls.append((agent.id if agent else None, refreshed.id))
 
-    result = runs_service.complete_run(
+    result = ExecutionService().complete_run(
         run_id,
         agent_defs=store.agent_defs,
         ok=True,
@@ -206,7 +206,7 @@ def test_complete_run_marks_terminal_and_fires_callback(
 def test_post_outcome_records_status(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
-    result = runs_service.post_outcome(
+    result = ExecutionService().post_outcome(
         run_id, status="ok", error_kind=None, errors=None
     )
     assert result["ok"] is True
@@ -215,7 +215,7 @@ def test_post_outcome_records_status(store: Database) -> None:
 
 def test_post_outcome_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
-        runs_service.post_outcome("missing", status="ok")
+        ExecutionService().post_outcome("missing", status="ok")
 
 
 async def test_cancel_run_idempotent_on_terminal(store: Database) -> None:
@@ -223,7 +223,7 @@ async def test_cancel_run_idempotent_on_terminal(store: Database) -> None:
     run_id = _seed_run(store)
     _svc().finish_run(run_id, ok=True, output="done")
     ex = _FakeExecutor()
-    result = await runs_service.cancel_run(run_id, executor=cast(RunExecutor, ex))
+    result = await ExecutionService().cancel_run(run_id, executor=cast(RunExecutor, ex))
     assert result["cancelled"] is False
     assert ex.cancelled == []
 
@@ -232,14 +232,14 @@ async def test_cancel_run_calls_executor_when_running(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
     ex = _FakeExecutor()
-    result = await runs_service.cancel_run(run_id, executor=cast(RunExecutor, ex))
+    result = await ExecutionService().cancel_run(run_id, executor=cast(RunExecutor, ex))
     assert result["cancelled"] is True
     assert ex.cancelled == [run_id]
 
 
 async def test_cancel_run_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
-        await runs_service.cancel_run(
+        await ExecutionService().cancel_run(
             "missing", executor=cast(RunExecutor, _FakeExecutor())
         )
 
@@ -252,7 +252,7 @@ async def test_cancel_run_raises_when_unknown(store: Database) -> None:
 def test_list_runs_returns_raw_list_when_unfiltered(store: Database) -> None:
     _seed_agent(store)
     _seed_run(store)
-    result = runs_service.list_runs(agent_versions=store.agent_versions)
+    result = ExecutionService().list_runs_enriched(agent_versions=store.agent_versions)
     assert isinstance(result, list)
     assert len(result) == 1
     assert result[0]["agent_version"] is None
@@ -261,7 +261,7 @@ def test_list_runs_returns_raw_list_when_unfiltered(store: Database) -> None:
 def test_list_runs_returns_envelope_when_paginated(store: Database) -> None:
     _seed_agent(store)
     _seed_run(store)
-    result = runs_service.list_runs(agent_versions=store.agent_versions, paginated=True)
+    result = ExecutionService().list_runs_enriched(agent_versions=store.agent_versions, paginated=True)
     assert isinstance(result, dict)
     assert set(result) == {"items", "total", "offset", "limit", "has_more"}
     assert result["total"] == 1
@@ -269,20 +269,20 @@ def test_list_runs_returns_envelope_when_paginated(store: Database) -> None:
 
 def test_get_run_detail_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
-        runs_service.get_run_detail("missing", agent_versions=store.agent_versions)
+        ExecutionService().get_run_detail("missing", agent_versions=store.agent_versions)
 
 
 def test_get_run_detail_shape(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
-    detail = runs_service.get_run_detail(run_id, agent_versions=store.agent_versions)
+    detail = ExecutionService().get_run_detail(run_id, agent_versions=store.agent_versions)
     assert set(detail) == {"run", "usage"}
     assert detail["run"]["id"] == run_id
     assert detail["run"]["backend"] is None
 
 
 def test_run_facets_includes_known_statuses(store: Database) -> None:
-    facets = runs_service.run_facets()
+    facets = ExecutionService().run_facets()
     assert "running" in facets["statuses"]
     assert "ok" in facets["statuses"]
 
@@ -360,14 +360,14 @@ def test_list_runs_paged_respects_filters(tmp_path: Path) -> None:
 
 def test_list_comments_raises_when_unknown(store: Database) -> None:
     with pytest.raises(RunNotFound):
-        runs_service.list_comments("missing", store=store)
+        ExecutionService().list_comments("missing")
 
 
 def test_add_and_list_comment(store: Database) -> None:
     _seed_agent(store)
     run_id = _seed_run(store)
-    runs_service.add_comment(run_id, store=store, author="me", body="hi")
-    listed = runs_service.list_comments(run_id, store=store)
+    ExecutionService().add_comment(run_id, author="me", body="hi")
+    listed = ExecutionService().list_comments(run_id)
     assert listed["run_id"] == run_id
     assert len(listed["comments"]) == 1
     assert listed["comments"][0]["body"] == "hi"

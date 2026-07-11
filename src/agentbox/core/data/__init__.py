@@ -52,8 +52,11 @@ from agentbox.core.data.constants import (
     ValidatorKind,
 )
 from agentbox.core.data.errors import (
+    AgentDisabled,
     AgentboxError,
     InconsistentSchema,
+    InvalidRunInput,
+    RunNotFound,
     UnsupportedSchema,
     WorkspaceError,
     WorkspaceExists,
@@ -180,9 +183,12 @@ from agentbox.core.data.snapshots import (
 from agentbox.core.data.transcripts import read_transcript
 
 __all__ = [
+    "AgentDisabled",
     "BackendRunResult",
     "CanonicalTool",
     "InconsistentSchema",
+    "InvalidRunInput",
+    "RunNotFound",
     "UnsupportedSchema",
     "assert_schema_consistent",
     "ComposedReferenceView",

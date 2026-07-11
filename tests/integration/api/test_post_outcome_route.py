@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from agentbox.core.service.execution.service import ExecutionService
+from agentbox.core.service.execution import ExecutionService
 
 
 def _svc() -> ExecutionService:

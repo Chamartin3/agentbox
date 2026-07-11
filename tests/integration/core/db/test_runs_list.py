@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentbox.core.service.execution.service import ExecutionService
+from agentbox.core.service.execution import ExecutionService
 
 
 def _svc() -> ExecutionService:

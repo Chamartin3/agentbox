@@ -5,6 +5,11 @@ Re-exports every exception class. Consumers import from
 """
 
 from agentbox.core.data.errors.base import AgentboxError
+from agentbox.core.data.errors.execution import (
+    AgentDisabled,
+    InvalidRunInput,
+    RunNotFound,
+)
 from agentbox.core.data.errors.schemas import InconsistentSchema, UnsupportedSchema
 from agentbox.core.data.errors.workspaces import (
     WorkspaceError,
@@ -14,8 +19,11 @@ from agentbox.core.data.errors.workspaces import (
 )
 
 __all__ = [
+    "AgentDisabled",
     "AgentboxError",
     "InconsistentSchema",
+    "InvalidRunInput",
+    "RunNotFound",
     "UnsupportedSchema",
     "WorkspaceError",
     "WorkspaceExists",
