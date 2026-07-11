@@ -36,11 +36,9 @@ from agentbox.core.data.constants import LogLevel
 from agentbox.core.data.events import DoneEvent
 from agentbox.core.data.constants import RunStatus
 from agentbox.core.data.composition import ComposedPrompt
-from agentbox.core.engines.contracts.base import (
-    BackendAdapter,
-    RenderedConfig,
-)
-from agentbox.core.engines.contracts.requests import BackendRunResult
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
+from agentbox.core.data import BackendRunResult
 from agentbox.core.execution.observability.stream import RunStreamSession
 
 logger = logging.getLogger(__name__)

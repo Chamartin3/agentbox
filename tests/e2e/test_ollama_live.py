@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data.events import DoneEvent, LogEvent, TextEvent, ToolCallEvent
-from agentbox.core.engines.contracts.base import RenderedConfig
+from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 
 pytestmark = [

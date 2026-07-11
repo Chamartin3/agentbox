@@ -6,7 +6,7 @@ import logging
 from importlib.metadata import entry_points
 from typing import TypeVar
 
-from agentbox.core.engines.contracts.base import BackendAdapter
+from agentbox.core.engines.backends.base import BackendAdapter
 
 T = TypeVar("T")
 

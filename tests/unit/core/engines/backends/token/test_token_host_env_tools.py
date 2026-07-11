@@ -18,7 +18,7 @@ from agentbox.core.engines.backends.token.tools import (
     build_host_env_tools,
     build_host_env_toolsets,
 )
-from agentbox.core.engines.contracts.base import RenderedConfig
+from agentbox.core.data import RenderedConfig
 
 FS_GRANTS = {
     "fs.read": {"allowed_paths": ["/work"], "max_bytes": 1048576},

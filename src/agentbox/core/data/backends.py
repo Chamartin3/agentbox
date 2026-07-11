@@ -1,18 +1,142 @@
-"""RenderedConfig — immutable run config dataclass."""
+"""Backend boundary shapes — the shared vocabulary of a backend run.
+
+The canonical value types both the engines and execution/agents domains
+exchange at the backend boundary: the immutable ``RenderedConfig`` a
+backend ``render()`` produces, the ``BackendRunResult`` it reports, the
+per-run ``RunRequest``, the MCP tool manifest ``McpToolSpec``, and the
+engine-local *views* of agent config (``RuntimeConfigView``,
+``PythonAgentConfigView``, ``ComposedView``, ``ComposedReferenceView``).
+
+They live in ``core.data`` (the shapes leaf) so neither domain has to
+reach across into the other to name them.
+"""
 
 from __future__ import annotations
-from typing import Any
 
 import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, TypedDict
+
+from agentbox.core.data.manifests.agents import AgentDef
 from agentbox.core.data.payload_types import AgentMetaDict
-from agentbox.core.resources.skills import SkillPack
-from agentbox.core.tools.canonical import CanonicalTool
-from ._mcp_types import McpToolSpec
-from .views import PythonAgentConfigView, RuntimeConfigView
+from agentbox.core.data.skills import SkillPack
+from agentbox.core.data.tools import CanonicalTool
+
+
+class McpToolSpec(TypedDict, total=False):
+    name: str
+    description: str
+    inputSchema: dict[str, Any]
+
+
+# ── Engine-local views of agent config ───────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class RuntimeConfigView:
+    """Engine-local view of agent runtime config (``allowed_tools`` +
+    ``forbidden_tools``).
+
+    This is the only slice of ``core.agents.definition.RuntimeConfig`` that
+    backends consume.
+    """
+
+    allowed_tools: tuple[CanonicalTool, ...] = ()
+    forbidden_tools: tuple[CanonicalTool, ...] = ()
+
+
+@dataclass(frozen=True)
+class PythonAgentConfigView:
+    """Engine-local view of agent python config (``agent_module``, schema path).
+
+    This is the only slice of ``core.agents.definition.PythonAgentConfig``
+    that backends consume.
+    """
+
+    agent_module: str | None = None
+    output_schema_path: str | None = None
+
+
+@dataclass(frozen=True)
+class ComposedReferenceView:
+    """Engine-local view of a composed prompt reference section.
+
+    Mirrors ``core.agents.composition.bundle.compose.ComposedReference``.
+    """
+
+    path: str
+    heading: str
+    content: str
+
+
+@dataclass(frozen=True)
+class ComposedView:
+    """Engine-local view of composed prompt state.
+
+    Execution builds this from its richer ComposedState at the render
+    boundary.
+    """
+
+    system: str | None = None
+    system_base: str | None = None
+    schema: dict[str, Any] | None = None
+    input_schema: dict[str, Any] | None = None
+    user: str | None = None
+    references: tuple[ComposedReferenceView, ...] = ()
+    bundle_sha: str | None = None
+    validation_mode: str | None = None
+
+
+# ── Run request / result ─────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class BackendRunResult:
+    """Terminal status reported by a backend after a run completes.
+
+    Backends report their *runner-level* outcome here — did the
+    subprocess exit cleanly, was there a runtime error, what was the
+    exit code. Validation outcome is the executor's concern: it runs
+    schema checks after the execution-layer pump returns and adjusts the
+    final state accordingly before emitting the terminal ``DoneEvent``.
+
+    Why a return value instead of a streamed ``DoneEvent``: the executor
+    must enforce "DoneEvent is the last event emitted" so WS clients
+    see validation results before they treat the run as terminal.
+    Returning the status keeps the backend out of the ordering decision.
+    """
+
+    ok: bool
+    exit_code: int | None = None
+    error: str | None = None
+    status: str | None = None  # "ok" | "error" | "timeout" | None
+
+
+@dataclass
+class RunRequest:
+    """Per-run inputs handed to a backend's ``run()`` (legacy shape, kept
+    for direct in-process callers).
+
+    Most code paths use :class:`RenderedConfig` instead — the executor
+    renders once and then calls ``run(rendered, input, run_id)``. This
+    dataclass survives for tests and the few helpers that still want a
+    single object holding everything about a run.
+    """
+
+    run_id: str
+    agent: AgentDef
+    input: str
+    workdir: Path
+    project_root: Path
+    session_id: str | None = None
+    runner_profile: str | None = None
+    runner_config: dict[str, Any] | None = None
+
+
+# ── Rendered config ──────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)

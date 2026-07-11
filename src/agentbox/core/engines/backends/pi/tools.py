@@ -7,7 +7,7 @@ Additional tools (off by default, enable with --tools): grep/find/ls.
 
 from __future__ import annotations
 
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 
 NATIVE_TOOLS: dict[CanonicalTool, str] = {
     CanonicalTool.FS_READ: "read",

@@ -55,7 +55,7 @@ from agentbox.core.data import (
     _AgentVersionFields,
 )
 from agentbox.core.data.payload_types import ToolInfo
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.data._util import now_iso
 from agentbox.core.service.agents.crud import (
     get_agent_detail as _get_agent_detail_free,

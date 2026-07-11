@@ -24,7 +24,7 @@ from agentbox.core.execution.orchestrate.setup import (
     RunSetup,
     _composed_view,
 )
-from agentbox.core.engines.contracts.views import ComposedView
+from agentbox.core.data import ComposedView
 
 pytestmark = pytest.mark.unit
 

@@ -18,7 +18,7 @@ from typing import Any, cast
 
 from agentbox.core.data.constants import ConfiguredValidationMode, ValidationMode
 from agentbox.core.data.payload_types import ConfigJsonPayload
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 
 _CONFIGURED_ENGINES = frozenset(
     {ValidationMode.JSONSCHEMA, ValidationMode.PYDANTIC, ValidationMode.BOTH}

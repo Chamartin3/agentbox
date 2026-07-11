@@ -1,12 +1,7 @@
-"""Backend framework contracts.
+"""Transitional package — only ``schema_to_model`` remains here.
 
-The ABC and value types that define what a backend *is* — separated from
-``engines/backends/``, which is the pure catalog of concrete backend
-implementations. Catalog members and the executor both implement against
-these contracts.
+The ``BackendAdapter`` ABC moved to ``engines.backends.base`` and the
+boundary shapes moved to ``core.data.backends`` (plan 123 C). The
+``schema_to_model`` submodule is split out in plan 123 D, after which
+this package is deleted.
 """
-
-from agentbox.core.engines.contracts.base import BackendAdapter
-from agentbox.core.engines.contracts.rendered import RenderedConfig
-
-__all__ = ["BackendAdapter", "RenderedConfig"]

@@ -19,14 +19,15 @@ from agentbox.core.data.events import (
     TextEvent,
     TimeoutEvent,
 )
-from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.claude_code.render import (
     _runtime_config_view_from_agent,
 )
 from agentbox.core.engines.backends.claude_code.tools import (
     NATIVE_TOOLS as _CLAUDE_TOOLS,
 )
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.translation import (
     render_allowed_tools,
     translate_tool,

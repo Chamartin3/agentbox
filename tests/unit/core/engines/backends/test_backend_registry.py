@@ -6,7 +6,7 @@ import pytest
 import agentbox.core.engines.backends.registry as plugins
 from agentbox.core.engines.backends.registry import backends
 from agentbox.core.engines.backends import get_backend, list_backends
-from agentbox.core.engines.contracts.base import RenderedConfig
+from agentbox.core.data import RenderedConfig
 
 
 def test_registry_loads_all_entry_points() -> None:

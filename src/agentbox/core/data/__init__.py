@@ -59,6 +59,18 @@ from agentbox.core.data.errors import (
     WorkspacePathEscape,
 )
 from agentbox.core.data._util import hash_blobs, now_iso
+from agentbox.core.data.tools import CanonicalTool
+from agentbox.core.data.skills import SkillPack
+from agentbox.core.data.backends import (
+    BackendRunResult,
+    ComposedReferenceView,
+    ComposedView,
+    McpToolSpec,
+    PythonAgentConfigView,
+    RenderedConfig,
+    RunRequest,
+    RuntimeConfigView,
+)
 from agentbox.core.data.payload_types import (
     AgentDiffResult,
     AgentMetaDict,
@@ -165,6 +177,16 @@ from agentbox.core.data.snapshots import (
 from agentbox.core.data.transcripts import read_transcript
 
 __all__ = [
+    "BackendRunResult",
+    "CanonicalTool",
+    "ComposedReferenceView",
+    "ComposedView",
+    "McpToolSpec",
+    "PythonAgentConfigView",
+    "RenderedConfig",
+    "RunRequest",
+    "RuntimeConfigView",
+    "SkillPack",
     "AGENT_TOOLS_SERVER_NAME",
     "ActivityStateFilter",
     "AgentboxError",

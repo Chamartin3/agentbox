@@ -26,7 +26,7 @@ from agentbox.core.data.events import (
 )
 from agentbox.core.engines.backends import codex as codex_mod
 from agentbox.core.engines.backends import pi as pi_mod
-from agentbox.core.engines.contracts.base import RenderedConfig
+from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 from pydantic import BaseModel, ValidationError
 

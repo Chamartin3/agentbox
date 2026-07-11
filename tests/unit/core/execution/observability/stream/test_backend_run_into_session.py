@@ -16,8 +16,9 @@ from pathlib import Path
 import pytest
 from agentbox.core.data.constants import LogLevel, RunStatus
 from agentbox.core.data.events import DoneEvent, LogEvent, RunEvent, TextEvent
-from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
-from agentbox.core.engines.contracts.requests import BackendRunResult
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
+from agentbox.core.data import BackendRunResult
 from agentbox.core.execution.retry import pump_into_session
 from agentbox.core.execution.observability.stream import CaptureSession, RunStreamSession
 

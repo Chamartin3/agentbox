@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Collection
 
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 
 
 def _target_mcp_prefix(

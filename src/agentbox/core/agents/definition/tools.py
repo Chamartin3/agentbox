@@ -24,7 +24,7 @@ from collections.abc import Sequence
 from agentbox.core.agents.definition.config import RuntimeConfig
 from agentbox.core.data import AgentDef
 from agentbox.core.data.payload_types import ToolInfo
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.translation import effective_tool_set
 
 logger = logging.getLogger(__name__)

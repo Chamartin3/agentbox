@@ -7,7 +7,7 @@ are covered by the catalog integration tests.)
 
 from __future__ import annotations
 
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.catalog import enumerate_callables
 from agentbox.core.workspaces.tooling.catalog import (
     _builtin_complement_callables,

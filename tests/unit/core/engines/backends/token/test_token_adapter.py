@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from agentbox.core.data.events import TextEvent
-from agentbox.core.engines.contracts.base import RenderedConfig
+from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.token import TokenBackend
 from agentbox.core.execution.observability.stream import RunStreamSession
 from agentbox.core.data.conversation.transcript import (

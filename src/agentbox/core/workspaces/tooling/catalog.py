@@ -24,7 +24,7 @@ from agentbox.core.db import (
 )
 from agentbox.core.resources.catalog import resolve_resource_callables
 from agentbox.core.tools.builtin import BUILTIN_TOOLS, get_builtin
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES
 from agentbox.core.tools.catalog import CallableItem, enumerate_callables
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry

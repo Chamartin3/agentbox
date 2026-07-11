@@ -10,21 +10,14 @@ from typing import Any
 from agentbox.core.agents import resolve_engine
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.engines.contracts.base import (
-    BackendAdapter,
-    RenderedConfig,
-    RuntimeConfigView,
-)
-from agentbox.core.engines.contracts.views import (
-    ComposedReferenceView,
-    ComposedView,
-    PythonAgentConfigView,
-)
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig, RuntimeConfigView
+from agentbox.core.data import ComposedReferenceView, ComposedView, PythonAgentConfigView
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.execution.orchestrate.generator import (
     _read_agent_config_json,
 )
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.workspaces import resolve_path
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables

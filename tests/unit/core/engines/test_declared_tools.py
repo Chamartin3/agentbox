@@ -5,7 +5,7 @@ from __future__ import annotations
 from agentbox.core.engines.backends.claude_code.adapter import ClaudeCodeBackend
 from agentbox.core.engines.backends.codex.adapter import CodexBackend
 from agentbox.core.engines.backends.opencode.adapter import OpenCodeBackend
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 
 
 def test_claude_declares_native_tools() -> None:

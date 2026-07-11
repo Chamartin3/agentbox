@@ -29,7 +29,7 @@ from agentbox.core.data.composition import ComposedPrompt, RunSpec
 from agentbox.core.execution.observability.snapshot import SnapshotWriter
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
-from agentbox.core.engines.contracts.rendered import RenderedConfig
+from agentbox.core.data import RenderedConfig
 from agentbox.core.workspaces import Workspaces
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME, HOST_ENV_SERVER_NAME

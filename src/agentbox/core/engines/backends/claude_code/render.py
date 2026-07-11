@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 
-from agentbox.core.engines.contracts.base import (
-    HasAgentConfig,
-    RuntimeConfigView,
-)
+from agentbox.core.engines.backends.base import HasAgentConfig
+from agentbox.core.data import RuntimeConfigView
 
 
 def _runtime_config_view_from_agent(agent: HasAgentConfig) -> RuntimeConfigView:

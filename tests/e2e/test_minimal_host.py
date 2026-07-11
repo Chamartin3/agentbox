@@ -15,7 +15,8 @@ import pytest
 from agentbox.core.config import SETTINGS
 from agentbox.core.data.events import DoneEvent, RunEvent
 from agentbox.core.data import AgentDef
-from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
 from agentbox.core.service.agents.service import AgentService
 from fastapi.testclient import TestClient
 

@@ -24,10 +24,13 @@ from typing import Any, ClassVar, Protocol
 import yaml
 
 from agentbox.core.data.events import RunEvent
-from agentbox.core.tools.canonical import CanonicalTool
-from ._mcp_types import McpToolSpec
-from .rendered import RenderedConfig
-from .views import ComposedView, RuntimeConfigView
+from agentbox.core.data import CanonicalTool
+from agentbox.core.data.backends import (
+    ComposedView,
+    McpToolSpec,
+    RenderedConfig,
+    RuntimeConfigView,
+)
 
 from agentbox.core.data.workenv import Item, WorkspaceConfig
 

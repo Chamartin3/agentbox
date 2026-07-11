@@ -6,7 +6,7 @@ tool names mirror Claude Code's PascalCase convention.
 
 from __future__ import annotations
 
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 
 NATIVE_TOOLS: dict[CanonicalTool, str] = {
     CanonicalTool.FS_READ: "Read",

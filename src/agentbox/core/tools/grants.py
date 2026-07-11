@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from typing import TypedDict
 
 from agentbox.core.data.payload_types import GrantConfig
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES
 
 

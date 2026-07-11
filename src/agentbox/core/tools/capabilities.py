@@ -10,7 +10,7 @@ from typing import Any
 
 from dataclasses import dataclass
 
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 
 
 @dataclass(frozen=True)

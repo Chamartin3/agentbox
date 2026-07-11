@@ -5,7 +5,7 @@ from __future__ import annotations
 from agentbox.core.agents.definition.tools import available_tools, effective_tools
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.data.payload_types import ToolInfo
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 
 
 def _agent(*, allowed: list[str] | None = None, forbidden: list[str] | None = None) -> AgentDef:

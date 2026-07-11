@@ -8,7 +8,7 @@ to narrow the set when desired.
 
 from __future__ import annotations
 
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 
 _READ = CanonicalTool.FS_READ

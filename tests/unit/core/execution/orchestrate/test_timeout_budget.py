@@ -20,10 +20,8 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.data.events import DoneEvent, RunEvent, TextEvent
-from agentbox.core.engines.contracts.base import (
-    BackendAdapter,
-    RenderedConfig,
-)
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
 from agentbox.core.execution.orchestrate.executor import pump_into_session
 from agentbox.core.execution.observability.stream import CaptureSession
 

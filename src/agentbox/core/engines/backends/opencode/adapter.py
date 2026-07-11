@@ -22,14 +22,15 @@ from agentbox.core.data.events import (
     LogEvent,
     RunEvent,
 )
-from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.opencode.render import build_opencode_items
 from agentbox.core.engines.backends.opencode.tools import NATIVE_TOOLS as _OPENCODE_TOOLS
 from agentbox.core.engines.backends.opencode.session import (  # noqa: F401
     parse_event_stream_with_thinking,
     strip_code_fences,
 )
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.translation import render_allowed_tools
 from agentbox.core.data.workenv import Item, WorkspaceConfig
 

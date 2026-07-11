@@ -9,6 +9,10 @@ Because ``CanonicalTool`` extends ``CatalogEnum`` (which extends
 
 This means existing code that uses bare strings in comparisons or as
 dict keys continues to work without changes — adopt incrementally.
+
+It lives in ``core.data`` (the shapes leaf) because it is vocabulary — a
+pure shape with no logic — and both the agents and engines domains name
+it in their boundary views.
 """
 
 from __future__ import annotations

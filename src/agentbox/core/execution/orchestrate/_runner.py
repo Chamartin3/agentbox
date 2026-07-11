@@ -6,7 +6,8 @@ from pathlib import Path
 
 from agentbox.core.agents import ComposedPrompt
 from agentbox.core.data import AgentDef
-from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 from agentbox.core.execution.orchestrate.finalizer import RunFinalizer

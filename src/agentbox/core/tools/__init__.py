@@ -3,7 +3,7 @@ from agentbox.core.tools.builtin import (
     BuiltinToolSpec,
     get_builtin,
 )
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES, Capability
 from agentbox.core.tools.registry import (
     SharedToolRegistry,

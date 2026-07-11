@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from agentbox.core.tools.canonical import CanonicalTool
+from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.mcp_servers.host_env.context import HostEnvContext
 from agentbox.core.tools.grants import GrantViolation, check_capability
 from fastmcp import FastMCP

@@ -22,7 +22,8 @@ from agentbox.core.data.events import UsageEvent
 from agentbox.core.config import Settings
 from agentbox.core.agents import build_runtime_view
 from agentbox.core.data.composition import ComposedPrompt
-from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
+from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data.constants import RunStatus
 from agentbox.core.data import AgentDef

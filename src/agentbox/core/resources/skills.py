@@ -8,18 +8,20 @@ first-match wins, with .claude/skills/ taking precedence.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
+
+from agentbox.core.data.skills import SkillPack
 
 # Where to look for skill packs inside a workspace, in priority order.
 _SKILL_ROOTS: tuple[str, ...] = (".claude/skills", ".opencode/skills", "skills")
 
-
-@dataclass
-class SkillPack:
-    name: str
-    path: Path
-    content: str
+__all__ = [
+    "SkillPack",
+    "build_skills_prompt",
+    "discover_skills",
+    "find_skill",
+    "skill_roots",
+]
 
 
 def skill_roots(workspace_path: Path) -> list[Path]:
