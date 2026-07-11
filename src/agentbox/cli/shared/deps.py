@@ -56,7 +56,7 @@ from agentbox.core.service import (  # noqa: E402
     SystemService,
 )
 from agentbox.core.service.engines.service import EngineService  # noqa: E402
-from agentbox.core.service.resources.service import ResourceService  # noqa: E402
+from agentbox.core.service.resources import ResourceService  # noqa: E402
 
 
 @lru_cache(maxsize=1)

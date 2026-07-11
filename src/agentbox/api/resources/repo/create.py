@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 
 from agentbox.api.deps import get_resource_service
 from agentbox.core.data.rows import RepoResourceRow, ResourceVersionRow
-from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound, ResourceService
+from agentbox.core.service.resources import InvalidResource, ResourceNotFound, ResourceService
 from agentbox.api.resources.repo._models import (
     CreateResourceBody,
     HostPathImportBody,

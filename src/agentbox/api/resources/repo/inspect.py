@@ -16,7 +16,7 @@ from agentbox.core.data.payload_types import (
     ResourceVersionsResult,
     ScriptSampleValidationResult,
 )
-from agentbox.core.service.resources.service import (
+from agentbox.core.service.resources import (
     InvalidResource,
     NoActiveVersion,
     ResourceNotFound,

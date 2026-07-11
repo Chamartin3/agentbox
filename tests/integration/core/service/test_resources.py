@@ -13,7 +13,7 @@ import pytest
 from agentbox.core.data.constants import ResourceType
 from agentbox.core.data import RepoResourceRow
 from agentbox.core.db.database import Database
-from agentbox.core.service import resources as res_service
+from agentbox.core.service.resources import ResourceService
 from agentbox.core.service.resources import (
     InvalidResource,
     NoActiveVersion,
@@ -27,7 +27,7 @@ def store(tmp_path: Path) -> Database:
 
 
 def _create(store: Database, slug: str = "doc/a", rtype: ResourceType = ResourceType.DOCUMENT) -> RepoResourceRow:
-    return res_service.create_resource(
+    return ResourceService().create_resource(
         slug=slug,
         type=rtype,
         display_name=slug,
@@ -40,17 +40,17 @@ def _create(store: Database, slug: str = "doc/a", rtype: ResourceType = Resource
 
 
 def test_resolve_resource_id_returns_none_for_unknown(store: Database) -> None:
-    assert res_service.resolve_resource_id("nope") is None
+    assert ResourceService().resolve_resource_id("nope") is None
 
 
 def test_resolve_resource_id_finds_by_slug(store: Database) -> None:
     row = _create(store)
-    assert res_service.resolve_resource_id("doc/a") == row["id"]
+    assert ResourceService().resolve_resource_id("doc/a") == row["id"]
 
 
 def test_resolve_resource_id_finds_by_legacy_dotted_slug(store: Database) -> None:
     row = _create(store, slug="agent/X/foo")
-    assert res_service.resolve_resource_id("agent.X.foo") == row["id"]
+    assert ResourceService().resolve_resource_id("agent.X.foo") == row["id"]
 
 
 # ---------------------------------------------------------------------------
@@ -60,12 +60,12 @@ def test_resolve_resource_id_finds_by_legacy_dotted_slug(store: Database) -> Non
 
 def test_get_resource_raises_when_missing(store: Database) -> None:
     with pytest.raises(ResourceNotFound):
-        res_service.get_resource("missing")
+        ResourceService().get_resource("missing")
 
 
 def test_get_resource_returns_envelope(store: Database) -> None:
     _create(store)
-    payload = res_service.get_resource("doc/a")
+    payload = ResourceService().get_resource("doc/a")
     assert set(payload) == {"resource", "active_version"}
     assert payload["resource"]["slug"] == "doc/a"
     assert payload["active_version"] is None
@@ -73,12 +73,12 @@ def test_get_resource_returns_envelope(store: Database) -> None:
 
 def test_update_resource_raises_when_missing(store: Database) -> None:
     with pytest.raises(ResourceNotFound):
-        res_service.update_resource("missing", display_name="x")
+        ResourceService().update_resource("missing", display_name="x")
 
 
 def test_update_resource_changes_display_name(store: Database) -> None:
     _create(store)
-    out = res_service.update_resource("doc/a", display_name="renamed")
+    out = ResourceService().update_resource("doc/a", display_name="renamed")
     assert out["display_name"] == "renamed"
 
 
@@ -92,7 +92,7 @@ def test_create_resource_duplicate_slug_raises(store: Database) -> None:
 
 def test_list_resources_envelope(store: Database) -> None:
     _create(store)
-    out = res_service.list_resources()
+    out = ResourceService().list_resources()
     assert set(out) == {"items", "total", "limit", "offset"}
     assert out["total"] == 1
 
@@ -104,26 +104,26 @@ def test_list_resources_envelope(store: Database) -> None:
 
 def test_list_versions_empty_for_new_resource(store: Database) -> None:
     _create(store)
-    out = res_service.list_versions("doc/a")
+    out = ResourceService().list_versions("doc/a")
     assert out == {"items": []}
 
 
 def test_get_blob_raises_no_active_version(store: Database) -> None:
     _create(store)
     with pytest.raises(NoActiveVersion):
-        res_service.get_blob("doc/a")
+        ResourceService().get_blob("doc/a")
 
 
 def test_render_resource_raises_no_active_version(store: Database) -> None:
     _create(store)
     with pytest.raises(NoActiveVersion):
-        res_service.render_resource("doc/a")
+        ResourceService().render_resource("doc/a")
 
 
 def test_get_tree_raises_no_active_version(store: Database) -> None:
     _create(store)
     with pytest.raises(NoActiveVersion):
-        res_service.get_tree("doc/a")
+        ResourceService().get_tree("doc/a")
 
 
 # ---------------------------------------------------------------------------
@@ -134,30 +134,30 @@ def test_get_tree_raises_no_active_version(store: Database) -> None:
 def test_export_pydantic_rejects_non_schema(store: Database) -> None:
     row = _create(store)
     with pytest.raises(InvalidResource):
-        res_service.export_pydantic(row["id"])
+        ResourceService().export_pydantic(row["id"])
 
 
 def test_export_zip_rejects_non_folder_or_skill(store: Database) -> None:
     row = _create(store)
     with pytest.raises(InvalidResource):
-        res_service.export_zip(row["id"])
+        ResourceService().export_zip(row["id"])
 
 
 def test_validate_script_sample_rejects_non_script(store: Database) -> None:
     row = _create(store)
     with pytest.raises(InvalidResource):
-        res_service.validate_script_sample(row["id"], sample={})
+        ResourceService().validate_script_sample(row["id"], sample={})
 
 
 def test_soft_delete_resource_raises_when_missing(store: Database) -> None:
     with pytest.raises(ResourceNotFound):
-        res_service.soft_delete_resource("missing", reason="bye")
+        ResourceService().soft_delete_resource("missing", reason="bye")
 
 
 def test_soft_delete_resource_marks_deleted(store: Database) -> None:
     row = _create(store)
-    res_service.soft_delete_resource(row["id"], reason="cleanup")
-    listed = res_service.list_resources()
+    ResourceService().soft_delete_resource(row["id"], reason="cleanup")
+    listed = ResourceService().list_resources()
     assert listed["total"] == 0
 
 
@@ -169,21 +169,21 @@ def test_soft_delete_resource_marks_deleted(store: Database) -> None:
 def test_publish_unknown_version_raises_not_found(store: Database) -> None:
     _create(store)
     with pytest.raises(ResourceNotFound):
-        res_service.publish_version(
+        ResourceService().publish_version(
             "doc/a", "no-such", reason="ship it"
         )
 
 
 def test_rollback_unknown_resource_raises(store: Database) -> None:
     with pytest.raises(ResourceNotFound):
-        res_service.rollback_resource(
+        ResourceService().rollback_resource(
             "missing", target_version=1, reason="rb"
         )
 
 
 def test_import_upload_version_missing_resource_raises(store: Database) -> None:
     with pytest.raises(ResourceNotFound):
-        res_service.import_upload_version(
+        ResourceService().import_upload_version(
             "missing",
                         filename="x.txt",
             content=b"x",
@@ -194,10 +194,10 @@ def test_import_upload_version_missing_resource_raises(store: Database) -> None:
 
 def test_import_zip_rejects_non_folder_or_skill(store: Database) -> None:
     _create(store)  # type='document'
-    res = res_service.get_resource("doc/a")
+    res = ResourceService().get_resource("doc/a")
     resource_id = res["resource"]["id"]
     with pytest.raises(InvalidResource):
-        res_service.import_zip_version(
+        ResourceService().import_zip_version(
             resource_id,
                         filename="bundle.zip",
             content=b"zip",

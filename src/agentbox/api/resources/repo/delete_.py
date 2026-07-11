@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response
 
 from agentbox.api.deps import get_resource_service
-from agentbox.core.service.resources.service import ResourceNotFound, ResourceService
+from agentbox.core.service.resources import ResourceNotFound, ResourceService
 from agentbox.api.resources.repo._models import _raise_not_found
 
 delete_router = APIRouter(prefix="/api/repo-resources", tags=["repo-resources"])

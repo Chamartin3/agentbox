@@ -9,7 +9,7 @@ import typer
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.deps import get_resource_service
 from agentbox.core.data.constants import ResourceType
-from agentbox.core.service.resources.service import InvalidResource, ResourceNotFound  # TODO(cli-arch)
+from agentbox.core.service.resources import InvalidResource, ResourceNotFound  # TODO(cli-arch)
 
 repo_app = typer.Typer(
     name="repo",

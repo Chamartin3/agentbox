@@ -27,7 +27,7 @@ from agentbox.core.data.payload_types import (
     WorkspaceBindingSpec,
     WorkspaceResourcesResult,
 )
-from agentbox.core.service.resources.service import (
+from agentbox.core.service.resources import (
     AgentVersionMissing,
     BindingError,
     ResourceNotFound,

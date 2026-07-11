@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from agentbox.api.deps import get_db as _get_store
 from agentbox.cli import app
-from agentbox.core.service.resources.repo import create_resource as create_repo_resource
+from agentbox.core.service.resources import ResourceService
 from agentbox.cli.shared import (
     get_executor,
     get_mcp_registry,
@@ -65,15 +65,15 @@ def test_resource_list_empty(store_fixture) -> None:
 
 
 def test_resource_list_shows_resource(store_fixture) -> None:
-    create_repo_resource(slug="my-doc", type="document", display_name="My Doc")
+    ResourceService().create_resource(slug="my-doc", type="document", display_name="My Doc")
     result = runner.invoke(app, ["ops", "resource", "repo", "ls"])
     assert result.exit_code == 0
     assert "my-doc" in result.output
 
 
 def test_resource_list_type_filter(store_fixture) -> None:
-    create_repo_resource(slug="skill-a", type="skill", display_name="Skill A")
-    create_repo_resource(slug="doc-b", type="document", display_name="Doc B")
+    ResourceService().create_resource(slug="skill-a", type="skill", display_name="Skill A")
+    ResourceService().create_resource(slug="doc-b", type="document", display_name="Doc B")
     result = runner.invoke(app, ["ops", "resource", "repo", "ls", "--type", "skill"])
     assert result.exit_code == 0
     assert "skill-a" in result.output
@@ -91,7 +91,7 @@ def test_resource_show_not_found(store_fixture) -> None:
 
 
 def test_resource_show_existing(store_fixture) -> None:
-    create_repo_resource(slug="test-slug", type="document", display_name="Test Resource")
+    ResourceService().create_resource(slug="test-slug", type="document", display_name="Test Resource")
     result = runner.invoke(app, ["ops", "resource", "repo", "show", "test-slug"])
     assert result.exit_code == 0
     assert "test-slug" in result.output
@@ -106,7 +106,7 @@ def test_resource_upload_creates_version(store_fixture, tmp_path: Path) -> None:
     src = tmp_path / "hello.txt"
     src.write_text("hello world")
     # Create the resource first
-    create_repo_resource(slug="upload-test", type="document", display_name="Upload Test")
+    ResourceService().create_resource(slug="upload-test", type="document", display_name="Upload Test")
     result = runner.invoke(
         app,
         [
@@ -205,7 +205,7 @@ def test_prompt_bindings_set_missing_resource(store_fixture) -> None:
 
 
 def test_prompt_bindings_set_and_list(store_fixture) -> None:
-    create_repo_resource(slug="kb-docs", type="document", display_name="KB Docs")
+    ResourceService().create_resource(slug="kb-docs", type="document", display_name="KB Docs")
     result = runner.invoke(
         app,
         [

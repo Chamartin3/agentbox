@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_resource_service
-from agentbox.core.service.resources.service import ResourceService
+from agentbox.core.service.resources import ResourceService
 from agentbox.core.service import SharedResourceRecord
 
 

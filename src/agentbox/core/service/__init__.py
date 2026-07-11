@@ -124,13 +124,11 @@ from agentbox.core.service.engines.service import EngineService as EngineService
 from agentbox.core.service.system.service import SystemService as SystemService
 
 # ── Resources service (plan 090) ────────────────────────────────────────
-from agentbox.core.service.resources.service import ResourceService as ResourceService
+from agentbox.core.service.resources import ResourceService as ResourceService
 
-# ── Resource / agent / system admin free functions (per-domain admin.py) ──
+# ── Agent / system admin free functions (per-domain admin.py) ──
 from agentbox.core.service.agents.admin import replace_version_config as replace_version_config
 from agentbox.core.service.agents.admin import update_agent_meta as update_agent_meta
-from agentbox.core.service.resources.admin import list_workspace_file_bindings as list_workspace_file_bindings
-from agentbox.core.service.resources.admin import replace_workspace_file_bindings as replace_workspace_file_bindings
 from agentbox.core.service.system.admin import list_host_env_calls_for_run as list_host_env_calls_for_run
 
 # ── Workspace ─────────────────────────────────────────────────────────

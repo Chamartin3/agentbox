@@ -20,7 +20,7 @@ import typer
 from agentbox.core.config import Settings
 from agentbox.core.service import AgentDef
 from agentbox.core.service import AgentService, EngineService, ExecutionService, EvaluationService, SystemService
-from agentbox.core.service.resources.service import ResourceService
+from agentbox.core.service.resources import ResourceService
 from agentbox.core.service.workspaces import WorkspaceService
 
 from agentbox.cli.shared.deps import (
