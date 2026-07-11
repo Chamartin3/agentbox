@@ -53,7 +53,7 @@ class TestValidateOutput:
             ),
         )
 
-        result = check_output(agent, Path("."), '{"ok": true}', store=None)
+        result = check_output(agent, Path("."), '{"ok": true}')
         # Gate 1 passes; Gate 2 (http) will fail because the endpoint
         # is not reachable, producing an error result.
         assert result.ok is False

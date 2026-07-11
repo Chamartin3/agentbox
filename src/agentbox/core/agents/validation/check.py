@@ -20,7 +20,7 @@ from agentbox.core.agents.validation.schema import (
 )
 from agentbox.core.agents.definition import ExecutionConfig
 from agentbox.core.config import SETTINGS
-from agentbox.core.data.composition import ValidationResult
+from agentbox.core.data.composition import ComposedPrompt, ValidationResult
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data._util import extract_json
 from agentbox.core.engines.contracts.schema_to_model.translate import (
@@ -318,8 +318,7 @@ def check_output(
     output: str | None,
     *,
     project_root: Any = None,
-    store: Any | None = None,
-    composed: Any | None = None,
+    composed: ComposedPrompt | None = None,
 ) -> ValidationResult:
     """Check ``output`` against the agent's declared schema.
 
@@ -331,27 +330,39 @@ def check_output(
         listed in the agent version's bound validation contract. Run only
         when that contract carries entries.
 
-    ``store`` is needed to resolve the output binding + bound contract.
-    When omitted, the function falls back to the legacy on-disk schema
-    path (``runner.output_schema_path``). New code must pass ``store``.
+    When a ``composed`` prompt is provided with a runtime view, uses its
+    pre-resolved output config (json_schema, validators, engine). Otherwise
+    falls back to the legacy on-disk schema path (``runner.output_schema_path``).
 
     Returns:
       - ``ok=True, engine="off"`` when no schema is configured.
       - ``ok=False, engine="none"`` for empty output when a schema exists.
     """
-    output_cfg = resolve_output_config(store, agent)
-    if output_cfg.json_schema is not None or output_cfg.validators:
+    rv = composed.runtime_view if composed is not None else None
+    if rv is not None:
+        json_schema, validators, engine_name = rv.json_schema, rv.validators, rv.output_validation_engine
+    else:
+        oc = resolve_output_config(None, agent)
+        json_schema, validators = oc.json_schema, oc.validators
+        engine_name = ExecutionConfig.from_agent(agent).output_validation_engine
+
+    if json_schema is not None or validators:
         if not output:
             return ValidationResult(
                 ok=False,
                 error="output is empty but an output schema is required",
                 engine="none",
             )
-        return _run_gates(output_cfg.json_schema, output_cfg.validators, output)
+        return _run_gates(json_schema, validators, output)
 
-    composed_schema = getattr(composed, "schema", None) if composed is not None else None
+    composed_schema = composed.composed_schema if composed is not None else None
     schema, schema_err = resolve_schema(
-        agent, workdir, project_root, composed_schema=composed_schema
+        agent,
+        workdir,
+        project_root,
+        # ``composed_schema`` is a JsonSchemaDict (TypedDict); copy into a plain
+        # dict for resolve_schema's ``dict[str, Any]`` param.
+        composed_schema=dict(composed_schema) if composed_schema is not None else None,
     )
     if schema is None:
         if schema_err:
@@ -364,8 +375,6 @@ def check_output(
             error="output is empty but an output schema is required",
             engine="none",
         )
-
-    engine_name = ExecutionConfig.from_agent(agent).output_validation_engine
 
     if engine_name == "jsonschema":
         return validate_jsonschema(output, schema)

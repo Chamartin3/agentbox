@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 from agentbox.core.agents.validation import (
     ValidationResult,
@@ -13,6 +12,7 @@ from agentbox.core.agents.validation import (
     validate_pydantic,
 )
 from agentbox.core.data._util import extract_json
+from agentbox.core.data.composition import ComposedPrompt
 
 
 # Minimal fake agent — only the attributes check_output() reads.
@@ -79,7 +79,7 @@ def test_validate_output_off_when_no_schema(tmp_path: Path) -> None:
 def test_validate_output_empty_when_schema_required(tmp_path: Path) -> None:
     """A schema is configured but output is empty → reportable failure."""
     agent = _FakeAgent()
-    composed = SimpleNamespace(schema=_SCHEMA)
+    composed = ComposedPrompt(composed_schema=_SCHEMA)
     result = check_output(agent, tmp_path, "", composed=composed)
     assert not result.ok
     assert result.engine == "none"
@@ -89,7 +89,7 @@ def test_validate_output_empty_when_schema_required(tmp_path: Path) -> None:
 def test_validate_output_uses_composed_schema(tmp_path: Path) -> None:
     """Composed schema beats reading from disk — works for DB-only agents."""
     agent = _FakeAgent(engine="jsonschema")
-    composed = SimpleNamespace(schema=_SCHEMA)
+    composed = ComposedPrompt(composed_schema=_SCHEMA)
     result = check_output(agent, tmp_path, '{"name": "x"}', composed=composed)
     assert result.ok
     assert result.engine == "jsonschema"
@@ -116,7 +116,7 @@ def test_validate_output_both_engines(tmp_path: Path) -> None:
     """``both`` runs jsonschema first then pydantic — failure attribution
     matters for the retry prompt."""
     agent = _FakeAgent(engine="both")
-    composed = SimpleNamespace(schema=_SCHEMA)
+    composed = ComposedPrompt(composed_schema=_SCHEMA)
     result = check_output(agent, tmp_path, '{"name": "x"}', composed=composed)
     assert result.ok
     assert result.engine == "both"

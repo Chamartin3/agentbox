@@ -35,6 +35,7 @@ from agentbox.core.data._util import extract_json
 from agentbox.core.data.constants import LogLevel
 from agentbox.core.data.events import DoneEvent
 from agentbox.core.data.constants import RunStatus
+from agentbox.core.data.composition import ComposedPrompt
 from agentbox.core.engines.contracts.base import (
     BackendAdapter,
     RenderedConfig,
@@ -161,9 +162,8 @@ class RetryOrchestrator:
         adapter: BackendAdapter,
         rendered: RenderedConfig,
         agent: Any,
-        composed: Any | None,
+        composed: ComposedPrompt | None,
         workdir: Path,
-        store: Any,
         project_root: Path,
     ) -> None:
         self.adapter = adapter
@@ -171,7 +171,6 @@ class RetryOrchestrator:
         self.agent = agent
         self.composed = composed
         self.workdir = workdir
-        self.store = store
         self.project_root = project_root
 
     async def execute(
@@ -283,7 +282,6 @@ class RetryOrchestrator:
                     self.workdir,
                     output,
                     project_root=self.project_root,
-                    store=self.store,
                     composed=self.composed,
                 )
                 schema_validated_via = result.engine

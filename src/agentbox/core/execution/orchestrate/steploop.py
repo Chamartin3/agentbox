@@ -21,7 +21,7 @@ from typing import Any, Final, cast
 from agentbox.core.data.events import UsageEvent
 from agentbox.core.config import Settings
 from agentbox.core.agents import build_runtime_view
-from agentbox.core.agents.composition.build import _DbStoreAdapter
+from agentbox.core.data.composition import ComposedPrompt
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data.constants import RunStatus
@@ -123,10 +123,9 @@ class RunStepLoop:
         transcript_path: Path,
         broadcaster: RunBroadcaster,
         effective: EffectiveRunnerConfig | None,
-        composed: Any | None,
+        composed: ComposedPrompt | None,
     ) -> StepResult:
-        store = _DbStoreAdapter(self._db)
-        view = build_runtime_view(agent, store=store)
+        view = composed.runtime_view if composed is not None and composed.runtime_view is not None else build_runtime_view(agent)
 
         error_retries_left = view.max_error_retries or 0
         validation_retries_left = view.max_validation_retries or 0
@@ -166,7 +165,7 @@ class RunStepLoop:
         with session:
             has_schema = bool(
                 view.output_schema_path
-                or (composed is not None and isinstance(composed.schema, dict))
+                or (composed is not None and isinstance(composed.composed_schema, dict))
                 or view.json_schema is not None
                 or bool(view.validators)
             )
@@ -182,7 +181,6 @@ class RunStepLoop:
                 agent=agent,
                 composed=composed,
                 workdir=workdir,
-                store=store,
                 project_root=self.settings.project_root,
             )
             outcome = await orchestrator.execute(

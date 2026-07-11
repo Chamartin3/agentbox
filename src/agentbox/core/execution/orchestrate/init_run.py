@@ -13,6 +13,7 @@ from agentbox.core.config import Settings
 from agentbox.core.data.constants import LogLevel, RunStatus
 from agentbox.core.data.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef
+from agentbox.core.data.composition import ComposedPrompt
 from agentbox.core.db.database import Database
 from agentbox.core.db.utils import now_iso
 from agentbox.core.db.schema import runs as _runs_table  # ponytail: transitional — direct SQL for agent_version_id stamp
@@ -108,7 +109,7 @@ def init_run(
     settings: Any,
     adapter: Any,
     rendered: Any,
-    composed: Any,
+    composed: ComposedPrompt | None,
     input_: Any,
     transcript_path: Path,
     _snapshots: SnapshotWriter,
@@ -176,8 +177,11 @@ def init_run(
             variables=variables or {},
         )
     else:
-        _final_system = composed.system if composed.system is not None else (agent.prompt or "")
-        _final_schema = composed.schema
+        _final_system = (
+            composed.system_text if composed is not None and composed.system_text is not None
+            else (agent.prompt or "")
+        )
+        _final_schema = composed.composed_schema if composed is not None else None
         db.runs.save_composition(
             run_id=run_id,
             composition_snapshot=None,
@@ -217,7 +221,7 @@ def launch_background_task(
     db: "Database",
     settings: Any,
     effective: Any,
-    composed: Any,
+    composed: ComposedPrompt | None,
     step_loop: Any,
     finalizer: Any,
     _run_loop: Any,

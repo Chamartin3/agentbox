@@ -26,9 +26,6 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # steploop instantiates _DbStoreAdapter(db) — deleted in plan 121
-    # (de-DB the step loop); until then it needs the private class.
-    agentbox.core.execution.orchestrate.steploop -> agentbox.core.agents.composition.build
     # whole-module namespace import of the prompt-doc CRUD module (read/
     # write/publish/rollback accessed as prompts.<fn>) — not a symbol the
     # facade can re-export; the module is the unit.

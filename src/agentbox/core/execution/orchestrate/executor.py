@@ -228,7 +228,7 @@ class RunExecutor:
         init_run(
             run_id=run_id, agent=agent, db=self.db,
             settings=self.settings, adapter=adapter, rendered=rendered,
-            composed=composed, input_=input_,
+            composed=composed_prompt, input_=input_,
             transcript_path=transcript_path,
             _snapshots=self._snapshots, _setup=self._setup,
             effective=effective,
@@ -256,7 +256,7 @@ class RunExecutor:
             agent=agent, input_=input_, workdir=workdir, run_dir=run_dir,
             transcript_path=transcript_path,
             db=self.db, settings=self.settings,
-            effective=effective, composed=composed,
+            effective=effective, composed=composed_prompt,
             step_loop=self._step_loop, finalizer=self._finalizer,
             _run_loop=_run_loop,
             broadcasters=self._broadcasters,

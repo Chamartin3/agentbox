@@ -25,7 +25,6 @@ from pathlib import Path
 from agentbox.core.data import AgentDef
 from agentbox.core.data.composition import ComposedPrompt, PromptFragment
 from agentbox.core.data.constants import BackendName
-from agentbox.core.db import PromptVersionManager
 
 
 def capture_fragments(
@@ -34,7 +33,6 @@ def capture_fragments(
     user_input: str,
     project_root: Path,
     argv: list[str] | None = None,
-    prompt_versions: PromptVersionManager | None = None,
     composed: ComposedPrompt | None = None,
 ) -> str:
     """Build prompt fragments and return them as a JSON string.
@@ -47,7 +45,6 @@ def capture_fragments(
         user_input=user_input,
         project_root=project_root,
         argv=argv,
-        prompt_versions=prompt_versions,
         composed=composed,
     )
     return fragments_to_json(frags)
@@ -58,8 +55,7 @@ def build_fragments(
     user_input: str,
     project_root: Path,
     argv: list[str] | None = None,
-    prompt_versions: PromptVersionManager | None = None,
-    composed: object | None = None,
+    composed: ComposedPrompt | None = None,
 ) -> list[PromptFragment]:
     frags: list[PromptFragment] = [
         PromptFragment(
@@ -71,7 +67,7 @@ def build_fragments(
     ]
 
     # Composed prompts take precedence over legacy prompt_path.
-    composed_system = getattr(composed, "system", None) if composed is not None else None
+    composed_system = composed.system_text if composed is not None else None
     if composed_system is not None:
         frags.append(
             PromptFragment(
@@ -81,7 +77,7 @@ def build_fragments(
                 content=composed_system,
             )
         )
-        composed_schema = getattr(composed, "schema", None) if composed is not None else None
+        composed_schema = composed.composed_schema if composed is not None else None
         if composed_schema is not None:
             frags.append(
                 PromptFragment(
@@ -93,24 +89,19 @@ def build_fragments(
             )
     elif agent.prompt_path:
         text: str | None = None
-        if prompt_versions is not None:
-            committed = prompt_versions.get_latest_committed(agent.id)
-            if committed:
-                text = committed["content"]
-        if text is None:
-            try:
-                text = (project_root / agent.prompt_path).read_text(encoding="utf-8")
-            except OSError as exc:
-                frags.append(
-                    PromptFragment(
-                        name="agent_system_prompt",
-                        source="agent_def",
-                        injected_by=agent.runner.kind,
-                        content=f"<unreadable: {exc}>",
-                        inspectable=False,
-                    )
+        try:
+            text = (project_root / agent.prompt_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            frags.append(
+                PromptFragment(
+                    name="agent_system_prompt",
+                    source="agent_def",
+                    injected_by=agent.runner.kind,
+                    content=f"<unreadable: {exc}>",
+                    inspectable=False,
                 )
-                text = None
+            )
+            text = None
         if text is not None:
             frags.append(
                 PromptFragment(

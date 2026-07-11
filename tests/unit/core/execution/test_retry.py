@@ -124,7 +124,6 @@ def _make_orchestrator(
         agent=agent,
         composed=None,
         workdir=tmp_path,
-        store=None,
         project_root=tmp_path,
     )
 
