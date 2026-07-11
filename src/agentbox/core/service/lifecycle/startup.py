@@ -32,7 +32,7 @@ from agentbox.core.service.lifecycle._utils import (
     _to_mcp_config,
 )
 from agentbox.core.service.lifecycle.report import StartupReport
-from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.service.workspaces import WorkspaceService
 
 _log = logging.getLogger(__name__)
 

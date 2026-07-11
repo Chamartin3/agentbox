@@ -24,11 +24,8 @@ from agentbox.core.service.resources.bindings import (
     dry_run_workspace_resources,
     preview_modes,
 )
-from agentbox.core.service.resources.service import AgentVersionMissing
-from agentbox.core.service.workspaces.bindings import (
-    list_workspace_subagents,
-    list_workspace_skill_bindings,
-)
+from agentbox.core.service.resources.service import AgentVersionMissing, ResourceService
+from agentbox.core.service.workspaces import WorkspaceService
 
 
 @pytest.fixture
@@ -135,11 +132,11 @@ def test_preview_modes_returns_empty_when_no_active_version(
 
 def test_list_workspace_subagents_empty(store: Database) -> None:
     store.workspaces.insert("alpha")
-    out = list_workspace_subagents("alpha", agent_defs=store.agent_defs)
+    out = WorkspaceService().list_workspace_subagents("alpha", agent_defs=store.agent_defs)
     assert out == {"items": []}
 
 
 def test_list_workspace_skill_bindings_envelope(store: Database) -> None:
     store.workspaces.insert("alpha")
-    out = list_workspace_skill_bindings("alpha")
+    out = ResourceService().list_workspace_skill_bindings("alpha")
     assert "items" in out

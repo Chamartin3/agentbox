@@ -25,6 +25,7 @@ from agentbox.core.service.workspaces import (
     WorkspaceExists,
     WorkspaceNotFound,
     WorkspacePathEscape,
+    WorkspaceService,
 )
 
 
@@ -58,7 +59,7 @@ def test_resolve_workspace_path_raises_when_unknown(
     store: Database, settings: Settings
 ) -> None:
     with pytest.raises(WorkspaceNotFound):
-        ws_service.resolve_workspace_path(
+        WorkspaceService().resolve_workspace_path(
             "missing", settings=settings
         )
 
@@ -67,7 +68,7 @@ def test_resolve_workspace_path_falls_back_to_workspaces_root(
     store: Database, settings: Settings
 ) -> None:
     store.workspaces.insert(name="alpha")
-    path, project_root = ws_service.resolve_workspace_path(
+    path, project_root = WorkspaceService().resolve_workspace_path(
         "alpha", settings=settings
     )
     assert path == settings.workspaces_root / "alpha"
@@ -82,7 +83,6 @@ def test_resolve_workspace_path_falls_back_to_workspaces_root(
 def test_create_workspace_registry_duplicate_raises(
     store: Database,
 ) -> None:
-    from agentbox.core.service.workspaces.service import WorkspaceService
 
     svc = WorkspaceService()
     svc.create_workspace("alpha")
@@ -94,7 +94,7 @@ def test_delete_workspace_registry_raises_when_unknown(
     store: Database, settings: Settings
 ) -> None:
     with pytest.raises(WorkspaceNotFound):
-        ws_service.delete_workspace_registry(
+        WorkspaceService().delete_workspace(
             "missing", settings=settings
         )
 
@@ -106,7 +106,7 @@ def test_delete_workspace_registry_purges_disk_when_requested(
     ws_path = settings.workspaces_root / "alpha"
     ws_path.mkdir()
     (ws_path / "file.txt").write_text("x")
-    result = ws_service.delete_workspace_registry(
+    result = WorkspaceService().delete_workspace(
         "alpha",
         settings=settings,
         purge_disk=True,
@@ -132,7 +132,7 @@ def test_get_workspace_by_name_lists_user_files(
     (ws_path / ".claude" / "skip.txt").write_text("skip")
     (ws_path / "CLAUDE.md").write_text("render artifact")
 
-    doc = ws_service.get_workspace_by_name(
+    doc = WorkspaceService().get_workspace_by_name(
         "alpha", settings=settings
     )
     paths = {f["path"] for f in doc["files"]}
@@ -159,14 +159,14 @@ def test_write_then_read_file_roundtrip(
 ) -> None:
     store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
-    written = ws_service.write_file_by_name(
+    written = WorkspaceService().write_workspace_file(
         "alpha",
         "notes/x.txt",
         "hi",
         settings=settings,
     )
     assert written == {"path": "notes/x.txt", "bytes": 2}
-    read = ws_service.read_file_by_name(
+    read = WorkspaceService().read_workspace_file(
         "alpha", "notes/x.txt", settings=settings
     )
     assert read == {"path": "notes/x.txt", "content": "hi"}
@@ -178,7 +178,7 @@ def test_read_file_returns_none_for_missing(
     store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
     assert (
-        ws_service.read_file_by_name(
+        WorkspaceService().read_workspace_file(
             "alpha", "ghost.txt", settings=settings
         )
         is None
@@ -191,7 +191,7 @@ def test_write_file_rejects_path_escape(
     store.workspaces.insert(name="alpha")
     (settings.workspaces_root / "alpha").mkdir()
     with pytest.raises(WorkspacePathEscape):
-        ws_service.write_file_by_name(
+        WorkspaceService().write_workspace_file(
             "alpha",
             "../escape.txt",
             "evil",
@@ -207,9 +207,7 @@ def test_write_file_rejects_path_escape(
 def test_load_effective_permissions_returns_defaults_for_unknown_name(
     store: Database, settings: Settings
 ) -> None:
-    perms = ws_service.load_effective_permissions(
-        None, settings=settings
-    )
+    perms = WorkspaceService().load_effective_permissions("")
     assert perms["allowed_tools"] == []
     assert perms["allow_file_write"] is True
 
@@ -229,9 +227,7 @@ def test_load_effective_permissions_applies_db_overlay(
         allow_file_write=False,
         allow_network=False,
     )
-    perms = ws_service.load_effective_permissions(
-        "alpha", settings=settings
-    )
+    perms = WorkspaceService().load_effective_permissions("alpha")
     assert perms["allowed_builtin_tools"] == ["WebFetch"]
     assert perms["max_tokens"] == 4096
     assert perms["allow_file_write"] is False
@@ -250,7 +246,7 @@ def test_list_workspaces_enriched_shape(
     (settings.workspaces_root / "alpha").mkdir()
     (settings.workspaces_root / "alpha" / "note.txt").write_text("hi")
 
-    result = ws_service.list_workspaces_enriched(
+    result = WorkspaceService().list_workspaces_enriched(
         settings=settings
     )
     assert len(result) == 1

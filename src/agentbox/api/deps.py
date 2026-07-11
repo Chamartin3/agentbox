@@ -68,7 +68,7 @@ def get_resource_service() -> ResourceService:
 
 def get_workspace_service() -> WorkspaceService:
     """Workspace-domain service. Uncached — self-wires from settings."""
-    from agentbox.core.service.workspaces.service import WorkspaceService  # noqa: PLC0415
+    from agentbox.core.service.workspaces import WorkspaceService  # noqa: PLC0415
     return WorkspaceService()
 
 

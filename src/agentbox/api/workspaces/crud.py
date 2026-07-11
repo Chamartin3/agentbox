@@ -36,8 +36,8 @@ from agentbox.core import service as ws
 from agentbox.core.config import Settings
 from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.service import AgentService
-from agentbox.core.service.workspaces.files import is_user_file
-from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.service.workspaces import is_user_file
+from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.data.errors import (
     WorkspaceExists,
     WorkspaceNotFound,

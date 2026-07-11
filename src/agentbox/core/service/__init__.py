@@ -126,44 +126,21 @@ from agentbox.core.service.system.service import SystemService as SystemService
 # ── Resources service (plan 090) ────────────────────────────────────────
 from agentbox.core.service.resources.service import ResourceService as ResourceService
 
-# ── Workspace / resource / system admin free functions (per-domain admin.py) ──
+# ── Resource / agent / system admin free functions (per-domain admin.py) ──
 from agentbox.core.service.agents.admin import replace_version_config as replace_version_config
 from agentbox.core.service.agents.admin import update_agent_meta as update_agent_meta
 from agentbox.core.service.resources.admin import list_workspace_file_bindings as list_workspace_file_bindings
 from agentbox.core.service.resources.admin import replace_workspace_file_bindings as replace_workspace_file_bindings
 from agentbox.core.service.system.admin import list_host_env_calls_for_run as list_host_env_calls_for_run
-from agentbox.core.service.workspaces.admin import get_active_env_doc as get_active_env_doc
-from agentbox.core.service.workspaces.admin import get_workspace as get_workspace
-from agentbox.core.service.workspaces.admin import get_agent_host_env as get_agent_host_env
-from agentbox.core.service.workspaces.admin import get_workspace_mcp_policy as get_workspace_mcp_policy
-from agentbox.core.service.workspaces.admin import list_env_doc_versions as list_env_doc_versions
-from agentbox.core.service.workspaces.admin import list_host_env_profiles as list_host_env_profiles
-from agentbox.core.service.workspaces.admin import list_workspace_mcp_server_overrides as list_workspace_mcp_server_overrides
-from agentbox.core.service.workspaces.admin import list_workspace_mcp_tool_overrides as list_workspace_mcp_tool_overrides
-from agentbox.core.service.workspaces.admin import publish_env_doc as publish_env_doc
-from agentbox.core.service.workspaces.admin import resolve_agent_host_env as resolve_agent_host_env
-from agentbox.core.service.workspaces.admin import rollback_env_doc as rollback_env_doc
-from agentbox.core.service.workspaces.admin import save_env_doc as save_env_doc
-from agentbox.core.service.workspaces.admin import set_workspace_mcp_policy as set_workspace_mcp_policy
-from agentbox.core.service.workspaces.admin import set_workspace_mcp_server_override as set_workspace_mcp_server_override
 
 # ── Workspace ─────────────────────────────────────────────────────────
 from agentbox.core.workspaces.workdir import WorkspaceInfo as WorkspaceInfo
 from agentbox.core.workspaces.workdir import ensure as ensure
 from agentbox.core.workspaces.workdir import info as info
-from agentbox.core.service.workspaces.registry import (
-    list_all_workspaces as list_all_workspaces,
-)
-from agentbox.core.service.workspaces import (
-    get_workspace_mcp_tools as get_workspace_mcp_tools,
-    launch_runner_configs as launch_runner_configs,
-)
 from agentbox.core.workspaces.workdir import reset as reset
 from agentbox.core.workspaces.workdir import resolve_path as resolve_path
 from agentbox.core.workspaces.tooling.mcp import McpRegistry as McpRegistry
 
 # ── WorkspaceService (Plan 089) ────────────────────────────────────────
-from agentbox.core.service.workspaces.service import WorkspaceService as WorkspaceService
-from agentbox.core.service.workspaces.service import env_doc_body as env_doc_body
-from agentbox.core.service.workspaces.service import render_env_doc_preview as render_env_doc_preview
-from agentbox.core.service.workspaces.service import save_and_sync_env_doc as save_and_sync_env_doc
+from agentbox.core.service.workspaces import WorkspaceService as WorkspaceService
+from agentbox.core.service.workspaces import render_env_doc_preview as render_env_doc_preview

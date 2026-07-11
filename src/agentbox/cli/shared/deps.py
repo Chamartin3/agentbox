@@ -17,7 +17,7 @@ from agentbox.core.db.database import Database  # ponytail: transitional — 113
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.workspaces.tooling.mcp import McpRegistry
 
-from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.service.workspaces import WorkspaceService
 
 
 @lru_cache(maxsize=1)

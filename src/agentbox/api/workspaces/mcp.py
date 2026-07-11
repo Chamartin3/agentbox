@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_workspace_service
 from agentbox.core.data.constants import McpPolicy
 from agentbox.core.data.rows import WorkspaceMcpOverrideRow, WorkspaceMcpToolOverrideRow
-from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.service.workspaces import WorkspaceService
 
 router = APIRouter(tags=["workspace-mcp-provisioning"])
 

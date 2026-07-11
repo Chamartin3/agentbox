@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 from agentbox.core.db.database import Database
-from agentbox.core.service import (
+from agentbox.core.service.workspaces import (
+    WorkspaceService,
     env_doc_body,
     render_env_doc_preview,
-    save_and_sync_env_doc,
 )
 
 
@@ -59,7 +59,7 @@ def test_save_and_sync_env_doc_creates_version(
     store: Database, settings: object
 ) -> None:
     store.workspaces.insert("test-ws")
-    result = save_and_sync_env_doc("test-ws", content="# Test\n\nTesting")
+    result = WorkspaceService().save_and_sync_env_doc("test-ws", content="# Test\n\nTesting")
     assert isinstance(result, dict)
     assert result.get("changelog") is not None
     active = store.workspace_env_doc_versions.get_active("test-ws")
@@ -72,5 +72,5 @@ def test_save_and_sync_missing_workspace(
 ) -> None:
     """save_env_doc creates a workspace record if none exists, so this
     verifies the function completes rather than crashing."""
-    result = save_and_sync_env_doc("nonexistent", content="# X")
+    result = WorkspaceService().save_and_sync_env_doc("nonexistent", content="# X")
     assert isinstance(result, dict)

@@ -22,7 +22,6 @@ from agentbox.cli.shared import CLIContext
 from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
-from agentbox.core.service.workspaces import launch_runner_configs  # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 
 
 def shell_cmd(
@@ -62,8 +61,8 @@ def shell_cmd(
     # Place native runner config in the workspace cwd for the interactive
     # session. ``keep=True`` — the exec'd shell needs it to persist; the
     # service never clobbers the user's own config files.
-    launch_cm = launch_runner_configs(
-        workspace_path, settings=settings, keep=True
+    launch_cm = obj.workspaces.launch_runner_configs(
+        workspace_path, keep=True
     )
     launch_cm.__enter__()
 

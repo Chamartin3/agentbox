@@ -7,8 +7,6 @@ import sys
 import typer
 
 from agentbox.cli.shared import CLIContext
-# TODO(cli-arch): WorkspaceService (plan 089)
-from agentbox.core.service import workspaces as workspaces_service
 # TODO(cli-arch): move to facade export
 from agentbox.core.data.errors import WorkspaceNotFound
 
@@ -27,7 +25,7 @@ def file_gen(
     """Generate runner configs into a workspace."""
     obj: CLIContext = ctx.obj
     try:
-        result = workspaces_service.generate_configs_by_name(
+        result = obj.workspaces.generate_configs(
             name, settings=obj.settings,
         )
     except WorkspaceNotFound:

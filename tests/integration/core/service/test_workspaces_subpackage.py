@@ -1,7 +1,8 @@
-"""Tests for the 6 workspaces subpackage split modules.
+"""Tests for the flattened WorkspaceService surface.
 
-One happy-path + one error-path for each:
-_registry, _configs, _files, _mcp, _permissions, _skills.
+One happy-path + one error-path per method group: registry, configs,
+files, mcp, permissions, skills. (Was the 6-submodule split; now one
+service.)
 """
 
 from __future__ import annotations
@@ -13,24 +14,8 @@ from typing import cast
 import pytest
 from agentbox.core.config import Settings
 from agentbox.core.db.database import Database
-from agentbox.core.service.workspaces import (
-    WorkspaceExists,
-    WorkspaceNotFound,
-    WorkspacePathEscape,
-    create_workspace_registry,
-    delete_workspace_registry,
-    generate_configs_by_name,
-    generate_skills_by_name,
-    get_permissions,
-    get_skill_content_by_name,
-    get_workspace_by_name,
-    list_skills_by_name,
-    list_workspaces_enriched,
-    read_file_by_name,
-    resolve_workspace_mcp,
-    set_permissions,
-    write_file_by_name,
-)
+from agentbox.core.data.errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
+from agentbox.core.service.workspaces import WorkspaceService
 
 
 @dataclass
@@ -58,66 +43,57 @@ def _register(store: Database, name: str) -> None:
     store.workspaces.insert(name=name)
 
 
-# ── _registry ───────────────────────────────────────────────────────────
+# ── registry ────────────────────────────────────────────────────────────
 
 
-def test_create_workspace_registry_happy(store: Database) -> None:
-    result = create_workspace_registry("alpha")
+def test_create_workspace_happy(store: Database) -> None:
+    result = WorkspaceService().create_workspace("alpha")
     assert result["name"] == "alpha"
 
 
-def test_create_workspace_registry_duplicate(store: Database) -> None:
+def test_create_workspace_duplicate(store: Database) -> None:
     _register(store, "alpha")
     with pytest.raises(WorkspaceExists):
-        create_workspace_registry("alpha")
+        WorkspaceService().create_workspace("alpha")
 
 
-def test_delete_workspace_registry(store: Database, settings: Settings) -> None:
+def test_delete_workspace(store: Database, settings: Settings) -> None:
     _register(store, "alpha")
-    delete_workspace_registry("alpha", settings=settings)
+    WorkspaceService().delete_workspace("alpha", settings=settings)
     with pytest.raises(WorkspaceNotFound):
-        get_workspace_by_name("alpha", settings=settings)
+        WorkspaceService().get_workspace_by_name("alpha", settings=settings)
 
 
 def test_get_workspace_by_name_unknown(store: Database, settings: Settings) -> None:
     with pytest.raises(WorkspaceNotFound):
-        get_workspace_by_name("missing", settings=settings)
+        WorkspaceService().get_workspace_by_name("missing", settings=settings)
 
 
 def test_list_workspaces_enriched(store: Database, settings: Settings) -> None:
     _register(store, "ws1")
     _register(store, "ws2")
-    result = list_workspaces_enriched(settings=settings)
+    result = WorkspaceService().list_workspaces_enriched(settings=settings)
     assert len(result) >= 2
 
 
-# ── _files ──────────────────────────────────────────────────────────────
+# ── files ──────────────────────────────────────────────────────────────
 
 
-def test_read_file_by_name_happy(
-    store: Database, settings: Settings
-) -> None:
+def test_read_file_happy(store: Database, settings: Settings) -> None:
     _register(store, "filers")
     ws_path = settings.workspaces_root / "filers"
     ws_path.mkdir(parents=True, exist_ok=True)
     (ws_path / "README.md").write_text("hello")
-    result = read_file_by_name(
-        "filers", "README.md", settings=settings
-    )
+    result = WorkspaceService().read_workspace_file("filers", "README.md", settings=settings)
     assert result is not None
     assert result["content"] == "hello"
 
 
-def test_write_file_then_read(
-    store: Database, settings: Settings
-) -> None:
+def test_write_file_then_read(store: Database, settings: Settings) -> None:
     _register(store, "writrs")
-    write_file_by_name(
-        "writrs", "notes.txt", "data", settings=settings
-    )
-    result = read_file_by_name(
-        "writrs", "notes.txt", settings=settings
-    )
+    svc = WorkspaceService()
+    svc.write_workspace_file("writrs", "notes.txt", "data", settings=settings)
+    result = svc.read_workspace_file("writrs", "notes.txt", settings=settings)
     assert result is not None
     assert result["content"] == "data"
 
@@ -125,25 +101,21 @@ def test_write_file_then_read(
 def test_read_file_path_escape(store: Database, settings: Settings) -> None:
     _register(store, "escape")
     with pytest.raises(WorkspacePathEscape):
-        read_file_by_name(
-            "escape", "../outside.txt", settings=settings
-        )
+        WorkspaceService().read_workspace_file("escape", "../outside.txt", settings=settings)
 
 
-# ── _permissions ────────────────────────────────────────────────────────
+# ── permissions ────────────────────────────────────────────────────────
 
 
 def test_get_permissions_defaults(store: Database, settings: Settings) -> None:
     _register(store, "perms-ws")
-    result = get_permissions(
-        "perms-ws", settings=settings
-    )
+    result = WorkspaceService().get_permissions("perms-ws")
     assert "permissions" in result
 
 
 def test_set_permissions_happy(store: Database, settings: Settings) -> None:
     _register(store, "perms-ws2")
-    result = set_permissions(
+    result = WorkspaceService().set_permissions(
         "perms-ws2",
         {"network": "allow"},
         settings=settings,
@@ -154,66 +126,55 @@ def test_set_permissions_happy(store: Database, settings: Settings) -> None:
 
 def test_permissions_unknown_workspace(store: Database, settings: Settings) -> None:
     with pytest.raises(WorkspaceNotFound):
-        get_permissions(
-            "missing", settings=settings
-        )
+        WorkspaceService().get_permissions("missing")
 
 
-# ── _skills ─────────────────────────────────────────────────────────────
+# ── skills ─────────────────────────────────────────────────────────────
 
 
-def test_generate_skills_by_name(store: Database, settings: Settings) -> None:
+def test_generate_skills(store: Database, settings: Settings) -> None:
     _register(store, "skillz")
-    result = generate_skills_by_name(
-        "skillz", settings=settings
-    )
+    result = WorkspaceService().generate_skills("skillz", settings=settings)
     assert isinstance(result, dict)
     assert result["workspace"] == "skillz"
 
 
-def test_list_skills_by_name_empty(store: Database, settings: Settings) -> None:
+def test_list_skills_empty(store: Database, settings: Settings) -> None:
     _register(store, "noskills")
-    result = list_skills_by_name(
-        "noskills", settings=settings
-    )
+    result = WorkspaceService().list_skills("noskills", settings=settings)
     assert isinstance(result, dict)
     assert result["skills"] == []
 
 
 def test_get_skill_content_missing(store: Database, settings: Settings) -> None:
     _register(store, "nosuchskill")
-    result = get_skill_content_by_name(
-        "nosuchskill", "missing_skill", settings=settings
-    )
+    result = WorkspaceService().get_skill_content("nosuchskill", "missing_skill", settings=settings)
     assert result is None
 
 
-# ── _configs ────────────────────────────────────────────────────────────
+# ── configs ────────────────────────────────────────────────────────────
 
 
-def test_generate_configs_by_name(store: Database, settings: Settings) -> None:
+def test_generate_configs(store: Database, settings: Settings) -> None:
     _register(store, "cfgrs")
-    result = generate_configs_by_name(
-        "cfgrs", settings=settings
-    )
+    result = WorkspaceService().generate_configs("cfgrs", settings=settings)
     assert isinstance(result, dict)
-    # Generated config paths are nested under result["generated"]
     generated = result.get("generated", result)
     assert isinstance(generated, dict)
     assert len(generated) > 0
 
 
-# ── _mcp ────────────────────────────────────────────────────────────────
+# ── mcp ────────────────────────────────────────────────────────────────
 
 
 def test_resolve_workspace_mcp_empty(store: Database) -> None:
-    result = resolve_workspace_mcp("nonexistent")
+    result = WorkspaceService().resolve_workspace_mcp("nonexistent")
     assert isinstance(result, dict)
     assert "servers" in result
 
 
 def test_resolve_workspace_mcp_with_workspace(store: Database) -> None:
     store.workspaces.insert(name="mcp-ws")
-    result = resolve_workspace_mcp("mcp-ws")
+    result = WorkspaceService().resolve_workspace_mcp("mcp-ws")
     assert isinstance(result, dict)
     assert "servers" in result

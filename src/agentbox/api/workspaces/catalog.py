@@ -21,7 +21,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from agentbox.api.deps import get_mcp_registry, get_workspace_service
-from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 

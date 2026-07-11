@@ -24,6 +24,7 @@ from agentbox.core.data.constants import McpPolicy
 from agentbox.core.data import EnvDocPreviewResult, EnvDocRow
 from agentbox.core.data.payload_types import (
     EffectivePermissions,
+    EnrichedSubagentRow,
     PermissionFileEntry,
     EnvDocRenderEntry,
     GeneratedConfigsResult,
@@ -39,13 +40,17 @@ from agentbox.core.data.payload_types import (
     ResolvedWorkspaceMcp,
     SkillContentResult,
     SkillsListResult,
+    SubagentItemsResult,
     SubagentSpec,
     WorkspaceDeleteResult,
+    WorkspaceDetail,
+    WorkspaceFileInfo,
     WorkspaceFileRead,
     WorkspaceFileWrite,
     WorkspaceListItem,
     WorkspaceMcpToolsResult,
 )
+from agentbox.core.db import AgentDefManager
 from agentbox.core.data.rows import (
     HostEnvProfileRow,
     WorkspaceMcpOverrideRow,
@@ -287,6 +292,68 @@ class WorkspaceService(Service):
                 shutil.rmtree(ws_path)
                 disk_removed = True
         return {"deleted": name, "counts": counts, "disk_removed": disk_removed}
+
+    def list_workspaces_enriched(
+        self,
+        *,
+        settings: Settings | None = None,
+    ) -> list[WorkspaceListItem]:
+        """Return all named workspaces with agent assignments + summary stats."""
+        registry = self.list_workspaces(settings=settings)
+        result: list[WorkspaceListItem] = []
+        for ws_row in registry:
+            name = ws_row["name"]
+            ws_path = Path(ws_row["path"])
+            agents: list[str] = []
+            file_count = 0
+            skill_count = 0
+            if ws_path.exists():
+                for p in ws_path.rglob("*"):
+                    if p.is_file() and is_user_file(str(p.relative_to(ws_path))):
+                        file_count += 1
+                skill_count = len(discover_skills(ws_path))
+            result.append(
+                {
+                    "name": name,
+                    "path": str(ws_path),
+                    "description": ws_row.get("description"),
+                    "source": ws_row.get("source"),
+                    "kind": "named",
+                    "agents": agents,
+                    "agent_count": len(agents),
+                    "file_count": file_count,
+                    "skill_count": skill_count,
+                    "resource_count": ws_row.get("resource_count", 0),
+                    "exists": ws_path.exists(),
+                    "on_disk": ws_row.get("on_disk", False),
+                    "created_at": ws_row.get("created_at"),
+                    "updated_at": ws_row.get("updated_at"),
+                }
+            )
+        return result
+
+    def get_workspace_by_name(
+        self,
+        name: str,
+        *,
+        settings: Settings | None = None,
+    ) -> WorkspaceDetail:
+        ws_path, _ = self.resolve_workspace_path(name, settings=settings)
+        files: list[WorkspaceFileInfo] = []
+        if ws_path.exists():
+            for p in sorted(ws_path.rglob("*")):
+                if p.is_file():
+                    rel = str(p.relative_to(ws_path))
+                    if not is_user_file(rel):
+                        continue
+                    files.append({"path": rel, "size": p.stat().st_size})
+        return {
+            "name": name,
+            "path": str(ws_path),
+            "exists": ws_path.exists(),
+            "files": files,
+            "generated_configs": {},
+        }
 
     def backfill_workspaces(self) -> int:
         return self._workspaces.backfill_from_satellites()
@@ -1171,6 +1238,28 @@ class WorkspaceService(Service):
         """Return raw subagent rows for a workspace."""
         return self._subagents.list_for_workspace(workspace_id)
 
+    def list_workspace_subagents(
+        self,
+        workspace_id: str,
+        *,
+        agent_defs: AgentDefManager,
+    ) -> SubagentItemsResult:
+        """Return workspace subagents enriched with agent name/description."""
+        items = self.list_workspace_subagents_raw(workspace_id)
+        enriched: list[EnrichedSubagentRow] = []
+        for s in items:
+            agent = agent_defs.get(s["agent_id"])
+            enriched.append(
+                {
+                    **s,
+                    "agent_name": getattr(agent, "name", None) if agent else None,
+                    "agent_description": getattr(agent, "description", None)
+                    if agent
+                    else None,
+                }
+            )
+        return {"items": enriched}
+
     def replace_workspace_subagents(
         self,
         workspace_id: str,
@@ -1209,16 +1298,3 @@ def render_env_doc_preview(content: Any) -> EnvDocPreviewResult:
     """Preview the instruction files. Identical body for every engine."""
     body = env_doc_body(content)
     return {"claude_md": body, "agents_md": body}
-
-
-def save_and_sync_env_doc(
-    workspace_id: str,
-    *,
-    content: Any,
-    reason: str = "edit",
-    actor: str | None = None,
-) -> EnvDocRow:
-    """Persist env-doc as live version, then sync CLAUDE.md/AGENTS.md on disk."""
-    return WorkspaceService().save_and_sync_env_doc(
-        workspace_id, content=content, reason=reason, actor=actor
-    )

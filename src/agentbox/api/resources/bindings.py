@@ -33,7 +33,7 @@ from agentbox.core.service.resources.service import (
     ResourceNotFound,
     ResourceService,
 )
-from agentbox.core.service.workspaces.service import WorkspaceService
+from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.service import AgentService, PreviewError
 
 router = APIRouter(tags=["resource-bindings"])

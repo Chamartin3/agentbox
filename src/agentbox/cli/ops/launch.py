@@ -27,8 +27,6 @@ from agentbox.core.service import AgentDef, WorkspaceService  # TODO(cli-arch): 
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.service.system.service import SystemService
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.service.workspaces import launch_runner_configs
-# TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.tooling.mcp import McpRegistry
 
 # Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
@@ -128,9 +126,8 @@ def _launch_session(
         )
         # The service owns placing native runner config in the workspace
         # cwd (where the engine discovers it) and cleaning up what it wrote.
-        config_cm = launch_runner_configs(
+        config_cm = obj.workspaces.launch_runner_configs(
             workspace_path,
-            settings=settings,
             servers=servers,
             keep=keep_configs,
         )
