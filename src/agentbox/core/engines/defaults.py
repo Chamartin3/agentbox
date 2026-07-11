@@ -1,8 +1,8 @@
 """Operator-configured runtime defaults resolved from the settings store.
 
-Lives in ``core/agent`` (not ``core/constants``) so that constants stays a
-pure module of typed enums with no runtime dependencies. Importing this
-module must not create a ``core -> api`` cycle.
+Lives in ``core/engines`` (not ``core/data/constants``) so that the data
+leaf stays a pure module of typed enums with no runtime dependencies.
+Importing this module must not create a ``core -> api`` cycle.
 """
 
 from __future__ import annotations
