@@ -1,7 +1,7 @@
 """Backend adapter for the OpenAI Codex CLI (``codex exec --json``).
 
 Streaming uses the shared
-:func:`agentbox.core.engines.streaming.jsonl.stream_jsonl_subprocess` helper.
+:func:`agentbox.core.engines.backends.streaming.jsonl.stream_jsonl_subprocess` helper.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
 from agentbox.core.data.workenv import Item
 from agentbox.core.engines.backends.codex.render import build_codex_items
 from agentbox.core.engines.backends.codex.tools import NATIVE_TOOLS as _CODEX_TOOLS
-from agentbox.core.engines.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.engines.backends.streaming.jsonl import stream_jsonl_subprocess
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import (
     intersect_allowed_tools,

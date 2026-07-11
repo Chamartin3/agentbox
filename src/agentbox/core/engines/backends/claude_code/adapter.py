@@ -35,7 +35,7 @@ from agentbox.core.engines.backends.claude_code.views import (
     _build_usage_event,
     _parse_envelope,
 )
-from agentbox.core.engines.streaming.rate_limit import detect_in_text_line
+from agentbox.core.engines.backends.streaming.rate_limit import detect_in_text_line
 
 _NAME = "claude_code"
 

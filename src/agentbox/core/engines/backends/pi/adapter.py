@@ -25,7 +25,7 @@ from agentbox.core.data.events import (
     UsageEvent,
 )
 from agentbox.core.engines.contracts.base import BackendAdapter, RenderedConfig
-from agentbox.core.engines.streaming.jsonl import stream_jsonl_subprocess
+from agentbox.core.engines.backends.streaming.jsonl import stream_jsonl_subprocess
 from agentbox.core.tools.canonical import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 

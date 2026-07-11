@@ -1,4 +1,4 @@
-"""Unit tests for agentbox.core.engines.streaming.rate_limit.
+"""Unit tests for agentbox.core.engines.backends.streaming.rate_limit.
 
 Covers detect_in_opencode_event, detect_in_text_line, _walk_for_api_error,
 and _try_parse_trailing_json.  All functions under test are pure — no mocks,
@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from agentbox.core.engines.streaming.rate_limit import (
+from agentbox.core.engines.backends.streaming.rate_limit import (
     _try_parse_trailing_json,
     _walk_for_api_error,
     detect_in_opencode_event,

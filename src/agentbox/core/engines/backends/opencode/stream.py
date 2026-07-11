@@ -26,7 +26,7 @@ from agentbox.core.engines.backends.opencode.session import (
     parse_event_stream_with_thinking,
     strip_code_fences,
 )
-from agentbox.core.engines.streaming.rate_limit import (
+from agentbox.core.engines.backends.streaming.rate_limit import (
     detect_in_opencode_event,
     detect_in_text_line,
 )
