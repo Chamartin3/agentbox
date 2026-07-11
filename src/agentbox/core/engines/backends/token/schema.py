@@ -1,7 +1,7 @@
 """Loose JSON-Schema → pydantic ``BaseModel`` converter.
 
 This is the lenient fallback used by :class:`TokenBackend` when the
-strict converter in :mod:`agentbox.core.engines.contracts.schema_to_model`
+strict converter in :mod:`agentbox.core.engines.schema`
 raises :class:`UnsupportedSchema`. It only honors basic shapes
 (``type``, ``$ref``, ``oneOf``/``anyOf``, ``required``, ``default``)
 and intentionally drops enums, length/pattern constraints, and the like

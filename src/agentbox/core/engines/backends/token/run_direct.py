@@ -37,10 +37,8 @@ from agentbox.core.data.events import (
     ThinkingEvent,
     UsageEvent,
 )
-from agentbox.core.engines.contracts.schema_to_model import (
-    UnsupportedSchema,
-    json_schema_to_pydantic_model,
-)
+from agentbox.core.data import UnsupportedSchema
+from agentbox.core.engines.schema import json_schema_to_pydantic_model
 from agentbox.core.engines.backends.token.schema import _json_schema_to_pydantic_model
 from agentbox.core.engines.backends.token.tools import (
     build_host_env_toolsets,

@@ -53,6 +53,8 @@ from agentbox.core.data.constants import (
 )
 from agentbox.core.data.errors import (
     AgentboxError,
+    InconsistentSchema,
+    UnsupportedSchema,
     WorkspaceError,
     WorkspaceExists,
     WorkspaceNotFound,
@@ -61,6 +63,7 @@ from agentbox.core.data.errors import (
 from agentbox.core.data._util import hash_blobs, now_iso
 from agentbox.core.data.tools import CanonicalTool
 from agentbox.core.data.skills import SkillPack
+from agentbox.core.data.schema_consistency import assert_schema_consistent
 from agentbox.core.data.backends import (
     BackendRunResult,
     ComposedReferenceView,
@@ -179,6 +182,9 @@ from agentbox.core.data.transcripts import read_transcript
 __all__ = [
     "BackendRunResult",
     "CanonicalTool",
+    "InconsistentSchema",
+    "UnsupportedSchema",
+    "assert_schema_consistent",
     "ComposedReferenceView",
     "ComposedView",
     "McpToolSpec",

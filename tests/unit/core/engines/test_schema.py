@@ -1,4 +1,4 @@
-"""Tests for ``_schema_to_model.json_schema_to_pydantic_model``.
+"""Tests for ``engines.schema.json_schema_to_pydantic_model``.
 
 These cover the constraints the token backend needs to keep enforced
 once it stops appending the JSON schema in the system prompt: required
@@ -9,10 +9,8 @@ descriptions and ranges.
 from __future__ import annotations
 
 import pytest
-from agentbox.core.engines.contracts.schema_to_model import (
-    UnsupportedSchema,
-    json_schema_to_pydantic_model,
-)
+from agentbox.core.data import UnsupportedSchema
+from agentbox.core.engines.schema import json_schema_to_pydantic_model
 from pydantic import ValidationError
 
 

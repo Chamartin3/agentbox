@@ -1,23 +1,18 @@
-"""Schema consistency checker — ensures ``required`` ⊆ ``properties`` everywhere."""
+"""Schema consistency checker — ensures ``required`` ⊆ ``properties`` everywhere.
+
+A pure, stdlib-only walker over a JSON Schema dict. It lives at the
+shapes leaf because both domains need it: the agents domain runs it as
+the agent output-contract gate (at the executor boundary), and the
+engines token backend's ``json_schema_to_pydantic_model`` calls it before
+building a pydantic model. Since ``engines`` must never import
+``agents``, the shared check lives here in ``core.data``.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-
-
-class UnsupportedSchema(Exception):
-    """Raised when a schema uses a construct this converter cannot translate."""
-
-
-class InconsistentSchema(UnsupportedSchema):
-    """Raised when a schema is internally inconsistent (e.g. ``required``
-    names a property that is not declared in ``properties``).
-
-    Subclasses :class:`UnsupportedSchema` so callers that already handle
-    the broader failure mode keep working; new callers can catch this
-    specifically to produce a precise authoring-error message.
-    """
+from agentbox.core.data.errors.schemas import InconsistentSchema
 
 
 def assert_schema_consistent(
@@ -110,4 +105,4 @@ def assert_schema_consistent(
     _walk(schema, path)
 
 
-__all__ = ["InconsistentSchema", "UnsupportedSchema", "assert_schema_consistent"]
+__all__ = ["assert_schema_consistent"]

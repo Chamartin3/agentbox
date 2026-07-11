@@ -11,12 +11,12 @@ runs (Claude CLI hid the bug because it never built a ``result_type``).
 from __future__ import annotations
 
 import pytest
-from agentbox.core.engines.contracts.schema_to_model import (
+from agentbox.core.data import (
     InconsistentSchema,
     UnsupportedSchema,
     assert_schema_consistent,
-    json_schema_to_pydantic_model,
 )
+from agentbox.core.engines.schema import json_schema_to_pydantic_model
 
 
 def test_required_subset_of_properties_passes() -> None:

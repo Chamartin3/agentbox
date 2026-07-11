@@ -23,9 +23,7 @@ from agentbox.core.config import SETTINGS
 from agentbox.core.data.composition import ComposedPrompt, ValidationResult
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data._util import extract_json
-from agentbox.core.engines.contracts.schema_to_model.translate import (
-    json_schema_to_pydantic_model,
-)
+from agentbox.core.engines.schema import json_schema_to_pydantic_model
 
 import httpx
 

@@ -13,10 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
 
-from agentbox.core.engines.contracts.schema_to_model.consistency import (
-    UnsupportedSchema,
-    assert_schema_consistent,
-)
+from agentbox.core.data import UnsupportedSchema, assert_schema_consistent
 
 _FORMAT_TYPES: dict[str, Any] = {
     "date": date,
