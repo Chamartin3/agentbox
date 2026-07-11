@@ -9,6 +9,7 @@ without creating circular dependencies or importing the agents domain.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from agentbox.core.data.payload_types import (
@@ -296,11 +297,30 @@ class ComposedPrompt:
         )
 
 
+@dataclass(frozen=True)
+class RunSpec:
+    """Execution's input contract for a single run.
+
+    The prompt is composed ONCE at run creation (the service layer), never
+    rebuilt by the executor: a run queued before an agent edit executes the
+    prompt composed at creation. ``RunSpec`` bundles that composed prompt with
+    the dispatch statics the executor resolves as the run begins, so execution
+    only drives the engine, enforces the contract, and retries within budget.
+    """
+
+    composed: ComposedPrompt
+    engine_name: str
+    input_: str
+    workdir: Path
+    timeout_seconds: int
+
+
 __all__ = [
     "AgentRuntimeView",
     "ComposedPrompt",
     "ComposedReference",
     "ComposedState",
+    "RunSpec",
     "ComposeResult",
     "HttpValidatorConfig",
     "PromptFragment",

@@ -8,7 +8,6 @@ import logging
 import uuid
 
 from agentbox.core.config import Settings
-from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
 from agentbox.core.db.utils import now_iso
 from agentbox.core.data.constants import RunStatus
@@ -26,7 +25,7 @@ from agentbox.core.execution.orchestrate.setup import (
     NoBackendAvailable,
     RunSetup,
 )
-from agentbox.core.agents import build_prompt
+from agentbox.core.data.composition import ComposedPrompt, RunSpec
 from agentbox.core.execution.observability.snapshot import SnapshotWriter
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
@@ -71,40 +70,37 @@ class RunExecutor:
     # ------------------------------------------------------------------ execute
     async def execute(
         self,
-        agent: AgentDef,
-        input_: str,
+        composed: ComposedPrompt,
+        *,
+        variables: dict[str, Any] | None = None,
         session_id: str | None = None,
         workspace_override: str | None = None,
         timeout_seconds: int | None = None,
-        webhook_url: str | None = None,
         runner_override: str | None = None,
         backend: str | None = None,
-        variables: dict[str, Any] | None = None,
         runner_embedded: bool = False,
         runner_profile: str | None = None,
         runner_config: dict[str, Any] | None = None,
     ) -> str:
+        """Drive a single run from an already-composed prompt.
+
+        The prompt was composed at run creation (service layer); this method
+        never builds one. It resolves the dispatch statics (workdir, engine,
+        timeout) into a :class:`RunSpec`, then drives the engine + retry loop.
+        Any ``webhook_url`` is already baked into ``composed.agent``.
+        """
+        assert composed.agent is not None
+        agent = composed.agent
+        input_ = composed.input_
+
         workdir, session_id = self._setup.prepare_workdir(
             agent, session_id, workspace_override
         )
         if backend is None and runner_override is not None:
             backend = runner_override
-        if webhook_url is not None:
-            agent = agent.model_copy(update={"webhook_url": webhook_url})
 
-        # ── Prompt / composition resolution (agents domain owns this) ─────
-        composed_prompt = build_prompt(
-            db=self.db,
-            settings=self.settings,
-            agent=agent,
-            input_=input_,
-            variables=variables,
-        )
-        assert composed_prompt.agent is not None
-        agent = composed_prompt.agent
-        input_ = composed_prompt.input_
-        composed = composed_prompt.to_composed_state()
-        _prompt_snapshot_entries = composed_prompt.snapshot_entries
+        composed_state = composed.to_composed_state()
+        _prompt_snapshot_entries = composed.snapshot_entries
         # Prefer the run-requested workspace (same source prepare_workdir used
         # for the workdir); fall back to the agent's bound workspace.
         _ws_from_agent = agent.workspace if agent.workspace != "<ephemeral>" else None
@@ -141,8 +137,20 @@ class RunExecutor:
                 ),
             )
 
+        # Execution's complete input contract — composed prompt (built at run
+        # creation) + the resolved dispatch statics. Assembled once here.
+        spec = RunSpec(
+            composed=composed,
+            engine_name=effective.backend or backend or "",
+            input_=input_,
+            workdir=workdir,
+            timeout_seconds=int(
+                effective.timeout_seconds or agent.runner.timeout_seconds
+            ),
+        )
+
         adapter, rendered = self._setup.select_backend(
-            agent, workdir, backend, runner_config=effective, composed=composed
+            agent, spec.workdir, backend, runner_config=effective, composed=composed_state
         )
 
         # ── Workspace materialization + run_dir creation ──────────────────
@@ -182,7 +190,7 @@ class RunExecutor:
         _build = self._workspaces.build(
             _wsid,
             into=run_dir,
-            system_prompt=composed.system if composed else None,
+            system_prompt=composed_state.system if composed_state else None,
             extra_mcp_servers=_extra_mcp or None,
         )
         _workspace_snapshot_entries = _build.snapshot_entries
@@ -228,7 +236,7 @@ class RunExecutor:
         init_run(
             run_id=run_id, agent=agent, db=self.db,
             settings=self.settings, adapter=adapter, rendered=rendered,
-            composed=composed_prompt, input_=input_,
+            composed=spec.composed, input_=spec.input_,
             transcript_path=transcript_path,
             _snapshots=self._snapshots, _setup=self._setup,
             effective=effective,
@@ -239,7 +247,7 @@ class RunExecutor:
             timeout_override=timeout_seconds,
             workspace_id=_workspace_id,
             resource_snapshot_entries=_resource_snapshot_entries,
-            prepared_composed_result=composed_prompt.composition_result,
+            prepared_composed_result=spec.composed.composition_result,
             variables=variables,
         )
 
@@ -256,7 +264,7 @@ class RunExecutor:
             agent=agent, input_=input_, workdir=workdir, run_dir=run_dir,
             transcript_path=transcript_path,
             db=self.db, settings=self.settings,
-            effective=effective, composed=composed_prompt,
+            effective=effective, composed=spec.composed,
             step_loop=self._step_loop, finalizer=self._finalizer,
             _run_loop=_run_loop,
             broadcasters=self._broadcasters,

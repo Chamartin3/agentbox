@@ -5,6 +5,7 @@ from __future__ import annotations
 import json as _json
 import logging
 
+from agentbox.core.agents import build_prompt
 from agentbox.core.db import AgentDefManager, AgentMetaManager
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.service.agents.crud import resolve_agent
@@ -66,13 +67,21 @@ async def create_run(
                 "migrate to 'variables' with 'user_message'",
                 agent.id,
             )
+        if webhook_url is not None:
+            agent = agent.model_copy(update={"webhook_url": webhook_url})
+        composed = build_prompt(
+            db=executor.db,
+            settings=executor.settings,
+            agent=agent,
+            input_=input_,
+            variables=None,
+        )
         run_id = await executor.execute(
-            agent,
-            input_,
+            composed,
+            variables=None,
             session_id=session_id,
             workspace_override=workspace,
             timeout_seconds=timeout_seconds,
-            webhook_url=webhook_url,
             runner_override=runner,
             backend=backend,
             runner_profile=runner_profile,
@@ -83,14 +92,21 @@ async def create_run(
     if variables is None:
         raise InvalidRunInput("either 'input' or 'variables' must be provided")
 
+    if webhook_url is not None:
+        agent = agent.model_copy(update={"webhook_url": webhook_url})
+    composed = build_prompt(
+        db=executor.db,
+        settings=executor.settings,
+        agent=agent,
+        input_="",
+        variables=variables,
+    )
     run_id = await executor.execute(
-        agent,
-        "",
+        composed,
         variables=variables,
         session_id=session_id,
         workspace_override=workspace,
         timeout_seconds=timeout_seconds,
-        webhook_url=webhook_url,
         runner_override=runner,
         backend=backend,
         runner_profile=runner_profile,
@@ -129,9 +145,15 @@ async def rerun(
         except Exception:
             variables = None
 
+    composed = build_prompt(
+        db=executor.db,
+        settings=executor.settings,
+        agent=agent,
+        input_=rec.input or "",
+        variables=variables,
+    )
     new_id = await executor.execute(
-        agent,
-        rec.input or "",
+        composed,
         variables=variables,
         session_id=None,
         workspace_override=None,

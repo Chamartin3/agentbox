@@ -20,6 +20,7 @@ from typing import Any, cast
 
 import pytest
 from agentbox.core.data import AgentDef
+from agentbox.core.config import load_settings
 from agentbox.core.db.database import Database
 from agentbox.core.service.execution.service import ExecutionService
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable, RunExecutor
@@ -38,13 +39,19 @@ from agentbox.core.service.execution import (
 
 
 class _FakeExecutor:
-    def __init__(self, run_id: str = "new-run-id") -> None:
+    def __init__(self, db=None, settings=None, run_id: str = "new-run-id") -> None:
         self._run_id = run_id
         self.calls: list[dict[str, Any]] = []
         self.cancelled: list[str] = []
+        # create_run composes the prompt via build_prompt(db, settings) before
+        # dispatch, so the stub carries a real db/settings.
+        self.db = db
+        self.settings = settings
 
-    async def execute(self, agent, input_, **kwargs):
-        self.calls.append({"agent_id": agent.id, "input": input_, **kwargs})
+    async def execute(self, composed, **kwargs):
+        self.calls.append(
+            {"agent_id": composed.agent.id, "input": composed.input_, **kwargs}
+        )
         return self._run_id
 
     async def cancel_run(self, run_id: str) -> bool:
@@ -113,18 +120,18 @@ async def test_create_run_raises_invalid_when_no_input_or_variables(
 
 async def test_create_run_dispatches_legacy_input(store: Database) -> None:
     _seed_agent(store)
-    ex = _FakeExecutor()
+    ex = _FakeExecutor(store, load_settings())
     result = await runs_service.create_run(
         "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, ex), input_="hi"
     )
     assert result == {"run_id": "new-run-id", "agent": "alpha"}
     assert ex.calls[0]["input"] == "hi"
-    assert "variables" not in ex.calls[0]
+    assert ex.calls[0]["variables"] is None
 
 
 async def test_create_run_dispatches_with_variables(store: Database) -> None:
     _seed_agent(store)
-    ex = _FakeExecutor()
+    ex = _FakeExecutor(store, load_settings())
     await runs_service.create_run(
         "alpha", agent_defs=store.agent_defs, agent_meta=store.agent_meta, executor=cast(RunExecutor, ex), variables={"k": "v"}
     )
