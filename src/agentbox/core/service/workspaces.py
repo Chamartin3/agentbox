@@ -65,7 +65,7 @@ from agentbox.core.workspaces.tooling.catalog import resolve_host_env_callables,
 from agentbox.core.workspaces.tooling.catalog import resolve_mcp_callables
 from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
-from agentbox.core.service.system.service import SystemService
+from agentbox.core.service.system import SystemService
 from agentbox.core.workspaces import BuildResult, Workspaces
 from agentbox.core.workspaces.compose import WorkspaceComposer
 from agentbox.core.data.workenv import (

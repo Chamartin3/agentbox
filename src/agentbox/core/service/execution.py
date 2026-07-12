@@ -59,7 +59,7 @@ from agentbox.core.data.conversation.transcript import TranscriptSource
 from agentbox.core.service.agents.crud import resolve_agent
 from agentbox.core.service.agents.prompts import AgentNotFound
 from agentbox.core.service.base import Service
-from agentbox.core.service.evaluation.service import EvaluationService
+from agentbox.core.service.evaluation import EvaluationService
 
 logger = logging.getLogger(__name__)
 

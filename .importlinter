@@ -337,7 +337,7 @@ ignore_imports =
     agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.schema
     agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.database
     agentbox.core.service.agents.crud -> agentbox.core.db.schema
-    agentbox.core.service.lifecycle.startup -> agentbox.core.db.database
+    agentbox.core.service.lifecycle -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
     agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.database
     agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.system.config
@@ -350,7 +350,7 @@ ignore_imports =
     agentbox.core.engines.defaults -> agentbox.core.db.system.config
     agentbox.core.execution.observability.snapshot.mcp -> agentbox.core.db.system.config
     agentbox.core.resources -> agentbox.core.db.resources.models
-    agentbox.core.service.lifecycle.startup -> agentbox.core.db.engines.seeds
+    agentbox.core.service.lifecycle -> agentbox.core.db.engines.seeds
     agentbox.core.workspaces.compose -> agentbox.core.db.system.config
 
 

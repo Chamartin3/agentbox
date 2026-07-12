@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_workspace_service
 from agentbox.core.data.rows import HostEnvProfileRow
 from agentbox.core.service import WorkspaceService
-from agentbox.core.service.system.service import SystemService
+from agentbox.core.service.system import SystemService
 from agentbox.core.tools import CAPABILITIES
 
 router = APIRouter(tags=["host-env-provisioning"])

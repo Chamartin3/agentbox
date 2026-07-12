@@ -61,7 +61,7 @@ from agentbox.core.engines.credentials import (
 )
 from agentbox.core.engines.providers.registry import ProviderAdapter
 from agentbox.core.service.base import Service
-from agentbox.core.service.evaluation.service import EvaluationService
+from agentbox.core.service.evaluation import EvaluationService
 
 logger = logging.getLogger(__name__)
 

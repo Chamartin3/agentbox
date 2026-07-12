@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from agentbox.core.service.evaluation import since_iso
-from agentbox.core.service.evaluation.service import EvaluationService
+from agentbox.core.service.evaluation import EvaluationService
 from agentbox.core.service.execution import ExecutionService
 
 

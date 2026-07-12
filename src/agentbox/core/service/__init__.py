@@ -115,21 +115,20 @@ from agentbox.core.service.agents.lifecycle import soft_delete_agent as soft_del
 from agentbox.core.service.execution import ExecutionService as ExecutionService
 
 # ── Evaluation service (plan 093 — analytics) ──────────────────────────
-from agentbox.core.service.evaluation.service import EvaluationService as EvaluationService
+from agentbox.core.service.evaluation import EvaluationService as EvaluationService
 
 # ── Engines service (plan 091) ─────────────────────────────────────────
 from agentbox.core.service.engines import EngineService as EngineService
 
 # ── System service ────────────────────────────────────────────────────
-from agentbox.core.service.system.service import SystemService as SystemService
+from agentbox.core.service.system import SystemService as SystemService
 
 # ── Resources service (plan 090) ────────────────────────────────────────
 from agentbox.core.service.resources import ResourceService as ResourceService
 
-# ── Agent / system admin free functions (per-domain admin.py) ──
+# ── Agent admin free functions (per-domain admin.py) ──
 from agentbox.core.service.agents.admin import replace_version_config as replace_version_config
 from agentbox.core.service.agents.admin import update_agent_meta as update_agent_meta
-from agentbox.core.service.system.admin import list_host_env_calls_for_run as list_host_env_calls_for_run
 
 # ── Workspace ─────────────────────────────────────────────────────────
 from agentbox.core.workspaces.workdir import WorkspaceInfo as WorkspaceInfo

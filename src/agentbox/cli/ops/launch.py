@@ -25,7 +25,7 @@ from agentbox.core.config import Settings  # TODO(cli-arch): Settings (plan 095)
 from agentbox.core.data.constants import RunnerKind  # TODO(cli-arch): RunnerKind export (plan 095)
 from agentbox.core.service import AgentDef, WorkspaceService  # TODO(cli-arch): facade export (plan 095)
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
-from agentbox.core.service.system.service import SystemService
+from agentbox.core.service.system import SystemService
 # TODO(cli-arch): launch/shell orchestration → Workspace/Execution Service (plans 089/095)
 from agentbox.core.workspaces.tooling.mcp import McpRegistry
 
