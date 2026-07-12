@@ -11,29 +11,47 @@ is the surface.
 
 ponytail: increment 1 exposes the meta/lifecycle/comments/ratings cluster.
 Remaining surface (versions, prompts, grants, sync) is added as those
-mixins are ported off ``SessionStore``.
-"""
+mixins are ported off ``SessionStore``."""
 from __future__ import annotations
 
 import difflib
 import hashlib
 import json
+import json as _json
 import logging
+import types
 import uuid
-from typing import Any, cast
-
-from agentbox.core.agents import build_agent_snapshot, build_config_json_str
 from agentbox.core.agents import (
     PreviewError as PreviewError,
     render_agent_prompt_preview as _render_agent_prompt_preview,
 )
-from agentbox.core.agents import build_config_json_payload, available_tools, effective_tools, resolve_engine
-from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
+from agentbox.core.agents import (
+    build_agent_snapshot,
+    build_config_json_str,
+)
+from agentbox.core.agents import PromptDoc
+from agentbox.core.agents import PromptError as PromptError
+from agentbox.core.agents import build_config_json_payload
+from agentbox.core.agents import available_tools, effective_tools, resolve_engine
+from agentbox.core.agents import compose_from_source, load_bundle_from_bindings
+from agentbox.core.agents import engine_load_failure as backend_load_failure
+from agentbox.core.agents import list_engines
+from agentbox.core.agents.versioning import prompts as _prompts
+from agentbox.core.config import Settings
 from agentbox.core.config import load_settings
-from agentbox.core.data.constants import SessionMode
+from agentbox.core.data import (
+    AgentAlreadyExists,
+    AgentDef,
+    AgentNotFound,
+    AgentVersionRow,
+    DuplicateVersionFile,
+    VersionFileNotFound,
+    VersionFileUploadRow,
+    VersionNotDraft,
+    VersionNotFound,
+)
 from agentbox.core.data import (
     AgentConfigEventRow,
-    AgentDef,
     AgentDiffResult,
     AgentMetaRow,
     AgentSyncRow,
@@ -42,47 +60,1562 @@ from agentbox.core.data import (
     AgentVersionCommentRow,
     AgentVersionFileRow,
     AgentVersionRatingRow,
-    AgentVersionRow,
     JsonDiffResult,
     PromptBindingSpec,
     PromptPreviewResult,
     PromptVersionRow,
-    VersionFileUploadRow,
     _AgentMetaFields,
     _AgentMetaPatchFields,
     _AgentSyncPatchFields,
     _AgentToolGrantPatchFields,
     _AgentVersionFields,
 )
-from agentbox.core.data.payload_types import ToolInfo
+from agentbox.core.data import AgentServiceError
 from agentbox.core.data import CanonicalTool
 from agentbox.core.data._util import now_iso
-from agentbox.core.service.agents.crud import (
-    get_agent_detail as _get_agent_detail_free,
-    list_agents_enriched as _list_agents_enriched_free,
-    resolve_agent as _resolve_agent_free,
+from agentbox.core.data.constants import SessionMode
+from agentbox.core.data.constants import ValidatorKind
+from agentbox.core.data.payload_types import (
+    HttpValidatorView,
+    ScriptValidatorView,
+    ValidationView,
 )
-from agentbox.core.service.agents.prompt_patch import (
-    AgentServiceError as AgentServiceError,
-    _apply_patch_to_agent,
-    _validate_runner_against_registry,
-    decode_config_json as _decode_config_json_free,
+from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult, PromptVersionSummary
+from agentbox.core.data.payload_types import ToolInfo
+from agentbox.core.db import (
+    ActiveAgentVersionManager,
+    AgentDefManager,
+    AgentMetaManager,
+    AgentToolGrantManager,
+    AgentVersionCommentManager,
+    AgentVersionManager,
+    AgentVersionRatingManager,
+    PromptVersionManager,
 )
-from agentbox.core.service.agents.prompt_validation import (
-    _validators_view,
-    normalize_validator_entries as _normalize_validator_entries_free,
+from agentbox.core.db import (
+    AgentSyncManager,
 )
-from agentbox.core.service.agents.versions import (
-    AgentAlreadyExists as AgentAlreadyExists,
-    AgentNotFound as AgentNotFound,
-    DuplicateVersionFile as DuplicateVersionFile,
-    VersionFileNotFound as VersionFileNotFound,
-    VersionNotDraft as VersionNotDraft,
-    VersionNotFound as VersionNotFound,
+from agentbox.core.db import (
+    AgentPromptResourceBindingManager,
+    AgentVersionFileManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
 )
+from agentbox.core.db.schema import agent_runner_profiles
+from agentbox.core.db.schema import runs as runs_table
 from agentbox.core.service.base import Service
+from agentbox.core.service.engines import EngineService
+from agentbox.core.workspaces import workdir as ws
+from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
+from pathlib import Path
+from sqlalchemy import func, select
+from sqlalchemy.engine import Engine
+from typing import Any
+from typing import cast
+
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_agent(
+    agent_id: str,
+    *,
+    agent_defs: AgentDefManager,
+) -> AgentDef | None:
+    return agent_defs.get(agent_id)
+
+
+def list_all_agents(
+    *,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    include_disabled: bool = False,
+) -> list[AgentDef]:
+    rows = agent_versions.list_latest_per_agent()
+    hidden: set[str] = set()
+    hidden |= agent_meta.agent_ids_with_deleted()
+    if not include_disabled:
+        hidden |= agent_meta.agent_ids_with_disabled()
+    out: list[AgentDef] = []
+    for row in rows:
+        if row.get("agent_id") in hidden:
+            continue
+        try:
+            agent = AgentDef.from_db_row(row)
+        except ValueError:
+            continue
+        except Exception:
+            logger.exception(
+                "list_all_agents: snapshot for %r v%s failed validation",
+                row.get("agent_id"),
+                row.get("version"),
+            )
+            continue
+        out.append(agent)
+    return out
+
+
+def _aggregate_run_metadata(
+    engine: Engine,
+) -> tuple[dict[str, int], dict[str, str], dict[str, str]]:
+    run_counts: dict[str, int] = {}
+    last_run_at: dict[str, str] = {}
+    profile_bindings: dict[str, str] = {}
+    try:
+        with engine.connect() as conn:
+            for agent_id, n, last in conn.execute(
+                select(
+                    runs_table.c.agent_id,
+                    func.count().label("n"),
+                    func.max(runs_table.c.created_at).label("last"),
+                ).group_by(runs_table.c.agent_id)
+            ):
+                if agent_id:
+                    run_counts[agent_id] = int(n)
+                    if last:
+                        last_run_at[agent_id] = str(last)
+            for agent_id, profile_id in conn.execute(
+                select(
+                    agent_runner_profiles.c.agent_id,
+                    agent_runner_profiles.c.runner_profile_id,
+                )
+            ):
+                profile_bindings[agent_id] = profile_id
+    except Exception:
+        logger.exception(
+            "list_agents_enriched: failed to load run counts / profile bindings"
+        )
+    return run_counts, last_run_at, profile_bindings
+
+
+def _strip_legacy_runner_model(dumped: dict) -> dict:
+    if isinstance(dumped.get("runner"), dict):
+        dumped["runner"] = {k: v for k, v in dumped["runner"].items() if k != "model"}
+    return dumped
+
+
+def _enrich_agent(
+    agent: AgentDef,
+    *,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    settings: Settings,
+    run_counts: dict[str, int],
+    last_run_at: dict[str, str],
+    profile_bindings: dict[str, str],
+) -> dict:
+    try:
+        # ponytail: pass None for WorkspaceLookupStore — ws.resolve_path gracefully
+        # falls back to settings-based path when no workspace row lookup is available.
+        workspace_str = str(ws.resolve_path(agent, settings, None)[0])
+    except Exception:
+        workspace_str = ""
+    active = agent_versions.get_active(agent.id)
+    latest = agent_versions.get_latest(agent.id)
+    dumped = _strip_legacy_runner_model(agent.model_dump())
+    profile_id = profile_bindings.get(agent.id)
+    profile = None
+    if profile_id:
+        try:
+            profile = EngineService().get_profile(profile_id)
+        except Exception:
+            profile = None
+    data = {
+        **dumped,
+        "resolved_workspace": workspace_str,
+        "run_count": run_counts.get(agent.id, 0),
+        "last_run_at": last_run_at.get(agent.id),
+        "runner_profile_id": profile_id,
+        "model": profile.model if profile else None,
+        "model_provider": profile.provider if profile else None,
+    }
+    if latest is not None:
+        data["updated_at"] = latest.get("created_at")
+        data["version"] = active["version"] if active else latest.get("version")
+    data["last_activity_at"] = max(
+        (t for t in (data.get("updated_at"), data.get("last_run_at")) if t),
+        default=None,
+    )
+    meta = agent_meta.get_meta(agent.id) or {}
+    data["disabled_at"] = meta.get("disabled_at")
+    return data
+
+
+def list_agents_enriched(
+    *,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    engine: Engine,
+    settings: Settings,
+    include_disabled: bool = False,
+) -> list[dict]:
+    run_counts, last_run_at, profile_bindings = _aggregate_run_metadata(engine)
+    return [
+        _enrich_agent(
+            agent,
+            agent_versions=agent_versions,
+            agent_meta=agent_meta,
+            settings=settings,
+            run_counts=run_counts,
+            last_run_at=last_run_at,
+            profile_bindings=profile_bindings,
+        )
+        for agent in list_all_agents(
+            agent_versions=agent_versions,
+            agent_meta=agent_meta,
+            include_disabled=include_disabled,
+        )
+    ]
+
+
+def get_agent_detail(
+    agent_id: str,
+    *,
+    agent_defs: AgentDefManager,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    agent_version_comments: AgentVersionCommentManager,
+    agent_version_ratings: AgentVersionRatingManager,
+    resources: ResourceManager,
+    resource_versions: ResourceVersionManager,
+    resource_blobs: ResourceBlobManager,
+    agent_version_files: AgentVersionFileManager,
+    agent_prompt_resource_bindings: AgentPromptResourceBindingManager,
+    settings: Settings,
+) -> dict | None:
+    agent = resolve_agent(agent_id, agent_defs=agent_defs)
+    if agent is None:
+        return None
+    # ponytail: pass None — ws.resolve_path falls back to settings-based path.
+    workspace_path, ephemeral = ws.resolve_path(agent, settings, None)
+
+    latest_row = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
+    prompt = ""
+    db_prompt = (latest_row or {}).get("prompt_content")
+    if isinstance(db_prompt, str) and db_prompt:
+        prompt = db_prompt
+    elif agent.prompt_path:
+        try:
+            prompt = agent.load_prompt(settings.project_root)
+        except FileNotFoundError:
+            prompt = ""
+
+    composed_system: str | None = None
+    composed_user: str | None = None
+    try:
+        # Build a duck-typed shim for load_bundle_from_bindings (store: Any)
+        _store = types.SimpleNamespace(
+            list_prompt_bindings=lambda aid: agent_prompt_resource_bindings.list_for_agent(aid),
+            get_repo_resource=lambda rid: resources.get_resource(rid),
+            get_active_repo_version=lambda rid: resource_versions.get_active_version(rid),
+            get_repo_version=lambda vid: resource_versions.get_version(vid),
+            iter_repo_blobs=lambda vid: resource_blobs.iter_blobs(vid),
+            get_active_version=lambda aid: agent_versions.get_active(aid),
+            latest_version=lambda aid: agent_versions.get_latest(aid),
+            list_version_files=lambda vid: agent_version_files.list_for_version(vid),
+        )
+        bundle = load_bundle_from_bindings(agent_id=agent_id, store=_store)
+        if bundle.source is None:
+            raise FileNotFoundError("agent has no composition source")
+        result = compose_from_source(bundle.source, variables={}, render=False)
+        composed_system = result.system
+        composed_user = result.user
+    except FileNotFoundError:
+        logger.info(
+            "get_agent_detail: no system slot binding for %r; preview empty",
+            agent_id,
+        )
+    except Exception:
+        logger.exception(
+            "get_agent_detail: composition preview failed for %r", agent_id
+        )
+
+    versions = agent_versions.list_for_agent(agent_id)
+    enriched_versions = []
+    for v in versions:
+        comments = agent_version_comments.list_for_version(v["id"])
+        rating = agent_version_ratings.latest_for_version(v["id"])
+        enriched_versions.append(
+            {
+                "id": v["id"],
+                "version": v["version"],
+                "author": v["author"],
+                "changelog": v["changelog"],
+                "is_legacy": v["is_legacy"],
+                "created_at": v["created_at"],
+                "has_comments": len(comments) > 0,
+                "rating": rating["rating"] if rating else None,
+                "config_json": v.get("config_json"),
+            }
+        )
+
+    agent_dump = _strip_legacy_runner_model(agent.model_dump())
+    bound_profile = EngineService().get_agent_runner_profile(agent_id)
+    return {
+        "agent": agent_dump,
+        "prompt": prompt,
+        "composed_system": composed_system,
+        "composed_user": composed_user,
+        "runner_profile_id": bound_profile.id if bound_profile else None,
+        "model": bound_profile.model if bound_profile else None,
+        "model_provider": bound_profile.provider if bound_profile else None,
+        "workspace": {
+            "path": str(workspace_path),
+            "ephemeral": ephemeral,
+            "generated_configs": {},
+        },
+        "current_version": latest_row["version"] if latest_row else None,
+        "versions": enriched_versions,
+        "disabled_at": (agent_meta.get_meta(agent_id) or {}).get("disabled_at"),
+    }
+
+
+def _version_config_hash(config_json: dict) -> str:
+    return hashlib.sha256(
+        _json.dumps(config_json, sort_keys=True).encode()
+    ).hexdigest()
+
+
+def _refresh_meta(
+    agent_meta: AgentMetaManager,
+    agent_id: str,
+    *,
+    sync_mode: str,
+    export_to_disk: bool,
+    source_path: str | None,
+    source_format: str | None,
+    clear_deleted: bool,
+) -> None:
+    now = now_iso()
+    if agent_meta.get_meta(agent_id) is not None:
+        values: dict = {
+            "sync_mode": sync_mode,
+            "export_to_disk": int(export_to_disk),
+            "source_path": source_path,
+            "source_format": source_format,
+            "updated_at": now,
+        }
+        if clear_deleted:
+            values["deleted_at"] = None
+        agent_meta.patch(agent_id, **values)
+    else:
+        agent_meta.insert(
+            agent_id=agent_id,
+            sync_mode=sync_mode,
+            export_to_disk=int(export_to_disk),
+            source_path=source_path,
+            source_format=source_format,
+            created_at=now,
+            updated_at=now,
+        )
+
+
+def create_agent_record(
+    *,
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    agent_id: str,
+    description: str,
+    runner: Any,
+    prompt: str | None,
+    composition: Any,
+    tools: list[str] | None,
+    tags: list[str] | None,
+    workspace: Any,
+    session_mode: Any,
+    webhook_url: str | None,
+    author: str,
+    changelog: str,
+) -> AgentVersionRow:
+    agent_def = AgentDef(
+        id=agent_id,
+        description=description,
+        runner=runner,
+        prompt=prompt,
+        composition=composition,
+        tools=tools or [],
+        tags=tags or [],
+        workspace=workspace,
+        session_mode=cast(SessionMode, session_mode or "headless"),
+        webhook_url=webhook_url,
+        source_path=None,
+        source_format=None,
+    )
+    config_payload = {
+        **agent_def.model_dump(mode="json", exclude_none=True),
+        **build_config_json_payload(agent_def),
+    }
+
+    # is_agent_deleted: check meta row
+    meta = agent_meta.get_meta(agent_id)
+    is_deleted = bool(meta and meta.get("deleted_at"))
+
+    if is_deleted:
+        # add_agent_version: append a new version, clear deleted_at
+        latest = agent_versions.get_latest(agent_id)
+        next_v = (latest.get("version") or 0) + 1 if latest else 1
+        vid = agent_versions.insert_version(
+            agent_id=agent_id,
+            version=next_v,
+            source_path=None or "",
+            source_format=None or "",
+            content_snapshot="",
+            prompt_snapshot="",
+            content_hash=_version_config_hash(config_payload),
+            author=author,
+            changelog=changelog,
+            is_legacy=0,
+            created_at=now_iso(),
+            config_json=_json.dumps(config_payload, sort_keys=True),
+            prompt_content=prompt,
+            source="ui",
+        )
+        _refresh_meta(
+            agent_meta, agent_id,
+            sync_mode="off", export_to_disk=False,
+            source_path=None, source_format=None,
+            clear_deleted=True,
+        )
+        result = agent_versions.get_by_id(vid)
+        assert result is not None
+        return result
+    try:
+        # create_agent: v1, no existence
+        if agent_versions.exists_for_agent(agent_id):
+            raise ValueError(f"Agent {agent_id!r} already exists")
+        vid = agent_versions.insert_version(
+            agent_id=agent_id,
+            version=1,
+            source_path=None or "",
+            source_format=None or "",
+            content_snapshot="",
+            prompt_snapshot="",
+            content_hash=_version_config_hash(config_payload),
+            author=author,
+            changelog=changelog,
+            is_legacy=0,
+            created_at=now_iso(),
+            config_json=_json.dumps(config_payload, sort_keys=True),
+            prompt_content=prompt,
+            source="ui",
+        )
+        _refresh_meta(
+            agent_meta, agent_id,
+            sync_mode="off", export_to_disk=False,
+            source_path=None, source_format=None,
+            clear_deleted=False,
+        )
+        result = agent_versions.get_by_id(vid)
+        assert result is not None
+        return result
+    except ValueError as exc:
+        raise AgentAlreadyExists(str(exc)) from exc
+
+
+def upload_version_file(
+    *,
+    agent_versions: AgentVersionManager,
+    agent_version_files: AgentVersionFileManager,
+    agent_id: str,
+    version: int,
+    kind: str,
+    name: str,
+    content: str,
+) -> VersionFileUploadRow:
+    version_record = agent_versions.get_by_number(agent_id, version)
+    if version_record is None:
+        raise VersionNotFound(f"version {version} not found")
+    active = agent_versions.get_active(agent_id)
+    if active is not None and active["id"] == version_record["id"]:
+        raise VersionNotDraft("cannot modify active version")
+
+    sha256_hash = hashlib.sha256(content.encode()).hexdigest()
+    files = agent_version_files.list_for_version(version_record["id"])
+    for f in files:
+        if f.get("sha256") == sha256_hash:
+            raise DuplicateVersionFile("duplicate_sha256")
+        if f.get("relative_path") == name:
+            raise DuplicateVersionFile("duplicate_path")
+
+    agent_version_files.insert_files(
+        version_record["id"],
+        [
+            {
+                "relative_path": name,
+                "kind": kind,
+                "content": content,
+                "sha256": sha256_hash,
+            }
+        ],
+    )
+    files = agent_version_files.list_for_version(version_record["id"])
+    inserted = next((f for f in files if f.get("sha256") == sha256_hash), None)
+    if inserted is None:
+        raise RuntimeError("file_insert_failed")
+    return {"file": inserted, "sha256": sha256_hash, "size": len(content)}
+
+
+def delete_version_file(
+    *,
+    agent_versions: AgentVersionManager,
+    agent_version_files: AgentVersionFileManager,
+    agent_id: str,
+    version: int,
+    file_id: int,
+) -> None:
+    version_record = agent_versions.get_by_number(agent_id, version)
+    if version_record is None:
+        raise VersionNotFound(f"version {version} not found")
+    active = agent_versions.get_active(agent_id)
+    if active is not None and active["id"] == version_record["id"]:
+        raise VersionNotDraft("not_draft")
+    files = agent_version_files.list_for_version(version_record["id"])
+    if not any(f.get("id") == file_id for f in files):
+        raise VersionFileNotFound(f"file {file_id} not found")
+    agent_version_files.delete_file(file_id)
+
+
+def require_agent_exists(agent_id: str, *, agent_defs: AgentDefManager) -> None:
+    if agent_defs.get(agent_id) is not None:
+        return
+    raise AgentNotFound(agent_id)
+
+
+def _resolve_or_raise(
+    agent_id: str,
+    *,
+    agent_defs: AgentDefManager,
+) -> AgentDef:
+    """DB-first resolution. Raises ``AgentNotFound`` when missing."""
+    agent = agent_defs.get(agent_id)
+    if agent is None:
+        raise AgentNotFound(agent_id)
+    return agent
+
+
+def get_prompt(
+    agent_id: str,
+    *,
+    agent_defs: AgentDefManager,
+    agent_versions: AgentVersionManager,
+    prompt_versions: PromptVersionManager,
+    project_root: Path,
+) -> PromptDoc:
+    """Return the active prompt document for an agent."""
+    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    return _prompts.read_versioned(agent, project_root, agent_versions, prompt_versions)
+
+
+def list_versions(
+    agent_id: str,
+    *,
+    agent_defs: AgentDefManager,
+    prompt_versions: PromptVersionManager,
+) -> PromptVersionListResult:
+    """Return the version-list payload for the prompt-versions endpoint."""
+    _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    versions = prompt_versions.list_for_agent(agent_id)
+    committed = [v for v in versions if not v["is_draft"]]
+    drafts = [v for v in versions if v["is_draft"]]
+    version_summaries: list[PromptVersionSummary] = [
+        PromptVersionSummary(
+            version=v["version"],
+            is_draft=bool(v["is_draft"]),
+            created_at=v["created_at"],
+            author=v["author"],
+            changelog=v["changelog"],
+            size=len(v["content"].encode("utf-8")),
+        )
+        for v in versions
+    ]
+    return PromptVersionListResult(
+        agent_id=agent_id,
+        active_version=committed[0]["version"] if committed else None,
+        draft_version=drafts[0]["version"] if drafts else None,
+        versions=version_summaries,
+    )
+
+
+def get_version(
+    agent_id: str,
+    version: int,
+    *,
+    agent_defs: AgentDefManager,
+    prompt_versions: PromptVersionManager,
+) -> PromptVersionDetail | None:
+    """Return a single prompt version payload, or ``None`` if missing."""
+    _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    v = prompt_versions.get_by_number(agent_id, version)
+    if v is None:
+        return None
+    return PromptVersionDetail(
+        version=v["version"],
+        is_draft=bool(v["is_draft"]),
+        created_at=v["created_at"],
+        author=v["author"],
+        changelog=v["changelog"],
+        content=v["content"],
+        size=len(v["content"].encode("utf-8")),
+    )
+
+
+def put_prompt(
+    agent_id: str,
+    content: str,
+    *,
+    agent_defs: AgentDefManager,
+    prompt_versions: PromptVersionManager,
+    project_root: Path,
+    author: str = "api",
+) -> PromptDoc:
+    """Write prompt to disk and capture a new version when changed."""
+    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    doc = _prompts.write(agent, project_root, content)
+    # Replicate sync_prompt_from_disk: no-op if content matches latest committed.
+    new_hash = hashlib.sha256(content.encode()).hexdigest()
+    latest = prompt_versions.get_latest_committed(agent_id)
+    if latest is not None:
+        existing_hash = latest.get("content_hash") or hashlib.sha256(
+            latest["content"].encode()
+        ).hexdigest()
+        if existing_hash != new_hash:
+            prompt_versions.insert_committed(
+                agent_id,
+                content=content,
+                content_hash=new_hash,
+                author=author,
+                changelog="Out-of-band file edit",
+                created_at=now_iso(),
+                delete_drafts=False,
+            )
+    else:
+        prompt_versions.insert_committed(
+            agent_id,
+            content=content,
+            content_hash=new_hash,
+            author=author,
+            changelog="Imported from disk",
+            created_at=now_iso(),
+            delete_drafts=False,
+        )
+    return doc
+
+
+def save_draft(
+    agent_id: str,
+    content: str,
+    *,
+    agent_defs: AgentDefManager,
+    prompt_versions: PromptVersionManager,
+    author: str = "system",
+) -> PromptDoc:
+    """Save a draft prompt version for an agent."""
+    _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    return _prompts.save_draft(agent_id, prompt_versions, content, author=author)
+
+
+def publish(
+    agent_id: str,
+    *,
+    agent_defs: AgentDefManager,
+    prompt_versions: PromptVersionManager,
+    project_root: Path,
+    changelog: str = "",
+    author: str = "system",
+) -> PromptDoc:
+    """Publish the current draft and sync the committed body to disk."""
+    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    return _prompts.publish(
+        agent_id,
+        prompt_versions,
+        project_root,
+        agent=agent,
+        changelog=changelog,
+        author=author,
+    )
+
+
+def rollback(
+    agent_id: str,
+    target_version: int,
+    *,
+    agent_defs: AgentDefManager,
+    prompt_versions: PromptVersionManager,
+    project_root: Path,
+    author: str = "system",
+) -> PromptDoc:
+    """Roll back to a previous committed version and sync to disk."""
+    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    return _prompts.rollback(
+        agent_id,
+        prompt_versions,
+        project_root,
+        target_version=target_version,
+        agent=agent,
+        author=author,
+    )
+
+
+_FORBIDDEN_PATCH_KEYS = {"id"}
+
+
+def decode_config_json(raw: Any) -> dict:
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = _json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
+    out = dict(agent_dump)
+    for k, v in patch.items():
+        if k in _FORBIDDEN_PATCH_KEYS:
+            continue
+        if k == "runner" and isinstance(v, dict):
+            base = dict(out.get("runner") or {})
+            base.update({rk: rv for rk, rv in v.items() if rv is not None})
+            out["runner"] = base
+        elif k == "composition" and isinstance(v, dict):
+            base = dict(out.get("composition") or {})
+            base.update({ck: cv for ck, cv in v.items() if cv is not None})
+            out["composition"] = base
+        else:
+            out[k] = v
+    return out
+
+
+def _validate_runner_against_registry(agent: AgentDef) -> None:
+    kind = agent.runner.kind
+    name = kind
+    loaded = list_engines()
+    if name in loaded:
+        return
+    failure = backend_load_failure(name)
+    if failure is not None:
+        raise AgentServiceError(
+            400,
+            "backend_unloadable",
+            (
+                f"runner.kind={name!r} is declared but failed to load "
+                f"at startup ({failure})."
+            ),
+        )
+    raise AgentServiceError(
+        400,
+        "backend_unknown",
+        (
+            f"runner.kind={name!r} has no backend installed. "
+            f"Registered: {sorted(loaded.keys())}."
+        ),
+    )
+
+
+def patch_agent_config(
+    *,
+    agent_defs: AgentDefManager,
+    agent_versions: AgentVersionManager,
+    active_agent_versions: ActiveAgentVersionManager,
+    agent_sync: AgentSyncManager,
+    settings: Any,
+    agent_id: str,
+    patch: dict,
+) -> AgentDef:
+    if not patch:
+        raise AgentServiceError(400, "empty_patch", "empty patch")
+
+    current = resolve_agent(agent_id, agent_defs=agent_defs)
+    if current is None:
+        raise AgentServiceError(404, "unknown_agent", agent_id)
+
+    merged = _apply_patch_to_agent(current.model_dump(mode="python"), patch)
+    try:
+        updated = AgentDef.model_validate(merged)
+    except Exception as exc:
+        raise AgentServiceError(400, "validation_failed", str(exc)) from exc
+    _validate_runner_against_registry(updated)
+    updated.source_path = current.source_path
+    updated.source_format = current.source_format
+
+    prompt_text = ""
+    if updated.prompt_path:
+        try:
+            prompt_text = updated.load_prompt(settings.project_root)
+        except FileNotFoundError:
+            prompt_text = ""
+    snapshot = build_agent_snapshot(updated)
+    config_json = build_config_json_str(updated)
+
+    active_row = agent_versions.get_active(agent_id)
+
+    prior_cfg = decode_config_json((active_row or {}).get("config_json"))
+    new_cfg = _json.loads(config_json)
+    for direction in ("input", "output"):
+        prior_section = prior_cfg.get(direction)
+        if not isinstance(prior_section, dict) or "validators" not in prior_section:
+            continue
+        section = new_cfg.get(direction)
+        if not isinstance(section, dict):
+            section = {}
+        section.setdefault("validators", prior_section["validators"])
+        new_cfg[direction] = section
+    config_json = _json.dumps(new_cfg)
+
+    carried_prompt_content = (
+        (active_row or {}).get("prompt_content") or prompt_text or None
+    )
+    carried_prompt_snapshot = (
+        prompt_text or (active_row or {}).get("prompt_snapshot") or ""
+    )
+
+    try:
+        vid = agent_versions.insert_version(
+            agent_id=updated.id,
+            version=agent_versions.next_version(updated.id),
+            source_path=str(updated.source_path) if updated.source_path else "",
+            source_format=(
+                updated.source_format.value if updated.source_format else "unknown"
+            ),
+            content_snapshot=snapshot,
+            prompt_snapshot=carried_prompt_snapshot,
+            content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
+            author="api:patch",
+            changelog=f"patch: {', '.join(sorted(patch))}",
+            config_json=config_json,
+            prompt_content=carried_prompt_content,
+            is_legacy=0,
+            created_at=now_iso(),
+            source="api",
+        )
+        new_version = agent_versions.get_by_id(vid)
+        assert new_version is not None
+    except Exception as exc:
+        logger.exception("patch_agent_config: DB write failed for %r", agent_id)
+        raise AgentServiceError(500, "db_write_failed", agent_id) from exc
+
+    try:
+        active_agent_versions.set_pointer(updated.id, int(new_version["id"]), now_iso())
+    except Exception as exc:
+        logger.exception(
+            "patch_agent_config: activate_version failed for %r", agent_id
+        )
+        raise AgentServiceError(500, "activate_failed", agent_id) from exc
+
+    # upsert_agent_sync
+    now = now_iso()
+    proxy_path = str(updated.source_path) if updated.source_path else None
+    if agent_sync.get_row(updated.id) is None:
+        agent_sync.insert(
+            agent_id=updated.id,
+            proxy_path=proxy_path,
+            sync_mode="manual",
+            sync_policy="db_wins",
+            last_file_hash=None,
+            last_file_mtime=None,
+            last_sync_at=now,
+        )
+    else:
+        patch_values: dict = {"last_sync_at": now}
+        if proxy_path is not None:
+            patch_values["proxy_path"] = proxy_path
+        agent_sync.patch(updated.id, **patch_values)
+
+    return updated
+
+
+def normalize_validator_entries(direction: str, entries: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for i, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise AgentServiceError(
+                400,
+                "invalid_validator",
+                f"{direction}.validators[{i}] must be an object",
+            )
+        kind = entry.get("kind", "http")
+        try:
+            ValidatorKind.coerce(kind, label="validator kind")
+        except ValueError:
+            raise AgentServiceError(
+                400,
+                "invalid_validator",
+                (
+                    f"{direction}.validators[{i}].kind={kind!r} — must be "
+                    f"one of {ValidatorKind.values()}. The jsonschema validator is "
+                    "implicit from the schema binding and must not be "
+                    "listed here."
+                ),
+            )
+        desc = entry.get("description", "") or ""
+        if not isinstance(desc, str):
+            raise AgentServiceError(
+                400,
+                "invalid_validator",
+                f"{direction}.validators[{i}].description must be a string",
+            )
+        if kind == "http":
+            endpoint = entry.get("endpoint")
+            if not isinstance(endpoint, str) or not endpoint:
+                raise AgentServiceError(
+                    400,
+                    "invalid_validator",
+                    f"{direction}.validators[{i}]: http requires a non-empty endpoint",
+                )
+            out.append(
+                {
+                    "kind": "http",
+                    "endpoint": endpoint,
+                    "timeout_seconds": int(entry.get("timeout_seconds", 5)),
+                    "description": desc,
+                }
+            )
+        else:  # script
+            rid = entry.get("resource_id")
+            if not isinstance(rid, str) or not rid:
+                raise AgentServiceError(
+                    400,
+                    "invalid_validator",
+                    (
+                        f"{direction}.validators[{i}]: script requires "
+                        "resource_id (pointing at a repo_resource of type='script')"
+                    ),
+                )
+            pinned = entry.get("pinned_version_id")
+            if pinned is not None and not isinstance(pinned, str):
+                raise AgentServiceError(
+                    400,
+                    "invalid_validator",
+                    (
+                        f"{direction}.validators[{i}]: script.pinned_version_id "
+                        "must be a string or null"
+                    ),
+                )
+            row: dict = {"kind": "script", "resource_id": rid, "description": desc}
+            if pinned:
+                row["pinned_version_id"] = pinned
+            out.append(row)
+    return out
+
+
+def _validators_view(cfg: dict, direction: str) -> ValidationView | None:
+    section = cfg.get(direction)
+    if not isinstance(section, dict):
+        return None
+    entries = section.get("validators")
+    if not isinstance(entries, list) or not entries:
+        return None
+    cleaned: list[HttpValidatorView | ScriptValidatorView] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            ValidatorKind.coerce(entry.get("kind", ""), label="validator kind")
+        except ValueError:
+            continue
+        cleaned.append(cast(HttpValidatorView | ScriptValidatorView, dict(entry)))
+    if not cleaned:
+        return None
+    return {"validators": cleaned}
+
+
+def get_agent_validation(
+    agent_versions: AgentVersionManager,
+    agent_id: str,
+) -> AgentValidationResult:
+    active = agent_versions.get_active(agent_id)
+    if not active or active.get("id") is None:
+        return {
+            "agent_id": agent_id,
+            "agent_version_id": None,
+            "input": None,
+            "output": None,
+        }
+    cfg = decode_config_json(active.get("config_json"))
+    return {
+        "agent_id": agent_id,
+        "agent_version_id": int(active["id"]),
+        "input": _validators_view(cfg, "input"),
+        "output": _validators_view(cfg, "output"),
+    }
+
+
+def put_agent_validation(
+    *,
+    agent_defs: AgentDefManager,
+    agent_versions: AgentVersionManager,
+    active_agent_versions: ActiveAgentVersionManager,
+    settings: Any,
+    agent_id: str,
+    input_validators: list[dict] | None,
+    output_validators: list[dict] | None,
+    reason: str,
+    actor: str | None,
+) -> AgentValidationResult:
+    current = resolve_agent(agent_id, agent_defs=agent_defs)
+    if current is None:
+        raise AgentServiceError(404, "unknown_agent", agent_id)
+
+    explicit: dict[str, list[dict]] = {}
+    if input_validators is not None:
+        explicit["input"] = normalize_validator_entries("input", input_validators)
+    if output_validators is not None:
+        explicit["output"] = normalize_validator_entries("output", output_validators)
+    if not explicit:
+        raise AgentServiceError(
+            400, "empty_validation_patch", "supply input and/or output"
+        )
+
+    active = agent_versions.get_active(current.id) or {}
+    base_cfg = decode_config_json(active.get("config_json"))
+    for direction, validators in explicit.items():
+        section = base_cfg.get(direction)
+        if not isinstance(section, dict):
+            section = {}
+        section["validators"] = validators
+        base_cfg[direction] = section
+    new_config_json = _json.dumps(base_cfg)
+
+    prompt_text = ""
+    if current.prompt_path:
+        try:
+            prompt_text = current.load_prompt(settings.project_root)
+        except FileNotFoundError:
+            prompt_text = ""
+    snapshot = build_agent_snapshot(current)
+    carried_prompt_content = (
+        active.get("prompt_content")
+        or (current.prompt or "").strip()
+        or prompt_text
+        or None
+    )
+
+    try:
+        vid = agent_versions.insert_version(
+            agent_id=current.id,
+            version=agent_versions.next_version(current.id),
+            source_path=str(current.source_path) if current.source_path else "",
+            source_format=(
+                current.source_format.value if current.source_format else "unknown"
+            ),
+            content_snapshot=snapshot,
+            prompt_snapshot=prompt_text,
+            content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
+            author=actor or "api:validation",
+            changelog=f"validation: {reason}",
+            config_json=new_config_json,
+            prompt_content=carried_prompt_content,
+            is_legacy=0,
+            created_at=now_iso(),
+            source="api",
+        )
+        new_version = agent_versions.get_by_id(vid)
+        assert new_version is not None
+    except Exception as exc:
+        logger.exception("put_agent_validation: create_version failed for %r", agent_id)
+        raise AgentServiceError(500, "db_write_failed", agent_id) from exc
+
+    try:
+        active_agent_versions.set_pointer(current.id, int(new_version["id"]), now_iso())
+    except Exception as exc:
+        logger.exception(
+            "put_agent_validation: activate_version failed for %r", agent_id
+        )
+        raise AgentServiceError(500, "activate_failed", agent_id) from exc
+
+    return get_agent_validation(agent_versions, agent_id)
+
+
+def replace_version_config(
+    agent_versions: AgentVersionManager, version_id: int, config_json: str
+) -> None:
+    """Replace the config_json payload on an agent version."""
+    agent_versions.patch(version_id, config_json=config_json)
+
+
+def update_agent_meta(
+    agent_meta: AgentMetaManager,
+    agent_id: str,
+    *,
+    sync_mode: str | None = None,
+    export_to_disk: bool | None = None,
+    source_path: str | None = None,
+    source_format: str | None = None,
+) -> AgentMetaRow | None:
+    """Update agent metadata fields."""
+    if agent_meta.get_meta(agent_id) is None:
+        return None
+    values: dict = {"updated_at": now_iso()}
+    if sync_mode is not None:
+        values["sync_mode"] = sync_mode
+    if export_to_disk is not None:
+        values["export_to_disk"] = int(export_to_disk)
+    if source_path is not None:
+        values["source_path"] = source_path
+    if source_format is not None:
+        values["source_format"] = source_format
+    agent_meta.patch(agent_id, **values)
+    return agent_meta.get_meta(agent_id)
+
+
+def _lc_text_diff(a: str, b: str) -> str:
+    if a == b:
+        return ""
+    return "".join(
+        difflib.unified_diff(
+            a.splitlines(keepends=True), b.splitlines(keepends=True), lineterm=""
+        )
+    )
+
+
+def _lc_json_diff(a: str, b: str) -> JsonDiffResult:
+    try:
+        obj_a = json.loads(a) if a else {}
+        obj_b = json.loads(b) if b else {}
+    except json.JSONDecodeError:
+        return {"from": a, "to": b, "note": "invalid JSON"}
+    return {
+        "added": {k: obj_b[k] for k in obj_b if k not in obj_a},
+        "removed": {k: obj_a[k] for k in obj_a if k not in obj_b},
+        "changed": {
+            k: {"from": obj_a[k], "to": obj_b[k]}
+            for k in obj_a
+            if k in obj_b and obj_a[k] != obj_b[k]
+        },
+    }
+
+
+def soft_delete_agent(
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    active_agent_versions: ActiveAgentVersionManager,
+    agent_id: str,
+) -> AgentMetaRow | None:
+    """Soft-delete an agent. Returns None if not found."""
+    if not agent_versions.exists_for_agent(agent_id):
+        return None
+    now = now_iso()
+    if agent_meta.get_meta(agent_id) is not None:
+        agent_meta.patch(agent_id, deleted_at=now, updated_at=now)
+    else:
+        agent_meta.insert(
+            agent_id=agent_id,
+            sync_mode="off",
+            export_to_disk=0,
+            source_path=None,
+            source_format=None,
+            created_at=now,
+            updated_at=now,
+            deleted_at=now,
+        )
+    active_agent_versions.delete_for_agent(agent_id)
+    return agent_meta.get_meta(agent_id)
+
+
+def branch_draft(
+    agent_versions: AgentVersionManager,
+    agent_id: str,
+    *,
+    author: str,
+) -> AgentVersionRow:
+    """Create a new draft version by cloning the active version."""
+    active = agent_versions.get_active(agent_id)
+    if active is None:
+        raise ValueError(f"No active version for agent {agent_id}")
+    vid = agent_versions.insert_version(
+        copy_files_from=active["id"],
+        agent_id=agent_id,
+        version=agent_versions.next_version(agent_id),
+        source_path=active.get("source_path") or "",
+        source_format=active.get("source_format") or "",
+        content_snapshot=active.get("content_snapshot") or "",
+        prompt_snapshot=active.get("prompt_snapshot") or "",
+        content_hash=active.get("content_hash") or "",
+        author=author,
+        changelog=f"branched from v{active['version']}",
+        is_legacy=0,
+        created_at=now_iso(),
+        config_json=active.get("config_json"),
+        prompt_content=active.get("prompt_content"),
+        source=active.get("source", "ui"),
+    )
+    result = agent_versions.get_by_id(vid)
+    assert result is not None
+    return result
+
+
+def publish_version(
+    agent_versions: AgentVersionManager,
+    agent_tool_grants: AgentToolGrantManager,
+    active_agent_versions: ActiveAgentVersionManager,
+    agent_id: str,
+    version: int,
+    reason: str,
+) -> AgentVersionRow:
+    """Publish a draft version (set as active)."""
+    if not reason or len(reason) < 3:
+        raise ValueError("reason must be at least 3 characters")
+    row = agent_versions.get_by_number(agent_id, version)
+    if row is None:
+        raise ValueError(f"version {version} not found for agent {agent_id}")
+    version_id = row["id"]
+    old = row.get("changelog") or ""
+    values: dict = {"changelog": f"{old}\n\npublish: {reason}" if old else reason}
+    try:
+        values["resolved_tool_grants"] = sorted(
+            {r["tool_name"] for r in agent_tool_grants.list_for_agent(agent_id)}
+        )
+    except Exception:
+        pass
+    agent_versions.patch(version_id, **values)
+    active_agent_versions.set_pointer(agent_id, version_id, now_iso())
+    result = agent_versions.get_by_number(agent_id, version)
+    assert result is not None
+    return result
+
+
+def rollback_to(
+    agent_versions: AgentVersionManager,
+    active_agent_versions: ActiveAgentVersionManager,
+    agent_id: str,
+    target_version: int,
+    reason: str,
+    *,
+    author: str,
+) -> AgentVersionRow:
+    """Roll back to a previous agent version (creates a new version)."""
+    if not reason or len(reason) < 3:
+        raise ValueError("reason must be at least 3 characters")
+    target = agent_versions.get_by_number(agent_id, target_version)
+    if target is None:
+        raise ValueError(f"target_version {target_version} not found for agent {agent_id}")
+    latest = agent_versions.get_latest(agent_id)
+    next_v = (latest.get("version") or 0) + 1 if latest else 1
+    new_vid = agent_versions.insert_version(
+        copy_files_from=target["id"],
+        agent_id=agent_id,
+        version=next_v,
+        source_path=target.get("source_path") or "",
+        source_format=target.get("source_format") or "",
+        content_snapshot=target.get("content_snapshot") or "",
+        prompt_snapshot=target.get("prompt_snapshot") or "",
+        content_hash=target.get("content_hash") or "",
+        author=author,
+        changelog=f"rollback to v{target_version}: {reason}",
+        is_legacy=0,
+        created_at=now_iso(),
+        config_json=target.get("config_json"),
+        prompt_content=target.get("prompt_content"),
+        source=target.get("source", "ui"),
+    )
+    active_agent_versions.set_pointer(agent_id, new_vid, now_iso())
+    result = agent_versions.get_by_id(new_vid)
+    assert result is not None
+    return result
+
+
+def get_agent_def(agent_defs: AgentDefManager, agent_id: str) -> AgentDef | None:
+    """Get the resolved agent definition."""
+    return agent_defs.get(agent_id)
+
+
+def latest_version(agent_versions: AgentVersionManager, agent_id: str) -> AgentVersionRow | None:
+    """Get latest version row for an agent."""
+    return agent_versions.get_latest(agent_id)
+
+
+def get_active_version(agent_versions: AgentVersionManager, agent_id: str) -> AgentVersionRow | None:
+    """Get the currently active version for an agent."""
+    return agent_versions.get_active(agent_id)
+
+
+def get_agent_version(
+    agent_versions: AgentVersionManager, agent_id: str, version: int
+) -> AgentVersionRow | None:
+    """Get a specific version by number."""
+    return agent_versions.get_by_number(agent_id, version)
+
+
+def list_agent_versions(
+    agent_versions: AgentVersionManager, agent_id: str
+) -> list[AgentVersionRow]:
+    """List all versions for an agent."""
+    return agent_versions.list_for_agent(agent_id)
+
+
+def create_agent(
+    agent_versions: AgentVersionManager,
+    agent_meta: AgentMetaManager,
+    agent_id: str,
+    config_json: dict,
+    *,
+    prompt_content: str | None = None,
+    author: str,
+    changelog: str,
+    source: str = "cli",
+    source_path: str | None = None,
+    source_format: str | None = None,
+    sync_mode: str = "off",
+    export_to_disk: bool = False,
+) -> AgentVersionRow:
+    """Create a new agent record."""
+    if agent_versions.exists_for_agent(agent_id):
+        raise ValueError(f"Agent {agent_id!r} already exists")
+    config_hash = hashlib.sha256(
+        json.dumps(config_json, sort_keys=True).encode()
+    ).hexdigest()
+    vid = agent_versions.insert_version(
+        agent_id=agent_id,
+        version=1,
+        source_path=source_path or "",
+        source_format=source_format or "",
+        content_snapshot="",
+        prompt_snapshot="",
+        content_hash=config_hash,
+        author=author,
+        changelog=changelog,
+        is_legacy=0,
+        created_at=now_iso(),
+        config_json=json.dumps(config_json, sort_keys=True),
+        prompt_content=prompt_content,
+        source=source,
+    )
+    _refresh_meta(
+        agent_meta,
+        agent_id,
+        sync_mode=sync_mode,
+        export_to_disk=export_to_disk,
+        source_path=source_path,
+        source_format=source_format,
+        clear_deleted=False,
+    )
+    result = agent_versions.get_by_id(vid)
+    assert result is not None
+    return result
+
+
+def create_version(
+    agent_versions: AgentVersionManager,
+    agent_id: str,
+    source_path: str,
+    source_format: str,
+    content_snapshot: str,
+    prompt_snapshot: str,
+    content_hash: str,
+    author: str = "system",
+    changelog: str = "",
+    files: list[dict] | None = None,
+    config_json: str | None = None,
+    prompt_content: str | None = None,
+    source: str = "cli",
+) -> AgentVersionRow:
+    """Create a new agent version record."""
+    vid = agent_versions.insert_version(
+        files=files or None,
+        agent_id=agent_id,
+        version=agent_versions.next_version(agent_id),
+        source_path=source_path,
+        source_format=source_format,
+        content_snapshot=content_snapshot,
+        prompt_snapshot=prompt_snapshot,
+        content_hash=content_hash,
+        author=author,
+        changelog=changelog,
+        is_legacy=0,
+        created_at=now_iso(),
+        config_json=config_json,
+        prompt_content=prompt_content,
+        source=source,
+    )
+    result = agent_versions.get_by_id(vid)
+    assert result is not None
+    return result
+
+
+def get_prompt_version(
+    prompt_versions: PromptVersionManager, agent_id: str, version: int
+) -> PromptVersionRow | None:
+    """Get a specific prompt version."""
+    return prompt_versions.get_by_number(agent_id, version)
+
+
+def list_agent_tool_grants(
+    agent_tool_grants: AgentToolGrantManager,
+    agent_id: str,
+    *,
+    include_revoked: bool = False,
+) -> list[AgentToolGrantRow]:
+    """List tool grants for an agent."""
+    return agent_tool_grants.list_for_agent(agent_id, include_revoked=include_revoked)
+
+
+def grant_agent_tool(
+    agent_tool_grants: AgentToolGrantManager,
+    agent_id: str,
+    tool_name: str,
+    changelog: str,
+    *,
+    actor: str | None = None,
+) -> AgentToolGrantRow:
+    """Grant tool access to an agent."""
+    if len(changelog.strip()) < 3:
+        raise ValueError("changelog must be at least 3 characters")
+    now = now_iso()
+    fields: dict = {
+        "changelog": changelog,
+        "granted_at": now,
+        "granted_by": actor,
+        "revoked_at": None,
+        "revoked_by": None,
+        "revoke_changelog": None,
+    }
+    existing = agent_tool_grants.get_grant(agent_id, tool_name)
+    if existing is None:
+        agent_tool_grants.insert(
+            id=str(uuid.uuid4()), agent_id=agent_id, tool_name=tool_name, **fields
+        )
+    else:
+        agent_tool_grants.update_by_id(existing["id"], **fields)
+    row = agent_tool_grants.get_grant(agent_id, tool_name)
+    assert row is not None
+    return row
+
+
+def revoke_agent_tool(
+    agent_tool_grants: AgentToolGrantManager,
+    agent_id: str,
+    tool_name: str,
+    changelog: str,
+    *,
+    actor: str | None = None,
+) -> None:
+    """Revoke tool access from an agent."""
+    agent_tool_grants.revoke_active(
+        agent_id, tool_name, revoked_at=now_iso(), revoked_by=actor, revoke_changelog=changelog
+    )
+
+
+def get_rating(
+    agent_version_ratings: AgentVersionRatingManager, version_id: int
+) -> AgentVersionRatingRow | None:
+    """Get the rating row for a version."""
+    return agent_version_ratings.latest_for_version(version_id)
+
+
+def list_comments(
+    agent_version_comments: AgentVersionCommentManager, version_id: int
+) -> list[AgentVersionCommentRow]:
+    """List comments for a version."""
+    return agent_version_comments.list_for_version(version_id)
+
+
+def add_comment(
+    agent_version_comments: AgentVersionCommentManager,
+    version_id: int,
+    author: str,
+    body: str,
+) -> AgentVersionCommentRow:
+    """Add a comment to a version."""
+    agent_version_comments.insert(
+        version_id=version_id, author=author, body=body, created_at=now_iso()
+    )
+    comment = agent_version_comments.latest_for_version(version_id)
+    assert comment is not None
+    return comment
+
+
+def set_rating(
+    agent_version_ratings: AgentVersionRatingManager,
+    version_id: int,
+    rating: int,
+    rater: str,
+) -> AgentVersionRatingRow:
+    """Set the rating for a version."""
+    if not (1 <= rating <= 5):
+        raise ValueError(f"rating must be 1-5, got {rating}")
+    agent_version_ratings.insert(
+        version_id=version_id, rating=rating, rater=rater, rated_at=now_iso()
+    )
+    result = agent_version_ratings.latest_for_version(version_id)
+    assert result is not None
+    return result
+
+
+def diff_versions(
+    agent_versions: AgentVersionManager,
+    agent_id: str,
+    a: int,
+    b: int,
+) -> AgentDiffResult:
+    """Diff two agent versions."""
+    va = agent_versions.get_by_number(agent_id, a)
+    vb = agent_versions.get_by_number(agent_id, b)
+    if va is None or vb is None:
+        raise ValueError(f"version not found: {a if va is None else b}")
+    return {
+        "from_version": a,
+        "to_version": b,
+        "prompt_diff": _lc_text_diff(va["prompt_snapshot"], vb["prompt_snapshot"]),
+        "content_diff": _lc_json_diff(va["content_snapshot"], vb["content_snapshot"]),
+    }
+
+
+def save_prompt_revision(
+    agent_versions: AgentVersionManager,
+    active_agent_versions: ActiveAgentVersionManager,
+    agent_id: str,
+    *,
+    prompt_content: str,
+    author: str = "cli",
+    changelog: str = "",
+    activate: bool = False,
+) -> AgentVersionRow:
+    """Save a prompt revision for an agent (creates a new version)."""
+    active = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
+    if active is None:
+        raise ValueError(f"No version to clone for agent {agent_id}")
+    cloned_config = active.get("config_json")
+    if cloned_config:
+        try:
+            cfg_dict = (
+                json.loads(cloned_config)
+                if isinstance(cloned_config, str)
+                else dict(cloned_config)
+            )
+            cfg_dict["prompt"] = prompt_content
+            cloned_config = json.dumps(cfg_dict)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    now = now_iso()
+    vid = agent_versions.insert_version(
+        copy_files_from=active["id"],
+        activate_for=agent_id if activate else None,
+        activated_at=now if activate else None,
+        agent_id=agent_id,
+        version=agent_versions.next_version(agent_id),
+        source_path=active.get("source_path") or "",
+        source_format=active.get("source_format") or "",
+        content_snapshot=active.get("content_snapshot") or "",
+        prompt_snapshot=prompt_content,
+        content_hash="",
+        author=author,
+        changelog=changelog or f"prompt edit from v{active['version']}",
+        is_legacy=0,
+        created_at=now,
+        config_json=cloned_config,
+        prompt_content=prompt_content,
+        source=active.get("source", "ui"),
+    )
+    result = agent_versions.get_by_id(vid)
+    assert result is not None
+    return result
+
 
 _VALID_FILE_KINDS = {
     "system",
@@ -1577,3 +3110,12 @@ class AgentService(Service):
             agent_prompt_resource_bindings=self._db.agent_prompt_resource_bindings,
             settings=settings or load_settings(),
         )
+
+
+# Internal aliases preserved from the pre-merge service.py, which imported
+# these helpers under private names to disambiguate from same-named methods.
+_decode_config_json_free = decode_config_json
+_resolve_agent_free = resolve_agent
+_list_agents_enriched_free = list_agents_enriched
+_get_agent_detail_free = get_agent_detail
+_normalize_validator_entries_free = normalize_validator_entries

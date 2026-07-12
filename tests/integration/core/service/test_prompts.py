@@ -13,9 +13,9 @@ from pathlib import Path
 import pytest
 from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
-from agentbox.core.service.agents import prompts as prompts_service
-from agentbox.core.service.agents.prompts import AgentNotFound
-from agentbox.core.service.agents.service import AgentService
+import agentbox.core.service.agents as prompts_service
+from agentbox.core.service.agents import AgentNotFound
+from agentbox.core.service.agents import AgentService
 
 
 def _seed_agent_with_prompt(

@@ -17,7 +17,7 @@ from agentbox.core.data.events import DoneEvent, RunEvent
 from agentbox.core.data import AgentDef
 from agentbox.core.engines.backends.base import BackendAdapter
 from agentbox.core.data import RenderedConfig
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 from fastapi.testclient import TestClient
 
 

@@ -56,8 +56,8 @@ from agentbox.core.execution.observability.conversation import get as _get_conve
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.execution.orchestrate.setup import NoBackendAvailable
 from agentbox.core.data.conversation.transcript import TranscriptSource
-from agentbox.core.service.agents.crud import resolve_agent
-from agentbox.core.service.agents.prompts import AgentNotFound
+from agentbox.core.service.agents import resolve_agent
+from agentbox.core.service.agents import AgentNotFound
 from agentbox.core.service.base import Service
 from agentbox.core.service.evaluation import EvaluationService
 

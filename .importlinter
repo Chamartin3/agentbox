@@ -29,7 +29,7 @@ ignore_imports =
     # whole-module namespace import of the prompt-doc CRUD module (read/
     # write/publish/rollback accessed as prompts.<fn>) — not a symbol the
     # facade can re-export; the module is the unit.
-    agentbox.core.service.agents.prompts -> agentbox.core.agents.versioning.prompts
+    agentbox.core.service.agents -> agentbox.core.agents.versioning.prompts
 
 
 # ─── Interface boundary ──────────────────────────────────────────────────
@@ -336,7 +336,7 @@ ignore_imports =
     agentbox.core.execution.orchestrate.executor -> agentbox.core.db.database
     agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.schema
     agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.database
-    agentbox.core.service.agents.crud -> agentbox.core.db.schema
+    agentbox.core.service.agents -> agentbox.core.db.schema
     agentbox.core.service.lifecycle -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
     agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.database

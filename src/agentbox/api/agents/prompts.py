@@ -13,8 +13,8 @@ from pydantic import BaseModel
 
 from agentbox.api.deps import get_db, get_settings
 from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult
-from agentbox.core.service.agents import prompts as prompts_service
-from agentbox.core.service.agents.prompts import AgentNotFound, PromptError
+import agentbox.core.service.agents as prompts_service
+from agentbox.core.service.agents import AgentNotFound, PromptError
 
 router = APIRouter(prefix="/api", tags=["prompts"])
 

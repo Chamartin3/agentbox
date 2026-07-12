@@ -16,7 +16,7 @@ from agentbox.core.agents import RuntimeConfig
 from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
 from agentbox.core.service.agents import resolve_agent
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 
 def _seed_agent(store: Database, agent_id: str, kind: str = "token") -> None:

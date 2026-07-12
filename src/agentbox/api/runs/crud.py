@@ -30,7 +30,7 @@ from agentbox.core.data.payload_types import (
 )
 from agentbox.core.data.rows import RunCommentRow, RunStatsRow
 from agentbox.core.service import read_transcript, NoBackendAvailable
-from agentbox.core.service.agents.prompts import AgentNotFound
+from agentbox.core.service.agents import AgentNotFound
 from agentbox.core.service.execution import ExecutionService, no_backend_detail as _svc_no_backend_detail
 from agentbox.core.data import AgentDisabled, InvalidRunInput, RunNotFound
 

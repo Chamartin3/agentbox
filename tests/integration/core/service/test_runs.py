@@ -14,7 +14,7 @@ from agentbox.core.db.database import Database
 from agentbox.core.execution.orchestrate.executor import NoBackendAvailable, RunExecutor
 import agentbox.core.service.execution as runs_service
 from agentbox.core.service.execution import ExecutionService
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 from agentbox.core.service.execution import (
     AgentNotFound,
     InvalidRunInput,

@@ -16,7 +16,7 @@ import pytest
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 
 def _make_settings(tmp_path: Path) -> Settings:

@@ -19,7 +19,7 @@ import warnings
 import agentbox.api.deps as deps
 import pytest
 from agentbox.api.app import create_app
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 from fastapi.testclient import TestClient
 
 # resolve_agent serializes session_mode back as a str default, which trips

@@ -23,7 +23,7 @@ from agentbox.cli.shared.deps import (
     get_db as _get_store,
 )
 from agentbox.core.data import AgentDef, RunnerSpec
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 runner = CliRunner()
 

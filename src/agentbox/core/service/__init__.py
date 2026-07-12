@@ -85,31 +85,31 @@ from agentbox.core.execution.observability.conversation import get as get_conver
 from agentbox.core.agents import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
 
 # ── Cross-cutting agents service ──────────────────────────────────────
-from agentbox.core.service.agents.service import AgentService as AgentService
+from agentbox.core.service.agents import AgentService as AgentService
 from agentbox.core.service.agents import build_agent_snapshot as build_agent_snapshot
 from agentbox.core.service.agents import list_all_agents as list_all_agents
 from agentbox.core.service.agents import resolve_agent as resolve_agent
-from agentbox.core.service.agents.lifecycle import add_comment as add_version_comment  # noqa: F401
-from agentbox.core.service.agents.lifecycle import branch_draft as branch_agent_draft  # noqa: F401
-from agentbox.core.service.agents.lifecycle import create_agent as create_agent
-from agentbox.core.service.agents.lifecycle import create_version as create_agent_version  # noqa: F401
-from agentbox.core.service.agents.lifecycle import diff_versions as diff_agent_versions  # noqa: F401
-from agentbox.core.service.agents.lifecycle import get_active_version as get_active_agent_version  # noqa: F401
-from agentbox.core.service.agents.lifecycle import get_agent_def as get_agent_def
-from agentbox.core.service.agents.lifecycle import get_prompt_version as get_prompt_version
-from agentbox.core.service.agents.lifecycle import get_rating as get_version_rating  # noqa: F401
-from agentbox.core.service.agents.lifecycle import get_version as get_agent_version  # noqa: F401
-from agentbox.core.service.agents.lifecycle import grant_agent_tool as grant_agent_tool
-from agentbox.core.service.agents.lifecycle import latest_version as latest_agent_version  # noqa: F401
-from agentbox.core.service.agents.lifecycle import list_agent_tool_grants as list_agent_tool_grants
-from agentbox.core.service.agents.lifecycle import list_comments as list_version_comments  # noqa: F401
-from agentbox.core.service.agents.lifecycle import list_versions as list_agent_versions  # noqa: F401
-from agentbox.core.service.agents.lifecycle import publish_version as publish_agent_version  # noqa: F401
-from agentbox.core.service.agents.lifecycle import revoke_agent_tool as revoke_agent_tool
-from agentbox.core.service.agents.lifecycle import rollback_to as rollback_agent_to  # noqa: F401
-from agentbox.core.service.agents.lifecycle import save_prompt_revision as save_prompt_revision
-from agentbox.core.service.agents.lifecycle import set_rating as set_version_rating  # noqa: F401
-from agentbox.core.service.agents.lifecycle import soft_delete_agent as soft_delete_agent
+from agentbox.core.service.agents import add_comment as add_version_comment  # noqa: F401
+from agentbox.core.service.agents import branch_draft as branch_agent_draft  # noqa: F401
+from agentbox.core.service.agents import create_agent as create_agent
+from agentbox.core.service.agents import create_version as create_agent_version  # noqa: F401
+from agentbox.core.service.agents import diff_versions as diff_agent_versions  # noqa: F401
+from agentbox.core.service.agents import get_active_version as get_active_agent_version  # noqa: F401
+from agentbox.core.service.agents import get_agent_def as get_agent_def
+from agentbox.core.service.agents import get_prompt_version as get_prompt_version
+from agentbox.core.service.agents import get_rating as get_version_rating  # noqa: F401
+from agentbox.core.service.agents import get_agent_version as get_agent_version  # noqa: F401
+from agentbox.core.service.agents import grant_agent_tool as grant_agent_tool
+from agentbox.core.service.agents import latest_version as latest_agent_version  # noqa: F401
+from agentbox.core.service.agents import list_agent_tool_grants as list_agent_tool_grants
+from agentbox.core.service.agents import list_comments as list_version_comments  # noqa: F401
+from agentbox.core.service.agents import list_agent_versions as list_agent_versions  # noqa: F401
+from agentbox.core.service.agents import publish_version as publish_agent_version  # noqa: F401
+from agentbox.core.service.agents import revoke_agent_tool as revoke_agent_tool
+from agentbox.core.service.agents import rollback_to as rollback_agent_to  # noqa: F401
+from agentbox.core.service.agents import save_prompt_revision as save_prompt_revision
+from agentbox.core.service.agents import set_rating as set_version_rating  # noqa: F401
+from agentbox.core.service.agents import soft_delete_agent as soft_delete_agent
 
 # ── Execution service (plan 088) ───────────────────────────────────────
 from agentbox.core.service.execution import ExecutionService as ExecutionService
@@ -127,8 +127,8 @@ from agentbox.core.service.system import SystemService as SystemService
 from agentbox.core.service.resources import ResourceService as ResourceService
 
 # ── Agent admin free functions (per-domain admin.py) ──
-from agentbox.core.service.agents.admin import replace_version_config as replace_version_config
-from agentbox.core.service.agents.admin import update_agent_meta as update_agent_meta
+from agentbox.core.service.agents import replace_version_config as replace_version_config
+from agentbox.core.service.agents import update_agent_meta as update_agent_meta
 
 # ── Workspace ─────────────────────────────────────────────────────────
 from agentbox.core.workspaces.workdir import WorkspaceInfo as WorkspaceInfo

@@ -4,7 +4,7 @@ import pytest
 from agentbox.core.data import now_iso
 from agentbox.core.db.database import Database
 from agentbox.core.db.schema import agents
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 
 @pytest.fixture

@@ -14,7 +14,7 @@ from agentbox.api.app import create_app
 from agentbox.core.config import load_settings
 from agentbox.core.db.database import get_database
 from agentbox.core.db.schema import agent_versions
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 

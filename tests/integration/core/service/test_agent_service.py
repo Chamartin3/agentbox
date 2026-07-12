@@ -23,7 +23,7 @@ from agentbox.core.service.agents import (
     VersionNotDraft,
     VersionNotFound,
 )
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 
 def _seed_version(db: Database, agent_id: str = "a1", version: int = 1, vid: int = 1) -> int:

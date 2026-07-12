@@ -11,7 +11,7 @@ from agentbox.core.agents.versioning.drift import (
     check_drift,
     startup_sweep,
 )
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 
 def _agent(

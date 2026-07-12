@@ -16,7 +16,7 @@ import agentbox.mcp.deps as mcp_deps
 import pytest
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.db.database import Database
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 from agentbox.mcp.server import build_server
 from fastmcp import Client, FastMCP
 

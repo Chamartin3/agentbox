@@ -64,7 +64,7 @@ from agentbox.core.resources.importers.skill import SkillImporter
 from agentbox.core.resources.importers.upload import UploadImporter
 from agentbox.core.resources.importers.zip import ZipUploadImporter
 from agentbox.core.resources.pydantic_export import schema_to_pydantic
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 from agentbox.core.service.base import Service
 
 

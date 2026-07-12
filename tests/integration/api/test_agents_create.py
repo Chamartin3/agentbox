@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 
 def test_create_agent_happy_path(client: Any) -> None:

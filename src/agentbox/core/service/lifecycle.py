@@ -24,7 +24,7 @@ from agentbox.core.db.database import Database
 from agentbox.core.db.engines.seeds import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.resources.boot import import_repo_resources
-from agentbox.core.service.agents.crud import resolve_agent
+from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.execution import ExecutionService
 from agentbox.core.service.system import SystemService
 from agentbox.core.service.workspaces import WorkspaceService

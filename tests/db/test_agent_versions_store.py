@@ -6,7 +6,7 @@ import pytest
 
 from agentbox.core.data import AgentVersionRow
 from agentbox.core.db.database import Database
-from agentbox.core.service.agents.service import AgentService
+from agentbox.core.service.agents import AgentService
 
 
 @pytest.fixture

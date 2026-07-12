@@ -70,7 +70,7 @@ ALLOWED = {
     # ── plan 109 Phase A debt: core.db.schema allowlist ────────────────────
     # These import schema tables directly; burned by plans 111/112.
     REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "orchestrate" / "init_run.py",
-    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "agents" / "crud.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "agents.py",
 }
 
 PATTERN = re.compile(r"\bfrom\s+agentbox\.core\.db\.[a-z_][a-z_0-9]*\s+import\b")
