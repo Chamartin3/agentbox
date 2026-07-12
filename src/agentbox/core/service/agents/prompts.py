@@ -19,7 +19,7 @@ from pathlib import Path
 
 from agentbox.core.agents.versioning import prompts as _prompts
 from agentbox.core.agents import PromptDoc, PromptError
-from agentbox.core.data import AgentDef
+from agentbox.core.data import AgentDef, AgentNotFound
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult, PromptVersionSummary
 from agentbox.core.db import AgentDefManager, AgentVersionManager, PromptVersionManager
@@ -36,14 +36,6 @@ __all__ = [
     "publish",
     "rollback",
 ]
-
-
-class AgentNotFound(LookupError):
-    """Raised when no ``AgentDef`` can be resolved for ``agent_id``."""
-
-    def __init__(self, agent_id: str) -> None:
-        super().__init__(f"unknown agent {agent_id!r}")
-        self.agent_id = agent_id
 
 
 def _resolve_or_raise(

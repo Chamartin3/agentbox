@@ -16,7 +16,7 @@ from agentbox.core.agents import (
 )
 from agentbox.core.agents import engine_load_failure as backend_load_failure
 from agentbox.core.agents import list_engines
-from agentbox.core.data import AgentDef
+from agentbox.core.data import AgentDef, AgentServiceError
 from agentbox.core.data._util import now_iso
 from agentbox.core.db import (
     ActiveAgentVersionManager,
@@ -29,14 +29,6 @@ from agentbox.core.service.agents.crud import resolve_agent
 logger = logging.getLogger(__name__)
 
 _FORBIDDEN_PATCH_KEYS = {"id"}
-
-
-class AgentServiceError(Exception):
-    def __init__(self, status_code: int, code: str, detail: Any) -> None:
-        super().__init__(f"{code}: {detail}")
-        self.status_code = status_code
-        self.code = code
-        self.detail = detail
 
 
 def decode_config_json(raw: Any) -> dict:

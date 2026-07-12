@@ -11,7 +11,17 @@ from typing import Any, cast
 
 from agentbox.core.agents import build_config_json_payload
 from agentbox.core.data.constants import SessionMode
-from agentbox.core.data import AgentDef, AgentVersionRow, VersionFileUploadRow
+from agentbox.core.data import (
+    AgentAlreadyExists,
+    AgentDef,
+    AgentNotFound,
+    AgentVersionRow,
+    DuplicateVersionFile,
+    VersionFileNotFound,
+    VersionFileUploadRow,
+    VersionNotDraft,
+    VersionNotFound,
+)
 from agentbox.core.data._util import now_iso
 from agentbox.core.db import (
     AgentDefManager,
@@ -19,26 +29,6 @@ from agentbox.core.db import (
     AgentVersionFileManager,
     AgentVersionManager,
 )
-
-
-class AgentAlreadyExists(ValueError):
-    """Raised when create_agent_record is called for an existing agent_id."""
-
-
-class VersionNotFound(LookupError):
-    pass
-
-
-class VersionNotDraft(ValueError):
-    pass
-
-
-class DuplicateVersionFile(ValueError):
-    """Same sha256 or relative_path already attached to the draft version."""
-
-
-class VersionFileNotFound(LookupError):
-    pass
 
 
 def _config_hash(config_json: dict) -> str:
@@ -244,12 +234,6 @@ def delete_version_file(
     if not any(f.get("id") == file_id for f in files):
         raise VersionFileNotFound(f"file {file_id} not found")
     agent_version_files.delete_file(file_id)
-
-
-class AgentNotFound(LookupError):
-    def __init__(self, agent_id: str) -> None:
-        super().__init__(f"unknown agent {agent_id!r}")
-        self.agent_id = agent_id
 
 
 def require_agent_exists(agent_id: str, *, agent_defs: AgentDefManager) -> None:
