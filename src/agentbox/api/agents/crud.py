@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from agentbox.api.deps import get_agent_service, get_engine_service
 from agentbox.api.runs.webhooks import schedule_agent_event_webhook
 from agentbox.core.service import RunnerProfile
-from agentbox.core.service.engines.service import EngineService, ProfileNotFound
+from agentbox.core.service.engines import EngineService, ProfileNotFound
 
 logger = logging.getLogger(__name__)
 

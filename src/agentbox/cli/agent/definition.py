@@ -12,7 +12,7 @@ import typer
 from agentbox.cli.shared import CLIContext, resolve_agent
 # TODO(cli-arch): build_* free-fns — candidate AgentService create_version helpers
 from agentbox.core.service import AgentDef, build_agent_snapshot, build_config_json_payload
-from agentbox.core.service.engines.service import ProfileNotFound
+from agentbox.core.service.engines import ProfileNotFound
 
 
 # TODO(cli-arch): candidate AgentService export/import methods

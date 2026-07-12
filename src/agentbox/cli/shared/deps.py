@@ -55,7 +55,7 @@ from agentbox.core.service import (  # noqa: E402
     EvaluationService,
     SystemService,
 )
-from agentbox.core.service.engines.service import EngineService  # noqa: E402
+from agentbox.core.service.engines import EngineService  # noqa: E402
 from agentbox.core.service.resources import ResourceService  # noqa: E402
 
 

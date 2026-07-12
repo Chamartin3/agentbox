@@ -23,7 +23,7 @@ from agentbox.cli.shared.deps import (
     get_system_service,
 )
 from agentbox.core.service import AgentService, ExecutionService, EvaluationService, SystemService
-from agentbox.core.service.engines.service import EngineService
+from agentbox.core.service.engines import EngineService
 
 
 def test_build_ctx_service_fields(tmp_path: Path, monkeypatch) -> None:

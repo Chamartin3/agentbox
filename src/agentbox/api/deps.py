@@ -57,7 +57,7 @@ def get_system_service() -> SystemService:
 
 def get_engine_service() -> EngineService:
     """TODO: plan 091 — EngineService. Lazy import to avoid circular import."""
-    from agentbox.core.service.engines.service import EngineService  # noqa: PLC0415
+    from agentbox.core.service.engines import EngineService  # noqa: PLC0415
     return EngineService()
 
 

@@ -19,7 +19,7 @@ from agentbox.cli.shared.deps import (
     get_db as _get_store,
 )
 from agentbox.core.data import AgentDef, RunnerProfileCreate, RunnerSpec
-from agentbox.core.service.engines.service import EngineService
+from agentbox.core.service.engines import EngineService
 from agentbox.core.service.agents.service import AgentService
 
 runner = CliRunner()

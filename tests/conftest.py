@@ -44,7 +44,7 @@ from agentbox.core.service import (
     SystemService,
     WorkspaceService,
 )
-from agentbox.core.service.engines.service import EngineService
+from agentbox.core.service.engines import EngineService
 from fastapi.testclient import TestClient
 
 

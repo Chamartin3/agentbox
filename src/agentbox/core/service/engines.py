@@ -17,11 +17,19 @@ emerges.
 from __future__ import annotations
 
 import json as _json
+import logging
 import re
 import uuid
 from typing import Any
 
-from agentbox.core.agents import list_engines, resolve_engine_by_name
+import httpx
+
+from agentbox.core.agents import (
+    engine_load_failure,
+    list_engines,
+    resolve_engine_by_name,
+)
+from agentbox.core.db import RunnerProfileManager
 from agentbox.core.engines.backends import BackendAdapter
 from agentbox.core.data import (
     RunnerProfile,
@@ -29,9 +37,11 @@ from agentbox.core.data import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
+from agentbox.core.data.payload_types import RefreshProvidersResult
 from agentbox.core.tools.registry import SharedToolRegistry, ToolSpec
 from agentbox.core.data._util import now_iso
 from agentbox.core.engines import (
+    EffectiveRunnerConfig,
     ProviderDescriptor,
     ProviderModel,
     get_credential,
@@ -39,17 +49,21 @@ from agentbox.core.engines import (
     list_backends,
     list_credentials,
     list_models,
+    list_models as registry_list_models,
     list_providers,
     refresh_opencode_providers,
 )
-from agentbox.core.engines.credentials import CredentialMethod, load_all as _load_credentials
+from agentbox.core.engines.credentials import (
+    CredentialMethod,
+    CredentialState as CredentialState,
+    Method as Method,
+    load_all as _load_credentials,
+)
 from agentbox.core.engines.providers.registry import ProviderAdapter
 from agentbox.core.service.base import Service
-from agentbox.core.service.engines.profile_validation import validate_create, validate_patch
 from agentbox.core.service.evaluation.service import EvaluationService
 
-# ponytail bridge — temporary until a dedicated providers service emerges.
-from agentbox.core.service.engines.providers import list_provider_models as _free_list_provider_models  # noqa: E402  (ponytail bridge)
+logger = logging.getLogger(__name__)
 
 _load_credentials()  # registers credential methods (backends + providers)
 
@@ -311,10 +325,10 @@ class EngineService(Service):
     ) -> list[ProviderModel]:
         """Resolve config and list models for a provider.
 
-        ponytail: delegates to the free-function while a dedicated providers
-        service is not yet extracted.
+        ponytail: delegates to the module-level ``list_provider_models``
+        while a dedicated providers service is not yet extracted.
         """
-        return await _free_list_provider_models(
+        return await list_provider_models(
             provider_id,
             runner_profiles=self._db.runner_profiles,
             profile_id=profile_id,
@@ -373,3 +387,230 @@ class EngineService(Service):
         than importing the in-process registry directly.
         """
         return SharedToolRegistry.all()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Runner-profile field validators (merged from profile_validation.py).
+# Kept module-level so the ``core.agents`` / ``core.engines`` names they call
+# stay monkeypatchable at ``agentbox.core.service.engines.<name>``.
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class InvalidProfile(ValueError):
+    """Validation rejection for a runner-profile field."""
+
+
+def _validate_backend(backend: str) -> None:
+    try:
+        resolve_engine_by_name(backend)
+    except KeyError as exc:
+        failure = engine_load_failure(backend)
+        if failure is not None:
+            raise InvalidProfile(
+                f"backend {backend!r} is declared but failed to load at startup "
+                f"({failure}). Fix the agentbox install before binding it."
+            ) from exc
+        raise InvalidProfile(
+            f"unknown backend: {backend!r}. Registered: {sorted(list_engines().keys())}."
+        ) from exc
+
+
+def _validate_provider(provider: str | None) -> None:
+    if provider is None:
+        return
+    provider_ids = {p.id for p in list_providers()}
+    if provider not in provider_ids:
+        raise InvalidProfile(f"unknown provider: {provider!r}")
+
+
+def _validate_base_url(base_url: str | None) -> None:
+    if base_url is None:
+        return
+    if not (base_url.startswith("http://") or base_url.startswith("https://")):
+        raise InvalidProfile("base_url must start with http:// or https://")
+
+
+def _validate_api_key_env(api_key_env: str | None) -> None:
+    if api_key_env is None:
+        return
+    if api_key_env.startswith("sk-") or api_key_env.startswith("Bearer "):
+        raise InvalidProfile(
+            "api_key_env looks like a secret value, not an env var name"
+        )
+    if len(api_key_env) > 64:
+        raise InvalidProfile(
+            "api_key_env looks like a secret value, not an env var name"
+        )
+    if not re.match(r"^[A-Z][A-Z0-9_]*$", api_key_env):
+        raise InvalidProfile(
+            "api_key_env must be a valid env var name "
+            "(uppercase letters, digits, underscores)"
+        )
+
+
+def _validate_backend_provider_compat(backend: str, provider: str | None) -> None:
+    if provider is None:
+        return
+    adapter = get_provider(provider)
+    if adapter is None:
+        return
+    compatible = adapter.descriptor.compatible_backends or []
+    if backend not in compatible:
+        raise InvalidProfile(
+            f"provider {provider!r} is not compatible with backend "
+            f"{backend!r} (compatible: {', '.join(compatible) or 'none'})"
+        )
+
+
+def _validate_headers(headers: dict[str, str] | None) -> None:
+    if headers is None:
+        return
+    for key in headers:
+        if key.lower() == "authorization":
+            raise InvalidProfile("headers cannot include Authorization")
+
+
+def validate_create(data: RunnerProfileCreate) -> None:
+    _validate_backend(data.backend)
+    _validate_provider(data.provider)
+    _validate_backend_provider_compat(data.backend, data.provider)
+    _validate_base_url(data.base_url)
+    _validate_api_key_env(data.api_key_env)
+    _validate_headers(data.headers)
+
+
+def validate_patch(patch: RunnerProfilePatch, current_backend: str) -> None:
+    if patch.backend is not None:
+        _validate_backend(patch.backend)
+    if patch.provider is not None:
+        _validate_provider(patch.provider)
+    effective_backend = patch.backend or current_backend
+    if patch.provider is not None or patch.backend is not None:
+        _validate_backend_provider_compat(effective_backend, patch.provider)
+    _validate_base_url(patch.base_url)
+    _validate_api_key_env(patch.api_key_env)
+    _validate_headers(patch.headers)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Provider discovery + model listing (merged from providers.py).
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class ProviderNotFound(LookupError):
+    def __init__(self, provider_id: str) -> None:
+        super().__init__(f"Provider not found: {provider_id}")
+        self.provider_id = provider_id
+
+
+class InvalidProviderRequest(ValueError):
+    """Validation rejection for a model-listing request."""
+
+
+class ProviderAuthFailed(RuntimeError):
+    def __init__(self, status_code: int) -> None:
+        super().__init__("Authentication failed")
+        self.status_code = status_code
+
+
+class ProviderUpstreamError(RuntimeError):
+    """Catch-all for non-auth upstream provider failures."""
+
+
+def list_runner_providers(*, backend: str | None = None) -> list[ProviderDescriptor]:
+    providers = list_providers()
+    if backend is None:
+        return providers
+    return [p for p in providers if backend in (p.compatible_backends or [])]
+
+
+def refresh_providers() -> RefreshProvidersResult:
+    """Re-run dynamic provider discovery and invalidate model caches."""
+    discovered = refresh_opencode_providers()
+    # refresh_opencode_providers() already clears _MODEL_CACHE internally.
+    return {
+        "opencode": discovered,
+        "opencode_count": len(discovered),
+        "model_cache_cleared": True,
+    }
+
+
+async def list_provider_models(
+    provider_id: str,
+    *,
+    runner_profiles: RunnerProfileManager,
+    profile_id: str | None = None,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
+    backend: str | None = None,
+    refresh: bool = False,
+) -> list[ProviderModel]:
+    """Resolve config and list models for a provider.
+
+    Raises:
+        ProviderNotFound: provider id is unknown.
+        InvalidProviderRequest: profile id missing, incompatible backend,
+            or upstream validation rejection.
+        ProviderAuthFailed: upstream 401/403.
+        ProviderUpstreamError: other upstream failure.
+    """
+    provider = get_provider(provider_id)
+    if not provider:
+        raise ProviderNotFound(provider_id)
+
+    if backend is not None:
+        compat = provider.descriptor.compatible_backends or []
+        if backend not in compat:
+            raise InvalidProviderRequest(
+                f"provider {provider_id!r} is not compatible with backend "
+                f"{backend!r}"
+            )
+
+    config: EffectiveRunnerConfig
+    if profile_id:
+        row = runner_profiles.get_by_id(profile_id)
+        if not row:
+            raise InvalidProviderRequest(f"Runner profile not found: {profile_id}")
+        profile = row
+        config = EffectiveRunnerConfig(
+            backend=profile.backend,
+            provider=profile.provider,
+            model=profile.model,
+            base_url=profile.base_url,
+            api_key_env=profile.api_key_env,
+            params=profile.params or {},
+            headers=profile.headers or {},
+            extra_args=profile.extra_args or [],
+            profile_id=profile.id,
+            source="run_profile",
+        )
+    else:
+        config = EffectiveRunnerConfig(
+            backend=backend,
+            base_url=base_url or provider.descriptor.default_base_url,
+            api_key_env=api_key_env or provider.descriptor.default_api_key_env,
+            provider=provider_id,
+            source="run_override",
+        )
+
+    try:
+        return await registry_list_models(provider_id, config, refresh=refresh)
+    except ValueError as exc:
+        logger.warning(f"Model listing validation error for {provider_id}: {exc}")
+        raise InvalidProviderRequest(str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (401, 403):
+            logger.warning(
+                f"Authentication error from {provider_id}: {exc.response.status_code}"
+            )
+            raise ProviderAuthFailed(exc.response.status_code) from exc
+        logger.error(f"HTTP error from {provider_id}: {exc.response.status_code}")
+        raise ProviderUpstreamError(
+            f"Provider request failed: {exc.response.status_code}"
+        ) from exc
+    except httpx.RequestError as exc:
+        logger.error(f"Request error from {provider_id}: {exc}")
+        raise ProviderUpstreamError("Provider request failed") from exc
+    except Exception as exc:
+        logger.exception(f"Unexpected error listing models from {provider_id}")
+        raise ProviderUpstreamError("Provider request failed") from exc

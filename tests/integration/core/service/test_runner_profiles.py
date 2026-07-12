@@ -10,26 +10,19 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import agentbox.core.service.engines.profile_validation as pv
+import agentbox.core.service.engines as pv
 from agentbox.core.data import (
     RunnerProfileCreate,
     RunnerProfilePatch,
 )
 from agentbox.core.db.database import Database
 from agentbox.core.engines.providers.base import ProviderDescriptor as PD
-from agentbox.core.service.engines.profile_validation import (
+from agentbox.core.service.engines import (
+    EngineService,
     InvalidProfile,
+    ProfileNotFound,
     validate_create,
     validate_patch,
-)
-from agentbox.core.service.engines.profiles import (
-    ProfileNotFound,
-    create_profile,
-    delete_profile,
-    get_profile,
-    get_profile_stats,
-    list_profiles,
-    update_profile,
 )
 
 
@@ -86,14 +79,14 @@ def _patch_backends(monkeypatch, *, fail_load: str | None = None) -> None:
         return None
 
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profile_validation.resolve_engine_by_name",
+        "agentbox.core.service.engines.resolve_engine_by_name",
         _get_backend,
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profile_validation.list_engines", _backends
+        "agentbox.core.service.engines.list_engines", _backends
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profile_validation.engine_load_failure",
+        "agentbox.core.service.engines.engine_load_failure",
         _backend_load_failure,
     )
 
@@ -110,10 +103,10 @@ def _patch_providers(monkeypatch, *, compat: list[str] | None = None) -> None:
         return None
 
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profile_validation.list_providers", _list_providers_impl
+        "agentbox.core.service.engines.list_providers", _list_providers_impl
     )
     monkeypatch.setattr(
-        "agentbox.core.service.engines.profile_validation.get_provider", _get_provider
+        "agentbox.core.service.engines.get_provider", _get_provider
     )
 
 
@@ -211,7 +204,7 @@ def test_validate_patch_uses_current_backend_for_compat(monkeypatch) -> None:
 def test_create_profile_round_trip(store: Database, monkeypatch) -> None:
     _patch_backends(monkeypatch)
     data = RunnerProfileCreate(name="test", backend="mock")
-    profile = create_profile(data, store=store)
+    profile = EngineService().create_profile(data)
     assert profile.name == "test"
     assert profile.backend == "mock"
     assert profile.id
@@ -219,35 +212,35 @@ def test_create_profile_round_trip(store: Database, monkeypatch) -> None:
 
 def test_get_profile_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
-        get_profile("nonexistent", store=store)
+        EngineService().get_profile("nonexistent")
 
 
 def test_update_profile_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
-        update_profile("nonexistent", RunnerProfilePatch(name="x"), store=store)
+        EngineService().update_profile("nonexistent", RunnerProfilePatch(name="x"))
 
 
 def test_delete_profile_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
-        delete_profile("nonexistent", store=store)
+        EngineService().delete_profile("nonexistent")
 
 
 def test_get_profile_stats_raises_profile_not_found(store: Database) -> None:
     with pytest.raises(ProfileNotFound):
-        get_profile_stats("nonexistent", store=store)
+        EngineService().get_profile_stats("nonexistent")
 
 
 def test_list_profiles_returns_empty_list(store: Database) -> None:
-    assert list_profiles(store=store) == []
+    assert EngineService().list_profiles() == []
 
 
 def test_list_profiles_filters_by_backend(store: Database, monkeypatch) -> None:
     _patch_backends(monkeypatch)
-    create_profile(RunnerProfileCreate(name="a", backend="mock"), store=store)
-    create_profile(RunnerProfileCreate(name="b", backend="mock"), store=store)
+    EngineService().create_profile(RunnerProfileCreate(name="a", backend="mock"))
+    EngineService().create_profile(RunnerProfileCreate(name="b", backend="mock"))
     # Filtering by a backend that exists but has no matches
-    result = list_profiles(store=store, backend="other")
+    result = EngineService().list_profiles(backend="other")
     assert len(result) == 0
     # All profiles
-    all_profiles = list_profiles(store=store)
+    all_profiles = EngineService().list_profiles()
     assert len(all_profiles) == 2

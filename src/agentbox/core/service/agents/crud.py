@@ -29,7 +29,7 @@ from agentbox.core.db import (
 )
 from agentbox.core.db.schema import agent_runner_profiles  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
 from agentbox.core.db.schema import runs as runs_table  # ponytail: transitional — plans 111/112/110/113_04 replace this with managers/Services
-from agentbox.core.service.engines.service import EngineService
+from agentbox.core.service.engines import EngineService
 
 logger = logging.getLogger(__name__)
 

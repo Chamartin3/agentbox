@@ -11,12 +11,8 @@ import typer
 from agentbox.core.data.payload_types import CredentialContext
 from agentbox.cli.shared import CLIContext, EngineRenderer  # TODO(cli-arch): transitional renderer import — plan 095
 from agentbox.core.config import Settings
-from agentbox.core.service.engines import (
-    CredentialMethod,
-    CredentialState,
-    Method,
-)
-from agentbox.core.service.engines.service import EngineService
+from agentbox.core.service.engines import CredentialMethod, CredentialState, Method
+from agentbox.core.service.engines import EngineService
 
 creds_app = typer.Typer(
     name="creds",

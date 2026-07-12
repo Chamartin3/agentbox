@@ -118,7 +118,7 @@ from agentbox.core.service.execution import ExecutionService as ExecutionService
 from agentbox.core.service.evaluation.service import EvaluationService as EvaluationService
 
 # ── Engines service (plan 091) ─────────────────────────────────────────
-from agentbox.core.service.engines.service import EngineService as EngineService
+from agentbox.core.service.engines import EngineService as EngineService
 
 # ── System service ────────────────────────────────────────────────────
 from agentbox.core.service.system.service import SystemService as SystemService
