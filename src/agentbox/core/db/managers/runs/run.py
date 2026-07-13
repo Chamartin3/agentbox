@@ -1,9 +1,11 @@
 """RunManager — run lifecycle operations."""
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict
+
 import json as _json
 from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from typing import cast
 
 from sqlalchemy import (
     Integer,
@@ -49,7 +51,7 @@ class RunManager(Manager[Run]):
         finished_at: str | None = None,
     ) -> Run | None:
         """Mark a run as finished with status, output, error, and finish time."""
-        values: dict[str, Any] = {"status": status}
+        values: JsonDict = {"status": status}
         if output is not None:
             values["output"] = output
         if error is not None:
@@ -76,7 +78,7 @@ class RunManager(Manager[Run]):
 
         Only transitions rows still in ``running`` (idempotent on terminal).
         """
-        values: dict[str, Any] = {
+        values: JsonDict = {
             "status": status
             if status
             else (RS.OK.value if ok else RS.ERROR.value),
@@ -104,7 +106,7 @@ class RunManager(Manager[Run]):
         conversation_uri: str | None = None,
     ) -> None:
         """Set the conversation format and optional URI columns on a run."""
-        values: dict[str, Any] = {}
+        values: JsonDict = {}
         if conversation_format is not None:
             values["conversation_format"] = conversation_format
         if conversation_uri is not None:
@@ -120,7 +122,7 @@ class RunManager(Manager[Run]):
         errors: list[dict] | None = None,
     ) -> None:
         """Set post-run outcome status (and optional error payload) on a run."""
-        values: dict[str, Any] = {"post_status": "ok" if ok else "fail"}
+        values: JsonDict = {"post_status": "ok" if ok else "fail"}
         if errors is not None:
             values["post_errors"] = _json.dumps(
                 {"error_kind": error_kind, "errors": errors}
@@ -151,7 +153,7 @@ class RunManager(Manager[Run]):
         composition_snapshot: dict | None = None,
     ) -> None:
         """Persist the full post-run snapshot onto the run row."""
-        values: dict[str, Any] = {
+        values: JsonDict = {
             "rendered_prompt": _json.dumps(rendered_prompt),
             "variables": _json.dumps(variables),
             "validation_status": validation_status,
@@ -169,7 +171,7 @@ class RunManager(Manager[Run]):
         variables: dict | None,
     ) -> None:
         """Persist only composition/prompt/variables fields (partial update)."""
-        values: dict[str, Any] = {}
+        values: JsonDict = {}
         if composition_snapshot is not None:
             values["composition_snapshot"] = _json.dumps(composition_snapshot)
         if rendered_prompt is not None:
@@ -187,7 +189,7 @@ class RunManager(Manager[Run]):
         mcp_snapshot: dict | None = None,
     ) -> None:
         """Persist resource snapshot and/or MCP snapshot JSON onto the run row."""
-        values: dict[str, Any] = {}
+        values: JsonDict = {}
         if resource_snapshot is not None:
             values["resource_snapshot"] = _json.dumps(resource_snapshot)
         if mcp_snapshot is not None:

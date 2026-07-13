@@ -6,7 +6,8 @@ parsing itself lives on ``SettingManager``. Settings *writes* and
 token/crypto policy stay on ``SystemService``.
 """
 from __future__ import annotations
-from typing import Any
+
+from agentbox.core.data.jsontypes import JsonDict
 
 import uuid
 
@@ -27,7 +28,7 @@ def _default_db() -> Database:
     return get_database(str(load_settings().db_path))
 
 
-def load_settings_section(section: str, *, db: Database | None = None) -> dict[str, Any]:
+def load_settings_section(section: str, *, db: Database | None = None) -> JsonDict:
     """Return all ``{key: value}`` pairs in a section (JSON-deserialised)."""
     return (db or _default_db()).settings.get_settings_section(section)
 

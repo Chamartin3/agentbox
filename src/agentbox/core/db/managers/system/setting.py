@@ -1,6 +1,7 @@
 """SettingManager — application settings key-value CRUD (composite PK)."""
 from __future__ import annotations
-from typing import Any
+
+from agentbox.core.data.jsontypes import JsonDict
 
 import json as _json
 
@@ -51,9 +52,9 @@ class SettingManager(Manager[Setting]):
                 for r in rows
             ]
 
-    def get_settings_section(self, section: str) -> dict[str, Any]:
+    def get_settings_section(self, section: str) -> JsonDict:
         """Return a section as ``{key: deserialised_value}``."""
-        out: dict[str, Any] = {}
+        out: JsonDict = {}
         for r in self.get_section(section):
             try:
                 out[r["key"]] = _json.loads(r["value_json"])

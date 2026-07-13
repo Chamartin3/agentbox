@@ -5,7 +5,8 @@ Composed into ``SessionStore``. Reads ``self.engine`` and operates on
 """
 
 from __future__ import annotations
-from typing import Any
+
+from agentbox.core.data.jsontypes import JsonDict
 
 import json as _json
 import re
@@ -205,7 +206,7 @@ class RunnerProfilesMixin:
             DeprecationWarning,
             stacklevel=2,
         )
-        values: dict[str, Any] = {}
+        values: JsonDict = {}
         if patch.name is not None:
             values["name"] = patch.name
         if patch.description is not None:
