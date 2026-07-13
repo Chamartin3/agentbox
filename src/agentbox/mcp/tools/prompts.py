@@ -10,6 +10,7 @@ from __future__ import annotations
 import difflib
 import json
 from pathlib import Path
+from typing import TypedDict
 
 from fastmcp import FastMCP
 
@@ -18,12 +19,22 @@ from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
 
+class VersionMeta(TypedDict):
+    """Slim metadata for an agent version."""
+
+    version: int | None
+    version_id: int | None
+    author: str | None
+    changelog: str | None
+    created_at: str | None
+
+
 def _version_prompt_content(version: AgentVersionRow) -> str:
     """Return the prompt body stored on an ``agent_versions`` row."""
     return version.get("prompt_content") or version.get("prompt_snapshot") or ""
 
 
-def _version_meta(version: AgentVersionRow) -> dict:
+def _version_meta(version: AgentVersionRow) -> VersionMeta:
     """Slim metadata dict for an ``agent_versions`` row."""
     return {
         "version": version.get("version"),
