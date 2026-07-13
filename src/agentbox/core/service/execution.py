@@ -56,7 +56,6 @@ from agentbox.core.execution.observability.conversation import get as _get_conve
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.execution.orchestrate.setup import NoBackendAvailable
 from agentbox.core.data.conversation.transcript import TranscriptSource
-from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.agents import AgentNotFound
 from agentbox.core.service.base import Service
 from agentbox.core.service.evaluation import EvaluationService
@@ -479,7 +478,7 @@ class ExecutionService(Service):
         Raises :class:`AgentNotFound`, :class:`InvalidRunInput`, or
         :class:`NoBackendAvailable`. Returns ``{"run_id", "agent"}``.
         """
-        agent = resolve_agent(agent_id, agent_defs=agent_defs)
+        agent = agent_defs.get(agent_id)
         if agent is None:
             raise AgentNotFound(agent_id)
         self._assert_enabled(agent_meta, agent.id)
@@ -551,7 +550,7 @@ class ExecutionService(Service):
         rec = self.get_run(run_id)
         if rec is None:
             raise RunNotFound(run_id)
-        agent = resolve_agent(rec.agent_id, agent_defs=agent_defs)
+        agent = agent_defs.get(rec.agent_id)
         if agent is None:
             raise AgentNotFound(rec.agent_id)
         self._assert_enabled(agent_meta, agent.id)
@@ -746,7 +745,7 @@ class ExecutionService(Service):
 
         refreshed = self.get_run(run_id) or existing
         if schedule_webhook_cb is not None:
-            agent = resolve_agent(refreshed.agent_id, agent_defs=agent_defs)
+            agent = agent_defs.get(refreshed.agent_id)
             schedule_webhook_cb(agent, refreshed)
         return {"ok": True, "run_id": run_id, "status": refreshed.status}
 
@@ -789,7 +788,7 @@ class ExecutionService(Service):
 
         refreshed = self.get_run(run_id) or existing
         if schedule_webhook_cb is not None:
-            agent = resolve_agent(refreshed.agent_id, agent_defs=agent_defs)
+            agent = agent_defs.get(refreshed.agent_id)
             if agent is not None:
                 schedule_webhook_cb(agent, refreshed)
         return {"ok": True, "run_id": run_id}

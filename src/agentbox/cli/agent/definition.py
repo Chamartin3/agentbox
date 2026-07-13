@@ -11,7 +11,7 @@ import typer
 
 from agentbox.cli.shared import CLIContext, resolve_agent
 # TODO(cli-arch): build_* free-fns — candidate AgentService create_version helpers
-from agentbox.core.service import AgentDef, build_agent_snapshot, build_config_json_payload
+from agentbox.core.service import AgentDef
 from agentbox.core.service.engines import ProfileNotFound
 
 
@@ -204,7 +204,7 @@ def def_new(
         agent_id=agent_def.id,
         config_json={
             **agent_def.model_dump(mode="json", exclude_none=True),
-            **build_config_json_payload(agent_def),
+            **obj.agents.build_config_payload(agent_def),
         },
         prompt_content=agent_def.prompt,
         author=author,
@@ -290,7 +290,7 @@ def def_edit(
 
     updated.source_path = current.source_path
     updated.source_format = current.source_format
-    snapshot = build_agent_snapshot(updated)
+    snapshot = obj.agents.build_snapshot(updated)
     prompt_text = ""
     if updated.prompt_path:
         try:

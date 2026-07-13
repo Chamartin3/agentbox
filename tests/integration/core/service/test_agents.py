@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
-from agentbox.core.service.agents import list_all_agents, resolve_agent
+from agentbox.core.service.agents import list_all_agents
 from agentbox.core.service.agents import AgentService
 
 
@@ -51,7 +51,7 @@ def store(tmp_path: Path) -> Database:
 def test_resolve_agent_returns_db_agent(store: Database) -> None:
     _seed_db_agent(store, "stage.draft_fixer")
 
-    agent = resolve_agent("stage.draft_fixer", agent_defs=store.agent_defs)
+    agent = store.agent_defs.get("stage.draft_fixer")
 
     assert agent is not None
     assert agent.id == "stage.draft_fixer"
@@ -59,7 +59,7 @@ def test_resolve_agent_returns_db_agent(store: Database) -> None:
 
 
 def test_resolve_agent_returns_none_when_unknown(store: Database) -> None:
-    assert resolve_agent("missing", agent_defs=store.agent_defs) is None
+    assert store.agent_defs.get("missing") is None
 
 
 def test_list_all_agents_returns_db_agents_only(store: Database) -> None:

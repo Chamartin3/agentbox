@@ -14,7 +14,6 @@ from pathlib import Path
 from fastmcp import FastMCP
 
 from agentbox.core.service import AgentService, AgentVersionRow
-from agentbox.core.service import composition_preview as preview_composition
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -230,7 +229,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
             }
         shared_roots = ctx.system.get_project_shared_roots()
         try:
-            prev = preview_composition(bundle_path, shared_roots)
+            prev = ctx.agents.preview_composition(bundle_path, shared_roots)
         except FileNotFoundError as exc:
             return {"error": "composition_unreadable", "detail": str(exc)}
         return {

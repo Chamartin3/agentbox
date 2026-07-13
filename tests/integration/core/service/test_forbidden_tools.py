@@ -15,7 +15,6 @@ import pytest
 from agentbox.core.agents import RuntimeConfig
 from agentbox.core.data import AgentDef
 from agentbox.core.db.database import Database
-from agentbox.core.service.agents import resolve_agent
 from agentbox.core.service.agents import AgentService
 
 
@@ -41,7 +40,7 @@ def _seed_agent(store: Database, agent_id: str, kind: str = "token") -> None:
 
 
 def _forbidden(agent_id: str, store: Database) -> tuple[str, ...]:
-    reloaded = resolve_agent(agent_id, agent_defs=store.agent_defs)
+    reloaded = store.agent_defs.get(agent_id)
     assert reloaded is not None
     return RuntimeConfig.from_agent(reloaded).forbidden_tools
 

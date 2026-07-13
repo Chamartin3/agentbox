@@ -6,11 +6,6 @@ deep core internals. This keeps the internal organization private.
 
 # ── Data / persistence ────────────────────────────────────────────────
 # ── Agent config / profiles / plugins ─────────────────────────────────
-from agentbox.core.agents import build_config_json_payload as build_config_json_payload
-from agentbox.core.agents import build_config_json_str as build_config_json_str  # noqa: F401
-from agentbox.core.agents import engine_load_failure as backend_load_failure  # noqa: F401
-from agentbox.core.agents import list_engines as backends  # noqa: F401
-from agentbox.core.agents import resolve_engine_by_name as get_backend  # noqa: F401
 from agentbox.core.engines import EffectiveRunnerConfig as EffectiveRunnerConfig
 from agentbox.core.engines import get_provider as get_provider
 from agentbox.core.engines import list_providers as list_providers
@@ -60,12 +55,7 @@ from agentbox.core.tools import CAPABILITIES as CAPABILITIES  # noqa: F401
 from agentbox.core.tools import ToolSpec as ToolSpec
 
 # ── Prompt / composition ──────────────────────────────────────────────
-from agentbox.core.agents import compose_from_source as compose_from_source
-from agentbox.core.agents import preview as composition_preview  # noqa: F401
 from agentbox.core.agents import PreviewError as PreviewError
-from agentbox.core.agents import render_agent_prompt_preview as render_agent_prompt_preview
-from agentbox.core.agents import render_for_type as render_for_type
-from agentbox.core.agents import resolve_prompt as resolve_prompt
 from agentbox.core.resources.importers.base import ImporterContext as ImporterContext
 from agentbox.core.resources.importers.host_path import HostPathImporter as HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter as SchemaImporter
@@ -75,32 +65,13 @@ from agentbox.core.resources.importers.upload import UploadImporter as UploadImp
 from agentbox.core.resources.importers.zip import ZipUploadImporter as ZipUploadImporter
 
 # ── Resources ─────────────────────────────────────────────────────────
-from agentbox.core.resources.skills import discover_skills as discover_skills
-from agentbox.core.resources.skills import find_skill as find_skill
 
 # ── Run execution ─────────────────────────────────────────────────────
 from agentbox.core.execution.orchestrate.setup import NoBackendAvailable as NoBackendAvailable
 from agentbox.core.execution.orchestrate.executor import RunExecutor as RunExecutor
-from agentbox.core.agents import resolve_agent_prompt_bindings as resolve_agent_prompt_bindings
 
 # ── Cross-cutting agents service ──────────────────────────────────────
 from agentbox.core.service.agents import AgentService as AgentService
-from agentbox.core.service.agents import build_agent_snapshot as build_agent_snapshot
-from agentbox.core.service.agents import list_all_agents as list_all_agents
-from agentbox.core.service.agents import resolve_agent as resolve_agent
-from agentbox.core.service.agents import create_agent as create_agent
-from agentbox.core.service.agents import create_version as create_agent_version  # noqa: F401
-from agentbox.core.service.agents import diff_versions as diff_agent_versions  # noqa: F401
-from agentbox.core.service.agents import get_active_version as get_active_agent_version  # noqa: F401
-from agentbox.core.service.agents import get_agent_def as get_agent_def
-from agentbox.core.service.agents import get_prompt_version as get_prompt_version
-from agentbox.core.service.agents import get_agent_version as get_agent_version  # noqa: F401
-from agentbox.core.service.agents import grant_agent_tool as grant_agent_tool
-from agentbox.core.service.agents import list_agent_tool_grants as list_agent_tool_grants
-from agentbox.core.service.agents import list_agent_versions as list_agent_versions  # noqa: F401
-from agentbox.core.service.agents import revoke_agent_tool as revoke_agent_tool
-from agentbox.core.service.agents import save_prompt_revision as save_prompt_revision
-from agentbox.core.service.agents import soft_delete_agent as soft_delete_agent
 
 # ── Execution service (plan 088) ───────────────────────────────────────
 from agentbox.core.service.execution import ExecutionService as ExecutionService
@@ -118,8 +89,6 @@ from agentbox.core.service.system import SystemService as SystemService
 from agentbox.core.service.resources import ResourceService as ResourceService
 
 # ── Agent admin free functions (per-domain admin.py) ──
-from agentbox.core.service.agents import replace_version_config as replace_version_config
-from agentbox.core.service.agents import update_agent_meta as update_agent_meta
 
 # ── Workspace ─────────────────────────────────────────────────────────
 from agentbox.core.workspaces.workdir import WorkspaceInfo as WorkspaceInfo

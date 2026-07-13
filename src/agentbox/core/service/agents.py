@@ -22,9 +22,12 @@ import logging
 import types
 import uuid
 from agentbox.core.agents import (
+    CompositionPreview,
     PreviewError as PreviewError,
+    preview as _preview,
     render_agent_prompt_preview as _render_agent_prompt_preview,
 )
+from agentbox.core.data import ConfigJsonPayload
 from agentbox.core.agents import (
     build_agent_snapshot,
     build_config_json_str,
@@ -116,14 +119,6 @@ from typing import cast
 
 
 logger = logging.getLogger(__name__)
-
-
-def resolve_agent(
-    agent_id: str,
-    *,
-    agent_defs: AgentDefManager,
-) -> AgentDef | None:
-    return agent_defs.get(agent_id)
 
 
 def list_all_agents(
@@ -284,7 +279,7 @@ def get_agent_detail(
     agent_prompt_resource_bindings: AgentPromptResourceBindingManager,
     settings: Settings,
 ) -> dict | None:
-    agent = resolve_agent(agent_id, agent_defs=agent_defs)
+    agent = agent_defs.get(agent_id)
     if agent is None:
         return None
     # ponytail: pass None — ws.resolve_path falls back to settings-based path.
@@ -831,7 +826,7 @@ def patch_agent_config(
     if not patch:
         raise AgentServiceError(400, "empty_patch", "empty patch")
 
-    current = resolve_agent(agent_id, agent_defs=agent_defs)
+    current = agent_defs.get(agent_id)
     if current is None:
         raise AgentServiceError(404, "unknown_agent", agent_id)
 
@@ -1058,7 +1053,7 @@ def put_agent_validation(
     reason: str,
     actor: str | None,
 ) -> AgentValidationResult:
-    current = resolve_agent(agent_id, agent_defs=agent_defs)
+    current = agent_defs.get(agent_id)
     if current is None:
         raise AgentServiceError(404, "unknown_agent", agent_id)
 
@@ -1132,38 +1127,6 @@ def put_agent_validation(
     return get_agent_validation(agent_versions, agent_id)
 
 
-def replace_version_config(
-    agent_versions: AgentVersionManager, version_id: int, config_json: str
-) -> None:
-    """Replace the config_json payload on an agent version."""
-    agent_versions.patch(version_id, config_json=config_json)
-
-
-def update_agent_meta(
-    agent_meta: AgentMetaManager,
-    agent_id: str,
-    *,
-    sync_mode: str | None = None,
-    export_to_disk: bool | None = None,
-    source_path: str | None = None,
-    source_format: str | None = None,
-) -> AgentMetaRow | None:
-    """Update agent metadata fields."""
-    if agent_meta.get_meta(agent_id) is None:
-        return None
-    values: dict = {"updated_at": now_iso()}
-    if sync_mode is not None:
-        values["sync_mode"] = sync_mode
-    if export_to_disk is not None:
-        values["export_to_disk"] = int(export_to_disk)
-    if source_path is not None:
-        values["source_path"] = source_path
-    if source_format is not None:
-        values["source_format"] = source_format
-    agent_meta.patch(agent_id, **values)
-    return agent_meta.get_meta(agent_id)
-
-
 def _lc_text_diff(a: str, b: str) -> str:
     if a == b:
         return ""
@@ -1189,33 +1152,6 @@ def _lc_json_diff(a: str, b: str) -> JsonDiffResult:
             if k in obj_b and obj_a[k] != obj_b[k]
         },
     }
-
-
-def soft_delete_agent(
-    agent_versions: AgentVersionManager,
-    agent_meta: AgentMetaManager,
-    active_agent_versions: ActiveAgentVersionManager,
-    agent_id: str,
-) -> AgentMetaRow | None:
-    """Soft-delete an agent. Returns None if not found."""
-    if not agent_versions.exists_for_agent(agent_id):
-        return None
-    now = now_iso()
-    if agent_meta.get_meta(agent_id) is not None:
-        agent_meta.patch(agent_id, deleted_at=now, updated_at=now)
-    else:
-        agent_meta.insert(
-            agent_id=agent_id,
-            sync_mode="off",
-            export_to_disk=0,
-            source_path=None,
-            source_format=None,
-            created_at=now,
-            updated_at=now,
-            deleted_at=now,
-        )
-    active_agent_versions.delete_for_agent(agent_id)
-    return agent_meta.get_meta(agent_id)
 
 
 def branch_draft(
@@ -1320,187 +1256,6 @@ def rollback_to(
     return result
 
 
-def get_agent_def(agent_defs: AgentDefManager, agent_id: str) -> AgentDef | None:
-    """Get the resolved agent definition."""
-    return agent_defs.get(agent_id)
-
-
-def latest_version(agent_versions: AgentVersionManager, agent_id: str) -> AgentVersionRow | None:
-    """Get latest version row for an agent."""
-    return agent_versions.get_latest(agent_id)
-
-
-def get_active_version(agent_versions: AgentVersionManager, agent_id: str) -> AgentVersionRow | None:
-    """Get the currently active version for an agent."""
-    return agent_versions.get_active(agent_id)
-
-
-def get_agent_version(
-    agent_versions: AgentVersionManager, agent_id: str, version: int
-) -> AgentVersionRow | None:
-    """Get a specific version by number."""
-    return agent_versions.get_by_number(agent_id, version)
-
-
-def list_agent_versions(
-    agent_versions: AgentVersionManager, agent_id: str
-) -> list[AgentVersionRow]:
-    """List all versions for an agent."""
-    return agent_versions.list_for_agent(agent_id)
-
-
-def create_agent(
-    agent_versions: AgentVersionManager,
-    agent_meta: AgentMetaManager,
-    agent_id: str,
-    config_json: dict,
-    *,
-    prompt_content: str | None = None,
-    author: str,
-    changelog: str,
-    source: str = "cli",
-    source_path: str | None = None,
-    source_format: str | None = None,
-    sync_mode: str = "off",
-    export_to_disk: bool = False,
-) -> AgentVersionRow:
-    """Create a new agent record."""
-    if agent_versions.exists_for_agent(agent_id):
-        raise ValueError(f"Agent {agent_id!r} already exists")
-    config_hash = hashlib.sha256(
-        json.dumps(config_json, sort_keys=True).encode()
-    ).hexdigest()
-    vid = agent_versions.insert_version(
-        agent_id=agent_id,
-        version=1,
-        source_path=source_path or "",
-        source_format=source_format or "",
-        content_snapshot="",
-        prompt_snapshot="",
-        content_hash=config_hash,
-        author=author,
-        changelog=changelog,
-        is_legacy=0,
-        created_at=now_iso(),
-        config_json=json.dumps(config_json, sort_keys=True),
-        prompt_content=prompt_content,
-        source=source,
-    )
-    _refresh_meta(
-        agent_meta,
-        agent_id,
-        sync_mode=sync_mode,
-        export_to_disk=export_to_disk,
-        source_path=source_path,
-        source_format=source_format,
-        clear_deleted=False,
-    )
-    result = agent_versions.get_by_id(vid)
-    assert result is not None
-    return result
-
-
-def create_version(
-    agent_versions: AgentVersionManager,
-    agent_id: str,
-    source_path: str,
-    source_format: str,
-    content_snapshot: str,
-    prompt_snapshot: str,
-    content_hash: str,
-    author: str = "system",
-    changelog: str = "",
-    files: list[dict] | None = None,
-    config_json: str | None = None,
-    prompt_content: str | None = None,
-    source: str = "cli",
-) -> AgentVersionRow:
-    """Create a new agent version record."""
-    vid = agent_versions.insert_version(
-        files=files or None,
-        agent_id=agent_id,
-        version=agent_versions.next_version(agent_id),
-        source_path=source_path,
-        source_format=source_format,
-        content_snapshot=content_snapshot,
-        prompt_snapshot=prompt_snapshot,
-        content_hash=content_hash,
-        author=author,
-        changelog=changelog,
-        is_legacy=0,
-        created_at=now_iso(),
-        config_json=config_json,
-        prompt_content=prompt_content,
-        source=source,
-    )
-    result = agent_versions.get_by_id(vid)
-    assert result is not None
-    return result
-
-
-def get_prompt_version(
-    prompt_versions: PromptVersionManager, agent_id: str, version: int
-) -> PromptVersionRow | None:
-    """Get a specific prompt version."""
-    return prompt_versions.get_by_number(agent_id, version)
-
-
-def list_agent_tool_grants(
-    agent_tool_grants: AgentToolGrantManager,
-    agent_id: str,
-    *,
-    include_revoked: bool = False,
-) -> list[AgentToolGrantRow]:
-    """List tool grants for an agent."""
-    return agent_tool_grants.list_for_agent(agent_id, include_revoked=include_revoked)
-
-
-def grant_agent_tool(
-    agent_tool_grants: AgentToolGrantManager,
-    agent_id: str,
-    tool_name: str,
-    changelog: str,
-    *,
-    actor: str | None = None,
-) -> AgentToolGrantRow:
-    """Grant tool access to an agent."""
-    if len(changelog.strip()) < 3:
-        raise ValueError("changelog must be at least 3 characters")
-    now = now_iso()
-    fields: dict = {
-        "changelog": changelog,
-        "granted_at": now,
-        "granted_by": actor,
-        "revoked_at": None,
-        "revoked_by": None,
-        "revoke_changelog": None,
-    }
-    existing = agent_tool_grants.get_grant(agent_id, tool_name)
-    if existing is None:
-        agent_tool_grants.insert(
-            id=str(uuid.uuid4()), agent_id=agent_id, tool_name=tool_name, **fields
-        )
-    else:
-        agent_tool_grants.update_by_id(existing["id"], **fields)
-    row = agent_tool_grants.get_grant(agent_id, tool_name)
-    assert row is not None
-    return row
-
-
-def revoke_agent_tool(
-    agent_tool_grants: AgentToolGrantManager,
-    agent_id: str,
-    tool_name: str,
-    changelog: str,
-    *,
-    actor: str | None = None,
-) -> None:
-    """Revoke tool access from an agent."""
-    agent_tool_grants.revoke_active(
-        agent_id, tool_name, revoked_at=now_iso(), revoked_by=actor, revoke_changelog=changelog
-    )
-
-
 def get_rating(
     agent_version_ratings: AgentVersionRatingManager, version_id: int
 ) -> AgentVersionRatingRow | None:
@@ -1543,76 +1298,6 @@ def set_rating(
         version_id=version_id, rating=rating, rater=rater, rated_at=now_iso()
     )
     result = agent_version_ratings.latest_for_version(version_id)
-    assert result is not None
-    return result
-
-
-def diff_versions(
-    agent_versions: AgentVersionManager,
-    agent_id: str,
-    a: int,
-    b: int,
-) -> AgentDiffResult:
-    """Diff two agent versions."""
-    va = agent_versions.get_by_number(agent_id, a)
-    vb = agent_versions.get_by_number(agent_id, b)
-    if va is None or vb is None:
-        raise ValueError(f"version not found: {a if va is None else b}")
-    return {
-        "from_version": a,
-        "to_version": b,
-        "prompt_diff": _lc_text_diff(va["prompt_snapshot"], vb["prompt_snapshot"]),
-        "content_diff": _lc_json_diff(va["content_snapshot"], vb["content_snapshot"]),
-    }
-
-
-def save_prompt_revision(
-    agent_versions: AgentVersionManager,
-    active_agent_versions: ActiveAgentVersionManager,
-    agent_id: str,
-    *,
-    prompt_content: str,
-    author: str = "cli",
-    changelog: str = "",
-    activate: bool = False,
-) -> AgentVersionRow:
-    """Save a prompt revision for an agent (creates a new version)."""
-    active = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
-    if active is None:
-        raise ValueError(f"No version to clone for agent {agent_id}")
-    cloned_config = active.get("config_json")
-    if cloned_config:
-        try:
-            cfg_dict = (
-                json.loads(cloned_config)
-                if isinstance(cloned_config, str)
-                else dict(cloned_config)
-            )
-            cfg_dict["prompt"] = prompt_content
-            cloned_config = json.dumps(cfg_dict)
-        except (json.JSONDecodeError, TypeError):
-            pass
-    now = now_iso()
-    vid = agent_versions.insert_version(
-        copy_files_from=active["id"],
-        activate_for=agent_id if activate else None,
-        activated_at=now if activate else None,
-        agent_id=agent_id,
-        version=agent_versions.next_version(agent_id),
-        source_path=active.get("source_path") or "",
-        source_format=active.get("source_format") or "",
-        content_snapshot=active.get("content_snapshot") or "",
-        prompt_snapshot=prompt_content,
-        content_hash="",
-        author=author,
-        changelog=changelog or f"prompt edit from v{active['version']}",
-        is_legacy=0,
-        created_at=now,
-        config_json=cloned_config,
-        prompt_content=prompt_content,
-        source=active.get("source", "ui"),
-    )
-    result = agent_versions.get_by_id(vid)
     assert result is not None
     return result
 
@@ -2240,7 +1925,7 @@ class AgentService(Service):
         uses an empty catalog.
         """
         # Resolve the agent
-        agent = _resolve_agent_free(agent_id, agent_defs=self._db.agent_defs)
+        agent = self._db.agent_defs.get(agent_id)
         if agent is None:
             raise ValueError(f"Agent {agent_id!r} not found")
 
@@ -2698,6 +2383,23 @@ class AgentService(Service):
             bindings_override=bindings_override,
         )
 
+    @staticmethod
+    def build_config_payload(agent: AgentDef) -> ConfigJsonPayload:
+        """Project an ``AgentDef`` into its structured ``config_json`` payload."""
+        return build_config_json_payload(agent)
+
+    @staticmethod
+    def build_snapshot(agent: AgentDef) -> str:
+        """Serialize an ``AgentDef`` into a stable JSON snapshot string."""
+        return build_agent_snapshot(agent)
+
+    @staticmethod
+    def preview_composition(
+        bundle_path: Path, shared_roots: dict[str, Path]
+    ) -> CompositionPreview:
+        """Load a bundle's un-rendered ``[composition]`` block for preview."""
+        return _preview(bundle_path, shared_roots)
+
     def require_agent_exists(self, agent_id: str) -> None:
         """Raise ``AgentNotFound`` when the agent has no usable version."""
         if self.get_agent_def(agent_id) is not None:
@@ -3115,7 +2817,6 @@ class AgentService(Service):
 # Internal aliases preserved from the pre-merge service.py, which imported
 # these helpers under private names to disambiguate from same-named methods.
 _decode_config_json_free = decode_config_json
-_resolve_agent_free = resolve_agent
 _list_agents_enriched_free = list_agents_enriched
 _get_agent_detail_free = get_agent_detail
 _normalize_validator_entries_free = normalize_validator_entries
