@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -12,6 +14,12 @@ from agentbox.core.data.rows import EnvDocRow
 from agentbox.core.service import render_env_doc_preview
 
 router = APIRouter(tags=["env-doc"])
+
+
+class GetEnvDocResult(TypedDict):
+    """Response envelope for GET /api/workspaces/{workspace_id}/env-doc."""
+
+    active: EnvDocRow | None
 
 
 class SaveEnvDocBody(BaseModel):
@@ -31,7 +39,7 @@ class PreviewEnvDocBody(BaseModel):
 def get_env_doc(
     workspace_id: str,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> GetEnvDocResult:
     active = ctx.workspaces.get_active_env_doc(workspace_id)
     if not active:
         return {"active": None}

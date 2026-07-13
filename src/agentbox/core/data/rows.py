@@ -606,6 +606,12 @@ class ApiTokenPublicRow(TypedDict):
     updated_at: str
 
 
+class ApiTokenWithSecret(ApiTokenRow):
+    """A token row plus the one-time plaintext ``secret`` (rotate/create result)."""
+
+    secret: str
+
+
 class HostEnvProfileRow(TypedDict):
     """A row from ``host_env_profiles``."""
 

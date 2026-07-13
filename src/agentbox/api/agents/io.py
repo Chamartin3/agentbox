@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -12,6 +13,12 @@ from agentbox.api.deps import get_api_context
 from agentbox.core.service.agents import AgentServiceError
 
 logger = logging.getLogger(__name__)
+
+
+class _PatchAgentResult(TypedDict):
+    """Response shape of PATCH /api/agents/{agent_id}."""
+
+    agent: dict
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -64,7 +71,7 @@ def patch_agent(
     agent_id: str,
     body: AgentPatch,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> _PatchAgentResult:
     """DB-first config save. Creates a new ``agent_versions`` row.
 
     On-disk files are not written by this endpoint — use

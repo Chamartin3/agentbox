@@ -28,6 +28,7 @@ from agentbox.core.data import McpServerSpec, now_iso
 from agentbox.core.data.rows import (
     ApiTokenPublicRow,
     ApiTokenRow,
+    ApiTokenWithSecret,
     HostEnvCallLogRow,
 )
 from agentbox.core.service.base import Service
@@ -238,7 +239,7 @@ class SystemService(Service):
 
     def rotate_api_token(
         self, token_id: str, *, secret: str | None = None
-    ) -> dict[str, object] | None:
+    ) -> ApiTokenWithSecret | None:
         """Rotate a token's secret. Returns the updated row (with plaintext secret) or None."""
         if secret is None:
             secret = _secrets.token_urlsafe(32)
@@ -251,9 +252,7 @@ class SystemService(Service):
             token_id, encrypted, last_four, ts
         )
         if result is not None:
-            result_dict: dict[str, object] = dict(result)
-            result_dict["secret"] = secret
-            return result_dict
+            return {**result, "secret": secret}
         return None
 
     def delete_api_token(self, token_id: str) -> bool:

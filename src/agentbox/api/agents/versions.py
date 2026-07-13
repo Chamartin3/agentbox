@@ -7,6 +7,8 @@ to HTTP. The repeated agent-existence guard lives in
 
 from __future__ import annotations
 
+from typing import NotRequired, TypedDict
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -22,6 +24,46 @@ from agentbox.core.service.agents import AgentNotFound
 router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
 
 
+class _VersionSummaryItem(TypedDict):
+    """One entry in the versions list."""
+
+    id: int
+    version: int
+    author: str
+    changelog: str
+    is_legacy: bool
+    is_active: bool
+    created_at: str
+
+
+class _VersionListResult(TypedDict):
+    """Response shape of GET /api/agents/{agent_id}/versions."""
+
+    agent_id: str
+    latest_version: int | None
+    active_version: int | None
+    active_version_id: int | None
+    versions: list[_VersionSummaryItem]
+
+
+class _VersionDetailResult(TypedDict):
+    """Response shape of GET /api/agents/{agent_id}/versions/{version}."""
+
+    id: int
+    version: int
+    author: str
+    changelog: str
+    source_path: str
+    source_format: str
+    content_snapshot: str
+    prompt_snapshot: str
+    content_hash: str
+    is_legacy: bool
+    created_at: str
+    rating: NotRequired[AgentVersionRatingRow | None]
+    comments: NotRequired[list[AgentVersionCommentRow]]
+
+
 def _require_agent(agent_id: str) -> None:
     try:
         get_agent_service().require_agent_exists(agent_id)
@@ -35,7 +77,7 @@ def _require_agent(agent_id: str) -> None:
 
 
 @router.get("")
-def list_agent_versions(agent_id: str) -> dict:
+def list_agent_versions(agent_id: str) -> _VersionListResult:
     _require_agent(agent_id)
     svc = get_agent_service()
     versions = svc.list_versions(agent_id)
@@ -47,16 +89,16 @@ def list_agent_versions(agent_id: str) -> dict:
         active = latest
     active_id = active["id"] if active else None
     active_version_num = active["version"] if active else None
-    enriched = [
-        {
-            "id": v["id"],
-            "version": v["version"],
-            "author": v["author"],
-            "changelog": v["changelog"],
-            "is_legacy": v.get("is_legacy", False),
-            "is_active": v["id"] == active_id,
-            "created_at": v["created_at"],
-        }
+    enriched: list[_VersionSummaryItem] = [
+        _VersionSummaryItem(
+            id=v["id"],
+            version=v["version"],
+            author=v["author"],
+            changelog=v["changelog"],
+            is_legacy=v.get("is_legacy", False),
+            is_active=v["id"] == active_id,
+            created_at=v["created_at"],
+        )
         for v in versions
     ]
     return {
@@ -69,7 +111,7 @@ def list_agent_versions(agent_id: str) -> dict:
 
 
 @router.get("/{version}")
-def get_agent_version(agent_id: str, version: int) -> dict:
+def get_agent_version(agent_id: str, version: int) -> _VersionDetailResult:
     _require_agent(agent_id)
     svc = get_agent_service()
     v = svc.get_version(agent_id, version)

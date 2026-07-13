@@ -23,6 +23,8 @@ from agentbox.core.data.payload_types import (
     PromptResourcesResult,
     ResourcePreviewModesResult,
     SkillBindingsResult,
+    SubagentItemsResult,
+    SubagentRowsResult,
     WorkspaceBindingItemsResult,
     WorkspaceBindingSpec,
     WorkspaceResourcesResult,
@@ -232,7 +234,7 @@ def list_workspace_subagents(
     workspace_id: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     agent_svc: Annotated[AgentService, Depends(get_agent_service)],
-) -> dict:
+) -> SubagentItemsResult:
     # Enrichment with agent info is done here at the API layer
     items = svc.list_workspace_subagents_raw(workspace_id)
     enriched = []
@@ -253,7 +255,7 @@ def replace_workspace_subagents(
     workspace_id: str,
     body: ReplaceSubagents,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> SubagentRowsResult:
     try:
         items = svc.replace_workspace_subagents(
             workspace_id,

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from agentbox.core.data.payload_types import (
     AgentSkillsResult,
+    AgentWorkspaceDetail,
     GeneratedConfigsResult,
     GeneratedSkillsResult,
     PermissionsPatch,
@@ -19,10 +20,13 @@ from agentbox.core.data.payload_types import (
     SkillContentResult,
     SkillsListResult,
     WorkspaceDeleteResult,
+    WorkspaceDetail,
+    WorkspaceFileInfo,
     WorkspaceFileRead,
     WorkspaceFileWrite,
     WorkspaceListItem,
     WorkspaceMcpToolsResult,
+    WorkspacePathResult,
 )
 
 from typing import Annotated, NoReturn
@@ -144,10 +148,10 @@ def get_workspace_by_name(
     name: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> dict:
+) -> WorkspaceDetail:
     try:
         ws_path, _ = svc.resolve_workspace_path(name, settings=settings)
-        files: list[dict] = []
+        files: list[WorkspaceFileInfo] = []
         if ws_path.exists():
             for p in sorted(ws_path.rglob("*")):
                 if p.is_file():
@@ -330,12 +334,12 @@ def get_workspace(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
     agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> dict:
+) -> AgentWorkspaceDetail:
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         _raise_agent_not_found(agent_id)
     info = ws.info(agent, settings, None)
-    files: list[dict] = []
+    files: list[WorkspaceFileInfo] = []
     if info.exists:
         for p in sorted(info.path.rglob("*")):
             if p.is_file():
@@ -358,7 +362,7 @@ def create_workspace(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
     agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> dict:
+) -> WorkspacePathResult:
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)
@@ -371,7 +375,7 @@ def reset_workspace(
     agent_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
     agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> dict:
+) -> WorkspacePathResult:
     agent = agents.get_agent_def(agent_id)
     if agent is None:
         raise HTTPException(404)

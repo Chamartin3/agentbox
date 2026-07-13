@@ -179,7 +179,41 @@ changed values have no schema to type against.
 """
 
 
+type JsonValue = str | int | float | bool | None | dict[str, JsonValue] | list[JsonValue]
+"""Any JSON-serializable value.
+
+Used to type genuinely dynamic dicts (run-record dumps, transcript events,
+composed prompt fragments) that carry free-form JSON with no fixed schema —
+the honest concrete alternative to the banned ``dict[str, object]``.
+"""
+
+
 ChangedEntry = TypedDict("ChangedEntry", {"from": DiffValue, "to": DiffValue})
+
+
+class RunDetailResult(TypedDict):
+    """Return shape of ``GET /api/runs/{run_id}`` and ``ExecutionService.get_run_detail``."""
+
+    run: dict[str, JsonValue]
+    usage: UsagePayload | None
+
+
+class RunPromptFragmentsResult(TypedDict):
+    """Return shape of ``GET /api/runs/{run_id}/prompt``."""
+
+    run_id: str
+    fragments: list[dict[str, JsonValue]]
+    total_bytes: int
+
+
+class PaginatedRunsResult(TypedDict):
+    """Paginated ``list_runs_enriched`` result envelope."""
+
+    items: list[dict[str, JsonValue]]
+    total: int
+    offset: int
+    limit: int
+    has_more: bool
 
 
 JsonDiffResult = TypedDict(

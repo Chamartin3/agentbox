@@ -12,6 +12,8 @@ continue using ``PATCH /api/settings/{section}``.
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from agentbox.api.context import APIContext
@@ -21,10 +23,43 @@ from agentbox.core.service import McpServerSpec
 router = APIRouter(prefix="/api/project", tags=["project"])
 
 
+class McpServerSpecDumped(TypedDict):
+    """McpServerSpec as returned by model_dump(mode="json")."""
+
+    name: str
+    url: str | None
+    transport: str
+    command: list[str] | None
+    cache_ttl: int
+
+
+class ListProjectMcpServersResult(TypedDict):
+    """Response envelope for GET /api/project/mcp-servers."""
+
+    servers: list[McpServerSpecDumped]
+
+
+class DeleteProjectMcpServerResult(TypedDict):
+    """Response envelope for DELETE /api/project/mcp-servers/{name}."""
+
+    deleted: str
+
+
 @router.get("/mcp-servers")
-def list_project_mcp_servers(ctx: APIContext = Depends(get_api_context)) -> dict:
+def list_project_mcp_servers(ctx: APIContext = Depends(get_api_context)) -> ListProjectMcpServersResult:
     servers = ctx.system.get_project_mcp_servers()
-    return {"servers": [s.model_dump(mode="json") for s in servers]}
+    result: list[McpServerSpecDumped] = []
+    for s in servers:
+        dumped = s.model_dump(mode="json")
+        entry: McpServerSpecDumped = {
+            "name": dumped["name"],
+            "url": dumped["url"],
+            "transport": dumped["transport"],
+            "command": dumped["command"],
+            "cache_ttl": dumped["cache_ttl"],
+        }
+        result.append(entry)
+    return {"servers": result}
 
 
 @router.put("/mcp-servers/{name}")
@@ -32,18 +67,26 @@ def upsert_project_mcp_server(
     name: str,
     spec: McpServerSpec,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> McpServerSpecDumped:
     if spec.name != name:
         spec = spec.model_copy(update={"name": name})
     ctx.system.set_project_mcp_server(spec)
-    return spec.model_dump(mode="json")
+    dumped = spec.model_dump(mode="json")
+    result: McpServerSpecDumped = {
+        "name": dumped["name"],
+        "url": dumped["url"],
+        "transport": dumped["transport"],
+        "command": dumped["command"],
+        "cache_ttl": dumped["cache_ttl"],
+    }
+    return result
 
 
 @router.delete("/mcp-servers/{name}")
 def delete_project_mcp_server(
     name: str,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> DeleteProjectMcpServerResult:
     existing = {s.name for s in ctx.system.get_project_mcp_servers()}
     if name not in existing:
         raise HTTPException(status_code=404, detail=f"unknown mcp server: {name!r}")

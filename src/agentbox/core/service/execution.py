@@ -37,13 +37,16 @@ from agentbox.core.data import (
 )
 from agentbox.core.data.payload_types import (
     CancelRunResult,
+    JsonValue,
     LogEntry,
     RerunResult,
     RunCommentsResult,
     RunCreatedResult,
+    RunDetailResult,
     RunFacetsResult,
     RunLifecycleResult,
     RunLogsResult,
+    RunPromptFragmentsResult,
 )
 from agentbox.core.data.rows import (
     RunCommentRow,
@@ -678,12 +681,16 @@ class ExecutionService(Service):
             "statuses": ["ok", "error", "failed", "timeout", "incomplete", "running"],
         }
 
-    def get_run_detail(self, run_id: str, *, agent_versions: AgentVersionManager) -> dict:
+    def get_run_detail(
+        self, run_id: str, *, agent_versions: AgentVersionManager
+    ) -> RunDetailResult:
         rec = self.get_run(run_id)
         if rec is None:
             raise RunNotFound(run_id)
         usage = self.get_usage(run_id)
-        run_dict = rec.model_dump() if hasattr(rec, "model_dump") else dict(rec.__dict__)
+        run_dict: dict[str, JsonValue] = (
+            rec.model_dump() if hasattr(rec, "model_dump") else dict(rec.__dict__)
+        )
         if rec.agent_version_id is not None:
             ver = agent_versions.get_by_id(rec.agent_version_id)
             if ver is not None:
@@ -707,13 +714,17 @@ class ExecutionService(Service):
         run_dict["reported_model"] = usage.get("model") if usage else None
         return {"run": run_dict, "usage": usage}
 
-    def get_run_prompt_fragments(self, run_id: str) -> dict:
+    def get_run_prompt_fragments(self, run_id: str) -> RunPromptFragmentsResult:
         rec = self.get_run(run_id)
         if rec is None:
             raise RunNotFound(run_id)
         raw = self.get_run_prompt(run_id)
-        fragments = _json.loads(raw) if raw else []
-        total = sum(int(f.get("size_bytes") or 0) for f in fragments)
+        fragments: list[dict[str, JsonValue]] = _json.loads(raw) if raw else []
+        total = sum(
+            int(sb)
+            for f in fragments
+            if isinstance(sb := f.get("size_bytes"), (int, float))
+        )
         return {"run_id": run_id, "fragments": fragments, "total_bytes": total}
 
     # ══════════════════════════════════════════════════════════════════
@@ -840,7 +851,7 @@ class ExecutionService(Service):
             raise RunNotFound(run_id)
         return self.add_run_comment(run_id, author, body)
 
-    def read_transcript_events(self, run_id: str) -> list[dict]:
+    def read_transcript_events(self, run_id: str) -> list[dict[str, JsonValue]]:
         """Read the JSONL transcript file for a run as a list of event dicts."""
         rec = self.get_run(run_id)
         if rec is None or not rec.transcript_path:

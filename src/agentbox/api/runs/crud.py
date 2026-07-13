@@ -23,10 +23,14 @@ from agentbox.api.runs.schemas import (
 from agentbox.api.runs.webhooks import schedule_webhook
 from agentbox.core.data.payload_types import (
     CancelRunResult,
+    JsonValue,
+    PaginatedRunsResult,
     RunCommentsResult,
     RunCreatedResult,
+    RunDetailResult,
     RunFacetsResult,
     RunLifecycleResult,
+    RunPromptFragmentsResult,
 )
 from agentbox.core.data.rows import RunCommentRow, RunStatsRow
 from agentbox.core.service import read_transcript, NoBackendAvailable
@@ -88,10 +92,10 @@ def list_runs(
     limit: int = 50,
     offset: int = 0,
     paginated: bool = False,
-) -> list[dict] | dict:
+) -> list[dict[str, JsonValue]] | PaginatedRunsResult:
     """List runs. See ``ExecutionService.list_runs_enriched`` for the shape."""
     db = get_db()
-    return ExecutionService().list_runs_enriched(
+    result = ExecutionService().list_runs_enriched(
         agent_versions=db.agent_versions,
         agent=agent,
         status=status,
@@ -104,6 +108,15 @@ def list_runs(
         offset=offset,
         paginated=paginated,
     )
+    if isinstance(result, dict):
+        return {
+            "items": result["items"],
+            "total": result["total"],
+            "offset": result["offset"],
+            "limit": result["limit"],
+            "has_more": result["has_more"],
+        }
+    return result
 
 
 @router.get("/_stats")
@@ -239,7 +252,7 @@ def run_facets() -> RunFacetsResult:
 
 
 @router.get("/{run_id}")
-def get_run(run_id: str) -> dict:
+def get_run(run_id: str) -> RunDetailResult:
     try:
         db = get_db()
         return ExecutionService().get_run_detail(run_id, agent_versions=db.agent_versions)
@@ -248,7 +261,7 @@ def get_run(run_id: str) -> dict:
 
 
 @router.get("/{run_id}/prompt")
-def get_run_prompt(run_id: str) -> dict:
+def get_run_prompt(run_id: str) -> RunPromptFragmentsResult:
     try:
         return ExecutionService().get_run_prompt_fragments(run_id)
     except RunNotFound as exc:
@@ -256,7 +269,7 @@ def get_run_prompt(run_id: str) -> dict:
 
 
 @router.get("/{run_id}/transcript")
-def get_transcript(run_id: str) -> list[dict]:
+def get_transcript(run_id: str) -> list[dict[str, JsonValue]]:
     try:
         return ExecutionService().read_transcript_events(run_id)
     except RunNotFound as exc:

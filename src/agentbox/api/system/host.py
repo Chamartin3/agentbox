@@ -10,20 +10,47 @@ endpoint is the sole authorization surface; effective permissions are
 
 from __future__ import annotations
 
-from agentbox.core.data.payload_types import ResolvedHostEnv
+from typing import Annotated, TypedDict
 
-from typing import Annotated
+from agentbox.core.data.payload_types import ResolvedHostEnv
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_workspace_service
-from agentbox.core.data.rows import HostEnvProfileRow
+from agentbox.core.data.rows import HostEnvProfileRow, HostEnvCallLogRow
 from agentbox.core.service import WorkspaceService
 from agentbox.core.service.system import SystemService
 from agentbox.core.tools import CAPABILITIES
 
 router = APIRouter(tags=["host-env-provisioning"])
+
+
+class CapabilityEntry(TypedDict):
+    """One entry in the capabilities list."""
+
+    name: str
+    description: str
+    grant_schema: dict
+    default_granted: bool
+
+
+class ListCapabilitiesResult(TypedDict):
+    """Response envelope for GET /api/host-env/capabilities."""
+
+    capabilities: list[CapabilityEntry]
+
+
+class ListProfilesResult(TypedDict):
+    """Response envelope for GET /api/host-env/profiles."""
+
+    items: list[HostEnvProfileRow]
+
+
+class ListRunCallsResult(TypedDict):
+    """Response envelope for GET /api/runs/{run_id}/host-env-calls."""
+
+    items: list[HostEnvCallLogRow]
 
 
 class ProfileBody(BaseModel):
@@ -47,7 +74,7 @@ class WorkspaceHostEnvBody(BaseModel):
 
 
 @router.get("/api/host-env/capabilities")
-def list_capabilities() -> dict:
+def list_capabilities() -> ListCapabilitiesResult:
     return {
         "capabilities": [
             {
@@ -62,7 +89,7 @@ def list_capabilities() -> dict:
 
 
 @router.get("/api/host-env/profiles")
-def list_profiles(ws: Annotated[WorkspaceService, Depends(get_workspace_service)]) -> dict:
+def list_profiles(ws: Annotated[WorkspaceService, Depends(get_workspace_service)]) -> ListProfilesResult:
     return {"items": ws.list_host_env_profiles()}
 
 
@@ -128,5 +155,5 @@ def set_agent_host_env(
 
 
 @router.get("/api/runs/{run_id}/host-env-calls")
-def list_run_calls(run_id: str) -> dict:
+def list_run_calls(run_id: str) -> ListRunCallsResult:
     return {"items": SystemService().list_host_env_calls_for_run(run_id)}

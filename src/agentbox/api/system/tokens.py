@@ -7,14 +7,23 @@ at rest (key from ``AGENTBOX_SECRET_KEY`` env var or per-DB fallback).
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
-from agentbox.core.data.rows import ApiTokenPublicRow, ApiTokenRow
+from agentbox.core.data.rows import ApiTokenPublicRow, ApiTokenRow, ApiTokenWithSecret
 
 router = APIRouter(prefix="/api/api-tokens", tags=["api-tokens"])
+
+
+class ListTokensResult(TypedDict):
+    """Response envelope for GET /api/api-tokens."""
+
+    items: list[ApiTokenRow]
+    total: int
 
 
 class CreateBody(BaseModel):
@@ -35,7 +44,7 @@ class RotateBody(BaseModel):
 def list_tokens(
     environment: str | None = None,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> ListTokensResult:
     items = ctx.system.list_api_tokens(environment=environment)
     return {"items": items, "total": len(items)}
 
@@ -76,7 +85,7 @@ def rotate_token(
     token_id: str,
     body: RotateBody,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> ApiTokenWithSecret:
     try:
         result = ctx.system.rotate_api_token(token_id, secret=body.secret)
     except ValueError as exc:

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_agent_service, get_engine_service
 from agentbox.api.runs.webhooks import schedule_agent_event_webhook
+from agentbox.core.data import JsonValue
 from agentbox.core.service import RunnerProfile
 from agentbox.core.service.engines import EngineService, ProfileNotFound
 
@@ -17,8 +19,74 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
+class _GetAgentResult(TypedDict, total=False):
+    """Response shape of GET /api/agents/{agent_id}."""
+
+    agent: dict | None
+    prompt: str | None
+    composed_system: str | None
+    composed_user: str | None
+    runner_profile_id: str | None
+    model: str | None
+    model_provider: str | None
+    workspace: dict | None
+    current_version: int | None
+    versions: list[dict] | None
+    disabled_at: str | None
+
+
+class _SetWorkspaceResult(TypedDict):
+    """Response shape of PATCH /api/agents/{agent_id}/workspace."""
+
+    agent_id: str
+    workspace: str | None
+
+
+class _PublishVersionResult(TypedDict):
+    """Response shape of POST /api/agents/{agent_id}/versions/{version}/publish."""
+
+    active_version: int
+    version_id: int | None
+    version: int | None
+    author: str | None
+    changelog: str | None
+
+
+class _BranchDraftResult(TypedDict):
+    """Response shape of POST /api/agents/{agent_id}/draft."""
+
+    version: int | None
+    version_id: int | None
+    author: str | None
+    changelog: str | None
+
+
+class _DisableAgentResult(TypedDict):
+    """Response shape of POST /api/agents/{agent_id}/disable."""
+
+    agent_id: str
+    disabled_at: str | None
+
+
+class _EnableAgentResult(TypedDict):
+    """Response shape of POST /api/agents/{agent_id}/enable."""
+
+    agent_id: str
+    disabled_at: str | None
+
+
+class _RollbackVersionResult(TypedDict):
+    """Response shape of POST /api/agents/{agent_id}/versions/{version}/rollback."""
+
+    version: int | None
+    version_id: int | None
+    active_version: int | None
+    author: str | None
+    changelog: str | None
+
+
 @router.get("")
-def list_agents(include_disabled: bool = False) -> list[dict]:
+def list_agents(include_disabled: bool = False) -> list[dict[str, JsonValue]]:
     """List agents from the DB (one row per agent_id, latest version).
 
     DB-as-source-of-truth: every agent that has ever been imported into
@@ -32,11 +100,23 @@ def list_agents(include_disabled: bool = False) -> list[dict]:
 
 
 @router.get("/{agent_id}")
-def get_agent(agent_id: str) -> dict:
+def get_agent(agent_id: str) -> _GetAgentResult:
     detail = get_agent_service().get_agent_detail(agent_id)
     if detail is None:
         raise HTTPException(404)
-    return detail
+    return {
+        "agent": detail.get("agent"),
+        "prompt": detail.get("prompt"),
+        "composed_system": detail.get("composed_system"),
+        "composed_user": detail.get("composed_user"),
+        "runner_profile_id": detail.get("runner_profile_id"),
+        "model": detail.get("model"),
+        "model_provider": detail.get("model_provider"),
+        "workspace": detail.get("workspace"),
+        "current_version": detail.get("current_version"),
+        "versions": detail.get("versions"),
+        "disabled_at": detail.get("disabled_at"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +129,7 @@ class WorkspaceBody(BaseModel):
 
 
 @router.patch("/{agent_id}/workspace")
-def set_workspace(agent_id: str, body: WorkspaceBody) -> dict:
+def set_workspace(agent_id: str, body: WorkspaceBody) -> _SetWorkspaceResult:
     """Update an agent's workspace assignment.
 
     Workspace assignment is stored in the DB via the agent version config.
@@ -74,7 +154,7 @@ class PublishRequest(BaseModel):
 
 
 @router.post("/{agent_id}/versions/{version}/publish")
-def publish_version(agent_id: str, version: int, body: PublishRequest) -> dict:
+def publish_version(agent_id: str, version: int, body: PublishRequest) -> _PublishVersionResult:
     """Publish a version (set as active).
 
     Returns:
@@ -120,7 +200,7 @@ class DraftRequest(BaseModel):
 
 
 @router.post("/{agent_id}/draft", status_code=201)
-def branch_draft(agent_id: str, body: DraftRequest) -> dict:
+def branch_draft(agent_id: str, body: DraftRequest) -> _BranchDraftResult:
     """Create a new (non-active) version by cloning the active version.
 
     Returns:
@@ -203,7 +283,7 @@ def delete_agent(agent_id: str) -> None:
 
 
 @router.post("/{agent_id}/disable", status_code=200)
-def disable_agent(agent_id: str) -> dict:
+def disable_agent(agent_id: str) -> _DisableAgentResult:
     """Mark an agent disabled — visible in lists with ``include_disabled``
     but the run dispatcher refuses to invoke it with HTTP 403.
     """
@@ -214,7 +294,7 @@ def disable_agent(agent_id: str) -> dict:
 
 
 @router.post("/{agent_id}/enable", status_code=200)
-def enable_agent(agent_id: str) -> dict:
+def enable_agent(agent_id: str) -> _EnableAgentResult:
     """Clear the disabled marker. Idempotent — returns 200 even when the
     agent was already enabled."""
     meta = get_agent_service().enable(agent_id)
@@ -224,7 +304,7 @@ def enable_agent(agent_id: str) -> dict:
 
 
 @router.post("/{agent_id}/versions/{version}/rollback", status_code=201)
-def rollback_version(agent_id: str, version: int, body: RollbackRequest) -> dict:
+def rollback_version(agent_id: str, version: int, body: RollbackRequest) -> _RollbackVersionResult:
     """Create a new version rolling back to target_version's config (becomes active).
 
     Returns:

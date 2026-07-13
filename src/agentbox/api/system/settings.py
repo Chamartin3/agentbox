@@ -7,6 +7,8 @@ PATCH /api/settings/{section}    — partial patch; only listed keys change.
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -14,6 +16,29 @@ from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+
+class ListSettingsResult(TypedDict):
+    """Response envelope for GET /api/settings."""
+
+    known: list[str]
+    present: list[str]
+
+
+class GetSettingsResult(TypedDict):
+    """Response envelope for GET /api/settings/{section}."""
+
+    section: str
+    values: dict
+    defaults: dict
+    overrides: dict
+
+
+class PatchSettingsResult(TypedDict):
+    """Response envelope for PATCH /api/settings/{section}."""
+
+    section: str
+    values: dict
 
 # Known sections — the UI uses these to render typed tabs. Storing them
 # here (not enforced in DB) means a new section ships with a code change,
@@ -50,7 +75,7 @@ class PatchBody(BaseModel):
 @router.get("")
 def list_sections(
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> ListSettingsResult:
     return {
         "known": list(KNOWN_SECTIONS),
         "present": ctx.system.list_settings_sections(),
@@ -61,7 +86,7 @@ def list_sections(
 def get_section(
     section: str,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> GetSettingsResult:
     """Return the section. Missing keys are filled from `SECTION_DEFAULTS`
     so the UI shows the active fallback values, not an empty object.
     """
@@ -81,6 +106,6 @@ def patch_section(
     section: str,
     body: PatchBody,
     ctx: APIContext = Depends(get_api_context),
-) -> dict:
+) -> PatchSettingsResult:
     updated = ctx.system.update_settings_section(section, body.values)
     return {"section": section, "values": updated}

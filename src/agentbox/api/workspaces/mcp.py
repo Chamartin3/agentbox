@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from agentbox.core.data.payload_types import McpDiscoveryRefreshResult, ResolvedWorkspaceMcp
 
-from typing import Annotated
+from typing import Annotated, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -40,6 +40,12 @@ class PolicyBody(BaseModel):
     default_policy: McpPolicy
 
 
+class McpPolicyResult(TypedDict):
+    """Response for MCP policy endpoints."""
+
+    policy: McpPolicy
+
+
 @router.get("/api/workspaces/{workspace_id}/mcp")
 def get_effective_mcp(
     workspace_id: str,
@@ -60,7 +66,7 @@ def get_effective_servers(
 @router.get("/api/workspaces/{workspace_id}/mcp/policy")
 def get_policy(
     workspace_id: str, ws: Annotated[WorkspaceService, Depends(get_workspace_service)]
-) -> dict:
+) -> McpPolicyResult:
     return {"policy": ws.get_mcp_policy(workspace_id)}
 
 
@@ -69,7 +75,7 @@ def set_policy(
     workspace_id: str,
     body: PolicyBody,
     ws: Annotated[WorkspaceService, Depends(get_workspace_service)],
-) -> dict:
+) -> McpPolicyResult:
     try:
         return {
             "policy": ws.set_mcp_policy(workspace_id, body.default_policy)

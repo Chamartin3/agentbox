@@ -16,11 +16,12 @@ collector that gathers their slices and serialises the result.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, TypedDict
 
 from fastapi import APIRouter, Depends
 
 from agentbox.api.deps import get_mcp_registry, get_workspace_service
+from agentbox.core.data import JsonValue
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
@@ -28,7 +29,13 @@ from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 router = APIRouter(tags=["workspace-catalog"])
 
 
-def _item_as_dict(item: CallableItem) -> dict:
+class AvailableToolsResponse(TypedDict):
+    """Response from ``GET /api/workspaces/{workspace_id}/available_tools``."""
+
+    items: list[dict[str, JsonValue]]
+
+
+def _item_as_dict(item: CallableItem) -> dict[str, JsonValue]:
     """Convert a CallableItem to the wire shape expected by the API contract.
 
     The shape varies slightly by kind — the ``policy`` field (the
@@ -36,7 +43,7 @@ def _item_as_dict(item: CallableItem) -> dict:
     and flattened into the body for resource items, matching the
     pre-refactoring contract.
     """
-    d: dict = {
+    d: dict[str, JsonValue] = {
         "name": item.name,
         "description": item.description,
         "kind": item.kind,
@@ -59,7 +66,7 @@ def list_available_tools(
     workspace_id: str,
     svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     mcp_registry: Annotated[McpRegistry, Depends(get_mcp_registry)],
-) -> dict:
+) -> AvailableToolsResponse:
     """Return every tool, capability, and resource *installed* in this workspace.
 
     The agent's authorization pick-list is drawn from this catalog.

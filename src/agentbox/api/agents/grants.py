@@ -8,17 +8,52 @@ before its workspace finishes provisioning.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, NotRequired, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agentbox.api.deps import get_agent_service, get_mcp_registry, get_resource_service, get_workspace_service
+from agentbox.core.data.rows import AgentToolGrantRow
 from agentbox.core.service import AgentService
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 
 router = APIRouter(prefix="/api/agents", tags=["agent-tool-grants"])
+
+
+class _ToolGrantListResult(TypedDict):
+    """Response shape of GET /api/agents/{agent_id}/tool_grants."""
+
+    items: list[AgentToolGrantRow]
+
+
+class _ToolGrantResult(TypedDict, total=False):
+    """Response shape of POST /api/agents/{agent_id}/tool_grants."""
+
+    id: str
+    agent_id: str
+    tool_name: str
+    changelog: str
+    granted_at: str
+    granted_by: str | None
+    revoked_at: str | None
+    revoked_by: str | None
+    revoke_changelog: str | None
+    warning: NotRequired[str]
+
+
+class _ForbidToolResult(TypedDict):
+    """Response shape of POST /api/agents/{agent_id}/forbidden_tools."""
+
+    forbidden: bool
+    tool_name: str
+
+
+class _EffectiveToolsResult(TypedDict):
+    """Response shape of GET /api/agents/{agent_id}/effective_tools."""
+
+    items: list[dict]
 
 
 class GrantBody(BaseModel):
@@ -65,7 +100,7 @@ def list_grants(
     agent_id: str,
     include_revoked: bool = False,
     svc: AgentService = Depends(get_agent_service),
-) -> dict:
+) -> _ToolGrantListResult:
     return {"items": svc.list_tool_grants(agent_id, include_revoked=include_revoked)}
 
 
@@ -76,7 +111,7 @@ def grant_tool(
     ws_svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
     mcp_registry: Annotated[McpRegistry, Depends(get_mcp_registry)],
     svc: AgentService = Depends(get_agent_service),
-) -> dict:
+) -> _ToolGrantResult:
     try:
         result = svc.grant_tool(
             agent_id=agent_id,
@@ -88,7 +123,17 @@ def grant_tool(
         raise HTTPException(400, str(exc)) from exc
 
     # Validate against workspace catalog (warn, not hard-fail).
-    response: dict = dict(result)
+    response: _ToolGrantResult = {
+        "id": result["id"],
+        "agent_id": result["agent_id"],
+        "tool_name": result["tool_name"],
+        "changelog": result["changelog"],
+        "granted_at": result["granted_at"],
+        "granted_by": result["granted_by"],
+        "revoked_at": result["revoked_at"],
+        "revoked_by": result["revoked_by"],
+        "revoke_changelog": result["revoke_changelog"],
+    }
     if body.workspace_id:
         installed = _catalog_tool_names(body.workspace_id, ws_svc, mcp_registry)
         if body.tool_name not in installed:
@@ -123,7 +168,7 @@ def forbid_tool(
     agent_id: str,
     body: ForbidBody,
     svc: AgentService = Depends(get_agent_service),
-) -> dict:
+) -> _ForbidToolResult:
     try:
         svc.forbid_tool(
             agent_id=agent_id,
@@ -159,7 +204,7 @@ def list_effective_tools(
     agent_id: str,
     workspace_id: str | None = None,
     svc: AgentService = Depends(get_agent_service),
-) -> dict:
+) -> _EffectiveToolsResult:
     try:
         tools = svc.list_effective_tools(agent_id, workspace_id)
         return {"items": [dict(t) for t in tools]}
