@@ -11,7 +11,8 @@ parsing lives in the caller.
 """
 
 from __future__ import annotations
-from typing import Any
+
+from agentbox.core.data.jsontypes import JsonDict
 
 import asyncio
 import contextlib
@@ -35,7 +36,7 @@ _HEARTBEAT_INTERVAL_SECONDS = 30.0
 ParsedEvent = tuple[list[RunEvent], str | None]
 """Return value of an event parser: (events to yield, captured session id)."""
 
-EventParser = Callable[[dict[str, Any], str], ParsedEvent]
+EventParser = Callable[[JsonDict, str], ParsedEvent]
 """Parses one decoded JSON event. ``run_id`` is passed for event construction."""
 
 

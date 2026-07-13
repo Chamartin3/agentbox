@@ -17,6 +17,8 @@ Two detectors:
 
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict, JsonValue
+
 import json
 import re
 from typing import Any
@@ -60,7 +62,15 @@ _TEXT_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
-def detect_in_opencode_event(evt: dict[str, Any]) -> str | None:
+def _as_str(v: JsonValue) -> str | None:
+    return v if isinstance(v, str) else None
+
+
+def _as_int(v: JsonValue) -> int | None:
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def detect_in_opencode_event(evt: JsonDict) -> str | None:
     """Return a short error message if ``evt`` carries a fatal API error.
 
     Opencode emits error events in several shapes across versions, e.g.::
@@ -143,7 +153,7 @@ def _format_opencode_log_line(s: str) -> str | None:
     provider = _extract_kv(s, "providerID")
     model = _extract_kv(s, "modelID")
 
-    err_obj: dict[str, Any] | None = None
+    err_obj: JsonDict | None = None
     idx = s.find("error=")
     if idx != -1:
         err_obj = _try_parse_trailing_json(s[idx + len("error=") :])
@@ -163,9 +173,9 @@ def _format_opencode_log_line(s: str) -> str | None:
                 else err_obj
             )
             if isinstance(inner, dict):
-                name = inner.get("name") or inner.get("type")
-                status = inner.get("statusCode") or inner.get("status")
-                message = inner.get("message")
+                name = _as_str(inner.get("name")) or _as_str(inner.get("type"))
+                status = _as_int(inner.get("statusCode")) or _as_int(inner.get("status"))
+                message = _as_str(inner.get("message"))
 
     # If we didn't find an error name in the JSON, try regex on the raw
     # line — covers the case where the JSON is truncated before ``name``.
@@ -217,7 +227,7 @@ def _extract_kv(s: str, key: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _try_parse_trailing_json(s: str) -> dict[str, Any] | None:
+def _try_parse_trailing_json(s: str) -> JsonDict | None:
     """Best-effort parse of a possibly-truncated JSON object at start of ``s``.
 
     Walks forward looking for the longest balanced-brace prefix that

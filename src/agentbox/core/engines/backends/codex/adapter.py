@@ -6,6 +6,8 @@ Streaming uses the shared
 
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict
+
 import os
 import shutil
 from collections.abc import AsyncIterator
@@ -44,7 +46,7 @@ def build_codex_argv(
 
 
 def parse_codex_event(
-    evt: dict[str, Any], run_id: str
+    evt: JsonDict, run_id: str
 ) -> tuple[list[RunEvent], str | None]:
     """Parse one ``codex exec --json`` event line.
 
@@ -86,7 +88,8 @@ def parse_codex_event(
 
     usage = evt.get("usage")
     if isinstance(usage, dict):
-        model = evt.get("model") if isinstance(evt.get("model"), str) else None
+        _m = evt.get("model")
+        model = _m if isinstance(_m, str) else None
         events.append(
             UsageEvent(
                 run_id=run_id,

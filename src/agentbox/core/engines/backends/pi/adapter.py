@@ -5,6 +5,8 @@ Mirrors :mod:`agentbox.core.engines.backends.codex`.
 
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict
+
 import json
 import os
 import shutil
@@ -32,6 +34,11 @@ from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
 
 _NAME = "pi"
+
+
+
+def _as_str(v: JsonValue) -> str | None:
+    return v if isinstance(v, str) else None
 
 
 def _normalize_pi_model_id(model: str | None, provider: str | None) -> str | None:
@@ -83,7 +90,7 @@ def build_pi_argv(
 
 
 def parse_pi_event(
-    evt: dict[str, Any], run_id: str
+    evt: JsonDict, run_id: str
 ) -> tuple[list[RunEvent], str | None]:
     """Parse one ``pi --mode json`` event line (pi v3 schema).
 
@@ -126,7 +133,7 @@ def parse_pi_event(
                     run_id=run_id,
                     tool=name,
                     arguments=args if isinstance(args, dict) else {},
-                    call_id=evt.get("toolCallId"),
+                    call_id=_as_str(evt.get("toolCallId")),
                 )
             )
 
@@ -137,7 +144,7 @@ def parse_pi_event(
                 ToolResultEvent(
                     run_id=run_id,
                     tool=name,
-                    call_id=evt.get("toolCallId"),
+                    call_id=_as_str(evt.get("toolCallId")),
                     ok=not evt.get("isError", False),
                     result_excerpt=_pi_result_text(evt.get("result")),
                 )
@@ -150,7 +157,7 @@ def parse_pi_event(
             events.append(
                 UsageEvent(
                     run_id=run_id,
-                    model=msg.get("model") if isinstance(msg, dict) else None,
+                    model=_as_str(msg.get("model")) if isinstance(msg, dict) else None,
                     input_tokens=_int_or_zero(usage.get("input")),
                     output_tokens=_int_or_zero(usage.get("output")),
                     cache_read_tokens=_int_or_zero(usage.get("cacheRead")),

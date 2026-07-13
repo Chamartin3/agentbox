@@ -14,11 +14,13 @@ A future refactor may read the session JSON directly from
 
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict, JsonValue
+
 import json
 import shutil
 import subprocess
 from contextlib import suppress
-from typing import Any, Final, TypedDict
+from typing import Final, TypedDict
 
 from agentbox.core.data.constants import ContentBlockType, MessageRole
 from agentbox.core.data import RunRecord
@@ -32,6 +34,10 @@ from agentbox.core.data.conversation.types import (
 
 
 _VALID_ROLES_OC: Final = frozenset(MessageRole)
+
+
+def _as_str(v: JsonValue) -> str | None:
+    return v if isinstance(v, str) else None
 
 
 class _OpencodeTokenCache(TypedDict, total=False):
@@ -61,7 +67,7 @@ class _OpencodeSessionExport(TypedDict, total=False):
     """Root structure of OpenCode session export."""
 
     info: _OpencodeSessionInfo | None
-    messages: list[dict[str, Any]] | None
+    messages: list[JsonDict] | None
 
 
 class OpencodeSessionSource(ConversationSource):
@@ -184,7 +190,7 @@ class OpencodeSessionSource(ConversationSource):
                         continue
                     ct = c.get("type", "")
                     if ct == "text":
-                        body = c.get("text", "") or ""
+                        body = _as_str(c.get("text")) or ""
                         parts.append(
                             ContentPart(
                                 type=ContentBlockType.TEXT,
@@ -193,7 +199,7 @@ class OpencodeSessionSource(ConversationSource):
                             )
                         )
                     elif ct == "thinking":
-                        body = c.get("thinking", "") or ""
+                        body = _as_str(c.get("thinking")) or ""
                         parts.append(
                             ContentPart(
                                 type=ContentBlockType.THINKING,
@@ -210,8 +216,8 @@ class OpencodeSessionSource(ConversationSource):
                                 type=ContentBlockType.TOOL_USE,
                                 byte_len=len(body_str) if body_str else 0,
                                 body=body_str if include_bodies else None,
-                                tool_name=tool_name,
-                                tool_use_id=c.get("id") or c.get("tool_use_id"),
+                                tool_name=_as_str(tool_name),
+                                tool_use_id=_as_str(c.get("id")) or _as_str(c.get("tool_use_id")),
                             )
                         )
                     elif ct == "tool_result":
@@ -226,7 +232,7 @@ class OpencodeSessionSource(ConversationSource):
                                 type=ContentBlockType.TOOL_RESULT,
                                 byte_len=len(body_str) if body_str else 0,
                                 body=body_str if include_bodies else None,
-                                tool_use_id=c.get("tool_use_id"),
+                                tool_use_id=_as_str(c.get("tool_use_id")),
                             )
                         )
             role = role_str if role_str in _VALID_ROLES_OC else "user"
