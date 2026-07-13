@@ -13,6 +13,8 @@ reach across into the other to name them.
 
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict
+
 import hashlib
 import json
 from collections.abc import Mapping
@@ -29,7 +31,7 @@ from agentbox.core.data.tools import CanonicalTool
 class McpToolSpec(TypedDict, total=False):
     name: str
     description: str
-    inputSchema: dict[str, Any]
+    inputSchema: JsonDict
 
 
 # ── Engine-local views of agent config ───────────────────────────────────────
@@ -82,8 +84,8 @@ class ComposedView:
 
     system: str | None = None
     system_base: str | None = None
-    schema: dict[str, Any] | None = None
-    input_schema: dict[str, Any] | None = None
+    schema: JsonDict | None = None
+    input_schema: JsonDict | None = None
     user: str | None = None
     references: tuple[ComposedReferenceView, ...] = ()
     bundle_sha: str | None = None

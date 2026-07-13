@@ -6,12 +6,14 @@ Merges the former client/client.py + client/discovery.py.
 
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict
+
 import asyncio
 import contextlib
 import json
 import logging
 from collections.abc import Callable
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import httpx
 
@@ -26,7 +28,7 @@ class McpRawTool(TypedDict, total=False):
 
     name: str
     description: str
-    inputSchema: dict[str, Any]
+    inputSchema: JsonDict
 
 
 class McpError(Exception):

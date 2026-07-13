@@ -6,10 +6,12 @@ Merges the former client/health.py + client/registry.py.
 
 from __future__ import annotations
 
+from agentbox.core.data.jsontypes import JsonDict
+
 import json
 import time
 from pathlib import Path
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
 from agentbox.core.data import McpHealthReportDict, McpServerHealthDict
 from agentbox.core.workspaces.tooling.mcp.manifest import McpToolManifest, Tool
@@ -64,7 +66,7 @@ class CachedTool(TypedDict):
 
     name: str
     description: str
-    input_schema: dict[str, Any] | None
+    input_schema: JsonDict | None
 
 
 class McpServerConfig(TypedDict, total=False):

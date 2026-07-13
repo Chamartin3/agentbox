@@ -6,7 +6,8 @@ of truth the API, grant resolver, and MCP implementations agree on.
 """
 
 from __future__ import annotations
-from typing import Any
+
+from agentbox.core.data.jsontypes import JsonDict
 
 from dataclasses import dataclass
 
@@ -17,7 +18,7 @@ from agentbox.core.data import CanonicalTool
 class Capability:
     name: CanonicalTool
     description: str
-    grant_schema: dict[str, Any]
+    grant_schema: JsonDict
     default_granted: bool = False
 
 
