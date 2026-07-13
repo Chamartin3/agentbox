@@ -72,6 +72,7 @@ from agentbox.core.data.errors import (
 )
 from agentbox.core.data._util import hash_blobs, now_iso
 from agentbox.core.data.tools import CanonicalTool
+from agentbox.core.data.jsontypes import JsonDict, JsonValue
 from agentbox.core.data.skills import SkillPack
 from agentbox.core.data.schema_consistency import assert_schema_consistent
 from agentbox.core.data.backends import (
@@ -115,7 +116,6 @@ from agentbox.core.data.payload_types import (
     RenderMetadata,
     RenderedBlob,
     ResourceListResult,
-    JsonValue,
     RunCommentsResult,
     RunCreatedResult,
     RerunResult,
@@ -204,6 +204,8 @@ __all__ = [
     "AgentServiceError",
     "BackendRunResult",
     "CanonicalTool",
+    "JsonValue",
+    "JsonDict",
     "DuplicateVersionFile",
     "InconsistentSchema",
     "InvalidRunInput",
@@ -322,7 +324,6 @@ __all__ = [
     "BindingDict",
     "RunPromptFragmentsResult",
     "RunDetailResult",
-    "JsonValue",
     "RunLogsResult",
     "RunErrorResult",
     "RunLifecycleResult",

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 
+from agentbox.core.data.jsontypes import JsonValue
 from agentbox.core.data.workenv import SourceMetadata
 from agentbox.core.data.rows import (
     AgentPromptBindingRow,
@@ -177,15 +178,6 @@ type DiffValue = str | int | float | bool | None | dict[str, DiffValue] | list[D
 
 Diffed snapshots are free-form ``config_json`` documents; the individual
 changed values have no schema to type against.
-"""
-
-
-type JsonValue = str | int | float | bool | None | dict[str, JsonValue] | list[JsonValue]
-"""Any JSON-serializable value.
-
-Used to type genuinely dynamic dicts (run-record dumps, transcript events,
-composed prompt fragments) that carry free-form JSON with no fixed schema —
-the honest concrete alternative to the banned ``dict[str, object]``.
 """
 
 

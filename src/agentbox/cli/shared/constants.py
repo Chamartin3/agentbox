@@ -11,14 +11,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Final
 
-from agentbox.core.data import EventStylesDict
-
-# ---------------------------------------------------------------------------
-# Canonical recursive JSON value alias.
-# Covers every value that json.dumps / json.loads can produce.
-# ---------------------------------------------------------------------------
-
-type JsonValue = str | int | float | bool | None | dict[str, JsonValue] | list[JsonValue]
+from agentbox.core.data import EventStylesDict, JsonValue as JsonValue
 
 # Sentinel value accepted by workspace resolution to request a fresh tmp dir.
 EPHEMERAL_WORKSPACE: Final[str] = "<ephemeral>"
