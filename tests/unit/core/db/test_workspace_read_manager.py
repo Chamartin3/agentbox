@@ -15,7 +15,7 @@ from agentbox.core.db import (
     WorkspaceReadManager,
 )
 from agentbox.core.db.database import Database
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 class TestWorkspaceReadManagerListFileBindings:

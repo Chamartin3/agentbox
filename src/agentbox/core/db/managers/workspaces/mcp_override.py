@@ -16,7 +16,7 @@ from agentbox.core.db.schema import (
     workspace_mcp_policies,
     workspace_mcp_tool_overrides,
 )
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 from agentbox.core.data.constants import McpPolicy
 
 

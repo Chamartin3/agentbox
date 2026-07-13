@@ -10,7 +10,7 @@ from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.resources.shared_resource import SharedResource
 from agentbox.core.data.records import SharedResourceRecord, row_to_shared_resource as row_to_record
 from agentbox.core.db.schema import shared_resources
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 def _compute_sha256(content: str | None, config_json: str | None) -> str:

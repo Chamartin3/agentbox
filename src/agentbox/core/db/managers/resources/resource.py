@@ -25,7 +25,7 @@ from agentbox.core.db.schema import (
     resource_versions,
     resources as resources_table,
 )
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 # ---------------------------------------------------------------------------

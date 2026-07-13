@@ -25,7 +25,7 @@ from agentbox.core.data.rows import (
     RunStatsRow,
 )
 from agentbox.core.data.snapshots import RunnerSnapshot
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.runs.run import Run
 from agentbox.core.db.schema import agent_versions, runs, usage

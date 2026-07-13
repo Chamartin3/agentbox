@@ -7,7 +7,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.runs.run_prompt import RunPrompt
 from agentbox.core.db.schema import run_prompts
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 class RunPromptManager(Manager[RunPrompt]):

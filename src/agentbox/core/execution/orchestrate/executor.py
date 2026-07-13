@@ -9,7 +9,7 @@ import uuid
 
 from agentbox.core.config import Settings
 from agentbox.core.db.database import Database
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 from agentbox.core.data.constants import RunStatus
 from agentbox.core.engines.profiles import RunnerProfileResolver
 from agentbox.core.execution.orchestrate._runner import _run as _run_loop

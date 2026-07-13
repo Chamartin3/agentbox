@@ -20,7 +20,7 @@ from agentbox.core.db.schema import (
     resources as resources_table,
     workspace_file_resource_bindings,
 )
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 _MIN_REASON = 3

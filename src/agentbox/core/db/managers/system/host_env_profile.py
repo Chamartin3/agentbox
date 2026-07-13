@@ -11,7 +11,7 @@ from agentbox.core.data.rows import HostEnvProfileRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.system.host_env_profile import HostEnvProfile
 from agentbox.core.db.schema import host_env_profiles
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 class HostEnvProfileManager(Manager[HostEnvProfile]):

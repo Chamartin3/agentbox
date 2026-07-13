@@ -18,7 +18,7 @@ from agentbox.core.db.models.workspaces.runtime_permission import WorkspaceRunti
 from agentbox.core.db.models.workspaces.subagent import WorkspaceSubagent
 from agentbox.core.db.models.workspaces.workspace import Workspace
 from agentbox.core.db.schema import workspaces as workspaces_schema
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 _SATELLITE_TABLES: tuple[str, ...] = (
     "workspace_subagents",

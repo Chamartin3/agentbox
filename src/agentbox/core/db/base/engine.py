@@ -20,7 +20,7 @@ from sqlalchemy.engine import Engine
 
 from agentbox.core.data.constants import RunStatus
 from agentbox.core.db.schema import runs
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 # Used as fallback when Alembic is unavailable.
 from agentbox.core.db.base.metadata import metadata  # noqa: F401

@@ -6,7 +6,7 @@ from typing import Unpack
 from sqlalchemy import Row, func, select, update as sa_update
 from sqlalchemy.engine import Connection
 
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.version import (
     AgentVersion,
@@ -30,7 +30,7 @@ from agentbox.core.db.schema import (
     agent_version_ratings,
     agent_versions,
 )
-from agentbox.core.db.utils import now_iso as _now_iso
+from agentbox.core.data._util import now_iso as _now_iso
 
 
 def _version_row(row: Row) -> AgentVersionRow:

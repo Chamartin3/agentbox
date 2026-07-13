@@ -13,7 +13,7 @@ import uuid
 
 from agentbox.core.config import load_settings
 from agentbox.core.db.database import Database, get_database
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 from agentbox.core.data.manifests.workspaces import McpServerSpec
 
 __all__ = [

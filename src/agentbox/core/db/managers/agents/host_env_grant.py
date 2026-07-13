@@ -12,7 +12,7 @@ from agentbox.core.data.rows import AgentHostEnvGrantRow, HostEnvProfileRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.agents.host_env_grant import AgentHostEnvGrant
 from agentbox.core.db.schema import agent_host_env_grants, host_env_profiles
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 class AgentHostEnvGrantManager(Manager[AgentHostEnvGrant]):

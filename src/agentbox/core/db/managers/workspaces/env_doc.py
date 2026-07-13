@@ -10,7 +10,7 @@ from agentbox.core.db.base.manager import Manager
 from agentbox.core.data.rows import EnvDocRow, WorkspaceEnvDocPointerRow
 from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
 from agentbox.core.db.schema import workspace_env_doc_versions, workspace_env_docs
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 class WorkspaceEnvDocManager(Manager[WorkspaceEnvDoc]):

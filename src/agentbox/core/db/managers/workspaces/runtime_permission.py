@@ -9,7 +9,7 @@ from agentbox.core.data.rows import PermissionFileEntry, WorkspaceRuntimePermiss
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.runtime_permission import WorkspaceRuntimePermission
 from agentbox.core.db.schema import workspace_runtime_permissions
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 def _bool_to_int(b: bool | None) -> int | None:

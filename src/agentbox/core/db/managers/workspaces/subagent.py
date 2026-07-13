@@ -11,7 +11,7 @@ from agentbox.core.data.rows import WorkspaceSubagentRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.workspaces.subagent import WorkspaceSubagent
 from agentbox.core.db.schema import workspace_subagents
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 class WorkspaceSubagentManager(Manager[WorkspaceSubagent]):

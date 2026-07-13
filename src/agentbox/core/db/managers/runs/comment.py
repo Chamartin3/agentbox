@@ -7,7 +7,7 @@ from agentbox.core.data.rows import RunCommentRow
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.models.runs.comment import RunComment
 from agentbox.core.db.schema import run_comments
-from agentbox.core.db.utils import now_iso
+from agentbox.core.data._util import now_iso
 
 
 class RunCommentManager(Manager[RunComment]):
