@@ -166,8 +166,8 @@ class ScriptValidatorConfig:
     The script (loaded from a versioned ``repo_resource`` of type
     ``'script'``) must define::
 
-        def validate(output: str) -> dict:
-            # return {"ok": True} or {"ok": False, "error": "..."}
+        def validate(output):
+            # returns {"ok": True} or {"ok": False, "error": "..."}
 
     Resolved upstream by ``resolve_output_config`` so the runtime
     receives the source code directly and does not need DB access.

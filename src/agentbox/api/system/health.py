@@ -5,17 +5,9 @@ from typing import TypedDict, NotRequired
 from fastapi import APIRouter
 
 from agentbox.api.deps import get_mcp_registry
+from agentbox.core.data import McpServerHealthDict
 
 router = APIRouter(tags=["health"])
-
-
-class ServerHealthEntry(TypedDict):
-    """Per-server health, as produced by ``ServerHealth.to_dict``."""
-
-    status: str
-    tool_count: int
-    fetched_at: NotRequired[str]
-    last_error: NotRequired[str]
 
 
 class HealthResult(TypedDict):
@@ -23,7 +15,7 @@ class HealthResult(TypedDict):
 
     ok: bool
     version: str
-    mcp_servers: NotRequired[dict[str, ServerHealthEntry]]
+    mcp_servers: NotRequired[dict[str, McpServerHealthDict]]
     status: NotRequired[str]
     mcp_error: NotRequired[str]
 

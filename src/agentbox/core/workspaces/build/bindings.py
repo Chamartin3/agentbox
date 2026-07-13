@@ -14,13 +14,16 @@ from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 
 from agentbox.core.data.constants import ResourceType
+from agentbox.core.data.payload_types import BindingDict
+from agentbox.core.data.rows import ResourceBlobRow
+from agentbox.core.data.workenv import SourceMetadata
 from agentbox.core.data.workenv import Recipe
 from agentbox.core.data.workenv import MaterializeOutcome as MaterializeOutcome
 from agentbox.core.workspaces.build._paths import safe_dest
 
 
 def materialize_blobs(
-    blobs: Iterable[dict],
+    blobs: Iterable[ResourceBlobRow],
     target_root: Path,
     *,
     overwrite: bool = True,
@@ -80,7 +83,7 @@ def _resolve_single_file_name(
     *,
     resource_type: str,
     display_name: str,
-    source_metadata: dict | None,
+    source_metadata: SourceMetadata | None,
 ) -> str:
     """Pick the filename for a single-blob resource.
 
@@ -106,7 +109,7 @@ def _resolve_single_file_name(
     return Path(name).name
 
 
-def _skill_targets(b: dict, recipes: Iterable[Recipe]) -> list[str]:
+def _skill_targets(b: BindingDict, recipes: Iterable[Recipe]) -> list[str]:
     """Skill dirs across every engine whose recipe declares a skill layout.
 
     Skill placement is harness-specific, so the path comes from each
@@ -118,9 +121,11 @@ def _skill_targets(b: dict, recipes: Iterable[Recipe]) -> list[str]:
     skills", and the binding is skipped rather than silently dropped in a
     claude-shaped path.
     """
-    if b.get("target_path"):
-        return [b["target_path"]]
-    name = (b.get("skill_meta") or {}).get("skill_name") or (b.get("display_name") or "")
+    tp = b.get("target_path")
+    if tp:
+        return [tp]
+    skill_name = (b.get("skill_meta") or {}).get("skill_name")
+    name = skill_name if isinstance(skill_name, str) else (b.get("display_name") or "")
     targets: list[str] = []
     for r in recipes:
         pattern = r.resolve_layout("skill", name=name)
@@ -129,7 +134,7 @@ def _skill_targets(b: dict, recipes: Iterable[Recipe]) -> list[str]:
     return targets
 
 
-def _resolve_target_path(b: dict) -> str:
+def _resolve_target_path(b: BindingDict) -> str:
     """Return the final relative target path for a non-skill binding.
 
     Semantics:
@@ -159,7 +164,7 @@ def _resolve_target_path(b: dict) -> str:
 
 
 def _materialize_one(
-    b: dict, workdir: Path, target_rel: str, *, cache_root: Path | None
+    b: BindingDict, workdir: Path, target_rel: str, *, cache_root: Path | None
 ) -> MaterializeOutcome:
     """Write a single binding's blobs to one destination under ``workdir``."""
     dest = safe_dest(workdir, target_rel)
@@ -221,7 +226,7 @@ def _materialize_one(
 
 def materialize_workspace(
     workdir: Path,
-    resolved_bindings: Iterable[dict],
+    resolved_bindings: Iterable[BindingDict],
     *,
     recipes: Iterable[Recipe] = (),
     cache_root: Path | None = None,

@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
+from agentbox.core.data import McpHealthReportDict, McpServerHealthDict
 from agentbox.core.workspaces.tooling.mcp.manifest import McpToolManifest, Tool
 from agentbox.core.workspaces.tooling.mcp.transport import McpClient
 
@@ -32,8 +33,8 @@ class ServerHealth:
         self.fetched_at = fetched_at
         self.last_error = last_error
 
-    def to_dict(self) -> dict:
-        d: dict = {
+    def to_dict(self) -> McpServerHealthDict:
+        d: McpServerHealthDict = {
             "status": self.status,
             "tool_count": self.tool_count,
         }
@@ -51,7 +52,7 @@ class McpHealthReport:
         self.overall = overall
         self.servers = servers
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> McpHealthReportDict:
         return {
             "status": self.overall,
             "mcp_servers": {name: h.to_dict() for name, h in self.servers.items()},

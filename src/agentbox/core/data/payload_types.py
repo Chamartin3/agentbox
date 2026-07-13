@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 
+from agentbox.core.data.workenv import SourceMetadata
 from agentbox.core.data.rows import (
     AgentPromptBindingRow,
     McpServerConfigView,
@@ -214,6 +215,40 @@ class PaginatedRunsResult(TypedDict):
     offset: int
     limit: int
     has_more: bool
+
+
+class McpServerHealthDict(TypedDict):
+    """One MCP server's health, as produced by ``ServerHealth.to_dict``."""
+
+    status: str
+    tool_count: int
+    fetched_at: NotRequired[str]
+    last_error: NotRequired[str]
+
+
+class McpHealthReportDict(TypedDict):
+    """Aggregate MCP health, as produced by ``McpHealthReport.to_dict``."""
+
+    status: str
+    mcp_servers: dict[str, McpServerHealthDict]
+
+
+class BindingDict(TypedDict):
+    """A ``ResolvedBinding`` projected to the dict the materializer consumes."""
+
+    binding_id: str
+    resource_id: str
+    version_id: str
+    content_hash: str
+    type: str
+    slug: str
+    display_name: str
+    target_path: str | None
+    materialize_mode: str
+    on_conflict: str
+    blobs: list[ResourceBlobRow]
+    skill_meta: dict[str, JsonValue] | None
+    source_metadata: SourceMetadata
 
 
 JsonDiffResult = TypedDict(

@@ -196,7 +196,7 @@ def call_script_validator(validator_cfg: Any, output: str) -> ValidationResult:
 
     Convention: the script must define a top-level callable::
 
-        def validate(output: str) -> dict:  # {"ok": bool, "error": str}
+        def validate(output):  # returns {"ok": bool, "error": str}
 
     Security note: the script runs in this process with full privileges.
     Operators upload it as a versioned ``script`` resource, so trust is

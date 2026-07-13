@@ -92,6 +92,11 @@ class McpClient:
                 lambda t: t.exception() if not t.cancelled() else None
             )
 
+    # ponytail: JSON-RPC request/response stay bare `dict`. Typing them
+    # `dict[str, JsonValue]` cascades unfixably without a banned cast —
+    # `list_tools` would have to coerce JsonValue into `list[McpRawTool]`,
+    # and nested literals (`_CLIENT_INFO`) hit dict-invariance. Real fix:
+    # a pydantic JSON-RPC envelope model if this layer ever grows.
     async def _jsonrpc(self, method: str, params: dict) -> dict:
         self._request_id += 1
         body = {

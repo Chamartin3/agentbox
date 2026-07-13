@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from agentbox.core.config import SETTINGS
+from agentbox.core.data import JsonValue
 
 from agentbox.core.data.events import (
     DoneEvent,
@@ -40,7 +41,7 @@ def _normalize_pi_model_id(model: str | None, provider: str | None) -> str | Non
     return model
 
 
-def _build_pi_models_json(runner_config: Any, model: str | None) -> dict | None:
+def _build_pi_models_json(runner_config: Any, model: str | None) -> dict[str, JsonValue] | None:
     """pi custom-provider block (``~/.pi/agent/models.json`` schema).
 
     ponytail: ollama only — the one keyless local provider the QA suite runs.

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from agentbox.core.config import SETTINGS
+from agentbox.core.data import JsonValue
 
 from agentbox.core.engines.backends.opencode.stream import _run_opencode_stream
 
@@ -54,7 +55,7 @@ def _normalize_model_id(model: str, provider: str | None) -> str:
     return model
 
 
-def _build_provider_block(runner_config: Any, model: str) -> dict | None:
+def _build_provider_block(runner_config: Any, model: str) -> dict[str, JsonValue] | None:
     """opencode provider entry derived from the runner profile.
 
     ponytail: ollama only — the one keyless local provider the QA suite runs.
@@ -78,7 +79,7 @@ def _build_provider_block(runner_config: Any, model: str) -> dict | None:
     }
 
 
-def _merge_opencode_json(path: Path, provider_block: dict) -> None:
+def _merge_opencode_json(path: Path, provider_block: dict[str, JsonValue]) -> None:
     """Deep-merge ``{provider: ...}`` into an existing/new opencode.json.
 
     The workspace generator already wrote the base config; we only add the

@@ -29,7 +29,12 @@ from pathlib import Path
 
 from agentbox.core.config import Settings
 from agentbox.core.data.constants import MCP_FILENAME
-from agentbox.core.data.payload_types import EnvDocRenderEntry, McpStdioServerSpec, RunSnapshotEntry
+from agentbox.core.data.payload_types import (
+    BindingDict,
+    EnvDocRenderEntry,
+    McpStdioServerSpec,
+    RunSnapshotEntry,
+)
 from agentbox.core.data.snapshots import workspace_outcomes_to_snapshot
 from agentbox.core.data.workenv import (
     Item,
@@ -108,7 +113,7 @@ class WorkspaceConstructor:
     def materialize(
         self,
         workdir: Path,
-        resolved_bindings: Iterable[dict],
+        resolved_bindings: Iterable[BindingDict],
         *,
         cache_root: Path | None = None,
     ) -> list[MaterializeOutcome]:
@@ -145,7 +150,7 @@ class BuildResult:
     errors: list[str] = field(default_factory=list)
 
 
-def _binding_to_dict(b: ResolvedBinding, *, persistent: bool) -> dict:
+def _binding_to_dict(b: ResolvedBinding, *, persistent: bool) -> BindingDict:
     """Project a ``ResolvedBinding`` into the dict shape ``materialize`` reads.
 
     ponytail: the materializer (``generation/materialize.py``) still consumes
@@ -173,7 +178,7 @@ def _binding_to_dict(b: ResolvedBinding, *, persistent: bool) -> dict:
         "on_conflict": on_conflict,
         "blobs": list(b.blobs),
         "skill_meta": b.skill_meta,
-        "source_metadata": dict(b.source_metadata) if b.source_metadata else {},
+        "source_metadata": b.source_metadata or {},
     }
 
 
