@@ -1,13 +1,19 @@
-"""McpToolDiscoveryCacheManager — MCP discovery cache CRUD."""
+"""McpToolDiscoveryCache model + manager — cached tool manifests for MCP servers.
+
+Maps to the ``mcp_tool_discovery_cache`` table.
+"""
 from __future__ import annotations
 
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from sqlmodel import Field, Index, UniqueConstraint
+
 from agentbox.core.config import SETTINGS
+from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.system.mcp_discovery_cache import McpToolDiscoveryCache
+from agentbox.core.db.base.tablename import tablename, tableargs
 from agentbox.core.db.schema import mcp_tool_discovery_cache
 
 TTL_SECONDS = SETTINGS.mcp_discovery_ttl
@@ -22,6 +28,23 @@ def _parse_iso(s: str) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt
+
+
+class McpToolDiscoveryCache(Entity, table=True):
+    """Cached tool manifest for an MCP server identified by its config hash."""
+
+    __tablename__ = tablename("mcp_tool_discovery_cache")
+
+    id: str = Field(primary_key=True)
+    server_name: str = Field(nullable=False)
+    config_hash: str = Field(nullable=False)
+    tools_json: str = Field(nullable=False)
+    discovered_at: str = Field(nullable=False)
+
+    __table_args__ = tableargs(
+        UniqueConstraint("server_name", "config_hash", name="uq_mcp_discovery_server_hash"),
+        Index("ix_mcp_discovery_server", "server_name"),
+    )
 
 
 class McpToolDiscoveryCacheManager(Manager[McpToolDiscoveryCache]):

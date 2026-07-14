@@ -1,13 +1,39 @@
-"""HostEnvCallLogManager — host env call audit log CRUD."""
+"""HostEnvCallLog model + manager — audit log of host environment capability invocations.
+
+Maps to the ``host_env_call_log`` table.
+"""
 from __future__ import annotations
 
-from typing import cast
+from typing import Optional, cast
 
-from sqlalchemy import select as sa_select
+from sqlalchemy import JSON, select as sa_select
+from sqlmodel import Field, Index
 
 from agentbox.core.data.rows import HostEnvCallLogRow
+from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.system.host_env_call import HostEnvCallLog
+from agentbox.core.db.base.tablename import tablename, tableargs
+
+
+class HostEnvCallLog(Entity, table=True):
+    """An audit record of a host environment capability call."""
+
+    __tablename__ = tablename("host_env_call_log")
+
+    id: str = Field(primary_key=True)
+    run_id: str = Field(nullable=False)
+    workspace_id: str = Field(nullable=False)
+    capability: str = Field(nullable=False)
+    params: Optional[dict] = Field(default=None, sa_type=JSON)
+    status: str = Field(nullable=False)
+    error: Optional[str] = Field(default=None)
+    surface: str = Field(nullable=False, default="host_env")
+    created_at: str = Field(nullable=False)
+
+    __table_args__ = tableargs(
+        Index("ix_host_env_call_log_run", "run_id"),
+        Index("ix_host_env_call_log_workspace", "workspace_id"),
+    )
 
 
 class HostEnvCallLogManager(Manager[HostEnvCallLog]):

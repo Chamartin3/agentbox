@@ -52,7 +52,7 @@ from agentbox.core.db.managers.runs import (
     UsageManager,
     WebhookDeliveryManager,
 )
-from agentbox.core.db.managers.system import (
+from agentbox.core.db.system import (
     ApiTokenManager,
     HostEnvCallLogManager,
     HostEnvProfileManager,

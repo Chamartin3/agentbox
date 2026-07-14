@@ -45,9 +45,8 @@ from agentbox.core.db.models.workspaces import (
     WorkspaceSubagent,
 )
 
-
 # System domain
-from agentbox.core.db.models.system import (
+from agentbox.core.db.system import (
     ApiToken,
     HostEnvCallLog,
     HostEnvProfile,

@@ -1,20 +1,38 @@
-"""SettingManager — application settings key-value CRUD (composite PK)."""
+"""Setting model + manager — application settings key-value store.
+
+Maps to the ``settings`` table. Uses a composite primary key of
+(section, key).
+"""
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
-
 import json as _json
+from typing import Optional
 
 from sqlalchemy import select as sa_select, delete as sa_delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlmodel import Field
 
+from agentbox.core.data.jsontypes import JsonDict
 from agentbox.core.data.manifests.workspaces import McpServerSpec
 from agentbox.core.data.rows import SettingKeyRow
+from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.system.setting import Setting
+from agentbox.core.db.base.tablename import tablename
 
 _PROJ_MCP_SERVERS = "project_mcp_servers"
 _PROJ_SHARED_ASSETS = "project_shared_assets"
+
+
+class Setting(Entity, table=True):
+    """A single application setting within a section."""
+
+    __tablename__ = tablename("settings")
+
+    section: str = Field(primary_key=True)
+    key: str = Field(primary_key=True)
+    value_json: str = Field(nullable=False)
+    updated_at: str = Field(nullable=False)
+    updated_by: Optional[str] = Field(default=None)
 
 
 class SettingManager(Manager[Setting]):

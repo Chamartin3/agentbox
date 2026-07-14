@@ -52,12 +52,6 @@ from agentbox.core.db.managers import (
     WorkspaceReadManager,
     WorkspaceRuntimePermissionManager,
     WorkspaceSubagentManager,
-    # system
-    ApiTokenManager,
-    HostEnvCallLogManager,
-    HostEnvProfileManager,
-    McpToolDiscoveryCacheManager,
-    SettingManager,
 )
 from agentbox.core.db.engines import RunnerProfileManager
 from agentbox.core.db.resources import (
@@ -68,6 +62,13 @@ from agentbox.core.db.resources import (
     ResourceVersionManager,
     SharedResourceManager,
     WorkspaceFileResourceBindingManager,
+)
+from agentbox.core.db.system import (
+    ApiTokenManager,
+    HostEnvCallLogManager,
+    HostEnvProfileManager,
+    McpToolDiscoveryCacheManager,
+    SettingManager,
 )
 
 __all__ = [

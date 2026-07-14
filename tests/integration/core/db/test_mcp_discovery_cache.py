@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 from agentbox.core.db import McpToolDiscoveryCacheManager
-from agentbox.core.db.managers.system import mcp_discovery_cache as _mod
+from agentbox.core.db.system import mcp_discovery_cache as _mod
 
 
 class TestCacheTools:

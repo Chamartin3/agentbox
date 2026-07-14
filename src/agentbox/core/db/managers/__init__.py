@@ -47,16 +47,6 @@ from agentbox.core.db.managers.workspaces import (
     WorkspaceSubagentManager,
 )
 
-
-# System domain
-from agentbox.core.db.managers.system import (
-    ApiTokenManager,
-    HostEnvCallLogManager,
-    HostEnvProfileManager,
-    McpToolDiscoveryCacheManager,
-    SettingManager,
-)
-
 __all__ = [
     # runs
     "RunCommentManager",
@@ -90,10 +80,4 @@ __all__ = [
     "WorkspaceReadManager",
     "WorkspaceRuntimePermissionManager",
     "WorkspaceSubagentManager",
-    # system
-    "ApiTokenManager",
-    "HostEnvCallLogManager",
-    "HostEnvProfileManager",
-    "McpToolDiscoveryCacheManager",
-    "SettingManager",
 ]

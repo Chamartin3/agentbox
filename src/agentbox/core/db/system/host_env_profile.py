@@ -1,21 +1,46 @@
-"""HostEnvProfileManager — host-env profile (named grant bundle) CRUD.
+"""HostEnvProfile model + manager — host environment capability profiles.
 
-Profiles are shared reusable presets referenced by agent-scoped grants.
+Maps to the ``host_env_profiles`` table. Each profile defines a set of
+grants (permissions) for interacting with the host environment.
 """
 from __future__ import annotations
 
 import uuid
-from typing import cast
+from typing import Optional, cast
 
-from agentbox.core.data.rows import HostEnvProfileRow
-from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.system.host_env_profile import HostEnvProfile
-from agentbox.core.db.schema import host_env_profiles
+from sqlalchemy import JSON
+from sqlmodel import Field, UniqueConstraint
+
 from agentbox.core.data._util import now_iso
+from agentbox.core.data.rows import HostEnvProfileRow
+from agentbox.core.db.base.model import Entity
+from agentbox.core.db.base.manager import Manager
+from agentbox.core.db.base.tablename import tablename, tableargs
+from agentbox.core.db.schema import host_env_profiles
+
+
+class HostEnvProfile(Entity, table=True):
+    """A named host environment profile with capability grants."""
+
+    __tablename__ = tablename("host_env_profiles")
+
+    id: str = Field(primary_key=True)
+    name: str = Field(nullable=False)
+    description: Optional[str] = Field(default=None)
+    grants: str = Field(nullable=False, sa_type=JSON)
+    created_at: str = Field(nullable=False)
+    created_by: Optional[str] = Field(default=None)
+
+    __table_args__ = tableargs(
+        UniqueConstraint("name", name="uq_host_env_profile_name"),
+    )
 
 
 class HostEnvProfileManager(Manager[HostEnvProfile]):
-    """Manager for the ``host_env_profiles`` table."""
+    """Manager for the ``host_env_profiles`` table.
+
+    Profiles are shared reusable presets referenced by agent-scoped grants.
+    """
 
     model = HostEnvProfile
 
