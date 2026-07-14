@@ -45,16 +45,6 @@ from agentbox.core.db.models.workspaces import (
     WorkspaceSubagent,
 )
 
-# Resources domain
-from agentbox.core.db.models.resources import (
-    ActiveResourceVersion,
-    AgentPromptResourceBinding,
-    Resource,
-    ResourceBlob,
-    ResourceVersion,
-    SharedResource,
-    WorkspaceFileResourceBinding,
-)
 
 # System domain
 from agentbox.core.db.models.system import (
@@ -96,15 +86,6 @@ __all__ = [
     "WorkspaceMcpToolOverride",
     "WorkspaceRuntimePermission",
     "WorkspaceSubagent",
-    # resources
-    "ActiveResourceVersion",
-    "AgentPromptResourceBinding",
-    "Resource",
-    "ResourceBlob",
-    "ResourceVersion",
-    "SharedResource",
-    "WorkspaceFileResourceBinding",
-    # engines
     # system
     "ApiToken",
     "HostEnvCallLog",

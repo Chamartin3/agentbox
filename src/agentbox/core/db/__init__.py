@@ -52,14 +52,6 @@ from agentbox.core.db.managers import (
     WorkspaceReadManager,
     WorkspaceRuntimePermissionManager,
     WorkspaceSubagentManager,
-    # resources
-    ActiveResourceVersionManager,
-    AgentPromptResourceBindingManager,
-    ResourceBlobManager,
-    ResourceManager,
-    ResourceVersionManager,
-    SharedResourceManager,
-    WorkspaceFileResourceBindingManager,
     # system
     ApiTokenManager,
     HostEnvCallLogManager,
@@ -68,6 +60,15 @@ from agentbox.core.db.managers import (
     SettingManager,
 )
 from agentbox.core.db.engines import RunnerProfileManager
+from agentbox.core.db.resources import (
+    ActiveResourceVersionManager,
+    AgentPromptResourceBindingManager,
+    ResourceBlobManager,
+    ResourceManager,
+    ResourceVersionManager,
+    SharedResourceManager,
+    WorkspaceFileResourceBindingManager,
+)
 
 __all__ = [
     # runs

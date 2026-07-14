@@ -7,7 +7,7 @@ from sqlalchemy import delete as sa_delete, text
 
 from agentbox.core.data.rows import WorkspaceRow
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.resources.binding import WorkspaceFileResourceBinding
+from agentbox.core.db.resources.binding import WorkspaceFileResourceBinding
 from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
 from agentbox.core.db.models.workspaces.mcp_override import (
     WorkspaceMcpOverride,

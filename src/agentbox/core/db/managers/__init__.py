@@ -47,16 +47,6 @@ from agentbox.core.db.managers.workspaces import (
     WorkspaceSubagentManager,
 )
 
-# Resources domain
-from agentbox.core.db.managers.resources import (
-    ActiveResourceVersionManager,
-    AgentPromptResourceBindingManager,
-    ResourceBlobManager,
-    ResourceManager,
-    ResourceVersionManager,
-    SharedResourceManager,
-    WorkspaceFileResourceBindingManager,
-)
 
 # System domain
 from agentbox.core.db.managers.system import (
@@ -100,15 +90,6 @@ __all__ = [
     "WorkspaceReadManager",
     "WorkspaceRuntimePermissionManager",
     "WorkspaceSubagentManager",
-    # resources
-    "ActiveResourceVersionManager",
-    "AgentPromptResourceBindingManager",
-    "ResourceBlobManager",
-    "ResourceManager",
-    "ResourceVersionManager",
-    "SharedResourceManager",
-    "WorkspaceFileResourceBindingManager",
-    # engines
     # system
     "ApiTokenManager",
     "HostEnvCallLogManager",
