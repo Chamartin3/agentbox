@@ -26,7 +26,7 @@ from agentbox.core.data.rows import (
     RunStatsRow,
     UsageSummaryRow,
 )
-from agentbox.core.db.feedback.types import ActivityRange, since_iso
+from agentbox.core.data.feedback import ActivityRange, since_iso
 from agentbox.core.service.base import Service
 
 

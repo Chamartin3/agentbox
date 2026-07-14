@@ -36,7 +36,7 @@ from agentbox.core.agents.composition.rendering import (
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView, ResolvedPromptBinding
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
 from agentbox.core.data import AgentDef
-from agentbox.core.db.system.config import load_project_shared_assets
+from agentbox.core.db.config import load_project_shared_assets
 from agentbox.core.data import InconsistentSchema, assert_schema_consistent
 from agentbox.core.data.snapshots import prompt_resolution_to_snapshot
 from agentbox.core.data.composition import (

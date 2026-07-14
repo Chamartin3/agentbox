@@ -14,7 +14,7 @@ Usage
 ::
 
     from agentbox.core.db import Database
-    from agentbox.core.db.system.seeds import backfill
+    from agentbox.core.db.seeds.system import backfill
 
     db = Database(Path("path/to/agentbox.db"))
     n = backfill(db)

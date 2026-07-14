@@ -1,1 +1,0 @@
-"""Shared-resource row helpers."""

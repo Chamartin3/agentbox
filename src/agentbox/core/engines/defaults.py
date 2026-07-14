@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from agentbox.core.db.system.config import load_settings_section
+from agentbox.core.db.config import load_settings_section
 
 logger = logging.getLogger(__name__)
 

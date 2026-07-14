@@ -21,7 +21,7 @@ from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.data import RunRecord
 from agentbox.core.data.manifests.workspaces import McpServerSpec
 from agentbox.core.db.database import Database
-from agentbox.core.db.engines.seeds import seed_default_runner_profiles
+from agentbox.core.db.seeds.engines import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.resources.boot import import_repo_resources
 from agentbox.core.service.execution import ExecutionService

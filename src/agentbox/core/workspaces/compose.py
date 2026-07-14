@@ -27,7 +27,7 @@ from agentbox.core.data.workenv import (
     WorkspaceBlueprint,
 )
 from agentbox.core.db import WorkspaceReadManager
-from agentbox.core.db.system.config import load_project_mcp_servers
+from agentbox.core.db.config import load_project_mcp_servers
 from agentbox.core.engines.backends.recipe_loader import list_recipes, load_recipe
 from agentbox.core.workspaces._types import WorkspaceSyncMeta
 

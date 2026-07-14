@@ -10,7 +10,7 @@ from functools import cached_property
 from pathlib import Path
 
 from agentbox.core.db.database import Database  # allowed: secondary-store opener (plan 110)
-from agentbox.core.db.system.config import record_host_env_call
+from agentbox.core.db.config import record_host_env_call
 
 
 @dataclass(frozen=True)

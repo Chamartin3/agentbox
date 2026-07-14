@@ -1,4 +1,6 @@
-"""Feedback domain types — shared across data and service layers."""
+"""Feedback domain types — the analytics activity range + its window helper."""
+
+from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from typing import Literal

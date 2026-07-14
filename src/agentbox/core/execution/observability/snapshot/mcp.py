@@ -11,7 +11,7 @@ from agentbox.core.db import (
     WorkspaceMcpPolicyManager,
     WorkspaceMcpToolOverrideManager,
 )
-from agentbox.core.db.system.config import load_project_mcp_servers
+from agentbox.core.db.config import load_project_mcp_servers
 from agentbox.core.workspaces.tooling.servers import resolve_workspace_mcp_helper
 
 logger = logging.getLogger(__name__)

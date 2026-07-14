@@ -73,7 +73,11 @@ ALLOWED = {
     REPO_ROOT / "src" / "agentbox" / "core" / "service" / "agents.py",
 }
 
-PATTERN = re.compile(r"\bfrom\s+agentbox\.core\.db\.[a-z_][a-z_0-9]*\s+import\b")
+# ``core.db.config`` is a public self-wiring read-helper module (not a manager,
+# so it is not facade-exported) — application code imports it directly, by
+# design (plan 127 moved it up from the old ``core.db.system.config``). Exclude
+# it from the guard; every other single-segment ``core.db.<sub>`` is held.
+PATTERN = re.compile(r"\bfrom\s+agentbox\.core\.db\.(?!config\b)[a-z_][a-z_0-9]*\s+import\b")
 
 
 def _is_allowed(path: Path) -> bool:
