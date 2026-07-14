@@ -18,7 +18,7 @@ from pathlib import Path
 from sqlalchemy.engine import Engine
 
 from agentbox.core.db.base.engine import init_engine
-from agentbox.core.db.managers.agents import (
+from agentbox.core.db.agents import (
     ActiveAgentVersionManager,
     AgentConfigEventManager,
     AgentDefManager,

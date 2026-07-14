@@ -27,6 +27,18 @@ from agentbox.core.db.managers import (
     SessionManager,
     UsageManager,
     WebhookDeliveryManager,
+    # workspaces
+    WorkspaceEnvDocManager,
+    WorkspaceEnvDocVersionManager,
+    WorkspaceManager,
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpPolicyManager,
+    WorkspaceMcpToolOverrideManager,
+    WorkspaceReadManager,
+    WorkspaceRuntimePermissionManager,
+    WorkspaceSubagentManager,
+)
+from agentbox.core.db.agents import (
     # agents
     ActiveAgentVersionManager,
     AgentConfigEventManager,
@@ -42,16 +54,6 @@ from agentbox.core.db.managers import (
     AgentVersionManager,
     AgentVersionRatingManager,
     PromptVersionManager,
-    # workspaces
-    WorkspaceEnvDocManager,
-    WorkspaceEnvDocVersionManager,
-    WorkspaceManager,
-    WorkspaceMcpOverrideManager,
-    WorkspaceMcpPolicyManager,
-    WorkspaceMcpToolOverrideManager,
-    WorkspaceReadManager,
-    WorkspaceRuntimePermissionManager,
-    WorkspaceSubagentManager,
 )
 from agentbox.core.db.engines import RunnerProfileManager
 from agentbox.core.db.resources import (

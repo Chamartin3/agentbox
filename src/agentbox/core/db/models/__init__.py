@@ -17,7 +17,7 @@ from agentbox.core.db.models.runs import (
 )
 
 # Agents domain
-from agentbox.core.db.models.agents import (
+from agentbox.core.db.agents import (
     ActiveAgentVersion,
     Agent,
     AgentConfigEvent,

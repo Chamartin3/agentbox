@@ -16,24 +16,6 @@ from agentbox.core.db.managers.runs import (
     WebhookDeliveryManager,
 )
 
-# Agents domain
-from agentbox.core.db.managers.agents import (
-    ActiveAgentVersionManager,
-    AgentConfigEventManager,
-    AgentDefManager,
-    AgentManager,
-    AgentMetaManager,
-    AgentRunnerProfileManager,
-    AgentSyncManager,
-    AgentToolGrantManager,
-    AgentHostEnvGrantManager,
-    AgentVersionCommentManager,
-    AgentVersionFileManager,
-    AgentVersionManager,
-    AgentVersionRatingManager,
-    PromptVersionManager,
-)
-
 # Workspaces domain
 from agentbox.core.db.managers.workspaces import (
     WorkspaceEnvDocManager,
@@ -55,21 +37,6 @@ __all__ = [
     "SessionManager",
     "UsageManager",
     "WebhookDeliveryManager",
-    # agents
-    "ActiveAgentVersionManager",
-    "AgentConfigEventManager",
-    "AgentDefManager",
-    "AgentManager",
-    "AgentMetaManager",
-    "AgentRunnerProfileManager",
-    "AgentSyncManager",
-    "AgentToolGrantManager",
-    "AgentHostEnvGrantManager",
-    "AgentVersionCommentManager",
-    "AgentVersionFileManager",
-    "AgentVersionManager",
-    "AgentVersionRatingManager",
-    "PromptVersionManager",
     # workspaces
     "WorkspaceEnvDocManager",
     "WorkspaceEnvDocVersionManager",
