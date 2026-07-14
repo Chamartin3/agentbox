@@ -1,24 +1,63 @@
-"""RunnerProfileManager — runner backend profile CRUD.
+"""RunnerProfile entity + manager — runner backend configuration profiles.
 
-Pure-DB operations only: no validation, no policy decisions, no field
-normalization. Callers (EngineService) own those concerns.
+Maps to the ``runner_profiles`` table. Each row defines a named backend
+configuration (backend, model, credentials, params, etc.).
 
-Most query methods return ``dict`` rather than ORM model instances so the
-service layer can hydrate the API-facing Pydantic models directly. ORM
-returns are a later, separate purification.
+The SQLModel ``RunnerProfile`` entity is the persistence shape; the manager
+returns the pydantic ``RunnerProfileView`` (``core.data.profiles.RunnerProfile``)
+so the service layer can hydrate API-facing models directly.
 """
 from __future__ import annotations
 
 import json as _json
-from typing import Any
+from typing import Any, Optional
 
-from sqlalchemy import ColumnElement, Integer, cast, func, select, update as sa_update, delete as sa_delete
+from sqlalchemy import (
+    ColumnElement,
+    Integer,
+    cast,
+    delete as sa_delete,
+    func,
+    select,
+    update as sa_update,
+)
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlmodel import Field, Index
 
+from agentbox.core.data.profiles import RunnerProfile as RunnerProfileView, RunnerProfileStats
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.engines.runner_profile import RunnerProfile as RunnerProfileORM
-from agentbox.core.data.profiles import RunnerProfile, RunnerProfileStats
+from agentbox.core.db.base.model import Entity
+from agentbox.core.db.base.tablename import tableargs, tablename
 from agentbox.core.db.schema import agent_runner_profiles, runner_profiles, runs, usage
+
+
+class RunnerProfile(Entity, table=True):
+    """A named runner profile: backend + model + parameter configuration."""
+
+    __tablename__ = tablename("runner_profiles")
+
+    id: str = Field(primary_key=True)
+    name: str = Field(nullable=False)
+    description: Optional[str] = Field(default=None)
+    backend: str = Field(nullable=False)
+    provider: Optional[str] = Field(default=None)
+    model: Optional[str] = Field(default=None)
+    base_url: Optional[str] = Field(default=None)
+    api_key_env: Optional[str] = Field(default=None)
+    output_mode: str = Field(nullable=False, default="auto")
+    params_json: str = Field(nullable=False, default="{}")
+    headers_json: str = Field(nullable=False, default="{}")
+    extra_args_json: str = Field(nullable=False, default="[]")
+    is_enabled: int = Field(nullable=False, default=1)
+    is_system_default: int = Field(nullable=False, default=0)
+    api_token_id: Optional[str] = Field(foreign_key="api_tokens.id", default=None)
+    created_at: str = Field(nullable=False)
+    updated_at: str = Field(nullable=False)
+
+    __table_args__ = tableargs(
+        Index("idx_runner_profiles_backend_provider", "backend", "provider"),
+        Index("idx_runner_profiles_enabled", "is_enabled"),
+    )
 
 
 def _duration_ms_expr(c_started: object, c_finished: object) -> object:
@@ -28,28 +67,28 @@ def _duration_ms_expr(c_started: object, c_finished: object) -> object:
     return (epoch_finished - epoch_started) * 1000
 
 
-class RunnerProfileManager(Manager[RunnerProfileORM]):
+class RunnerProfileManager(Manager[RunnerProfile]):
     """Manager for the ``runner_profiles`` and ``agent_runner_profiles`` tables."""
 
-    model = RunnerProfileORM
+    model = RunnerProfile
 
     # ------------------------------------------------------------------
     # Legacy ORM helpers (kept for existing callers until Phase C)
     # ------------------------------------------------------------------
 
-    def get_default(self) -> RunnerProfileORM | None:
+    def get_default(self) -> RunnerProfile | None:
         """Return the system-default runner profile, or None."""
         stmt = (
-            select(RunnerProfileORM)
+            select(RunnerProfile)
             .where(
-                getattr(RunnerProfileORM, "is_system_default") == 1,
-                getattr(RunnerProfileORM, "is_enabled") == 1,
+                getattr(RunnerProfile, "is_system_default") == 1,
+                getattr(RunnerProfile, "is_enabled") == 1,
             )
             .limit(1)
         )
         return self._scalar(stmt)
 
-    def find_by_backend(self, backend: str) -> list[RunnerProfileORM]:
+    def find_by_backend(self, backend: str) -> list[RunnerProfile]:
         """Return all enabled profiles for a given backend name."""
         return self.find(backend=backend, is_enabled=1)
 
@@ -58,7 +97,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _row_to_model(row: Any) -> RunnerProfile:
+    def _row_to_model(row: Any) -> RunnerProfileView:
         """Convert a SQLAlchemy Core Row to a RunnerProfile Pydantic model.
 
         JSON columns (``params_json``, ``headers_json``, ``extra_args_json``)
@@ -66,7 +105,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
         ``is_system_default``) are converted to Python bool.
         """
         m = row._mapping
-        return RunnerProfile(
+        return RunnerProfileView(
             id=m["id"],
             name=m["name"],
             description=m.get("description"),
@@ -95,7 +134,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
         backend: str | None = None,
         provider: str | None = None,
         enabled: bool | None = None,
-    ) -> list[RunnerProfile]:
+    ) -> list[RunnerProfileView]:
         """Return all runner profiles (optionally filtered), ordered by creation time."""
         stmt = select(runner_profiles)
         if backend is not None:
@@ -108,14 +147,14 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
         with self._engine.connect() as conn:
             return [self._row_to_model(r) for r in conn.execute(stmt)]
 
-    def get_by_id(self, profile_id: str) -> RunnerProfile | None:
+    def get_by_id(self, profile_id: str) -> RunnerProfileView | None:
         """Return a single profile model, or None."""
         stmt = select(runner_profiles).where(runner_profiles.c.id == profile_id)
         with self._engine.connect() as conn:
             row = conn.execute(stmt).first()
             return self._row_to_model(row) if row else None
 
-    def create_one(self, **fields: Any) -> RunnerProfile:
+    def create_one(self, **fields: Any) -> RunnerProfileView:
         """Insert a new runner profile. Returns the created profile model.
 
         All columns must be provided (caller handles id derivation and
@@ -129,7 +168,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
             raise RuntimeError(f"Failed to read back created profile {fields['id']}")
         return result
 
-    def update_one(self, profile_id: str, **values: Any) -> RunnerProfile | None:
+    def update_one(self, profile_id: str, **values: Any) -> RunnerProfileView | None:
         """Partial-update a runner profile. Returns the updated profile model.
 
         Only the supplied columns are changed. Returns None if the
@@ -158,7 +197,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
     # Compound atomic operations (invariant: only one system_default)
     # ------------------------------------------------------------------
 
-    def create_with_default_clear(self, **fields: Any) -> RunnerProfile:
+    def create_with_default_clear(self, **fields: Any) -> RunnerProfileView:
         """Create a profile *and* clear ``is_system_default`` on every other
         profile — all within the same transaction so the invariant holds.
 
@@ -178,7 +217,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
 
     def update_with_default_clear(
         self, profile_id: str, **values: Any
-    ) -> RunnerProfile | None:
+    ) -> RunnerProfileView | None:
         """Partial-update a profile. If ``is_system_default`` is being set to
         ``1``, atomically clear that flag on all other profiles first.
 
@@ -205,7 +244,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
     # System default
     # ------------------------------------------------------------------
 
-    def get_system_default(self) -> RunnerProfile | None:
+    def get_system_default(self) -> RunnerProfileView | None:
         """Return the system-default runner profile model, or None.
 
         Looks for the single row where ``is_system_default == 1`` (no
@@ -326,7 +365,7 @@ class RunnerProfileManager(Manager[RunnerProfileORM]):
     # Agent ↔ profile binding — agent_runner_profiles
     # ------------------------------------------------------------------
 
-    def get_agent_profile(self, agent_id: str) -> RunnerProfile | None:
+    def get_agent_profile(self, agent_id: str) -> RunnerProfileView | None:
         """Return the runner profile bound to *agent_id*, or None.
 
         Joins ``agent_runner_profiles`` + ``runner_profiles`` so the

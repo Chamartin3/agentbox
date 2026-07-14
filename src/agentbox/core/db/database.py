@@ -34,7 +34,7 @@ from agentbox.core.db.managers.agents import (
     AgentVersionRatingManager,
     PromptVersionManager,
 )
-from agentbox.core.db.managers.engines import RunnerProfileManager
+from agentbox.core.db.engines import RunnerProfileManager
 from agentbox.core.db.managers.resources import (
     ActiveResourceVersionManager,
     AgentPromptResourceBindingManager,

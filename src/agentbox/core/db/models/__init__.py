@@ -56,11 +56,6 @@ from agentbox.core.db.models.resources import (
     WorkspaceFileResourceBinding,
 )
 
-# Engines domain
-from agentbox.core.db.models.engines import (
-    RunnerProfile,
-)
-
 # System domain
 from agentbox.core.db.models.system import (
     ApiToken,
@@ -110,7 +105,6 @@ __all__ = [
     "SharedResource",
     "WorkspaceFileResourceBinding",
     # engines
-    "RunnerProfile",
     # system
     "ApiToken",
     "HostEnvCallLog",

@@ -60,8 +60,6 @@ from agentbox.core.db.managers import (
     ResourceVersionManager,
     SharedResourceManager,
     WorkspaceFileResourceBindingManager,
-    # engines
-    RunnerProfileManager,
     # system
     ApiTokenManager,
     HostEnvCallLogManager,
@@ -69,6 +67,7 @@ from agentbox.core.db.managers import (
     McpToolDiscoveryCacheManager,
     SettingManager,
 )
+from agentbox.core.db.engines import RunnerProfileManager
 
 __all__ = [
     # runs

@@ -58,11 +58,6 @@ from agentbox.core.db.managers.resources import (
     WorkspaceFileResourceBindingManager,
 )
 
-# Engines domain
-from agentbox.core.db.managers.engines import (
-    RunnerProfileManager,
-)
-
 # System domain
 from agentbox.core.db.managers.system import (
     ApiTokenManager,
@@ -114,7 +109,6 @@ __all__ = [
     "SharedResourceManager",
     "WorkspaceFileResourceBindingManager",
     # engines
-    "RunnerProfileManager",
     # system
     "ApiTokenManager",
     "HostEnvCallLogManager",

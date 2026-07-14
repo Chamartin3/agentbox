@@ -23,7 +23,7 @@ from agentbox.core.db.models import (
     AgentVersion,
 )
 from agentbox.core.db.schema import metadata as old_metadata
-from agentbox.core.db.models.engines.runner_profile import RunnerProfile
+from agentbox.core.db.engines.runner_profile import RunnerProfile
 
 
 def test_schema_builds() -> None:
