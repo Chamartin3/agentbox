@@ -340,18 +340,10 @@ ignore_imports =
     agentbox.core.service.lifecycle -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
     agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.database
-    agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.system.config
     agentbox.core.tools.mcp_servers.host_env.context -> agentbox.core.db.database
-    agentbox.core.tools.mcp_servers.host_env.context -> agentbox.core.db.system.config
     # ── Pre-existing deep imports (no manager API yet): ──────────────────
     # Run model used as return type; fix: RunManager.get() → RunRecord (plan 112+)
     agentbox.core.service.execution -> agentbox.core.db.models.runs.run
-    agentbox.core.agents.composition.build -> agentbox.core.db.system.config
-    agentbox.core.engines.defaults -> agentbox.core.db.system.config
-    agentbox.core.execution.observability.snapshot.mcp -> agentbox.core.db.system.config
-    agentbox.core.resources -> agentbox.core.db.resources.models
-    agentbox.core.service.lifecycle -> agentbox.core.db.engines.seeds
-    agentbox.core.workspaces.compose -> agentbox.core.db.system.config
 
 
 # ─── core.data is the leaf — no upward imports (plan 117) ────────────────────
