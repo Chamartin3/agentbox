@@ -34,7 +34,7 @@ from agentbox.core.db.agents import (
 )
 
 # Workspaces domain
-from agentbox.core.db.models.workspaces import (
+from agentbox.core.db.workspaces import (
     Workspace,
     WorkspaceEnvDoc,
     WorkspaceEnvDocVersion,

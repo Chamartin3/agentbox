@@ -1,15 +1,36 @@
-"""WorkspaceRuntimePermissionManager — runtime permission CRUD."""
+"""WorkspaceRuntimePermission model and manager — runtime permission constraints per workspace.
+
+Maps to the ``workspace_runtime_permissions`` table.
+"""
 from __future__ import annotations
 
-from typing import cast
+from typing import Optional, cast
 
+from sqlalchemy import JSON
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlmodel import Field
 
-from agentbox.core.data.rows import PermissionFileEntry, WorkspaceRuntimePermissionRow
+from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.workspaces.runtime_permission import WorkspaceRuntimePermission
+from agentbox.core.db.base.tablename import tablename
 from agentbox.core.db.schema import workspace_runtime_permissions
 from agentbox.core.data._util import now_iso
+from agentbox.core.data.rows import PermissionFileEntry, WorkspaceRuntimePermissionRow
+
+
+class WorkspaceRuntimePermission(Entity, table=True):
+    """Runtime permission constraints applied to runs in a workspace."""
+
+    __tablename__ = tablename("workspace_runtime_permissions")
+
+    workspace_id: str = Field(primary_key=True)
+    allowed_builtin_tools: Optional[list[str]] = Field(default=None, sa_type=JSON)
+    files: Optional[list[dict]] = Field(default=None, sa_type=JSON)
+    max_tokens: Optional[int] = Field(default=None)
+    allow_file_write: Optional[int] = Field(default=None)
+    allow_network: Optional[int] = Field(default=None)
+    updated_at: str = Field(nullable=False)
+    updated_by: Optional[str] = Field(default=None)
 
 
 def _bool_to_int(b: bool | None) -> int | None:

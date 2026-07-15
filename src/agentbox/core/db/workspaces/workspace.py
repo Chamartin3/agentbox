@@ -1,24 +1,37 @@
-"""WorkspaceManager — workspace registry CRUD with cascade delete."""
+"""Workspace model and manager — workspace registry.
+
+Maps to the ``workspaces`` table. The canonical registry of workspaces
+known to agentbox.
+"""
 from __future__ import annotations
 
-from typing import cast
+from typing import Optional, cast
 
 from sqlalchemy import delete as sa_delete, text
+from sqlmodel import Field
 
-from agentbox.core.data.rows import WorkspaceRow
+from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
+from agentbox.core.db.base.tablename import tablename
 from agentbox.core.db.resources.binding import WorkspaceFileResourceBinding
-from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
-from agentbox.core.db.models.workspaces.mcp_override import (
-    WorkspaceMcpOverride,
-    WorkspaceMcpPolicy,
-    WorkspaceMcpToolOverride,
-)
-from agentbox.core.db.models.workspaces.runtime_permission import WorkspaceRuntimePermission
-from agentbox.core.db.models.workspaces.subagent import WorkspaceSubagent
-from agentbox.core.db.models.workspaces.workspace import Workspace
 from agentbox.core.db.schema import workspaces as workspaces_schema
 from agentbox.core.data._util import now_iso
+from agentbox.core.data.rows import WorkspaceRow
+
+
+class Workspace(Entity, table=True):
+    """A named workspace — the unit of organisational grouping in agentbox."""
+
+    __tablename__ = tablename("workspaces")
+
+    name: str = Field(primary_key=True)
+    description: Optional[str] = Field(default=None)
+    path: Optional[str] = Field(default=None)
+    source: str = Field(nullable=False, default="db")
+    created_at: str = Field(nullable=False)
+    created_by: Optional[str] = Field(default=None)
+    updated_at: str = Field(nullable=False)
+
 
 _SATELLITE_TABLES: tuple[str, ...] = (
     "workspace_subagents",
@@ -133,6 +146,16 @@ class WorkspaceManager(Manager[Workspace]):
         Returns ``{table_name: rows_deleted}``. Idempotent — missing tables
         are skipped.
         """
+        # Import here to avoid circular imports with sibling modules
+        from agentbox.core.db.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion  # noqa: PLC0415
+        from agentbox.core.db.workspaces.mcp_override import (  # noqa: PLC0415
+            WorkspaceMcpOverride,
+            WorkspaceMcpPolicy,
+            WorkspaceMcpToolOverride,
+        )
+        from agentbox.core.db.workspaces.runtime_permission import WorkspaceRuntimePermission  # noqa: PLC0415
+        from agentbox.core.db.workspaces.subagent import WorkspaceSubagent  # noqa: PLC0415
+
         counts: dict[str, int] = {}
         cascade_tables = [
             WorkspaceEnvDocVersion.__table__,

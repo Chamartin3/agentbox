@@ -1,16 +1,52 @@
-"""WorkspaceEnvDoc and WorkspaceEnvDocVersion managers."""
+"""Workspace env-doc models and managers — environment documentation for workspaces.
+
+Maps to the ``workspace_env_docs`` and ``workspace_env_doc_versions`` tables.
+"""
 from __future__ import annotations
 
 import uuid
-from typing import cast
+from typing import Optional, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import JSON, func, select
+from sqlmodel import Field, Index, UniqueConstraint
 
+from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.data.rows import EnvDocRow, WorkspaceEnvDocPointerRow
-from agentbox.core.db.models.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
+from agentbox.core.db.base.tablename import tablename, tableargs
 from agentbox.core.db.schema import workspace_env_doc_versions, workspace_env_docs
 from agentbox.core.data._util import now_iso
+from agentbox.core.data.rows import EnvDocRow, WorkspaceEnvDocPointerRow
+
+
+class WorkspaceEnvDoc(Entity, table=True):
+    """Points to the active env-doc version for a workspace."""
+
+    __tablename__ = tablename("workspace_env_docs")
+
+    workspace_id: str = Field(primary_key=True)
+    active_version_id: Optional[str] = Field(
+        foreign_key="workspace_env_doc_versions.id", ondelete="SET NULL", default=None,
+    )
+
+
+class WorkspaceEnvDocVersion(Entity, table=True):
+    """A versioned environment documentation snapshot for a workspace."""
+
+    __tablename__ = tablename("workspace_env_doc_versions")
+
+    id: str = Field(primary_key=True)
+    workspace_id: str = Field(nullable=False)
+    version_number: int = Field(nullable=False)
+    content_json: dict = Field(nullable=False, sa_type=JSON)
+    is_draft: int = Field(nullable=False, default=0)
+    changelog: str = Field(nullable=False)
+    created_at: str = Field(nullable=False)
+    created_by: Optional[str] = Field(default=None)
+
+    __table_args__ = tableargs(
+        UniqueConstraint("workspace_id", "version_number", name="uq_workspace_env_doc_version"),
+        Index("ix_workspace_env_doc_versions_workspace_id", "workspace_id"),
+    )
 
 
 class WorkspaceEnvDocManager(Manager[WorkspaceEnvDoc]):

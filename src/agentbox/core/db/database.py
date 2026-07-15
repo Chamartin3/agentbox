@@ -59,7 +59,7 @@ from agentbox.core.db.system import (
     McpToolDiscoveryCacheManager,
     SettingManager,
 )
-from agentbox.core.db.managers.workspaces import (
+from agentbox.core.db.workspaces import (
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
     WorkspaceManager,

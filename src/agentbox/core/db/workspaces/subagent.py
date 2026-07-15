@@ -1,17 +1,41 @@
-"""WorkspaceSubagentManager — subagent registration CRUD."""
-from __future__ import annotations
+"""WorkspaceSubagent model and manager — subagent mappings within a workspace.
 
-from agentbox.core.data.payload_types import SubagentSpec
+Maps to the ``workspace_subagents`` table.
+"""
+from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from typing import cast
+from typing import Optional, cast
 
-from agentbox.core.data.rows import WorkspaceSubagentRow
+from sqlmodel import Field, Index, UniqueConstraint
+
+from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.workspaces.subagent import WorkspaceSubagent
+from agentbox.core.db.base.tablename import tablename, tableargs
 from agentbox.core.db.schema import workspace_subagents
 from agentbox.core.data._util import now_iso
+from agentbox.core.data.payload_types import SubagentSpec
+from agentbox.core.data.rows import WorkspaceSubagentRow
+
+
+class WorkspaceSubagent(Entity, table=True):
+    """A subagent (agent alias registration) within a workspace."""
+
+    __tablename__ = tablename("workspace_subagents")
+
+    id: str = Field(primary_key=True)
+    workspace_id: str = Field(nullable=False)
+    agent_id: str = Field(nullable=False)
+    alias: str = Field(nullable=False)
+    display_order: int = Field(nullable=False, default=0)
+    created_at: str = Field(nullable=False)
+    created_by: Optional[str] = Field(default=None)
+
+    __table_args__ = tableargs(
+        UniqueConstraint("workspace_id", "alias", name="uq_workspace_subagents_alias"),
+        Index("ix_workspace_subagents_workspace", "workspace_id"),
+    )
 
 
 class WorkspaceSubagentManager(Manager[WorkspaceSubagent]):

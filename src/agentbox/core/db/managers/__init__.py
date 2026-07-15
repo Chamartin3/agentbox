@@ -16,19 +16,6 @@ from agentbox.core.db.managers.runs import (
     WebhookDeliveryManager,
 )
 
-# Workspaces domain
-from agentbox.core.db.managers.workspaces import (
-    WorkspaceEnvDocManager,
-    WorkspaceEnvDocVersionManager,
-    WorkspaceManager,
-    WorkspaceMcpOverrideManager,
-    WorkspaceMcpPolicyManager,
-    WorkspaceMcpToolOverrideManager,
-    WorkspaceReadManager,
-    WorkspaceRuntimePermissionManager,
-    WorkspaceSubagentManager,
-)
-
 __all__ = [
     # runs
     "RunCommentManager",
@@ -37,14 +24,4 @@ __all__ = [
     "SessionManager",
     "UsageManager",
     "WebhookDeliveryManager",
-    # workspaces
-    "WorkspaceEnvDocManager",
-    "WorkspaceEnvDocVersionManager",
-    "WorkspaceManager",
-    "WorkspaceMcpOverrideManager",
-    "WorkspaceMcpPolicyManager",
-    "WorkspaceMcpToolOverrideManager",
-    "WorkspaceReadManager",
-    "WorkspaceRuntimePermissionManager",
-    "WorkspaceSubagentManager",
 ]
