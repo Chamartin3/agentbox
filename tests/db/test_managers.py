@@ -194,8 +194,8 @@ def test_facade_exports_managers_only(blank_db: Database) -> None:
     """The facade exports managers only.
 
     Database and SQLModel entities (Run, etc.) are NOT in the facade — they
-    are internal wiring / model layer accessed via core.db.database /
-    core.db.models respectively.
+    are internal wiring / per-domain model files accessed via core.db.database /
+    core.db.<domain> respectively.
     """
     public = set(getattr(db_pkg, "__all__", []))
     # Managers must be present

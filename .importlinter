@@ -317,10 +317,8 @@ source_modules =
 forbidden_modules =
     agentbox.core.db.schema
     agentbox.core.db.base
-    agentbox.core.db.models
     agentbox.core.db.store
     agentbox.core.db.database
-    agentbox.core.db.managers
     agentbox.core.db.agents
     agentbox.core.db.workspaces
     agentbox.core.db.resources

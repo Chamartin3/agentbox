@@ -11,8 +11,10 @@ by a named allowlist (service/base.py, the three deps.py, cli/ops/migrate.py,
 the two mcp/servers/*/context.py).  Everything else uses managers.
 
 Shared data shapes (``SharedResourceRecord``, rows, snapshots) live in
-``core.data`` / ``core.protocols`` / ``core.events``.  Schema tables and SQLModel
-entities are in ``core.db.schema`` / ``core.db.models`` — not re-exported here.
+``core.data`` / ``core.protocols`` / ``core.events``.  SQLModel entities live in
+their per-domain packages (``core.db.runs``, ``core.db.agents``, …) alongside
+their managers, one file per table; Core schema tables are in ``core.db.schema``
+(folded into the entities in a later phase).  Neither is re-exported here.
 """
 from __future__ import annotations
 

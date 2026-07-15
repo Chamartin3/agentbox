@@ -3,8 +3,8 @@
 Verifies schema construction, round-trips, validation, and facade encapsulation.
 
 After plan 109, ``agentbox.core.db`` exports managers only.  SQLModel entities
-come from ``agentbox.core.db.models`` and ``metadata`` from
-``agentbox.core.db.schema``.
+live in their per-domain packages (``agentbox.core.db.runs`` etc.) and
+``metadata`` in ``agentbox.core.db.schema``.
 """
 from __future__ import annotations
 
@@ -13,15 +13,10 @@ from sqlalchemy import create_engine
 from sqlmodel import SQLModel
 
 import agentbox.core.db as db_pkg
-from agentbox.core.db.models import (
-    Run,
-    Session,
-    Usage,
-    Agent,
-    Workspace,
-    Setting,
-    AgentVersion,
-)
+from agentbox.core.db.runs import Run, Session, Usage
+from agentbox.core.db.agents import Agent, AgentVersion
+from agentbox.core.db.workspaces import Workspace
+from agentbox.core.db.system import Setting
 from agentbox.core.db.schema import metadata as old_metadata
 from agentbox.core.db.engines.runner_profile import RunnerProfile
 
@@ -108,7 +103,7 @@ def test_facade_managers_only() -> None:
     """core.db.__all__ contains only managers.
 
     SQLModel entities (Run, Agent, etc.) are no longer re-exported by the
-    façade — they live in ``agentbox.core.db.models``.
+    façade — they live in their per-domain packages (``agentbox.core.db.runs``…).
     """
     public_names = set(getattr(db_pkg, "__all__", dir(db_pkg)))
     # Managers should be present
