@@ -1,5 +1,7 @@
 import SettingsBaseTab from './SettingsBaseTab';
 import SettingsApiTokensTab from './SettingsApiTokensTab';
+import SettingsSecretsTab from './SettingsSecretsTab';
+import SettingsDeploymentTab from './SettingsDeploymentTab';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -19,8 +21,14 @@ export default function SettingsPage() {
       <Section title="Base">
         <SettingsBaseTab />
       </Section>
+      <Section title="Secrets">
+        <SettingsSecretsTab />
+      </Section>
       <Section title="API tokens">
         <SettingsApiTokensTab />
+      </Section>
+      <Section title="Deployment">
+        <SettingsDeploymentTab />
       </Section>
     </div>
   );

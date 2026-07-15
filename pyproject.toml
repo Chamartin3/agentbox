@@ -19,6 +19,7 @@ dependencies = [
   "alembic>=1.18.4",
   "datamodel-code-generator>=0.26",
   "sqlmodel>=0.0.38",
+  "python-dotenv>=1.0",
 ]
 
 [project.scripts]

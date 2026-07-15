@@ -15,7 +15,6 @@ const SECTIONS = [
   },
   { key: 'webhook', label: 'Webhook', hint: 'Run-completion webhook URL, retries, signing key.' },
   { key: 'telemetry', label: 'Telemetry', hint: 'Anonymous usage telemetry opt-in / endpoint.' },
-  { key: 'secrets', label: 'Secrets', hint: 'Write-only secret values. Existing values are never shown.' },
 ] as const;
 
 interface SectionPayload {
@@ -404,7 +403,7 @@ function McpGlobalForm({ onToast }: { onToast: (t: ToastState) => void }) {
   );
 }
 
-function SecretsForm({ onToast }: { onToast: (t: ToastState) => void }) {
+export function SecretsForm({ onToast }: { onToast: (t: ToastState) => void }) {
   const section = 'secrets';
   const [keys, setKeys] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -531,10 +530,8 @@ export default function SettingsBaseTab() {
             <TelemetryForm onToast={setToast} />
           ) : s.key === 'workspace_defaults' ? (
             <WorkspaceDefaultsForm onToast={setToast} />
-          ) : s.key === 'mcp_global' ? (
-            <McpGlobalForm onToast={setToast} />
           ) : (
-            <SecretsForm onToast={setToast} />
+            <McpGlobalForm onToast={setToast} />
           )}
         </SectionShell>
       ))}

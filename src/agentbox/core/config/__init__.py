@@ -6,7 +6,17 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 _AGENTBOX_ROOT = Path("/agentbox")
+
+# ponytail: hydrate os.environ from .env files so AGENTBOX_* and provider
+# secrets (OPENROUTER_API_KEY, OLLAMA_HOST, …) can live in a file instead of
+# being exported by hand. override=False → a real exported env var always wins;
+# a missing file is a silent no-op. Runs once at import, before SETTINGS builds.
+load_dotenv()  # nearest .env, walking up from cwd (dev convenience)
+_creds_dir = os.environ.get("AGENTBOX_CREDS_DIR") or str(_AGENTBOX_ROOT / "creds")
+load_dotenv(Path(_creds_dir) / ".env")  # designed secrets store (creds_env_file)
 
 
 @dataclass(frozen=True)

@@ -360,6 +360,10 @@ class ModelParams(TypedDict, total=False):
     parallel_tool_calls: bool
     timeout: float
     extra_headers: dict[str, str]
+    # Provider-specific body passthrough (pydantic-ai ``extra_body``), e.g.
+    # {"reasoning_effort": "none"} to disable qwen3 thinking loops. run_direct
+    # forwards this into model_settings; without it here the schema strips it.
+    extra_body: dict[str, JsonValue]
 
 
 class ExecutionSection(TypedDict):
