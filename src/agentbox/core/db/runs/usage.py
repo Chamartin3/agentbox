@@ -25,10 +25,10 @@ class Usage(Entity, table=True):
 
     run_id: str = Field(primary_key=True, foreign_key="runs.id")
     model: Optional[str] = Field(default=None)
-    input_tokens: Optional[int] = Field(default=0)
-    output_tokens: Optional[int] = Field(default=0)
-    cache_read_tokens: Optional[int] = Field(default=0)
-    cache_write_tokens: Optional[int] = Field(default=0)
+    input_tokens: Optional[int] = Field(default=0, sa_column_kwargs={"server_default": "0"})
+    output_tokens: Optional[int] = Field(default=0, sa_column_kwargs={"server_default": "0"})
+    cache_read_tokens: Optional[int] = Field(default=0, sa_column_kwargs={"server_default": "0"})
+    cache_write_tokens: Optional[int] = Field(default=0, sa_column_kwargs={"server_default": "0"})
     cost_usd: Optional[float] = Field(default=None)
 
 

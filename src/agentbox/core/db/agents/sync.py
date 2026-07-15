@@ -24,8 +24,8 @@ class AgentSync(Entity, table=True):
 
 	agent_id: str = Field(primary_key=True)
 	proxy_path: Optional[str] = Field(default=None)
-	sync_mode: str = Field(nullable=False, default="manual")
-	sync_policy: str = Field(nullable=False, default="db_wins")
+	sync_mode: str = Field(nullable=False, default="manual", sa_column_kwargs={"server_default": "manual"})
+	sync_policy: str = Field(nullable=False, default="db_wins", sa_column_kwargs={"server_default": "db_wins"})
 	last_file_hash: Optional[str] = Field(default=None)
 	last_file_mtime: Optional[str] = Field(default=None)
 	last_sync_at: Optional[str] = Field(default=None)

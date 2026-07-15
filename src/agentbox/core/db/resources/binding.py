@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Iterable
 from typing import Optional, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import CheckConstraint, func, select, text
 from sqlmodel import Field, Index, UniqueConstraint
 
 from agentbox.core.data.constants import MaterializeMode, OnConflict, PromptMode, PromptSlot
@@ -37,17 +37,23 @@ class AgentPromptResourceBinding(Entity, table=True):
     marker: Optional[str] = Field(default=None)
     mode: Optional[str] = Field(default=None)
     slot: Optional[str] = Field(default=None)
-    attach_as_reference: int = Field(nullable=False, default=0)
+    attach_as_reference: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     pinned_version_id: Optional[str] = Field(foreign_key="resource_versions.id", default=None)
-    display_order: int = Field(nullable=False, default=0)
-    required: int = Field(nullable=False, default=1)
+    display_order: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
+    required: int = Field(nullable=False, default=1, sa_column_kwargs={"server_default": "1"})
     changelog: str = Field(nullable=False)
     created_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
 
     __table_args__ = tableargs(
+        CheckConstraint("mode IS NULL OR mode IN ('inline', 'skill_primer', 'name_only', 'manifest')", name="agent_prompt_bindings_mode_check"),
+        CheckConstraint("slot IS NULL OR slot IN ('system', 'user_template', 'input_schema', 'output_schema')", name="agent_prompt_bindings_slot_check"),
+        CheckConstraint("(slot IS NOT NULL) OR (marker IS NOT NULL AND mode IS NOT NULL)", name="agent_prompt_bindings_slot_or_marker"),
+        CheckConstraint("required IN (0, 1)", name="agent_prompt_bindings_required_bool"),
+        CheckConstraint("attach_as_reference IN (0, 1)", name="agent_prompt_bindings_reference_bool"),
         UniqueConstraint("agent_id", "marker", "resource_id", name="uq_agent_prompt_bindings_triple"),
         Index("ix_agent_prompt_bindings_agent", "agent_id"),
+        Index("uq_agent_prompt_bindings_slot", "agent_id", "slot", unique=True, sqlite_where=text("slot IS NOT NULL")),
     )
 
 
@@ -61,14 +67,16 @@ class WorkspaceFileResourceBinding(Entity, table=True):
     resource_id: str = Field(foreign_key="resources.id", nullable=False)
     target_path: Optional[str] = Field(default=None)
     pinned_version_id: Optional[str] = Field(foreign_key="resource_versions.id", default=None)
-    materialize_mode: str = Field(nullable=False, default="copy")
-    on_conflict: str = Field(nullable=False, default="error")
-    display_order: int = Field(nullable=False, default=0)
+    materialize_mode: str = Field(nullable=False, default="copy", sa_column_kwargs={"server_default": "copy"})
+    on_conflict: str = Field(nullable=False, default="error", sa_column_kwargs={"server_default": "error"})
+    display_order: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     changelog: str = Field(nullable=False)
     created_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
 
     __table_args__ = tableargs(
+        CheckConstraint("materialize_mode IN ('copy', 'symlink', 'mount')", name="workspace_file_bindings_mode_check"),
+        CheckConstraint("on_conflict IN ('error', 'overwrite', 'skip')", name="workspace_file_bindings_on_conflict_check"),
         UniqueConstraint("workspace_id", "resource_id", "target_path", name="uq_workspace_file_bindings_triple"),
         Index("ix_workspace_file_bindings_workspace", "workspace_id"),
     )

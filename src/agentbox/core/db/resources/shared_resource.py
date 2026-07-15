@@ -32,7 +32,7 @@ class SharedResource(Entity, table=True):
     content: Optional[str] = Field(default=None)
     config_json: Optional[str] = Field(default=None)
     sha256: str = Field(nullable=False)
-    is_active: int = Field(nullable=False, default=0)
+    is_active: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     author: Optional[str] = Field(default=None)
     changelog: Optional[str] = Field(default=None)
     tags: Optional[str] = Field(default=None)

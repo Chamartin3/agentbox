@@ -9,7 +9,7 @@ import uuid
 from typing import Optional, cast
 
 from sqlalchemy import JSON
-from sqlmodel import Field, Index, UniqueConstraint
+from sqlmodel import CheckConstraint, Field, Index, UniqueConstraint
 
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
@@ -59,6 +59,7 @@ class WorkspaceMcpToolOverride(Entity, table=True):
 
     __table_args__ = tableargs(
         UniqueConstraint("workspace_id", "server_name", "tool_name", name="uq_workspace_mcp_tool_override"),
+        Index("ix_workspace_mcp_tool_overrides_workspace", "workspace_id"),
     )
 
 
@@ -68,7 +69,11 @@ class WorkspaceMcpPolicy(Entity, table=True):
     __tablename__ = tablename("workspace_mcp_policies")
 
     workspace_id: str = Field(primary_key=True)
-    default_policy: str = Field(nullable=False, default="allow_all_unless_disabled")
+    default_policy: str = Field(nullable=False, default="allow_all_unless_disabled", sa_column_kwargs={"server_default": "allow_all_unless_disabled"})
+
+    __table_args__ = tableargs(
+        CheckConstraint("default_policy IN ('allow_all_unless_disabled', 'deny_all_unless_enabled')", name="workspace_mcp_policy_check"),
+    )
 
 
 class WorkspaceMcpPolicyManager(Manager[WorkspaceMcpPolicy]):

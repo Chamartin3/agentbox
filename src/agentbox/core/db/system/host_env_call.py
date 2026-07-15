@@ -27,7 +27,7 @@ class HostEnvCallLog(Entity, table=True):
     params: Optional[dict] = Field(default=None, sa_type=JSON)
     status: str = Field(nullable=False)
     error: Optional[str] = Field(default=None)
-    surface: str = Field(nullable=False, default="host_env")
+    surface: str = Field(nullable=False, default="host_env", sa_column_kwargs={"server_default": "host_env"})
     created_at: str = Field(nullable=False)
 
     __table_args__ = tableargs(

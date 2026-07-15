@@ -27,9 +27,9 @@ class PromptVersion(Entity, table=True):
 	agent_id: str = Field(nullable=False)
 	version: int = Field(nullable=False)
 	content: str = Field(nullable=False)
-	author: str = Field(nullable=False, default="system")
-	changelog: str = Field(nullable=False, default="")
-	is_draft: int = Field(nullable=False, default=0)
+	author: str = Field(nullable=False, default="system", sa_column_kwargs={"server_default": "system"})
+	changelog: str = Field(nullable=False, default="", sa_column_kwargs={"server_default": ""})
+	is_draft: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
 	content_hash: Optional[str] = Field(default=None)
 	created_at: str = Field(nullable=False)
 

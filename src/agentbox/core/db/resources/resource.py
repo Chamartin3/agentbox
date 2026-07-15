@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Iterator
 from typing import Optional, cast
 
-from sqlalchemy import LargeBinary, and_, func, or_, select
+from sqlalchemy import CheckConstraint, LargeBinary, and_, func, or_, select
 from sqlalchemy.engine import Connection
 from sqlmodel import Field, Index, UniqueConstraint
 
@@ -41,12 +41,13 @@ class Resource(Entity, table=True):
     description: Optional[str] = Field(default=None)
     tags: Optional[str] = Field(default=None)
     active_version_id: Optional[str] = Field(default=None)
-    status: str = Field(nullable=False, default="active")
+    status: str = Field(nullable=False, default="active", sa_column_kwargs={"server_default": "active"})
     created_at: str = Field(nullable=False)
     updated_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
 
     __table_args__ = tableargs(
+        CheckConstraint("type IN ('document', 'folder', 'skill', 'schema', 'script')", name="resources_type_check"),
         UniqueConstraint("slug", name="uq_resources_slug"),
         Index("ix_resources_type", "type"),
         Index("ix_resources_status", "status"),
@@ -61,17 +62,19 @@ class ResourceVersion(Entity, table=True):
     id: str = Field(primary_key=True)
     resource_id: str = Field(foreign_key="resources.id", nullable=False)
     version_number: int = Field(nullable=False)
-    is_draft: int = Field(nullable=False, default=0)
+    is_draft: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     import_source: str = Field(nullable=False)
     source_metadata: Optional[str] = Field(default=None)
     content_hash: str = Field(nullable=False)
-    byte_size: int = Field(nullable=False, default=0)
+    byte_size: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     metadata_json: Optional[str] = Field(default=None)
     changelog: str = Field(nullable=False)
     created_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
 
     __table_args__ = tableargs(
+        CheckConstraint("import_source IN ('upload', 'host_path', 'toml_migration', 'db_only')", name="resource_versions_import_source_check"),
+        CheckConstraint("is_draft IN (0, 1)", name="resource_versions_is_draft_bool"),
         UniqueConstraint("resource_id", "version_number", name="uq_resource_versions_number"),
         Index("ix_resource_versions_resource", "resource_id"),
     )
@@ -90,7 +93,7 @@ class ResourceBlob(Entity, table=True):
     content: bytes = Field(nullable=False, sa_type=LargeBinary)
     content_text: Optional[str] = Field(default=None)
     mime_type: Optional[str] = Field(default=None)
-    size_bytes: int = Field(nullable=False, default=0)
+    size_bytes: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
 
     __table_args__ = tableargs(
         UniqueConstraint("resource_version_id", "relative_path", name="uq_resource_blobs_path"),

@@ -43,8 +43,8 @@ class AgentMeta(Entity, table=True):
 	__tablename__ = tablename("agent_meta")
 
 	agent_id: str = Field(primary_key=True)
-	sync_mode: str = Field(nullable=False, default="off")
-	export_to_disk: int = Field(nullable=False, default=0)
+	sync_mode: str = Field(nullable=False, default="off", sa_column_kwargs={"server_default": "off"})
+	export_to_disk: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
 	source_path: Optional[str] = Field(default=None)
 	source_format: Optional[str] = Field(default=None)
 	created_at: str = Field(nullable=False)

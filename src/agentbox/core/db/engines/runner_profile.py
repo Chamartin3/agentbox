@@ -22,7 +22,7 @@ from sqlalchemy import (
     update as sa_update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlmodel import Field, Index
+from sqlmodel import CheckConstraint, Field, Index
 
 from agentbox.core.data.profiles import RunnerProfile as RunnerProfileView, RunnerProfileStats
 from agentbox.core.db.base.manager import Manager
@@ -44,17 +44,19 @@ class RunnerProfile(Entity, table=True):
     model: Optional[str] = Field(default=None)
     base_url: Optional[str] = Field(default=None)
     api_key_env: Optional[str] = Field(default=None)
-    output_mode: str = Field(nullable=False, default="auto")
-    params_json: str = Field(nullable=False, default="{}")
-    headers_json: str = Field(nullable=False, default="{}")
-    extra_args_json: str = Field(nullable=False, default="[]")
-    is_enabled: int = Field(nullable=False, default=1)
-    is_system_default: int = Field(nullable=False, default=0)
+    output_mode: str = Field(nullable=False, default="auto", sa_column_kwargs={"server_default": "auto"})
+    params_json: str = Field(nullable=False, default="{}", sa_column_kwargs={"server_default": "{}"})
+    headers_json: str = Field(nullable=False, default="{}", sa_column_kwargs={"server_default": "{}"})
+    extra_args_json: str = Field(nullable=False, default="[]", sa_column_kwargs={"server_default": "[]"})
+    is_enabled: int = Field(nullable=False, default=1, sa_column_kwargs={"server_default": "1"})
+    is_system_default: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     api_token_id: Optional[str] = Field(foreign_key="api_tokens.id", default=None)
     created_at: str = Field(nullable=False)
     updated_at: str = Field(nullable=False)
 
     __table_args__ = tableargs(
+        CheckConstraint("is_enabled IN (0, 1)", name="runner_profiles_is_enabled_bool"),
+        CheckConstraint("is_system_default IN (0, 1)", name="runner_profiles_is_system_default_bool"),
         Index("idx_runner_profiles_backend_provider", "backend", "provider"),
         Index("idx_runner_profiles_enabled", "is_enabled"),
     )

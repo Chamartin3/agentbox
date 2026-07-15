@@ -12,7 +12,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy import UniqueConstraint
 
 from agentbox.core.db.base.tablename import tablename, tableargs
-from sqlmodel import Field, Index
+from sqlmodel import Field, Index, CheckConstraint
 
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
@@ -49,12 +49,12 @@ class AgentVersion(Entity, table=True):
 	prompt_snapshot: str = Field(nullable=False)
 	content_hash: str = Field(nullable=False)
 	author: str = Field(nullable=False)
-	changelog: str = Field(nullable=False, default="")
-	is_legacy: int = Field(nullable=False, default=0)
+	changelog: str = Field(nullable=False, default="", sa_column_kwargs={"server_default": ""})
+	is_legacy: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
 	created_at: str = Field(nullable=False)
 	config_json: Optional[str] = Field(default=None)
 	prompt_content: Optional[str] = Field(default=None)
-	source: str = Field(nullable=False, default="manifest")
+	source: str = Field(nullable=False, default="manifest", sa_column_kwargs={"server_default": "manifest"})
 	resolved_tool_grants: Optional[list[str]] = Field(default=None, sa_type=JSON)
 
 	__table_args__ = tableargs(
@@ -74,7 +74,7 @@ class AgentVersionFile(Entity, table=True):
 	content: str = Field(nullable=False)
 	sha256: str = Field(nullable=False)
 	source_uri: Optional[str] = Field(default=None)
-	position: int = Field(nullable=False, default=0)
+	position: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
 	created_at: str = Field(nullable=False)
 
 	__table_args__ = tableargs(
@@ -92,6 +92,10 @@ class AgentVersionRating(Entity, table=True):
 	rating: int = Field(nullable=False)
 	rater: str = Field(nullable=False)
 	rated_at: str = Field(nullable=False)
+
+	__table_args__ = tableargs(
+		CheckConstraint("rating BETWEEN 1 AND 5", name="rating_range"),
+	)
 
 
 class AgentVersionComment(Entity, table=True):

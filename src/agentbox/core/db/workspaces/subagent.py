@@ -28,7 +28,7 @@ class WorkspaceSubagent(Entity, table=True):
     workspace_id: str = Field(nullable=False)
     agent_id: str = Field(nullable=False)
     alias: str = Field(nullable=False)
-    display_order: int = Field(nullable=False, default=0)
+    display_order: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     created_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
 

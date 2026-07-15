@@ -8,11 +8,11 @@ from __future__ import annotations
 from typing import Optional, cast
 
 from sqlalchemy import delete as sa_delete, text
-from sqlmodel import Field
+from sqlmodel import CheckConstraint, Field
 
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.base.tablename import tablename
+from agentbox.core.db.base.tablename import tablename, tableargs
 from agentbox.core.db.resources.binding import WorkspaceFileResourceBinding
 from agentbox.core.db.schema import workspaces as workspaces_schema
 from agentbox.core.data._util import now_iso
@@ -27,10 +27,14 @@ class Workspace(Entity, table=True):
     name: str = Field(primary_key=True)
     description: Optional[str] = Field(default=None)
     path: Optional[str] = Field(default=None)
-    source: str = Field(nullable=False, default="db")
+    source: str = Field(nullable=False, default="db", sa_column_kwargs={"server_default": "db"})
     created_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
     updated_at: str = Field(nullable=False)
+
+    __table_args__ = tableargs(
+        CheckConstraint("source IN ('manifest', 'db')", name="workspaces_source_check"),
+    )
 
 
 _SATELLITE_TABLES: tuple[str, ...] = (

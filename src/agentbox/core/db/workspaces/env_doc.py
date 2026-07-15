@@ -38,7 +38,7 @@ class WorkspaceEnvDocVersion(Entity, table=True):
     workspace_id: str = Field(nullable=False)
     version_number: int = Field(nullable=False)
     content_json: dict = Field(nullable=False, sa_type=JSON)
-    is_draft: int = Field(nullable=False, default=0)
+    is_draft: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
     changelog: str = Field(nullable=False)
     created_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
