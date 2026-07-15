@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 
-from agentbox.core.data.jsontypes import JsonValue
+from agentbox.core.data.jsontypes import JsonValue, JsonDict
 from agentbox.core.data.workenv import SourceMetadata
 from agentbox.core.data.rows import (
     AgentPromptBindingRow,
@@ -23,6 +23,7 @@ from agentbox.core.data.rows import (
     ResourceBlobRow,
     ResourceVersionRow,
     RunCommentRow,
+    RunPagedRow,
     WorkspaceFileBindingRow,
     WorkspaceSubagentRow,
 )
@@ -184,10 +185,86 @@ changed values have no schema to type against.
 ChangedEntry = TypedDict("ChangedEntry", {"from": DiffValue, "to": DiffValue})
 
 
+# ── Run-related payload shapes ─────────────────────────────────────────────────
+
+
+class PromptFragmentPayload(TypedDict):
+    """A single prompt fragment in a run's assembled prompt."""
+
+    name: str
+    """Short label, e.g. 'user_input', 'agent_system_prompt'."""
+
+    source: str
+    """'user', 'agent_def', 'project', 'agentbox', 'claude_cli'."""
+
+    injected_by: str
+    """Which layer pushes this text into the model: 'agentbox', 'claude_cli', 'token'."""
+
+    content: str
+    """The actual text. May be a note for things we cannot inspect."""
+
+    inspectable: bool
+    """False = we describe what's there but don't have the bytes."""
+
+    shared_resource_id: NotRequired[str | None]
+    """Optional: id of the shared resource this fragment came from."""
+
+    shared_resource_version: NotRequired[int | None]
+    """Optional: version of the shared resource (None = active version was used)."""
+
+    size_bytes: int
+    """Size of the content in bytes."""
+
+
+class RunDetailPayload(TypedDict):
+    """A single run with all its details (Run table + enrichment + snapshots)."""
+
+    # Runs table columns (non-optional as they're created with defaults)
+    id: str
+    agent_id: str
+    session_id: str | None
+    status: str
+    input: str
+    output: str | None
+    error: str | None
+    workdir: str | None
+    transcript_path: str | None
+    created_at: str
+    finished_at: str | None
+    config_digest: str | None
+    agent_version_id: int | None
+    composition_snapshot: str | None
+    rendered_prompt: str | None
+    variables: str | None
+    validation_status: str | None
+    validation_errors: str | None
+    schema_validated_via: str | None
+    post_status: str | None
+    post_errors: str | None
+    conversation_format: str | None
+    conversation_uri: str | None
+    runner_profile_id: str | None
+    resource_snapshot: str | None
+    mcp_snapshot: str | None
+    runner_snapshot: JsonDict | None
+    # Enriched fields added by get_run_detail
+    agent_version: int | None
+    backend: str | None
+    configured_model: str | None
+    reported_model: str | None
+    prompt_version_id: int | None
+
+
+class PaginatedRunItem(RunPagedRow, total=False):
+    """A run item in paginated results (RunPagedRow + agent_version enrichment)."""
+
+    agent_version: int | None
+
+
 class RunDetailResult(TypedDict):
     """Return shape of ``GET /api/runs/{run_id}`` and ``ExecutionService.get_run_detail``."""
 
-    run: dict[str, JsonValue]
+    run: RunDetailPayload
     usage: UsagePayload | None
 
 
@@ -195,14 +272,14 @@ class RunPromptFragmentsResult(TypedDict):
     """Return shape of ``GET /api/runs/{run_id}/prompt``."""
 
     run_id: str
-    fragments: list[dict[str, JsonValue]]
+    fragments: list[PromptFragmentPayload]
     total_bytes: int
 
 
 class PaginatedRunsResult(TypedDict):
     """Paginated ``list_runs_enriched`` result envelope."""
 
-    items: list[dict[str, JsonValue]]
+    items: list[PaginatedRunItem]
     total: int
     offset: int
     limit: int
@@ -1283,13 +1360,19 @@ __all__ = [
     "UsagePayload",
     "AgentValidationResult",
     "LogEntry",
+    "PromptFragmentPayload",
     "PromptVersionDetail",
     "PromptVersionListResult",
     "PromptVersionSummary",
     "ResourceListResult",
     "RunCommentsResult",
+    "RunDetailPayload",
+    "RunDetailResult",
     "RunFacetsResult",
     "RunLogsResult",
+    "RunPromptFragmentsResult",
+    "PaginatedRunItem",
+    "PaginatedRunsResult",
     "ValidationView",
     "WebhookChannelConfig",
     "WorkspaceBindingItemsResult",

@@ -39,15 +39,18 @@ from agentbox.core.data.payload_types import (
     CancelRunResult,
     JsonValue,
     LogEntry,
+    PromptFragmentPayload,
     RerunResult,
     RunCommentsResult,
     RunCreatedResult,
+    RunDetailPayload,
     RunDetailResult,
     RunFacetsResult,
     RunLifecycleResult,
     RunLogsResult,
     RunPromptFragmentsResult,
 )
+from agentbox.core.data.jsontypes import JsonDict
 from agentbox.core.data.rows import (
     RunCommentRow,
     SessionRow,
@@ -688,43 +691,98 @@ class ExecutionService(Service):
         if rec is None:
             raise RunNotFound(run_id)
         usage = self.get_usage(run_id)
-        run_dict: dict[str, JsonValue] = (
+        base_dict = (
             rec.model_dump() if hasattr(rec, "model_dump") else dict(rec.__dict__)
         )
+
+        # Construct RunDetailPayload by building up fields from Run + enrichments
+        agent_version: int | None = None
         if rec.agent_version_id is not None:
             ver = agent_versions.get_by_id(rec.agent_version_id)
             if ver is not None:
-                run_dict["agent_version"] = ver.get("version")
+                agent_version = ver.get("version")
 
-        snap_raw = run_dict.get("runner_snapshot")
+        snap_raw = base_dict.get("runner_snapshot")
         snap: dict | None = None
+        runner_snapshot: JsonDict | None = None
         if isinstance(snap_raw, str) and snap_raw:
             try:
                 snap = _json.loads(snap_raw)
-                run_dict["runner_snapshot"] = snap
+                runner_snapshot = snap
             except ValueError:
-                run_dict["runner_snapshot"] = {"snapshot": "invalid", "raw": snap_raw}
+                runner_snapshot = {"snapshot": "invalid", "raw": snap_raw}
         elif not snap_raw and rec.runner_profile_id:
-            run_dict["runner_snapshot"] = {"snapshot": "missing"}
+            runner_snapshot = {"snapshot": "missing"}
 
-        run_dict["backend"] = snap.get("backend") if isinstance(snap, dict) else None
-        run_dict["configured_model"] = (
+        backend: str | None = snap.get("backend") if isinstance(snap, dict) else None
+        configured_model: str | None = (
             snap.get("model") if isinstance(snap, dict) else None
         )
-        run_dict["reported_model"] = usage.get("model") if usage else None
-        return {"run": run_dict, "usage": usage}
+        reported_model: str | None = usage.get("model") if usage else None
+
+        # Build the complete RunDetailPayload
+        run_payload: RunDetailPayload = {
+            "id": base_dict["id"],
+            "agent_id": base_dict["agent_id"],
+            "session_id": base_dict["session_id"],
+            "status": base_dict["status"],
+            "input": base_dict["input"],
+            "output": base_dict["output"],
+            "error": base_dict["error"],
+            "workdir": base_dict["workdir"],
+            "transcript_path": base_dict["transcript_path"],
+            "created_at": base_dict["created_at"],
+            "finished_at": base_dict["finished_at"],
+            "config_digest": base_dict["config_digest"],
+            "agent_version_id": base_dict["agent_version_id"],
+            "composition_snapshot": base_dict["composition_snapshot"],
+            "rendered_prompt": base_dict["rendered_prompt"],
+            "variables": base_dict["variables"],
+            "validation_status": base_dict["validation_status"],
+            "validation_errors": base_dict["validation_errors"],
+            "schema_validated_via": base_dict["schema_validated_via"],
+            "post_status": base_dict["post_status"],
+            "post_errors": base_dict["post_errors"],
+            "conversation_format": base_dict["conversation_format"],
+            "conversation_uri": base_dict["conversation_uri"],
+            "runner_profile_id": base_dict["runner_profile_id"],
+            "resource_snapshot": base_dict["resource_snapshot"],
+            "mcp_snapshot": base_dict["mcp_snapshot"],
+            "runner_snapshot": runner_snapshot,
+            "agent_version": agent_version,
+            "backend": backend,
+            "configured_model": configured_model,
+            "reported_model": reported_model,
+            "prompt_version_id": base_dict["prompt_version_id"],
+        }
+        return {"run": run_payload, "usage": usage}
 
     def get_run_prompt_fragments(self, run_id: str) -> RunPromptFragmentsResult:
         rec = self.get_run(run_id)
         if rec is None:
             raise RunNotFound(run_id)
         raw = self.get_run_prompt(run_id)
-        fragments: list[dict[str, JsonValue]] = _json.loads(raw) if raw else []
+        fragments_list = _json.loads(raw) if raw else []
         total = sum(
             int(sb)
-            for f in fragments
+            for f in fragments_list
             if isinstance(sb := f.get("size_bytes"), (int, float))
         )
+        # The fragments are created by capture_fragments() which produces
+        # properly-structured PromptFragmentPayload dicts from JSON.
+        fragments: list[PromptFragmentPayload] = [
+            {
+                "name": f["name"],
+                "source": f["source"],
+                "injected_by": f["injected_by"],
+                "content": f["content"],
+                "inspectable": f["inspectable"],
+                "shared_resource_id": f.get("shared_resource_id"),
+                "shared_resource_version": f.get("shared_resource_version"),
+                "size_bytes": f["size_bytes"],
+            }
+            for f in fragments_list
+        ]
         return {"run_id": run_id, "fragments": fragments, "total_bytes": total}
 
     # ══════════════════════════════════════════════════════════════════
