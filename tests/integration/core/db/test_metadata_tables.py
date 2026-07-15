@@ -1,19 +1,17 @@
-"""Snapshot the table set bound to ``agentbox.core.db.metadata``.
+"""Snapshot the table set bound to the single ``MetaData``.
 
-Phase 3 of the consolidation plan moves schema definitions across domain
-packages while keeping a single shared ``MetaData`` instance. Alembic
-inspects ``metadata.tables`` to autogenerate migrations and
-``metadata.create_all(engine)`` runs at startup, so losing a table from
-the shared instance silently breaks both.
-
-Lock the table set here so the split can't quietly drop one.
+Plan 127 collapsed the Core ``schema/`` tables into the SQLModel entities;
+``base.metadata`` (``SQLModel.metadata``) is now the one shared ``MetaData``.
+Alembic inspects ``metadata.tables`` to autogenerate migrations and
+``metadata.create_all(engine)`` runs at startup, so losing a table from the
+shared instance silently breaks both. Lock the table set here so a future
+entity move can't quietly drop one.
 """
 
 from __future__ import annotations
 
-from agentbox.core.db import schema  # subpackage attribute — always accessible
-from agentbox.core.db.schema import metadata
-from agentbox.core.db._metadata import metadata as private
+import agentbox.core.db  # noqa: F401 — importing the facade registers every entity
+from agentbox.core.db.base.metadata import metadata
 
 EXPECTED_TABLES: frozenset[str] = frozenset(
     {
@@ -69,20 +67,3 @@ def test_metadata_tables_match_expected() -> None:
     assert not extra, (
         f"metadata gained tables without updating this test: {sorted(extra)}"
     )
-
-
-def test_metadata_is_shared_singleton() -> None:
-    """The façade ``metadata`` must be the same object as ``_metadata.metadata``.
-
-    If a domain ``schema.py`` ever instantiates its own ``MetaData()``,
-    its tables silently won't appear in ``agentbox.core.db.metadata``
-    — Alembic would miss them. This test catches that.
-    """
-    assert metadata is private
-
-
-def test_shared_metadata_seen_by_legacy_schema_module() -> None:
-    """Until Phase 6 deletes the monolith, the old ``schema.py`` is the
-    canonical table location. Its ``metadata`` must be the shared one.
-    """
-    assert schema.metadata is metadata

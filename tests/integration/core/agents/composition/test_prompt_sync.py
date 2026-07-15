@@ -5,9 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentbox.core.data import AgentDef, AgentSource, RunnerSpec
-from agentbox.core.db.schema import prompt_versions
+from agentbox.core.db.agents.prompt import PromptVersion
 from agentbox.core.agents.versioning.drift import startup_sweep
 from agentbox.core.service.agents import AgentService
+
+prompt_versions = PromptVersion.__table__
 
 
 def _agent_with_prompt(agent_id: str, source_path: Path, prompt_path: str) -> AgentDef:

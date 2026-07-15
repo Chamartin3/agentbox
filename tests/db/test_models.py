@@ -3,8 +3,8 @@
 Verifies schema construction, round-trips, validation, and facade encapsulation.
 
 After plan 109, ``agentbox.core.db`` exports managers only.  SQLModel entities
-live in their per-domain packages (``agentbox.core.db.runs`` etc.) and
-``metadata`` in ``agentbox.core.db.schema``.
+live in their per-domain packages (``agentbox.core.db.runs`` etc.); the single
+``metadata`` is ``SQLModel.metadata`` (``agentbox.core.db.base.metadata``).
 """
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from agentbox.core.db.runs import Run, Session, Usage
 from agentbox.core.db.agents import Agent, AgentVersion
 from agentbox.core.db.workspaces import Workspace
 from agentbox.core.db.system import Setting
-from agentbox.core.db.schema import metadata as old_metadata
 from agentbox.core.db.engines.runner_profile import RunnerProfile
 
 
@@ -28,21 +27,6 @@ def test_schema_builds() -> None:
     # If we reach here without exception, that's the passing signal.
     assert True
 
-
-def test_table_names_match_existing() -> None:
-    """The table-name set matches the existing core/data schema set.
-
-    This proves migration compatibility: every table that exists in the
-    legacy schema is also defined in the new models catalog, and no extra
-    tables are created.
-    """
-    old_tables = set(old_metadata.tables.keys())
-    new_tables = set(SQLModel.metadata.tables.keys())
-    assert old_tables == new_tables, (
-        f"Table name mismatch.\n"
-        f"Missing from new: {old_tables - new_tables}\n"
-        f"Extra in new: {new_tables - old_tables}"
-    )
 
 
 def test_json_blob_roundtrip() -> None:
@@ -122,8 +106,8 @@ def test_facade_managers_only() -> None:
     assert "get_database" not in public_names, "get_database leaked into managers-only facade"
 
 
-def test_tablenames_match_old_schema() -> None:
-    """Every model's __tablename__ equals the existing table name."""
+def test_tablenames_present_in_metadata() -> None:
+    """Every model's __tablename__ is registered on the shared metadata."""
     models_with_tablenames = [
         Run,
         Session,
@@ -135,6 +119,6 @@ def test_tablenames_match_old_schema() -> None:
     ]
     for model in models_with_tablenames:
         table_name = model.__tablename__
-        assert table_name in old_metadata.tables, (
-            f"Table {table_name!r} (from {model.__name__}) not found in legacy schema"
+        assert table_name in SQLModel.metadata.tables, (
+            f"Table {table_name!r} (from {model.__name__}) not found in metadata"
         )

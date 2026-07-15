@@ -14,7 +14,6 @@ from sqlmodel import Field
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.data.rows import AgentMetaRow, _AgentMetaFields, _AgentMetaPatchFields
-from agentbox.core.db.schema import active_agent_versions, agent_meta
 
 
 class Agent(Entity, table=True):
@@ -62,6 +61,10 @@ class AgentRunnerProfile(Entity, table=True):
 	runner_profile_id: str = Field(foreign_key="runner_profiles.id", nullable=False)
 	created_at: str = Field(nullable=False)
 	updated_at: str = Field(nullable=False)
+
+
+active_agent_versions = ActiveAgentVersion.__table__
+agent_meta = AgentMeta.__table__
 
 
 def _meta_row(row: Row) -> AgentMetaRow:

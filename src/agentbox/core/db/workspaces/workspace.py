@@ -14,7 +14,6 @@ from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
 from agentbox.core.db.resources.binding import WorkspaceFileResourceBinding
-from agentbox.core.db.schema import workspaces as workspaces_schema
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.rows import WorkspaceRow
 
@@ -36,6 +35,8 @@ class Workspace(Entity, table=True):
         CheckConstraint("source IN ('manifest', 'db')", name="workspaces_source_check"),
     )
 
+
+workspaces_schema = Workspace.__table__
 
 _SATELLITE_TABLES: tuple[str, ...] = (
     "workspace_subagents",

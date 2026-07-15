@@ -14,7 +14,6 @@ from agentbox.core.config import SETTINGS
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import mcp_tool_discovery_cache
 
 TTL_SECONDS = SETTINGS.mcp_discovery_ttl
 
@@ -45,6 +44,9 @@ class McpToolDiscoveryCache(Entity, table=True):
         UniqueConstraint("server_name", "config_hash", name="uq_mcp_discovery_server_hash"),
         Index("ix_mcp_discovery_server", "server_name"),
     )
+
+
+mcp_tool_discovery_cache = McpToolDiscoveryCache.__table__  # table sourced from the SQLModel entity
 
 
 class McpToolDiscoveryCacheManager(Manager[McpToolDiscoveryCache]):

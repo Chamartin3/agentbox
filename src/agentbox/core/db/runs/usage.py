@@ -15,7 +15,6 @@ from sqlmodel import Field
 from agentbox.core.db.base.model import Entity
 from agentbox.core.data.rows import UsageRow, UsageSummaryRow
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.schema import usage
 
 
 class Usage(Entity, table=True):
@@ -30,6 +29,9 @@ class Usage(Entity, table=True):
     cache_read_tokens: Optional[int] = Field(default=0, sa_column_kwargs={"server_default": "0"})
     cache_write_tokens: Optional[int] = Field(default=0, sa_column_kwargs={"server_default": "0"})
     cost_usd: Optional[float] = Field(default=None)
+
+
+usage = Usage.__table__  # table sourced from the SQLModel entity
 
 
 class UsageManager(Manager[Usage]):

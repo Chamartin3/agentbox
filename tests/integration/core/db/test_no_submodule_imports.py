@@ -1,14 +1,19 @@
-"""CI guard: external code must import from ``agentbox.core.db``, not its submodules.
+"""CI guard: APPLICATION code must import from ``agentbox.core.db``, not its submodules.
 
-The façade re-exports every public symbol (see ``test_facade_exports.py``).
-Reaching into ``agentbox.core.db.<sub>`` from outside the package locks
-callers to the current layout and blocks the consolidation work in
+The façade re-exports every public manager. Reaching into
+``agentbox.core.db.<sub>`` from application code locks callers to the current
+layout and blocks the consolidation work in
 ``docs/plans/24-core-data-consolidation.md``.
 
-The only allowed external direct-submodule import is this test file's own
-fixture for asserting the rule — and ``test_facade_exports.py`` which
-intentionally re-imports ``SessionStore`` from its submodule to verify
-the façade points at the same object.
+Scope: only ``src/`` (plus ``alembic``/``bin``) is checked — see ``SEARCH_ROOTS``.
+Tests are NOT held to this rule; they may use specific submodule imports
+(``Database``, schema tables, a manager module for patching).
+
+Plan 109 exception: ``agentbox.core.db.database`` is intentionally importable
+from the named allowlist below (composition roots and DI singletons).  These
+are tracked as debt in importlinter ``db-facade-managers-only`` and burned by
+plans 111/112/110/113_04.  ``agentbox.core.db.schema`` is similarly tolerated
+in service/execution modules that haven't yet migrated to managers.
 """
 
 from __future__ import annotations
@@ -18,9 +23,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# Only the APPLICATION is held to facade-only imports. Tests may reach into
+# ``agentbox.core.db`` subbranches (e.g. import ``Database`` / schema tables /
+# a manager module for patching) — they are allowed specific imports.
 SEARCH_ROOTS = (
     REPO_ROOT / "src",
-    REPO_ROOT / "tests",
     REPO_ROOT / "alembic",
     REPO_ROOT / "bin",
 )
@@ -29,14 +36,47 @@ SEARCH_ROOTS = (
 ALLOWED = {
     # Internal to the package — its own modules legitimately import siblings.
     REPO_ROOT / "src" / "agentbox" / "core" / "db",
-    # Tests that verify the façade itself by comparing against submodule.
-    REPO_ROOT / "tests" / "db" / "test_facade_exports.py",
-    REPO_ROOT / "tests" / "db" / "test_metadata_tables.py",
-    # This guard.
-    REPO_ROOT / "tests" / "db" / "test_no_submodule_imports.py",
+    # Alembic is the schema's own migration tooling, not application code: the
+    # baseline runs ``metadata.create_all`` and needs ``core.db.schema.metadata``
+    # (the facade is managers-only and does not re-export it).
+    REPO_ROOT / "alembic",
+    # Lifecycle imports that reach into data submodules (pre-existing).
+    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "lifecycle.py",
+    # ── plan 109 Phase A debt: core.db.database allowlist ──────────────────
+    # These files import ``from agentbox.core.db.database import Database/get_database``
+    # because Database/get_database are no longer facade-exported. Each site is
+    # tracked in importlinter db-facade-managers-only.ignore_imports and burned
+    # by plans 111/112/110/113_04.
+    # Permanent (composition roots):
+    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "base.py",
+    # Transitional DI singletons (burned by plan 113_04):
+    REPO_ROOT / "src" / "agentbox" / "api" / "deps.py",
+    REPO_ROOT / "src" / "agentbox" / "cli" / "shared" / "deps.py",
+    REPO_ROOT / "src" / "agentbox" / "mcp" / "deps.py",
+    # Transitional cli commands:
+    REPO_ROOT / "src" / "agentbox" / "cli" / "ops" / "shell.py",
+    # Transitional mcp/server contexts (burned by plan 110):
+    REPO_ROOT / "src" / "agentbox" / "core" / "tools" / "mcp_servers" / "agent_tools" / "context.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "tools" / "mcp_servers" / "host_env" / "context.py",
+    # Transitional core domain users (burned by plans 111/112):
+    REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "orchestrate" / "executor.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "observability" / "snapshot" / "runner.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "engines" / "profiles.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "engines" / "providers.py",
+    # Transitional service/workspace modules:
+    REPO_ROOT / "src" / "agentbox" / "api" / "workspaces" / "crud.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "lifecycle" / "startup.py",
+    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "workspaces" / "registry.py",
+    # init_run imports ``core.db.database`` (Database) directly for run-creation
+    # composition; tracked in importlinter init_run→database.
+    REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "orchestrate" / "init_run.py",
 }
 
-PATTERN = re.compile(r"\bfrom\s+agentbox\.core\.db\.[a-z_][a-z_0-9]*\s+import\b")
+# ``core.db.config`` is a public self-wiring read-helper module (not a manager,
+# so it is not facade-exported) — application code imports it directly, by
+# design (plan 127 moved it up from the old ``core.db.system.config``). Exclude
+# it from the guard; every other single-segment ``core.db.<sub>`` is held.
+PATTERN = re.compile(r"\bfrom\s+agentbox\.core\.db\.(?!config\b)[a-z_][a-z_0-9]*\s+import\b")
 
 
 def _is_allowed(path: Path) -> bool:

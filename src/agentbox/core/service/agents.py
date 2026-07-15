@@ -105,8 +105,8 @@ from agentbox.core.db import (
     ResourceManager,
     ResourceVersionManager,
 )
-from agentbox.core.db.schema import agent_runner_profiles
-from agentbox.core.db.schema import runs as runs_table
+from agentbox.core.db.agents.agent import AgentRunnerProfile as _AgentRunnerProfile
+from agentbox.core.db.runs.run import Run as _Run
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines import EngineService
 from agentbox.core.workspaces import workdir as ws
@@ -116,6 +116,10 @@ from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 from typing import Any
 from typing import cast
+
+# Tables sourced from the SQLModel entities (was core.db.schema).
+agent_runner_profiles = _AgentRunnerProfile.__table__
+runs_table = _Run.__table__
 
 
 logger = logging.getLogger(__name__)

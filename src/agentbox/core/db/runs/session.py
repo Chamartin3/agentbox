@@ -15,7 +15,6 @@ from sqlmodel import Field
 from agentbox.core.db.base.model import Entity
 from agentbox.core.data.rows import SessionRow
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.schema import sessions
 from agentbox.core.data._util import now_iso
 
 
@@ -30,6 +29,9 @@ class Session(Entity, table=True):
     workdir: Optional[str] = Field(default=None)
     created_at: str = Field(nullable=False)
     last_used_at: Optional[str] = Field(default=None)
+
+
+sessions = Session.__table__  # table sourced from the SQLModel entity
 
 
 class SessionManager(Manager[Session]):

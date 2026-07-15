@@ -14,11 +14,6 @@ from sqlmodel import CheckConstraint, Field, Index, UniqueConstraint
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import (
-    workspace_mcp_overrides,
-    workspace_mcp_policies,
-    workspace_mcp_tool_overrides,
-)
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.constants import McpPolicy
 from agentbox.core.data.rows import WorkspaceMcpOverrideRow, WorkspaceMcpToolOverrideRow
@@ -74,6 +69,11 @@ class WorkspaceMcpPolicy(Entity, table=True):
     __table_args__ = tableargs(
         CheckConstraint("default_policy IN ('allow_all_unless_disabled', 'deny_all_unless_enabled')", name="workspace_mcp_policy_check"),
     )
+
+
+workspace_mcp_overrides = WorkspaceMcpOverride.__table__
+workspace_mcp_policies = WorkspaceMcpPolicy.__table__
+workspace_mcp_tool_overrides = WorkspaceMcpToolOverride.__table__
 
 
 class WorkspaceMcpPolicyManager(Manager[WorkspaceMcpPolicy]):

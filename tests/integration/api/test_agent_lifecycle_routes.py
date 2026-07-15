@@ -13,10 +13,12 @@ import agentbox.api.deps as deps
 from agentbox.api.app import create_app
 from agentbox.core.config import load_settings
 from agentbox.core.db.database import get_database
-from agentbox.core.db.schema import agent_versions
+from agentbox.core.db.agents.version import AgentVersion
 from agentbox.core.service.agents import AgentService
 from fastapi.testclient import TestClient
 from sqlalchemy import update
+
+agent_versions = AgentVersion.__table__
 
 
 class _ManagedTestClient(TestClient):

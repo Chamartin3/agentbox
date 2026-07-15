@@ -14,7 +14,6 @@ from sqlmodel import Field, Index, UniqueConstraint
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.data.rows import AgentToolGrantRow, _AgentToolGrantFields, _AgentToolGrantPatchFields
-from agentbox.core.db.schema import agent_tool_grants
 
 
 class AgentToolGrant(Entity, table=True):
@@ -36,6 +35,9 @@ class AgentToolGrant(Entity, table=True):
 		Index("ix_agent_tool_grants_agent", "agent_id"),
 		UniqueConstraint("agent_id", "tool_name", name="uq_agent_tool_grant"),
 	)
+
+
+agent_tool_grants = AgentToolGrant.__table__
 
 
 def _grant_row(row: Row) -> AgentToolGrantRow:

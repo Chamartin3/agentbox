@@ -16,7 +16,6 @@ from agentbox.core.data.rows import HostEnvProfileRow
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import host_env_profiles
 
 
 class HostEnvProfile(Entity, table=True):
@@ -34,6 +33,9 @@ class HostEnvProfile(Entity, table=True):
     __table_args__ = tableargs(
         UniqueConstraint("name", name="uq_host_env_profile_name"),
     )
+
+
+host_env_profiles = HostEnvProfile.__table__  # table sourced from the SQLModel entity
 
 
 class HostEnvProfileManager(Manager[HostEnvProfile]):

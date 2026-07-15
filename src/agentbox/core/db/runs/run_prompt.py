@@ -12,7 +12,6 @@ from sqlmodel import Field
 
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.schema import run_prompts
 from agentbox.core.data._util import now_iso
 
 
@@ -24,6 +23,9 @@ class RunPrompt(Entity, table=True):
     run_id: str = Field(primary_key=True, foreign_key="runs.id")
     fragments: str = Field(nullable=False)
     created_at: str = Field(nullable=False)
+
+
+run_prompts = RunPrompt.__table__  # table sourced from the SQLModel entity
 
 
 class RunPromptManager(Manager[RunPrompt]):

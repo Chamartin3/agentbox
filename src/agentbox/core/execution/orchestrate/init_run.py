@@ -16,13 +16,15 @@ from agentbox.core.data import AgentDef
 from agentbox.core.data.composition import ComposedPrompt
 from agentbox.core.db.database import Database
 from agentbox.core.data._util import now_iso
-from agentbox.core.db.schema import runs as _runs_table  # ponytail: transitional — direct SQL for agent_version_id stamp
+from agentbox.core.db.runs.run import Run as _Run  # direct SQL for agent_version_id stamp
 from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 from agentbox.core.execution.observability.snapshot import (
     SnapshotWriter,
     build_runner_snapshot,
     capture_fragments,
 )
+
+_runs_table = _Run.__table__  # ``runs`` table sourced from the SQLModel entity
 
 logger = logging.getLogger(__name__)
 

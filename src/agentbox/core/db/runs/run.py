@@ -33,7 +33,8 @@ from agentbox.core.data.rows import (
 from agentbox.core.data.snapshots import RunnerSnapshot
 from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.schema import agent_versions, runs, usage
+from agentbox.core.db.agents.version import AgentVersion
+from agentbox.core.db.runs.usage import Usage
 
 
 class Run(Entity, table=True):
@@ -87,6 +88,12 @@ def _duration_ms_expr(c_started: object, c_finished: object) -> object:
     epoch_finished = sql_cast(func.strftime("%s", c_finished), Integer)
     epoch_started = sql_cast(func.strftime("%s", c_started), Integer)
     return (epoch_finished - epoch_started) * 1000
+
+
+# Table aliases sourced from SQLModel entities (instead of core.db.schema)
+runs = Run.__table__
+usage = Usage.__table__
+agent_versions = AgentVersion.__table__
 
 
 class RunManager(Manager[Run]):

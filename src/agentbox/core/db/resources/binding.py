@@ -19,11 +19,7 @@ from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import (
-    agent_prompt_resource_bindings,
-    resources as resources_table,
-    workspace_file_resource_bindings,
-)
+from agentbox.core.db.resources.resource import Resource
 
 
 class AgentPromptResourceBinding(Entity, table=True):
@@ -80,6 +76,11 @@ class WorkspaceFileResourceBinding(Entity, table=True):
         UniqueConstraint("workspace_id", "resource_id", "target_path", name="uq_workspace_file_bindings_triple"),
         Index("ix_workspace_file_bindings_workspace", "workspace_id"),
     )
+
+
+agent_prompt_resource_bindings = AgentPromptResourceBinding.__table__
+workspace_file_resource_bindings = WorkspaceFileResourceBinding.__table__
+resources_table = Resource.__table__
 
 
 _MIN_REASON = 3

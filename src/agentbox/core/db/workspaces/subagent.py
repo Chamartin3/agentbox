@@ -13,7 +13,6 @@ from sqlmodel import Field, Index, UniqueConstraint
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import workspace_subagents
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.payload_types import SubagentSpec
 from agentbox.core.data.rows import WorkspaceSubagentRow
@@ -36,6 +35,9 @@ class WorkspaceSubagent(Entity, table=True):
         UniqueConstraint("workspace_id", "alias", name="uq_workspace_subagents_alias"),
         Index("ix_workspace_subagents_workspace", "workspace_id"),
     )
+
+
+workspace_subagents = WorkspaceSubagent.__table__
 
 
 class WorkspaceSubagentManager(Manager[WorkspaceSubagent]):

@@ -14,7 +14,6 @@ from sqlmodel import Field
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.data.rows import AgentSyncRow, _AgentSyncFields, _AgentSyncPatchFields
-from agentbox.core.db.schema import agent_sync
 
 
 class AgentSync(Entity, table=True):
@@ -29,6 +28,9 @@ class AgentSync(Entity, table=True):
 	last_file_hash: Optional[str] = Field(default=None)
 	last_file_mtime: Optional[str] = Field(default=None)
 	last_sync_at: Optional[str] = Field(default=None)
+
+
+agent_sync = AgentSync.__table__
 
 
 def _sync_row(row: Row) -> AgentSyncRow:

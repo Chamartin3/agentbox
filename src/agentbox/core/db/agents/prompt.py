@@ -15,7 +15,6 @@ from sqlmodel import Field, Index
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.data.rows import PromptVersionRow, _PromptVersionFields
-from agentbox.core.db.schema import prompt_versions
 
 
 class PromptVersion(Entity, table=True):
@@ -36,6 +35,9 @@ class PromptVersion(Entity, table=True):
 	__table_args__ = tableargs(
 		Index("idx_prompt_versions_agent", "agent_id", "version", unique=True),
 	)
+
+
+prompt_versions = PromptVersion.__table__
 
 
 def _prompt_row(row: Row) -> PromptVersionRow:

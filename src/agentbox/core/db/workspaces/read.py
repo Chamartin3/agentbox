@@ -9,7 +9,7 @@ a delegating proxy.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import cast
 
 from agentbox.core.data import AgentDef
 from agentbox.core.data.constants import McpPolicy
@@ -27,24 +27,45 @@ from agentbox.core.data.rows import (
     WorkspaceRuntimePermissionRow,
     WorkspaceSubagentRow,
 )
-from agentbox.core.db.schema import (
-    active_agent_versions,
-    active_resource_versions,
-    agent_versions,
-    host_env_profiles,
-    resource_blobs,
-    resource_versions,
-    resources,
-    workspace_env_doc_versions,
-    workspace_env_docs,
-    workspace_file_resource_bindings,
-    workspace_mcp_overrides,
-    workspace_mcp_policies,
-    workspace_mcp_tool_overrides,
-    workspace_runtime_permissions,
-    workspace_subagents,
-    workspaces,
+from agentbox.core.db.agents.agent import ActiveAgentVersion
+from agentbox.core.db.agents.version import AgentVersion
+from agentbox.core.db.resources.binding import WorkspaceFileResourceBinding
+from agentbox.core.db.resources.resource import (
+    ActiveResourceVersion,
+    Resource,
+    ResourceBlob,
+    ResourceVersion,
 )
+from agentbox.core.db.system.host_env_profile import HostEnvProfile
+from agentbox.core.db.workspaces.env_doc import (
+    WorkspaceEnvDoc,
+    WorkspaceEnvDocVersion,
+)
+from agentbox.core.db.workspaces.mcp_override import (
+    WorkspaceMcpOverride,
+    WorkspaceMcpPolicy,
+    WorkspaceMcpToolOverride,
+)
+from agentbox.core.db.workspaces.runtime_permission import WorkspaceRuntimePermission
+from agentbox.core.db.workspaces.subagent import WorkspaceSubagent
+from agentbox.core.db.workspaces.workspace import Workspace
+
+active_agent_versions = ActiveAgentVersion.__table__
+agent_versions = AgentVersion.__table__
+active_resource_versions = ActiveResourceVersion.__table__
+resource_blobs = ResourceBlob.__table__
+resource_versions = ResourceVersion.__table__
+resources = Resource.__table__
+host_env_profiles = HostEnvProfile.__table__
+workspace_file_resource_bindings = WorkspaceFileResourceBinding.__table__
+workspace_env_doc_versions = WorkspaceEnvDocVersion.__table__
+workspace_env_docs = WorkspaceEnvDoc.__table__
+workspace_mcp_overrides = WorkspaceMcpOverride.__table__
+workspace_mcp_policies = WorkspaceMcpPolicy.__table__
+workspace_mcp_tool_overrides = WorkspaceMcpToolOverride.__table__
+workspace_runtime_permissions = WorkspaceRuntimePermission.__table__
+workspace_subagents = WorkspaceSubagent.__table__
+workspaces = Workspace.__table__
 
 
 class WorkspaceReadManager:
@@ -54,7 +75,7 @@ class WorkspaceReadManager:
     (same shape as the individual managers).  No writes, no business logic.
     """
 
-    def __init__(self, engine: Any) -> None:
+    def __init__(self, engine) -> None:
         self._engine = engine
 
     # ── Workspace ─────────────────────────────────────────────────────────────

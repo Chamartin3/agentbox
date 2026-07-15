@@ -6,9 +6,9 @@ Create Date: 2026-06-07 00:00:00.000000
 
 Single squashed baseline. Replaces 30 historical migrations that were
 collapsed when agentbox was extracted as a standalone library. The
-schema is materialized directly from ``agentbox.core.db.schema``
-(the SQLAlchemy metadata is the single source of truth), so there is
-no hand-maintained DDL here to drift from the models.
+schema is materialized directly from the SQLModel entities' shared
+``MetaData`` (``agentbox.core.db.base.metadata``, the single source of
+truth), so there is no hand-maintained DDL here to drift from the models.
 
 Existing deployments that were past any prior revision must drop and
 recreate their database before upgrading; there is no incremental
@@ -19,7 +19,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-from agentbox.core.db.schema import metadata
+import agentbox.core.db  # noqa: F401 — importing the facade registers every SQLModel entity
+from agentbox.core.db.base.metadata import metadata
 
 revision: str = "0001_initial"
 down_revision: str | Sequence[str] | None = None

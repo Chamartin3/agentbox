@@ -21,12 +21,6 @@ from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import (
-    active_resource_versions,
-    resource_blobs,
-    resource_versions,
-    resources as resources_table,
-)
 
 
 class Resource(Entity, table=True):
@@ -110,6 +104,12 @@ class ActiveResourceVersion(Entity, table=True):
     version_id: str = Field(foreign_key="resource_versions.id", nullable=False)
     activated_at: str = Field(nullable=False)
     activated_by: Optional[str] = Field(default=None)
+
+
+resources_table = Resource.__table__
+resource_versions = ResourceVersion.__table__
+resource_blobs = ResourceBlob.__table__
+active_resource_versions = ActiveResourceVersion.__table__
 
 
 # ---------------------------------------------------------------------------

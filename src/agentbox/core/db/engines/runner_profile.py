@@ -28,7 +28,9 @@ from agentbox.core.data.profiles import RunnerProfile as RunnerProfileView, Runn
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.tablename import tableargs, tablename
-from agentbox.core.db.schema import agent_runner_profiles, runner_profiles, runs, usage
+from agentbox.core.db.agents.agent import AgentRunnerProfile
+from agentbox.core.db.runs.run import Run
+from agentbox.core.db.runs.usage import Usage
 
 
 class RunnerProfile(Entity, table=True):
@@ -60,6 +62,13 @@ class RunnerProfile(Entity, table=True):
         Index("idx_runner_profiles_backend_provider", "backend", "provider"),
         Index("idx_runner_profiles_enabled", "is_enabled"),
     )
+
+
+# Table aliases sourced from SQLModel entities (instead of core.db.schema)
+runner_profiles = RunnerProfile.__table__
+agent_runner_profiles = AgentRunnerProfile.__table__
+runs = Run.__table__
+usage = Usage.__table__
 
 
 def _duration_ms_expr(c_started: object, c_finished: object) -> object:

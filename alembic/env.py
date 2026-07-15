@@ -4,7 +4,8 @@ from sqlalchemy import create_engine, pool
 
 from alembic import context
 
-from agentbox.core.db.schema import metadata
+import agentbox.core.db  # noqa: F401 — importing the facade registers every SQLModel entity
+from agentbox.core.db.base.metadata import metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

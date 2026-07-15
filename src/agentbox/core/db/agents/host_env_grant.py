@@ -15,7 +15,7 @@ from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.tablename import tablename
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.data.rows import AgentHostEnvGrantRow, HostEnvProfileRow
-from agentbox.core.db.schema import agent_host_env_grants, host_env_profiles
+from agentbox.core.db.system.host_env_profile import HostEnvProfile
 from agentbox.core.data._util import now_iso
 
 
@@ -34,6 +34,10 @@ class AgentHostEnvGrant(Entity, table=True):
 	changelog: str = Field(nullable=False)
 	created_at: str = Field(nullable=False)
 	created_by: Optional[str] = Field(default=None)
+
+
+agent_host_env_grants = AgentHostEnvGrant.__table__
+host_env_profiles = HostEnvProfile.__table__
 
 
 class AgentHostEnvGrantManager(Manager[AgentHostEnvGrant]):

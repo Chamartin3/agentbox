@@ -67,10 +67,9 @@ ALLOWED = {
     REPO_ROOT / "src" / "agentbox" / "api" / "workspaces" / "crud.py",
     REPO_ROOT / "src" / "agentbox" / "core" / "service" / "lifecycle" / "startup.py",
     REPO_ROOT / "src" / "agentbox" / "core" / "service" / "workspaces" / "registry.py",
-    # ── plan 109 Phase A debt: core.db.schema allowlist ────────────────────
-    # These import schema tables directly; burned by plans 111/112.
+    # init_run imports ``core.db.database`` (Database) directly for run-creation
+    # composition; tracked in importlinter init_run→database.
     REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "orchestrate" / "init_run.py",
-    REPO_ROOT / "src" / "agentbox" / "core" / "service" / "agents.py",
 }
 
 # ``core.db.config`` is a public self-wiring read-helper module (not a manager,

@@ -26,13 +26,7 @@ from agentbox.core.data.rows import (
 	_AgentVersionFields,
 	_AgentVersionRatingFields,
 )
-from agentbox.core.db.schema import (
-	active_agent_versions,
-	agent_version_comments,
-	agent_version_files,
-	agent_version_ratings,
-	agent_versions,
-)
+from agentbox.core.db.agents.agent import ActiveAgentVersion
 
 
 class AgentVersion(Entity, table=True):
@@ -108,6 +102,13 @@ class AgentVersionComment(Entity, table=True):
 	author: str = Field(nullable=False)
 	body: str = Field(nullable=False)
 	created_at: str = Field(nullable=False)
+
+
+agent_versions = AgentVersion.__table__
+agent_version_files = AgentVersionFile.__table__
+agent_version_ratings = AgentVersionRating.__table__
+agent_version_comments = AgentVersionComment.__table__
+active_agent_versions = ActiveAgentVersion.__table__
 
 
 def _version_row(row: Row) -> AgentVersionRow:

@@ -14,7 +14,6 @@ from sqlmodel import Field, Index
 from agentbox.core.db.base.model import Entity
 from agentbox.core.data.rows import WebhookDeliveryRow
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.schema import webhook_deliveries
 from agentbox.core.data._util import now_iso
 
 
@@ -37,6 +36,9 @@ class WebhookDelivery(Entity, table=True):
     __table_args__ = tableargs(
         Index("idx_webhook_deliveries_run", "run_id"),
     )
+
+
+webhook_deliveries = WebhookDelivery.__table__  # table sourced from the SQLModel entity
 
 
 class WebhookDeliveryManager(Manager[WebhookDelivery]):

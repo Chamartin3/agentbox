@@ -14,7 +14,6 @@ from sqlmodel import Field, Index
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.data.rows import AgentConfigEventRow, _AgentConfigEventFields
-from agentbox.core.db.schema import agent_config_events
 
 
 class AgentConfigEvent(Entity, table=True):
@@ -35,6 +34,9 @@ class AgentConfigEvent(Entity, table=True):
 		Index("ix_agent_config_events_agent", "agent_id"),
 		Index("ix_agent_config_events_created", "created_at"),
 	)
+
+
+agent_config_events = AgentConfigEvent.__table__
 
 
 def _event_row(row: Row) -> AgentConfigEventRow:

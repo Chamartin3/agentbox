@@ -315,7 +315,6 @@ source_modules =
     agentbox.core.tools
     agentbox.core.workspaces
 forbidden_modules =
-    agentbox.core.db.schema
     agentbox.core.db.base
     agentbox.core.db.store
     agentbox.core.db.database
@@ -333,9 +332,10 @@ ignore_imports =
     agentbox.core.service.base -> agentbox.core.db.database
     # ── Transitional: burned by the UNIFIED plan ────────────────────────────
     agentbox.core.execution.orchestrate.executor -> agentbox.core.db.database
-    agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.schema
+    agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.runs.run
     agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.database
-    agentbox.core.service.agents -> agentbox.core.db.schema
+    agentbox.core.service.agents -> agentbox.core.db.runs.run
+    agentbox.core.service.agents -> agentbox.core.db.agents.agent
     agentbox.core.service.lifecycle -> agentbox.core.db.database
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────
     agentbox.core.tools.mcp_servers.agent_tools.context -> agentbox.core.db.database

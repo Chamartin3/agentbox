@@ -13,7 +13,6 @@ from sqlmodel import Field
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename
-from agentbox.core.db.schema import workspace_runtime_permissions
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.rows import PermissionFileEntry, WorkspaceRuntimePermissionRow
 
@@ -37,6 +36,9 @@ def _bool_to_int(b: bool | None) -> int | None:
     if b is None:
         return None
     return 1 if b else 0
+
+
+workspace_runtime_permissions = WorkspaceRuntimePermission.__table__
 
 
 class WorkspaceRuntimePermissionManager(Manager[WorkspaceRuntimePermission]):

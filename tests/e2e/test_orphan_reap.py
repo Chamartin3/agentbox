@@ -13,7 +13,9 @@ from pathlib import Path
 
 from agentbox.core.data import now_iso
 from agentbox.core.db.database import Database
-from agentbox.core.db.schema import runs
+from agentbox.core.db.runs.run import Run
+
+runs = Run.__table__
 
 
 def _make_run(store: Database, agent_id: str) -> str:

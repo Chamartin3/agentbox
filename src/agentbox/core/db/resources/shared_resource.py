@@ -16,7 +16,6 @@ from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import shared_resources
 
 
 class SharedResource(Entity, table=True):
@@ -43,6 +42,9 @@ class SharedResource(Entity, table=True):
         Index("ix_shared_resources_kind_active", "kind", "is_active"),
         Index("ix_shared_resources_id_active", "id", "is_active"),
     )
+
+
+shared_resources = SharedResource.__table__
 
 
 def _compute_sha256(content: str | None, config_json: str | None) -> str:

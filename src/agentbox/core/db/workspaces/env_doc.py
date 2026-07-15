@@ -13,7 +13,6 @@ from sqlmodel import Field, Index, UniqueConstraint
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.tablename import tablename, tableargs
-from agentbox.core.db.schema import workspace_env_doc_versions, workspace_env_docs
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.rows import EnvDocRow, WorkspaceEnvDocPointerRow
 
@@ -47,6 +46,10 @@ class WorkspaceEnvDocVersion(Entity, table=True):
         UniqueConstraint("workspace_id", "version_number", name="uq_workspace_env_doc_version"),
         Index("ix_workspace_env_doc_versions_workspace_id", "workspace_id"),
     )
+
+
+workspace_env_doc_versions = WorkspaceEnvDocVersion.__table__
+workspace_env_docs = WorkspaceEnvDoc.__table__
 
 
 class WorkspaceEnvDocManager(Manager[WorkspaceEnvDoc]):

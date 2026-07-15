@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from agentbox.core.db.database import Database
-from agentbox.core.db.schema import agent_version_files
+from agentbox.core.db.agents.version import AgentVersionFile
 from agentbox.core.service import RunnerSpec
 from agentbox.core.service.agents import (
     AgentAlreadyExists,
@@ -24,6 +24,8 @@ from agentbox.core.service.agents import (
     VersionNotFound,
 )
 from agentbox.core.service.agents import AgentService
+
+agent_version_files = AgentVersionFile.__table__
 
 
 def _seed_version(db: Database, agent_id: str = "a1", version: int = 1, vid: int = 1) -> int:
