@@ -12,7 +12,7 @@ import os
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypedDict
 
 from agentbox.core.config import SETTINGS
 from agentbox.core.data import JsonValue
@@ -36,6 +36,36 @@ from agentbox.core.tools.translation import intersect_allowed_tools
 _NAME = "pi"
 
 
+class _PiCompat(TypedDict):
+    """pi provider compatibility flags."""
+    supportsDeveloperRole: bool
+    supportsReasoningEffort: bool
+
+
+class _PiModel(TypedDict):
+    """pi model identifier."""
+    id: str
+
+
+class _PiOllamaProvider(TypedDict):
+    """pi ollama provider configuration block."""
+    baseUrl: str
+    api: str
+    apiKey: str
+    compat: _PiCompat
+    models: list[_PiModel]
+
+
+class _PiProvidersBlock(TypedDict):
+    """pi providers block (ollama custom provider config)."""
+    ollama: _PiOllamaProvider
+
+
+class PiModelsJson(TypedDict):
+    """pi models.json configuration (custom provider schema)."""
+    providers: _PiProvidersBlock
+
+
 
 def _as_str(v: JsonValue) -> str | None:
     return v if isinstance(v, str) else None
@@ -48,7 +78,7 @@ def _normalize_pi_model_id(model: str | None, provider: str | None) -> str | Non
     return model
 
 
-def _build_pi_models_json(runner_config: Any, model: str | None) -> dict[str, JsonValue] | None:
+def _build_pi_models_json(runner_config: Any, model: str | None) -> PiModelsJson | None:
     """pi custom-provider block (``~/.pi/agent/models.json`` schema).
 
     ponytail: ollama only — the one keyless local provider the QA suite runs.
@@ -60,20 +90,20 @@ def _build_pi_models_json(runner_config: Any, model: str | None) -> dict[str, Js
     if provider != "ollama" or not base_url or not model:
         return None
     model_id = model.split("/", 1)[1] if "/" in model else model
-    return {
-        "providers": {
-            "ollama": {
-                "baseUrl": base_url,
-                "api": "openai-completions",
-                "apiKey": "ollama",
-                "compat": {
-                    "supportsDeveloperRole": False,
-                    "supportsReasoningEffort": False,
-                },
-                "models": [{"id": model_id}],
-            }
-        }
-    }
+    return PiModelsJson(
+        providers=_PiProvidersBlock(
+            ollama=_PiOllamaProvider(
+                baseUrl=base_url,
+                api="openai-completions",
+                apiKey="ollama",
+                compat=_PiCompat(
+                    supportsDeveloperRole=False,
+                    supportsReasoningEffort=False,
+                ),
+                models=[_PiModel(id=model_id)],
+            )
+        )
+    )
 
 
 def build_pi_argv(

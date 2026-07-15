@@ -11,10 +11,10 @@ import os
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypedDict
 
+from agentbox.core.data.jsontypes import JsonDict
 from agentbox.core.config import SETTINGS
-from agentbox.core.data import JsonValue
 
 from agentbox.core.engines.backends.opencode.stream import _run_opencode_stream
 
@@ -44,6 +44,26 @@ __all__ = [
 _NAME = "opencode"
 
 
+class _OpenCodeProviderOptions(TypedDict):
+    """opencode provider options (e.g., baseURL for ollama)."""
+    baseURL: str
+
+
+class _OpenCodeProviderEntry(TypedDict):
+    """opencode provider configuration entry (ollama-ai-provider-v2)."""
+    npm: str
+    options: _OpenCodeProviderOptions
+    models: dict[str, JsonDict]
+
+
+class OpenCodeProviderBlock(TypedDict):
+    """opencode provider block derived from runner profile.
+
+    Maps provider names (e.g., 'ollama') to their configuration entries.
+    """
+    ollama: _OpenCodeProviderEntry
+
+
 def _normalize_model_id(model: str, provider: str | None) -> str:
     """agentbox stores ``ollama:qwen3:8b``; opencode addresses ``ollama/qwen3:8b``.
 
@@ -55,7 +75,7 @@ def _normalize_model_id(model: str, provider: str | None) -> str:
     return model
 
 
-def _build_provider_block(runner_config: Any, model: str) -> dict[str, JsonValue] | None:
+def _build_provider_block(runner_config: Any, model: str) -> OpenCodeProviderBlock | None:
     """opencode provider entry derived from the runner profile.
 
     ponytail: ollama only — the one keyless local provider the QA suite runs.
@@ -70,16 +90,16 @@ def _build_provider_block(runner_config: Any, model: str) -> dict[str, JsonValue
     # the OpenAI-compatible /v1 base_url, so swap the suffix.
     api_url = base_url[: -len("/v1")] + "/api" if base_url.endswith("/v1") else base_url
     model_id = model.split("/", 1)[1] if "/" in model else model
-    return {
-        "ollama": {
-            "npm": "ollama-ai-provider-v2",
-            "options": {"baseURL": api_url},
-            "models": {model_id: {}},
-        }
-    }
+    return OpenCodeProviderBlock(
+        ollama=_OpenCodeProviderEntry(
+            npm="ollama-ai-provider-v2",
+            options=_OpenCodeProviderOptions(baseURL=api_url),
+            models={model_id: {}},
+        )
+    )
 
 
-def _merge_opencode_json(path: Path, provider_block: dict[str, JsonValue]) -> None:
+def _merge_opencode_json(path: Path, provider_block: OpenCodeProviderBlock) -> None:
     """Deep-merge ``{provider: ...}`` into an existing/new opencode.json.
 
     The workspace generator already wrote the base config; we only add the
