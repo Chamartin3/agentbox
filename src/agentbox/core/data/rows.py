@@ -649,6 +649,32 @@ class SettingKeyRow(TypedDict):
 # patch: only the fields being updated).
 
 
+class RunUpdateFields(TypedDict, total=False):
+    """Partial-update fields for the runs table (all fields are optional).
+
+    Used in RunManager methods to build UPDATE statements with selective columns.
+    """
+
+    status: str
+    finished_at: str | None
+    error: str | None
+    output: str | None
+    runner_profile_id: str | None
+    agent_version_id: int | None
+    validation_status: str | None
+    validation_errors: str
+    schema_validated_via: str | None
+    conversation_format: str | None
+    conversation_uri: str | None
+    post_status: str
+    post_errors: str
+    rendered_prompt: str
+    variables: str
+    composition_snapshot: str
+    resource_snapshot: str
+    mcp_snapshot: str
+
+
 class _AgentMetaFields(TypedDict, total=False):
     agent_id: str
     sync_mode: str

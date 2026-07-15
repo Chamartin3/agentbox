@@ -72,6 +72,7 @@ class SettingManager(Manager[Setting]):
 
     def get_settings_section(self, section: str) -> JsonDict:
         """Return a section as ``{key: deserialised_value}``."""
+        # JsonDict: section values are genuinely arbitrary JSON per key (no fixed shape)
         out: JsonDict = {}
         for r in self.get_section(section):
             try:

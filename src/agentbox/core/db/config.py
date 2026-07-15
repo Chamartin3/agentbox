@@ -29,7 +29,10 @@ def _default_db() -> Database:
 
 
 def load_settings_section(section: str, *, db: Database | None = None) -> JsonDict:
-    """Return all ``{key: value}`` pairs in a section (JSON-deserialised)."""
+    """Return all ``{key: value}`` pairs in a section (JSON-deserialised).
+
+    JsonDict: section values are genuinely arbitrary JSON per key (no fixed shape).
+    """
     return (db or _default_db()).settings.get_settings_section(section)
 
 
