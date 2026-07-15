@@ -44,7 +44,7 @@ from agentbox.core.db.resources import (
     SharedResourceManager,
     WorkspaceFileResourceBindingManager,
 )
-from agentbox.core.db.managers.runs import (
+from agentbox.core.db.runs import (
     RunCommentManager,
     RunManager,
     RunPromptManager,

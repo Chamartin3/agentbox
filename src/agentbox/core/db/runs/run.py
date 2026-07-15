@@ -1,11 +1,15 @@
-"""RunManager — run lifecycle operations."""
+"""Run model + manager — core execution record.
+
+Maps to the ``runs`` table. This is the central entity in the agentbox
+execution model; every run produces one row.
+"""
 from __future__ import annotations
 
 from agentbox.core.data.jsontypes import JsonDict
-
+from agentbox.core.db.base.tablename import tablename, tableargs
+from typing import Optional, cast
 import json as _json
 from datetime import UTC, datetime, timedelta
-from typing import cast
 
 from sqlalchemy import (
     Integer,
@@ -16,7 +20,9 @@ from sqlalchemy import (
     select,
     update as sa_update,
 )
+from sqlmodel import Field, Index
 
+from agentbox.core.db.base.model import Entity
 from agentbox.core.data.constants import RunStatus as RS
 from agentbox.core.data.rows import (
     ActivitySummaryRow,
@@ -27,8 +33,54 @@ from agentbox.core.data.rows import (
 from agentbox.core.data.snapshots import RunnerSnapshot
 from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.manager import Manager
-from agentbox.core.db.models.runs.run import Run
 from agentbox.core.db.schema import agent_versions, runs, usage
+
+
+class Run(Entity, table=True):
+    """A single agent execution run.
+
+    ``id`` is a UUID string assigned by the executor. ``status`` follows
+    the ``RunStatus`` enum (ok / error / timeout / failed / incomplete /
+    running).  Most columns are nullable because they are populated at
+    different stages of the run lifecycle.
+    """
+
+    __tablename__ = tablename("runs")
+
+    id: str = Field(primary_key=True)
+    agent_id: str = Field(nullable=False)
+    session_id: Optional[str] = Field(foreign_key="sessions.id", default=None)
+    status: str = Field(nullable=False)
+    input: str = Field(nullable=False)
+    output: Optional[str] = Field(default=None)
+    error: Optional[str] = Field(default=None)
+    workdir: Optional[str] = Field(default=None)
+    transcript_path: Optional[str] = Field(default=None)
+    created_at: str = Field(nullable=False)
+    finished_at: Optional[str] = Field(default=None)
+    config_digest: Optional[str] = Field(default=None)
+    agent_version_id: Optional[int] = Field(foreign_key="agent_versions.id", default=None)
+    composition_snapshot: Optional[str] = Field(default=None)
+    rendered_prompt: Optional[str] = Field(default=None)
+    variables: Optional[str] = Field(default=None)
+    validation_status: Optional[str] = Field(default=None)
+    validation_errors: Optional[str] = Field(default=None)
+    schema_validated_via: Optional[str] = Field(default=None)
+    post_status: Optional[str] = Field(default=None)
+    post_errors: Optional[str] = Field(default=None)
+    conversation_format: Optional[str] = Field(default=None)
+    conversation_uri: Optional[str] = Field(default=None)
+    runner_profile_id: Optional[str] = Field(foreign_key="runner_profiles.id", default=None)
+    resource_snapshot: Optional[str] = Field(default=None)
+    mcp_snapshot: Optional[str] = Field(default=None)
+    runner_snapshot: Optional[str] = Field(default=None)
+    prompt_version_id: Optional[int] = Field(foreign_key="prompt_versions.id", default=None)
+
+    __table_args__ = tableargs(
+        Index("runs_by_agent", "agent_id", "created_at"),
+        Index("runs_by_status", "status", "created_at"),
+        Index("idx_runs_runner_profile_id", "runner_profile_id"),
+    )
 
 
 def _duration_ms_expr(c_started: object, c_finished: object) -> object:

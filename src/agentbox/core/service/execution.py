@@ -54,7 +54,7 @@ from agentbox.core.data.rows import (
     WebhookDeliveryRow,
 )
 from agentbox.core.db import AgentDefManager, AgentMetaManager, AgentVersionManager
-from agentbox.core.db.models.runs.run import Run
+from agentbox.core.db.runs.run import Run
 from agentbox.core.execution.observability.conversation import get as _get_conversation_source
 from agentbox.core.execution.orchestrate.executor import RunExecutor
 from agentbox.core.execution.orchestrate.setup import NoBackendAvailable

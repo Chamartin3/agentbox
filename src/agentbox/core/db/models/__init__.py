@@ -2,12 +2,12 @@
 
 Callers import models from here or from the ``core.db`` façade:
     from agentbox.core.db.models import Run, Session
-    from agentbox.core.db.models.runs import Run
+    from agentbox.core.db.runs import Run
 """
 from __future__ import annotations
 
 # Runs domain
-from agentbox.core.db.models.runs import (
+from agentbox.core.db.runs import (
     Run,
     RunComment,
     RunPrompt,

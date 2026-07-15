@@ -14,7 +14,7 @@ from sqlmodel import SQLModel
 
 import agentbox.core.db as db_pkg
 from agentbox.core.db.database import Database
-from agentbox.core.db.models.runs.run import Run
+from agentbox.core.db.runs.run import Run
 
 
 # ---------------------------------------------------------------------------

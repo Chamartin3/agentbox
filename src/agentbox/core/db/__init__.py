@@ -19,8 +19,7 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 # Managers (the only public surface of core.db)
 # ---------------------------------------------------------------------------
-from agentbox.core.db.managers import (
-    # runs
+from agentbox.core.db.runs import (
     RunCommentManager,
     RunManager,
     RunPromptManager,

@@ -326,6 +326,7 @@ forbidden_modules =
     agentbox.core.db.resources
     agentbox.core.db.engines
     agentbox.core.db.system
+    agentbox.core.db.runs
     agentbox.core.db.execution
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
@@ -343,7 +344,7 @@ ignore_imports =
     agentbox.core.tools.mcp_servers.host_env.context -> agentbox.core.db.database
     # ── Pre-existing deep imports (no manager API yet): ──────────────────
     # Run model used as return type; fix: RunManager.get() → RunRecord (plan 112+)
-    agentbox.core.service.execution -> agentbox.core.db.models.runs.run
+    agentbox.core.service.execution -> agentbox.core.db.runs.run
 
 
 # ─── core.data is the leaf — no upward imports (plan 117) ────────────────────
