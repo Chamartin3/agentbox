@@ -12,8 +12,7 @@ Tests are NOT held to this rule; they may use specific submodule imports
 Plan 109 exception: ``agentbox.core.db.database`` is intentionally importable
 from the named allowlist below (composition roots and DI singletons).  These
 are tracked as debt in importlinter ``db-facade-managers-only`` and burned by
-plans 111/112/110/113_04.  ``agentbox.core.db.schema`` is similarly tolerated
-in service/execution modules that haven't yet migrated to managers.
+plans 111/112/110/113_04.
 """
 
 from __future__ import annotations

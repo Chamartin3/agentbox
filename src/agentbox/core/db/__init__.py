@@ -13,8 +13,9 @@ the two mcp/servers/*/context.py).  Everything else uses managers.
 Shared data shapes (``SharedResourceRecord``, rows, snapshots) live in
 ``core.data`` / ``core.protocols`` / ``core.events``.  SQLModel entities live in
 their per-domain packages (``core.db.runs``, ``core.db.agents``, …) alongside
-their managers, one file per table; Core schema tables are in ``core.db.schema``
-(folded into the entities in a later phase).  Neither is re-exported here.
+their managers, one file per table (entity + manager together).  The entities'
+shared ``MetaData`` (``core.db.base.metadata``) is the single schema source of
+truth.  Entities are not re-exported by this façade.
 """
 from __future__ import annotations
 
