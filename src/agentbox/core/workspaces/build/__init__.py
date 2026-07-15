@@ -53,7 +53,6 @@ from agentbox.core.engines.backends.recipe_loader import (
 from agentbox.core.workspaces._types import WorkspaceSyncMeta
 from agentbox.core.workspaces.build.bindings import materialize_workspace
 from agentbox.core.workspaces.build.engine import render
-from agentbox.core.workspaces.build.files import materialize_workspace_files
 
 logger = logging.getLogger(__name__)
 
@@ -153,10 +152,11 @@ class BuildResult:
 def _binding_to_dict(b: ResolvedBinding, *, persistent: bool) -> BindingDict:
     """Project a ``ResolvedBinding`` into the dict shape ``materialize`` reads.
 
-    ponytail: the materializer (``generation/materialize.py``) still consumes
-    ``Iterable[dict]``; deep-typing it to accept ``ResolvedBinding`` is deferred
-    (see UNIFIED_RESTRUCT_PLAN — typing changes deferred). Retype the
-    materializer to drop this bridge.
+    ponytail: the materializer (``build.materialize`` + ``build/bindings.py``)
+    consumes the typed ``Iterable[BindingDict]``; this bridge projects the
+    ``ResolvedBinding`` dataclass into it. Optional cleanup: thread
+    ``ResolvedBinding`` through the materializer directly and drop this bridge —
+    discretionary, no type-safety gain (both shapes are already typed).
 
     For a persistent workspace the per-binding ``on_conflict`` (designed for
     one-shot run dirs) is forced to ``overwrite`` so re-syncs stay current —
@@ -353,21 +353,6 @@ class WorkspaceBuilder:
         mcp_json.write_text(
             json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
-
-        perm_files = (
-            blueprint.permissions.get("files") if blueprint.permissions else None
-        )
-        if perm_files:
-            try:
-                materialize_workspace_files(
-                    target_dir, perm_files, self._settings.project_root
-                )
-            except Exception as e:
-                logger.exception(
-                    "workspace render: workspace-file materialization failed for %r",
-                    blueprint.workspace_id,
-                )
-                errors.append(f"workspace_files: {e}")
 
         # ── 4. Secrets (dead today; secret_keys is empty) ─────────────────
         if secrets:

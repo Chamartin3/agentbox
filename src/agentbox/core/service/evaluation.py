@@ -8,10 +8,9 @@ Analytics is query-centric: the aggregate SQL (and its natural row shaping)
 lives on the Data layer — ``RunManager`` (run-centric, joins usage/agent_versions),
 ``UsageManager`` (usage aggregates), and ``RunnerProfileManager`` (profile stats).
 This service orchestrates them; payload composition and field normalization
-are service policy.
-
-ponytail: analytics returns are nested ``dict`` response shapes; a full
-TypedDict pass over them is deferred (tracked with plan 094's typing work).
+are service policy. Every method returns a concrete typed shape
+(``UsageSummaryRow``, ``ActivitySummaryRow``, ``RunStatsRow``, ``RichRunRow``,
+``EnrichedRunsResult``, ``RunnerProfileStats``) — no bare-dict response shapes.
 """
 from __future__ import annotations
 

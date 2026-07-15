@@ -28,7 +28,6 @@ app.command(name="shell")(shell_cmd)
 app.add_typer(_cfg_app, name="cfg")
 _cfg_app.callback()(group_callback)
 app.add_typer(_resource_app, name="resource")
-# ponytail: workenv still a separate group; fold into `cfg` in a later cleanup.
 app.add_typer(_workenv_app, name="workenv")
 _workenv_app.callback()(group_callback)
 

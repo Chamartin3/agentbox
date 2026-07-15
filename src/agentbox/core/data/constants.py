@@ -159,7 +159,8 @@ class BundleFile(StrEnum):
 class ResourceType(CatalogEnum):
     """Allowed values for ``repo_resources.type``.
 
-    Mirrors the SQL CHECK constraint in ``core/db/schema/execution.py``.
+    Mirrors the ``resources_type_check`` CHECK constraint on the ``Resource``
+    entity (``core/db/resources/resource.py``).
     """
 
     DOCUMENT = "document"
