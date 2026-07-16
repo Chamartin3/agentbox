@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict, JsonValue
+from agentbox.core.data.jsontypes import RawJson, RawJsonValue
 
 import json
 from typing import Any
@@ -10,7 +10,7 @@ from typing import Any
 from agentbox.core.data.events import UsageEvent
 
 
-def _parse_envelope(raw: str) -> JsonDict | None:
+def _parse_envelope(raw: str) -> RawJson | None:
     """Pull the first JSON object out of claude's stdout."""
     raw = raw.strip()
     if raw.startswith("{"):
@@ -27,7 +27,7 @@ def _parse_envelope(raw: str) -> JsonDict | None:
         return None
 
 
-def _build_usage_event(run_id: str, envelope: JsonDict) -> UsageEvent | None:
+def _build_usage_event(run_id: str, envelope: RawJson) -> UsageEvent | None:
     usage = envelope.get("usage")
     if not isinstance(usage, dict):
         return None
@@ -46,7 +46,7 @@ def _build_usage_event(run_id: str, envelope: JsonDict) -> UsageEvent | None:
     )
 
 
-def _safe_int(v: JsonValue) -> int:
+def _safe_int(v: RawJsonValue) -> int:
     return int(v) if isinstance(v, (int, float)) else 0
 
 

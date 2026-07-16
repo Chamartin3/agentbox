@@ -5,7 +5,7 @@ Mirrors :mod:`agentbox.core.engines.backends.codex`.
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 
 import json
 import os
@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
 from agentbox.core.config import SETTINGS
-from agentbox.core.data import JsonValue
+from agentbox.core.data import RawJsonValue
 
 from agentbox.core.data.events import (
     DoneEvent,
@@ -67,7 +67,7 @@ class PiModelsJson(TypedDict):
 
 
 
-def _as_str(v: JsonValue) -> str | None:
+def _as_str(v: RawJsonValue) -> str | None:
     return v if isinstance(v, str) else None
 
 
@@ -120,7 +120,7 @@ def build_pi_argv(
 
 
 def parse_pi_event(
-    evt: JsonDict, run_id: str
+    evt: RawJson, run_id: str
 ) -> tuple[list[RunEvent], str | None]:
     """Parse one ``pi --mode json`` event line (pi v3 schema).
 

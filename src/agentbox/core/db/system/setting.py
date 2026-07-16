@@ -12,7 +12,7 @@ from sqlalchemy import select as sa_select, delete as sa_delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlmodel import Field
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 from agentbox.core.data.manifests.workspaces import McpServerSpec
 from agentbox.core.data.rows import SettingKeyRow
 from agentbox.core.db.base.model import Entity
@@ -70,10 +70,10 @@ class SettingManager(Manager[Setting]):
                 for r in rows
             ]
 
-    def get_settings_section(self, section: str) -> JsonDict:
+    def get_settings_section(self, section: str) -> RawJson:
         """Return a section as ``{key: deserialised_value}``."""
-        # JsonDict: section values are genuinely arbitrary JSON per key (no fixed shape)
-        out: JsonDict = {}
+        # RawJson: section values are genuinely arbitrary JSON per key (no fixed shape)
+        out: RawJson = {}
         for r in self.get_section(section):
             try:
                 out[r["key"]] = _json.loads(r["value_json"])

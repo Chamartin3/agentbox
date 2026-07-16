@@ -17,7 +17,7 @@ Two detectors:
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict, JsonValue
+from agentbox.core.data.jsontypes import RawJson, RawJsonValue
 
 import json
 import re
@@ -62,15 +62,15 @@ _TEXT_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
-def _as_str(v: JsonValue) -> str | None:
+def _as_str(v: RawJsonValue) -> str | None:
     return v if isinstance(v, str) else None
 
 
-def _as_int(v: JsonValue) -> int | None:
+def _as_int(v: RawJsonValue) -> int | None:
     return v if isinstance(v, int) and not isinstance(v, bool) else None
 
 
-def detect_in_opencode_event(evt: JsonDict) -> str | None:
+def detect_in_opencode_event(evt: RawJson) -> str | None:
     """Return a short error message if ``evt`` carries a fatal API error.
 
     Opencode emits error events in several shapes across versions, e.g.::
@@ -153,7 +153,7 @@ def _format_opencode_log_line(s: str) -> str | None:
     provider = _extract_kv(s, "providerID")
     model = _extract_kv(s, "modelID")
 
-    err_obj: JsonDict | None = None
+    err_obj: RawJson | None = None
     idx = s.find("error=")
     if idx != -1:
         err_obj = _try_parse_trailing_json(s[idx + len("error=") :])
@@ -227,7 +227,7 @@ def _extract_kv(s: str, key: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _try_parse_trailing_json(s: str) -> JsonDict | None:
+def _try_parse_trailing_json(s: str) -> RawJson | None:
     """Best-effort parse of a possibly-truncated JSON object at start of ``s``.
 
     Walks forward looking for the longest balanced-brace prefix that

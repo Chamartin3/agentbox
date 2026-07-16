@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 from agentbox.core.config import SETTINGS
 
 from agentbox.core.engines.backends.opencode.stream import _run_opencode_stream
@@ -53,7 +53,7 @@ class _OpenCodeProviderEntry(TypedDict):
     """opencode provider configuration entry (ollama-ai-provider-v2)."""
     npm: str
     options: _OpenCodeProviderOptions
-    models: dict[str, JsonDict]
+    models: dict[str, RawJson]
 
 
 class OpenCodeProviderBlock(TypedDict):

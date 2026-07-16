@@ -15,7 +15,7 @@ CLI providers may return native CLI model ids instead (for example
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 
 import logging
 import os
@@ -72,7 +72,7 @@ class ProviderDescriptor(BaseModel):
     supports_model_listing: bool
     default_base_url: str | None = None
     default_api_key_env: str | None = None
-    config_schema: JsonDict = Field(default_factory=dict)
+    config_schema: RawJson = Field(default_factory=dict)
 
 
 class ProviderAdapter(Protocol):

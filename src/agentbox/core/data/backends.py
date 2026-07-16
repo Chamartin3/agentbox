@@ -13,7 +13,7 @@ reach across into the other to name them.
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 
 import hashlib
 import json
@@ -32,7 +32,7 @@ class McpToolSpec(TypedDict, total=False):
     name: str
     description: str
     # KEEP: JSON Schema document, structure varies.
-    inputSchema: JsonDict
+    inputSchema: RawJson
 
 
 # ── Engine-local views of agent config ───────────────────────────────────────
@@ -86,9 +86,9 @@ class ComposedView:
     system: str | None = None
     system_base: str | None = None
     # KEEP: JSON Schema document, structure varies.
-    schema: JsonDict | None = None
+    schema: RawJson | None = None
     # KEEP: JSON Schema document, structure varies.
-    input_schema: JsonDict | None = None
+    input_schema: RawJson | None = None
     user: str | None = None
     references: tuple[ComposedReferenceView, ...] = ()
     bundle_sha: str | None = None

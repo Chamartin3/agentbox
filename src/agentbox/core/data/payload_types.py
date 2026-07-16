@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 
-from agentbox.core.data.jsontypes import JsonDict, JsonValue
+from agentbox.core.data.jsontypes import RawJson, RawJsonValue
 from agentbox.core.data.workenv import SourceMetadata
 from agentbox.core.data.rows import (
     AgentPromptBindingRow,
@@ -246,7 +246,7 @@ class RunDetailPayload(TypedDict):
     runner_profile_id: str | None
     resource_snapshot: str | None
     mcp_snapshot: str | None
-    runner_snapshot: JsonDict | None  # stored runner-snapshot JSON (arbitrary at this boundary) — true-edge keep
+    runner_snapshot: RawJson | None  # stored runner-snapshot JSON (arbitrary at this boundary) — true-edge keep
     # Enriched fields added by get_run_detail
     agent_version: int | None
     backend: str | None
@@ -450,7 +450,7 @@ class ModelParams(TypedDict, total=False):
     # {"reasoning_effort": "none"} to disable qwen3 thinking loops. run_direct
     # forwards this into model_settings; without it here the schema strips it.
     # KEEP: arbitrary provider-specific JSON passthrough; schema varies by provider.
-    extra_body: dict[str, JsonValue]
+    extra_body: dict[str, RawJsonValue]
 
 
 class ExecutionSection(TypedDict):

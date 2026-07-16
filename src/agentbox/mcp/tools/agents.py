@@ -7,7 +7,7 @@ from typing import Any, cast
 
 from fastmcp import FastMCP
 
-from agentbox.core.data import JsonValue
+from agentbox.core.data import RawJsonValue
 from agentbox.core.service import EngineService
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
@@ -22,7 +22,7 @@ def _agent_dict(agent: Any) -> dict:
     return dict(vars(agent))
 
 
-def _strip_legacy_runner_model(d: dict) -> dict[str, JsonValue]:
+def _strip_legacy_runner_model(d: dict) -> dict[str, RawJsonValue]:
     """Drop the legacy ``runner.model`` field from a serialized agent dict.
 
     The authoritative model lives on the bound runner profile; the
@@ -38,7 +38,7 @@ def _strip_legacy_runner_model(d: dict) -> dict[str, JsonValue]:
     return d
 
 
-def _inject_profile_model(d: dict, engines: EngineService) -> dict[str, JsonValue]:
+def _inject_profile_model(d: dict, engines: EngineService) -> dict[str, RawJsonValue]:
     """Resolve the agent's effective model via its bound runner profile.
 
     Adds ``model``, ``model_provider`` and ``runner_profile_id`` at the
@@ -65,7 +65,7 @@ def _inject_profile_model(d: dict, engines: EngineService) -> dict[str, JsonValu
     return d
 
 
-def _paginate(items: list, limit: int, offset: int) -> dict[str, JsonValue]:
+def _paginate(items: list, limit: int, offset: int) -> dict[str, RawJsonValue]:
     total = len(items)
     page = items[offset : offset + limit]
     return {

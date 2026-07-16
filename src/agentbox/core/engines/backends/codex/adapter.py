@@ -6,7 +6,7 @@ Streaming uses the shared
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 
 import os
 import shutil
@@ -46,7 +46,7 @@ def build_codex_argv(
 
 
 def parse_codex_event(
-    evt: JsonDict, run_id: str
+    evt: RawJson, run_id: str
 ) -> tuple[list[RunEvent], str | None]:
     """Parse one ``codex exec --json`` event line.
 

@@ -72,7 +72,7 @@ from agentbox.core.data.errors import (
 )
 from agentbox.core.data._util import hash_blobs, now_iso
 from agentbox.core.data.tools import CanonicalTool
-from agentbox.core.data.jsontypes import JsonDict, JsonValue
+from agentbox.core.data.jsontypes import RawJson, RawJsonValue
 from agentbox.core.data.skills import SkillPack
 from agentbox.core.data.schema_consistency import assert_schema_consistent
 from agentbox.core.data.backends import (
@@ -207,8 +207,8 @@ __all__ = [
     "AgentServiceError",
     "BackendRunResult",
     "CanonicalTool",
-    "JsonValue",
-    "JsonDict",
+    "RawJsonValue",
+    "RawJson",
     "DuplicateVersionFile",
     "InconsistentSchema",
     "InvalidRunInput",

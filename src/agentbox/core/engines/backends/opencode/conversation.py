@@ -14,7 +14,7 @@ A future refactor may read the session JSON directly from
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict, JsonValue
+from agentbox.core.data.jsontypes import RawJson, RawJsonValue
 
 import json
 import shutil
@@ -36,7 +36,7 @@ from agentbox.core.data.conversation.types import (
 _VALID_ROLES_OC: Final = frozenset(MessageRole)
 
 
-def _as_str(v: JsonValue) -> str | None:
+def _as_str(v: RawJsonValue) -> str | None:
     return v if isinstance(v, str) else None
 
 
@@ -67,7 +67,7 @@ class _OpencodeSessionExport(TypedDict, total=False):
     """Root structure of OpenCode session export."""
 
     info: _OpencodeSessionInfo | None
-    messages: list[JsonDict] | None
+    messages: list[RawJson] | None
 
 
 class OpencodeSessionSource(ConversationSource):

@@ -7,7 +7,7 @@ of truth the API, grant resolver, and MCP implementations agree on.
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 
 from dataclasses import dataclass
 
@@ -18,7 +18,7 @@ from agentbox.core.data import CanonicalTool
 class Capability:
     name: CanonicalTool
     description: str
-    grant_schema: JsonDict
+    grant_schema: RawJson
     default_granted: bool = False
 
 

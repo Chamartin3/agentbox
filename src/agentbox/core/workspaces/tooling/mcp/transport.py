@@ -6,7 +6,7 @@ Merges the former client/client.py + client/discovery.py.
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 
 import asyncio
 import contextlib
@@ -28,7 +28,7 @@ class McpRawTool(TypedDict, total=False):
 
     name: str
     description: str
-    inputSchema: JsonDict
+    inputSchema: RawJson
 
 
 class McpError(Exception):
@@ -95,8 +95,8 @@ class McpClient:
             )
 
     # ponytail: JSON-RPC request/response stay bare `dict`. Typing them
-    # `dict[str, JsonValue]` cascades unfixably without a banned cast —
-    # `list_tools` would have to coerce JsonValue into `list[McpRawTool]`,
+    # `dict[str, RawJsonValue]` cascades unfixably without a banned cast —
+    # `list_tools` would have to coerce RawJsonValue into `list[McpRawTool]`,
     # and nested literals (`_CLIENT_INFO`) hit dict-invariance. Real fix:
     # a pydantic JSON-RPC envelope model if this layer ever grows.
     async def _jsonrpc(self, method: str, params: dict) -> dict:

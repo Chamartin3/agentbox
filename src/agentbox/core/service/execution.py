@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 from agentbox.core.agents import (
     build_prompt,
     engine_load_failure as backend_load_failure,
@@ -703,7 +703,7 @@ class ExecutionService(Service):
 
         snap_raw = base_dict.get("runner_snapshot")
         snap: dict | None = None
-        runner_snapshot: JsonDict | None = None
+        runner_snapshot: RawJson | None = None
         if isinstance(snap_raw, str) and snap_raw:
             try:
                 snap = _json.loads(snap_raw)
@@ -908,7 +908,7 @@ class ExecutionService(Service):
             raise RunNotFound(run_id)
         return self.add_run_comment(run_id, author, body)
 
-    def read_transcript_events(self, run_id: str) -> list[JsonDict]:
+    def read_transcript_events(self, run_id: str) -> list[RawJson]:
         """Read the JSONL transcript file for a run as a list of event dicts.
 
         Returns arbitrary backend-emitted events (structure varies by backend).

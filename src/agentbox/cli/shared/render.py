@@ -18,7 +18,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.core.data.jsontypes import JsonValue
+from agentbox.core.data.jsontypes import RawJsonValue
 from agentbox.cli.shared.constants import EVENT_STYLES, NA, Style
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ class Renderer:
         """Print syntax-highlighted code."""
         self.con.print(Syntax(code, lexer, theme=theme, line_numbers=line_numbers))
 
-    def json(self, data: str | JsonValue) -> None:
+    def json(self, data: str | RawJsonValue) -> None:
         """Print pretty JSON (accepts a str of JSON or any dumpable object)."""
         self.con.print(JSON(data) if isinstance(data, str) else JSON.from_data(data))
 

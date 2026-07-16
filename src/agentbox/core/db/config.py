@@ -7,7 +7,7 @@ token/crypto policy stay on ``SystemService``.
 """
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 
 import uuid
 
@@ -28,10 +28,10 @@ def _default_db() -> Database:
     return get_database(str(load_settings().db_path))
 
 
-def load_settings_section(section: str, *, db: Database | None = None) -> JsonDict:
+def load_settings_section(section: str, *, db: Database | None = None) -> RawJson:
     """Return all ``{key: value}`` pairs in a section (JSON-deserialised).
 
-    JsonDict: section values are genuinely arbitrary JSON per key (no fixed shape).
+    RawJson: section values are genuinely arbitrary JSON per key (no fixed shape).
     """
     return (db or _default_db()).settings.get_settings_section(section)
 

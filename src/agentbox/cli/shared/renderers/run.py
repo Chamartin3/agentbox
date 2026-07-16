@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.core.data.jsontypes import JsonDict
+from agentbox.core.data.jsontypes import RawJson
 from agentbox.core.data.payload_types import EnrichedRunRow, UsagePayload
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.service import RunCommentRow, UsageSummaryRow
@@ -22,7 +22,7 @@ class RunRenderer(Renderer):
     # history ls -- runs table
     # ------------------------------------------------------------------
 
-    def runs_table(self, rows: Sequence[JsonDict]) -> None:
+    def runs_table(self, rows: Sequence[RawJson]) -> None:
         """Render the 'history ls' runs table."""
         if not rows:
             self.warn("No runs yet.")
@@ -46,7 +46,7 @@ class RunRenderer(Renderer):
         for r in rows:
             # TODO(cli-arch): narrow untyped service dict at the contract level
             usage_raw = r.get("usage")
-            usage: JsonDict = usage_raw if isinstance(usage_raw, dict) else {}
+            usage: RawJson = usage_raw if isinstance(usage_raw, dict) else {}
             status_val = str(r.get("status", ""))
             status_style = {
                 "ok": "green", "running": "blue", "error": "red",
@@ -69,7 +69,7 @@ class RunRenderer(Renderer):
     # history show -- run detail panels
     # ------------------------------------------------------------------
 
-    def run_detail(self, run_dict: JsonDict, usage: UsagePayload | None) -> None:
+    def run_detail(self, run_dict: RawJson, usage: UsagePayload | None) -> None:
         """Render the 'history show' run detail panels."""
         meta = Table.grid(padding=(0, 2))
         meta.add_column(style="dim", justify="right")
@@ -136,7 +136,7 @@ class RunRenderer(Renderer):
     # history log -- event stream
     # ------------------------------------------------------------------
 
-    def event_line(self, event_type: str, payload: JsonDict) -> None:
+    def event_line(self, event_type: str, payload: RawJson) -> None:
         """Print a single event line with coloured event-type tag.
 
         Truncates the payload JSON to 400 characters for readability.
