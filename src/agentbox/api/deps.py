@@ -6,7 +6,7 @@ from functools import lru_cache
 
 from agentbox.api.context import APIContext
 from agentbox.core.config import Settings, load_settings
-from agentbox.core.db.database import Database  # ponytail: transitional — 113_04 routes DI through Services
+from agentbox.core.db.database import Database  # transitional: DI opens the store directly; should route through Services (see TECH_DEBT.md)
 from agentbox.core.service import (
     AgentService,
     EngineService,
@@ -53,10 +53,8 @@ def get_system_service() -> SystemService:
     return SystemService()
 
 
-# ── Stubs for services not yet migrated (plans 089–092) ──────────────────
-
 def get_engine_service() -> EngineService:
-    """TODO: plan 091 — EngineService. Lazy import to avoid circular import."""
+    """Engine-domain service. Lazy import to avoid a circular import."""
     from agentbox.core.service.engines import EngineService  # noqa: PLC0415
     return EngineService()
 

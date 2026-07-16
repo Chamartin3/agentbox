@@ -33,6 +33,9 @@ from agentbox.core.agents.composition.rendering import (
     append as _append_output_contract,
     append_validation_engine_hint,
 )
+from jsonschema.exceptions import SchemaError
+
+from agentbox.core.agents.composition.schema_io import load_json_schema
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView, ResolvedPromptBinding
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
 from agentbox.core.data import AgentDef
@@ -357,8 +360,8 @@ def build_prompt(
                 if not _raw:
                     continue
                 try:
-                    _schema: JsonSchemaDict | None = json.loads(_raw)
-                except (json.JSONDecodeError, TypeError):
+                    _schema: JsonSchemaDict | None = load_json_schema(_raw)
+                except (json.JSONDecodeError, TypeError, SchemaError):
                     logger.warning(
                         "executor: failed to parse output_schema binding for agent %r",
                         agent.id,

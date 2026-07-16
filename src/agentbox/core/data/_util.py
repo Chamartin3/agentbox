@@ -1,9 +1,7 @@
 """Shared utility functions — non-domain helpers used across packages.
 
-``now_iso`` (extracted from ``core.db.utils``), ``hash_blobs``
-(extracted from ``core.db.resources._rows``), and ``extract_json``
-(extracted from ``core.agents.validation.errors``) live here so they can be
-imported from ``core.data`` without pulling in persistence or backend code.
+Stdlib-only helpers (``now_iso``, ``hash_blobs``, ``extract_json``) that
+``core.data`` can expose without importing persistence or backend code.
 """
 
 from __future__ import annotations

@@ -16,6 +16,9 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Protocol, TypedDict
 
+from jsonschema.exceptions import SchemaError
+
+from agentbox.core.agents.composition.schema_io import load_json_schema
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data.constants import BundleFile
 from agentbox.core.data import CompositionConfig
@@ -197,8 +200,12 @@ def compose(
     input_schema_file = bundle_path / BundleFile.INPUT_SCHEMA
     if input_schema_file.exists():
         try:
-            input_schema = json.loads(_read_text(input_schema_file))
-        except json.JSONDecodeError:
+            input_schema = load_json_schema(_read_text(input_schema_file))
+        except (json.JSONDecodeError, SchemaError):
+            logger.warning(
+                "agent input_schema is not a valid JSON Schema; ignoring: %s",
+                input_schema_file,
+            )
             input_schema = None
         if input_schema is not None:
             system_rendered = append_input_schema(system_rendered, input_schema)
@@ -263,7 +270,7 @@ def compose(
                 output_schema_path = fallback
                 break
     if schema_file is not None:
-        loaded: JsonSchemaDict | None = json.loads(_read_text(schema_file))
+        loaded: JsonSchemaDict | None = load_json_schema(_read_text(schema_file))
         schema_sha = _sha256(json.dumps(loaded, sort_keys=True, separators=(",", ":")))
         if isinstance(loaded, dict):
             schema = loaded

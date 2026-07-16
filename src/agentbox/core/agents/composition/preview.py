@@ -19,7 +19,10 @@ from agentbox.core.agents.definition import (
     HttpValidatorConfig,
     ScriptValidatorConfig,
 )
+from jsonschema.exceptions import SchemaError
+
 from agentbox.core.agents.validation import OutputConfig
+from agentbox.core.agents.composition.schema_io import load_json_schema
 from agentbox.core.agents.composition.rendering import (
     append_input_schema,
     append_schema,
@@ -391,16 +394,16 @@ def preview(
                 break
     if schema_file is not None and schema_file.exists():
         try:
-            schema = json.loads(_read_text(schema_file))
-        except json.JSONDecodeError:
+            schema = load_json_schema(_read_text(schema_file))
+        except (json.JSONDecodeError, SchemaError):
             schema = None
 
     input_schema: JsonSchemaDict | None = None
     input_schema_file = bundle_path / BundleFile.INPUT_SCHEMA
     if input_schema_file.exists():
         try:
-            input_schema = json.loads(_read_text(input_schema_file))
-        except json.JSONDecodeError:
+            input_schema = load_json_schema(_read_text(input_schema_file))
+        except (json.JSONDecodeError, SchemaError):
             input_schema = None
 
     return CompositionPreview(
