@@ -79,6 +79,51 @@ def test_runs_ls_json_empty(store_fixture) -> None:
     assert parsed == []
 
 
+def _seed_run_with_usage(store, agent_id: str = "t1") -> str:
+    """Insert one finished run + usage row via the same service the CLI uses."""
+    from agentbox.core.service.execution import ExecutionService
+
+    svc = ExecutionService()
+    run_id = svc.create_run(
+        agent_id=agent_id, input_="hi", workdir="/tmp/x", transcript_path="/tmp/x.jsonl"
+    )
+    svc.finish_run(run_id, ok=True, output="done")
+    svc.record_usage(
+        run_id,
+        {"model": "gpt-4o", "input_tokens": 12, "output_tokens": 3, "cost_usd": 0.01},
+    )
+    return run_id
+
+
+def test_runs_ls_renders_row(store_fixture) -> None:
+    """history ls builds RunSummary + renders the seeded run's usage totals.
+
+    (Rich truncates per-cell content in the test's narrow terminal, so the
+    exact id/status values are asserted by the --json test below; here we
+    only prove one summary reached the table.)
+    """
+    _seed_agent(store_fixture)
+    _seed_run_with_usage(store_fixture)
+    result = runner.invoke(app, ["history", "ls"])
+    assert result.exit_code == 0
+    assert "Runs (latest 1)" in result.output
+
+
+def test_runs_ls_json_dumps_summary(store_fixture) -> None:
+    """--json dumps the RunSummary model with its typed usage nested."""
+    _seed_agent(store_fixture)
+    run_id = _seed_run_with_usage(store_fixture)
+    result = runner.invoke(app, ["history", "ls", "--json"])
+    assert result.exit_code == 0
+    parsed = json.loads(result.output)
+    assert len(parsed) == 1
+    row = parsed[0]
+    assert row["id"] == run_id
+    assert row["status"] == "ok"
+    assert row["usage"]["input_tokens"] == 12
+    assert row["usage"]["cost_usd"] == 0.01
+
+
 # ---------------------------------------------------------------------------
 # history show (not found)
 # ---------------------------------------------------------------------------

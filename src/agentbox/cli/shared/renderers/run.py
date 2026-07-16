@@ -12,7 +12,7 @@ from rich.text import Text
 from agentbox.core.data.jsontypes import RawJson
 from agentbox.core.data.payload_types import EnrichedRunRow, UsagePayload
 from agentbox.cli.shared.render import Renderer
-from agentbox.core.service import RunCommentRow, UsageSummaryRow
+from agentbox.core.service import RunCommentRow, RunSummary, UsageSummaryRow
 
 
 class RunRenderer(Renderer):
@@ -22,7 +22,7 @@ class RunRenderer(Renderer):
     # history ls -- runs table
     # ------------------------------------------------------------------
 
-    def runs_table(self, rows: Sequence[RawJson]) -> None:
+    def runs_table(self, rows: Sequence[RunSummary]) -> None:
         """Render the 'history ls' runs table."""
         if not rows:
             self.warn("No runs yet.")
@@ -44,24 +44,21 @@ class RunRenderer(Renderer):
         table.add_column("Finished", style="dim")
 
         for r in rows:
-            # TODO(cli-arch): narrow untyped service dict at the contract level
-            usage_raw = r.get("usage")
-            usage: RawJson = usage_raw if isinstance(usage_raw, dict) else {}
-            status_val = str(r.get("status", ""))
+            usage = r.usage
             status_style = {
                 "ok": "green", "running": "blue", "error": "red",
-            }.get(status_val, "white")
-            status = Text(status_val, style=f"bold {status_style}")
-            cost = usage.get("cost_usd")
+            }.get(r.status, "white")
+            status = Text(r.status, style=f"bold {status_style}")
+            cost = usage.get("cost_usd") if usage else None
             table.add_row(
-                (str(r.get("id", "")))[:12],
-                str(r.get("agent_id", "")),
+                r.id[:12],
+                r.agent_id,
                 status,
-                str(usage.get("input_tokens") or "\u00b7"),
-                str(usage.get("output_tokens") or "\u00b7"),
+                str((usage and usage.get("input_tokens")) or "\u00b7"),
+                str((usage and usage.get("output_tokens")) or "\u00b7"),
                 f"{cost:.4f}" if isinstance(cost, (int, float)) else "[dim]\u00b7[/dim]",
-                str(r.get("created_at", "")),
-                str(r.get("finished_at")) or "[dim]\u2026[/dim]",
+                r.created_at,
+                r.finished_at or "[dim]\u2026[/dim]",
             )
         self.print(table)
 

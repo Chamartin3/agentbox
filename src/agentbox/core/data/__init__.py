@@ -158,7 +158,7 @@ from agentbox.core.data.profiles import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.data.records import RunRecord, SharedResourceRecord
+from agentbox.core.data.records import RunRecord, RunSummary, SharedResourceRecord
 from agentbox.core.data.rows import (
     AgentConfigEventRow,
     AgentMetaRow,
@@ -349,6 +349,7 @@ __all__ = [
     "StubResult",
     "RunnerSpec",
     "RunRecord",
+    "RunSummary",
     "SharedResourceRecord",
     "UsagePayload",
     "UsageSummaryRow",

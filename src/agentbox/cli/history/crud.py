@@ -29,14 +29,11 @@ def register_ls(parent: typer.Typer) -> None:
         """Show recent runs with status, tokens, and cost."""
         obj: CLIContext = ctx.obj
 
-        rows = obj.execution.list_runs(limit=limit, agent_id=agent)
-        assert isinstance(rows, list)
-        # Enrich with usage (mirrors the old free-function behaviour)
-        for r in rows:
-            r["usage"] = obj.execution.get_usage(r["id"])
+        rows = obj.execution.list_run_summaries(limit=limit, agent_id=agent)
 
         if json_output:
-            obj.render.run.print(json.dumps(rows, indent=2, default=str))
+            payload = [r.model_dump(mode="json") for r in rows]
+            obj.render.run.print(json.dumps(payload, indent=2, default=str))
             return
 
         obj.render.run.runs_table(rows)

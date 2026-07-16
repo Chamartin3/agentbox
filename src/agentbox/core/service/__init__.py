@@ -33,6 +33,7 @@ from agentbox.core.data import RunnerProfileCreate as RunnerProfileCreate
 from agentbox.core.data import RunnerProfilePatch as RunnerProfilePatch
 from agentbox.core.data import RunnerProfileStats as RunnerProfileStats
 from agentbox.core.data import RunRecord as RunRecord
+from agentbox.core.data import RunSummary as RunSummary
 from agentbox.core.data import WorkspaceDef as WorkspaceDef
 from agentbox.core.data import AgentVersionRow as AgentVersionRow
 from agentbox.core.data import AgentVersionCommentRow as AgentVersionCommentRow

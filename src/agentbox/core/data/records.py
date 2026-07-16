@@ -6,6 +6,26 @@ import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from pydantic import BaseModel
+
+from agentbox.core.data.payload_types import UsagePayload
+
+
+class RunSummary(BaseModel):
+    """A run plus its usage totals, for the ``history ls`` listing.
+
+    Built by ``ExecutionService.list_run_summaries`` from the ``Run`` pydantic
+    models the manager returns. The renderer reads attributes directly;
+    ``--json`` output dumps via ``model_dump``.
+    """
+
+    id: str
+    agent_id: str
+    status: str
+    created_at: str
+    finished_at: str | None = None
+    usage: UsagePayload | None = None
+
 
 @dataclass
 class RunRecord:

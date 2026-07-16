@@ -32,6 +32,7 @@ from agentbox.core.data import (
     InvalidRunInput,
     RunNotFound,
     RunnerSnapshot,
+    RunSummary,
     now_iso,
     read_transcript,
     UsagePayload,
@@ -182,6 +183,22 @@ class ExecutionService(Service):
         """List recent runs (optionally filtered by agent_id)."""
         return [
             r.model_dump()
+            for r in self._runs.list_runs_by_agent(limit=limit, agent_id=agent_id)
+        ]
+
+    def list_run_summaries(
+        self, limit: int = 50, agent_id: str | None = None
+    ) -> list[RunSummary]:
+        """Recent runs enriched with usage totals, for the ``history ls`` view."""
+        return [
+            RunSummary(
+                id=r.id,
+                agent_id=r.agent_id,
+                status=r.status,
+                created_at=r.created_at,
+                finished_at=r.finished_at,
+                usage=self.get_usage(r.id),
+            )
             for r in self._runs.list_runs_by_agent(limit=limit, agent_id=agent_id)
         ]
 
