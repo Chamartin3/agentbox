@@ -8,9 +8,9 @@ from typing import TypedDict
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from agentbox.core.data.jsontypes import JsonDict
 from agentbox.api.deps import get_agent_service, get_engine_service
 from agentbox.api.runs.webhooks import schedule_agent_event_webhook
-from agentbox.core.data import JsonValue
 from agentbox.core.service import RunnerProfile
 from agentbox.core.service.engines import EngineService, ProfileNotFound
 
@@ -86,7 +86,7 @@ class _RollbackVersionResult(TypedDict):
 
 
 @router.get("")
-def list_agents(include_disabled: bool = False) -> list[dict[str, JsonValue]]:
+def list_agents(include_disabled: bool = False) -> list[JsonDict]:
     """List agents from the DB (one row per agent_id, latest version).
 
     DB-as-source-of-truth: every agent that has ever been imported into

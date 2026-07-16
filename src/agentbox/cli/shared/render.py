@@ -18,7 +18,8 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from agentbox.cli.shared.constants import EVENT_STYLES, NA, Style, JsonValue
+from agentbox.core.data.jsontypes import JsonValue
+from agentbox.cli.shared.constants import EVENT_STYLES, NA, Style
 
 # ---------------------------------------------------------------------------
 # Module-level console singleton — the single Rich output stream for all CLI.

@@ -31,6 +31,7 @@ from agentbox.core.data.tools import CanonicalTool
 class McpToolSpec(TypedDict, total=False):
     name: str
     description: str
+    # KEEP: JSON Schema document, structure varies.
     inputSchema: JsonDict
 
 
@@ -84,7 +85,9 @@ class ComposedView:
 
     system: str | None = None
     system_base: str | None = None
+    # KEEP: JSON Schema document, structure varies.
     schema: JsonDict | None = None
+    # KEEP: JSON Schema document, structure varies.
     input_schema: JsonDict | None = None
     user: str | None = None
     references: tuple[ComposedReferenceView, ...] = ()

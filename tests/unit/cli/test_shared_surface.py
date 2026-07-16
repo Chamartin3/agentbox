@@ -24,7 +24,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset({
     "CLI_SOURCE",
     "EPHEMERAL_WORKSPACE",
     "EVENT_STYLES",
-    "JsonValue",
     "NA",
     "RUNNER_CLEAR",
     "Style",

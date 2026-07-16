@@ -16,12 +16,12 @@ collector that gathers their slices and serialises the result.
 
 from __future__ import annotations
 
-from typing import Annotated, TypedDict
+from typing import Annotated, NotRequired, TypedDict
 
 from fastapi import APIRouter, Depends
 
 from agentbox.api.deps import get_mcp_registry, get_workspace_service
-from agentbox.core.data import JsonValue
+from agentbox.core.data.jsontypes import JsonValue
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
@@ -29,13 +29,30 @@ from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 router = APIRouter(tags=["workspace-catalog"])
 
 
+class AvailableToolsItem(TypedDict, total=False):
+    """One available tool in the catalog.
+
+    Structure varies by kind: mcp items include input_schema, host_env items
+    include grant_schema, resource items include resource_id/target_path.
+    """
+
+    name: str
+    description: str
+    kind: str  # "mcp" | "host_env" | "resource"
+    server: NotRequired[str | None]  # mcp only
+    input_schema: NotRequired[JsonValue]  # mcp only; JSON Schema
+    grant_schema: NotRequired[JsonValue]  # host_env only
+    resource_id: NotRequired[str]  # resource only
+    target_path: NotRequired[str]  # resource only
+
+
 class AvailableToolsResponse(TypedDict):
     """Response from ``GET /api/workspaces/{workspace_id}/available_tools``."""
 
-    items: list[dict[str, JsonValue]]
+    items: list[AvailableToolsItem]
 
 
-def _item_as_dict(item: CallableItem) -> dict[str, JsonValue]:
+def _item_as_dict(item: CallableItem) -> AvailableToolsItem:
     """Convert a CallableItem to the wire shape expected by the API contract.
 
     The shape varies slightly by kind — the ``policy`` field (the
@@ -43,7 +60,7 @@ def _item_as_dict(item: CallableItem) -> dict[str, JsonValue]:
     and flattened into the body for resource items, matching the
     pre-refactoring contract.
     """
-    d: dict[str, JsonValue] = {
+    d: AvailableToolsItem = {
         "name": item.name,
         "description": item.description,
         "kind": item.kind,

@@ -19,6 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+from agentbox.core.data.jsontypes import JsonDict
 from agentbox.core.agents import (
     build_prompt,
     engine_load_failure as backend_load_failure,
@@ -30,14 +31,13 @@ from agentbox.core.data import (
     AgentDisabled,
     InvalidRunInput,
     RunNotFound,
+    RunnerSnapshot,
     now_iso,
     read_transcript,
-    RunnerSnapshot,
     UsagePayload,
 )
 from agentbox.core.data.payload_types import (
     CancelRunResult,
-    JsonValue,
     LogEntry,
     PromptFragmentPayload,
     RerunResult,
@@ -50,7 +50,6 @@ from agentbox.core.data.payload_types import (
     RunLogsResult,
     RunPromptFragmentsResult,
 )
-from agentbox.core.data.jsontypes import JsonDict
 from agentbox.core.data.rows import (
     RunCommentRow,
     SessionRow,
@@ -909,8 +908,12 @@ class ExecutionService(Service):
             raise RunNotFound(run_id)
         return self.add_run_comment(run_id, author, body)
 
-    def read_transcript_events(self, run_id: str) -> list[dict[str, JsonValue]]:
-        """Read the JSONL transcript file for a run as a list of event dicts."""
+    def read_transcript_events(self, run_id: str) -> list[JsonDict]:
+        """Read the JSONL transcript file for a run as a list of event dicts.
+
+        Returns arbitrary backend-emitted events (structure varies by backend).
+        Each event is a JSON dict with at minimum a 'type' key.
+        """
         rec = self.get_run(run_id)
         if rec is None or not rec.transcript_path:
             raise RunNotFound(run_id)

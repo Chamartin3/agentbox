@@ -11,13 +11,12 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Final
 
-from agentbox.core.data import EventStylesDict, JsonValue as JsonValue
+from agentbox.core.data import EventStylesDict
 
 # Sentinel value accepted by workspace resolution to request a fresh tmp dir.
 EPHEMERAL_WORKSPACE: Final[str] = "<ephemeral>"
 
 __all__ = [
-    "JsonValue",
     "Style",
     "NA",
     "CLI_AUTHOR",

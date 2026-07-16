@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.core.data import JsonValue
+from agentbox.core.data.jsontypes import JsonDict
 
 
 env_doc_app = typer.Typer(
@@ -19,8 +19,8 @@ env_doc_app = typer.Typer(
 )
 
 
-def _load_content(content_or_file: str, obj: CLIContext) -> dict[str, JsonValue]:
-    """Treat the arg as a file path first, then as raw JSON."""
+def _load_content(content_or_file: str, obj: CLIContext) -> JsonDict:
+    """Treat the arg as a file path first, then as raw JSON. Genuinely arbitrary JSON object."""
     path = Path(content_or_file)
     text = path.read_text(encoding="utf-8") if path.exists() else content_or_file
     try:

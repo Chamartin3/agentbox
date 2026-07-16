@@ -5,7 +5,6 @@ from __future__ import annotations
 import json as _json
 from collections.abc import Sequence
 
-from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.service import RunnerProfile, RunnerProfileStats
 
@@ -113,7 +112,7 @@ class EngineRenderer(Renderer):
     # ------------------------------------------------------------------
 
     def backends_table(
-        self, backends: Sequence[tuple[str, str, JsonValue, JsonValue]]
+        self, backends: Sequence[tuple[str, str, str | None, str | None]]
     ) -> None:
         """Render a table of registered backend adapters.
 
@@ -131,16 +130,16 @@ class EngineRenderer(Renderer):
             table.add_row(
                 backend_id,
                 label,
-                str(default_model) if default_model else self.na(""),
-                str(compat) if compat else self.na(""),
+                default_model or self.na(""),
+                compat or self.na(""),
             )
         self.print(table)
 
     def backends_json(
-        self, backends: Sequence[tuple[str, str, JsonValue, JsonValue]]
+        self, backends: Sequence[tuple[str, str, str | None, str | None]]
     ) -> None:
         """Render registered backends as machine-readable JSON."""
-        result: list[dict[str, JsonValue]] = [
+        result: list[dict[str, str | None]] = [
             {
                 "id": bid,
                 "label": label,

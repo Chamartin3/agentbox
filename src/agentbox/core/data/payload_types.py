@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 
-from agentbox.core.data.jsontypes import JsonValue, JsonDict
+from agentbox.core.data.jsontypes import JsonDict, JsonValue
 from agentbox.core.data.workenv import SourceMetadata
 from agentbox.core.data.rows import (
     AgentPromptBindingRow,
@@ -246,7 +246,7 @@ class RunDetailPayload(TypedDict):
     runner_profile_id: str | None
     resource_snapshot: str | None
     mcp_snapshot: str | None
-    runner_snapshot: JsonDict | None
+    runner_snapshot: JsonDict | None  # stored runner-snapshot JSON (arbitrary at this boundary) — true-edge keep
     # Enriched fields added by get_run_detail
     agent_version: int | None
     backend: str | None
@@ -302,6 +302,15 @@ class McpHealthReportDict(TypedDict):
     mcp_servers: dict[str, McpServerHealthDict]
 
 
+class SkillMetadata(TypedDict, total=False):
+    """Skill resource metadata.
+
+    Known fields: skill_name (str). The structure may expand.
+    """
+
+    skill_name: str
+
+
 class BindingDict(TypedDict):
     """A ``ResolvedBinding`` projected to the dict the materializer consumes."""
 
@@ -316,7 +325,7 @@ class BindingDict(TypedDict):
     materialize_mode: str
     on_conflict: str
     blobs: list[ResourceBlobRow]
-    skill_meta: dict[str, JsonValue] | None
+    skill_meta: SkillMetadata | None
     source_metadata: SourceMetadata
 
 
@@ -440,6 +449,7 @@ class ModelParams(TypedDict, total=False):
     # Provider-specific body passthrough (pydantic-ai ``extra_body``), e.g.
     # {"reasoning_effort": "none"} to disable qwen3 thinking loops. run_direct
     # forwards this into model_settings; without it here the schema strips it.
+    # KEEP: arbitrary provider-specific JSON passthrough; schema varies by provider.
     extra_body: dict[str, JsonValue]
 
 
@@ -1356,6 +1366,7 @@ __all__ = [
     "ScriptValidatorView",
     "SkillBindingsResult",
     "SkillCatalogItem",
+    "SkillMetadata",
     "SnapshotEntryView",
     "UsagePayload",
     "AgentValidationResult",

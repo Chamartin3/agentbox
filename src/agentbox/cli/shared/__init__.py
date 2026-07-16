@@ -8,7 +8,7 @@ Sub-modules
 -----------
 deps        singleton factories (get_executor, get_mcp_registry — internal to context)
 context     CLIContext dataclass + Renderers registry + group_callback DI helper + error contract
-constants   Style enum, NA, CLI_AUTHOR, EVENT_STYLES, JsonValue, …
+constants   Style enum, NA, CLI_AUTHOR, EVENT_STYLES, EPHEMERAL_WORKSPACE
 render      Renderer — Rich output layer (console internal, commands use ctx.obj.render)
 renderers   Per-domain renderer components (AgentRenderer, EngineRenderer, …)
 """
@@ -20,7 +20,6 @@ from agentbox.cli.shared.constants import (
     CLI_SOURCE,
     EPHEMERAL_WORKSPACE,
     EVENT_STYLES,
-    JsonValue,
     NA,
     RUNNER_CLEAR,
     Style,
@@ -60,7 +59,6 @@ __all__ = [
     "CLI_SOURCE",
     "EPHEMERAL_WORKSPACE",
     "EVENT_STYLES",
-    "JsonValue",
     "NA",
     "RUNNER_CLEAR",
     "Style",

@@ -13,7 +13,6 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from agentbox.cli.shared.constants import JsonValue
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.data.payload_types import (
     AgentDiffResult,
@@ -142,9 +141,9 @@ class AgentRenderer(Renderer):
         versions: Sequence[dict[str, object]],
         agent_id: str,
         *,
-        active_id: JsonValue = None,
-        latest_version: JsonValue = None,
-        active_version: JsonValue = None,
+        active_id: int | None = None,
+        latest_version: int | None = None,
+        active_version: int | None = None,
     ) -> None:
         """Render version history table for an agent."""
         if not versions:
@@ -352,7 +351,7 @@ class AgentRenderer(Renderer):
     # Simple success messages (agent lifecycle)
     # ------------------------------------------------------------------
 
-    def agent_created(self, agent_id: str, version: JsonValue, version_id: JsonValue) -> None:
+    def agent_created(self, agent_id: str, version: int, version_id: int) -> None:
         """Print success message for agent creation."""
         self.success(f"created {agent_id!r} v{version} (draft, version_id={version_id})")
 
@@ -364,27 +363,27 @@ class AgentRenderer(Renderer):
         """Print error for missing agent."""
         self.error(f"agent {agent_id!r} not found")
 
-    def version_created(self, version: JsonValue, version_id: JsonValue) -> None:
+    def version_created(self, version: int, version_id: int) -> None:
         """Print success message for version creation."""
         self.success(f"created v{version} (id={version_id})")
 
-    def draft_created(self, version: JsonValue, version_id: JsonValue) -> None:
+    def draft_created(self, version: int, version_id: int) -> None:
         """Print success message for draft creation."""
         self.success(f"draft created v{version} (id={version_id})")
 
-    def prompt_revision_created(self, version: JsonValue, version_id: JsonValue, active: bool) -> None:
+    def prompt_revision_created(self, version: int, version_id: int, active: bool) -> None:
         """Print success message for prompt revision."""
         self.success(f"prompt revision v{version} (id={version_id}, active={active})")
 
-    def version_published(self, version: JsonValue, version_id: JsonValue) -> None:
+    def version_published(self, version: int, version_id: int) -> None:
         """Print success message for version publish."""
         self.success(f"published v{version} (id={version_id})")
 
-    def version_rolled_back(self, target_version: JsonValue, new_version: JsonValue) -> None:
+    def version_rolled_back(self, target_version: int, new_version: int) -> None:
         """Print success message for version rollback."""
         self.success(f"rolled back to v{target_version} (new v{new_version})")
 
-    def comment_added(self, comment_id: JsonValue) -> None:
+    def comment_added(self, comment_id: int) -> None:
         """Print success message for comment addition."""
         self.success(f"comment added (id={comment_id})")
 
@@ -396,7 +395,7 @@ class AgentRenderer(Renderer):
         """Print success message for agent export."""
         self.success(f"done \u2192 {base}")
 
-    def file_added(self, name: str, file_id: JsonValue, sha256: str) -> None:
+    def file_added(self, name: str, file_id: int, sha256: str) -> None:
         """Print success message for file addition."""
         self.success(f"added {name!r} (file_id={file_id}, sha256={sha256[:8]})")
 
@@ -404,7 +403,7 @@ class AgentRenderer(Renderer):
         """Print success message for file removal."""
         self.warn(f"removed file {file_id} from v{version}")
 
-    def version_edit_new(self, agent_id: str, version: JsonValue) -> None:
+    def version_edit_new(self, agent_id: str, version: int) -> None:
         """Print success message for version edit."""
         self.success(
             f"new version {agent_id!r} v{version} "
@@ -460,9 +459,10 @@ class AgentRenderer(Renderer):
             table.add_row(t["name"], t["source"], t["native"] or "")
         self.print(table)
 
-    def validation_updated(self, direction: str, version: JsonValue) -> None:
+    def validation_updated(self, direction: str, version: int | None) -> None:
         """Print success message for validation update."""
-        self.success(f"updated {direction} validators \u2014 v{version}")
+        version_str = f"v{version}" if version else "(no version)"
+        self.success(f"updated {direction} validators \u2014 {version_str}")
 
     def profile_bound(self, profile_id: str, agent_id: str) -> None:
         """Print success message for profile binding."""

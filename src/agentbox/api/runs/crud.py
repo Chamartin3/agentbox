@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
+from agentbox.core.data.jsontypes import JsonDict
 from agentbox.api.deps import get_db, get_executor
 from agentbox.api.runs.schemas import (
     CompleteRunBody,
@@ -23,7 +24,6 @@ from agentbox.api.runs.schemas import (
 from agentbox.api.runs.webhooks import schedule_webhook
 from agentbox.core.data.payload_types import (
     CancelRunResult,
-    JsonValue,
     PaginatedRunsResult,
     RunCommentsResult,
     RunCreatedResult,
@@ -92,7 +92,7 @@ def list_runs(
     limit: int = 50,
     offset: int = 0,
     paginated: bool = False,
-) -> list[dict[str, JsonValue]] | PaginatedRunsResult:
+) -> list[JsonDict] | PaginatedRunsResult:
     """List runs. See ``ExecutionService.list_runs_enriched`` for the shape."""
     db = get_db()
     result = ExecutionService().list_runs_enriched(
@@ -269,7 +269,11 @@ def get_run_prompt(run_id: str) -> RunPromptFragmentsResult:
 
 
 @router.get("/{run_id}/transcript")
-def get_transcript(run_id: str) -> list[dict[str, JsonValue]]:
+def get_transcript(run_id: str) -> list[JsonDict]:
+    """Read the JSONL transcript file for a run.
+
+    Returns a list of backend-emitted events (structure varies by backend).
+    """
     try:
         return ExecutionService().read_transcript_events(run_id)
     except RunNotFound as exc:
