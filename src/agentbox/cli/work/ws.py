@@ -11,10 +11,8 @@ import typer
 from agentbox.cli.shared import CLIContext, resolve_agent
 # TODO(cli-arch): launch orchestration → Service (plans 089/101)
 from agentbox.cli.ops.launch import _launch_session
-# TODO(cli-arch): workspace CRUD → WorkspaceService (plan 089)
 from agentbox.core import service as ws_core
-# TODO(cli-arch): move to facade export
-from agentbox.core.data.errors import WorkspaceNotFound
+from agentbox.core.service import WorkspaceNotFound
 
 
 def _resolve_workspace(obj: CLIContext, name: str) -> tuple[Path, str]:

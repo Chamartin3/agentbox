@@ -94,11 +94,7 @@ def register_cancel(parent: typer.Typer) -> None:
         obj: CLIContext = ctx.obj
 
         async def _cancel() -> None:
-            existing = obj.execution.get_run(run_id)
-            if existing is None:
-                raise RunNotFound(run_id)
-            # TODO(cli-arch): cancel belongs on ExecutionService (plan 095 territory)
-            await get_executor().cancel_run(run_id)
+            await obj.execution.cancel_run(run_id, executor=get_executor())
 
         try:
             asyncio.run(_cancel())

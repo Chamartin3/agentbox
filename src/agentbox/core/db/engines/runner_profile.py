@@ -84,26 +84,6 @@ class RunnerProfileManager(Manager[RunnerProfile]):
     model = RunnerProfile
 
     # ------------------------------------------------------------------
-    # Legacy ORM helpers (kept for existing callers until Phase C)
-    # ------------------------------------------------------------------
-
-    def get_default(self) -> RunnerProfile | None:
-        """Return the system-default runner profile, or None."""
-        stmt = (
-            select(RunnerProfile)
-            .where(
-                getattr(RunnerProfile, "is_system_default") == 1,
-                getattr(RunnerProfile, "is_enabled") == 1,
-            )
-            .limit(1)
-        )
-        return self._scalar(stmt)
-
-    def find_by_backend(self, backend: str) -> list[RunnerProfile]:
-        """Return all enabled profiles for a given backend name."""
-        return self.find(backend=backend, is_enabled=1)
-
-    # ------------------------------------------------------------------
     # Row → Pydantic model conversion
     # ------------------------------------------------------------------
 

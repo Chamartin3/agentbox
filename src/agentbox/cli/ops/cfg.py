@@ -5,8 +5,7 @@ import os
 import typer
 
 from agentbox.cli.shared import CLIContext
-# TODO(cli-arch): WorkspaceService workenv methods (plan 089)
-from agentbox.core import service as ws_mod  # noqa: E402  # TODO(cli-arch)
+from agentbox.core import service as ws_mod  # noqa: E402
 
 cfg_app = typer.Typer(
     name="cfg",

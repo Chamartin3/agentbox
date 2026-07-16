@@ -41,21 +41,14 @@ def get_executor() -> RunExecutor:
     return RunExecutor(get_db(), get_settings(), get_mcp_registry())
 
 
-# ---------------------------------------------------------------------------
 # Service factories — each service is zero-argument and self-wiring.
-# EngineService is imported directly from its module rather than the facade
-# because the facade defers the export due to a circular-import (plan 091).
-# TODO(cli-arch): switch to ``from agentbox.core.service import EngineService``
-#                 once that circular import is resolved.
-# ---------------------------------------------------------------------------
-
 from agentbox.core.service import (  # noqa: E402
     AgentService,
+    EngineService,
     ExecutionService,
     EvaluationService,
     SystemService,
 )
-from agentbox.core.service.engines import EngineService  # noqa: E402
 from agentbox.core.service.resources import ResourceService  # noqa: E402
 
 

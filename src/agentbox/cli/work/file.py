@@ -7,8 +7,7 @@ import sys
 import typer
 
 from agentbox.cli.shared import CLIContext
-# TODO(cli-arch): move to facade export
-from agentbox.core.data.errors import WorkspaceNotFound
+from agentbox.core.service import WorkspaceNotFound
 
 file_app = typer.Typer(
     name="file",

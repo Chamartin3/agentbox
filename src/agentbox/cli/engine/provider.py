@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.core.service.engines import ProfileNotFound  # TODO(cli-arch): move to facade export
+from agentbox.core.service import ProfileNotFound
 
 app = typer.Typer(
     name="providers",

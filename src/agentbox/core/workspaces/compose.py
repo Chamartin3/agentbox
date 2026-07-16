@@ -100,9 +100,9 @@ class WorkspaceComposer:
     # ── engines ──────────────────────────────────────────────────────────
 
     def _engines(self) -> tuple[Recipe, ...]:
-        # ponytail: load ALL installed recipes (current behaviour). Narrowing
-        # to the workspace's actual engines (via agent runner profiles) is the
-        # upgrade path if recipe load cost ever matters.
+        # Load ALL installed recipes. Narrowing to the workspace's actual
+        # engines (via agent runner profiles) is the upgrade path if recipe
+        # load cost ever matters.
         return tuple(r for name in list_recipes() if (r := load_recipe(name)) is not None)
 
     # ── bindings ─────────────────────────────────────────────────────────
@@ -291,8 +291,7 @@ class WorkspaceComposer:
 
         return WorkspaceConfig(
             name=workspace_id,
-            # ponytail: workspace row exposes no description today (the old
-            # loader read it via getattr on a dict row → always ""); keep "".
+            # workspace row exposes no description column; always "".
             description="",
             env_doc=env_doc_body,
             agents=agents,

@@ -5,8 +5,7 @@ from __future__ import annotations
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.core.service import RunnerProfileCreate
-from agentbox.core.service.engines import ProfileNotFound  # TODO(cli-arch): move to facade export
+from agentbox.core.service import ProfileNotFound, RunnerProfileCreate
 
 app = typer.Typer(
     name="profiles",

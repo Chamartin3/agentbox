@@ -8,7 +8,6 @@ import typer
 
 from agentbox.cli.shared import CLIContext
 
-# TODO(cli-arch): move to facade export (plan 095 Phase A)
 from agentbox.core.service import McpServerSpec
 
 project_app = typer.Typer(

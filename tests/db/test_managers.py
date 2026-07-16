@@ -145,22 +145,6 @@ def test_run_manager_finish(blank_db: Database) -> None:
     assert r.finished_at == "2026-01-01T01:00:00"
 
 
-def test_runner_profile_get_default(blank_db: Database) -> None:
-    """RunnerProfileManager.get_default returns the system default profile."""
-    blank_db.runner_profiles.create(
-        id="prof-1",
-        name="Default",
-        backend="token",
-        is_enabled=1,
-        is_system_default=1,
-        created_at="now",
-        updated_at="now",
-    )
-    default = blank_db.runner_profiles.get_default()
-    assert default is not None
-    assert default.id == "prof-1"
-
-
 # ---------------------------------------------------------------------------
 # Return-type invariants
 # ---------------------------------------------------------------------------

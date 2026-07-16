@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 _AGENTBOX_ROOT = Path("/agentbox")
 
-# ponytail: hydrate os.environ from .env files so AGENTBOX_* and provider
+# Hydrate os.environ from .env files so AGENTBOX_* and provider
 # secrets (OPENROUTER_API_KEY, OLLAMA_HOST, …) can live in a file instead of
 # being exported by hand. override=False → a real exported env var always wins;
 # a missing file is a silent no-op. Runs once at import, before SETTINGS builds.

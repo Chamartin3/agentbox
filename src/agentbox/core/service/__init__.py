@@ -10,10 +10,17 @@ from agentbox.core.engines import EffectiveRunnerConfig as EffectiveRunnerConfig
 from agentbox.core.engines import get_provider as get_provider
 from agentbox.core.engines import list_providers as list_providers
 
+# ── Config ────────────────────────────────────────────────────────────
+from agentbox.core.config import Settings as Settings
+
 # ── Constants ─────────────────────────────────────────────────────────
 from agentbox.core.data.constants import EventType as EventType
 from agentbox.core.data.constants import ResourceType as ResourceType
+from agentbox.core.data.constants import RunnerKind as RunnerKind
 from agentbox.core.data.constants import RunStatus as RunStatus
+
+# ── Errors ────────────────────────────────────────────────────────────
+from agentbox.core.data.errors import WorkspaceNotFound as WorkspaceNotFound
 from agentbox.core.data import read_transcript as read_transcript
 from agentbox.core.data import AgentDef as AgentDef
 from agentbox.core.data import AgentSource as AgentSource
@@ -81,6 +88,7 @@ from agentbox.core.service.evaluation import EvaluationService as EvaluationServ
 
 # ── Engines service (plan 091) ─────────────────────────────────────────
 from agentbox.core.service.engines import EngineService as EngineService
+from agentbox.core.service.engines import ProfileNotFound as ProfileNotFound
 
 # ── System service ────────────────────────────────────────────────────
 from agentbox.core.service.system import SystemService as SystemService

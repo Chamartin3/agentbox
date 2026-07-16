@@ -205,8 +205,8 @@ def _enrich_agent(
     profile_bindings: dict[str, str],
 ) -> dict:
     try:
-        # ponytail: pass None for WorkspaceLookupStore — ws.resolve_path gracefully
-        # falls back to settings-based path when no workspace row lookup is available.
+        # None WorkspaceLookupStore — ws.resolve_path falls back to the
+        # settings-based path when no workspace row lookup is available.
         workspace_str = str(ws.resolve_path(agent, settings, None)[0])
     except Exception:
         workspace_str = ""

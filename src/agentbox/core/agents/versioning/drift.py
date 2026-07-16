@@ -71,8 +71,8 @@ def build_config_json_str(agent: AgentDef) -> str:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=UserWarning)
         data = agent.model_dump(mode="json", exclude_none=False)
-    # Merge in structured execution/runtime/python sub-dicts so new versions
-    # never need the legacy `runner`-fallback path in `agent_config.py`.
+    # Merge in structured execution/runtime/python sub-dicts so the config
+    # snapshot is self-contained and needs no runner-fallback at read time.
     data.update(build_config_json_payload(agent))
     return json.dumps(data, sort_keys=True, default=str)
 
