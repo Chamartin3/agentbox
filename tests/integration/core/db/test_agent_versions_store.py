@@ -54,6 +54,29 @@ class TestAgentVersionsMixin:
     def test_latest_version_returns_none_for_missing(self, svc: AgentService) -> None:
         assert svc.latest_version("missing") is None
 
+    def test_effective_active_none_for_missing(self, svc: AgentService) -> None:
+        assert svc.effective_active_version("missing") is None
+
+    def test_effective_active_falls_back_to_latest_when_unactivated(
+        self, svc: AgentService
+    ) -> None:
+        # create_version never activates → active pointer is None, so the
+        # policy resolves to the latest version.
+        _build_version(svc, agent_id="eff", author="v1")
+        _build_version(svc, agent_id="eff", author="v2", changelog="update")
+        assert svc.active_version("eff") is None
+        eff = svc.effective_active_version("eff")
+        assert eff is not None and eff["version"] == 2
+
+    def test_effective_active_prefers_explicit_pointer(
+        self, svc: AgentService
+    ) -> None:
+        v1 = _build_version(svc, agent_id="eff2", author="v1")
+        svc.activate_version("eff2", v1["id"])
+        _build_version(svc, agent_id="eff2", author="v2")  # newer, unactivated
+        eff = svc.effective_active_version("eff2")
+        assert eff is not None and eff["version"] == 1
+
     def test_get_version(self, svc: AgentService) -> None:
         _build_version(svc)
         v = svc.get_version("test-agent", 1)

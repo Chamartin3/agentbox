@@ -1425,6 +1425,15 @@ class AgentService(Service):
     def active_version(self, agent_id: str) -> AgentVersionRow | None:
         return self._versions.get_active(agent_id)
 
+    def effective_active_version(self, agent_id: str) -> AgentVersionRow | None:
+        """The version to treat as active: explicit pointer, else latest.
+
+        The defined resolution rule (see ``get_effective_active``) — readers
+        that want "the active version" call this instead of composing
+        ``active_version() or latest_version()`` inline.
+        """
+        return self._versions.get_effective_active(agent_id)
+
     def get_version(self, agent_id: str, version: int) -> AgentVersionRow | None:
         return self._versions.get_by_number(agent_id, version)
 

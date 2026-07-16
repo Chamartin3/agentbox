@@ -83,10 +83,7 @@ def stamp_run_agent_version(
 ) -> None:
     """Stamp the run row with the active or latest agent version."""
     try:
-        chosen = (
-            db.agent_versions.get_active(agent.id)
-            or db.agent_versions.get_latest(agent.id)
-        )
+        chosen = db.agent_versions.get_effective_active(agent.id)
         if chosen is not None:
             with db.engine.begin() as conn:
                 conn.execute(

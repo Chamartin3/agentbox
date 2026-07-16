@@ -81,12 +81,8 @@ def list_agent_versions(agent_id: str) -> _VersionListResult:
     _require_agent(agent_id)
     svc = get_agent_service()
     versions = svc.list_versions(agent_id)
-    active = svc.active_version(agent_id)
+    active = svc.effective_active_version(agent_id)
     latest = svc.latest_version(agent_id)
-    # Fall back to latest when no active pointer exists (legacy agents
-    # imported before active_agent_versions was populated).
-    if active is None and latest is not None:
-        active = latest
     active_id = active["id"] if active else None
     active_version_num = active["version"] if active else None
     enriched: list[_VersionSummaryItem] = [
