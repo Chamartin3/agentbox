@@ -22,7 +22,7 @@ from agentbox.core.agents.definition import (
 from jsonschema.exceptions import SchemaError
 
 from agentbox.core.agents.validation import OutputConfig
-from agentbox.core.agents.composition.schema_io import load_json_schema
+from agentbox.core.data.schema_validation import load_json_schema
 from agentbox.core.agents.composition.rendering import (
     append_input_schema,
     append_schema,

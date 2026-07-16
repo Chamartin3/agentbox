@@ -154,8 +154,8 @@ class ChannelConfig(TypedDict, total=False):
     Channels validate the keys they need at runtime.
     """
 
-    # ponytail: single flat config for the one existing channel; split into
-    # per-channel TypedDicts + a generic base when a second channel lands.
+    # Single flat config for the one existing channel; split into per-channel
+    # TypedDicts + a generic base when a second channel lands.
     url: str
     headers: dict[str, str]
     retry_count: int

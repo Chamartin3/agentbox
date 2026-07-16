@@ -75,6 +75,7 @@ from agentbox.core.data.tools import CanonicalTool
 from agentbox.core.data.jsontypes import RawJson, RawJsonValue
 from agentbox.core.data.skills import SkillPack
 from agentbox.core.data.schema_consistency import assert_schema_consistent
+from agentbox.core.data.schema_validation import load_json_schema, validate_json_schema
 from agentbox.core.data.backends import (
     BackendRunResult,
     ComposedReferenceView,
@@ -219,6 +220,8 @@ __all__ = [
     "VersionNotDraft",
     "VersionNotFound",
     "assert_schema_consistent",
+    "load_json_schema",
+    "validate_json_schema",
     "ComposedReferenceView",
     "ComposedView",
     "McpToolSpec",

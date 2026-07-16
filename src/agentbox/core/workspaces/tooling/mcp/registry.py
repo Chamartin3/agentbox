@@ -6,16 +6,33 @@ Merges the former client/health.py + client/registry.py.
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import RawJson
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Literal, TypedDict
 
-from agentbox.core.data import McpHealthReportDict, McpServerHealthDict
+from agentbox.core.data import JsonSchemaDict, McpHealthReportDict, McpServerHealthDict, validate_json_schema
+from jsonschema.exceptions import SchemaError
 from agentbox.core.workspaces.tooling.mcp.manifest import McpToolManifest, Tool
 from agentbox.core.workspaces.tooling.mcp.transport import McpClient
+
+logger = logging.getLogger(__name__)
+
+
+def _validated_tool_schema(raw: object, tool_name: str) -> JsonSchemaDict | None:
+    """Validate an MCP server's advertised tool input schema on receipt.
+
+    Invalid schemas (a third-party server may send anything) are dropped with a
+    warning rather than asserted as a JsonSchemaDict."""
+    if raw is None:
+        return None
+    try:
+        return validate_json_schema(raw)
+    except SchemaError:
+        logger.warning("MCP tool %r advertised an invalid input schema; dropping it", tool_name)
+        return None
 
 ServerStatus = Literal["ok", "degraded", "unavailable"]
 
@@ -66,7 +83,7 @@ class CachedTool(TypedDict):
 
     name: str
     description: str
-    input_schema: RawJson | None
+    input_schema: JsonSchemaDict | None
 
 
 class McpServerConfig(TypedDict, total=False):
@@ -162,7 +179,7 @@ class McpRegistry:
                 Tool(
                     name=t.get("name", ""),
                     description=t.get("description", ""),
-                    input_schema=t.get("inputSchema"),
+                    input_schema=_validated_tool_schema(t.get("inputSchema"), t.get("name", "")),
                 )
                 for t in tools_data
             ]

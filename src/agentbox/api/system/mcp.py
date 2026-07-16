@@ -7,6 +7,7 @@ from typing import TypedDict, NotRequired
 from fastapi import APIRouter, HTTPException
 
 from agentbox.api.deps import get_mcp_registry
+from agentbox.core.data import JsonSchemaDict
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
@@ -42,7 +43,7 @@ class ToolEntry(TypedDict):
 
     name: str
     description: str
-    input_schema: dict | None
+    input_schema: JsonSchemaDict | None
 
 
 class GetServerToolsResult(TypedDict):

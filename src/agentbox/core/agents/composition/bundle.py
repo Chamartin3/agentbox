@@ -18,7 +18,7 @@ from typing import Any, Protocol, TypedDict
 
 from jsonschema.exceptions import SchemaError
 
-from agentbox.core.agents.composition.schema_io import load_json_schema
+from agentbox.core.data.schema_validation import load_json_schema
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data.constants import BundleFile
 from agentbox.core.data import CompositionConfig

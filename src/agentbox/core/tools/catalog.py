@@ -11,7 +11,7 @@ push their slices in; this module owns only the type and the algebra.
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import RawJson
+from agentbox.core.data import JsonSchemaDict
 from typing import Any
 
 import logging
@@ -33,7 +33,7 @@ class CallableItem:
     kind: str  # "builtin" | "mcp" | "host_env" | "resource"
     description: str = ""
     server: str | None = None
-    input_schema: RawJson | None = None
+    input_schema: JsonSchemaDict | None = None
     policy: dict[str, Any] | None = field(default_factory=dict)
     """Grant-param payload for host-env capabilities."""
 

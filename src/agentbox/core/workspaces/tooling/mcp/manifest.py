@@ -6,6 +6,8 @@ Merges the former client/types.py + client/grouping.py + client/tool_manifest.py
 
 from __future__ import annotations
 
+from agentbox.core.data import JsonSchemaDict
+
 from dataclasses import dataclass
 
 
@@ -13,7 +15,7 @@ from dataclasses import dataclass
 class Tool:
     name: str
     description: str = ""
-    input_schema: dict | None = None
+    input_schema: JsonSchemaDict | None = None
 
 
 _READ_PREFIXES = ("get_", "list_", "search_", "check_", "select_", "find_")

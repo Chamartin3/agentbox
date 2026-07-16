@@ -8,11 +8,11 @@ endpoint is pure discovery.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from fastapi import APIRouter, HTTPException
 
-from agentbox.core.data import CanonicalTool
+from agentbox.core.data import CanonicalTool, JsonSchemaDict
 from agentbox.core.tools import BUILTIN_TOOLS, SharedToolRegistry
 from agentbox.core.tools.builtin import BuiltinToolSpec
 from agentbox.core.tools.registry import ToolSpec
@@ -37,8 +37,8 @@ class _SharedToolDict(TypedDict):
     description: str
     capability: str
     tags: list[str]
-    input_schema: dict
-    output_schema: dict
+    input_schema: JsonSchemaDict
+    output_schema: JsonSchemaDict
     kind: str
 
 
@@ -70,8 +70,9 @@ def _spec_to_dict(spec: ToolSpec) -> _SharedToolDict:
         "description": spec.description,
         "capability": spec.capability,
         "tags": list(spec.tags),
-        "input_schema": spec.input_model.model_json_schema(),
-        "output_schema": spec.output_model.model_json_schema(),
+        # pydantic emits a valid JSON Schema by construction (type-safety §6).
+        "input_schema": cast("JsonSchemaDict", spec.input_model.model_json_schema()),
+        "output_schema": cast("JsonSchemaDict", spec.output_model.model_json_schema()),
         "kind": "shared",
     }
 

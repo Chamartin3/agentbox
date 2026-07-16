@@ -35,7 +35,7 @@ from agentbox.core.agents.composition.rendering import (
 )
 from jsonschema.exceptions import SchemaError
 
-from agentbox.core.agents.composition.schema_io import load_json_schema
+from agentbox.core.data.schema_validation import load_json_schema
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView, ResolvedPromptBinding
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
 from agentbox.core.data import AgentDef
@@ -345,7 +345,9 @@ def build_prompt(
             constraints_only = _OutputConfig(json_schema=None, validators=out_cfg.validators)
             system_base = _append_output_contract(system_base, constraints_only)
 
-    # ---- Stage 4: output_schema binding fallback (legacy_dir) ------------
+    # ---- Stage 4: output_schema binding fallback ------------------------
+    # Used when no inline composed schema exists but an agent binds an
+    # output_schema resource.
     if prompt_bindings and composed_schema is None:
         for _b in prompt_bindings:
             if _b.get("slot") != "output_schema":
