@@ -190,6 +190,9 @@ class RunExecutor:
         _build = self._workspaces.build(
             _wsid,
             into=run_dir,
+            # This run uses exactly one engine; the fresh run dir needs only its
+            # config, not every installed engine's.
+            engines=(spec.engine_name,) if spec.engine_name else None,
             system_prompt=composed_state.system if composed_state else None,
             extra_mcp_servers=_extra_mcp or None,
         )

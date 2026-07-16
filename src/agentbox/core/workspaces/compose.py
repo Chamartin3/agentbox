@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -79,14 +80,24 @@ class WorkspaceComposer:
     def __init__(self, reads: WorkspaceReadManager) -> None:
         self._read = reads
 
-    def compose(self, workspace_id: str) -> WorkspaceBlueprint:
-        """Load workspace state and produce an immutable blueprint."""
+    def compose(
+        self, workspace_id: str, *, engines: Collection[str] | None = None
+    ) -> WorkspaceBlueprint:
+        """Load workspace state and produce an immutable blueprint.
+
+        ``engines`` narrows which engine recipes the blueprint carries (a run
+        needs only its own) and overrides the default. ``None`` → the engines
+        the workspace's related agents resolve to; if that set is empty (no
+        agents), every installed engine.
+        """
+        if engines is None:
+            engines = self._read.list_workspace_engines(workspace_id) or None
         permissions = self._permissions(workspace_id)
         env_doc_body, env_doc_version_id = self._env_doc(workspace_id)
         return WorkspaceBlueprint(
             workspace_id=workspace_id,
             config=self._config(workspace_id, permissions),
-            recipes=self._engines(),
+            recipes=self._engines(engines),
             bindings=self._bindings(workspace_id),
             subagents=self._subagents(workspace_id),
             env_doc_body=env_doc_body,
@@ -99,11 +110,13 @@ class WorkspaceComposer:
 
     # ── engines ──────────────────────────────────────────────────────────
 
-    def _engines(self) -> tuple[Recipe, ...]:
-        # Load ALL installed recipes. Narrowing to the workspace's actual
-        # engines (via agent runner profiles) is the upgrade path if recipe
-        # load cost ever matters.
-        return tuple(r for name in list_recipes() if (r := load_recipe(name)) is not None)
+    def _engines(self, engines: Collection[str] | None = None) -> tuple[Recipe, ...]:
+        # engines=None → all installed. A subset renders only those recipes; the
+        # per-run dir needs just its own engine. Safe as an in-place subset build:
+        # engine config files aren't orphan-reconciled, so others already on disk
+        # stay, and re-rendering the requested one is idempotent (keeps it fresh).
+        names = [n for n in list_recipes() if engines is None or n in engines]
+        return tuple(r for n in names if (r := load_recipe(n)) is not None)
 
     # ── bindings ─────────────────────────────────────────────────────────
 

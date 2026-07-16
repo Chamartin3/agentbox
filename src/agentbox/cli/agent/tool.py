@@ -6,9 +6,6 @@ import typer
 
 from agentbox.cli.shared import CLIContext, handle_cli_errors, resolve_agent
 
-# TODO(cli-arch): AgentService.list_tool_catalog (core gap)
-from agentbox.core.tools import SharedToolRegistry
-
 tool_app = typer.Typer(
     name="tool",
     help="List, inspect, grant, and revoke agent tools.",
@@ -36,11 +33,7 @@ def tool_ls(
         obj.render.agent.grants_table([dict(g) for g in items], agent_id)
         return
 
-    specs = SharedToolRegistry.all()
-    if tag:
-        specs = [s for s in specs if tag in s.tags]
-
-    obj.render.agent.tools_table(specs)
+    obj.render.agent.tools_table(obj.agents.list_tool_catalog(tag))
 
 
 @tool_app.command("show")
@@ -50,7 +43,7 @@ def tool_show(
 ) -> None:
     """Show full details for a registered tool."""
     obj: CLIContext = ctx.obj
-    spec = SharedToolRegistry.get(tool_name)
+    spec = obj.agents.get_tool(tool_name)
     if spec is None:
         obj.render.agent.error(f"Tool {tool_name!r} not found.")
         raise typer.Exit(1)

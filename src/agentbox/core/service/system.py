@@ -23,8 +23,8 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from pathlib import Path
 
-from agentbox.core.config import SETTINGS
-from agentbox.core.data import McpServerSpec, now_iso
+from agentbox.core.config import SETTINGS, load_settings
+from agentbox.core.data import DoctorCheck, McpServerSpec, now_iso
 from agentbox.core.data.rows import (
     ApiTokenPublicRow,
     ApiTokenRow,
@@ -306,6 +306,80 @@ class SystemService(Service):
     def list_host_env_calls_for_run(self, run_id: str) -> list[HostEnvCallLogRow]:
         """List all host-env call log entries for a run."""
         return self._db.host_env_call_log.list_calls_for_run(run_id)
+
+    # ══════════════════════════════════════════════════════════════════
+    # Diagnostics
+    # ══════════════════════════════════════════════════════════════════
+
+    def doctor_checks(self) -> list[DoctorCheck]:
+        """Run the diagnostic suite and return one result per check.
+
+        The interface layer renders and decides the exit code; this method
+        owns the checks. Sibling services self-wire from settings, so this
+        aggregator constructs them locally.
+        """
+        # Local imports: sibling services + workspace helper, avoiding a
+        # module-level cycle through the service facade.
+        from agentbox.core.service.agents import AgentService  # noqa: PLC0415
+        from agentbox.core.service.engines import (  # noqa: PLC0415
+            CredentialState,
+            EngineService,
+        )
+        from agentbox.core.service.execution import ExecutionService  # noqa: PLC0415
+        from agentbox.core.workspaces.workdir import info as workspace_info  # noqa: PLC0415
+
+        settings = load_settings()
+        checks: list[DoctorCheck] = []
+
+        def ok(name: str, detail: str = "") -> None:
+            checks.append(DoctorCheck(name, True, detail))
+
+        def fail(name: str, detail: str) -> None:
+            checks.append(DoctorCheck(name, False, detail))
+
+        try:
+            rows = [workspace_info(a, settings) for a in AgentService().list_all_agents()]
+            resolvable = True
+            for w in rows:
+                if not w.exists and not w.ephemeral:
+                    resolvable = False
+                    ok("Workspaces", f"{w.agent_id}: path {w.path} does not exist")
+            if resolvable:
+                ok("Workspaces", f"{len(rows)} agent(s), all paths resolvable")
+        except Exception as exc:
+            fail("Workspaces", str(exc))
+
+        try:
+            ExecutionService().list_runs(limit=1)
+            ok("Database", str(settings.db_path))
+        except Exception as exc:
+            fail("Database", str(exc))
+
+        engines = EngineService()
+        try:
+            ok("Plugins", f"{len(engines.list_backend_names())} backend(s)")
+        except Exception as exc:
+            fail("Plugins", str(exc))
+
+        try:
+            creds = engines.list_credentials()
+            if not creds:
+                ok("Credentials", "no backends registered")
+            else:
+                ok("Credentials", f"{len(creds)} backend(s)")
+                for r in creds:
+                    label = "configured" if r.detect() == CredentialState.PRESENT else "missing"
+                    ok(f"  {r.backend}", label)
+        except Exception as exc:
+            ok("Credentials", str(exc))
+
+        cache = settings.mcp_cache_dir
+        if cache.exists():
+            ok("MCP cache", f"{len(list(cache.glob('*.json')))} cached server(s) in {cache}")
+        else:
+            ok("MCP cache", f"cache dir {cache} does not exist")
+
+        return checks
 
 
 # ------------------------------------------------------------------

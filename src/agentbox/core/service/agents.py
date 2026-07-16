@@ -109,6 +109,7 @@ from agentbox.core.db.agents.agent import AgentRunnerProfile as _AgentRunnerProf
 from agentbox.core.db.runs.run import Run as _Run
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines import EngineService
+from agentbox.core.tools import SharedToolRegistry, ToolSpec
 from agentbox.core.workspaces import workdir as ws
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
 from pathlib import Path
@@ -1784,6 +1785,18 @@ class AgentService(Service):
         """Set of active tool names — used by the executor at run-start."""
         return {r["tool_name"] for r in self._grants.list_for_agent(agent_id)}
 
+    # ── tool catalog ───────────────────────────────────────────────────
+    def list_tool_catalog(self, tag: str | None = None) -> list[ToolSpec]:
+        """All registered agent tools, optionally filtered by tag."""
+        specs = SharedToolRegistry.all()
+        if tag:
+            specs = [s for s in specs if tag in s.tags]
+        return specs
+
+    def get_tool(self, name: str) -> ToolSpec | None:
+        """A single registered tool by canonical name, or None."""
+        return SharedToolRegistry.get(name)
+
     # ── tool deny-list ─────────────────────────────────────────────────
     def forbid_tool(
         self, agent_id: str, tool_name: str, changelog: str, actor: str | None = None
@@ -2171,6 +2184,35 @@ class AgentService(Service):
         result = self._versions.get_by_id(vid)
         assert result is not None, f"version {vid} not found after insert for agent {agent_id!r}"
         return result
+
+    def create_version_from_snapshot(
+        self,
+        agent_id: str,
+        content_snapshot: str,
+        *,
+        author: str = "system",
+        changelog: str = "",
+    ) -> AgentVersionRow:
+        """Create a version from a raw content snapshot, deriving the source
+        metadata from the agent's current definition.
+
+        Convenience over ``create_version``: resolves the agent, fills
+        ``source_path``/``source_format`` and empty prompt/hash snapshots, so
+        callers pass only the snapshot. Raises ``AgentNotFound`` if unknown.
+        """
+        agent = self.get_agent_def(agent_id)
+        if agent is None:
+            raise AgentNotFound(agent_id)
+        return self.create_version(
+            agent_id=agent_id,
+            source_path=str(agent.source_path) if agent.source_path else "",
+            source_format=agent.source_format.value if agent.source_format else "unknown",
+            content_snapshot=content_snapshot,
+            prompt_snapshot="",
+            content_hash="",
+            author=author,
+            changelog=changelog,
+        )
 
     def list_version_files(self, version_id: int) -> list[AgentVersionFileRow]:
         return self._files.list_for_version(version_id)

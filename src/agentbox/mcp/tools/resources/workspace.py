@@ -59,6 +59,25 @@ def register_workspace(mcp: FastMCP, ctx: MCPContext) -> None:
         return {"workspace_id": workspace_id, "bindings": rows}
 
     @mcp.tool
+    def build_workspace(
+        workspace_id: str,
+        engines: list[str] | None = None,
+    ) -> dict:
+        """Render (sync) a workspace's env dir on demand.
+
+        ``engines`` overrides which engine configs are built; omit it to use the
+        default — the engines the workspace's related agents resolve to."""
+        result = ctx.workspaces.build_workspace(
+            workspace_id, engines=engines or None
+        )
+        return {
+            "workspace_id": workspace_id,
+            "target_dir": str(result.target_dir),
+            "bindings_materialized": result.bindings_materialized,
+            "errors": result.errors,
+        }
+
+    @mcp.tool
     def dry_run_workspace_resources(workspace_id: str) -> dict:
         """Return what would be materialized for the workspace without writing files.
 

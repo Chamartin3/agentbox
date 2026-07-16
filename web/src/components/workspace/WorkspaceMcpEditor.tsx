@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { workspaceMcpApi, EffectiveMcp, McpPolicy, McpServerView } from '../../api/repo';
 
 interface Props {
@@ -131,8 +131,8 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
             {data.servers.map((s) => {
               const tools = (s.config?.tools as string[] | undefined) ?? [];
               return (
-                <>
-                  <tr key={s.name}>
+                <Fragment key={s.name}>
+                  <tr>
                     <td><code>{s.name}</code></td>
                     <td>
                       <button
@@ -186,7 +186,7 @@ export default function WorkspaceMcpEditor({ workspaceId }: Props) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>

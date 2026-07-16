@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, NamedTuple
 
 from pydantic import BaseModel
 
 from agentbox.core.data.payload_types import UsagePayload
+
+
+class DoctorCheck(NamedTuple):
+    """One diagnostic result. Tuple-compatible: renders as ``(name, ok, detail)``."""
+
+    name: str
+    ok: bool
+    detail: str
 
 
 class RunSummary(BaseModel):

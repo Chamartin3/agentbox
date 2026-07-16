@@ -275,6 +275,15 @@ class AgentVersionManager(Manager[AgentVersion]):
 			).first()
 			return _version_row(row) if row else None
 
+	def get_effective_active(self, agent_id: str) -> AgentVersionRow | None:
+		"""The version to treat as active: the explicit ``active_agent_versions``
+		pointer, or the latest version when none was ever activated (versions
+		created but not promoted, or legacy agents imported before the pointer
+		table was populated). This is the one resolution rule — readers wanting
+		"the active version" call this instead of composing ``get_active or
+		get_latest`` inline."""
+		return self.get_active(agent_id) or self.get_latest(agent_id)
+
 	def get_by_id(self, version_id: int) -> AgentVersionRow | None:
 		with self._engine.connect() as conn:
 			row = conn.execute(

@@ -12,7 +12,7 @@ Responsibilities split by submodule (outsiders import only this package root):
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
 
 from agentbox.core.config import Settings
@@ -61,11 +61,16 @@ class Workspaces:
         workspace_id: str = "default",
         *,
         into: Path | None = None,
+        engines: Collection[str] | None = None,
         system_prompt: str | None = None,
         secrets: Mapping[str, str] | None = None,
         extra_mcp_servers: Mapping[str, McpStdioServerSpec] | None = None,
     ) -> BuildResult:
         """Render a workspace onto disk.
+
+        ``engines`` restricts which engine configs are rendered (``None`` = all).
+        A subset is additive: engine files aren't orphan-reconciled, so engines
+        already on disk from a prior build survive.
 
         ``into=None`` renders the persistent workspace workdir (orphan
         reconcile + provenance). ``into=path`` renders a fresh per-run dir
@@ -85,7 +90,7 @@ class Workspaces:
             target_dir.mkdir(parents=True, exist_ok=True)
             persistent = False
 
-        blueprint = self._composer.compose(workspace_id)
+        blueprint = self._composer.compose(workspace_id, engines=engines)
         return self._builder.render(
             blueprint,
             target_dir,

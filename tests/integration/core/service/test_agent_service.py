@@ -521,3 +521,21 @@ def test_get_agent_validation_no_active(svc: AgentService) -> None:
         "input": None,
         "output": None,
     }
+
+
+def test_create_version_from_snapshot_resolves_and_appends(svc: AgentService) -> None:
+    v1 = svc.create_agent("bot", {"id": "bot", "description": "d"}, author="alice", changelog="init")
+    svc.activate_version("bot", v1["id"])
+
+    row = svc.create_version_from_snapshot(
+        "bot", '{"id": "bot"}', author="bob", changelog="snap"
+    )
+
+    assert row["agent_id"] == "bot"
+    assert row["version"] == 2  # create_agent seeded v1
+    assert row["changelog"] == "snap"
+
+
+def test_create_version_from_snapshot_unknown_agent_raises(svc: AgentService) -> None:
+    with pytest.raises(AgentNotFound):
+        svc.create_version_from_snapshot("ghost", "{}")

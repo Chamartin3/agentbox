@@ -175,24 +175,13 @@ def version_new(
         )
         raise typer.Exit(2)
 
-    # TODO(cli-arch): direct create legacy path — replace with AgentService.create_version
-    agent = obj.agents.get_agent_def(agent_id)
-    if agent is None:
-        obj.render.agent.error(f"unknown agent {agent_id!r}")
-        raise typer.Exit(1)
-
-    result = obj.agents.create_version(
-        agent_id=agent_id,
-        source_path=str(agent.source_path) if agent.source_path else "",
-        source_format=(
-            agent.source_format.value if agent.source_format else "unknown"
-        ),
-        content_snapshot=content_snapshot,
-        prompt_snapshot="",
-        content_hash="",
-        author=author,
-        changelog=changelog,
-    )
+    with handle_cli_errors():
+        result = obj.agents.create_version_from_snapshot(
+            agent_id,
+            content_snapshot=content_snapshot,
+            author=author,
+            changelog=changelog,
+        )
     obj.render.agent.version_created(result["version"], result["id"])
 
 

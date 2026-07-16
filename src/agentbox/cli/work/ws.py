@@ -145,6 +145,29 @@ def ws_rm(
     obj.render.workspace.workspace_deleted(str(result["deleted"]))
 
 
+@ws_app.command("build")
+def ws_build(
+    ctx: typer.Context,
+    name: str = typer.Argument(..., help="Workspace name to build"),
+    engine: list[str] = typer.Option(
+        None,
+        "--engine",
+        "-e",
+        help="Engine to build (repeatable). Default: the workspace's agents' engines.",
+    ),
+) -> None:
+    """Render (sync) the workspace env dir. ``--engine`` overrides which engines build."""
+    obj: CLIContext = ctx.obj
+    ops = obj.render.ops
+    result = obj.workspaces.build_workspace(name, engines=engine or None)
+    if not str(result.target_dir):
+        ops.warn(f"Nothing built for {name!r} (ephemeral or unknown workspace).")
+        return
+    for err in result.errors:
+        ops.warn(f"build warning: {err}")
+    ops.success(f"Built {name} → {result.target_dir}")
+
+
 @ws_app.command("shell")
 def ws_shell(
     ctx: typer.Context,

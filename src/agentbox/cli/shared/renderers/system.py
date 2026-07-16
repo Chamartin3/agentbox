@@ -13,6 +13,7 @@ from rich.table import Table
 
 from agentbox.cli.shared.render import Renderer
 from agentbox.core.service import (
+    DoctorCheck,
     EnvDocRow,
     HostEnvCallLogRow,
     HostEnvProfileRow,
@@ -325,20 +326,12 @@ class SystemRenderer(Renderer):
     # Doctor
     # ------------------------------------------------------------------
 
-    def doctor_report(self, checks: list[tuple[str, bool, str]]) -> None:
-        """Render a table of doctor check results.
-
-        Each item: ``(check_name, passed, detail)``.
-        *passed* is ``True`` for OK, ``False`` for FAIL.
-        """
+    def doctor_report(self, checks: Sequence[DoctorCheck]) -> None:
+        """Render a table of doctor check results."""
         table = self.table("Agentbox Doctor", "Status", "Check", "Detail")
-        for name, passed, detail in checks:
-            status = (
-                "[green]OK[/green]"
-                if passed
-                else "[red]FAIL[/red]"
-            )
-            table.add_row(status, name, detail)
+        for c in checks:
+            status = "[green]OK[/green]" if c.ok else "[red]FAIL[/red]"
+            table.add_row(status, c.name, c.detail)
         self.print(table)
 
     # ------------------------------------------------------------------

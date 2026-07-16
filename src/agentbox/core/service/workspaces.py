@@ -16,7 +16,7 @@ import tempfile
 from dataclasses import replace
 from contextlib import contextmanager, suppress
 from pathlib import Path
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 from typing import Any
 
 from agentbox.core.config import Settings, load_settings
@@ -442,14 +442,18 @@ class WorkspaceService(Service):
             )
         return result
 
-    def build_workspace(self, workspace_id: str) -> BuildResult:
+    def build_workspace(
+        self, workspace_id: str, *, engines: Collection[str] | None = None
+    ) -> BuildResult:
         """Render the persistent workspace workdir.
 
+        ``engines`` restricts the render to those engines (``None`` = all);
+        pass a run's engine to build just what that execution needs, in place.
         For an ephemeral/unknown/path-missing workspace the facade returns a
         no-op ``BuildResult`` (empty ``target_dir``, no errors) instead of the
         old ``None``.
         """
-        return self._ws_facade.build(workspace_id)
+        return self._ws_facade.build(workspace_id, engines=engines)
 
     # ═══════════════════════════════════════════════════════════════════
     # MCP policy + overrides (from McpOverridesMixin + mcp.py)

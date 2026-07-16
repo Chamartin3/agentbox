@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import cast
 
+from sqlalchemy import select
+
 from agentbox.core.data import AgentDef
 from agentbox.core.data.constants import McpPolicy
 from agentbox.core.data.rows import (
@@ -27,8 +29,9 @@ from agentbox.core.data.rows import (
     WorkspaceRuntimePermissionRow,
     WorkspaceSubagentRow,
 )
-from agentbox.core.db.agents.agent import ActiveAgentVersion
+from agentbox.core.db.agents.agent import ActiveAgentVersion, AgentRunnerProfile
 from agentbox.core.db.agents.version import AgentVersion
+from agentbox.core.db.engines.runner_profile import RunnerProfile
 from agentbox.core.db.resources.binding import WorkspaceFileResourceBinding
 from agentbox.core.db.resources.resource import (
     ActiveResourceVersion,
@@ -66,6 +69,8 @@ workspace_mcp_tool_overrides = WorkspaceMcpToolOverride.__table__
 workspace_runtime_permissions = WorkspaceRuntimePermission.__table__
 workspace_subagents = WorkspaceSubagent.__table__
 workspaces = Workspace.__table__
+runner_profiles = RunnerProfile.__table__
+agent_runner_profiles = AgentRunnerProfile.__table__
 
 
 class WorkspaceReadManager:
@@ -131,6 +136,51 @@ class WorkspaceReadManager:
                 .order_by(workspace_subagents.c.display_order)
             )
             return [cast(WorkspaceSubagentRow, dict(r._mapping)) for r in rows]
+
+    def list_workspace_engines(self, workspace_id: str) -> set[str]:
+        """Engines the workspace's related agents resolve to — the build default.
+
+        Related agents = the workspace's own agent (when ``workspace_id`` names
+        one) plus its subagents. Each agent's engine is its bound runner
+        profile's ``backend``; an agent with no bound profile uses the
+        system-default profile. Empty when the workspace has no agents — the
+        caller then falls back to rendering every installed engine.
+        """
+        agent_ids = [r["agent_id"] for r in self.list_subagents(workspace_id)]
+        with self._engine.connect() as conn:
+            is_own_agent = conn.execute(
+                select(agent_versions.c.id)
+                .where(agent_versions.c.agent_id == workspace_id)
+                .limit(1)
+            ).first() is not None
+            if is_own_agent:
+                agent_ids.append(workspace_id)
+            if not agent_ids:
+                return set()
+
+            rows = conn.execute(
+                select(agent_runner_profiles.c.agent_id, runner_profiles.c.backend)
+                .select_from(
+                    agent_runner_profiles.join(
+                        runner_profiles,
+                        agent_runner_profiles.c.runner_profile_id == runner_profiles.c.id,
+                    )
+                )
+                .where(agent_runner_profiles.c.agent_id.in_(agent_ids))
+            ).all()
+            engines = {r.backend for r in rows}
+
+            bound = {r.agent_id for r in rows}
+            if any(a not in bound for a in agent_ids):
+                # Unbound agents dispatch to the system-default profile.
+                default = conn.execute(
+                    select(runner_profiles.c.backend)
+                    .where(runner_profiles.c.is_system_default == 1)
+                    .limit(1)
+                ).scalar()
+                if default:
+                    engines.add(default)
+        return engines
 
     # ── MCP overrides & policy ────────────────────────────────────────────────
 

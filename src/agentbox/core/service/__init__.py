@@ -25,6 +25,7 @@ from agentbox.core.data import read_transcript as read_transcript
 from agentbox.core.data import AgentDef as AgentDef
 from agentbox.core.data import AgentSource as AgentSource
 from agentbox.core.data import CompositionConfig as CompositionConfig
+from agentbox.core.data import DoctorCheck as DoctorCheck
 from agentbox.core.data import McpServerSpec as McpServerSpec
 from agentbox.core.data import ProjectManifest as ProjectManifest
 from agentbox.core.data import RunnerSpec as RunnerSpec
