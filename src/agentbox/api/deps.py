@@ -54,8 +54,7 @@ def get_system_service() -> SystemService:
 
 
 def get_engine_service() -> EngineService:
-    """Engine-domain service. Lazy import to avoid a circular import."""
-    from agentbox.core.service.engines import EngineService  # noqa: PLC0415
+    """Engine-domain service. Uncached — self-wires from settings."""
     return EngineService()
 
 
@@ -66,7 +65,6 @@ def get_resource_service() -> ResourceService:
 
 def get_workspace_service() -> WorkspaceService:
     """Workspace-domain service. Uncached — self-wires from settings."""
-    from agentbox.core.service.workspaces import WorkspaceService  # noqa: PLC0415
     return WorkspaceService()
 
 
