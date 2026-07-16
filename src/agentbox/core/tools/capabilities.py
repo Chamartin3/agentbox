@@ -7,18 +7,17 @@ of truth the API, grant resolver, and MCP implementations agree on.
 
 from __future__ import annotations
 
-from agentbox.core.data.jsontypes import RawJson
 
 from dataclasses import dataclass
 
-from agentbox.core.data import CanonicalTool
+from agentbox.core.data import CanonicalTool, GrantParam
 
 
 @dataclass(frozen=True)
 class Capability:
     name: CanonicalTool
     description: str
-    grant_schema: RawJson
+    grant_schema: dict[str, GrantParam]
     default_granted: bool = False
 
 

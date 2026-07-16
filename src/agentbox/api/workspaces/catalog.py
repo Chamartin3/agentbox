@@ -21,6 +21,7 @@ from typing import Annotated, NotRequired, TypedDict
 from fastapi import APIRouter, Depends
 
 from agentbox.api.deps import get_mcp_registry, get_workspace_service
+from agentbox.core.data import GrantParam
 from agentbox.core.data.jsontypes import RawJsonValue
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.tools.catalog import CallableItem
@@ -41,7 +42,7 @@ class AvailableToolsItem(TypedDict, total=False):
     kind: str  # "mcp" | "host_env" | "resource"
     server: NotRequired[str | None]  # mcp only
     input_schema: NotRequired[RawJsonValue]  # mcp only; JSON Schema
-    grant_schema: NotRequired[RawJsonValue]  # host_env only
+    grant_schema: NotRequired[dict[str, GrantParam]]  # host_env only
     resource_id: NotRequired[str]  # resource only
     target_path: NotRequired[str]  # resource only
 

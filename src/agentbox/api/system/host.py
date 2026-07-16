@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Annotated, TypedDict
 
-from agentbox.core.data.payload_types import ResolvedHostEnv
+from agentbox.core.data.payload_types import GrantParam, ResolvedHostEnv
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -31,7 +31,7 @@ class CapabilityEntry(TypedDict):
 
     name: str
     description: str
-    grant_schema: dict
+    grant_schema: dict[str, GrantParam]
     default_granted: bool
 
 

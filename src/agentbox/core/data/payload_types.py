@@ -449,6 +449,19 @@ codebase actually reads (``assert_schema_consistent``, the token
 backend's pydantic conversion, and prompt schema blocks)."""
 
 
+class GrantParam(TypedDict, total=False):
+    """One parameter descriptor in a capability's ``grant_schema``.
+
+    NB: this is the codebase's own ``{"type": "int", "required": True,
+    "default": …}`` descriptor shape — NOT a JSON Schema (the type system
+    caught the difference). ``type`` is a Python-ish type name string.
+    """
+
+    type: str
+    required: bool
+    default: RawJsonValue
+
+
 class GrantConfig(TypedDict, total=False):
     """Per-capability host-env grant configuration.
 
