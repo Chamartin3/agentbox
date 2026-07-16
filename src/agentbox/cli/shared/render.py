@@ -83,9 +83,9 @@ class Renderer:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def na(value: JsonValue) -> str:
-        """Return *NA* placeholder when *value* is None / empty."""
-        return str(value) if value not in (None, "", []) else NA
+    def na(value: str) -> str:
+        """Return *NA* placeholder when *value* is empty."""
+        return value if value else NA
 
     @staticmethod
     def check(flag: bool) -> Text:
