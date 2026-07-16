@@ -10,8 +10,6 @@ since it's a presentation concern.
 from __future__ import annotations
 
 from agentbox.core.data.payload_types import (
-    AgentSkillsResult,
-    AgentWorkspaceDetail,
     GeneratedConfigsResult,
     GeneratedSkillsResult,
     PermissionsPatch,
@@ -26,7 +24,6 @@ from agentbox.core.data.payload_types import (
     WorkspaceFileWrite,
     WorkspaceListItem,
     WorkspaceMcpToolsResult,
-    WorkspacePathResult,
 )
 
 from typing import Annotated, NoReturn
@@ -35,11 +32,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from agentbox.api.schemas import PaginatedEnvelope, paginate_list
-from agentbox.api.deps import get_agent_service, get_mcp_registry, get_settings, get_workspace_service
-from agentbox.core import service as ws
+from agentbox.api.deps import get_mcp_registry, get_settings, get_workspace_service
 from agentbox.core.config import Settings
 from agentbox.core.data.rows import WorkspaceRow
-from agentbox.core.service import AgentService
 from agentbox.core.service.workspaces import is_user_file
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.data.errors import (
@@ -59,10 +54,6 @@ def _try_get_mcp_manifest() -> object | None:
 
 def _raise_not_found(name: str) -> NoReturn:
     raise HTTPException(404, f"unknown workspace {name!r}")
-
-
-def _raise_agent_not_found(agent_id: str) -> NoReturn:
-    raise HTTPException(404, f"unknown agent {agent_id!r}")
 
 
 def _build_workspace_cb(settings: Settings, name: str) -> None:
@@ -320,163 +311,5 @@ def write_file_by_name(
         )
     except WorkspaceNotFound:
         _raise_not_found(name)
-    except WorkspacePathEscape as exc:
-        raise HTTPException(400, "path escapes workspace") from exc
-
-
-# ---------------------------------------------------------------------------
-# Legacy agent-centric endpoints (kept for backward compat)
-# ---------------------------------------------------------------------------
-
-
-@router.get("/{agent_id}")
-def get_workspace(
-    agent_id: str,
-    settings: Annotated[Settings, Depends(get_settings)],
-    agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> AgentWorkspaceDetail:
-    agent = agents.get_agent_def(agent_id)
-    if agent is None:
-        _raise_agent_not_found(agent_id)
-    info = ws.info(agent, settings, None)
-    files: list[WorkspaceFileInfo] = []
-    if info.exists:
-        for p in sorted(info.path.rglob("*")):
-            if p.is_file():
-                rel = str(p.relative_to(info.path))
-                if not is_user_file(rel):
-                    continue
-                files.append({"path": rel, "size": p.stat().st_size})
-    return {
-        "agent_id": info.agent_id,
-        "path": str(info.path),
-        "exists": info.exists,
-        "ephemeral": info.ephemeral,
-        "files": files,
-        "generated_configs": {},
-    }
-
-
-@router.post("/{agent_id}")
-def create_workspace(
-    agent_id: str,
-    settings: Annotated[Settings, Depends(get_settings)],
-    agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> WorkspacePathResult:
-    agent = agents.get_agent_def(agent_id)
-    if agent is None:
-        raise HTTPException(404)
-    path = ws.ensure(agent, settings, None)
-    return {"path": str(path)}
-
-
-@router.delete("/{agent_id}")
-def reset_workspace(
-    agent_id: str,
-    settings: Annotated[Settings, Depends(get_settings)],
-    agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> WorkspacePathResult:
-    agent = agents.get_agent_def(agent_id)
-    if agent is None:
-        raise HTTPException(404)
-    path = ws.reset(agent, settings, None)
-    return {"path": str(path)}
-
-
-@router.post("/{agent_id}/generate-configs")
-def generate_configs(
-    agent_id: str,
-    settings: Annotated[Settings, Depends(get_settings)],
-    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> GeneratedConfigsResult:
-    agent = agents.get_agent_def(agent_id)
-    if agent is None:
-        raise HTTPException(404)
-    workspace_path, _ = ws.resolve_path(agent, settings)
-    workspace_id = (
-        agent.workspace
-        if agent.workspace and agent.workspace != "<ephemeral>"
-        else agent_id
-    )
-    paths = svc.generate_configs(workspace_id, settings=settings)
-    return {
-        "workspace": str(workspace_path),
-        "generated": paths.get("generated", {}),
-    }
-
-
-@router.get("/{agent_id}/skills")
-def list_skills(
-    agent_id: str,
-    settings: Annotated[Settings, Depends(get_settings)],
-    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> AgentSkillsResult:
-    agent = agents.get_agent_def(agent_id)
-    if agent is None:
-        raise HTTPException(404)
-    workspace_path, _ = ws.resolve_path(agent, settings, None)
-    workspace_name = (
-        agent.workspace
-        if agent.workspace and agent.workspace != "<ephemeral>"
-        else agent_id
-    )
-    skills_result = svc.list_skills(workspace_name, settings=settings)
-    return {
-        "agent_id": agent_id,
-        "workspace": str(workspace_path),
-        "skills": skills_result.get("skills", []),
-    }
-
-
-@router.get("/{agent_id}/file")
-def read_file(
-    agent_id: str,
-    path: str,
-    settings: Annotated[Settings, Depends(get_settings)],
-    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> WorkspaceFileRead:
-    agent = agents.get_agent_def(agent_id)
-    if agent is None:
-        raise HTTPException(404)
-    workspace_name = (
-        agent.workspace
-        if agent.workspace and agent.workspace != "<ephemeral>"
-        else agent_id
-    )
-    try:
-        payload = svc.read_workspace_file(workspace_name, path, settings=settings)
-    except WorkspacePathEscape as exc:
-        raise HTTPException(400, "path escapes workspace") from exc
-    if payload is None:
-        raise HTTPException(404, "no such file")
-    return payload
-
-
-@router.put("/{agent_id}/file")
-def write_file(
-    agent_id: str,
-    body: FileBody,
-    settings: Annotated[Settings, Depends(get_settings)],
-    svc: Annotated[WorkspaceService, Depends(get_workspace_service)],
-    agents: Annotated[AgentService, Depends(get_agent_service)]
-) -> WorkspaceFileWrite:
-    agent = agents.get_agent_def(agent_id)
-    if agent is None:
-        raise HTTPException(404)
-    workspace_name = (
-        agent.workspace
-        if agent.workspace and agent.workspace != "<ephemeral>"
-        else agent_id
-    )
-    try:
-        return svc.write_workspace_file(
-            workspace_name,
-            body.path,
-            body.content,
-            settings=settings,
-        )
     except WorkspacePathEscape as exc:
         raise HTTPException(400, "path escapes workspace") from exc

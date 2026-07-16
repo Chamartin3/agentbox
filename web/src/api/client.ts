@@ -831,22 +831,4 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
-
-  // legacy agent-centric workspace endpoints
-  getWorkspace: (agentId: string) => req<Record<string, unknown>>(`/api/workspaces/${agentId}`),
-  createWorkspace: (agentId: string) =>
-    req<Record<string, unknown>>(`/api/workspaces/${agentId}`, { method: 'POST' }),
-  resetWorkspace: (agentId: string) =>
-    req<Record<string, unknown>>(`/api/workspaces/${agentId}`, { method: 'DELETE' }),
-  generateWorkspaceConfigs: (agentId: string) =>
-    req<Record<string, unknown>>(`/api/workspaces/${agentId}/generate-configs`, { method: 'POST' }),
-  listWorkspaceSkills: (agentId: string) =>
-    req<Record<string, unknown>>(`/api/workspaces/${agentId}/skills`),
-  getWorkspaceFile: (agentId: string, path: string) =>
-    req<Record<string, unknown>>(`/api/workspaces/${agentId}/file?path=${encodeURIComponent(path)}`),
-  putWorkspaceFile: (agentId: string, path: string, content: string) =>
-    req<Record<string, unknown>>(`/api/workspaces/${agentId}/file`, {
-      method: 'PUT',
-      body: JSON.stringify({ path, content }),
-    }),
 };
