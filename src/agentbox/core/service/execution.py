@@ -46,6 +46,7 @@ from agentbox.core.data.payload_types import (
     RunDetailPayload,
     RunDetailResult,
     RunFacetsResult,
+    RunnerSnapshotView,
     RunLifecycleResult,
     RunLogsResult,
     RunPromptFragmentsResult,
@@ -702,8 +703,8 @@ class ExecutionService(Service):
                 agent_version = ver.get("version")
 
         snap_raw = base_dict.get("runner_snapshot")
-        snap: dict | None = None
-        runner_snapshot: RawJson | None = None
+        snap: RunnerSnapshot | None = None
+        runner_snapshot: RunnerSnapshotView | None = None
         if isinstance(snap_raw, str) and snap_raw:
             try:
                 snap = _json.loads(snap_raw)

@@ -124,6 +124,7 @@ from agentbox.core.data.payload_types import (
     RunDetailResult,
     RunErrorResult,
     RunFacetsResult,
+    RunnerSnapshot,
     RunLifecycleResult,
     RunLogsResult,
     RunOutputResult,
@@ -196,7 +197,6 @@ from agentbox.core.data.rows import (
 from agentbox.core.data.snapshots import (
     McpSnapshot,
     ResourceSnapshotEntry,
-    RunnerSnapshot,
 )
 from agentbox.core.data.transcripts import read_transcript
 

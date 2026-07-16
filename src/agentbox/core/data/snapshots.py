@@ -52,19 +52,6 @@ def prompt_resolution_to_snapshot(resolution: PromptResolution) -> list[PromptEm
 
 
 
-class RunnerSnapshot(TypedDict):
-    """Append-only snapshot of the runner config that executed a run."""
-
-    profile_id: str | None
-    profile_name: str | None
-    backend: str | None
-    model: str | None
-    timeout_seconds: int | None
-    provider: str | None
-    extra_args: list[str]
-    source: str | None
-    overrides_applied: dict[str, Any]
-    captured_at: str
 
 
 class McpServerSnapshot(TypedDict):

@@ -216,6 +216,39 @@ class PromptFragmentPayload(TypedDict):
     """Size of the content in bytes."""
 
 
+class RunnerSnapshot(TypedDict):
+    """Append-only snapshot of the runner config that executed a run."""
+
+    profile_id: str | None
+    profile_name: str | None
+    backend: str | None
+    model: str | None
+    timeout_seconds: int | None
+    provider: str | None
+    extra_args: list[str]
+    source: str | None
+    overrides_applied: RawJson
+    captured_at: str
+
+
+class RunnerSnapshotInvalid(TypedDict):
+    """Placeholder when a run's stored runner snapshot failed to parse."""
+
+    snapshot: Literal["invalid"]
+    raw: str
+
+
+class RunnerSnapshotMissing(TypedDict):
+    """Placeholder when a run has no stored runner snapshot."""
+
+    snapshot: Literal["missing"]
+
+
+# The read-side view of a run's runner snapshot: a valid parse, or one of the
+# two placeholders when the stored JSON was absent/unparseable.
+type RunnerSnapshotView = RunnerSnapshot | RunnerSnapshotInvalid | RunnerSnapshotMissing
+
+
 class RunDetailPayload(TypedDict):
     """A single run with all its details (Run table + enrichment + snapshots)."""
 
@@ -246,7 +279,7 @@ class RunDetailPayload(TypedDict):
     runner_profile_id: str | None
     resource_snapshot: str | None
     mcp_snapshot: str | None
-    runner_snapshot: RawJson | None  # stored runner-snapshot JSON (arbitrary at this boundary) — true-edge keep
+    runner_snapshot: RunnerSnapshotView | None
     # Enriched fields added by get_run_detail
     agent_version: int | None
     backend: str | None

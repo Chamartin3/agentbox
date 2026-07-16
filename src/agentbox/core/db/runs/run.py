@@ -30,7 +30,7 @@ from agentbox.core.data.rows import (
     RunStatsRow,
     RunUpdateFields,
 )
-from agentbox.core.data.snapshots import RunnerSnapshot
+from agentbox.core.data.payload_types import RunnerSnapshot
 from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.agents.version import AgentVersion
