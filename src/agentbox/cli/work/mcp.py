@@ -5,8 +5,6 @@ from __future__ import annotations
 import typer
 
 from agentbox.cli.shared import CLIContext
-# TODO(cli-arch): workspace MCP surface belongs on WorkspaceService (plan 089)
-from agentbox.cli.shared import get_mcp_registry
 
 mcp_workspace_app = typer.Typer(
     name="mcp-workspace",
@@ -85,26 +83,15 @@ def mcp_refresh(
 ) -> None:
     """Invalidate the MCP server cache for all servers in this workspace."""
     obj: CLIContext = ctx.obj
-    overrides = obj.workspaces.list_mcp_server_overrides(workspace_id)
-    server_names = {o["server_name"] for o in overrides}
-    for s in obj.system.get_project_mcp_servers():
-        server_names.add(s.name)
-
-    if not server_names:
+    statuses = obj.workspaces.refresh_workspace_mcp_cache(workspace_id)
+    if not statuses:
         obj.render.workspace.no_mcp_servers(workspace_id)
         return
-
-    registry = get_mcp_registry()
-    cache_dir = obj.settings.mcp_cache_dir
-    for name in sorted(server_names):
-        cache_file = cache_dir / f"{name}.json"
-        if cache_file.exists():
-            cache_file.unlink()
-            obj.render.workspace.mcp_cache_invalidated(name)
+    for s in statuses:
+        if s["invalidated"]:
+            obj.render.workspace.mcp_cache_invalidated(s["name"])
         else:
-            obj.render.workspace.no_mcp_cache(name)
-    # Force registry to re-discover on next request by resetting health map
-    registry.reset_health()
+            obj.render.workspace.no_mcp_cache(s["name"])
 
 
 @mcp_workspace_app.command("tools")

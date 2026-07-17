@@ -30,6 +30,7 @@ from agentbox.core.data.payload_types import (
     GeneratedConfigsResult,
     GeneratedSkillsResult,
     McpDiscoveryRefreshResult,
+    McpServerCacheStatus,
     McpServerConfigView,
     McpToolGroup,
     PermissionsPatch,
@@ -572,6 +573,23 @@ class WorkspaceService(Service):
         for s in resolved.get("servers", []):
             removed += self._discovery_cache.invalidate_server_cache(s["name"])
         return {"invalidated": removed}
+
+    def refresh_workspace_mcp_cache(self, workspace_id: str) -> list[McpServerCacheStatus]:
+        """Invalidate the on-disk MCP discovery cache for every server visible
+        in this workspace (its overrides + project servers) so the next server
+        process re-discovers. Returns one status per server, sorted by name.
+        """
+        names = {o["server_name"] for o in self.list_mcp_server_overrides(workspace_id)}
+        names |= {s.name for s in SystemService().get_project_mcp_servers()}
+        cache_dir = self._settings.mcp_cache_dir
+        out: list[McpServerCacheStatus] = []
+        for name in sorted(names):
+            cache_file = cache_dir / f"{name}.json"
+            existed = cache_file.exists()
+            if existed:
+                cache_file.unlink()
+            out.append({"name": name, "invalidated": existed})
+        return out
 
     # ═══════════════════════════════════════════════════════════════════
     # MCP discovery cache (from McpDiscoveryMixin)

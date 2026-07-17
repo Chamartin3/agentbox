@@ -1064,6 +1064,13 @@ class McpDiscoveryRefreshResult(TypedDict):
     invalidated: int
 
 
+class McpServerCacheStatus(TypedDict):
+    """Per-server result of a workspace on-disk MCP cache refresh."""
+
+    name: str
+    invalidated: bool
+
+
 class ResolvedHostEnv(TypedDict):
     """Return shape of ``WorkspaceService.resolve_agent_host_env()``."""
 
@@ -1339,6 +1346,7 @@ __all__ = [
     "GeneratedConfigsResult",
     "GeneratedSkillsResult",
     "McpDiscoveryRefreshResult",
+    "McpServerCacheStatus",
     "McpServerConfigView",
     "McpServerConfigView",
     "McpToolGroup",

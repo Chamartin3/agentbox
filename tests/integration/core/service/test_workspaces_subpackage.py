@@ -178,3 +178,23 @@ def test_resolve_workspace_mcp_with_workspace(store: Database) -> None:
     result = WorkspaceService().resolve_workspace_mcp("mcp-ws")
     assert isinstance(result, dict)
     assert "servers" in result
+
+
+def test_refresh_workspace_mcp_cache_deletes_only_existing(store: Database) -> None:
+    from agentbox.core.config import load_settings
+
+    svc = WorkspaceService()
+    store.workspaces.insert(name="mcp-ws")
+    svc.set_mcp_server_override("mcp-ws", "srv-a", enabled=True, changelog="add a")
+    svc.set_mcp_server_override("mcp-ws", "srv-b", enabled=True, changelog="add b")
+
+    # srv-a has an on-disk cache file, srv-b does not.
+    cache_dir = load_settings().mcp_cache_dir
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "srv-a.json").write_text("{}", encoding="utf-8")
+
+    statuses = svc.refresh_workspace_mcp_cache("mcp-ws")
+
+    by_name = {s["name"]: s["invalidated"] for s in statuses}
+    assert by_name["srv-a"] is True and by_name["srv-b"] is False
+    assert not (cache_dir / "srv-a.json").exists()  # the present cache was removed
