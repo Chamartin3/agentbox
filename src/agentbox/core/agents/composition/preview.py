@@ -457,7 +457,7 @@ def render_agent_prompt_preview(
     On binding-resolution failure raises ``PreviewError``.
     """
     if template is None:
-        row = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
+        row = agent_versions.get_effective_active(agent_id)
         if row is None:
             raise PreviewError(
                 "no_agent_version",
