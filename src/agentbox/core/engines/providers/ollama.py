@@ -100,7 +100,6 @@ class OllamaAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.OLLAMA.value,
         label="Ollama",
-        backend=BackendName.TOKEN,
         compatible_backends=[BackendName.TOKEN, BackendName.OPENCODE],
         requires_api_key=False,
         supports_base_url=True,

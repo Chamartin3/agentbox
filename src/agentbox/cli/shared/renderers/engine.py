@@ -166,7 +166,8 @@ class EngineRenderer(Renderer):
         )
         for desc in descriptors:
             table.add_row(
-                desc.id, desc.label, desc.backend,
+                desc.id, desc.label,
+                ", ".join(desc.compatible_backends) or self.na(""),
                 self.check(desc.requires_api_key),
                 self.check(desc.supports_model_listing),
             )

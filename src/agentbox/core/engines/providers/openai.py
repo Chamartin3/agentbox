@@ -18,7 +18,6 @@ class OpenAIAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.OPENAI.value,
         label="OpenAI",
-        backend=BackendName.TOKEN,
         compatible_backends=[BackendName.TOKEN],
         requires_api_key=True,
         supports_base_url=True,

@@ -65,7 +65,7 @@ class TestProviderRegistry:
             assert isinstance(descriptor, ProviderDescriptor)
             assert descriptor.id
             assert descriptor.label
-            assert descriptor.backend
+            assert descriptor.compatible_backends
             assert isinstance(descriptor.requires_api_key, bool)
             assert isinstance(descriptor.supports_base_url, bool)
             assert isinstance(descriptor.supports_model_listing, bool)
@@ -311,7 +311,7 @@ class TestProviderRegistry:
         assert discovered == ["openai", "ollama", "opencode", "opencode-go"]
         # HTTP openai keeps the bare id; opencode side gets a namespaced id.
         assert isinstance(registry.get_provider("openai"), object)
-        assert registry.get_provider("openai").descriptor.backend == "token"  # type: ignore[union-attr]
+        assert registry.get_provider("openai").descriptor.compatible_backends == ["token"]  # type: ignore[union-attr]
         opencode_openai = registry.get_provider("opencode-openai")
         assert opencode_openai is not None
         assert opencode_openai.descriptor.compatible_backends == ["opencode"]

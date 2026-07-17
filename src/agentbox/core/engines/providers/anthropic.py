@@ -24,7 +24,6 @@ class AnthropicAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.ANTHROPIC.value,
         label="Anthropic",
-        backend=BackendName.TOKEN,
         compatible_backends=[BackendName.TOKEN, BackendName.CLAUDE_CODE],
         requires_api_key=True,
         supports_base_url=True,

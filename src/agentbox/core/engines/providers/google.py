@@ -32,7 +32,6 @@ class GoogleAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.GOOGLE.value,
         label="Google Gemini",
-        backend=BackendName.TOKEN,
         compatible_backends=[BackendName.TOKEN],
         requires_api_key=True,
         supports_base_url=True,

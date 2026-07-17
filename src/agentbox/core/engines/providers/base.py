@@ -24,7 +24,7 @@ from enum import Enum
 from typing import Any, ClassVar, Protocol
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 logger = logging.getLogger(__name__)
@@ -63,10 +63,19 @@ class ProviderDescriptor(BaseModel):
 
     id: str
     label: str
-    backend: str
-    """DEPRECATED: kept for compatibility. Use ``compatible_backends`` instead."""
     compatible_backends: list[str] = Field(default_factory=list)
-    """Backend ids that can drive this provider. Empty means token-only (legacy)."""
+    """Backend ids that can drive this provider. Empty means token-only (legacy).
+    The single source of truth for backend compatibility."""
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def backend(self) -> str:
+        """The owning/primary backend — first of ``compatible_backends``.
+
+        Derived (not stored) so there's one source of truth; kept on the
+        wire for the runner-providers API + UI, which read ``backend``."""
+        return self.compatible_backends[0] if self.compatible_backends else ""
+
     requires_api_key: bool
     supports_base_url: bool
     supports_model_listing: bool

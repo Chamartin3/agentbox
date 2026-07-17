@@ -18,7 +18,6 @@ class OpenRouterAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.OPENROUTER.value,
         label="OpenRouter",
-        backend=BackendName.TOKEN,
         compatible_backends=[BackendName.TOKEN, BackendName.OPENCODE],
         requires_api_key=False,
         supports_base_url=True,

@@ -31,7 +31,6 @@ class _FakeProvider:
         self.descriptor = ProviderDescriptor(
             id="mock",
             label="Mock Provider",
-            backend="mock",
             compatible_backends=compatible_backends or ["mock"],
             requires_api_key=False,
             supports_base_url=True,

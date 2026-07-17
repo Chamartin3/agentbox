@@ -102,7 +102,6 @@ class CodexCLIAdapter:
     descriptor = ProviderDescriptor(
         id=Provider.CODEX.value,
         label="Codex CLI",
-        backend=BackendName.CODEX,
         compatible_backends=[BackendName.CODEX],
         requires_api_key=False,
         supports_base_url=False,
@@ -189,7 +188,6 @@ class OpenCodeCLIAdapter:
         return ProviderDescriptor(
             id=self.provider_id,
             label=self.label,
-            backend=BackendName.OPENCODE,
             compatible_backends=[BackendName.OPENCODE],
             requires_api_key=False,
             supports_base_url=False,

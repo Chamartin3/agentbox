@@ -23,7 +23,6 @@ class XAIAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.XAI.value,
         label="xAI",
-        backend="token",
         compatible_backends=["token"],
         requires_api_key=True,
         supports_base_url=True,
