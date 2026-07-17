@@ -103,7 +103,7 @@ fi
 # to it so containerized agents share MEMORY.md with the host Claude session.
 # HOST_PROJECT_DIR must be set (by docker-compose.override.yml) to the host
 # project root so we can derive Claude's project-path-encoding (dashes for
-# slashes) — e.g. /home/omidev/Code/ai/cv_agents → -home-omidev-Code-ai-cv-agents.
+# slashes) — e.g. /home/you/Code/myproject → -home-you-Code-myproject.
 HOST_MEMORY_DIR="/agentbox/host-memory/projects"
 if [[ -d "$HOST_MEMORY_DIR" && -n "${HOST_PROJECT_DIR:-}" ]]; then
   PROJECT_PATH="$(echo "$HOST_PROJECT_DIR" | tr '/' '-')"

@@ -19,13 +19,16 @@ import pytest
 from typer.testing import CliRunner
 
 from agentbox.cli import app
-from agentbox.cli.shared.deps import (
-    get_db as _get_store,
-)
+from agentbox.core.config import load_settings
 from agentbox.core.data import AgentDef, RunnerSpec
+from agentbox.core.db.database import get_database
 from agentbox.core.service.agents import AgentService
 
 runner = CliRunner()
+
+
+def _get_store():
+    return get_database(str(load_settings().db_path))
 
 
 def _clear_deps_caches() -> None:

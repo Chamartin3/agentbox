@@ -2,7 +2,7 @@
 # =============================================================================
 # agentbox dev.sh — unified development command runner
 # =============================================================================
-# All administrative tasks for agentbox in the cv_agents dev environment:
+# All administrative tasks for agentbox in the parent-monorepo dev environment:
 # database migrations, frontend rebuilds, container lifecycle, lint/test,
 # ownership fixes, CLI access. Run from anywhere; the script re-roots itself.
 #
@@ -11,8 +11,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# cv_agents root (libs/agentbox → ../..) — this is where docker-compose.yml lives.
-CV_AGENTS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# Parent monorepo root (libs/agentbox → ../..) — where docker-compose.yml lives.
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
@@ -33,8 +33,8 @@ warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
 err()     { echo -e "${RED}[ERR ]${NC} $*" >&2; }
 header()  { echo -e "\n${CYAN}=== $* ===${NC}"; }
 
-# Compose helper: always uses the cv_agents root compose stack.
-compose() { (cd "$CV_AGENTS_ROOT" && env UID="$HOST_UID" GID="$HOST_GID" docker compose "$@"); }
+# Compose helper: always uses the parent monorepo root compose stack.
+compose() { (cd "$PROJECT_ROOT" && env UID="$HOST_UID" GID="$HOST_GID" docker compose "$@"); }
 
 # Detect if the container is running.
 container_running() {

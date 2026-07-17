@@ -64,7 +64,6 @@ def mcp_server(db: Database) -> FastMCP:
     ``deps`` lru_caches are cleared so a prior test's path can't leak in.
     """
     mcp_deps._get_settings.cache_clear()
-    mcp_deps._get_db.cache_clear()
     return build_server()
 
 

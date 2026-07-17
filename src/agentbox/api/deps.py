@@ -70,7 +70,7 @@ def get_workspace_service() -> WorkspaceService:
 
 @lru_cache(maxsize=1)
 def get_executor() -> RunExecutor:
-    return RunExecutor(get_db(), get_settings(), get_mcp_registry())
+    return RunExecutor(get_settings(), get_mcp_registry())
 
 
 @lru_cache(maxsize=1)

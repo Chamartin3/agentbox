@@ -8,7 +8,7 @@ import logging
 import uuid
 
 from agentbox.core.config import Settings
-from agentbox.core.db.database import Database
+from agentbox.core.db.database import Database, get_database
 from agentbox.core.data._util import now_iso
 from agentbox.core.data.constants import RunStatus
 from agentbox.core.engines.profiles import RunnerProfileResolver
@@ -47,12 +47,15 @@ class RunExecutor:
 
     def __init__(
         self,
-        db: Database,
         settings: Settings,
         mcp_registry: "McpRegistry | None" = None,
+        *,
+        db: Database | None = None,
     ) -> None:
-        self.db = db
+        # Self-wire the store from settings (like Services); ``db`` stays an
+        # optional injection point for tests. DI never opens the store.
         self.settings = settings
+        self.db = db = db if db is not None else get_database(str(settings.db_path))
         self._mcp_registry = mcp_registry
         self._workspaces = Workspaces(db.workspace_read, settings)
         self._broadcasters: dict[str, RunBroadcaster] = {}

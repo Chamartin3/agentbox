@@ -6,35 +6,12 @@ import hashlib
 import json
 from pathlib import Path
 
-import tomlkit
 import typer
 
 from agentbox.cli.shared import CLIContext, resolve_agent
-# TODO(cli-arch): build_* free-fns — candidate AgentService create_version helpers
 from agentbox.core.service import AgentDef
+from agentbox.core.service.agent_formats import AgentFileFormat
 from agentbox.core.service.engines import ProfileNotFound
-
-
-# TODO(cli-arch): candidate AgentService export/import methods
-def _set_dotted(obj: dict[str, object], dotted: str, value: object) -> None:
-    """Set a nested key using dot notation on a dict."""
-    parts = dotted.split(".")
-    cur = obj
-    for p in parts[:-1]:
-        nxt = cur.get(p)
-        if not isinstance(nxt, dict):
-            nxt = {}
-            cur[p] = nxt
-        cur = nxt
-    cur[parts[-1]] = value
-
-
-def _coerce(value: str) -> object:
-    """Try JSON first, else return the str."""
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError:
-        return value
 
 
 def _list_agent_ids(obj: CLIContext) -> list[str]:
@@ -42,27 +19,11 @@ def _list_agent_ids(obj: CLIContext) -> list[str]:
     return [r["agent_id"] for r in rows]
 
 
-# TODO(cli-arch): candidate AgentService export/import methods
-def _export_one(agent: AgentDef, base: Path, obj: CLIContext) -> None:
-    base.mkdir(parents=True, exist_ok=True)
-    prompt = agent.prompt
-    agent_dump = agent.model_dump(mode="json", exclude_none=True)
-    agent_dump.pop("prompt", None)
-    agent_dump.pop("headless", None)
-    agent_dump.pop("claude_agent", None)
-
-    toml_path = base / f"{agent.id}.toml"
-    doc = tomlkit.document()
-    doc.add(tomlkit.comment(f" Exported from agentbox \u2014 {agent.id}"))
-    for key, value in agent_dump.items():
-        doc[key] = value
-    toml_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
-    obj.render.agent.dim(f"  {toml_path}")
-
-    if prompt:
-        prompt_path = base / f"{agent.id}.prompt.md"
-        prompt_path.write_text(prompt, encoding="utf-8")
-        obj.render.agent.dim(f"  {prompt_path}")
+def _export_one(
+    agent: AgentDef, base: Path, obj: CLIContext, fmt: AgentFileFormat
+) -> None:
+    for path in obj.agents.export_agent(agent, base, fmt):
+        obj.render.agent.dim(f"  {path}")
 
 
 definition_app = typer.Typer(
@@ -280,7 +241,7 @@ def def_edit(
             obj.render.agent.error(f"bad --set pair: {pair!r}")
             raise typer.Exit(2)
         k, v = pair.split("=", 1)
-        _set_dotted(merged, k.strip(), _coerce(v.strip()))
+        obj.agents.set_dotted(merged, k.strip(), obj.agents.coerce_value(v.strip()))
 
     try:
         updated = AgentDef.model_validate(merged)
@@ -354,11 +315,15 @@ def def_export(
     out_dir: str = typer.Option(
         ".", "--out", "-o", help="Output directory (default: current directory)."
     ),
+    fmt: AgentFileFormat = typer.Option(
+        AgentFileFormat.claude_code, "--format", "-f", help="Agent file format."
+    ),
 ) -> None:
-    """Export DB agents to on-disk TOML files.
+    """Export DB agents to on-disk agent files.
 
-    Writes ``<agent_id>.toml`` and (if the agent has a prompt)
-    ``<agent_id>.prompt.md`` into ``--out``. Idempotent.
+    ``claude_code``/``opencode`` write a single ``<agent_id>.md`` (frontmatter
+    + prompt); ``agentbox`` writes the portable ``<agent_id>.toml`` (+
+    ``<agent_id>.prompt.md``). Idempotent.
     """
     obj: CLIContext = ctx.obj
     base = Path(out_dir).expanduser()
@@ -368,7 +333,7 @@ def def_export(
         if agent is None:
             obj.render.agent.agent_not_found(agent_id)
             raise typer.Exit(1)
-        _export_one(agent, base, obj)
+        _export_one(agent, base, obj, fmt)
     else:
         agents = _list_agent_ids(obj)
         if not agents:
@@ -378,5 +343,42 @@ def def_export(
             agent = obj.agents.get_agent_def(aid)
             if agent is None:
                 continue
-            _export_one(agent, base, obj)
+            _export_one(agent, base, obj, fmt)
     obj.render.agent.agent_exported(str(base.resolve()))
+
+
+# ---------------------------------------------------------------------------
+# import
+# ---------------------------------------------------------------------------
+
+
+@definition_app.command("import")
+def def_import(
+    ctx: typer.Context,
+    path: Path = typer.Argument(
+        ..., exists=True, readable=True, help="Agent file to import."
+    ),
+    fmt: AgentFileFormat = typer.Option(
+        AgentFileFormat.claude_code, "--format", "-f", help="Agent file format."
+    ),
+    author: str = typer.Option("cli", "--author", help="Author identifier."),
+    changelog: str = typer.Option("imported", "--changelog", help="Changelog."),
+) -> None:
+    """Import an agent file into the DB as a new agent.
+
+    The id comes from the file's ``name`` frontmatter (claude_code) or the
+    filename stem (opencode). Fails if the agent already exists.
+    """
+    obj: CLIContext = ctx.obj
+    try:
+        rec = obj.agents.import_agent(
+            path.read_text(encoding="utf-8"),
+            fmt,
+            agent_id=path.stem,
+            author=author,
+            changelog=changelog,
+        )
+    except Exception as exc:
+        obj.render.agent.error(f"import failed: {exc}")
+        raise typer.Exit(1) from exc
+    obj.render.agent.agent_created(rec["agent_id"], rec["version"], rec["id"])
