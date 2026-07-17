@@ -103,9 +103,6 @@ class WorkspaceComposer:
             env_doc_body=env_doc_body,
             env_doc_version_id=env_doc_version_id,
             permissions=permissions,
-            # write_secrets has no producer today; the blueprint carries key
-            # NAMES only — wire a producer here when secrets return.
-            secret_keys=(),
         )
 
     # ── engines ──────────────────────────────────────────────────────────

@@ -141,7 +141,6 @@ from agentbox.core.data.payload_types import (
     StubResult,
     UsagePayload,
     ValidationView,
-    WebhookChannelConfig,
 )
 from agentbox.core.data.claude_session import find_session_log, parse_session_log
 from agentbox.core.data.manifests.agents import (
@@ -363,7 +362,6 @@ __all__ = [
     "WorkspaceMcpToolOverrideRow",
     "WorkspaceRow",
     "ValidationView",
-    "WebhookChannelConfig",
     "WorkspaceError",
     "WorkspaceExists",
     "WorkspaceNotFound",

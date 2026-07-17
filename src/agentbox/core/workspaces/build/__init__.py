@@ -182,25 +182,6 @@ def _binding_to_dict(b: ResolvedBinding, *, persistent: bool) -> BindingDict:
     }
 
 
-def write_secrets(workdir: Path, secrets: Mapping[str, str]) -> None:
-    """Write opaque secrets into ``<workdir>/.agentbox/secrets.env``.
-
-    Pure I/O: the renderer never inspects key names or values. The ``.env``
-    format is consumed by CLI backends that source the file at startup.
-    """
-    if not secrets:
-        return
-    secrets_dir = workdir / ".agentbox"
-    secrets_dir.mkdir(parents=True, exist_ok=True)
-    env_path = secrets_dir / "secrets.env"
-    tmp_path = env_path.with_suffix(".tmp")
-    with tmp_path.open("w", encoding="utf-8") as f:
-        for key, value in secrets.items():
-            escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-            f.write(f'{key}="{escaped}"\n')
-    shutil.move(str(tmp_path), str(env_path))
-
-
 def _read_previous_meta(workdir: Path) -> WorkspaceSyncMeta:
     meta_path = workdir / ".agentbox" / "meta.json"
     if not meta_path.exists():
@@ -248,7 +229,6 @@ class WorkspaceBuilder:
         *,
         persistent: bool,
         system_prompt: str | None = None,
-        secrets: Mapping[str, str] | None = None,
         extra_mcp_servers: Mapping[str, McpStdioServerSpec] | None = None,
     ) -> BuildResult:
         target_dir = Path(target_dir)
@@ -354,18 +334,7 @@ class WorkspaceBuilder:
             json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
 
-        # ── 4. Secrets (dead today; secret_keys is empty) ─────────────────
-        if secrets:
-            try:
-                write_secrets(target_dir, secrets)
-            except Exception as e:
-                logger.exception(
-                    "workspace render: secrets write failed for %r",
-                    blueprint.workspace_id,
-                )
-                errors.append(f"secrets: {e}")
-
-        # ── 5. Orphan reconcile (persistent only) ─────────────────────────
+        # ── 4. Orphan reconcile (persistent only) ─────────────────────────
         if persistent:
             current_paths = set(materialized_paths)
             for orphan in sorted(previous_paths - current_paths):

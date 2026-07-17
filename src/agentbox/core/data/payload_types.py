@@ -162,10 +162,6 @@ class ChannelConfig(TypedDict, total=False):
     retry_delay_seconds: float
 
 
-WebhookChannelConfig = ChannelConfig
-"""Deprecated alias — the webhook channel reads ``ChannelConfig`` directly."""
-
-
 class RefreshProvidersResult(TypedDict):
     """Return shape of ``refresh_providers()``."""
 
@@ -1431,7 +1427,6 @@ __all__ = [
     "PaginatedRunItem",
     "PaginatedRunsResult",
     "ValidationView",
-    "WebhookChannelConfig",
     "WorkspaceBindingItemsResult",
     "WorkspaceBindingSpec",
     "WorkspaceResourcesResult",

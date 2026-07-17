@@ -22,7 +22,6 @@ class TestComposeEdgeCases:
         assert bp.permissions is None
         assert bp.env_doc_body is None
         assert bp.env_doc_version_id is None
-        assert bp.secret_keys == ()
         assert bp.config.agents == []
 
     def test_empty_workspace(self, db: Database) -> None:

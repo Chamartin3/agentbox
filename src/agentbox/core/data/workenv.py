@@ -320,7 +320,6 @@ class WorkspaceBlueprint:
     env_doc_body: str | None
     env_doc_version_id: str | None
     permissions: EffectivePermissionsOverlay | None
-    secret_keys: tuple[str, ...]
 
 
 @dataclass(frozen=True)

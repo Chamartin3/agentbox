@@ -63,7 +63,6 @@ class Workspaces:
         into: Path | None = None,
         engines: Collection[str] | None = None,
         system_prompt: str | None = None,
-        secrets: Mapping[str, str] | None = None,
         extra_mcp_servers: Mapping[str, McpStdioServerSpec] | None = None,
     ) -> BuildResult:
         """Render a workspace onto disk.
@@ -96,7 +95,6 @@ class Workspaces:
             target_dir,
             persistent=persistent,
             system_prompt=system_prompt,
-            secrets=secrets,
             extra_mcp_servers=extra_mcp_servers,
         )
 
