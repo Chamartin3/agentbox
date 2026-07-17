@@ -58,6 +58,13 @@ class EvaluationService(Service):
         """Roll up runs in a date range into /activity endpoint shape."""
         return self._runs.activity_summary(since_iso_str, agent)
 
+    def activity_summary_range(
+        self, range_: ActivityRange = "30d", agent: str | None = None
+    ) -> ActivitySummaryRow:
+        """Activity summary for a range label (``30d`` …), converting to a
+        since-ISO cutoff internally so callers pass the label, not a date."""
+        return self.activity_summary(since_iso(range_), agent)
+
     # ── Filtered stats ────────────────────────────────────────────────
 
     def stats_for_filters(

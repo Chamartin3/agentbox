@@ -20,6 +20,7 @@ from agentbox.core.data.constants import RunnerKind as RunnerKind
 from agentbox.core.data.constants import RunStatus as RunStatus
 
 # ── Errors ────────────────────────────────────────────────────────────
+from agentbox.core.data.errors import AgentNotFound as AgentNotFound
 from agentbox.core.data.errors import WorkspaceNotFound as WorkspaceNotFound
 from agentbox.core.data import read_transcript as read_transcript
 from agentbox.core.data import AgentDef as AgentDef
@@ -65,6 +66,7 @@ from agentbox.core.tools import ToolSpec as ToolSpec
 
 # ── Prompt / composition ──────────────────────────────────────────────
 from agentbox.core.agents import PreviewError as PreviewError
+from agentbox.core.agents import PromptError as PromptError
 from agentbox.core.resources.importers.base import ImporterContext as ImporterContext
 from agentbox.core.resources.importers.host_path import HostPathImporter as HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter as SchemaImporter
@@ -87,6 +89,7 @@ from agentbox.core.service.execution import ExecutionService as ExecutionService
 
 # ── Evaluation service (plan 093 — analytics) ──────────────────────────
 from agentbox.core.service.evaluation import EvaluationService as EvaluationService
+from agentbox.core.data.feedback import ActivityRange as ActivityRange
 
 # ── Engines service (plan 091) ─────────────────────────────────────────
 from agentbox.core.service.engines import EngineService as EngineService
@@ -97,6 +100,8 @@ from agentbox.core.service.system import SystemService as SystemService
 
 # ── Resources service (plan 090) ────────────────────────────────────────
 from agentbox.core.service.resources import ResourceService as ResourceService
+from agentbox.core.service.resources import InvalidResource as InvalidResource
+from agentbox.core.service.resources import ResourceNotFound as ResourceNotFound
 
 # ── Agent admin free functions (per-domain admin.py) ──
 

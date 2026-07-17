@@ -7,8 +7,7 @@ from typing import Literal
 
 import typer
 
-# TODO(cli-arch): absorb into EvaluationService
-from agentbox.core.service.evaluation import ActivityRange, since_iso
+from agentbox.core.service import ActivityRange
 
 from agentbox.cli.shared import CLIContext
 
@@ -35,7 +34,7 @@ def stat_activity(
 ) -> None:
     """Print the activity summary as JSON."""
     obj: CLIContext = ctx.obj
-    data = obj.evaluation.activity_summary(since_iso(range_), agent=agent)
+    data = obj.evaluation.activity_summary_range(range_, agent=agent)
     obj.render.run.print(json.dumps(data, indent=2, default=str))
 
 
