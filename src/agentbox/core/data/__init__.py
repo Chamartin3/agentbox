@@ -142,7 +142,6 @@ from agentbox.core.data.payload_types import (
     UsagePayload,
     ValidationView,
 )
-from agentbox.core.data.claude_session import find_session_log, parse_session_log
 from agentbox.core.data.manifests.agents import (
     AgentDef,
     AgentSource,
@@ -366,10 +365,8 @@ __all__ = [
     "WorkspaceExists",
     "WorkspaceNotFound",
     "WorkspacePathEscape",
-    "find_session_log",
     "hash_blobs",
     "now_iso",
-    "parse_session_log",
     "read_transcript",
     "_AgentConfigEventFields",
     "_AgentMetaFields",

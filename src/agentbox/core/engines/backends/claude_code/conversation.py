@@ -10,21 +10,14 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Final
 
-from agentbox.core.data.constants import ContentBlockType, MessageRole
-from agentbox.core.data import RunRecord, find_session_log, parse_session_log
+from agentbox.core.data import RunRecord
 from agentbox.core.data.conversation.base import ConversationSource
-from agentbox.core.data.conversation.types import (
-    ContentPart,
-    ConversationView,
-    TokenTotals,
-    Turn,
+from agentbox.core.data.conversation.types import ConversationView, TokenTotals
+from agentbox.core.engines.backends.claude_code.session_log import (
+    find_session_log,
+    parse_session_log,
 )
-
-
-_VALID_CONTENT_TYPES: Final = frozenset(ContentBlockType)
-_VALID_ROLES: Final = frozenset(MessageRole)
 
 
 class ClaudeCliJsonlSource(ConversationSource):
@@ -84,57 +77,9 @@ class ClaudeCliJsonlSource(ConversationSource):
                 totals=TokenTotals(),
             )
 
-        # Parse using the existing Claude session parser
-        raw = parse_session_log(log_path, include_bodies=include_bodies)
-
-        # Convert to our new types
-        totals = TokenTotals(
-            input_tokens=raw.totals.get("input_tokens", 0),
-            output_tokens=raw.totals.get("output_tokens", 0),
-            cache_read_tokens=raw.totals.get("cache_read_tokens", 0),
-            cache_write_tokens=raw.totals.get("cache_write_tokens", 0),
-            thinking_chars=raw.totals.get("thinking_chars", 0),
-            text_chars=raw.totals.get("text_chars", 0),
-            stop_max_tokens=raw.totals.get("stop_max_tokens", 0),
-            stop_end_turn=raw.totals.get("stop_end_turn", 0),
-        )
-
-        turns: list[Turn] = []
-        for t in raw.turns:
-            parts = []
-            for p in t.content:
-                ct = p.type
-                if ct not in _VALID_CONTENT_TYPES:
-                    ct = "text"
-                parts.append(
-                    ContentPart(
-                        type=ContentBlockType(ct),
-                        byte_len=p.length,
-                        body=p.body,
-                        tool_name=getattr(p, "tool_name", None),
-                        tool_use_id=getattr(p, "tool_use_id", None),
-                    )
-                )
-            role = t.role
-            if role not in _VALID_ROLES:
-                role = "user"
-            turns.append(
-                Turn(
-                    index=t.index,
-                    role=MessageRole(role),
-                    ts=t.ts,
-                    stop_reason=t.stop_reason,
-                    usage=t.usage,
-                    content=parts,
-                )
-            )
-
-        page = turns[offset : offset + limit]
-        return ConversationView(
-            run_id=run_id,
-            session_id=raw.session_id,
-            source_format=self.format,
-            source_uri=str(log_path),
-            totals=totals,
-            turns=page,
-        )
+        # The parser already emits the runner-agnostic ConversationView;
+        # fill in run identity and page the turns.
+        view = parse_session_log(log_path, include_bodies=include_bodies)
+        view.run_id = run_id
+        view.turns = view.turns[offset : offset + limit]
+        return view

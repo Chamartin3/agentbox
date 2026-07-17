@@ -12,15 +12,28 @@ that cwd is logged as the first transcript event. This module:
 1. Reads the agentbox transcript to recover the per-run cwd.
 2. Encodes it to Claude's project-dir convention (``/`` → ``-``).
 3. Returns the newest ``*.jsonl`` under that project dir.
-4. Parses the JSONL into a compact turn summary suitable for inspection.
+4. Parses the JSONL straight into the runner-agnostic
+   :class:`~agentbox.core.data.conversation.types.ConversationView`.
+
+This is Claude-CLI-specific storage-layout knowledge; it lives beside the
+``ClaudeCliJsonlSource`` adapter, not in the provider-agnostic data leaf.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from agentbox.core.data.constants import ContentBlockType, MessageRole
+from agentbox.core.data.conversation.types import (
+    ContentPart,
+    ConversationView,
+    TokenTotals,
+    Turn,
+)
+
+FORMAT = "claude-cli-jsonl"
 
 
 def encode_cwd(cwd: str) -> str:
@@ -67,41 +80,14 @@ def find_session_log(transcript_path: Path, claude_projects_root: Path) -> Path 
     return candidates[0] if candidates else None
 
 
-@dataclass
-class ContentPart:
-    type: str
-    length: int
-    body: str | None = None
-    tool_name: str | None = None
-    tool_input: Any | None = None
-
-
-@dataclass
-class Turn:
-    index: int
-    role: str
-    ts: str | None
-    stop_reason: str | None = None
-    usage: dict[str, Any] | None = None
-    content: list[ContentPart] = field(default_factory=list)
-
-
-@dataclass
-class ConversationSummary:
-    session_id: str | None
-    log_path: str
-    turns: list[Turn]
-    totals: dict[str, Any]
-
-
 def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:
     parts: list[ContentPart] = []
     if not isinstance(items, list):
         if isinstance(items, str):
             parts.append(
                 ContentPart(
-                    type="text",
-                    length=len(items),
+                    type=ContentBlockType.TEXT,
+                    byte_len=len(items),
                     body=items if include_bodies else None,
                 )
             )
@@ -114,24 +100,28 @@ def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:
             body = c.get("text", "") or ""
             parts.append(
                 ContentPart(
-                    type=t, length=len(body), body=body if include_bodies else None
+                    type=ContentBlockType.TEXT,
+                    byte_len=len(body),
+                    body=body if include_bodies else None,
                 )
             )
         elif t == "thinking":
             body = c.get("thinking", "") or ""
             parts.append(
                 ContentPart(
-                    type=t, length=len(body), body=body if include_bodies else None
+                    type=ContentBlockType.THINKING,
+                    byte_len=len(body),
+                    body=body if include_bodies else None,
                 )
             )
         elif t == "tool_use":
             tool_input = c.get("input")
             parts.append(
                 ContentPart(
-                    type=t,
-                    length=len(json.dumps(tool_input)) if tool_input is not None else 0,
+                    type=ContentBlockType.TOOL_USE,
+                    byte_len=len(json.dumps(tool_input)) if tool_input is not None else 0,
                     tool_name=c.get("name"),
-                    tool_input=tool_input if include_bodies else None,
+                    tool_use_id=c.get("id"),
                 )
             )
         elif t == "tool_result":
@@ -139,11 +129,15 @@ def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:
             body = json.dumps(content) if not isinstance(content, str) else content
             parts.append(
                 ContentPart(
-                    type=t, length=len(body), body=body if include_bodies else None
+                    type=ContentBlockType.TOOL_RESULT,
+                    byte_len=len(body),
+                    body=body if include_bodies else None,
+                    tool_use_id=c.get("tool_use_id"),
                 )
             )
         else:
-            parts.append(ContentPart(type=t, length=0))
+            # ponytail: unknown block types collapse to an empty text part
+            parts.append(ContentPart(type=ContentBlockType.TEXT, byte_len=0))
     return parts
 
 
@@ -151,29 +145,25 @@ def parse_session_log(
     path: Path,
     include_bodies: bool = False,
     roles: set[str] | None = None,
-) -> ConversationSummary:
-    """Parse a Claude CLI session log into a turn-by-turn summary.
+) -> ConversationView:
+    """Parse a Claude CLI session log into a runner-agnostic view.
 
     ``include_bodies=True`` includes the full text/thinking/tool bodies.
     ``roles`` filters to a subset (default: user, assistant, system).
+    ``run_id`` is left as ``"?"`` — the caller owns run identity.
     """
     if roles is None:
         roles = {"user", "assistant", "system"}
     turns: list[Turn] = []
     session_id: str | None = None
-    totals = {
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "cache_read_tokens": 0,
-        "cache_creation_tokens": 0,
-        "thinking_chars": 0,
-        "text_chars": 0,
-        "stop_max_tokens": 0,
-        "stop_end_turn": 0,
-    }
+    totals = TokenTotals()
     if not path.exists():
-        return ConversationSummary(
-            session_id=None, log_path=str(path), turns=[], totals=totals
+        return ConversationView(
+            run_id="?",
+            session_id=None,
+            source_format=FORMAT,
+            source_uri=str(path),
+            totals=totals,
         )
     idx = 0
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -198,27 +188,25 @@ def parse_session_log(
         )
         parts = _summarize_content(content_raw, include_bodies)
         if usage:
-            totals["input_tokens"] += int(usage.get("input_tokens") or 0)
-            totals["output_tokens"] += int(usage.get("output_tokens") or 0)
-            totals["cache_read_tokens"] += int(
-                usage.get("cache_read_input_tokens") or 0
-            )
-            totals["cache_creation_tokens"] += int(
+            totals.input_tokens += int(usage.get("input_tokens") or 0)
+            totals.output_tokens += int(usage.get("output_tokens") or 0)
+            totals.cache_read_tokens += int(usage.get("cache_read_input_tokens") or 0)
+            totals.cache_write_tokens += int(
                 usage.get("cache_creation_input_tokens") or 0
             )
         for p in parts:
-            if p.type == "thinking":
-                totals["thinking_chars"] += p.length
-            elif p.type == "text":
-                totals["text_chars"] += p.length
+            if p.type == ContentBlockType.THINKING:
+                totals.thinking_chars += p.byte_len
+            elif p.type == ContentBlockType.TEXT:
+                totals.text_chars += p.byte_len
         if stop_reason == "max_tokens":
-            totals["stop_max_tokens"] += 1
+            totals.stop_max_tokens += 1
         elif stop_reason == "end_turn":
-            totals["stop_end_turn"] += 1
+            totals.stop_end_turn += 1
         turns.append(
             Turn(
                 index=idx,
-                role=role,
+                role=MessageRole(role),
                 ts=ts,
                 stop_reason=stop_reason,
                 usage=usage,
@@ -226,9 +214,11 @@ def parse_session_log(
             )
         )
         idx += 1
-    return ConversationSummary(
+    return ConversationView(
+        run_id="?",
         session_id=session_id,
-        log_path=str(path),
-        turns=turns,
+        source_format=FORMAT,
+        source_uri=str(path),
         totals=totals,
+        turns=turns,
     )
