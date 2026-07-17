@@ -70,12 +70,6 @@ class WorkspaceDef(BaseModel):
     Empty list means auto-discover all skills under workspace/skills/.
     """
 
-    permissions: str | None = None
-    """Deprecated: path to permissions file relative to workspace.
-
-    Permissions are now inlined via allowed_tools, allowed_builtin_tools, etc.
-    """
-
     # --- Inlined permissions (from capabilities.json) ---
 
     allowed_tools: list[str] = Field(default_factory=list)

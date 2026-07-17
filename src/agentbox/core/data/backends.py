@@ -217,17 +217,10 @@ class RenderedConfig:
     """Canonical tool names available in the workspace, pre-resolved via
     the workspace-tool catalog.
 
-    Replaces the legacy ``host_capabilities`` dict.  Populated by the
-    executor before ``render()`` so backends never import workspace or
-    resource domains directly.  Backends feed this into
+    Populated by the executor before ``render()`` so backends never import
+    workspace or resource domains directly.  Backends feed this into
     ``intersect_allowed_tools`` as the workspace side of the
     agent ∩ workspace intersection."""
-
-    host_capabilities: dict[str, Any] = field(default_factory=dict)
-    """Deprecated: use ``ws_allowed_tools`` instead.
-
-    Populated by the executor before ``render()`` so backends never
-    import ``core.workspace.manager`` directly."""
 
     skill_packs: list[SkillPack] = field(default_factory=list)
     """Filtered skill packs for the workspace.

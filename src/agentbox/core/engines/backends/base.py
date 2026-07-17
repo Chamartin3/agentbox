@@ -130,7 +130,6 @@ class BackendAdapter(ABC):
         composed: ComposedView | None = None,
         *,
         runtime_config: RuntimeConfigView | None = None,
-        host_capabilities: dict[str, Any] | None = None,
         ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
@@ -144,9 +143,9 @@ class BackendAdapter(ABC):
         adapters must not read ``agent.runner`` for backend/model/timeout/
         extra_args fallback.
 
-        ``runtime_config``, ``host_capabilities``, and ``ws_allowed_tools``
-        are pre-computed by the executor so backends never import
-        ``core.agents.*`` or ``core.workspace.*`` directly.
+        ``runtime_config`` and ``ws_allowed_tools`` are pre-computed by the
+        executor so backends never import ``core.agents.*`` or
+        ``core.workspace.*`` directly.
         """
 
     @abstractmethod

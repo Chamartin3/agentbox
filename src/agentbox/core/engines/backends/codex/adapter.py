@@ -142,7 +142,6 @@ class CodexBackend(BackendAdapter):
         composed: Any | None = None,
         *,
         runtime_config: Any = None,
-        host_capabilities: dict | None = None,
         ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
