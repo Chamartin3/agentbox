@@ -71,14 +71,9 @@ class TestTokenProviderRouting:
             or rendered.agent_meta.get("api_key") is None
         )
 
-    def test_render_without_runner_config_ignores_legacy_runner_model(self) -> None:
-        """render() does not read agent.runner.model as runtime config."""
-        agent = _make_agent(
-            runner=RunnerSpec(
-                kind="token",
-                model="legacy:model",
-            )
-        )
+    def test_render_without_runner_config_has_no_model(self) -> None:
+        """render() with no runner_config yields no model (no legacy fallback)."""
+        agent = _make_agent(runner=RunnerSpec(kind="token"))
         adapter = TokenBackend()
         rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=None)
 
@@ -88,12 +83,7 @@ class TestTokenProviderRouting:
 
     def test_render_runner_config_model_is_authoritative(self) -> None:
         """runner_config.model is the runtime source of truth."""
-        agent = _make_agent(
-            runner=RunnerSpec(
-                kind="token",
-                model="spec:default",
-            )
-        )
+        agent = _make_agent(runner=RunnerSpec(kind="token"))
         adapter = TokenBackend()
 
         runner_config = EffectiveRunnerConfig(

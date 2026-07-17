@@ -216,7 +216,6 @@ def _ingest_runner_profile(
             name=f"Legacy: {agent_id}",
             description="Imported from legacy agent runner config",
             backend=str(runner_spec.kind),
-            model=runner_spec.model,
             extra_args=runner_spec.extra_args or [],
         )
 

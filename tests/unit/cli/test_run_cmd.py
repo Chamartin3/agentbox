@@ -62,7 +62,7 @@ def _seed_agent(store, agent_id: str, runner_kind: str = "claude_code") -> None:
     agent_def = AgentDef(
         id=agent_id,
         description="Test agent",
-        runner=RunnerSpec(kind=runner_kind, model="test-model"),
+        runner=RunnerSpec(kind=runner_kind),
     )
     AgentService().create_agent(
         agent_id=agent_id,

@@ -9,10 +9,10 @@ active version said 400s) had two coupled causes:
    value carried on the active ``AgentDef``.
 
 These tests pin the contract: whatever the active ``AgentDef`` holds for
-``runner.timeout_seconds`` and ``runner.model`` must show up unchanged in
-the backend's ``RenderedConfig`` — for every shipped backend. If a future
-backend forgets to forward a field, the test fails before it reaches a
-real run.
+``runner.timeout_seconds`` (and whatever the effective runner config holds
+for ``model``) must show up unchanged in the backend's ``RenderedConfig`` —
+for every shipped backend. If a future backend forgets to forward a field,
+the test fails before it reaches a real run.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ import pytest
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.claude_code import ClaudeCodeBackend
 from agentbox.core.engines.backends.opencode import OpenCodeBackend
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 
 _CLAUDE_CODE = "claude_code"
 _OPENCODE = "opencode"
@@ -30,12 +31,10 @@ _OPENCODE = "opencode"
 _DEFAULT_AGENT_TIMEOUT = 1200
 
 
-def _agent(
-    runner_kind: str, timeout: int, model: str | None = "haiku"
-) -> AgentDef:
+def _agent(runner_kind: str, timeout: int) -> AgentDef:
     return AgentDef(
         id="stage.example",
-        runner=RunnerSpec(kind=runner_kind, model=model, timeout_seconds=timeout),
+        runner=RunnerSpec(kind=runner_kind, timeout_seconds=timeout),
     )
 
 
@@ -67,14 +66,16 @@ def test_backend_render_propagates_active_timeout(
 
 
 def test_claude_backend_render_propagates_active_model(tmp_path: Path) -> None:
-    """Model from the active config reaches the claude CLI argv.
+    """Model from the effective runner config reaches the claude CLI argv.
 
     Same single-source-of-truth contract as the timeout test, applied to
-    the model selector — if the active version says ``sonnet``, the
-    rendered argv must include ``--model sonnet``.
+    the model selector — the model is owned by the resolved runner config
+    (bound profile / system default), so ``runner_config.model = sonnet``
+    must produce ``--model sonnet`` in the rendered argv.
     """
-    agent = _agent("claude_code", timeout=300, model="sonnet")
-    rendered = ClaudeCodeBackend().render(agent, tmp_path)
+    agent = _agent("claude_code", timeout=300)
+    runner_config = EffectiveRunnerConfig(model="sonnet", source="run_override")
+    rendered = ClaudeCodeBackend().render(agent, tmp_path, runner_config=runner_config)
 
     assert "--model" in rendered.argv
     idx = rendered.argv.index("--model")

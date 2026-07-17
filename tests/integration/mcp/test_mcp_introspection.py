@@ -71,7 +71,7 @@ def _seed_agent(agent_id: str = "probe-agent") -> None:
     agent_def = AgentDef(
         id=agent_id,
         description="Introspection probe",
-        runner=RunnerSpec(kind="token", model="gpt-4o"),
+        runner=RunnerSpec(kind="token"),
     )
     AgentService().create_agent(
         agent_id=agent_id,

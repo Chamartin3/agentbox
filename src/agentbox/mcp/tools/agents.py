@@ -22,22 +22,6 @@ def _agent_dict(agent: Any) -> dict:
     return dict(vars(agent))
 
 
-def _strip_legacy_runner_model(d: dict) -> dict[str, RawJsonValue]:
-    """Drop the legacy ``runner.model`` field from a serialized agent dict.
-
-    The authoritative model lives on the bound runner profile; the
-    ``runner.model`` column is cosmetic/import-only and has misled
-    operators into thinking it was the runtime value. MCP responses
-    surface the profile-resolved model under a top-level ``model`` key
-    instead (see ``_inject_profile_model``).
-    """
-    runner = d.get("runner")
-    if isinstance(runner, dict) and "model" in runner:
-        runner = {k: v for k, v in runner.items() if k != "model"}
-        d["runner"] = runner
-    return d
-
-
 def _inject_profile_model(d: dict, engines: EngineService) -> dict[str, RawJsonValue]:
     """Resolve the agent's effective model via its bound runner profile.
 
@@ -103,10 +87,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
 
         agents = [
             _attach_disabled(
-                _inject_profile_model(
-                    _strip_legacy_runner_model(_agent_dict(a)),
-                    ctx.engines,
-                )
+                _inject_profile_model(_agent_dict(a), ctx.engines)
             )
             for a in svc.list_all_agents(include_disabled=include_disabled)
         ]
@@ -138,7 +119,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
             ).lower()
             if q in hay:
                 results.append(
-                    _inject_profile_model(_strip_legacy_runner_model(d), ctx.engines)
+                    _inject_profile_model(d, ctx.engines)
                 )
         return _paginate(results, limit, offset)
 
@@ -163,9 +144,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "author": active.get("author"),
                 "created_at": active.get("created_at"),
             }
-        agent_payload = _inject_profile_model(
-            _strip_legacy_runner_model(_agent_dict(agent)), ctx.engines
-        )
+        agent_payload = _inject_profile_model(_agent_dict(agent), ctx.engines)
         meta = svc.get_meta(agent_id) or {}
         agent_payload["disabled_at"] = meta.get("disabled_at")
         return {"agent": agent_payload, "prompt": prompt_meta}

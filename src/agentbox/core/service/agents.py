@@ -191,12 +191,6 @@ def _aggregate_run_metadata(
     return run_counts, last_run_at, profile_bindings
 
 
-def _strip_legacy_runner_model(dumped: dict) -> dict:
-    if isinstance(dumped.get("runner"), dict):
-        dumped["runner"] = {k: v for k, v in dumped["runner"].items() if k != "model"}
-    return dumped
-
-
 def _enrich_agent(
     agent: AgentDef,
     *,
@@ -215,7 +209,7 @@ def _enrich_agent(
         workspace_str = ""
     active = agent_versions.get_active(agent.id)
     latest = agent_versions.get_latest(agent.id)
-    dumped = _strip_legacy_runner_model(agent.model_dump())
+    dumped = agent.model_dump()
     profile_id = profile_bindings.get(agent.id)
     profile = None
     if profile_id:
@@ -352,7 +346,7 @@ def get_agent_detail(
             }
         )
 
-    agent_dump = _strip_legacy_runner_model(agent.model_dump())
+    agent_dump = agent.model_dump()
     bound_profile = EngineService().get_agent_runner_profile(agent_id)
     return {
         "agent": agent_dump,

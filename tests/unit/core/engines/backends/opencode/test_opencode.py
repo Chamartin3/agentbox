@@ -167,8 +167,8 @@ def test_digest_changes_when_effective_extra_args_change() -> None:
     assert r_a.digest != r_b.digest
 
 
-def test_effective_model_is_passed_even_when_agent_has_legacy_model() -> None:
-    agent = _make_agent(runner=RunnerSpec(kind="claude_code", model="haiku"))
+def test_effective_model_from_runner_config_is_passed() -> None:
+    agent = _make_agent(runner=RunnerSpec(kind="claude_code"))
     adapter = OpenCodeBackend()
     rendered = adapter.render(
         agent,
@@ -180,4 +180,3 @@ def test_effective_model_is_passed_even_when_agent_has_legacy_model() -> None:
 
     model_idx = rendered.argv.index("--model")
     assert rendered.argv[model_idx + 1] == "opencode/big-pickle"
-    assert "haiku" not in rendered.argv

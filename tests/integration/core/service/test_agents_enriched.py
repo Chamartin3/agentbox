@@ -79,9 +79,6 @@ def test_list_agents_enriched_returns_dicts_with_run_metadata(
         assert entry["model"] is None
         assert "resolved_workspace" in entry
         assert "version" in entry
-        # legacy runner.model field must be scrubbed
-        if isinstance(entry.get("runner"), dict):
-            assert "model" not in entry["runner"]
 
 
 def test_list_agents_enriched_empty_when_no_agents(

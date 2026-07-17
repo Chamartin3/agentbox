@@ -15,7 +15,6 @@ from agentbox.core.data import AgentDef, RunnerSpec
 
 DEFAULT_RUNNER = RunnerSpec(
     kind="claude_code",
-    model="claude-sonnet-4-20250514",
     allowed_tools=["Read", "Grep", "Write"],
     extra_args=["--verbose"],
 )

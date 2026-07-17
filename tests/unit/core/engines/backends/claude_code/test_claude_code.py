@@ -6,10 +6,10 @@ from pathlib import Path
 
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.claude_code import ClaudeCodeBackend
+from agentbox.core.engines.profiles import EffectiveRunnerConfig
 
 DEFAULT_RUNNER = RunnerSpec(
     kind="claude_code",
-    model="claude-sonnet-4-20250514",
     allowed_tools=["Read", "Grep", "Write"],
     extra_args=["--verbose"],
 )
@@ -34,7 +34,10 @@ def _make_agent(**overrides: object) -> AgentDef:
 def test_render_produces_expected_argv() -> None:
     agent = _make_agent()
     adapter = ClaudeCodeBackend()
-    rendered = adapter.render(agent, Path("/tmp/workdir"))
+    runner_config = EffectiveRunnerConfig(
+        model="claude-sonnet-4-20250514", source="run_override"
+    )
+    rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=runner_config)
 
     assert "claude" in rendered.argv
     assert "-p" in rendered.argv

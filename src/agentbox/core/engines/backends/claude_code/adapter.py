@@ -82,11 +82,7 @@ class ClaudeCodeBackend(BackendAdapter):
             or getattr(agent_runner, "extra_args", None)
             or []
         )
-        model = (
-            getattr(runner_config, "model", None)
-            or getattr(agent_runner, "model", None)
-            or self.default_model
-        )
+        model = getattr(runner_config, "model", None) or self.default_model
         argv: list[str] = ["claude", "-p"]
 
         if model:

@@ -16,18 +16,15 @@ class TestRunnerSpec:
         spec = RunnerSpec(kind="claude_code")
         assert spec.kind == "claude_code"
         assert spec.timeout_seconds == 1200
-        assert spec.model is None
 
     def test_with_all_fields(self) -> None:
         spec = RunnerSpec(
             kind="token",
-            model="gpt-4",
             timeout_seconds=120,
             max_error_retries=2,
             max_validation_retries=3,
             output_validation_engine="jsonschema",
         )
-        assert spec.model == "gpt-4"
         assert spec.timeout_seconds == 120
         assert spec.max_error_retries == 2
         assert spec.max_validation_retries == 3

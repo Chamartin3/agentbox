@@ -154,11 +154,7 @@ class OpenCodeBackend(BackendAdapter):
             or getattr(agent_runner, "extra_args", None)
             or []
         )
-        model = (
-            getattr(runner_config, "model", None)
-            or getattr(agent_runner, "model", None)
-            or SETTINGS.opencode_model
-        )
+        model = getattr(runner_config, "model", None) or SETTINGS.opencode_model
 
         provider = getattr(runner_config, "provider", None)
         model = _normalize_model_id(model, provider)
