@@ -21,6 +21,7 @@ from agentbox.core.data.errors.execution import (
 )
 from agentbox.core.data.errors.schemas import InconsistentSchema, UnsupportedSchema
 from agentbox.core.data.errors.workspaces import (
+    LaunchTargetUnresolved,
     WorkspaceError,
     WorkspaceExists,
     WorkspaceNotFound,
@@ -36,6 +37,7 @@ __all__ = [
     "DuplicateVersionFile",
     "InconsistentSchema",
     "InvalidRunInput",
+    "LaunchTargetUnresolved",
     "RunNotFound",
     "UnsupportedSchema",
     "VersionFileNotFound",

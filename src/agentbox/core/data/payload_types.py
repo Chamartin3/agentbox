@@ -11,6 +11,7 @@ JSON unions. JSON-schema documents use the structural ``JsonSchemaDict``.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
 from agentbox.core.data.jsontypes import RawJson, RawJsonValue
@@ -1000,6 +1001,40 @@ class RunLogsResult(TypedDict):
 # ── Workspace-service result shapes ─────────────────────────────────────────
 
 
+class LaunchTarget(TypedDict):
+    """Resolved launch target returned by ``WorkspaceService.resolve_launch_target``.
+
+    ``path``         — absolute workspace directory (tmp dir for ephemeral).
+    ``is_ephemeral`` — True when path is a temp dir to be removed after launch.
+    ``creds``        — credential profile name for ``_apply_creds``; always ``None``
+                       today (resolution never sets it), kept for API stability.
+    ``name``         — registry name used to identify the workspace for sync;
+                       ``None`` for ephemeral workspaces and explicit-path overrides.
+    """
+
+    path: Path
+    is_ephemeral: bool
+    creds: str | None
+    name: str | None
+
+
+class LaunchMcpServer(TypedDict):
+    """One MCP server entry resolved for an interactive launch session.
+
+    Produced by ``WorkspaceService.resolve_launch_mcp_servers``.  Only
+    servers that are both enabled *and* have a reachable endpoint
+    (``url`` or ``command``) are included.
+
+    ``command`` mirrors ``McpServerConfigView.command`` — a list of
+    argv tokens (e.g. ``["npx", "mcp-server-name"]``) or ``None``.
+    """
+
+    name: str
+    url: str | None
+    transport: str
+    command: list[str] | None
+
+
 class SubagentSpec(TypedDict):
     """Caller-supplied workspace subagent input."""
 
@@ -1326,6 +1361,8 @@ class McpStdioServerSpec(TypedDict):
 
 
 __all__ = [
+    "LaunchMcpServer",
+    "LaunchTarget",
     "HttpFetchResult",
     "McpServerEnv",
     "McpStdioServerSpec",

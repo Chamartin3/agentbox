@@ -19,9 +19,10 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext
-from agentbox.cli.ops.launch import _apply_creds, _resolve_workspace
+from agentbox.cli.ops.launch import _apply_creds
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
+from agentbox.core.data.errors import LaunchTargetUnresolved
 
 
 def shell_cmd(
@@ -52,9 +53,14 @@ def shell_cmd(
         obj.render.ops.error(f"Unknown agent: {agent!r}")
         raise typer.Exit(1)
 
-    workspace_path, is_ephemeral, creds, _ = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings, obj.render.ops, obj.workspaces
-    )
+    try:
+        target = obj.workspaces.resolve_launch_target(agent_def, workspace, ephemeral)
+    except LaunchTargetUnresolved as exc:
+        obj.render.ops.error(str(exc))
+        raise typer.Exit(1) from exc
+    workspace_path = target["path"]
+    is_ephemeral = target["is_ephemeral"]
+    creds = target["creds"]
 
     _apply_creds(creds, settings, obj.render.ops)
 

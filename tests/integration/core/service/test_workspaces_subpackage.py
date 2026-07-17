@@ -198,3 +198,137 @@ def test_refresh_workspace_mcp_cache_deletes_only_existing(store: Database) -> N
     by_name = {s["name"]: s["invalidated"] for s in statuses}
     assert by_name["srv-a"] is True and by_name["srv-b"] is False
     assert not (cache_dir / "srv-a.json").exists()  # the present cache was removed
+
+
+# ── resolve_launch_target ──────────────────────────────────────────────────
+
+
+def test_resolve_launch_target_ephemeral_flag(store: Database, tmp_path: Path) -> None:
+    """ephemeral=True → tmp dir that exists, is_ephemeral=True, creds/name=None."""
+    import shutil
+
+    from agentbox.core.service.workspaces import WorkspaceService
+
+    target = WorkspaceService().resolve_launch_target(None, None, ephemeral=True)
+    assert target["is_ephemeral"] is True
+    assert target["path"].is_dir()
+    assert target["creds"] is None
+    assert target["name"] is None
+    # Cleanup the tmp dir we created
+    shutil.rmtree(target["path"], ignore_errors=True)
+
+
+def test_resolve_launch_target_named_db_workspace(
+    store: Database, settings: Settings
+) -> None:
+    """Named DB workspace → its resolved path, is_ephemeral=False, name set."""
+    store.workspaces.insert(name="launch-ws")
+    from agentbox.core.service.workspaces import WorkspaceService
+
+    target = WorkspaceService().resolve_launch_target(
+        None, "launch-ws", ephemeral=False, settings=settings
+    )
+    assert target["is_ephemeral"] is False
+    assert target["name"] == "launch-ws"
+    assert target["creds"] is None
+    assert target["path"].is_dir()
+
+
+def test_resolve_launch_target_explicit_path_override(
+    store: Database, settings: Settings
+) -> None:
+    """Explicit workspace path override not in DB → path, name=None."""
+    from agentbox.core.service.workspaces import WorkspaceService
+
+    # "nonexistent-override" is not in the DB, so it's an explicit-path override.
+    target = WorkspaceService().resolve_launch_target(
+        None, "nonexistent-override", ephemeral=False, settings=settings
+    )
+    assert target["is_ephemeral"] is False
+    assert target["name"] is None  # no registry name
+    assert target["path"].is_dir()
+
+
+def test_resolve_launch_target_unresolved_raises(store: Database) -> None:
+    """Nothing provided → LaunchTargetUnresolved with the canonical message."""
+    from agentbox.core.data.errors import LaunchTargetUnresolved
+    from agentbox.core.service.workspaces import WorkspaceService
+
+    with pytest.raises(LaunchTargetUnresolved) as exc_info:
+        WorkspaceService().resolve_launch_target(None, None, ephemeral=False)
+
+    msg = str(exc_info.value)
+    assert "No workspace specified" in msg
+    assert "agentbox ws ls" in msg
+
+
+def test_resolve_launch_target_agent_ephemeral_workspace(store: Database) -> None:
+    """Agent with workspace='<ephemeral>' → tmp dir + is_ephemeral=True."""
+    import shutil
+
+    from agentbox.core.data.manifests.agents import AgentDef
+    from agentbox.core.service.workspaces import WorkspaceService
+
+    agent_def = AgentDef(id="test-agent", workspace="<ephemeral>")
+    target = WorkspaceService().resolve_launch_target(agent_def, None, ephemeral=False)
+    assert target["is_ephemeral"] is True
+    assert target["name"] is None
+    shutil.rmtree(target["path"], ignore_errors=True)
+
+
+# ── resolve_launch_mcp_servers ────────────────────────────────────────────
+
+
+def test_resolve_launch_mcp_servers_no_workspace(store: Database) -> None:
+    """None or empty workspace_id → empty list (no MCP servers to resolve)."""
+    svc = WorkspaceService()
+    assert svc.resolve_launch_mcp_servers(None) == []
+    assert svc.resolve_launch_mcp_servers("") == []
+
+
+def test_resolve_launch_mcp_servers_unknown_workspace_returns_empty(
+    store: Database,
+) -> None:
+    """An unregistered workspace_id yields [] (no project MCP servers in test)."""
+    result = WorkspaceService().resolve_launch_mcp_servers("no-such-ws")
+    assert result == []
+
+
+def test_resolve_launch_mcp_servers_filters_disabled_and_no_endpoint(
+    store: Database,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only enabled servers with a url or command survive the filter."""
+    from agentbox.core.data.manifests.workspaces import McpServerSpec
+    from agentbox.core.service.workspaces import WorkspaceService
+    from agentbox.core.service.system import SystemService
+
+    store.workspaces.insert(name="filter-ws")
+    svc = WorkspaceService()
+
+    # Stub get_project_mcp_servers so we control the server set without
+    # touching the real project config.  Two servers:
+    #   - enabled-url  : enabled, has url → should appear
+    #   - disabled-cmd : disabled, has command → should NOT appear
+    fake_specs = [
+        McpServerSpec(name="enabled-url", url="http://mcp.example.com", transport="http"),
+        McpServerSpec(name="disabled-cmd", command=["npx", "mcp-server"], transport="stdio"),
+    ]
+    monkeypatch.setattr(SystemService, "get_project_mcp_servers", lambda self: fake_specs)
+
+    # Override: disabled-cmd → explicitly disabled.
+    svc.set_mcp_server_override("filter-ws", "disabled-cmd", enabled=False, changelog="disable")
+    # Default policy is deny-unless-enabled, so we explicitly enable the url server.
+    svc.set_mcp_server_override("filter-ws", "enabled-url", enabled=True, changelog="enable")
+
+    result = svc.resolve_launch_mcp_servers("filter-ws")
+
+    names = [s["name"] for s in result]
+    assert "enabled-url" in names, "server with url must appear"
+    assert "disabled-cmd" not in names, "disabled server must be excluded"
+
+    # Verify the shape of the returned entry.
+    [entry] = [s for s in result if s["name"] == "enabled-url"]
+    assert entry["url"] == "http://mcp.example.com"
+    assert entry["transport"] == "http"
+    assert entry["command"] is None

@@ -14,17 +14,14 @@ import contextlib
 import os
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 
 import typer
 
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.renderers.ops import OpsRenderer
-from agentbox.core.service import AgentDef, RunnerKind, Settings, WorkspaceService
-# TODO(cli-arch): launch/shell orchestration belongs on a Service — see TECH_DEBT.md
-from agentbox.core.service.system import SystemService
-from agentbox.core.workspaces.tooling.mcp import McpRegistry
+from agentbox.core.data.errors import LaunchTargetUnresolved
+from agentbox.core.service import AgentDef, RunnerKind, Settings
 
 # Backends that ship a dedicated CLI. ``shell`` is special-cased: it exec's
 # ``$SHELL`` (falling back to /bin/bash) and never needs a runner binary.
@@ -93,9 +90,15 @@ def _launch_session(
             ops.error(f"Unknown agent: {agent!r}")
             raise typer.Exit(1)
 
-    workspace_path, is_ephemeral, creds, workspace_name = _resolve_workspace(
-        agent_def, workspace, ephemeral, settings, ops, obj.workspaces
-    )
+    try:
+        target = obj.workspaces.resolve_launch_target(agent_def, workspace, ephemeral)
+    except LaunchTargetUnresolved as exc:
+        ops.error(str(exc))
+        raise typer.Exit(1) from exc
+    workspace_path = target["path"]
+    is_ephemeral = target["is_ephemeral"]
+    creds = target["creds"]
+    workspace_name = target["name"]
 
     _apply_creds(creds, settings, ops)
 
@@ -118,14 +121,12 @@ def _launch_session(
     needs_config = runner in _RUNNERS_NEEDING_CONFIG or runner == RunnerKind.SHELL
     config_cm: contextlib.AbstractContextManager = contextlib.nullcontext()
     if needs_config:
-        _registry, servers = _resolve_mcp_for_launch(
-            settings, workspace_name, obj.system, obj.workspaces
-        )
+        servers = obj.workspaces.resolve_launch_mcp_servers(workspace_name)
         # The service owns placing native runner config in the workspace
         # cwd (where the engine discovers it) and cleaning up what it wrote.
         config_cm = obj.workspaces.launch_runner_configs(
             workspace_path,
-            servers=servers,
+            servers=servers if servers else None,
             keep=keep_configs,
         )
     try:
@@ -150,69 +151,6 @@ def _launch_session(
     return rc
 
 
-# ---------------------------------------------------------------------------
-# Workspace + creds resolution
-# ---------------------------------------------------------------------------
-
-
-def _resolve_workspace(
-    agent_def: AgentDef | None,
-    workspace_override: str | None,
-    force_ephemeral: bool,
-    settings: Settings,
-    ops: OpsRenderer,
-    workspace_svc: WorkspaceService,
-) -> tuple[Path, bool, str | None, str | None]:
-    """Return (workspace_path, is_ephemeral, creds, workspace_name).
-
-    Resolution order:
-      1. ``--ephemeral`` flag → tmp dir.
-      2. Explicit ``--workspace`` name (DB registry, then explicit path).
-      3. Agent's declared workspace (when ``--agent`` is given).
-      4. Error.
-
-    ``workspace_name`` is the registry name (used as workspace_id for
-    sync). It's ``None`` for ephemeral workspaces and for explicit-path
-    overrides that don't correspond to a named workspace.
-    """
-    if force_ephemeral:
-        return Path(tempfile.mkdtemp(prefix="agentbox-ws-")), True, None, None
-
-    ws_name = workspace_override
-    if ws_name is None and agent_def is not None:
-        ws_name = agent_def.workspace
-
-    if ws_name == "<ephemeral>":
-        return Path(tempfile.mkdtemp(prefix="agentbox-ws-")), True, None, None
-
-    if ws_name:
-        # Look up the DB registry (workspaces created via the API/UI).
-        # Returning the name lets build_workspace materialize env-doc +
-        # resource bindings.
-        db_row = workspace_svc.get_workspace(ws_name)
-        if db_row is not None:
-            rel_path = db_row.get("path")
-            path = (
-                settings.project_root / rel_path
-                if rel_path
-                else settings.workspaces_root / ws_name
-            )
-            path.mkdir(parents=True, exist_ok=True)
-            return path, False, None, ws_name
-        # Explicit override that isn't a named workspace → treat as relative path
-        if workspace_override is not None:
-            path = settings.workspaces_root / ws_name
-            path.mkdir(parents=True, exist_ok=True)
-            return path, False, None, None
-
-    ops.error(
-        "No workspace specified and no 'default' workspace defined.\n"
-        "Run agentbox ws ls to see available workspaces, "
-        "or pass --workspace NAME / --ephemeral."
-    )
-    raise typer.Exit(1)
-
-
 def _apply_creds(creds: str | None, settings: Settings, ops: OpsRenderer) -> None:
     """Set CLAUDE_CONFIG_DIR or ANTHROPIC_API_KEY based on the creds profile.
 
@@ -233,55 +171,6 @@ def _apply_creds(creds: str | None, settings: Settings, ops: OpsRenderer) -> Non
         os.environ["ANTHROPIC_API_KEY"] = api_key
     else:
         os.environ["CLAUDE_CONFIG_DIR"] = str(creds_base / f"claude-{creds}")
-
-
-# ---------------------------------------------------------------------------
-# Config generation
-# ---------------------------------------------------------------------------
-
-
-def _resolve_mcp_for_launch(
-    settings: Settings,
-    workspace_id: str | None,
-    system_svc: SystemService,
-    workspace_svc: WorkspaceService,
-) -> tuple[McpRegistry, list[dict] | None]:
-    """Resolve MCP registry and workspace-specific server overrides.
-
-    Returns ``(mcp_registry, servers)`` where *servers* is the
-    workspace-filtered MCP server list (or None when there's no
-    workspace_id).
-    """
-    manifest_specs = list(system_svc.get_project_mcp_servers())
-
-    # Per-workspace MCP isolation: resolve overrides and only emit
-    # enabled servers. Without a workspace_id we fall back to the
-    # global server list (handled by make_generator).
-    servers: list[dict] | None = None
-    if workspace_id and manifest_specs:
-        manifest_dicts = [
-            {"name": s.name, "config": s.model_dump(exclude={"name"})}
-            for s in manifest_specs
-        ]
-        resolved = workspace_svc.resolve_workspace_mcp(workspace_id, manifest_dicts)
-        servers = []
-        for entry in resolved.get("servers", []):
-            if not entry.get("enabled"):
-                continue
-            cfg = entry.get("config") or {}
-            if not cfg.get("url") and not cfg.get("command"):
-                continue
-            servers.append(
-                {
-                    "name": entry["name"],
-                    "url": cfg.get("url"),
-                    "transport": cfg.get("transport", "http"),
-                    "command": cfg.get("command"),
-                }
-            )
-
-    mcp_registry = McpRegistry(settings.mcp_cache_dir)
-    return mcp_registry, servers
 
 
 # ---------------------------------------------------------------------------

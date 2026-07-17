@@ -21,10 +21,12 @@ from typing import Any
 
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.data.constants import McpPolicy
-from agentbox.core.data import EnvDocPreviewResult, EnvDocRow
+from agentbox.core.data import AgentDef, EnvDocPreviewResult, EnvDocRow
 from agentbox.core.data.payload_types import (
     EffectivePermissions,
     EnrichedSubagentRow,
+    LaunchMcpServer,
+    LaunchTarget,
     PermissionFileEntry,
     EnvDocRenderEntry,
     GeneratedConfigsResult,
@@ -88,7 +90,12 @@ from agentbox.core.workspaces.build import (
 )
 from agentbox.core.tools.grants import resolve_grants
 
-from agentbox.core.data.errors import WorkspaceExists, WorkspaceNotFound, WorkspacePathEscape
+from agentbox.core.data.errors import (
+    LaunchTargetUnresolved,
+    WorkspaceExists,
+    WorkspaceNotFound,
+    WorkspacePathEscape,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +574,45 @@ class WorkspaceService(Service):
             )
         return {"servers": out_servers, "policy": policy}
 
+    def resolve_launch_mcp_servers(
+        self, workspace_id: str | None
+    ) -> list[LaunchMcpServer]:
+        """Return the filtered MCP server list for an interactive launch session.
+
+        Only servers that are enabled *and* have a ``url`` or ``command``
+        are included.  Returns ``[]`` when *workspace_id* is ``None``, when
+        the project has no manifest servers, or when no servers survive the
+        filter.
+        """
+        if not workspace_id:
+            return []
+        manifest_specs = list(SystemService().get_project_mcp_servers())
+        if not manifest_specs:
+            return []
+        manifest_dicts = [
+            {"name": s.name, "config": s.model_dump(exclude={"name"})}
+            for s in manifest_specs
+        ]
+        resolved = self.resolve_workspace_mcp(workspace_id, manifest_dicts)
+        out: list[LaunchMcpServer] = []
+        for entry in resolved.get("servers", []):
+            if not entry.get("enabled"):
+                continue
+            cfg = entry.get("config") or {}
+            url: str | None = cfg.get("url")
+            command: list[str] | None = cfg.get("command")
+            if not url and not command:
+                continue
+            out.append(
+                {
+                    "name": entry["name"],
+                    "url": url,
+                    "transport": cfg.get("transport", "http"),
+                    "command": command,
+                }
+            )
+        return out
+
     def refresh_mcp_discovery(self, workspace_id: str) -> McpDiscoveryRefreshResult:
         resolved = self.resolve_workspace_mcp(workspace_id)
         removed = 0
@@ -795,6 +841,81 @@ class WorkspaceService(Service):
         )
         return ws_path, _s.project_root
 
+    def resolve_launch_target(
+        self,
+        agent_def: AgentDef | None,
+        workspace_override: str | None,
+        ephemeral: bool,
+        *,
+        settings: Settings | None = None,
+    ) -> LaunchTarget:
+        """Return the resolved launch target for an interactive session.
+
+        Resolution order:
+          1. ``ephemeral=True`` → fresh tmp dir; ``is_ephemeral=True``.
+          2. ``workspace_override`` (DB lookup, then fallback path).
+          3. ``agent_def.workspace`` (agent's declared workspace).
+          4. Raises ``LaunchTargetUnresolved`` (maps to exit 1 in the CLI).
+
+        ``creds`` is always ``None`` in the current implementation — kept in
+        the shape so ``_apply_creds`` callers don't need to change.
+        ``settings`` is optional; when omitted ``self._settings`` is used.
+        """
+        _s = settings or self._settings
+
+        if ephemeral:
+            return {
+                "path": Path(tempfile.mkdtemp(prefix="agentbox-ws-")),
+                "is_ephemeral": True,
+                "creds": None,
+                "name": None,
+            }
+
+        ws_name = workspace_override
+        if ws_name is None and agent_def is not None:
+            ws_name = agent_def.workspace
+
+        if ws_name == "<ephemeral>":
+            return {
+                "path": Path(tempfile.mkdtemp(prefix="agentbox-ws-")),
+                "is_ephemeral": True,
+                "creds": None,
+                "name": None,
+            }
+
+        if ws_name:
+            # Look up the DB registry (workspaces created via the API/UI).
+            # Returning the name lets build_workspace materialise env-doc +
+            # resource bindings.
+            db_row = self.get_workspace(ws_name)
+            if db_row is not None:
+                rel_path = db_row.get("path")
+                path = (
+                    _s.project_root / rel_path
+                    if rel_path
+                    else _s.workspaces_root / ws_name
+                )
+                path.mkdir(parents=True, exist_ok=True)
+                return {
+                    "path": path,
+                    "is_ephemeral": False,
+                    "creds": None,
+                    "name": ws_name,
+                }
+            # Explicit override that isn't a named workspace → treat as
+            # relative path (no DB name for sync).
+            if workspace_override is not None:
+                path = _s.workspaces_root / ws_name
+                path.mkdir(parents=True, exist_ok=True)
+                return {
+                    "path": path,
+                    "is_ephemeral": False,
+                    "creds": None,
+                    "name": None,
+                }
+
+        raise LaunchTargetUnresolved()
+
     def _safe_resolve(self, ws_path: Path, rel: str) -> Path:
         target = (ws_path / rel).resolve()
         if not str(target).startswith(str(ws_path.resolve())):
@@ -834,7 +955,7 @@ class WorkspaceService(Service):
 
     def _project_mcp_refs(
         self,
-        servers: list[dict] | None = None,
+        servers: list[LaunchMcpServer] | list[dict] | None = None,
     ) -> list[McpRef]:
         if servers is not None:
             specs = servers
@@ -863,7 +984,7 @@ class WorkspaceService(Service):
         self,
         workspace_path: Path,
         *,
-        servers: list[dict] | None = None,
+        servers: list[LaunchMcpServer] | list[dict] | None = None,
         keep: bool = False,
     ) -> Iterator[Path]:
         """Place native runner config in *workspace_path* for interactive launch.

@@ -25,3 +25,22 @@ class WorkspacePathEscape(WorkspaceError, ValueError):
     def __init__(self, path: str) -> None:
         super().__init__("path escapes workspace")
         self.path = path
+
+
+class LaunchTargetUnresolved(WorkspaceError, LookupError):
+    """Raised when ``WorkspaceService.resolve_launch_target`` cannot determine
+    which workspace to use for an interactive launch.
+
+    Maps to exit code 1 via the CLI's ``except LookupError`` handler (same as
+    ``WorkspaceNotFound``).  The CLI catches this and renders the canonical
+    "No workspace specified…" message.
+    """
+
+    DEFAULT_MESSAGE = (
+        "No workspace specified and no 'default' workspace defined.\n"
+        "Run agentbox ws ls to see available workspaces, "
+        "or pass --workspace NAME / --ephemeral."
+    )
+
+    def __init__(self) -> None:
+        super().__init__(self.DEFAULT_MESSAGE)

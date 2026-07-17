@@ -75,7 +75,6 @@ ignore_imports =
     agentbox.cli.shared.deps -> agentbox.core.workspaces.tooling.mcp
     agentbox.api.agents.grants -> agentbox.core.workspaces.tooling.mcp.registry
     agentbox.api.workspaces.catalog -> agentbox.core.workspaces.tooling.mcp.registry
-    agentbox.cli.ops.launch -> agentbox.core.workspaces.tooling.mcp
 
 
 # ─── Resources is the foundation ─────────────────────────────────────────
