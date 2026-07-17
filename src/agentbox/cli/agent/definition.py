@@ -68,7 +68,7 @@ def def_ls(
         )
         table_rows.append({
             "id": a.id,
-            "runner_kind": a.runner.kind,
+            "runner_kind": obj.engines.effective_backend(a),
             "model": model_display,
             "session_mode": a.session_mode,
             "workspace": ws_display,
@@ -89,7 +89,7 @@ def def_show(ctx: typer.Context, agent_id: str) -> None:
     a = resolve_agent(agent_id)
 
     obj.render.agent.agent_meta_panel(a)
-    obj.render.agent.agent_runner_panel(a)
+    obj.render.agent.agent_runner_panel(a, obj.engines.effective_backend(a))
 
     profile = obj.engines.get_agent_runner_profile(a.id)
     profile_dict: dict[str, object] | None

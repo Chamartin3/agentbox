@@ -40,12 +40,11 @@ from agentbox.core.data import (
 from agentbox.core.data.payload_types import RefreshProvidersResult
 from agentbox.core.tools.registry import SharedToolRegistry, ToolSpec
 from agentbox.core.data._util import now_iso
-from agentbox.core.config import load_settings
 from agentbox.core.engines import (
     EffectiveRunnerConfig,
     ProviderDescriptor,
     ProviderModel,
-    RunnerProfileResolver,
+    effective_backend,
     get_credential,
     get_provider,
     list_backends,
@@ -266,15 +265,7 @@ class EngineService(Service):
         display, observability) uses to read "the agent's backend". It never
         consults the legacy ``runner.kind``.
         """
-        eff = RunnerProfileResolver().resolve(
-            agent=agent,
-            runner_profiles=self._db.runner_profiles,
-            runner_profile_id=None,
-            runner_config=None,
-            backend_override=None,
-            timeout_seconds=None,
-        )
-        return eff.backend or load_settings().default_backend
+        return effective_backend(agent, self._db.runner_profiles)
 
     def set_agent_runner_profile(
         self, agent_id: str, profile_id: str

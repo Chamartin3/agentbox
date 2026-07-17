@@ -74,6 +74,26 @@ class EffectiveRunnerConfig(BaseModel):
     """How this config was resolved."""
 
 
+def effective_backend(agent: Any, runner_profiles: RunnerProfileManager) -> str:
+    """The agent's effective backend — a backend projection of the one resolver.
+
+    Runs ``RunnerProfileResolver.resolve()`` with no per-run overrides
+    (agent-bound profile → system-default → ``Settings.default_backend``) and
+    returns its backend. The single place non-run callers read "the agent's
+    backend"; it never consults ``runner.kind``. Takes ``runner_profiles`` so
+    callers reuse their own DB handle instead of constructing a service.
+    """
+    eff = RunnerProfileResolver().resolve(
+        agent=agent,
+        runner_profiles=runner_profiles,
+        runner_profile_id=None,
+        runner_config=None,
+        backend_override=None,
+        timeout_seconds=None,
+    )
+    return eff.backend or load_settings().default_backend
+
+
 class RunnerProfileResolver:
     """Resolves effective runner config from multiple sources.
 
@@ -82,6 +102,7 @@ class RunnerProfileResolver:
     2. Per-run runner_profile_id
     3. Agent-bound runner profile
     4. System default runner profile
+    5. Settings.default_backend (terminal — the resolver is total)
 
     AgentDef.runner is intentionally not consulted here. The resolved
     EffectiveRunnerConfig is the only runtime dispatch source of truth.

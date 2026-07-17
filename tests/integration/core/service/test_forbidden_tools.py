@@ -90,9 +90,14 @@ def test_short_changelog_raises(store: Database) -> None:
         AgentService().forbid_tool("a.gent", "shell.exec", "ab")
 
 
-def test_list_effective_tools_excludes_forbidden(tmp_path: Path) -> None:
-    # A claude_code agent's native tools include shell.exec; forbidding it must
-    # drop it from the effective list while other native tools remain.
+def test_list_effective_tools_excludes_forbidden(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The backend is resolved from the runner profile / settings default now,
+    # not runner.kind — so drive it via AGENTBOX_DEFAULT_BACKEND. claude_code's
+    # native tools include shell.exec; forbidding it must drop it from the
+    # effective list while other native tools remain.
+    monkeypatch.setenv("AGENTBOX_DEFAULT_BACKEND", "claude_code")
     store = Database(tmp_path / "agentbox.sqlite")
     _seed_agent(store, "cc.agent", kind="claude_code")
     AgentService().forbid_tool("cc.agent", "shell.exec", "deny shell")

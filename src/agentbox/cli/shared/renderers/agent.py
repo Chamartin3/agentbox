@@ -76,12 +76,17 @@ class AgentRenderer(Renderer):
         grid.add_row("tags", ", ".join(agent.tags) if agent.tags else "\u2014")
         self.print(Panel(grid, title="Meta", border_style="cyan"))
 
-    def agent_runner_panel(self, agent: AgentDef) -> None:
-        """Render agent runner panel."""
+    def agent_runner_panel(self, agent: AgentDef, backend: str | None = None) -> None:
+        """Render agent runner panel.
+
+        ``backend`` is the agent's effective backend (resolved from its runner
+        profile / settings default) — the backend no longer comes from a
+        per-agent field.
+        """
         grid = Table.grid(padding=(0, 2))
         grid.add_column(style="dim", justify="right")
         grid.add_column()
-        grid.add_row("kind", agent.runner.kind)
+        grid.add_row("kind", backend or "—")
         grid.add_row("timeout", f"{agent.runner.timeout_seconds}s")
         grid.add_row(
             "allowed_tools",

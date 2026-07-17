@@ -34,11 +34,14 @@ def capture_fragments(
     project_root: Path,
     argv: list[str] | None = None,
     composed: ComposedPrompt | None = None,
+    backend: str | None = None,
 ) -> str:
     """Build prompt fragments and return them as a JSON string.
 
     The single public entry point: execution code calls this once and stores
     the result — it never imports the fragment-building internals directly.
+    ``backend`` is the run's resolved backend (from the one runner resolver);
+    it drives backend-specific fragments and their ``injected_by`` labels.
     """
     frags = build_fragments(
         agent=agent,
@@ -46,6 +49,7 @@ def capture_fragments(
         project_root=project_root,
         argv=argv,
         composed=composed,
+        backend=backend,
     )
     return fragments_to_json(frags)
 
@@ -56,7 +60,11 @@ def build_fragments(
     project_root: Path,
     argv: list[str] | None = None,
     composed: ComposedPrompt | None = None,
+    backend: str | None = None,
 ) -> list[PromptFragment]:
+    # The run's resolved backend labels fragments and selects backend-specific
+    # ones. Never read from runner.kind — the profile/settings resolver owns it.
+    backend_label = backend or "agentbox"
     frags: list[PromptFragment] = [
         PromptFragment(
             name="user_input",
@@ -96,7 +104,7 @@ def build_fragments(
                 PromptFragment(
                     name="agent_system_prompt",
                     source="agent_def",
-                    injected_by=agent.runner.kind,
+                    injected_by=backend_label,
                     content=f"<unreadable: {exc}>",
                     inspectable=False,
                 )
@@ -107,14 +115,14 @@ def build_fragments(
                 PromptFragment(
                     name="agent_system_prompt",
                     source="agent_def",
-                    injected_by=agent.runner.kind,
+                    injected_by=backend_label,
                     content=text,
                 )
             )
 
-    if agent.runner.kind == BackendName.CLAUDE_CODE:
+    if backend == BackendName.CLAUDE_CODE:
         frags.extend(_claude_code_fragments(agent, project_root, argv))
-    elif agent.runner.kind == BackendName.TOKEN:
+    elif backend == BackendName.TOKEN:
         frags.append(
             PromptFragment(
                 name="token_note",

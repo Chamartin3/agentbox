@@ -40,6 +40,7 @@ from agentbox.core.agents import available_tools, effective_tools, resolve_engin
 from agentbox.core.agents import compose_from_source, load_bundle_from_bindings
 from agentbox.core.agents import engine_load_failure as backend_load_failure
 from agentbox.core.agents import list_engines
+from agentbox.core.engines import effective_backend
 from agentbox.core.agents.versioning import prompts as _prompts
 from agentbox.core.config import Settings
 from agentbox.core.config import load_settings
@@ -98,6 +99,7 @@ from agentbox.core.db import (
 )
 from agentbox.core.db import (
     AgentSyncManager,
+    RunnerProfileManager,
 )
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,
@@ -788,9 +790,12 @@ def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
     return out
 
 
-def _validate_runner_against_registry(agent: AgentDef) -> None:
-    kind = agent.runner.kind
-    name = kind
+def _validate_runner_against_registry(
+    agent: AgentDef, runner_profiles: RunnerProfileManager
+) -> None:
+    # Validate the backend the agent will actually dispatch to — resolved from
+    # its runner profile / settings default, never the legacy runner.kind.
+    name = effective_backend(agent, runner_profiles)
     loaded = list_engines()
     if name in loaded:
         return
@@ -800,7 +805,7 @@ def _validate_runner_against_registry(agent: AgentDef) -> None:
             400,
             "backend_unloadable",
             (
-                f"runner.kind={name!r} is declared but failed to load "
+                f"resolved backend {name!r} failed to load "
                 f"at startup ({failure})."
             ),
         )
@@ -808,7 +813,7 @@ def _validate_runner_against_registry(agent: AgentDef) -> None:
         400,
         "backend_unknown",
         (
-            f"runner.kind={name!r} has no backend installed. "
+            f"resolved backend {name!r} has no backend installed. "
             f"Registered: {sorted(loaded.keys())}."
         ),
     )
@@ -820,6 +825,7 @@ def patch_agent_config(
     agent_versions: AgentVersionManager,
     active_agent_versions: ActiveAgentVersionManager,
     agent_sync: AgentSyncManager,
+    runner_profiles: RunnerProfileManager,
     settings: Any,
     agent_id: str,
     patch: dict,
@@ -836,7 +842,7 @@ def patch_agent_config(
         updated = AgentDef.model_validate(merged)
     except Exception as exc:
         raise AgentServiceError(400, "validation_failed", str(exc)) from exc
-    _validate_runner_against_registry(updated)
+    _validate_runner_against_registry(updated, runner_profiles)
     updated.source_path = current.source_path
     updated.source_format = current.source_format
 
@@ -1952,7 +1958,7 @@ class AgentService(Service):
             raise ValueError(f"Agent {agent_id!r} not found")
 
         # Get the agent's backend and its native declared tools
-        backend = resolve_engine(agent.runner.kind)
+        backend = resolve_engine(effective_backend(agent, self._db.runner_profiles))
         declared_tools = backend.declared_tools()
 
         # Resolve workspace availability catalog
@@ -2721,7 +2727,7 @@ class AgentService(Service):
             updated = AgentDef.model_validate(merged)
         except Exception as exc:
             raise AgentServiceError(400, "validation_failed", str(exc)) from exc
-        _validate_runner_against_registry(updated)
+        _validate_runner_against_registry(updated, self._db.runner_profiles)
         updated.source_path = current.source_path
         updated.source_format = current.source_format
 

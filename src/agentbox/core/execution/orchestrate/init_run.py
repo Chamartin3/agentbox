@@ -237,6 +237,7 @@ def launch_background_task(
             user_input=input_,
             project_root=settings.project_root,
             composed=composed,
+            backend=getattr(effective, "backend", None),
         )
         db.run_prompts.save(run_id, frags_json)
     except Exception:

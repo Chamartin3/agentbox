@@ -58,7 +58,11 @@ from agentbox.core.engines.credentials import (
 )
 
 # -- Profiles -----------------------------------------------------------------
-from agentbox.core.engines.profiles import EffectiveRunnerConfig, RunnerProfileResolver
+from agentbox.core.engines.profiles import (
+    EffectiveRunnerConfig,
+    RunnerProfileResolver,
+    effective_backend,
+)
 
 __all__ = [
     # Backends
@@ -89,4 +93,5 @@ __all__ = [
     # Profiles
     "EffectiveRunnerConfig",
     "RunnerProfileResolver",
+    "effective_backend",
 ]

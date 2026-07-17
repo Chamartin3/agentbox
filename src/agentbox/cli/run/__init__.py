@@ -158,7 +158,8 @@ def run_cmd(
         return
 
     # --- Interactive path -------------------------------------------------
-    # Determine the runner. Priority: --backend > agent's runner.kind
+    # Determine the runner. Priority: --backend > the agent's effective backend
+    # (resolved from its runner profile / settings default — never runner.kind).
     runner: str
     if backend:
         runner = backend
@@ -167,8 +168,7 @@ def run_cmd(
         if agent_def is None:
             renders.ops.error(f"Unknown agent: {agent!r}")
             raise typer.Exit(1)
-        raw_kind = agent_def.runner.kind
-        runner = BackendName.runner_for(raw_kind)
+        runner = BackendName.runner_for(obj.engines.effective_backend(agent_def))
     else:
         renders.ops.error(
             "No agent or --backend specified. "
