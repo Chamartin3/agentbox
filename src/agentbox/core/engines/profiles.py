@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from agentbox.core.config import load_settings
 from agentbox.core.data.payload_types import ModelParams
 from agentbox.core.engines.backends.registry import get_backend as resolve_engine_by_name
 from agentbox.core.engines.providers import get_provider
@@ -182,8 +183,13 @@ class RunnerProfileResolver:
             )
             return config
 
+        # Rule 5: terminal fallback — the settings-level default backend.
+        # Keeps the resolver total: it always yields a backend, so no caller
+        # ever needs to consult the legacy per-agent ``runner.kind``.
         return EffectiveRunnerConfig(
-            timeout_seconds=timeout_seconds, source="run_override"
+            backend=backend_override or load_settings().default_backend,
+            timeout_seconds=timeout_seconds,
+            source="run_override",
         )
 
     def _build_from_profile(

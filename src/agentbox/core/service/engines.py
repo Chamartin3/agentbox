@@ -40,10 +40,12 @@ from agentbox.core.data import (
 from agentbox.core.data.payload_types import RefreshProvidersResult
 from agentbox.core.tools.registry import SharedToolRegistry, ToolSpec
 from agentbox.core.data._util import now_iso
+from agentbox.core.config import load_settings
 from agentbox.core.engines import (
     EffectiveRunnerConfig,
     ProviderDescriptor,
     ProviderModel,
+    RunnerProfileResolver,
     get_credential,
     get_provider,
     list_backends,
@@ -253,6 +255,26 @@ class EngineService(Service):
         """Return the profile bound to *agent_id*, or None."""
         row = self._db.runner_profiles.get_agent_profile(agent_id)
         return row if row else None
+
+    def effective_backend(self, agent: Any) -> str:
+        """The agent's effective backend — the single resolver's answer.
+
+        A thin backend projection of ``RunnerProfileResolver.resolve()`` with
+        no per-run overrides: agent-bound profile → system-default profile →
+        ``Settings.default_backend``. This is the one entry point every
+        non-run caller (save validation, tool resolution, CLI dispatch,
+        display, observability) uses to read "the agent's backend". It never
+        consults the legacy ``runner.kind``.
+        """
+        eff = RunnerProfileResolver().resolve(
+            agent=agent,
+            runner_profiles=self._db.runner_profiles,
+            runner_profile_id=None,
+            runner_config=None,
+            backend_override=None,
+            timeout_seconds=None,
+        )
+        return eff.backend or load_settings().default_backend
 
     def set_agent_runner_profile(
         self, agent_id: str, profile_id: str

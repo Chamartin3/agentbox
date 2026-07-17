@@ -141,6 +141,18 @@ class Settings:
     def skip_resource_import(self) -> bool:
         return bool(os.environ.get("AGENTBOX_SKIP_RESOURCE_IMPORT"))
 
+    @property
+    def default_backend(self) -> str:
+        """Terminal fallback backend when no runner profile resolves.
+
+        The single source of truth for an agent's backend is the runner
+        profile cascade (per-run override → per-run profile → agent-bound
+        profile → system-default profile). This settings value is the last
+        resort below all of those — it replaced the legacy per-agent
+        ``runner.kind``. Overridable via ``AGENTBOX_DEFAULT_BACKEND``.
+        """
+        return os.environ.get("AGENTBOX_DEFAULT_BACKEND", "token")
+
     # Backend default models — the fallback model a backend uses when the
     # runner config omits one. Overridable per backend via AGENTBOX_*_MODEL.
     # ``None`` means "let the backend's own CLI/SDK pick its default".
