@@ -52,11 +52,7 @@ def test_render_stores_agent_meta() -> None:
 
 
 def test_render_stores_prompt_text(tmp_path: Path) -> None:
-    prompt_file = tmp_path / "prompt.md"
-    prompt_file.write_text("You are a helpful assistant.")
-    agent = _make_agent(
-        prompt_path=str(prompt_file),
-    )
+    agent = _make_agent(prompt="You are a helpful assistant.")
     adapter = TokenBackend()
     rendered = adapter.render(agent, tmp_path)
 

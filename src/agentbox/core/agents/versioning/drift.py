@@ -78,48 +78,15 @@ def build_config_json_str(agent: AgentDef) -> str:
     return json.dumps(data, sort_keys=True, default=str)
 
 
-def _load_prompt_safe(agent: AgentDef) -> str:
-    """Read the agent's prompt text, returning ``""`` on any error."""
-    try:
-        if getattr(agent, "prompt", None):
-            return agent.prompt or ""
-        if agent.source_path is None:
-            return ""
-        root = agent.source_path.parent
-        if hasattr(agent, "load_prompt"):
-            return agent.load_prompt(root)
-        return ""
-    except Exception:
-        logger.exception("versioning: prompt load failed for agent %r", agent.id)
-        return ""
-
 
 def _sync_prompt(
     agent: AgentDef,
     prompt_versions: PromptVersionManager,
-    project_root: Path | None,
+    project_root: Path | None = None,
 ) -> None:
-    """Capture the on-disk prompt as a new committed prompt version if it changed.
-
-    Independent of agent-definition drift: editing only ``prompt.md`` should
-    still produce a new entry in ``prompt_versions`` so the history viewer
-    reflects it.
-    """
+    """Capture the agent's inline prompt as a committed prompt version if it changed."""
     try:
-        if not getattr(agent, "prompt_path", None) and not getattr(
-            agent, "prompt", None
-        ):
-            return
-        root = project_root or (
-            agent.source_path.parent if agent.source_path else Path()
-        )
-        try:
-            content = agent.load_prompt(root) if hasattr(agent, "load_prompt") else ""
-        except FileNotFoundError:
-            # DB-only agent (or stale prompt_path after rename) — no disk
-            # source to sync from. Authoritative content lives in
-            # agent_versions.prompt_content; nothing to do here.
-            return
+        content = agent.prompt or ""
         if not content:
             return
 
@@ -306,13 +273,7 @@ def startup_sweep(
             _heal_active_pointer(agent.id, agent_versions)
             if status == AgentDriftStatus.NEW:
                 file_hash = _compute_file_hash(agent.source_path) or "unknown"
-                prompt_text = (
-                    agent.load_prompt(
-                        agent.source_path.parent if agent.source_path else Path()
-                    )
-                    if hasattr(agent, "load_prompt") and agent.source_path
-                    else ""
-                )
+                prompt_text = agent.prompt or ""
                 agent_versions.insert_version(
                     agent_id=agent.id,
                     version=agent_versions.next_version(agent.id),

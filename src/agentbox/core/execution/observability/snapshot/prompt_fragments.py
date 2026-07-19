@@ -62,9 +62,6 @@ def build_fragments(
     composed: ComposedPrompt | None = None,
     backend: str | None = None,
 ) -> list[PromptFragment]:
-    # The run's resolved backend labels fragments and selects backend-specific
-    # ones. Never read from runner.kind — the profile/settings resolver owns it.
-    backend_label = backend or "agentbox"
     frags: list[PromptFragment] = [
         PromptFragment(
             name="user_input",
@@ -74,7 +71,6 @@ def build_fragments(
         ),
     ]
 
-    # Composed prompts take precedence over legacy prompt_path.
     composed_system = composed.system_text if composed is not None else None
     if composed_system is not None:
         frags.append(
@@ -93,30 +89,6 @@ def build_fragments(
                     source="agent_def",
                     injected_by="agentbox",
                     content=json.dumps(composed_schema, indent=2),
-                )
-            )
-    elif agent.prompt_path:
-        text: str | None = None
-        try:
-            text = (project_root / agent.prompt_path).read_text(encoding="utf-8")
-        except OSError as exc:
-            frags.append(
-                PromptFragment(
-                    name="agent_system_prompt",
-                    source="agent_def",
-                    injected_by=backend_label,
-                    content=f"<unreadable: {exc}>",
-                    inspectable=False,
-                )
-            )
-            text = None
-        if text is not None:
-            frags.append(
-                PromptFragment(
-                    name="agent_system_prompt",
-                    source="agent_def",
-                    injected_by=backend_label,
-                    content=text,
                 )
             )
 

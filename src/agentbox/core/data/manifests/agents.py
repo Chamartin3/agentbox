@@ -102,23 +102,12 @@ class AgentDef(BaseModel):
     """Stable identifier (e.g. `myproject.draft_writer`)."""
 
     description: str = ""
-    prompt_path: str | None = None
-    """Project-relative path to system prompt markdown.
-
-    For ``token`` runners without an explicit ``agent_module``,
-    this markdown is used to auto-generate a minimal agent.
-
-    .. deprecated::
-       Use ``[composition]`` instead.
-    """
 
     prompt: str | None = None
-    """Inline system prompt text. Mutually exclusive with ``prompt_path`` —
-    when both are set, ``prompt`` wins."""
+    """Inline system prompt text."""
 
     composition: CompositionConfig | None = None
-    """Prompt-composition recipe. When present, takes precedence over
-    ``prompt_path`` / ``prompt``."""
+    """Prompt-composition recipe. When present, takes precedence over ``prompt``."""
 
     workspace: str | None = None
     """Workspace reference.
@@ -173,13 +162,6 @@ class AgentDef(BaseModel):
     Set automatically by ``DefinitionLoader``; *None* for agents
     created programmatically.
     """
-
-    def load_prompt(self, project_root: Path) -> str:
-        if self.prompt:
-            return self.prompt
-        if self.prompt_path:
-            return (project_root / self.prompt_path).read_text(encoding="utf-8")
-        return ""
 
     @classmethod
     def from_db_row(cls, row: AgentVersionRow | dict) -> AgentDef:

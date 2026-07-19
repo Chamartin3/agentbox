@@ -11,7 +11,7 @@ from typing import NoReturn, TypedDict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_db, get_settings
+from agentbox.api.deps import get_db
 from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult
 import agentbox.core.service.agents as prompts_service
 from agentbox.core.service.agents import AgentNotFound, PromptError
@@ -46,7 +46,6 @@ def get_prompt(agent_id: str) -> _PromptDocResult:
             agent_defs=db.agent_defs,
             agent_versions=db.agent_versions,
             prompt_versions=db.prompt_versions,
-            project_root=get_settings().project_root,
         )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
@@ -66,7 +65,7 @@ class PromptBody(BaseModel):
 
 @router.put("/agents/{agent_id}/prompt")
 def put_prompt(agent_id: str, body: PromptBody) -> _PromptDocResult:
-    """Write prompt to disk and create a new committed version if changed."""
+    """Capture a new committed prompt version if content changed."""
     try:
         db = get_db()
         doc = prompts_service.put_prompt(
@@ -74,7 +73,6 @@ def put_prompt(agent_id: str, body: PromptBody) -> _PromptDocResult:
             body.content,
             agent_defs=db.agent_defs,
             prompt_versions=db.prompt_versions,
-            project_root=get_settings().project_root,
         )
     except AgentNotFound as exc:
         raise HTTPException(404) from exc
@@ -167,7 +165,6 @@ def publish_prompt(agent_id: str, body: PublishBody) -> _PromptDocResult:
             agent_id,
             agent_defs=db.agent_defs,
             prompt_versions=db.prompt_versions,
-            project_root=get_settings().project_root,
             changelog=body.changelog,
             author=body.author,
         )
@@ -199,7 +196,6 @@ def rollback_prompt(agent_id: str, body: RollbackBody) -> _PromptDocResult:
             body.target_version,
             agent_defs=db.agent_defs,
             prompt_versions=db.prompt_versions,
-            project_root=get_settings().project_root,
             author=body.author,
         )
     except AgentNotFound as exc:

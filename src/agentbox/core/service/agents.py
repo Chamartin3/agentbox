@@ -293,11 +293,6 @@ def get_agent_detail(
     db_prompt = (latest_row or {}).get("prompt_content")
     if isinstance(db_prompt, str) and db_prompt:
         prompt = db_prompt
-    elif agent.prompt_path:
-        try:
-            prompt = agent.load_prompt(settings.project_root)
-        except FileNotFoundError:
-            prompt = ""
 
     composed_system: str | None = None
     composed_user: str | None = None
@@ -598,11 +593,10 @@ def get_prompt(
     agent_defs: AgentDefManager,
     agent_versions: AgentVersionManager,
     prompt_versions: PromptVersionManager,
-    project_root: Path,
 ) -> PromptDoc:
     """Return the active prompt document for an agent."""
-    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
-    return _prompts.read_versioned(agent, project_root, agent_versions, prompt_versions)
+    _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    return _prompts.read_versioned(agent_id, agent_versions, prompt_versions)
 
 
 def list_versions(
@@ -664,13 +658,10 @@ def put_prompt(
     *,
     agent_defs: AgentDefManager,
     prompt_versions: PromptVersionManager,
-    project_root: Path,
     author: str = "api",
 ) -> PromptDoc:
-    """Write prompt to disk and capture a new version when changed."""
-    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
-    doc = _prompts.write(agent, project_root, content)
-    # Replicate sync_prompt_from_disk: no-op if content matches latest committed.
+    """Capture a new committed prompt version when content changed."""
+    _resolve_or_raise(agent_id, agent_defs=agent_defs)
     new_hash = hashlib.sha256(content.encode()).hexdigest()
     latest = prompt_versions.get_latest_committed(agent_id)
     if latest is not None:
@@ -683,7 +674,7 @@ def put_prompt(
                 content=content,
                 content_hash=new_hash,
                 author=author,
-                changelog="Out-of-band file edit",
+                changelog="prompt update",
                 created_at=now_iso(),
                 delete_drafts=False,
             )
@@ -693,11 +684,11 @@ def put_prompt(
             content=content,
             content_hash=new_hash,
             author=author,
-            changelog="Imported from disk",
+            changelog="initial prompt",
             created_at=now_iso(),
             delete_drafts=False,
         )
-    return doc
+    return PromptDoc(path="", content=content, size=len(content.encode("utf-8")), mtime=now_iso())
 
 
 def save_draft(
@@ -718,20 +709,12 @@ def publish(
     *,
     agent_defs: AgentDefManager,
     prompt_versions: PromptVersionManager,
-    project_root: Path,
     changelog: str = "",
     author: str = "system",
 ) -> PromptDoc:
-    """Publish the current draft and sync the committed body to disk."""
-    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
-    return _prompts.publish(
-        agent_id,
-        prompt_versions,
-        project_root,
-        agent=agent,
-        changelog=changelog,
-        author=author,
-    )
+    """Publish the current draft as a committed version."""
+    _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    return _prompts.publish(agent_id, prompt_versions, changelog=changelog, author=author)
 
 
 def rollback(
@@ -740,19 +723,11 @@ def rollback(
     *,
     agent_defs: AgentDefManager,
     prompt_versions: PromptVersionManager,
-    project_root: Path,
     author: str = "system",
 ) -> PromptDoc:
-    """Roll back to a previous committed version and sync to disk."""
-    agent = _resolve_or_raise(agent_id, agent_defs=agent_defs)
-    return _prompts.rollback(
-        agent_id,
-        prompt_versions,
-        project_root,
-        target_version=target_version,
-        agent=agent,
-        author=author,
-    )
+    """Roll back to a previous committed version."""
+    _resolve_or_raise(agent_id, agent_defs=agent_defs)
+    return _prompts.rollback(agent_id, prompt_versions, target_version=target_version, author=author)
 
 
 _FORBIDDEN_PATCH_KEYS = {"id"}
@@ -846,12 +821,6 @@ def patch_agent_config(
     updated.source_path = current.source_path
     updated.source_format = current.source_format
 
-    prompt_text = ""
-    if updated.prompt_path:
-        try:
-            prompt_text = updated.load_prompt(settings.project_root)
-        except FileNotFoundError:
-            prompt_text = ""
     snapshot = build_agent_snapshot(updated)
     config_json = build_config_json_str(updated)
 
@@ -870,12 +839,8 @@ def patch_agent_config(
         new_cfg[direction] = section
     config_json = _json.dumps(new_cfg)
 
-    carried_prompt_content = (
-        (active_row or {}).get("prompt_content") or prompt_text or None
-    )
-    carried_prompt_snapshot = (
-        prompt_text or (active_row or {}).get("prompt_snapshot") or ""
-    )
+    carried_prompt_content = (active_row or {}).get("prompt_content") or None
+    carried_prompt_snapshot = (active_row or {}).get("prompt_snapshot") or ""
 
     try:
         vid = agent_versions.insert_version(
@@ -1084,17 +1049,10 @@ def put_agent_validation(
         base_cfg[direction] = section
     new_config_json = _json.dumps(base_cfg)
 
-    prompt_text = ""
-    if current.prompt_path:
-        try:
-            prompt_text = current.load_prompt(settings.project_root)
-        except FileNotFoundError:
-            prompt_text = ""
     snapshot = build_agent_snapshot(current)
     carried_prompt_content = (
         active.get("prompt_content")
         or (current.prompt or "").strip()
-        or prompt_text
         or None
     )
 
@@ -1107,7 +1065,7 @@ def put_agent_validation(
                 current.source_format.value if current.source_format else "unknown"
             ),
             content_snapshot=snapshot,
-            prompt_snapshot=prompt_text,
+            prompt_snapshot="",
             content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
             author=actor or "api:validation",
             changelog=f"validation: {reason}",
@@ -2519,7 +2477,7 @@ class AgentService(Service):
         return self.create_agent(
             agent_id=agent.id,
             config_json=config_json,
-            prompt_content=agent.prompt,
+            prompt_content=agent.prompt or None,
             author=author,
             changelog=changelog,
             source="cli",
@@ -2706,15 +2664,11 @@ class AgentService(Service):
         """Best-effort decode of a stored ``config_json`` blob to a dict."""
         return _decode_config_json_free(raw)
 
-    def patch_agent_config(
-        self, agent_id: str, patch: dict, *, settings: Any = None
-    ) -> AgentDef:
+    def patch_agent_config(self, agent_id: str, patch: dict) -> AgentDef:
         """Merge ``patch`` onto the active def, mint + activate a new version.
 
         Raises ``AgentServiceError`` (HTTP-shaped) on any failure.
         """
-        if settings is None:
-            settings = load_settings()
         if not patch:
             raise AgentServiceError(400, "empty_patch", "empty patch")
 
@@ -2731,12 +2685,6 @@ class AgentService(Service):
         updated.source_path = current.source_path
         updated.source_format = current.source_format
 
-        prompt_text = ""
-        if updated.prompt_path:
-            try:
-                prompt_text = updated.load_prompt(settings.project_root)
-            except FileNotFoundError:
-                prompt_text = ""
         snapshot = build_agent_snapshot(updated)
         config_json = build_config_json_str(updated)
 
@@ -2755,12 +2703,8 @@ class AgentService(Service):
             new_cfg[direction] = section
         config_json = json.dumps(new_cfg)
 
-        carried_prompt_content = (
-            (active_row or {}).get("prompt_content") or prompt_text or None
-        )
-        carried_prompt_snapshot = (
-            prompt_text or (active_row or {}).get("prompt_snapshot") or ""
-        )
+        carried_prompt_content = (active_row or {}).get("prompt_content") or None
+        carried_prompt_snapshot = (active_row or {}).get("prompt_snapshot") or ""
 
         try:
             new_version = self.create_version(
@@ -2829,11 +2773,8 @@ class AgentService(Service):
         output_validators: list[dict] | None,
         reason: str,
         actor: str | None,
-        settings: Any = None,
     ) -> AgentValidationResult:
         """Write inline validators by minting + activating a new version."""
-        if settings is None:
-            settings = load_settings()
         current = self.resolve_agent(agent_id)
         if current is None:
             raise AgentServiceError(404, "unknown_agent", agent_id)
@@ -2862,17 +2803,10 @@ class AgentService(Service):
             base_cfg[direction] = section
         new_config_json = json.dumps(base_cfg)
 
-        prompt_text = ""
-        if current.prompt_path:
-            try:
-                prompt_text = current.load_prompt(settings.project_root)
-            except FileNotFoundError:
-                prompt_text = ""
         snapshot = build_agent_snapshot(current)
         carried_prompt_content = (
             active.get("prompt_content")
             or (current.prompt or "").strip()
-            or prompt_text
             or None
         )
 
@@ -2884,7 +2818,7 @@ class AgentService(Service):
                     current.source_format.value if current.source_format else "unknown"
                 ),
                 content_snapshot=snapshot,
-                prompt_snapshot=prompt_text,
+                prompt_snapshot="",
                 content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
                 author=actor or "api:validation",
                 changelog=f"validation: {reason}",

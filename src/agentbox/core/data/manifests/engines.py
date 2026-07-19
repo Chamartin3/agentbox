@@ -49,8 +49,6 @@ class RunnerSpec(BaseModel):
     Format: ``module.path:ClassName`` (e.g.
     ``agents.company_researcher.agent:CompanyResearcherAgent``).
 
-    When unset but ``prompt_path`` is provided on the ``AgentDef``,
-    a minimal agent is auto-generated from the markdown.
     """
 
     # --- token direct-Agent dependencies ---

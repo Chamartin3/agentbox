@@ -189,16 +189,6 @@ class BackendAdapter(ABC):
         workdir: Path,
         composed: ComposedView | None = None,
     ) -> str:
-        """Resolve the system prompt for in-process backends.
-
-        Prefers ``composed.system`` (set by the prompt composer) and
-        falls back to ``agent.load_prompt(workdir.parent)`` when
-        available. Returns ``""`` when neither resolves.
-        """
-        composed_system = composed.system if composed is not None else None
-        if composed_system is not None:
-            return composed_system
-        prompt_text = getattr(agent, "load_prompt", None)
-        if prompt_text is None:
-            return ""
-        return prompt_text(workdir.parent) or ""
+        if composed is not None and composed.system:
+            return composed.system
+        return getattr(agent, "prompt", None) or ""

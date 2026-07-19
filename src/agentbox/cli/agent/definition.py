@@ -252,13 +252,6 @@ def def_edit(
     updated.source_path = current.source_path
     updated.source_format = current.source_format
     snapshot = obj.agents.build_snapshot(updated)
-    prompt_text = ""
-    if updated.prompt_path:
-        try:
-            prompt_text = updated.load_prompt(obj.settings.project_root)
-        except FileNotFoundError:
-            prompt_text = ""
-
     rec = obj.agents.create_version(
         agent_id=updated.id,
         source_path=str(updated.source_path) if updated.source_path else "",
@@ -266,7 +259,7 @@ def def_edit(
             updated.source_format.value if updated.source_format else "unknown"
         ),
         content_snapshot=snapshot,
-        prompt_snapshot=prompt_text,
+        prompt_snapshot="",
         content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
         author=author,
         changelog=changelog,

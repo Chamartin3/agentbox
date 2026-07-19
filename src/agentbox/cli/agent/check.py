@@ -65,7 +65,6 @@ def check_set(
             output_validators=output_validators,
             reason=reason,
             actor=actor,
-            settings=obj.settings,
         )
     except AgentServiceError as exc:
         obj.render.agent.error(f"{exc.code}: {exc.detail}")
