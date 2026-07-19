@@ -5,7 +5,6 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from agentbox.core.data.constants import (
-    BackendName,
     ConfiguredValidationMode,
     ValidationMode,
 )
@@ -78,33 +77,3 @@ class RunnerSpec(BaseModel):
     """How many times to re-run the agent when the run fails with an error
     (excluding timeouts and validation failures, which have their own retry
     configuration)."""
-
-
-class RunnerManifest(BaseModel):
-    """Per-agent runner config, a subset of RunnerSpec for the TOML file.
-
-    Workspace-generated configs (agents.json, settings.json, opencode.json)
-    are resolved automatically from the workspace directory at runtime and
-    do not appear here.
-    """
-
-    kind: str = BackendName.TOKEN
-    """Defaults to ``token`` so markdown-only agents need no
-    explicit runner configuration."""
-
-    model: str | None = None
-    agent_module: str | None = None
-    """Python import path for token/pydantic-ai agents
-    (e.g. ``agents.company_researcher.agent:CompanyResearcherAgent``)."""
-
-    mcp_config_path: str | None = None
-    """Global MCP server configuration, resolved relative to project root."""
-
-    allowed_tools: list[str] = Field(default_factory=list)
-    extra_args: list[str] = Field(default_factory=list)
-    timeout_seconds: int | None = None
-
-    output_schema_path: str | None = None
-
-    max_validation_retries: int = 0
-    max_error_retries: int = 0

@@ -10,7 +10,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentbox.core.data.constants import SessionMode
-from agentbox.core.data.manifests.engines import RunnerManifest, RunnerSpec
+from agentbox.core.data.manifests.engines import RunnerSpec
 from agentbox.core.data.rows import AgentVersionRow
 
 
@@ -203,33 +203,3 @@ class AgentDef(BaseModel):
         with contextlib.suppress(Exception):
             object.__setattr__(inst, "_config_json", data)
         return inst
-
-
-class AgentManifest(BaseModel):
-    """Per-agent metadata, read from ``<agents_dir>/<name>/agent.toml``."""
-
-    id: str
-    """Agent identifier (must match the directory name)."""
-
-    description: str = ""
-    prompt_path: str | None = None
-    """Path inside the agent directory to the system prompt markdown.
-
-    Resolved relative to the agent directory. When omitted, falls back to
-    ``prompts/system.md`` if that file exists; otherwise no prompt is set.
-
-    .. deprecated::
-       Use ``[composition]`` instead.
-    """
-
-    composition: CompositionConfig | None = None
-    """Prompt-composition recipe. When present, takes precedence."""
-
-    workspace: str | None = None
-    session_mode: SessionMode = SessionMode.HEADLESS
-    webhook_url: str | None = None
-    tags: list[str] = Field(default_factory=list)
-
-    runner: RunnerManifest | None = None
-    """Runner configuration. When unset, a default ``token``
-    runner is used (auto-generated agent from the markdown prompt)."""
