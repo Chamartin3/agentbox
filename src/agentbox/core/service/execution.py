@@ -481,8 +481,8 @@ class ExecutionService(Service):
         self,
         agent_id: str,
         *,
-        agent_defs: AgentDefManager,
-        agent_meta: AgentMetaManager,
+        agent_defs: AgentDefManager | None = None,
+        agent_meta: AgentMetaManager | None = None,
         executor: RunExecutor,
         input_: str | None = None,
         variables: dict[str, str] | None = None,
@@ -498,13 +498,18 @@ class ExecutionService(Service):
     ) -> RunCreatedResult:
         """Validate input, resolve the agent, and dispatch to the executor.
 
+        ``agent_defs`` and ``agent_meta`` default to ``self._db.*`` when not
+        supplied, so route callers need not thread the managers through.
+
         Raises :class:`AgentNotFound`, :class:`InvalidRunInput`, or
         :class:`NoBackendAvailable`. Returns ``{"run_id", "agent"}``.
         """
-        agent = agent_defs.get(agent_id)
+        _agent_defs = agent_defs if agent_defs is not None else self._db.agent_defs
+        _agent_meta = agent_meta if agent_meta is not None else self._db.agent_meta
+        agent = _agent_defs.get(agent_id)
         if agent is None:
             raise AgentNotFound(agent_id)
-        self._assert_enabled(agent_meta, agent.id)
+        self._assert_enabled(_agent_meta, agent.id)
 
         if input_ is not None and variables is None:
             if agent.composition is not None:
@@ -565,18 +570,24 @@ class ExecutionService(Service):
         self,
         run_id: str,
         *,
-        agent_defs: AgentDefManager,
-        agent_meta: AgentMetaManager,
+        agent_defs: AgentDefManager | None = None,
+        agent_meta: AgentMetaManager | None = None,
         executor: RunExecutor,
     ) -> RerunResult:
-        """Re-execute a finished run with the same agent + input/variables."""
+        """Re-execute a finished run with the same agent + input/variables.
+
+        ``agent_defs`` and ``agent_meta`` default to ``self._db.*`` when not
+        supplied, so route callers need not thread the managers through.
+        """
+        _agent_defs = agent_defs if agent_defs is not None else self._db.agent_defs
+        _agent_meta = agent_meta if agent_meta is not None else self._db.agent_meta
         rec = self.get_run(run_id)
         if rec is None:
             raise RunNotFound(run_id)
-        agent = agent_defs.get(rec.agent_id)
+        agent = _agent_defs.get(rec.agent_id)
         if agent is None:
             raise AgentNotFound(rec.agent_id)
-        self._assert_enabled(agent_meta, agent.id)
+        self._assert_enabled(_agent_meta, agent.id)
 
         variables: dict[str, str] | None = None
         if rec.variables:
@@ -625,7 +636,7 @@ class ExecutionService(Service):
     def list_runs_enriched(
         self,
         *,
-        agent_versions: AgentVersionManager,
+        agent_versions: AgentVersionManager | None = None,
         agent: str | None = None,
         status: str | None = None,
         executor: str | None = None,
@@ -638,12 +649,19 @@ class ExecutionService(Service):
         paginated: bool = False,
         with_usage: bool = False,
     ) -> list[dict] | dict:
-        """Backward-compatible run listing enriched with agent version + usage."""
+        """Backward-compatible run listing enriched with agent version + usage.
+
+        ``agent_versions`` defaults to ``self._db.agent_versions`` when not
+        supplied, so route callers need not thread the manager through.
+        """
+        _agent_versions = (
+            agent_versions if agent_versions is not None else self._db.agent_versions
+        )
         if not paginated and not any(
             [status, executor, q, since, until, offset, agent_version]
         ):
             result: list[dict] = [
-                self._enrich_with_version(agent_versions, r)
+                self._enrich_with_version(_agent_versions, r)
                 for r in self.list_runs(limit=limit, agent_id=agent)
             ]
             if with_usage:
@@ -661,7 +679,7 @@ class ExecutionService(Service):
             limit=limit,
             offset=offset,
         )
-        enriched = [self._enrich_with_version(agent_versions, r) for r in items]
+        enriched = [self._enrich_with_version(_agent_versions, r) for r in items]
         if with_usage:
             for d in enriched:
                 d["usage"] = self.get_usage(str(d["id"]))
@@ -702,8 +720,16 @@ class ExecutionService(Service):
         }
 
     def get_run_detail(
-        self, run_id: str, *, agent_versions: AgentVersionManager
+        self, run_id: str, *, agent_versions: AgentVersionManager | None = None
     ) -> RunDetailResult:
+        """Return the full run detail payload.
+
+        ``agent_versions`` defaults to ``self._db.agent_versions`` when not
+        supplied, so route callers need not thread the manager through.
+        """
+        _agent_versions = (
+            agent_versions if agent_versions is not None else self._db.agent_versions
+        )
         rec = self.get_run(run_id)
         if rec is None:
             raise RunNotFound(run_id)
@@ -715,7 +741,7 @@ class ExecutionService(Service):
         # Construct RunDetailPayload by building up fields from Run + enrichments
         agent_version: int | None = None
         if rec.agent_version_id is not None:
-            ver = agent_versions.get_by_id(rec.agent_version_id)
+            ver = _agent_versions.get_by_id(rec.agent_version_id)
             if ver is not None:
                 agent_version = ver.get("version")
 
@@ -810,14 +836,19 @@ class ExecutionService(Service):
         self,
         run_id: str,
         *,
-        agent_defs: AgentDefManager,
+        agent_defs: AgentDefManager | None = None,
         ok: bool,
         output: str | None,
         error: str | None,
         usage: UsagePayload | None,
         schedule_webhook_cb: Any = None,
     ) -> RunLifecycleResult:
-        """Finalize a run from an external worker."""
+        """Finalize a run from an external worker.
+
+        ``agent_defs`` defaults to ``self._db.agent_defs`` when not supplied,
+        so route callers need not thread the manager through.
+        """
+        _agent_defs = agent_defs if agent_defs is not None else self._db.agent_defs
         existing = self.get_run(run_id)
         if existing is None:
             raise RunNotFound(run_id)
@@ -831,7 +862,7 @@ class ExecutionService(Service):
 
         refreshed = self.get_run(run_id) or existing
         if schedule_webhook_cb is not None:
-            agent = agent_defs.get(refreshed.agent_id)
+            agent = _agent_defs.get(refreshed.agent_id)
             schedule_webhook_cb(agent, refreshed)
         return {"ok": True, "run_id": run_id, "status": refreshed.status}
 
@@ -839,7 +870,7 @@ class ExecutionService(Service):
         self,
         run_id: str,
         *,
-        agent_defs: AgentDefManager,
+        agent_defs: AgentDefManager | None = None,
         rendered_prompt: dict,
         variables: dict,
         response_raw: str,
@@ -848,7 +879,12 @@ class ExecutionService(Service):
         composition_snapshot: dict | None = None,
         schedule_webhook_cb: Any = None,
     ) -> RunLifecycleResult:
-        """Store a snapshot for an embedded run; idempotent on terminal runs."""
+        """Store a snapshot for an embedded run; idempotent on terminal runs.
+
+        ``agent_defs`` defaults to ``self._db.agent_defs`` when not supplied,
+        so route callers need not thread the manager through.
+        """
+        _agent_defs = agent_defs if agent_defs is not None else self._db.agent_defs
         existing = self.get_run(run_id)
         if existing is None:
             raise RunNotFound(run_id)
@@ -874,7 +910,7 @@ class ExecutionService(Service):
 
         refreshed = self.get_run(run_id) or existing
         if schedule_webhook_cb is not None:
-            agent = agent_defs.get(refreshed.agent_id)
+            agent = _agent_defs.get(refreshed.agent_id)
             if agent is not None:
                 schedule_webhook_cb(agent, refreshed)
         return {"ok": True, "run_id": run_id}

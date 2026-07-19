@@ -1,6 +1,6 @@
 """Prompt read/write endpoints with versioning, scoped per agent.
 
-Thin HTTP layer: delegates to ``core.service.agents.prompts`` and maps
+Thin HTTP layer: delegates to ``AgentService`` prompt-doc methods and maps
 ``AgentNotFound`` / ``PromptError`` / ``ValueError`` to HTTPException.
 """
 
@@ -11,9 +11,8 @@ from typing import NoReturn, TypedDict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agentbox.api.deps import get_db
+from agentbox.api.deps import get_agent_service
 from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult
-import agentbox.core.service.agents as prompts_service
 from agentbox.core.service.agents import AgentNotFound, PromptError
 
 router = APIRouter(prefix="/api", tags=["prompts"])
@@ -40,13 +39,7 @@ def _raise_prompt_error(exc: PromptError) -> NoReturn:
 @router.get("/agents/{agent_id}/prompt")
 def get_prompt(agent_id: str) -> _PromptDocResult:
     try:
-        db = get_db()
-        doc = prompts_service.get_prompt(
-            agent_id,
-            agent_defs=db.agent_defs,
-            agent_versions=db.agent_versions,
-            prompt_versions=db.prompt_versions,
-        )
+        doc = get_agent_service().get_prompt_doc(agent_id)
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
     except PromptError as exc:
@@ -67,13 +60,7 @@ class PromptBody(BaseModel):
 def put_prompt(agent_id: str, body: PromptBody) -> _PromptDocResult:
     """Capture a new committed prompt version if content changed."""
     try:
-        db = get_db()
-        doc = prompts_service.put_prompt(
-            agent_id,
-            body.content,
-            agent_defs=db.agent_defs,
-            prompt_versions=db.prompt_versions,
-        )
+        doc = get_agent_service().put_prompt_doc(agent_id, body.content)
     except AgentNotFound as exc:
         raise HTTPException(404) from exc
     except PromptError as exc:
@@ -94,12 +81,7 @@ def put_prompt(agent_id: str, body: PromptBody) -> _PromptDocResult:
 @router.get("/agents/{agent_id}/prompt/versions")
 def list_versions(agent_id: str) -> PromptVersionListResult:
     try:
-        db = get_db()
-        return prompts_service.list_versions(
-            agent_id,
-            agent_defs=db.agent_defs,
-            prompt_versions=db.prompt_versions,
-        )
+        return get_agent_service().prompt_version_list(agent_id)
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
 
@@ -107,13 +89,7 @@ def list_versions(agent_id: str) -> PromptVersionListResult:
 @router.get("/agents/{agent_id}/prompt/versions/{version}")
 def get_version(agent_id: str, version: int) -> PromptVersionDetail | None:
     try:
-        db = get_db()
-        payload = prompts_service.get_version(
-            agent_id,
-            version,
-            agent_defs=db.agent_defs,
-            prompt_versions=db.prompt_versions,
-        )
+        payload = get_agent_service().prompt_version_detail(agent_id, version)
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
     if payload is None:
@@ -134,13 +110,8 @@ class DraftBody(BaseModel):
 @router.post("/agents/{agent_id}/prompt/draft")
 def save_draft(agent_id: str, body: DraftBody) -> _PromptDocResult:
     try:
-        db = get_db()
-        doc = prompts_service.save_draft(
-            agent_id,
-            body.content,
-            agent_defs=db.agent_defs,
-            prompt_versions=db.prompt_versions,
-            author=body.author,
+        doc = get_agent_service().save_prompt_draft_doc(
+            agent_id, body.content, author=body.author
         )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
@@ -160,13 +131,8 @@ class PublishBody(BaseModel):
 @router.post("/agents/{agent_id}/prompt/publish")
 def publish_prompt(agent_id: str, body: PublishBody) -> _PromptDocResult:
     try:
-        db = get_db()
-        doc = prompts_service.publish(
-            agent_id,
-            agent_defs=db.agent_defs,
-            prompt_versions=db.prompt_versions,
-            changelog=body.changelog,
-            author=body.author,
+        doc = get_agent_service().publish_prompt_doc(
+            agent_id, changelog=body.changelog, author=body.author
         )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
@@ -190,13 +156,8 @@ class RollbackBody(BaseModel):
 @router.post("/agents/{agent_id}/prompt/rollback")
 def rollback_prompt(agent_id: str, body: RollbackBody) -> _PromptDocResult:
     try:
-        db = get_db()
-        doc = prompts_service.rollback(
-            agent_id,
-            body.target_version,
-            agent_defs=db.agent_defs,
-            prompt_versions=db.prompt_versions,
-            author=body.author,
+        doc = get_agent_service().rollback_prompt_doc(
+            agent_id, body.target_version, author=body.author
         )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc

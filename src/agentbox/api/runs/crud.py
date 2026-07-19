@@ -13,7 +13,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from agentbox.core.data.jsontypes import RawJson
-from agentbox.api.deps import get_db, get_executor
+from agentbox.api.deps import get_execution_service, get_executor
 from agentbox.api.runs.schemas import (
     CompleteRunBody,
     CreateRunBody,
@@ -44,11 +44,8 @@ router = APIRouter(prefix="/api/runs", tags=["runs"])
 @router.post("")
 async def create_run(body: CreateRunBody) -> RunCreatedResult:
     try:
-        db = get_db()
-        return await ExecutionService().dispatch_run(
+        return await get_execution_service().dispatch_run(
             body.agent,
-            agent_defs=db.agent_defs,
-            agent_meta=db.agent_meta,
             executor=get_executor(),
             input_=body.input,
             variables=body.variables,
@@ -94,9 +91,7 @@ def list_runs(
     paginated: bool = False,
 ) -> list[RawJson] | PaginatedRunsResult:
     """List runs. See ``ExecutionService.list_runs_enriched`` for the shape."""
-    db = get_db()
     result = ExecutionService().list_runs_enriched(
-        agent_versions=db.agent_versions,
         agent=agent,
         status=status,
         executor=executor,
@@ -144,10 +139,8 @@ def runs_stats(
 @router.post("/{run_id}/complete")
 async def complete_run(run_id: str, body: CompleteRunBody) -> RunLifecycleResult:
     try:
-        db = get_db()
-        return ExecutionService().complete_run(
+        return get_execution_service().complete_run(
             run_id,
-            agent_defs=db.agent_defs,
             ok=body.ok,
             output=body.output,
             error=body.error,
@@ -161,10 +154,8 @@ async def complete_run(run_id: str, body: CompleteRunBody) -> RunLifecycleResult
 @router.post("/{run_id}/snapshot")
 async def snapshot_run(run_id: str, body: SnapshotBody) -> RunLifecycleResult:
     try:
-        db = get_db()
-        return ExecutionService().snapshot_run(
+        return get_execution_service().snapshot_run(
             run_id,
-            agent_defs=db.agent_defs,
             rendered_prompt=body.rendered_prompt,
             variables=body.variables,
             response_raw=body.response_raw,
@@ -195,11 +186,8 @@ def post_outcome(run_id: str, body: PostOutcomeBody) -> RunLifecycleResult:
 async def rerun(run_id: str) -> RunCreatedResult:
     """Re-execute a finished run with the same agent + input/variables."""
     try:
-        db = get_db()
-        return await ExecutionService().rerun(
+        return await get_execution_service().rerun(
             run_id,
-            agent_defs=db.agent_defs,
-            agent_meta=db.agent_meta,
             executor=get_executor(),
         )
     except RunNotFound as exc:
@@ -254,8 +242,7 @@ def run_facets() -> RunFacetsResult:
 @router.get("/{run_id}")
 def get_run(run_id: str) -> RunDetailResult:
     try:
-        db = get_db()
-        return ExecutionService().get_run_detail(run_id, agent_versions=db.agent_versions)
+        return get_execution_service().get_run_detail(run_id)
     except RunNotFound as exc:
         raise HTTPException(404) from exc
 
@@ -286,7 +273,7 @@ async def stream_run(ws: WebSocket, run_id: str) -> None:
     broadcaster = get_executor().broadcaster(run_id)
     if broadcaster is None:
         # Replay transcript from disk if run is already finished.
-        rec = get_db().runs.get(run_id)
+        rec = get_execution_service().get_run(run_id)
         if rec is None or not rec.transcript_path:
             await ws.close(code=4404)
             return

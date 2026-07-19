@@ -2004,6 +2004,87 @@ class AgentService(Service):
             delete_drafts=True,
         )
 
+    # ── API prompt-payload methods (for api/agents/prompts.py) ────────
+    # These delegate to the module-level free-functions and return the
+    # same API payload shapes (PromptDoc / PromptVersionListResult /
+    # PromptVersionDetail).  The CLI uses the Row-returning methods above.
+
+    def get_prompt_doc(self, agent_id: str) -> PromptDoc:
+        """Return the active prompt document for an agent (API payload shape)."""
+        return get_prompt(
+            agent_id,
+            agent_defs=self._db.agent_defs,
+            agent_versions=self._versions,
+            prompt_versions=self._prompts,
+        )
+
+    def put_prompt_doc(
+        self, agent_id: str, content: str, *, author: str = "api"
+    ) -> PromptDoc:
+        """Capture a new committed prompt version when content changed."""
+        return put_prompt(
+            agent_id,
+            content,
+            agent_defs=self._db.agent_defs,
+            prompt_versions=self._prompts,
+            author=author,
+        )
+
+    def prompt_version_list(self, agent_id: str) -> PromptVersionListResult:
+        """Return the version-list payload for the prompt-versions endpoint."""
+        return list_versions(
+            agent_id,
+            agent_defs=self._db.agent_defs,
+            prompt_versions=self._prompts,
+        )
+
+    def prompt_version_detail(
+        self, agent_id: str, version: int
+    ) -> PromptVersionDetail | None:
+        """Return a single prompt version payload, or None if missing."""
+        return get_version(
+            agent_id,
+            version,
+            agent_defs=self._db.agent_defs,
+            prompt_versions=self._prompts,
+        )
+
+    def save_prompt_draft_doc(
+        self, agent_id: str, content: str, *, author: str = "system"
+    ) -> PromptDoc:
+        """Save a draft prompt version and return the API payload shape."""
+        return save_draft(
+            agent_id,
+            content,
+            agent_defs=self._db.agent_defs,
+            prompt_versions=self._prompts,
+            author=author,
+        )
+
+    def publish_prompt_doc(
+        self, agent_id: str, *, changelog: str = "", author: str = "system"
+    ) -> PromptDoc:
+        """Publish the current draft as a committed version (API payload shape)."""
+        return publish(
+            agent_id,
+            agent_defs=self._db.agent_defs,
+            prompt_versions=self._prompts,
+            changelog=changelog,
+            author=author,
+        )
+
+    def rollback_prompt_doc(
+        self, agent_id: str, target_version: int, *, author: str = "system"
+    ) -> PromptDoc:
+        """Roll back to a previous committed version (API payload shape)."""
+        return rollback(
+            agent_id,
+            target_version,
+            agent_defs=self._db.agent_defs,
+            prompt_versions=self._prompts,
+            author=author,
+        )
+
     def sync_prompt_from_disk(
         self,
         agent_id: str,
