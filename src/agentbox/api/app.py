@@ -62,8 +62,7 @@ def _on_startup() -> None:
     The DB is the source of truth, so the manifest is always ``None`` here.
     """
     settings = _deps.get_settings()
-    db = _deps.get_db()
-    report = run_startup_tasks(db, settings, manifest=None)
+    report = run_startup_tasks(settings, manifest=None)
     if report.errors:
         _log.warning("startup completed with %d error(s)", len(report.errors))
 

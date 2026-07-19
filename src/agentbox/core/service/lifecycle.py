@@ -15,16 +15,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field, replace
-from typing import Any, Final
+from typing import Final
 
 from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.data import RunRecord
 from agentbox.core.data.manifests.workspaces import McpServerSpec
-from agentbox.core.db.database import Database
 from agentbox.core.db.seeds.engines import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
-from agentbox.core.resources.boot import import_repo_resources
+from agentbox.core.service.agents import AgentService
 from agentbox.core.service.execution import ExecutionService
+from agentbox.core.service.resources import ResourceService
 from agentbox.core.service.system import SystemService
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.tools import discover_tools
@@ -125,29 +125,6 @@ def _to_mcp_config(spec: McpServerSpec) -> McpServerConfig:
     return out
 
 
-def _phase_import_repo(db: Any, settings: Settings) -> StartupReport:
-    try:
-        summary = import_repo_resources(
-            db.resources, db.resource_versions, settings.project_root
-        )
-    except Exception as exc:
-        _log.exception("repo-resource boot import failed")
-        return _error("import_repo_resources", exc)
-    if summary["created"] or summary["updated"]:
-        _log.info(
-            "boot-import repo_resources: created=%d updated=%d "
-            "skipped=%d failed=%d",
-            summary["created"],
-            summary["updated"],
-            summary["skipped"],
-            summary["failed"],
-        )
-    return StartupReport(
-        resources_created=int(summary.get("created", 0)),
-        resources_updated=int(summary.get("updated", 0)),
-    )
-
-
 # ── boot phases ────────────────────────────────────────────────────────────
 
 
@@ -162,7 +139,7 @@ def discover_agent_tools() -> StartupReport:
 
 
 def sync_project_mcp_servers(
-    db: Database, settings: Settings
+    settings: Settings,
 ) -> StartupReport:
     """Schedule async sync of any project-level MCP server specs."""
     try:
@@ -183,7 +160,7 @@ def sync_project_mcp_servers(
     return StartupReport(mcp_servers_synced=len(specs_models))
 
 
-def seed_runner_profiles(db: Database) -> StartupReport:
+def seed_runner_profiles() -> StartupReport:
     """Idempotent seed of the default runner profiles."""
     if SETTINGS.skip_default_profiles:
         return StartupReport()
@@ -198,17 +175,33 @@ def seed_runner_profiles(db: Database) -> StartupReport:
 
 
 def boot_import_resources(
-    db: Database,
     settings: Settings,
 ) -> StartupReport:
     """Populate the central resource repository from on-disk layout."""
     if SETTINGS.skip_resource_import:
         return StartupReport()
 
-    return _phase_import_repo(db, settings)
+    try:
+        summary = ResourceService().boot_import_repo(settings.project_root)
+    except Exception as exc:
+        _log.exception("repo-resource boot import failed")
+        return _error("import_repo_resources", exc)
+    if summary["created"] or summary["updated"]:
+        _log.info(
+            "boot-import repo_resources: created=%d updated=%d "
+            "skipped=%d failed=%d",
+            summary["created"],
+            summary["updated"],
+            summary["skipped"],
+            summary["failed"],
+        )
+    return StartupReport(
+        resources_created=summary["created"],
+        resources_updated=summary["updated"],
+    )
 
 
-def sync_workspace_registry(db: Database) -> StartupReport:
+def sync_workspace_registry() -> StartupReport:
     """Prune phantom workspace rows that no real subsystem references."""
     try:
         pruned = WorkspaceService().prune_phantoms(keep={"default"})
@@ -224,7 +217,7 @@ def sync_workspace_registry(db: Database) -> StartupReport:
     return StartupReport(workspaces_pruned=len(pruned))
 
 
-def reap_orphan_runs(db: Database) -> StartupReport:
+def reap_orphan_runs() -> StartupReport:
     """Mark any pre-existing 'running' rows as orphaned."""
     try:
         reaped = ExecutionService().reap_orphan_runs()
@@ -237,7 +230,7 @@ def reap_orphan_runs(db: Database) -> StartupReport:
 
 
 def dispatch_orphan_webhooks(
-    db: Database, settings: Settings
+    settings: Settings,
 ) -> StartupReport:
     """Fire dispatch channels for orphan-reaped runs whose post pipeline never ran."""
     try:
@@ -253,7 +246,7 @@ def dispatch_orphan_webhooks(
     scheduled = 0
     for run in pending:
         try:
-            agent = db.agent_defs.get(run.agent_id)
+            agent = AgentService().get_agent_def(run.agent_id)
             dispatch_completion(
                 run=run,
                 agent=agent,
@@ -267,7 +260,6 @@ def dispatch_orphan_webhooks(
 
 
 def run_startup_tasks(
-    db: Database,
     settings: Settings,
     manifest: object = None,
 ) -> StartupReport:
@@ -278,10 +270,10 @@ def run_startup_tasks(
     """
     report = StartupReport()
     report = _merge(report, discover_agent_tools())
-    report = _merge(report, sync_project_mcp_servers(db, settings))
-    report = _merge(report, seed_runner_profiles(db))
-    report = _merge(report, boot_import_resources(db, settings))
-    report = _merge(report, sync_workspace_registry(db))
-    report = _merge(report, reap_orphan_runs(db))
-    report = _merge(report, dispatch_orphan_webhooks(db, settings))
+    report = _merge(report, sync_project_mcp_servers(settings))
+    report = _merge(report, seed_runner_profiles())
+    report = _merge(report, boot_import_resources(settings))
+    report = _merge(report, sync_workspace_registry())
+    report = _merge(report, reap_orphan_runs())
+    report = _merge(report, dispatch_orphan_webhooks(settings))
     return report

@@ -56,6 +56,8 @@ from agentbox.core.data.rows import (
     ResourceVersionRow,
     WorkspaceFileBindingRow,
 )
+from agentbox.core.resources.boot import import_repo_resources
+from agentbox.core.resources.boot.reconcile import _ImportSummary
 from agentbox.core.resources.importers.base import ImporterContext
 from agentbox.core.resources.importers.host_path import HostPathImporter
 from agentbox.core.resources.importers.schema import SchemaImporter
@@ -178,6 +180,21 @@ class ResourceService(Service):
             if r:
                 return r["id"]
         return None
+
+    # -----------------------------------------------------------------------
+    # Boot-time import
+    # -----------------------------------------------------------------------
+
+    def boot_import_repo(self, project_root: Path) -> _ImportSummary:
+        """Bulk-import on-disk resources from *project_root* into the DB.
+
+        Delegates to :func:`import_repo_resources`, passing this service's
+        already-resolved manager instances so no ``Database`` object is
+        threaded through lifecycle code.
+        """
+        return import_repo_resources(
+            self._resources, self._resource_versions, project_root
+        )
 
     # -----------------------------------------------------------------------
     # Repo resource CRUD
