@@ -9,6 +9,18 @@ Usage::
     run = db.runs.get("some-run-id")
     db.runs.finish(run_id, status="ok", output="...")
     agents = db.agents.find(team="ml")
+
+Importable only from ``agentbox.core.db.database`` by a named allowlist:
+
+- ``core/service/base.py`` — service composition root (permanent)
+- ``core/execution/orchestrate/executor.py`` — executor composition root;
+  self-wires store, decomposes ``self.db`` into concrete managers for children
+  (no ``Database`` crosses a sub-component boundary, UNIFIED rule #4)
+- ``core/execution/orchestrate/init_run.py`` — transitional; burned by UNIFIED
+- ``api/deps.py``, ``cli/shared/deps.py`` — DI wiring; burned by UNIFIED
+- ``cli/ops/migrate.py`` — schema migration CLI
+- ``core/tools/mcp_servers/agent_tools/context.py`` — MCP context (transitional)
+- ``core/tools/mcp_servers/host_env/context.py`` — MCP context (transitional)
 """
 from __future__ import annotations
 

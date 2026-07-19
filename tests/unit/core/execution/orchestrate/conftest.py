@@ -22,8 +22,13 @@ from agentbox.core.execution.orchestrate.steploop import StepResult
 
 @pytest.fixture
 def finalizer(mock_store: MagicMock) -> RunFinalizer:
-    """RunFinalizer wired to the shared ``mock_store`` fixture (now ``db`` param)."""
-    return RunFinalizer(db=mock_store, settings=MagicMock())
+    """RunFinalizer wired to the shared ``mock_store`` fixture (manager params)."""
+    return RunFinalizer(
+        runs=mock_store.runs,
+        usage=mock_store.usage,
+        webhook_deliveries=mock_store.webhook_deliveries,
+        settings=MagicMock(),
+    )
 
 
 @pytest.fixture

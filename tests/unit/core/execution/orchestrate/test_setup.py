@@ -22,9 +22,27 @@ import pytest
 from agentbox.core.execution.orchestrate.setup import (
     NoBackendAvailable,
     RunSetup,
+    SetupManagers,
     _composed_view,
 )
 from agentbox.core.data import ComposedView
+
+
+def _make_setup(mock_store: MagicMock, mcp_registry: object = None) -> RunSetup:
+    """Build a RunSetup from mock_store manager attributes."""
+    return RunSetup(
+        SetupManagers(
+            workspaces=mock_store.workspaces,
+            sessions=mock_store.sessions,
+            agent_tool_grants=mock_store.agent_tool_grants,
+            workspace_file_resource_bindings=mock_store.workspace_file_resource_bindings,
+            workspace_mcp_policies=mock_store.workspace_mcp_policies,
+            workspace_mcp_overrides=mock_store.workspace_mcp_overrides,
+            workspace_mcp_tool_overrides=mock_store.workspace_mcp_tool_overrides,
+        ),
+        MagicMock(),
+        mcp_registry,
+    )
 
 pytestmark = pytest.mark.unit
 
@@ -122,7 +140,7 @@ class TestResolveAgentToolGrants:
             {"tool_name": "shell.exec"},
             {"tool_name": "fs.read"},
         ]
-        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = _make_setup(mock_store)
 
         result = setup.resolve_agent_tool_grants("agent-1")
 
@@ -132,7 +150,7 @@ class TestResolveAgentToolGrants:
     def test_returns_none_when_store_raises(self, mock_store: MagicMock) -> None:
         """resolve_agent_tool_grants swallows store exceptions and returns None."""
         mock_store.agent_tool_grants.list_for_agent.side_effect = RuntimeError("permission denied")
-        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = _make_setup(mock_store)
 
         result = setup.resolve_agent_tool_grants("agent-2")
 
@@ -141,7 +159,7 @@ class TestResolveAgentToolGrants:
     def test_returns_none_when_grants_are_empty(self, mock_store: MagicMock) -> None:
         """resolve_agent_tool_grants returns None when the store returns an empty list."""
         mock_store.agent_tool_grants.list_for_agent.return_value = []
-        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = _make_setup(mock_store)
 
         result = setup.resolve_agent_tool_grants("agent-3")
 
@@ -159,7 +177,7 @@ class TestSelectBackend:
     ) -> None:
         """select_backend raises NoBackendAvailable when neither backend_override nor
         runner_config is provided — no candidates means no adapter can be tried."""
-        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = _make_setup(mock_store)
         agent = make_agent()
         agent.id = "test-agent"
         agent.workspace = None
@@ -182,7 +200,7 @@ class TestSelectBackend:
         make_agent: MagicMock,
     ) -> None:
         """select_backend raises NoBackendAvailable when the named backend is not registered."""
-        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = _make_setup(mock_store)
         agent = make_agent()
         agent.id = "agent-no-backend"
         agent.workspace = None
@@ -213,7 +231,7 @@ class TestSelectBackend:
         make_agent: MagicMock,
     ) -> None:
         """select_backend returns the adapter and its rendered config when the backend resolves."""
-        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = _make_setup(mock_store)
         agent = make_agent()
         agent.id = "agent-with-backend"
         agent.workspace = None
@@ -255,7 +273,7 @@ class TestPrepareWorkdir:
         make_agent: MagicMock,
     ) -> None:
         """prepare_workdir with a named workspace returns the resolved path unchanged."""
-        setup = RunSetup(db=mock_store, settings=MagicMock(), mcp_registry=None)
+        setup = _make_setup(mock_store)
         agent = make_agent(workspace="production-ws", session_mode="stateless")
         expected_path = tmp_path / "production-ws"
 

@@ -14,7 +14,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from agentbox.core.data import McpSnapshot, RunnerSnapshot
-from agentbox.core.execution.observability.snapshot.writer import SnapshotWriter
+from agentbox.core.execution.observability.snapshot.writer import SnapshotManagers, SnapshotWriter
+
+
+def _make_writer(mock_store: MagicMock) -> SnapshotWriter:
+    """Build a SnapshotWriter from mock_store manager attributes."""
+    return SnapshotWriter(
+        SnapshotManagers(
+            runs=mock_store.runs,
+            agent_host_env_grants=mock_store.agent_host_env_grants,
+            workspace_mcp_policies=mock_store.workspace_mcp_policies,
+            workspace_mcp_overrides=mock_store.workspace_mcp_overrides,
+            workspace_mcp_tool_overrides=mock_store.workspace_mcp_tool_overrides,
+        )
+    )
 
 pytestmark = pytest.mark.unit
 
@@ -50,7 +63,7 @@ _MCP_SNAPSHOT: McpSnapshot = {
 class TestSaveRunner:
     def test_delegates_to_store(self, mock_store: MagicMock) -> None:
         """save_runner must forward the run_id and snapshot to db.runs.save_runner_snapshot."""
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         writer.save_runner("run-001", _RUNNER_SNAPSHOT)
 
@@ -61,7 +74,7 @@ class TestSaveRunner:
     def test_swallows_store_exception(self, mock_store: MagicMock) -> None:
         """save_runner must not propagate store errors — snapshot loss is non-fatal."""
         mock_store.runs.save_runner_snapshot.side_effect = RuntimeError("db locked")
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         # Act / Assert — no exception raised
         writer.save_runner("run-002", _RUNNER_SNAPSHOT)
@@ -75,7 +88,7 @@ class TestSaveRunner:
 class TestBuildMcpSnapshot:
     def test_delegates_to_helper_with_workspace(self, mock_store: MagicMock) -> None:
         """build_mcp_snapshot passes workspace managers and grants to the helper."""
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         with patch(
             "agentbox.core.execution.observability.snapshot.writer.build_mcp_snapshot"
@@ -96,7 +109,7 @@ class TestBuildMcpSnapshot:
 
     def test_returns_none_when_no_workspace(self, mock_store: MagicMock) -> None:
         """build_mcp_snapshot returns None when workspace_id is None (helper contract)."""
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         with patch(
             "agentbox.core.execution.observability.snapshot.writer.build_mcp_snapshot"
@@ -117,7 +130,7 @@ class TestBuildMcpSnapshot:
 class TestSaveResourceAndMcp:
     def test_delegates_to_store(self, mock_store: MagicMock) -> None:
         """save_resource_and_mcp forwards resource and MCP snapshots to db.runs.save_resource_snapshots."""
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         writer.save_resource_and_mcp(
             "run-003",
@@ -135,7 +148,7 @@ class TestSaveResourceAndMcp:
         self, mock_store: MagicMock
     ) -> None:
         """None resource_snapshot is forwarded as None to db.runs."""
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         writer.save_resource_and_mcp(
             "run-004",
@@ -150,7 +163,7 @@ class TestSaveResourceAndMcp:
     def test_swallows_store_exception(self, mock_store: MagicMock) -> None:
         """save_resource_and_mcp swallows store errors — snapshot loss is non-fatal."""
         mock_store.runs.save_resource_snapshots.side_effect = OSError("disk full")
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         # Act / Assert — no exception raised
         writer.save_resource_and_mcp(
@@ -168,7 +181,7 @@ class TestSaveResourceAndMcp:
 class TestResolveHostEnvGrants:
     def test_delegates_to_helper(self, mock_store: MagicMock) -> None:
         """resolve_host_env_grants forwards the agent_host_env_grants manager and agent_id."""
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         with patch(
             "agentbox.core.execution.observability.snapshot.writer.resolve_host_env_grants"
@@ -181,7 +194,7 @@ class TestResolveHostEnvGrants:
 
     def test_returns_none_when_no_workspace(self, mock_store: MagicMock) -> None:
         """resolve_host_env_grants returns None for workspace_id=None."""
-        writer = SnapshotWriter(mock_store)
+        writer = _make_writer(mock_store)
 
         with patch(
             "agentbox.core.execution.observability.snapshot.writer.resolve_host_env_grants"

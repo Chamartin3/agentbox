@@ -7,13 +7,19 @@ import contextlib
 import dataclasses
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from agentbox.core.config import Settings
 from agentbox.core.data import UsagePayload
 from agentbox.core.data.constants import LogLevel, RunStatus
 from agentbox.core.data.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef, RunRecord
+from agentbox.core.db import (
+    AgentDefManager,
+    RunManager,
+    UsageManager,
+    WebhookDeliveryManager,
+)
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 
@@ -23,7 +29,10 @@ logger = logging.getLogger(__name__)
 def cancel_run(
     *,
     run_id: str,
-    db: Any,
+    runs: RunManager,
+    agent_defs: AgentDefManager,
+    usage: UsageManager,
+    webhook_deliveries: WebhookDeliveryManager,
     broadcasters: dict[str, "RunBroadcaster"],
     run_tasks: dict[str, asyncio.Task[None]],
     settings: Settings,
@@ -35,7 +44,7 @@ def cancel_run(
 
     error_msg = "cancelled by operator"
     try:
-        db.runs.finish_full(
+        runs.finish_full(
             run_id,
             ok=False,
             error=error_msg,
@@ -63,11 +72,11 @@ def cancel_run(
 
     task.cancel()
     try:
-        refreshed_run = db.runs.get(run_id)
+        refreshed_run = runs.get(run_id)
         if refreshed_run is not None:
             agent: Any | None = None
             try:
-                _agent = db.agent_defs.get(refreshed_run.agent_id)
+                _agent = agent_defs.get(refreshed_run.agent_id)
                 if isinstance(_agent, AgentDef):
                     agent = _agent
             except Exception:
@@ -87,7 +96,9 @@ def cancel_run(
             dispatch_completion(
                 run=refreshed,
                 agent=agent,
-                store=_RunDispatchAdapter(db),
+                store=_RunDispatchAdapter(
+                    runs=runs, usage=usage, webhook_deliveries=webhook_deliveries
+                ),
                 broadcaster=broadcaster,
                 transcript_path=transcript_path,
                 settings=settings,
@@ -98,19 +109,29 @@ def cancel_run(
 
 
 class _RunDispatchAdapter:
-    """Minimal DispatchStore adapter backed by Database managers."""
+    """Minimal DispatchStore adapter backed by specific managers."""
 
-    def __init__(self, db: Any) -> None:
-        self._db = db
+    def __init__(
+        self,
+        *,
+        runs: RunManager,
+        usage: UsageManager,
+        webhook_deliveries: WebhookDeliveryManager,
+    ) -> None:
+        self._runs = runs
+        self._usage = usage
+        self._webhook_deliveries = webhook_deliveries
 
     def get_run(self, run_id: str) -> Any:
-        return self._db.runs.get(run_id)
+        return self._runs.get(run_id)
 
     def set_run_status(self, run_id: str, status: str) -> None:
-        self._db.runs.set_status(run_id, status)
+        self._runs.set_status(run_id, status)
 
     def get_usage(self, run_id: str) -> UsagePayload | None:
-        return self._db.usage.get_dict(run_id)
+        # UsageRow and UsagePayload are structurally equivalent at runtime;
+        # cast bridges the minor TypedDict field variance difference.
+        return cast(UsagePayload, row) if (row := self._usage.get_dict(run_id)) is not None else None
 
     def record_webhook_delivery(
         self,
@@ -123,7 +144,7 @@ class _RunDispatchAdapter:
         latency_ms: int | None = None,
         error: str | None = None,
     ) -> None:
-        self._db.webhook_deliveries.record(
+        self._webhook_deliveries.record(
             run_id,
             attempt,
             url,

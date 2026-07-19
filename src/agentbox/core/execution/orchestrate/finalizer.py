@@ -22,11 +22,12 @@ import dataclasses
 import logging
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from agentbox.core.config import SETTINGS, Settings
 from agentbox.core.data import UsagePayload
 from agentbox.core.data import AgentDef, RunRecord
+from agentbox.core.db import RunManager, UsageManager, WebhookDeliveryManager
 from agentbox.core.engines.backends import BackendAdapter
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
@@ -55,19 +56,29 @@ def cleanup_workdir(agent: AgentDef, workdir: Path) -> None:
 
 
 class _RunDispatchAdapter:
-    """Minimal DispatchStore adapter backed by Database managers."""
+    """Minimal DispatchStore adapter backed by specific managers."""
 
-    def __init__(self, db: Any) -> None:
-        self._db = db
+    def __init__(
+        self,
+        *,
+        runs: RunManager,
+        usage: UsageManager,
+        webhook_deliveries: WebhookDeliveryManager,
+    ) -> None:
+        self._runs = runs
+        self._usage = usage
+        self._webhook_deliveries = webhook_deliveries
 
     def get_run(self, run_id: str) -> Any:
-        return self._db.runs.get(run_id)
+        return self._runs.get(run_id)
 
     def set_run_status(self, run_id: str, status: str) -> None:
-        self._db.runs.set_status(run_id, status)
+        self._runs.set_status(run_id, status)
 
     def get_usage(self, run_id: str) -> UsagePayload | None:
-        return self._db.usage.get_dict(run_id)
+        # UsageRow and UsagePayload are structurally equivalent at runtime;
+        # cast bridges the minor TypedDict field variance difference.
+        return cast(UsagePayload, row) if (row := self._usage.get_dict(run_id)) is not None else None
 
     def record_webhook_delivery(
         self,
@@ -80,7 +91,7 @@ class _RunDispatchAdapter:
         latency_ms: int | None = None,
         error: str | None = None,
     ) -> None:
-        self._db.webhook_deliveries.record(
+        self._webhook_deliveries.record(
             run_id,
             attempt,
             url,
@@ -95,8 +106,17 @@ class _RunDispatchAdapter:
 class RunFinalizer:
     """Persists terminal state, fires dispatch channels, and cleans up."""
 
-    def __init__(self, db: Any, settings: Settings) -> None:
-        self._db = db
+    def __init__(
+        self,
+        *,
+        runs: RunManager,
+        usage: UsageManager,
+        webhook_deliveries: WebhookDeliveryManager,
+        settings: Settings,
+    ) -> None:
+        self._runs = runs
+        self._usage = usage
+        self._webhook_deliveries = webhook_deliveries
         self.settings = settings
 
     def finalize(
@@ -121,7 +141,7 @@ class RunFinalizer:
                     run_id=run_id, transcript_path=str(transcript_path)
                 )
                 if post_uri:
-                    self._db.runs.set_conversation(
+                    self._runs.set_conversation(
                         run_id,
                         conversation_format=None,
                         conversation_uri=post_uri,
@@ -132,7 +152,7 @@ class RunFinalizer:
                 )
 
         if step_result is None:
-            self._db.runs.finish_full(
+            self._runs.finish_full(
                 run_id,
                 ok=False,
                 output=None,
@@ -143,7 +163,7 @@ class RunFinalizer:
                 schema_validated_via=None,
             )
         else:
-            self._db.runs.finish_full(
+            self._runs.finish_full(
                 run_id,
                 ok=step_result.final_ok,
                 output=step_result.output,
@@ -155,7 +175,7 @@ class RunFinalizer:
             )
 
         try:
-            refreshed_run = self._db.runs.get(run_id)
+            refreshed_run = self._runs.get(run_id)
             if refreshed_run is not None:
                 _record_fields = {f.name for f in dataclasses.fields(RunRecord)}
                 refreshed = RunRecord(**{
@@ -165,7 +185,11 @@ class RunFinalizer:
                 dispatch_completion(
                     run=refreshed,
                     agent=agent,
-                    store=_RunDispatchAdapter(self._db),
+                    store=_RunDispatchAdapter(
+                        runs=self._runs,
+                        usage=self._usage,
+                        webhook_deliveries=self._webhook_deliveries,
+                    ),
                     broadcaster=broadcaster,
                     transcript_path=transcript_path,
                     settings=self.settings,

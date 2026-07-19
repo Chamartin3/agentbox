@@ -16,7 +16,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, cast
+from typing import Final, cast
 
 from agentbox.core.data.events import UsageEvent
 from agentbox.core.config import Settings
@@ -27,6 +27,7 @@ from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data.constants import RunStatus
 from agentbox.core.data import AgentDef
+from agentbox.core.db import UsageManager
 from agentbox.core.execution.retry import RetryOrchestrator
 from agentbox.core.execution.observability.stream import RunStreamSession
 from agentbox.core.execution.observability.stream.session import DoneStatus
@@ -108,8 +109,8 @@ class RunStepLoop:
     :class:`StepResult` ready for the finalizer.
     """
 
-    def __init__(self, db: Any, settings: Settings) -> None:
-        self._db = db
+    def __init__(self, *, usage: UsageManager, settings: Settings) -> None:
+        self._usage = usage
         self.settings = settings
 
     async def run(
@@ -149,7 +150,7 @@ class RunStepLoop:
         )
         session.add_observer(
             lambda ev: (
-                self._db.usage.record(run_id, ev.model_dump())
+                self._usage.record(run_id, ev.model_dump())
                 if isinstance(ev, UsageEvent)
                 else None
             )

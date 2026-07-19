@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import logging
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from agentbox.core.agents import resolve_engine
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
+from agentbox.core.db import (
+    AgentToolGrantManager,
+    SessionManager,
+    WorkspaceFileResourceBindingManager,
+    WorkspaceManager,
+    WorkspaceMcpOverrideManager,
+    WorkspaceMcpPolicyManager,
+    WorkspaceMcpToolOverrideManager,
+)
 from agentbox.core.engines.backends.base import BackendAdapter
 from agentbox.core.data import RenderedConfig, RuntimeConfigView
 from agentbox.core.data import ComposedReferenceView, ComposedView, PythonAgentConfigView
@@ -23,6 +33,19 @@ from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SetupManagers:
+    """Manager bundle threaded into :class:`RunSetup`."""
+
+    workspaces: WorkspaceManager
+    sessions: SessionManager
+    agent_tool_grants: AgentToolGrantManager
+    workspace_file_resource_bindings: WorkspaceFileResourceBindingManager
+    workspace_mcp_policies: WorkspaceMcpPolicyManager
+    workspace_mcp_overrides: WorkspaceMcpOverrideManager
+    workspace_mcp_tool_overrides: WorkspaceMcpToolOverrideManager
 
 
 def _composed_view(composed: Any | None) -> ComposedView | None:
@@ -60,11 +83,11 @@ class RunSetup:
 
     def __init__(
         self,
-        db: Any,
+        mgrs: SetupManagers,
         settings: Settings,
         mcp_registry: "McpRegistry | None",
     ) -> None:
-        self._db = db
+        self._mgrs = mgrs
         self.settings = settings
         self._mcp_registry = mcp_registry
 
@@ -75,7 +98,7 @@ class RunSetup:
         session_id: str | None,
         workspace_override: str | None = None,
     ) -> tuple[Path, str | None]:
-        ws_lookup = self._db.workspaces
+        ws_lookup = self._mgrs.workspaces
 
         if workspace_override:
             original = agent.workspace
@@ -94,15 +117,15 @@ class RunSetup:
             return path, session_id
         if agent.session_mode == "persistent":
             if session_id:
-                existing = self._db.sessions.get_dict(session_id)
+                existing = self._mgrs.sessions.get_dict(session_id)
                 if existing and existing["workdir"]:
-                    self._db.sessions.touch(session_id)
+                    self._mgrs.sessions.touch(session_id)
                     return Path(existing["workdir"]), session_id
             self.settings.sessions_dir.mkdir(parents=True, exist_ok=True)
-            sid = self._db.sessions.create_session(agent.id, agent.session_mode, None)
+            sid = self._mgrs.sessions.create_session(agent.id, agent.session_mode, None)
             wd = self.settings.sessions_dir / sid / "workdir"
             wd.mkdir(parents=True, exist_ok=True)
-            self._db.sessions.set_workdir(sid, str(wd))
+            self._mgrs.sessions.set_workdir(sid, str(wd))
             return wd, sid
         self.settings.runs_dir.mkdir(parents=True, exist_ok=True)
         wd = (
@@ -162,10 +185,10 @@ class RunSetup:
             ws_callables = (
                 resolve_workspace_callables(
                     ws_id,
-                    self._db.workspace_file_resource_bindings,
-                    self._db.workspace_mcp_policies,
-                    self._db.workspace_mcp_overrides,
-                    self._db.workspace_mcp_tool_overrides,
+                    self._mgrs.workspace_file_resource_bindings,
+                    self._mgrs.workspace_mcp_policies,
+                    self._mgrs.workspace_mcp_overrides,
+                    self._mgrs.workspace_mcp_tool_overrides,
                     self._mcp_registry,
                     declared_tools=adapter.declared_tools(),
                 )
@@ -195,7 +218,7 @@ class RunSetup:
     def resolve_agent_tool_grants(self, agent_id: str) -> set[str] | None:
         try:
             # list_for_agent(include_revoked=False) already excludes revoked rows
-            grants = self._db.agent_tool_grants.list_for_agent(agent_id)
+            grants = self._mgrs.agent_tool_grants.list_for_agent(agent_id)
             grants_set = {g["tool_name"] for g in grants}
             if grants_set:
                 return grants_set
@@ -212,5 +235,6 @@ from agentbox.core.execution.orchestrate.init_run import fail_pre_run  # noqa: F
 __all__ = [
     "NoBackendAvailable",
     "RunSetup",
+    "SetupManagers",
     "fail_pre_run",
 ]

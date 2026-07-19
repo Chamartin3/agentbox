@@ -1,4 +1,10 @@
-"""RunExecutor — orchestrates a single agent run end-to-end."""
+"""RunExecutor — orchestrates a single agent run end-to-end.
+
+``RunExecutor`` is the composition root for the executor subsystem (UNIFIED
+rule #4). It calls ``get_database`` once, then decomposes ``self.db`` into
+concrete manager instances and passes those to its sub-components. No
+``Database`` object crosses a sub-component boundary.
+"""
 
 from __future__ import annotations
 from typing import Any
@@ -24,9 +30,10 @@ from agentbox.core.execution.orchestrate.init_run import (
 from agentbox.core.execution.orchestrate.setup import (
     NoBackendAvailable,
     RunSetup,
+    SetupManagers,
 )
 from agentbox.core.data.composition import ComposedPrompt, RunSpec
-from agentbox.core.execution.observability.snapshot import SnapshotWriter
+from agentbox.core.execution.observability.snapshot import SnapshotManagers, SnapshotWriter
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
 from agentbox.core.data import RenderedConfig
@@ -62,10 +69,37 @@ class RunExecutor:
         self._tasks: set[asyncio.Task[None]] = set()
         self._run_tasks: dict[str, asyncio.Task[None]] = {}
         self._profile_resolver = RunnerProfileResolver()
-        self._setup = RunSetup(db, settings, mcp_registry)
-        self._snapshots = SnapshotWriter(db)
-        self._step_loop = RunStepLoop(db, settings)
-        self._finalizer = RunFinalizer(db, settings)
+        # Decompose db into concrete manager bundles/params for sub-components.
+        # No Database object crosses a sub-component boundary (UNIFIED rule #4).
+        self._setup = RunSetup(
+            SetupManagers(
+                workspaces=db.workspaces,
+                sessions=db.sessions,
+                agent_tool_grants=db.agent_tool_grants,
+                workspace_file_resource_bindings=db.workspace_file_resource_bindings,
+                workspace_mcp_policies=db.workspace_mcp_policies,
+                workspace_mcp_overrides=db.workspace_mcp_overrides,
+                workspace_mcp_tool_overrides=db.workspace_mcp_tool_overrides,
+            ),
+            settings,
+            mcp_registry,
+        )
+        self._snapshots = SnapshotWriter(
+            SnapshotManagers(
+                runs=db.runs,
+                agent_host_env_grants=db.agent_host_env_grants,
+                workspace_mcp_policies=db.workspace_mcp_policies,
+                workspace_mcp_overrides=db.workspace_mcp_overrides,
+                workspace_mcp_tool_overrides=db.workspace_mcp_tool_overrides,
+            )
+        )
+        self._step_loop = RunStepLoop(usage=db.usage, settings=settings)
+        self._finalizer = RunFinalizer(
+            runs=db.runs,
+            usage=db.usage,
+            webhook_deliveries=db.webhook_deliveries,
+            settings=settings,
+        )
 
     def broadcaster(self, run_id: str) -> RunBroadcaster | None:
         return self._broadcasters.get(run_id)
@@ -283,7 +317,10 @@ class RunExecutor:
         """Cancel an in-progress run."""
         return _cancel_run_helper(
             run_id=run_id,
-            db=self.db,
+            runs=self.db.runs,
+            agent_defs=self.db.agent_defs,
+            usage=self.db.usage,
+            webhook_deliveries=self.db.webhook_deliveries,
             broadcasters=self._broadcasters,
             run_tasks=self._run_tasks,
             settings=self.settings,
