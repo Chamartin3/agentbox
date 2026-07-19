@@ -31,10 +31,10 @@ _OPENCODE = "opencode"
 _DEFAULT_AGENT_TIMEOUT = 1200
 
 
-def _agent(runner_kind: str, timeout: int) -> AgentDef:
+def _agent(timeout: int) -> AgentDef:
     return AgentDef(
         id="stage.example",
-        runner=RunnerSpec(kind=runner_kind, timeout_seconds=timeout),
+        runner=RunnerSpec(timeout_seconds=timeout),
     )
 
 
@@ -56,7 +56,7 @@ def test_backend_render_propagates_active_timeout(
     longer. ``agent_meta["timeout_seconds"]`` is now the contract every
     backend honors.
     """
-    agent = _agent(runner_kind, timeout=400)
+    agent = _agent(timeout=400)
     rendered = backend_cls().render(agent, tmp_path)
 
     assert rendered.agent_meta.get("timeout_seconds") == 400, (
@@ -73,7 +73,7 @@ def test_claude_backend_render_propagates_active_model(tmp_path: Path) -> None:
     (bound profile / system default), so ``runner_config.model = sonnet``
     must produce ``--model sonnet`` in the rendered argv.
     """
-    agent = _agent("claude_code", timeout=300)
+    agent = _agent(timeout=300)
     runner_config = EffectiveRunnerConfig(model="sonnet", source="run_override")
     rendered = ClaudeCodeBackend().render(agent, tmp_path, runner_config=runner_config)
 
@@ -89,8 +89,8 @@ def test_config_change_invalidates_render_digest(tmp_path: Path) -> None:
     digest doesn't change when the active config does, a stale run dir
     is reused with the old timeout.
     """
-    first = ClaudeCodeBackend().render(_agent("claude_code", 120), tmp_path)
-    second = ClaudeCodeBackend().render(_agent("claude_code", 600), tmp_path)
+    first = ClaudeCodeBackend().render(_agent(120), tmp_path)
+    second = ClaudeCodeBackend().render(_agent(600), tmp_path)
 
     assert first.agent_meta["timeout_seconds"] == 120
     assert second.agent_meta["timeout_seconds"] == 600
@@ -117,7 +117,7 @@ def test_active_version_always_overrides_default_timeout(
     be caught.
     """
     explicit_timeout = _DEFAULT_AGENT_TIMEOUT + 137
-    agent = _agent(runner_kind, timeout=explicit_timeout)
+    agent = _agent(timeout=explicit_timeout)
     rendered = backend_cls().render(agent, tmp_path)
 
     assert "timeout_seconds" in rendered.agent_meta, (

@@ -58,11 +58,11 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     _clear_deps_caches()
 
 
-def _seed_agent(store, agent_id: str, runner_kind: str = "claude_code") -> None:
+def _seed_agent(store, agent_id: str) -> None:
     agent_def = AgentDef(
         id=agent_id,
         description="Test agent",
-        runner=RunnerSpec(kind=runner_kind),
+        runner=RunnerSpec(),
     )
     AgentService().create_agent(
         agent_id=agent_id,
@@ -144,7 +144,7 @@ def test_run_interactive_dispatches_to_launch_session(
     store_fixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """``agentbox run AGENT`` (no prompt) should call ``_launch_session``."""
-    _seed_agent(store_fixture, "claude-agent", runner_kind="claude_code")
+    _seed_agent(store_fixture, "claude-agent")
 
     launch_calls: list[dict] = []
 
@@ -189,7 +189,7 @@ def test_run_token_agent_interactive_rejected(
     store_fixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Interactive mode with a token-backed agent should exit 2 with a helpful message."""
-    _seed_agent(store_fixture, "tok-agent", runner_kind="token")
+    _seed_agent(store_fixture, "tok-agent")
 
     # The rejection happens inside _launch_session; let it run (no real subprocess)
     monkeypatch.setattr(
