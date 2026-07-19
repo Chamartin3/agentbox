@@ -19,7 +19,7 @@ def make_backend_agent() -> Callable[..., AgentDef]:
     """Factory for a minimal AgentDef for backend unit tests.
 
     Returns an AgentDef keyed on ``id``, defaulting
-    ``runner=RunnerSpec(kind="token")``.  Pass ``**overrides`` to
+    ``runner=RunnerSpec()``.  Pass ``**overrides`` to
     customise any field (including ``runner``, ``id``).
 
     If ``config_json`` is included in overrides it is stored as
@@ -31,7 +31,7 @@ def make_backend_agent() -> Callable[..., AgentDef]:
         config_json = overrides.pop("config_json", None)
         kwargs: dict[str, object] = {
             "id": "test_agent",
-            "runner": RunnerSpec(kind="token"),
+            "runner": RunnerSpec(),
         }
         kwargs.update(overrides)
         agent = AgentDef(**kwargs)  # type: ignore[arg-type]

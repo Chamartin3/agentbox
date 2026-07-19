@@ -44,7 +44,7 @@ class TestAgentDef:
         agent = AgentDef(
             id="agent-comp",
             description="With composition",
-            runner=RunnerSpec(kind="claude_code"),
+            runner=RunnerSpec(),
             composition=CompositionConfig(
                 system="You are helpful.",
                 user_template="Process {{input}}",
@@ -54,11 +54,11 @@ class TestAgentDef:
         assert agent.composition.system == "You are helpful."
 
     def test_webhook_url_optional(self) -> None:
-        agent = AgentDef(id="a", description="d", runner=RunnerSpec(kind="claude_code"))
+        agent = AgentDef(id="a", description="d", runner=RunnerSpec())
         assert agent.webhook_url is None
 
     def test_unsupported_backends_default_empty(self) -> None:
-        agent = AgentDef(id="a", description="d", runner=RunnerSpec(kind="claude_code"))
+        agent = AgentDef(id="a", description="d", runner=RunnerSpec())
         assert agent.unsupported_backends == []
 
 

@@ -76,7 +76,7 @@ def test_validate_output_rejects_missing_required(tmp_path: Path) -> None:
     agent = AgentDef(
         id="test",
         description="t",
-        runner=RunnerSpec(kind="claude_code", output_schema_path="schema.json"),
+        runner=RunnerSpec(output_schema_path="schema.json"),
     )
     executor = _make_executor(tmp_path)
 
@@ -108,7 +108,7 @@ def test_validate_output_rejects_enum_violation(tmp_path: Path) -> None:
     agent = AgentDef(
         id="test",
         description="t",
-        runner=RunnerSpec(kind="claude_code", output_schema_path="schema.json"),
+        runner=RunnerSpec(output_schema_path="schema.json"),
     )
     executor = _make_executor(tmp_path)
 
@@ -185,7 +185,7 @@ def test_empty_output_treated_as_validation_failure(tmp_path: Path) -> None:
     agent = AgentDef(
         id="test",
         description="t",
-        runner=RunnerSpec(kind="claude_code", output_schema_path="schema.json"),
+        runner=RunnerSpec(output_schema_path="schema.json"),
     )
     executor = _make_executor(tmp_path)
 

@@ -111,7 +111,7 @@ def test_render_injects_ollama_provider(tmp_path: Path) -> None:
 
 
 def test_render_applies_default_model_when_missing() -> None:
-    agent = _make_agent(runner=RunnerSpec(kind="opencode", extra_args=[]))
+    agent = _make_agent(runner=RunnerSpec(extra_args=[]))
     adapter = OpenCodeBackend()
     rendered = adapter.render(agent, Path("/tmp/workdir"))
 
@@ -168,7 +168,7 @@ def test_digest_changes_when_effective_extra_args_change() -> None:
 
 
 def test_effective_model_from_runner_config_is_passed() -> None:
-    agent = _make_agent(runner=RunnerSpec(kind="claude_code"))
+    agent = _make_agent(runner=RunnerSpec())
     adapter = OpenCodeBackend()
     rendered = adapter.render(
         agent,

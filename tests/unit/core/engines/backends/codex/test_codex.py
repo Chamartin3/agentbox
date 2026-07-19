@@ -13,7 +13,7 @@ from agentbox.core.engines.backends.codex import (
     parse_codex_event,
 )
 
-DEFAULT_RUNNER = RunnerSpec(kind="codex", extra_args=[])
+DEFAULT_RUNNER = RunnerSpec(extra_args=[])
 
 
 def _agent(**overrides: object) -> AgentDef:

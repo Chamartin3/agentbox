@@ -409,7 +409,7 @@ def test_create_agent_record_and_duplicate(svc: AgentService) -> None:
     kwargs = dict(
         agent_id="made",
         description="via record",
-        runner=RunnerSpec(kind="subprocess"),
+        runner=RunnerSpec(),
         prompt="hello",
         composition=None,
         tools=None,
@@ -430,7 +430,7 @@ def test_create_agent_record_reversions_deleted(svc: AgentService) -> None:
     kwargs = dict(
         agent_id="rev",
         description="d",
-        runner=RunnerSpec(kind="subprocess"),
+        runner=RunnerSpec(),
         prompt="p",
         composition=None,
         tools=None,

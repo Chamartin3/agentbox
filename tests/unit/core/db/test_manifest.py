@@ -30,14 +30,14 @@ class TestRunnerSpec:
 
 class TestAgentDef:
     def test_minimal(self) -> None:
-        agent = AgentDef(id="my-agent", description="An agent", runner=RunnerSpec(kind="claude_code"))
+        agent = AgentDef(id="my-agent", description="An agent", runner=RunnerSpec())
         assert agent.id == "my-agent"
         assert agent.description == "An agent"
         assert agent.tags == []
         assert agent.session_mode == "headless"
 
     def test_description_defaults_empty(self) -> None:
-        agent = AgentDef(id="a", runner=RunnerSpec(kind="claude_code"))
+        agent = AgentDef(id="a", runner=RunnerSpec())
         assert agent.description == ""
 
     def test_runner_defaults(self) -> None:
@@ -48,7 +48,7 @@ class TestAgentDef:
         agent = AgentDef(
             id="agent-comp",
             description="With composition",
-            runner=RunnerSpec(kind="claude_code"),
+            runner=RunnerSpec(),
             composition=CompositionConfig(
                 system="prompts/system.md",
                 user_template="Process {{input}}",
@@ -58,11 +58,11 @@ class TestAgentDef:
         assert agent.composition.system == "prompts/system.md"
 
     def test_webhook_url_optional(self) -> None:
-        agent = AgentDef(id="a", description="d", runner=RunnerSpec(kind="claude_code"))
+        agent = AgentDef(id="a", description="d", runner=RunnerSpec())
         assert agent.webhook_url is None
 
     def test_unsupported_backends_default_empty(self) -> None:
-        agent = AgentDef(id="a", description="d", runner=RunnerSpec(kind="claude_code"))
+        agent = AgentDef(id="a", description="d", runner=RunnerSpec())
         assert agent.unsupported_backends == []
 
 

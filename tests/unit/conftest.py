@@ -43,7 +43,7 @@ def make_agent_def():
         defaults: dict = {
             "slug": "test-agent",
             "name": "Test Agent",
-            "runner": RunnerSpec(kind="claude_code"),
+            "runner": RunnerSpec(),
         }
         defaults.update(overrides)
         return AgentDef(**defaults)

@@ -13,7 +13,7 @@ from agentbox.core.engines.backends.claude_code import ClaudeCodeBackend
 
 
 def _agent_with_runtime(runtime: dict[str, list[str]]) -> AgentDef:
-    agent = AgentDef(id="t.forbid", description="t", runner=RunnerSpec(kind="claude_code"))
+    agent = AgentDef(id="t.forbid", description="t", runner=RunnerSpec())
     agent.__dict__["_config_json"] = {"runtime": runtime}
     return agent
 

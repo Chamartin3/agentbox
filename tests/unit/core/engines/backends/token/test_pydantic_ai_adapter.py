@@ -7,7 +7,7 @@ from pathlib import Path
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.token import TokenBackend
 
-DEFAULT_RUNNER = RunnerSpec(kind="token")
+DEFAULT_RUNNER = RunnerSpec()
 
 
 def _make_agent(**overrides: object) -> AgentDef:

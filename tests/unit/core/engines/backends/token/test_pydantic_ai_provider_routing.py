@@ -16,7 +16,7 @@ from agentbox.core.engines.profiles import EffectiveRunnerConfig
 from agentbox.core.data import AgentDef, RunnerSpec
 from agentbox.core.engines.backends.token import TokenBackend
 
-DEFAULT_RUNNER = RunnerSpec(kind="token")
+DEFAULT_RUNNER = RunnerSpec()
 
 
 def _make_agent(**overrides: object) -> AgentDef:
@@ -73,7 +73,7 @@ class TestTokenProviderRouting:
 
     def test_render_without_runner_config_has_no_model(self) -> None:
         """render() with no runner_config yields no model (no legacy fallback)."""
-        agent = _make_agent(runner=RunnerSpec(kind="token"))
+        agent = _make_agent(runner=RunnerSpec())
         adapter = TokenBackend()
         rendered = adapter.render(agent, Path("/tmp/workdir"), runner_config=None)
 
@@ -83,7 +83,7 @@ class TestTokenProviderRouting:
 
     def test_render_runner_config_model_is_authoritative(self) -> None:
         """runner_config.model is the runtime source of truth."""
-        agent = _make_agent(runner=RunnerSpec(kind="token"))
+        agent = _make_agent(runner=RunnerSpec())
         adapter = TokenBackend()
 
         runner_config = EffectiveRunnerConfig(

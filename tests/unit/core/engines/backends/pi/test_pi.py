@@ -13,7 +13,7 @@ from agentbox.core.engines.backends.pi import (
     parse_pi_event,
 )
 
-DEFAULT_RUNNER = RunnerSpec(kind="pi", extra_args=[])
+DEFAULT_RUNNER = RunnerSpec(extra_args=[])
 
 
 def _agent(**overrides: object) -> AgentDef:

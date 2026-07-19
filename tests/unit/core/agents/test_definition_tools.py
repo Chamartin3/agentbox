@@ -9,7 +9,7 @@ from agentbox.core.data import CanonicalTool
 
 
 def _agent(*, allowed: list[str] | None = None, forbidden: list[str] | None = None) -> AgentDef:
-    agent = AgentDef(id="test.tools", description="t", runner=RunnerSpec(kind="claude_code"))
+    agent = AgentDef(id="test.tools", description="t", runner=RunnerSpec())
     runtime: dict[str, list[str]] = {}
     if allowed is not None:
         runtime["allowed_tools"] = allowed
