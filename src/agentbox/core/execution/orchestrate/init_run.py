@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -14,9 +15,14 @@ from agentbox.core.data.constants import LogLevel, RunStatus
 from agentbox.core.data.events import DoneEvent, LogEvent
 from agentbox.core.data import AgentDef
 from agentbox.core.data.composition import ComposedPrompt
-from agentbox.core.db.database import Database
 from agentbox.core.data._util import now_iso
-from agentbox.core.db.runs.run import Run as _Run  # direct SQL for agent_version_id stamp
+from agentbox.core.db import (
+    AgentVersionManager,
+    RunManager,
+    RunPromptManager,
+    RunnerProfileManager,
+    UsageManager,
+)
 from agentbox.core.execution.observability.stream.broadcaster import RunBroadcaster
 from agentbox.core.execution.observability.snapshot import (
     SnapshotWriter,
@@ -24,9 +30,18 @@ from agentbox.core.execution.observability.snapshot import (
     capture_fragments,
 )
 
-_runs_table = _Run.__table__  # ``runs`` table sourced from the SQLModel entity
-
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class InitRunManagers:
+    """Typed bundle of all managers needed by init_run and launch_background_task."""
+
+    runs: RunManager
+    agent_versions: AgentVersionManager
+    usage: UsageManager
+    run_prompts: RunPromptManager
+    runner_profiles: RunnerProfileManager
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 
 def fail_pre_run(
-    db: "Database",
+    runs: RunManager,
     settings: Settings,
     broadcasters: dict[str, RunBroadcaster],
     *,
@@ -50,7 +65,7 @@ def fail_pre_run(
     transcripts_dir.mkdir(parents=True, exist_ok=True)
     transcript_path = transcripts_dir / f"{uuid.uuid4().hex}.jsonl"
     run_id = uuid.uuid4().hex
-    db.runs.create(
+    runs.create(
         id=run_id,
         agent_id=agent.id,
         input=input_,
@@ -60,7 +75,7 @@ def fail_pre_run(
         status=RunStatus.RUNNING.value,
         created_at=now_iso(),
     )
-    db.runs.finish_full(run_id, ok=False, error=error_msg)
+    runs.finish_full(run_id, ok=False, error=error_msg)
     broadcaster = RunBroadcaster()
     broadcasters[run_id] = broadcaster
     broadcaster.publish(
@@ -77,20 +92,16 @@ def fail_pre_run(
 
 
 def stamp_run_agent_version(
-    db: "Database",
+    runs: RunManager,
+    agent_versions: AgentVersionManager,
     run_id: str,
     agent: AgentDef,
 ) -> None:
     """Stamp the run row with the active or latest agent version."""
     try:
-        chosen = db.agent_versions.get_effective_active(agent.id)
+        chosen = agent_versions.get_effective_active(agent.id)
         if chosen is not None:
-            with db.engine.begin() as conn:
-                conn.execute(
-                    _runs_table.update()
-                    .where(_runs_table.c.id == run_id)
-                    .values(agent_version_id=chosen["id"])
-                )
+            runs.set_agent_version(run_id, chosen["id"])
     except Exception:
         logger.exception("failed to stamp agent version for run %s", run_id)
 
@@ -104,7 +115,7 @@ def init_run(
     *,
     run_id: str,
     agent: AgentDef,
-    db: "Database",
+    managers: InitRunManagers,
     settings: Any,
     adapter: Any,
     rendered: Any,
@@ -124,11 +135,11 @@ def init_run(
     prepared_composed_result: Any,
     variables: dict[str, Any] | None,
 ) -> None:
-    """Initialize the run row after ``db.runs.create``."""
+    """Initialize the run row after ``runs.create``."""
     _snapshots.save_runner(
         run_id,
         build_runner_snapshot(
-            db.runner_profiles,
+            managers.runner_profiles,
             effective=effective,
             rendered_model=rendered.model,
             backend_override=backend_override,
@@ -142,7 +153,7 @@ def init_run(
 
     if rendered.model:
         try:
-            db.usage.record(run_id, {"model": rendered.model})
+            managers.usage.record(run_id, {"model": rendered.model})
         except Exception:
             logger.exception("failed to pre-record model for run %s", run_id)
 
@@ -154,7 +165,7 @@ def init_run(
             conv_uri = conv_meth(
                 run_id=run_id, transcript_path=str(transcript_path)
             )
-    db.runs.set_conversation(run_id, conv_format, conv_uri)
+    managers.runs.set_conversation(run_id, conv_format, conv_uri)
 
     if prepared_composed_result is not None:
         snapshot = {
@@ -165,7 +176,7 @@ def init_run(
                 for r in (agent.composition.references if agent.composition else [])
             ],
         }
-        db.runs.save_composition(
+        managers.runs.save_composition(
             run_id=run_id,
             composition_snapshot=snapshot,
             rendered_prompt={
@@ -181,7 +192,7 @@ def init_run(
             else (agent.prompt or "")
         )
         _final_schema = composed.composed_schema if composed is not None else None
-        db.runs.save_composition(
+        managers.runs.save_composition(
             run_id=run_id,
             composition_snapshot=None,
             rendered_prompt={
@@ -204,7 +215,7 @@ def init_run(
         mcp_snapshot=_mcp_snapshot,
     )
 
-    stamp_run_agent_version(db, run_id, agent)
+    stamp_run_agent_version(managers.runs, managers.agent_versions, run_id, agent)
 
 
 def launch_background_task(
@@ -217,7 +228,7 @@ def launch_background_task(
     workdir: Path,
     run_dir: Path,
     transcript_path: Path,
-    db: "Database",
+    managers: InitRunManagers,
     settings: Any,
     effective: Any,
     composed: ComposedPrompt | None,
@@ -239,7 +250,7 @@ def launch_background_task(
             composed=composed,
             backend=getattr(effective, "backend", None),
         )
-        db.run_prompts.save(run_id, frags_json)
+        managers.run_prompts.save(run_id, frags_json)
     except Exception:
         pass
 

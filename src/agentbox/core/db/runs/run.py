@@ -268,6 +268,15 @@ class RunManager(Manager[Run]):
         )
         self._query(stmt)
 
+    def set_agent_version(self, run_id: str, agent_version_id: int) -> None:
+        """Stamp the run row with the resolved agent version id."""
+        stmt = (
+            sa_update(Run)
+            .where(getattr(Run, "id") == run_id)
+            .values(agent_version_id=agent_version_id)
+        )
+        self._query(stmt)
+
     def list_orphaned_unnotified(self) -> list[Run]:
         """Runs whose error mentions 'orphaned' and have no post_status yet."""
         stmt = (

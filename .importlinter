@@ -331,8 +331,6 @@ ignore_imports =
     # once and threads specific managers to its children (plan 135). Permanent.
     agentbox.core.execution.orchestrate.executor -> agentbox.core.db.database
     # ── Transitional: burned by the UNIFIED plan ────────────────────────────
-    agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.runs.run
-    agentbox.core.execution.orchestrate.init_run -> agentbox.core.db.database
     agentbox.core.service.agents -> agentbox.core.db.runs.run
     agentbox.core.service.agents -> agentbox.core.db.agents.agent
     # ── Transitional: burned by plan 110 (mcp/server re-plumb) ──────────

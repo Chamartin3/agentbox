@@ -23,6 +23,7 @@ from agentbox.core.execution.observability.stream.broadcaster import RunBroadcas
 from agentbox.core.execution.orchestrate.cancel import cancel_run as _cancel_run_helper
 from agentbox.core.execution.orchestrate.finalizer import RunFinalizer
 from agentbox.core.execution.orchestrate.init_run import (
+    InitRunManagers,
     fail_pre_run as _fail_pre_run_fn,
     init_run,
     launch_background_task,
@@ -100,6 +101,13 @@ class RunExecutor:
             webhook_deliveries=db.webhook_deliveries,
             settings=settings,
         )
+        self._init_run_managers = InitRunManagers(
+            runs=db.runs,
+            agent_versions=db.agent_versions,
+            usage=db.usage,
+            run_prompts=db.run_prompts,
+            runner_profiles=db.runner_profiles,
+        )
 
     def broadcaster(self, run_id: str) -> RunBroadcaster | None:
         return self._broadcasters.get(run_id)
@@ -154,7 +162,7 @@ class RunExecutor:
             )
         except ValueError as exc:
             return _fail_pre_run_fn(
-                self.db,
+                self._init_run_managers.runs,
                 self.settings,
                 self._broadcasters,
                 agent=agent, input_=input_, workdir=workdir,
@@ -163,7 +171,7 @@ class RunExecutor:
 
         if effective.backend is None and backend is None:
             return _fail_pre_run_fn(
-                self.db,
+                self._init_run_managers.runs,
                 self.settings,
                 self._broadcasters,
                 agent=agent, input_=input_, workdir=workdir,
@@ -274,7 +282,7 @@ class RunExecutor:
         )
 
         init_run(
-            run_id=run_id, agent=agent, db=self.db,
+            run_id=run_id, agent=agent, managers=self._init_run_managers,
             settings=self.settings, adapter=adapter, rendered=rendered,
             composed=spec.composed, input_=spec.input_,
             transcript_path=transcript_path,
@@ -303,7 +311,7 @@ class RunExecutor:
             run_id=run_id, adapter=adapter, rendered=rendered,
             agent=agent, input_=input_, workdir=workdir, run_dir=run_dir,
             transcript_path=transcript_path,
-            db=self.db, settings=self.settings,
+            managers=self._init_run_managers, settings=self.settings,
             effective=effective, composed=spec.composed,
             step_loop=self._step_loop, finalizer=self._finalizer,
             _run_loop=_run_loop,

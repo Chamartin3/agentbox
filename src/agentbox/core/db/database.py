@@ -16,7 +16,6 @@ Importable only from ``agentbox.core.db.database`` by a named allowlist:
 - ``core/execution/orchestrate/executor.py`` — executor composition root;
   self-wires store, decomposes ``self.db`` into concrete managers for children
   (no ``Database`` crosses a sub-component boundary, UNIFIED rule #4)
-- ``core/execution/orchestrate/init_run.py`` — transitional; burned by UNIFIED
 - ``api/deps.py``, ``cli/shared/deps.py`` — DI wiring; burned by UNIFIED
 - ``cli/ops/migrate.py`` — schema migration CLI
 - ``core/tools/mcp_servers/agent_tools/context.py`` — MCP context (transitional)
