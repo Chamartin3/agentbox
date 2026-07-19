@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from . import bindings, crud, repo
+from . import bindings, repo
 
 router = APIRouter()
-router.include_router(crud.router)
 router.include_router(repo.router)
 router.include_router(bindings.router)
 
