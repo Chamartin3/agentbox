@@ -240,7 +240,7 @@ type = layers
 containers =
     agentbox.core.service
 layers =
-    lifecycle
+    lifecycle | diagnostics
     workspaces
     execution | resources
     agents

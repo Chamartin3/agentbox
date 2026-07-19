@@ -38,6 +38,7 @@ def get_executor() -> RunExecutor:
 # Service factories — each service is zero-argument and self-wiring.
 from agentbox.core.service import (  # noqa: E402
     AgentService,
+    DiagnosticsService,
     EngineService,
     ExecutionService,
     EvaluationService,
@@ -80,3 +81,8 @@ def get_resource_service() -> ResourceService:
 def get_workspace_service() -> WorkspaceService:
     """Workspace-domain service. Cached — self-wires from settings."""
     return WorkspaceService()
+
+
+def get_diagnostics_service() -> DiagnosticsService:
+    """Diagnostics service — uncached, self-wiring."""
+    return DiagnosticsService()

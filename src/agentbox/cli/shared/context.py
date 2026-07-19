@@ -19,13 +19,14 @@ import typer
 
 from agentbox.core.config import Settings
 from agentbox.core.service import AgentDef
-from agentbox.core.service import AgentService, EngineService, ExecutionService, EvaluationService, SystemService
+from agentbox.core.service import AgentService, DiagnosticsService, EngineService, ExecutionService, EvaluationService, SystemService
 from agentbox.core.service.resources import ResourceService
 from agentbox.core.service.workspaces import WorkspaceService
 
 from agentbox.cli.shared.deps import (
     get_settings,
     get_agent_service,
+    get_diagnostics_service,
     get_execution_service,
     get_engine_service,
     get_evaluation_service,
@@ -115,6 +116,7 @@ class CLIContext:
     system: SystemService
     resources: ResourceService
     workspaces: WorkspaceService
+    diagnostics: DiagnosticsService
 
 
 def build_ctx() -> CLIContext:
@@ -136,6 +138,7 @@ def build_ctx() -> CLIContext:
         system=get_system_service(),
         resources=get_resource_service(),
         workspaces=get_workspace_service(),
+        diagnostics=get_diagnostics_service(),
     )
 
 

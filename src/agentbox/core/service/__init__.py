@@ -116,3 +116,6 @@ from agentbox.core.workspaces.tooling.mcp import McpRegistry as McpRegistry
 # ── WorkspaceService (Plan 089) ────────────────────────────────────────
 from agentbox.core.service.workspaces import WorkspaceService as WorkspaceService
 from agentbox.core.service.workspaces import render_env_doc_preview as render_env_doc_preview
+
+# ── DiagnosticsService (Plan 131) ──────────────────────────────────────
+from agentbox.core.service.diagnostics import DiagnosticsService as DiagnosticsService
