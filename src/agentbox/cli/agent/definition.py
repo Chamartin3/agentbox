@@ -190,7 +190,7 @@ def def_edit(
         [],
         "--set",
         "-s",
-        help="dotted=value pairs, e.g. runner.kind=token. Repeatable.",
+        help="dotted=value pairs, e.g. runner.timeout_seconds=600. Repeatable.",
     ),
     runner: str | None = typer.Option(
         None,
