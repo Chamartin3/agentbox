@@ -14,6 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from agentbox.core.agents.definition import build_config_json_payload
+from agentbox.core.config import load_settings
 from agentbox.core.data import AgentDef, RunnerProfileCreate, now_iso
 from agentbox.core.db import (
     AgentVersionManager,
@@ -189,7 +190,7 @@ def _ingest_runner_profile(
     Profile ID scheme: ``f"legacy:{agent_id}"`` for stable, idempotent imports.
     Only creates a profile if the agent has a non-empty runner spec.
     """
-    if not agent.runner or not agent.runner.kind:
+    if not agent.runner:
         return
 
     try:
@@ -215,7 +216,7 @@ def _ingest_runner_profile(
             id=profile_id,
             name=f"Legacy: {agent_id}",
             description="Imported from legacy agent runner config",
-            backend=str(runner_spec.kind),
+            backend=load_settings().default_backend,
             extra_args=runner_spec.extra_args or [],
         )
 

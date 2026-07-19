@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
 
 from agentbox.core.data.manifests.agents import AgentDef, CompositionConfig
 from agentbox.core.data.manifests.engines import RunnerSpec
@@ -13,8 +11,7 @@ from agentbox.core.data.manifests.workspaces import WorkspaceDef
 
 class TestRunnerSpec:
     def test_minimal(self) -> None:
-        spec = RunnerSpec(kind="claude_code")
-        assert spec.kind == "claude_code"
+        spec = RunnerSpec()
         assert spec.timeout_seconds == 1200
 
     def test_with_all_fields(self) -> None:
@@ -30,10 +27,6 @@ class TestRunnerSpec:
         assert spec.max_validation_retries == 3
         assert spec.output_validation_engine == "jsonschema"
 
-    def test_invalid_kind_rejected(self) -> None:
-        with pytest.raises(ValidationError):
-            RunnerSpec(kind=123)  # type: ignore[arg-type]
-
 
 class TestAgentDef:
     def test_minimal(self) -> None:
@@ -46,10 +39,6 @@ class TestAgentDef:
     def test_description_defaults_to_empty(self) -> None:
         agent = AgentDef(id="a")
         assert agent.description == ""
-
-    def test_runner_defaults_to_token(self) -> None:
-        agent = AgentDef(id="a")
-        assert agent.runner.kind == "token"
 
     def test_with_composition(self) -> None:
         agent = AgentDef(

@@ -12,14 +12,9 @@ from agentbox.core.data.constants import (
 
 
 class RunnerSpec(BaseModel):
-    kind: str = BackendName.TOKEN
-    """Which backend to dispatch to (deprecated — use ``backend`` on the
-    run request or ``backend_preference`` on the project manifest instead).
-
-    The loader still reads this for backwards compatibility, mapping it
-    onto the corresponding backend adapter name. A ``DeprecationWarning``
-    is emitted when an agent definition relies on ``kind``.
-    """
+    # An agent's backend is no longer declared here. It is resolved by the one
+    # runner resolver (bound profile → system-default → Settings.default_backend);
+    # RunnerSpec carries only non-backend runner settings.
 
     # --- Shared across all runners ---
 
