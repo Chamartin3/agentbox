@@ -83,7 +83,6 @@ from agentbox.core.data.backends import (
     McpToolSpec,
     PythonAgentConfigView,
     RenderedConfig,
-    RunRequest,
     RuntimeConfigView,
 )
 from agentbox.core.data.payload_types import (
@@ -91,7 +90,9 @@ from agentbox.core.data.payload_types import (
     AgentMetaDict,
     AgentValidationResult,
     ChannelConfig,
+    ChannelConfigBase,
     ChannelSpec,
+    WebhookChannelConfig,
     CodexModelRow,
     ConfigJsonPayload,
     CredentialContext,
@@ -156,7 +157,7 @@ from agentbox.core.data.profiles import (
     RunnerProfilePatch,
     RunnerProfileStats,
 )
-from agentbox.core.data.records import DoctorCheck, RunRecord, RunSummary, SharedResourceRecord
+from agentbox.core.data.records import DoctorCheck, RunRecord, RunSummary
 from agentbox.core.data.rows import (
     AgentConfigEventRow,
     AgentMetaRow,
@@ -225,7 +226,6 @@ __all__ = [
     "McpToolSpec",
     "PythonAgentConfigView",
     "RenderedConfig",
-    "RunRequest",
     "RuntimeConfigView",
     "SkillPack",
     "AGENT_TOOLS_SERVER_NAME",
@@ -283,7 +283,9 @@ __all__ = [
     "ApiTokenWithSecret",
     "CancelRunResult",
     "ChannelConfig",
+    "ChannelConfigBase",
     "ChannelSpec",
+    "WebhookChannelConfig",
     "CodexModelRow",
     "CompositionConfig",
     "ConfigJsonPayload",
@@ -349,7 +351,6 @@ __all__ = [
     "RunnerSpec",
     "RunRecord",
     "RunSummary",
-    "SharedResourceRecord",
     "UsagePayload",
     "UsageSummaryRow",
     "VersionFileUploadRow",

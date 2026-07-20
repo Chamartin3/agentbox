@@ -8,7 +8,6 @@ existing routes. Any unknown GET that doesn't match an API route returns
 from __future__ import annotations
 
 import logging
-import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -32,28 +31,6 @@ SPA_DIR = Path(__file__).parent.parent / "ui" / "static" / "dist"
 
 
 _log = logging.getLogger(__name__)
-
-
-def _sweep_legacy_generated(workspaces_root: Path) -> None:
-    """Delete any leftover .agentbox/generated/ trees under every workspace.
-
-    Generated configs are now written to per-run tmpfs dirs; these directories
-    are always derived content and safe to delete on startup.
-    """
-    if not workspaces_root.is_dir():
-        return
-    swept = 0
-    for ws in workspaces_root.iterdir():
-        legacy = ws / ".agentbox" / "generated"
-        if legacy.is_dir():
-            shutil.rmtree(legacy, ignore_errors=True)
-            swept += 1
-    if swept:
-        _log.info(
-            "swept %d legacy .agentbox/generated/ directories under %s",
-            swept,
-            workspaces_root,
-        )
 
 
 def _on_startup() -> None:

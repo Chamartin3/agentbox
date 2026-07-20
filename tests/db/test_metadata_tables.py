@@ -43,7 +43,6 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "runs",
         "sessions",
         "settings",
-        "shared_resources",
         "usage",
         "webhook_deliveries",
         "workspace_env_doc_versions",

@@ -47,7 +47,6 @@ from agentbox.core.data import HostEnvCallLogRow as HostEnvCallLogRow
 from agentbox.core.data import HostEnvProfileRow as HostEnvProfileRow
 from agentbox.core.data import RepoResourceRow as RepoResourceRow
 from agentbox.core.data import RunCommentRow as RunCommentRow
-from agentbox.core.data import SharedResourceRecord as SharedResourceRecord
 from agentbox.core.data import UsageSummaryRow as UsageSummaryRow
 from agentbox.core.data import WorkspaceFileBindingRow as WorkspaceFileBindingRow
 from agentbox.core.data import AgentHostEnvGrantRow as AgentHostEnvGrantRow

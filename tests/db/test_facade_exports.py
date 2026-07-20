@@ -49,7 +49,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "ResourceBlobManager",
         "ResourceManager",
         "ResourceVersionManager",
-        "SharedResourceManager",
         "WorkspaceFileResourceBindingManager",
         # engines managers
         "RunnerProfileManager",

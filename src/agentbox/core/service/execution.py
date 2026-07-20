@@ -820,8 +820,6 @@ class ExecutionService(Service):
                 "injected_by": f["injected_by"],
                 "content": f["content"],
                 "inspectable": f["inspectable"],
-                "shared_resource_id": f.get("shared_resource_id"),
-                "shared_resource_version": f.get("shared_resource_version"),
                 "size_bytes": f["size_bytes"],
             }
             for f in fragments_list

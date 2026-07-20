@@ -21,11 +21,6 @@ from agentbox.core.db.resources.resource import (
     ResourceVersionManager,
     ResourceManager,
 )
-from agentbox.core.db.resources.shared_resource import (
-    SharedResource,
-    SharedResourceManager,
-)
-
 __all__ = [
     # binding entities + managers
     "AgentPromptResourceBinding",
@@ -41,7 +36,4 @@ __all__ = [
     "ResourceVersion",
     "ResourceVersionManager",
     "ResourceManager",
-    # shared_resource entity + manager
-    "SharedResource",
-    "SharedResourceManager",
 ]

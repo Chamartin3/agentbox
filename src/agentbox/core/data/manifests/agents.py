@@ -23,8 +23,6 @@ class AgentSource(enum.StrEnum):
     """Agent defined in a separate ``.toml`` file under ``agents.d/``."""
     MARKDOWN = "markdown"
     """Agent defined as a markdown file with YAML frontmatter under ``agents.d/``."""
-    LEGACY_DIR = "legacy_dir"
-    """Agent defined via the legacy ``agents/<name>/agent.toml`` + ``prompts/system.md`` pattern."""
     BUNDLE = "bundle"
     """Agent defined as a bundle directory: ``<bundle_dir>/<id>/agent.toml`` with
     a ``[composition]`` block declaring system prompt, references, and schemas."""

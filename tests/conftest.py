@@ -30,7 +30,6 @@ from agentbox.core.db import (
     RunManager,
     RunnerProfileManager,
     SessionManager,
-    SharedResourceManager,
     UsageManager,
     WorkspaceManager,
     WorkspaceSubagentManager,
@@ -145,11 +144,6 @@ def workspaces(db: Database) -> WorkspaceManager:
 @pytest.fixture
 def resources(db: Database) -> ResourceManager:
     return db.resources
-
-
-@pytest.fixture
-def shared_resources(db: Database) -> SharedResourceManager:
-    return db.shared_resources
 
 
 @pytest.fixture

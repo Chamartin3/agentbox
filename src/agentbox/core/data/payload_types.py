@@ -148,19 +148,34 @@ class RefSection(TypedDict):
     content: str
 
 
-class ChannelConfig(TypedDict, total=False):
-    """Per-channel dispatch configuration.
+class ChannelConfigBase(TypedDict, total=False):
+    """Shared optional fields present on every dispatch channel config.
 
-    Superset of the keys read by the built-in channels (today: webhook).
-    Channels validate the keys they need at runtime.
+    Channels that carry extra fields extend this base with their own
+    TypedDict (e.g. ``WebhookChannelConfig``). Keep this lean — only fields
+    that genuinely apply to *all* channels belong here.
     """
 
-    # Single flat config for the one existing channel; split into per-channel
-    # TypedDicts + a generic base when a second channel lands.
-    url: str
-    headers: dict[str, str]
     retry_count: int
     retry_delay_seconds: float
+
+
+class WebhookChannelConfig(ChannelConfigBase, total=False):
+    """Config for the ``webhook`` dispatch channel.
+
+    ``url`` is required at runtime but typed ``NotRequired`` so callers can
+    build the dict incrementally; the channel validates presence before use.
+    ``headers`` carries optional extra HTTP headers.
+    """
+
+    url: str
+    headers: dict[str, str]
+
+
+# Public alias — keeps the historic name stable across the codebase.
+# Today there is one channel (webhook); when a second channel lands,
+# extend this union: ``WebhookChannelConfig | OtherChannelConfig``.
+ChannelConfig = WebhookChannelConfig
 
 
 class RefreshProvidersResult(TypedDict):
@@ -202,12 +217,6 @@ class PromptFragmentPayload(TypedDict):
 
     inspectable: bool
     """False = we describe what's there but don't have the bytes."""
-
-    shared_resource_id: NotRequired[str | None]
-    """Optional: id of the shared resource this fragment came from."""
-
-    shared_resource_version: NotRequired[int | None]
-    """Optional: version of the shared resource (None = active version was used)."""
 
     size_bytes: int
     """Size of the content in bytes."""
@@ -1411,6 +1420,8 @@ __all__ = [
     "JsonDiffResult",
     "AgentMetaDict",
     "ChannelConfig",
+    "ChannelConfigBase",
+    "WebhookChannelConfig",
     "ChannelSpec",
     "CharBreakdownPart",
     "CodexModelRow",

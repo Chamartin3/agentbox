@@ -10,7 +10,7 @@ engine lifecycle.  They are importable only from ``agentbox.core.db.database``
 by a named allowlist (service/base.py, the three deps.py, cli/ops/migrate.py,
 the two mcp/servers/*/context.py).  Everything else uses managers.
 
-Shared data shapes (``SharedResourceRecord``, rows, snapshots) live in
+Shared data shapes (rows, snapshots) live in
 ``core.data`` / ``core.protocols`` / ``core.events``.  SQLModel entities live in
 their per-domain packages (``core.db.runs``, ``core.db.agents``, …) alongside
 their managers, one file per table (entity + manager together).  The entities'
@@ -66,7 +66,6 @@ from agentbox.core.db.resources import (
     ResourceBlobManager,
     ResourceManager,
     ResourceVersionManager,
-    SharedResourceManager,
     WorkspaceFileResourceBindingManager,
 )
 from agentbox.core.db.system import (
@@ -116,7 +115,6 @@ __all__ = [
     "ResourceBlobManager",
     "ResourceManager",
     "ResourceVersionManager",
-    "SharedResourceManager",
     "WorkspaceFileResourceBindingManager",
     # engines
     "RunnerProfileManager",

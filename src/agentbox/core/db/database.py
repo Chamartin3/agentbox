@@ -51,7 +51,6 @@ from agentbox.core.db.resources import (
     ResourceBlobManager,
     ResourceManager,
     ResourceVersionManager,
-    SharedResourceManager,
     WorkspaceFileResourceBindingManager,
 )
 from agentbox.core.db.runs import (
@@ -99,7 +98,7 @@ class Database:
             db.workspace_mcp_policies,
             db.workspace_runtime_permissions, db.workspace_subagents,
         db.resources, db.resource_versions, db.resource_blobs,
-            db.active_resource_versions, db.shared_resources,
+            db.active_resource_versions,
             db.agent_prompt_resource_bindings, db.workspace_file_resource_bindings
         db.runner_profiles
         db.api_tokens, db.settings, db.host_env_profiles, db.host_env_call_log,
@@ -154,7 +153,6 @@ class Database:
         self.resource_versions = ResourceVersionManager(self._engine)
         self.resource_blobs = ResourceBlobManager(self._engine)
         self.active_resource_versions = ActiveResourceVersionManager(self._engine)
-        self.shared_resources = SharedResourceManager(self._engine)
         self.agent_prompt_resource_bindings = AgentPromptResourceBindingManager(self._engine)
         self.workspace_file_resource_bindings = WorkspaceFileResourceBindingManager(self._engine)
 

@@ -3,9 +3,9 @@
 The canonical value types both the engines and execution/agents domains
 exchange at the backend boundary: the immutable ``RenderedConfig`` a
 backend ``render()`` produces, the ``BackendRunResult`` it reports, the
-per-run ``RunRequest``, the MCP tool manifest ``McpToolSpec``, and the
-engine-local *views* of agent config (``RuntimeConfigView``,
-``PythonAgentConfigView``, ``ComposedView``, ``ComposedReferenceView``).
+MCP tool manifest ``McpToolSpec``, and the engine-local *views* of agent
+config (``RuntimeConfigView``, ``PythonAgentConfigView``, ``ComposedView``,
+``ComposedReferenceView``).
 
 They live in ``core.data`` (the shapes leaf) so neither domain has to
 reach across into the other to name them.
@@ -20,9 +20,8 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
-from agentbox.core.data.manifests.agents import AgentDef
 from agentbox.core.data.payload_types import AgentMetaDict
 from agentbox.core.data.skills import SkillPack
 from agentbox.core.data.tools import CanonicalTool
@@ -118,27 +117,6 @@ class BackendRunResult:
     exit_code: int | None = None
     error: str | None = None
     status: str | None = None  # "ok" | "error" | "timeout" | None
-
-
-@dataclass
-class RunRequest:
-    """Per-run inputs handed to a backend's ``run()`` (legacy shape, kept
-    for direct in-process callers).
-
-    Most code paths use :class:`RenderedConfig` instead — the executor
-    renders once and then calls ``run(rendered, input, run_id)``. This
-    dataclass survives for tests and the few helpers that still want a
-    single object holding everything about a run.
-    """
-
-    run_id: str
-    agent: AgentDef
-    input: str
-    workdir: Path
-    project_root: Path
-    session_id: str | None = None
-    runner_profile: str | None = None
-    runner_config: dict[str, Any] | None = None
 
 
 # ── Rendered config ──────────────────────────────────────────────────────────

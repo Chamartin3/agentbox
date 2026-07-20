@@ -1,7 +1,7 @@
 """ResourceService — the resource-domain public service object.
 
 All repo-resource CRUD, version lifecycle, import dispatch, blob reads,
-materialization, shared resource CRUD, and prompt/workspace bindings live here.
+materialization, and prompt/workspace bindings live here.
 
 Callers construct with no arguments:  ``ResourceService()``
 The Database is resolved internally from settings.
@@ -48,7 +48,6 @@ from agentbox.core.data.payload_types import (
     WorkspaceBindingSpec,
     WorkspaceResourcesResult,
 )
-from agentbox.core.data.records import SharedResourceRecord
 from agentbox.core.data.rows import (
     AgentPromptBindingRow,
     RepoResourceRow,
@@ -107,7 +106,6 @@ class ResourceService(Service):
         self._resource_versions = self._db.resource_versions
         self._resource_blobs = self._db.resource_blobs
         self._active_resource_versions = self._db.active_resource_versions
-        self._shared_resources = self._db.shared_resources
         self._prompt_bindings = self._db.agent_prompt_resource_bindings
         self._file_bindings = self._db.workspace_file_resource_bindings
 
@@ -813,80 +811,4 @@ class ResourceService(Service):
             raise BindingError(str(exc)) from exc
         return {"items": items}
 
-    # -----------------------------------------------------------------------
-    # Shared resources (legacy cross-consumer API; will outlive the repo API)
-    # -----------------------------------------------------------------------
-
-    def get_shared_resource(self, id: str, version: int) -> SharedResourceRecord | None:
-        return self._shared_resources.get_versioned(id, version)
-
-    def get_active_shared_resource(self, id: str) -> SharedResourceRecord | None:
-        return self._shared_resources.get_active(id)
-
-    def list_shared_resources(
-        self,
-        *,
-        kind: str | None = None,
-        q: str | None = None,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> list[SharedResourceRecord]:
-        return self._shared_resources.list_active(kind=kind, q=q, limit=limit, offset=offset)
-
-    def count_shared_resources(self, *, kind: str | None = None, q: str | None = None) -> int:
-        return self._shared_resources.count_active(kind=kind, q=q)
-
-    def list_shared_resource_versions(
-        self, id: str, *, limit: int = 50, offset: int = 0
-    ) -> list[SharedResourceRecord]:
-        return self._shared_resources.list_versions(id, limit=limit, offset=offset)
-
-    def create_shared_resource(
-        self,
-        id: str,
-        kind: str,
-        name: str,
-        *,
-        description: str | None = None,
-        content: str | None = None,
-        config_json: str | None = None,
-        author: str | None = None,
-        changelog: str | None = None,
-        tags: list[str] | None = None,
-        activate: bool = True,
-    ) -> SharedResourceRecord:
-        return self._shared_resources.create_resource(
-            id, kind, name,
-            description=description,
-            content=content,
-            config_json=config_json,
-            author=author,
-            changelog=changelog,
-            tags=tags,
-            activate=activate,
-        )
-
-    def create_shared_resource_version(
-        self,
-        id: str,
-        *,
-        content: str | None = None,
-        config_json: str | None = None,
-        author: str | None = None,
-        changelog: str | None = None,
-        activate: bool = False,
-        **fields_to_update,
-    ) -> SharedResourceRecord:
-        return self._shared_resources.create_version(
-            id,
-            content=content,
-            config_json=config_json,
-            author=author,
-            changelog=changelog,
-            activate=activate,
-            **fields_to_update,
-        )
-
-    def activate_shared_resource(self, id: str, version: int) -> SharedResourceRecord:
-        return self._shared_resources.activate_version(id, version)
 

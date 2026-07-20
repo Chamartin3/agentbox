@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from agentbox.core.data.records import RunRecord, SharedResourceRecord
+from agentbox.core.data.records import RunRecord
 from agentbox.core.data import now_iso
 
 
@@ -89,36 +89,3 @@ class TestRunRecord:
         assert rec.finished_at == "2025-01-01T00:01:00Z"
 
 
-class TestSharedResourceRecord:
-    def test_minimal_construction(self) -> None:
-        rec = SharedResourceRecord(
-            id="r1",
-            version=1,
-            kind="document",
-            name="Test Doc",
-            sha256="abc123",
-            created_at="2025-01-01T00:00:00Z",
-        )
-        assert rec.id == "r1"
-        assert rec.kind == "document"
-        assert rec.sha256 == "abc123"
-        assert rec.description is None
-
-    def test_with_description_and_content(self) -> None:
-        rec = SharedResourceRecord(
-            id="r2",
-            version=2,
-            kind="folder",
-            name="My Folder",
-            sha256="def456",
-            created_at="2025-01-01T00:00:00Z",
-            description="A test folder",
-            content="file listing",
-            is_active=True,
-            author="alice",
-            changelog="updated",
-            tags=("tag1", "tag2"),
-        )
-        assert rec.description == "A test folder"
-        assert rec.is_active is True
-        assert rec.tags == ("tag1", "tag2")
