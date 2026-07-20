@@ -27,7 +27,6 @@ def test_startup_with_no_manifest_and_empty_db(
     # Clear caches so the next call reads the new env vars
     for fn in (
         _deps.get_settings,
-        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -45,7 +44,6 @@ def test_startup_with_no_manifest_and_empty_db(
     # Clear caches again for good measure
     for fn in (
         _deps.get_settings,
-        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -62,7 +60,6 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
     # Clear caches
     for fn in (
         _deps.get_settings,
-        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):
@@ -77,7 +74,6 @@ def test_agents_list_endpoint_empty_in_manifest_free_mode(
     # Clear caches again
     for fn in (
         _deps.get_settings,
-        _deps.get_db,
         _deps.get_executor,
         _deps.get_mcp_registry,
     ):

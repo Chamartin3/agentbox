@@ -6,7 +6,6 @@ from functools import lru_cache
 
 from agentbox.api.context import APIContext
 from agentbox.core.config import Settings, load_settings
-from agentbox.core.db.database import Database  # transitional: DI opens the store directly; should route through Services (see TECH_DEBT.md)
 from agentbox.core.service import (
     AgentService,
     EngineService,
@@ -23,11 +22,6 @@ from agentbox.core.workspaces.tooling.mcp import McpRegistry
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return load_settings()
-
-
-@lru_cache(maxsize=1)
-def get_db() -> Database:
-    return Database(get_settings().db_path)
 
 
 def get_agent_service() -> AgentService:

@@ -48,10 +48,6 @@ ALLOWED = {
     # by plans 111/112/110/113_04.
     # Permanent (composition roots):
     REPO_ROOT / "src" / "agentbox" / "core" / "service" / "base.py",
-    # Transitional DI singletons (burned by plan 113_04):
-    REPO_ROOT / "src" / "agentbox" / "api" / "deps.py",
-    REPO_ROOT / "src" / "agentbox" / "cli" / "shared" / "deps.py",
-    REPO_ROOT / "src" / "agentbox" / "mcp" / "deps.py",
     # Transitional cli commands:
     REPO_ROOT / "src" / "agentbox" / "cli" / "ops" / "shell.py",
     # Transitional mcp/server contexts (burned by plan 110):
@@ -66,9 +62,6 @@ ALLOWED = {
     REPO_ROOT / "src" / "agentbox" / "api" / "workspaces" / "crud.py",
     REPO_ROOT / "src" / "agentbox" / "core" / "service" / "lifecycle" / "startup.py",
     REPO_ROOT / "src" / "agentbox" / "core" / "service" / "workspaces" / "registry.py",
-    # init_run imports ``core.db.database`` (Database) directly for run-creation
-    # composition; tracked in importlinter init_run→database.
-    REPO_ROOT / "src" / "agentbox" / "core" / "execution" / "orchestrate" / "init_run.py",
 }
 
 # ``core.db.config`` is a public self-wiring read-helper module (not a manager,

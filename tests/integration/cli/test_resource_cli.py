@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agentbox.api.deps import get_db as _get_store
+from agentbox.core.db.database import Database
 from agentbox.cli import app
 from agentbox.core.service.resources import ResourceService
 from agentbox.cli.shared import (
@@ -47,7 +47,7 @@ def store_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENTBOX_PROJECT_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENTBOX_SKIP_DEFAULT_PROFILES", "1")
     _clear_shared_deps_caches()
-    store = _get_store()
+    store = Database(get_settings().db_path)
     yield store
     _clear_shared_deps_caches()
 

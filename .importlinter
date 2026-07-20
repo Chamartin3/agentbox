@@ -284,11 +284,6 @@ forbidden_modules =
 allow_indirect_imports = True
 unmatched_ignore_imports_alerting = warn
 ignore_imports =
-    # DI wiring constructs Database directly from core.db.database; goes
-    # away when deps modules resolve Services instead (UNIFIED plan).
-    # After plan 109, Database/get_database are in core.db.database, not the
-    # top-level facade, so we point at the specific submodule:
-    agentbox.api.deps -> agentbox.core.db.database
     # cli renderers touch core.db types to render domain objects
     # (real fix: shared value types below both layers)
     # api/mcp transitional direct db access (TODO: route through Services)
