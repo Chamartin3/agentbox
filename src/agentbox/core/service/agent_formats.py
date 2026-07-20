@@ -22,13 +22,10 @@ class AgentFileFormat(str, Enum):
 
     claude_code = "claude_code"
     opencode = "opencode"
-    agentbox = "agentbox"
+    codex = "codex"
 
 
 FORMATS = tuple(f.value for f in AgentFileFormat)
-
-# Fields dropped from the agentbox TOML dump (render-only / prompt sidecar).
-_TOML_DROP = ("prompt", "headless", "claude_agent")
 
 
 def _frontmatter_doc(meta: dict, body: str) -> str:
@@ -60,21 +57,21 @@ def dump_agent(agent: AgentDef, fmt: AgentFileFormat) -> list[tuple[str, str]]:
         if agent.tools:
             meta["tools"] = {t: True for t in agent.tools}
         return [(f"{agent.id}.md", _frontmatter_doc(meta, agent.prompt or ""))]
-    return _dump_agentbox(agent)
+    return _dump_codex(agent)
 
 
-def _dump_agentbox(agent: AgentDef) -> list[tuple[str, str]]:
-    dump = agent.model_dump(mode="json", exclude_none=True)
-    for key in _TOML_DROP:
-        dump.pop(key, None)
+def _dump_codex(agent: AgentDef) -> list[tuple[str, str]]:
+    """Codex subagent TOML: name / description / developer_instructions.
+
+    Mirrors the ``.codex/agents/{id}.toml`` shape the codex backend renders
+    at runtime (see engines/backends/codex/render.py). Codex's format carries
+    no tool list, so tools are dropped.
+    """
     doc = tomlkit.document()
-    doc.add(tomlkit.comment(f" Exported from agentbox — {agent.id}"))
-    for key, value in dump.items():
-        doc[key] = value
-    out = [(f"{agent.id}.toml", tomlkit.dumps(doc))]
-    if agent.prompt:
-        out.append((f"{agent.id}.prompt.md", agent.prompt))
-    return out
+    doc["name"] = agent.id
+    doc["description"] = agent.description or ""
+    doc["developer_instructions"] = agent.prompt or ""
+    return [(f"{agent.id}.toml", tomlkit.dumps(doc))]
 
 
 def parse_agent(
@@ -102,10 +99,13 @@ def parse_agent(
         return AgentDef(
             id=aid, description=meta.get("description", ""), prompt=body or None, tools=tools
         )
-    # ponytail: agentbox parses the .toml only; the prompt lives in the
-    # <id>.prompt.md sidecar and is not merged. Thread the sidecar in if
-    # round-trip prompt fidelity for the portable format is ever needed.
-    data = dict(tomlkit.parse(text))
-    if agent_id:
-        data.setdefault("id", agent_id)
-    return AgentDef.model_validate(data)
+    data = tomlkit.parse(text)
+    aid = data.get("name") or agent_id
+    if not aid:
+        raise ValueError("codex agent file has no 'name' and no id hint")
+    instructions = data.get("developer_instructions")
+    return AgentDef(
+        id=str(aid),
+        description=str(data.get("description", "")),
+        prompt=str(instructions) if instructions else None,
+    )

@@ -46,6 +46,17 @@ def test_opencode_needs_id_hint(agent: AgentDef) -> None:
         parse_agent(content, "opencode")
 
 
+def test_codex_round_trip_uses_subagent_toml(agent: AgentDef) -> None:
+    files = dump_agent(agent, "codex")
+    assert [n for n, _ in files] == ["greeter.toml"]
+    _, content = files[0]
+    # Real Codex subagent shape (name / description / developer_instructions).
+    assert "developer_instructions" in content
+    back = parse_agent(content, "codex")
+    assert (back.id, back.description) == ("greeter", "Greets people")
+    assert back.prompt == agent.prompt  # prompt survives round-trip
+
+
 def test_unknown_format_raises(agent: AgentDef) -> None:
     with pytest.raises(ValueError):
         dump_agent(agent, "nope")
