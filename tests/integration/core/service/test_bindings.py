@@ -69,7 +69,7 @@ def test_list_workspace_resources_empty(store: Database) -> None:
 
 
 def test_replace_workspace_resources_empty_round_trip(store: Database) -> None:
-    # ponytail: the old sync_cb-injection wrapper is gone — prod REST routes
+    # the old sync_cb-injection wrapper is gone — prod REST routes
     # call svc.build_workspace() directly after replace, so there is no sync_cb
     # contract left to pin.
     store.workspaces.insert("alpha")

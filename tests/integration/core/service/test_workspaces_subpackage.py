@@ -35,7 +35,7 @@ def settings(tmp_path: Path) -> Settings:
     project_root.mkdir()
     ws_root = project_root / "workspaces"
     ws_root.mkdir()
-    # ponytail: fake exposes only the two attrs the service reads; cast once here
+    # fake exposes only the two attrs the service reads; cast once here
     return cast(Settings, _FakeSettings(project_root=project_root, workspaces_root=ws_root))
 
 

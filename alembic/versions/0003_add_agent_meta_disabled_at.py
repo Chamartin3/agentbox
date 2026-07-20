@@ -21,7 +21,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # ponytail: idempotent — metadata.create_all may have added the column
+    # idempotent — metadata.create_all may have added the column
     # already when run against a fresh DB before alembic stamps.
     bind = op.get_bind()
     cols = {c["name"] for c in sa.inspect(bind).get_columns("agent_meta")}

@@ -285,7 +285,7 @@ def get_agent_detail(
     agent = agent_defs.get(agent_id)
     if agent is None:
         return None
-    # ponytail: pass None — ws.resolve_path falls back to settings-based path.
+    # pass None — ws.resolve_path falls back to settings-based path.
     workspace_path, ephemeral = ws.resolve_path(agent, settings, None)
 
     latest_row = agent_versions.get_effective_active(agent_id)

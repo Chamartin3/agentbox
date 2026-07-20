@@ -22,7 +22,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # ponytail: idempotent — the AgentVersion entity no longer declares is_draft,
+    # idempotent — the AgentVersion entity no longer declares is_draft,
     # so metadata.create_all against a fresh DB won't create it. Skip the drop if
     # it isn't there.
     bind = op.get_bind()

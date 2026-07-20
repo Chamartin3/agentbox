@@ -128,7 +128,8 @@ class McpClient:
     # `dict[str, RawJsonValue]` cascades unfixably without a banned cast —
     # `list_tools` would have to coerce RawJsonValue into `list[McpRawTool]`,
     # and nested literals (`_CLIENT_INFO`) hit dict-invariance. Real fix:
-    # a pydantic JSON-RPC envelope model if this layer ever grows.
+    # a pydantic JSON-RPC envelope model — add it when this file gains a 3rd
+    # JSON-RPC method or the first untyped-field bug ships.
     async def _jsonrpc(self, method: str, params: dict) -> dict:
         self._request_id += 1
         body = {

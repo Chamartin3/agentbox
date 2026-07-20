@@ -65,7 +65,7 @@ function AgentRunsTab({
       statsQ.refresh();
     }, 4000);
     return () => window.clearInterval(h);
-    // ponytail: refresh fns are stable
+    // refresh fns are stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLiveView]);
 

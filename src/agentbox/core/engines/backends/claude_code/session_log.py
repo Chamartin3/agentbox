@@ -136,8 +136,16 @@ def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:
                 )
             )
         else:
-            # ponytail: unknown block types collapse to an empty text part
-            parts.append(ContentPart(type=ContentBlockType.TEXT, byte_len=0))
+            # ponytail: unknown block → labeled placeholder so new Anthropic
+            # block types stay visible instead of silently dropping to empty
+            placeholder = f"[unhandled block: {t}]"
+            parts.append(
+                ContentPart(
+                    type=ContentBlockType.TEXT,
+                    byte_len=len(placeholder),
+                    body=placeholder if include_bodies else None,
+                )
+            )
     return parts
 
 
