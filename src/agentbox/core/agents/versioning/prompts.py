@@ -52,7 +52,7 @@ def read_versioned(
        (DB-as-source-of-truth).
     2. ``prompt_versions`` latest committed entry.
     """
-    row = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
+    row = agent_versions.get_effective_active(agent_id)
     if row and row.get("prompt_content"):
         content: str = row["prompt_content"] or ""
         return PromptDoc(

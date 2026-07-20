@@ -38,7 +38,7 @@ def prompt_show(
             raise typer.Exit(2)
         content = committed["content"]
     else:
-        ver = obj.agents.active_version(agent_id) or obj.agents.latest_version(agent_id)
+        ver = obj.agents.effective_active_version(agent_id)
         if ver is None:
             obj.render.agent.error(f"unknown agent {agent_id!r}")
             raise typer.Exit(1)

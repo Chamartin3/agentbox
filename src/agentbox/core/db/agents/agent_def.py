@@ -30,7 +30,7 @@ class AgentDefManager:
 		``None`` when the agent has never been versioned, is soft-deleted, or
 		the stored snapshot fails validation. Mirrors ``AgentService.get_agent_def``.
 		"""
-		row = self._versions.get_active(agent_id) or self._versions.get_latest(agent_id)
+		row = self._versions.get_effective_active(agent_id)
 		if row is None:
 			return None
 		meta = self._meta.get_meta(agent_id)

@@ -288,7 +288,7 @@ def get_agent_detail(
     # ponytail: pass None — ws.resolve_path falls back to settings-based path.
     workspace_path, ephemeral = ws.resolve_path(agent, settings, None)
 
-    latest_row = agent_versions.get_active(agent_id) or agent_versions.get_latest(agent_id)
+    latest_row = agent_versions.get_effective_active(agent_id)
     prompt = ""
     db_prompt = (latest_row or {}).get("prompt_content")
     if isinstance(db_prompt, str) and db_prompt:
@@ -2326,7 +2326,7 @@ class AgentService(Service):
         activate: bool = False,
     ) -> AgentVersionRow:
         """New version cloning active config but with a fresh prompt."""
-        active = self.active_version(agent_id) or self.latest_version(agent_id)
+        active = self.effective_active_version(agent_id)
         if active is None:
             raise ValueError(f"No version to clone for agent {agent_id}")
         cloned_config = active.get("config_json")
@@ -2374,7 +2374,7 @@ class AgentService(Service):
         activate: bool = True,
     ) -> AgentVersionRow:
         """New version with config_json shallow-merged from ``config_patch``."""
-        active = self.active_version(agent_id) or self.latest_version(agent_id)
+        active = self.effective_active_version(agent_id)
         if active is None:
             raise ValueError(f"No version to clone for agent {agent_id}")
         raw = active.get("config_json")
@@ -2434,7 +2434,7 @@ class AgentService(Service):
         Returns ``None`` when the agent has no usable version, is soft-deleted,
         or the stored snapshot fails validation.
         """
-        row = self.active_version(agent_id) or self.latest_version(agent_id)
+        row = self.effective_active_version(agent_id)
         if row is None:
             return None
         if self.is_deleted(agent_id):

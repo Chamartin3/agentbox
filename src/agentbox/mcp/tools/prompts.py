@@ -14,7 +14,7 @@ from typing import TypedDict
 
 from fastmcp import FastMCP
 
-from agentbox.core.service import AgentService, AgentVersionRow
+from agentbox.core.service import AgentVersionRow
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -45,11 +45,6 @@ def _version_meta(version: AgentVersionRow) -> VersionMeta:
     }
 
 
-def _resolve_active(svc: AgentService, agent_id: str) -> AgentVersionRow | None:
-    """Active version with ``latest_version`` fallback (mirrors the API)."""
-    return svc.active_version(agent_id) or svc.latest_version(agent_id)
-
-
 def register(mcp: FastMCP, ctx: MCPContext) -> None:
     @mcp.tool
     def get_prompt(agent_id: str, version: int | None = None) -> dict:
@@ -73,7 +68,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
                 "content": _version_prompt_content(row),
                 **_version_meta(row),
             }
-        active = _resolve_active(svc, agent_id)
+        active = svc.effective_active_version(agent_id)
         if active is None:
             return {"error": "no_versions", "agent_id": agent_id}
         return {

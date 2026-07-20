@@ -134,7 +134,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         agent = svc.resolve_agent(agent_id)
         if agent is None:
             return {"error": "not_found", "agent_id": agent_id}
-        active = svc.active_version(agent_id) or svc.latest_version(agent_id)
+        active = svc.effective_active_version(agent_id)
         prompt_meta = None
         if active:
             prompt_meta = {
