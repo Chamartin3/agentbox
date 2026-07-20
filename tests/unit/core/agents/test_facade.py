@@ -29,8 +29,6 @@ REQUIRED_SURFACE = (
     "build_config_json_payload",      # definition/
     "resolve_engine",                 # runner
     "list_engines",                   # runner
-    "check_drift",                    # versioning/
-    "startup_sweep",                  # versioning/
     "PromptDoc",                      # versioning/
 )
 

@@ -2,18 +2,7 @@
 
 from __future__ import annotations
 
-from agentbox.core.data import AgentDef, AgentSource, RunnerSpec
-from agentbox.core.agents.versioning.drift import startup_sweep
 from agentbox.core.service.agents import AgentService
-
-
-def _agent_with_prompt(agent_id: str, prompt: str) -> AgentDef:
-    return AgentDef(
-        id=agent_id,
-        source_format=AgentSource.STANDALONE_TOML,
-        prompt=prompt,
-        runner=RunnerSpec(),
-    )
 
 
 class TestSyncPromptFromDisk:
@@ -71,40 +60,3 @@ class TestSyncPromptFromDisk:
         result = AgentService().sync_prompt_from_disk("agent-e", "updated")
         assert result is not None
         assert result["version"] == 2
-
-
-class TestStartupSweepPromptSync:
-    def test_sweep_captures_inline_prompt_on_first_load(self, db, tmp_path) -> None:
-        agent = _agent_with_prompt("a", "hello prompt")
-        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles)
-
-        versions = db.prompt_versions.list_for_agent("a")
-        assert len(versions) == 1
-        assert versions[0]["content"] == "hello prompt"
-        assert versions[0]["author"] == "filesystem"
-
-    def test_sweep_captures_updated_inline_prompt(self, db, tmp_path) -> None:
-        agent_v1 = _agent_with_prompt("b", "original")
-        startup_sweep([agent_v1], db.agent_versions, db.prompt_versions, db.runner_profiles)
-
-        agent_v2 = _agent_with_prompt("b", "edited")
-        startup_sweep([agent_v2], db.agent_versions, db.prompt_versions, db.runner_profiles)
-
-        versions = db.prompt_versions.list_for_agent("b")
-        assert len(versions) == 2
-        assert versions[0]["version"] == 2
-        assert versions[0]["content"] == "edited"
-        assert versions[0]["changelog"] == "Out-of-band file edit"
-
-    def test_sweep_is_idempotent_when_prompt_unchanged(self, db, tmp_path) -> None:
-        agent = _agent_with_prompt("c", "stable")
-        for _ in range(3):
-            startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles)
-
-        versions = db.prompt_versions.list_for_agent("c")
-        assert len(versions) == 1
-
-    def test_sweep_skips_agents_without_prompt(self, db, tmp_path) -> None:
-        agent = AgentDef(id="d", runner=RunnerSpec())
-        startup_sweep([agent], db.agent_versions, db.prompt_versions, db.runner_profiles)
-        assert db.prompt_versions.list_for_agent("d") == []

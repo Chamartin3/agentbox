@@ -21,13 +21,10 @@ from agentbox.core.agents.runner import (
     resolve_engine_by_name as resolve_engine_by_name,
 )
 from agentbox.core.agents.versioning import (
-    AgentDriftStatus as AgentDriftStatus,
     PromptDoc as PromptDoc,
     PromptError as PromptError,
     build_agent_snapshot as build_agent_snapshot,
     build_config_json_str as build_config_json_str,
-    check_drift as check_drift,
-    startup_sweep as startup_sweep,
 )
 from agentbox.core.agents.validation import (
     OutputConfig as OutputConfig,
@@ -74,7 +71,6 @@ from agentbox.core.data.composition import (
 )
 
 __all__ = [
-    "AgentDriftStatus",
     "AgentRuntimeView",
     "BindingsBundleSource",
     "Bundle",
@@ -103,7 +99,6 @@ __all__ = [
     "build_config_json_str",
     "build_prompt",
     "build_runtime_view",
-    "check_drift",
     "check_output",
     "compose",
     "compose_from_source",
@@ -126,6 +121,5 @@ __all__ = [
     "resolve_output_config",
     "resolve_prompt",
     "resolve_schema",
-    "startup_sweep",
     "validate_input",
 ]

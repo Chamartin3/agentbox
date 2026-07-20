@@ -50,7 +50,6 @@ class StartupReport:
 
     tools_discovered: bool = False
     mcp_servers_synced: int = 0
-    drift_sweep_ran: bool = False
     runner_profiles_seeded: int = 0
     resources_created: int = 0
     resources_updated: int = 0
@@ -81,7 +80,6 @@ def _merge(base: StartupReport, delta: StartupReport) -> StartupReport:
         base,
         tools_discovered=base.tools_discovered or delta.tools_discovered,
         mcp_servers_synced=base.mcp_servers_synced + delta.mcp_servers_synced,
-        drift_sweep_ran=base.drift_sweep_ran or delta.drift_sweep_ran,
         runner_profiles_seeded=base.runner_profiles_seeded
         + delta.runner_profiles_seeded,
         resources_created=base.resources_created + delta.resources_created,

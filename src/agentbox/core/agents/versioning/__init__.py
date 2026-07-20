@@ -1,15 +1,12 @@
-"""Versioned prompt lifecycle: drift detection/sync + prompt-doc CRUD.
+"""Versioned prompt lifecycle: serializers + prompt-doc CRUD.
 
-- ``drift`` — startup drift sweep, per-agent drift status, prompt/version sync.
+- ``serialize`` — agent-version serializers (``build_agent_snapshot``, ``build_config_json_str``).
 - ``prompts`` — prompt document read/write/publish/rollback over versions.
 """
 
-from agentbox.core.agents.versioning.drift import (
-    AgentDriftStatus as AgentDriftStatus,
+from agentbox.core.agents.versioning.serialize import (
     build_agent_snapshot as build_agent_snapshot,
     build_config_json_str as build_config_json_str,
-    check_drift as check_drift,
-    startup_sweep as startup_sweep,
 )
 from agentbox.core.agents.versioning.prompts import (
     PromptDoc as PromptDoc,
@@ -17,11 +14,8 @@ from agentbox.core.agents.versioning.prompts import (
 )
 
 __all__ = [
-    "AgentDriftStatus",
     "PromptDoc",
     "PromptError",
     "build_agent_snapshot",
     "build_config_json_str",
-    "check_drift",
-    "startup_sweep",
 ]
