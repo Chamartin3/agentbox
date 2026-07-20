@@ -4,6 +4,15 @@ Public facade for the prompt pipeline: building composed prompts,
 resolving resource bindings, rendering previews, and validating output.
 """
 
+from agentbox.core.agents.composition.composer import (
+    BaseSegment,
+    CompositionDiagnostics,
+    InputSchemaSegment,
+    OutputSchemaSegment,
+    PromptComposer,
+    PromptComposition,
+    ReferenceSegment,
+)
 from agentbox.core.agents.composition.build import (
     BuildManagers,
     build_prompt,
@@ -44,6 +53,13 @@ from agentbox.core.agents.composition.rendering import (
 )
 
 __all__ = [
+    "BaseSegment",
+    "CompositionDiagnostics",
+    "InputSchemaSegment",
+    "OutputSchemaSegment",
+    "PromptComposer",
+    "PromptComposition",
+    "ReferenceSegment",
     "BuildManagers",
     "build_prompt",
     "build_runtime_view",

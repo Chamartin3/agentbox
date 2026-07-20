@@ -19,6 +19,7 @@ from agentbox.core.data.composition import (
 from agentbox.core.agents.composition.bundle import (
     load_bundle_from_bindings,
 )
+from agentbox.core.agents.composition.composer import PromptComposer
 from agentbox.core.agents.composition.resolver import (
     resolve_prompt,
 )
@@ -40,12 +41,12 @@ from agentbox.core.data.schema_validation import load_json_schema
 from agentbox.core.data.payload_types import JsonSchemaDict, PromptEmbedSnapshotEntry, ResolvedBindingView, ResolvedPromptBinding
 from agentbox.core.data.rows import AgentPromptBindingRow, RepoResourceRow, ResourceVersionRow, ResourceBlobRow
 from agentbox.core.data import AgentDef
-from agentbox.core.db.config import load_project_shared_assets
 from agentbox.core.data import InconsistentSchema, assert_schema_consistent
 from agentbox.core.data.snapshots import prompt_resolution_to_snapshot
 from agentbox.core.data.composition import (
     AgentRuntimeView,
     ComposedPrompt,
+    ComposeResult,
 )
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,
@@ -282,29 +283,43 @@ def build_prompt(
     composed_bundle_sha: str | None = None
 
     if agent.composition is not None and variables is not None:
-        shared_roots = {
-            k: settings.project_root / v
-            for k, v in load_project_shared_assets().items()
-        }
-
         bundle = load_bundle_from_bindings(agent_id=agent.id, store=store)
-        composition_result = bundle.compose(variables, shared_roots)
+        if bundle.source is None:
+            raise ValueError(f"Bundle for {agent.id!r} has no source")
 
-        system_text = composition_result.system
-        if composition_result.schema is not None:
+        _pc = PromptComposer().compose(bundle.source, variables)
+
+        # _pc.text is always a str (never None); system_text follows suite.
+        _composed_text: str = _pc.text
+        if _pc.output_schema is not None:
             engine = ExecutionConfig.from_agent(agent).output_validation_engine
-            system_text = append_validation_engine_hint(system_text, engine)
+            _composed_text = append_validation_engine_hint(_composed_text, engine)
+        system_text = _composed_text
 
-        system_base = composition_result.system_base
-        composed_schema = composition_result.schema
-        composed_input_schema = composition_result.input_schema
-        composed_user = composition_result.user
-        composed_references = composition_result.references
-        composed_bundle_sha = composition_result.bundle_sha
+        system_base = _pc.base if _pc.base else None
+        composed_schema = _pc.output_schema
+        composed_input_schema = _pc.input_schema
+        composed_user = _pc.user
+        composed_references = tuple(
+            s.to_composed_reference() for s in _pc.references
+        )
+        composed_bundle_sha = _pc.bundle_sha
+
+        # Build a ComposeResult for backward-compatible composition_result field.
+        composition_result = ComposeResult(
+            system=_pc.text,
+            user=_pc.user,
+            schema=_pc.output_schema,
+            schema_sha=_pc.output_schema_sha,
+            bundle_sha=_pc.bundle_sha,
+            system_base=_pc.base,
+            references=composed_references,
+            input_schema=_pc.input_schema,
+        )
 
         agent = agent.model_copy(deep=True)
         agent_copied = True
-        input_ = composition_result.user
+        input_ = _pc.user
 
     # ---- Stage 1b: validation-mode from agent.composition ---------------
     validation_mode: str | None = None

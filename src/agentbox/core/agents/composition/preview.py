@@ -9,35 +9,27 @@ resource contributes.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentbox.core.agents.definition import (
-    HttpValidatorConfig,
-    ScriptValidatorConfig,
-)
 from jsonschema.exceptions import SchemaError
 
-from agentbox.core.agents.validation import OutputConfig
 from agentbox.core.data.schema_validation import load_json_schema
 from agentbox.core.agents.composition.rendering import (
     append_input_schema,
     append_schema,
-    render as _render_output_contract,
 )
 from agentbox.core.data.payload_types import (
     CharBreakdownPart,
     JsonSchemaDict,
-    HttpValidatorView,
     PromptBindingSpec,
     ReferenceMetaView,
     ResolvedBindingView,
     SchemaSlotView,
-    ScriptValidatorView,
-    ValidationView,
 )
 from agentbox.core.data.rows import AgentPromptBindingRow
 from agentbox.core.db import (
@@ -51,6 +43,14 @@ from agentbox.core.data.payload_types import PromptPreviewResult
 from agentbox.core.data.constants import BundleFile
 from agentbox.core.agents.composition.rendering import render_for_type
 from agentbox.core.agents.composition.resolver import resolve_prompt
+from agentbox.core.agents.composition.composer import (
+    BaseSegment,
+    CompositionDiagnostics,
+    InputSchemaSegment,
+    OutputSchemaSegment,
+    PromptComposition,
+    ReferenceSegment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,48 +142,6 @@ def _resolve_binding(
     }
 
 
-def _render_references_block(
-    resolved: list[ResolvedBindingView],
-) -> tuple[str, list[ReferenceMetaView], list[CharBreakdownPart]]:
-
-    parts: list[str] = []
-    refs_meta: list[ReferenceMetaView] = []
-    per_ref_chars: list[CharBreakdownPart] = []
-    for b in resolved:
-        if not b.get("attach_as_reference") or b.get("slot"):
-            continue
-        if b["type"] not in ("document", "folder"):
-            continue
-        rendered = render_for_type(b["type"], b.get("blobs") or [])
-        heading = b.get("display_name") or b.get("resource_slug") or b["resource_id"]
-        body = rendered.get("text") or ""
-        if body:
-            entry = f"## {heading}\n\n{body}"
-            parts.append(entry)
-            per_ref_chars.append(
-                {
-                    "label": heading,
-                    "chars": len(entry) + 2,
-                    "binding_id": b["binding_id"],
-                    "resource_id": b["resource_id"],
-                    "version_id": b["version_id"],
-                }
-            )
-        refs_meta.append(
-            {
-                "binding_id": b["binding_id"],
-                "resource_id": b["resource_id"],
-                "version_id": b["version_id"],
-                "display_name": b.get("display_name"),
-            }
-        )
-    if not parts:
-        return "", refs_meta, per_ref_chars
-    if per_ref_chars:
-        per_ref_chars[0]["chars"] += len("## References\n\n")
-    return "## References\n\n" + "\n\n".join(parts), refs_meta, per_ref_chars
-
-
 def _schema_for_slot(resolved: list[ResolvedBindingView], slot: str) -> SchemaSlotView | None:
 
     for b in resolved:
@@ -199,99 +157,6 @@ def _schema_for_slot(resolved: list[ResolvedBindingView], slot: str) -> SchemaSl
             }
     return None
 
-
-def _validation_block_for_preview(
-    agent_versions: AgentVersionManager,
-    resources: ResourceManager,
-    agent_id: str,
-) -> tuple[str, ValidationView | None]:
-    """Render the validators hint block from the agent's inline
-    ``config_json["output"].validators`` on the active version.
-
-    Schema is intentionally NOT rendered here — it already appears as
-    the output_schema block above (single source of truth: the binding).
-    Returns ``(rendered_text, view_dict)`` where view_dict is the
-    structured payload returned to the UI under ``validation``.
-    """
-    active = agent_versions.get_active(agent_id)
-    if not active or active.get("id") is None:
-        return "", None
-    raw_cfg = active.get("config_json")
-    if isinstance(raw_cfg, str):
-        try:
-            cfg = json.loads(raw_cfg)
-        except (ValueError, TypeError):
-            cfg = {}
-    elif isinstance(raw_cfg, dict):
-        cfg = raw_cfg
-    else:
-        cfg = {}
-    output_section = cfg.get("output") if isinstance(cfg, dict) else None
-    entries = (
-        output_section.get("validators") if isinstance(output_section, dict) else None
-    )
-    if not isinstance(entries, list) or not entries:
-        return "", None
-    validators_meta: list[HttpValidatorView | ScriptValidatorView] = []
-    runtime_validators: list[HttpValidatorConfig | ScriptValidatorConfig] = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        kind = entry.get("kind")
-        description = entry.get("description") or ""
-        if not isinstance(description, str):
-            description = ""
-        if kind == "http":
-            validators_meta.append(
-                {
-                    "kind": "http",
-                    "endpoint": str(entry.get("endpoint", "")),
-                    "timeout_seconds": int(entry.get("timeout_seconds", 5)),
-                    "description": description,
-                }
-            )
-            runtime_validators.append(
-                HttpValidatorConfig(
-                    kind="http",
-                    endpoint=entry.get("endpoint", ""),
-                    timeout_seconds=int(entry.get("timeout_seconds", 5)),
-                    description=description,
-                )
-            )
-        elif kind == "script":
-            rid = str(entry.get("resource_id", ""))
-            resource = resources.get_resource(rid) if rid else None
-            validators_meta.append(
-                {
-                    "kind": "script",
-                    "resource_id": rid,
-                    "resource_slug": resource["slug"] if resource else None,
-                    "resource_display_name": resource["display_name"] if resource else None,
-                    "pinned_version_id": entry.get("pinned_version_id"),
-                    "description": description,
-                }
-            )
-            runtime_validators.append(
-                ScriptValidatorConfig(
-                    kind="script",
-                    resource_id=rid,
-                    resource_version_id=entry.get("pinned_version_id"),
-                    source_code="",
-                    description=description,
-                )
-            )
-    if not runtime_validators:
-        return "", None
-    rendered = _render_output_contract(
-        OutputConfig(
-            json_schema=None,
-            validators=tuple(runtime_validators),
-        )
-    )
-    view: ValidationView = {
-        "validators": validators_meta,
-    }
-    return rendered, view
 
 
 def _append_schema_slot(
@@ -512,72 +377,138 @@ def render_agent_prompt_preview(
     splice_bindings = [b for b in resolved if b.get("marker") and b.get("mode")]
     result = resolve_prompt(template, splice_bindings)
 
-    refs_text, refs_meta, per_ref_chars = _render_references_block(resolved)
     base_prompt = result.rendered_prompt
-    composed = base_prompt
 
     input_schema = _schema_for_slot(resolved, "input_schema")
     output_schema = _schema_for_slot(resolved, "output_schema")
     raw_text_output = output_schema is None
 
-    # --- Text assembly via canonical runtime assembler ---
-    # All schema blocks are appended through the same rendering.append_*
-    # primitives the runtime path uses, so preview and runtime can never
-    # silently diverge in formatting.  Char counts are derived from the
-    # length delta so we don't compute the block twice.
-    composed, input_schema_chars = _append_schema_slot(composed, "input_schema", input_schema)
+    # ── Build segments for the composer ──────────────────────────────────────
+    # Text assembly is delegated to PromptComposition so the references
+    # header (Q1: "## References\n\n") and all block formatting are produced
+    # by a single code path. The validators-hint block is intentionally absent
+    # (Q2: it was preview-only and never reached the model).
+    segments: list[BaseSegment | InputSchemaSegment | ReferenceSegment | OutputSchemaSegment] = [
+        BaseSegment(text=base_prompt)
+    ]
 
-    if refs_text:
-        composed = composed.rstrip() + "\n\n" + refs_text
+    if input_schema and input_schema.get("text"):
+        try:
+            parsed_input = load_json_schema(input_schema["text"])
+            segments.append(InputSchemaSegment(schema=parsed_input))
+        except (TypeError, ValueError, SchemaError):
+            pass
 
-    composed, output_schema_chars = _append_schema_slot(composed, "output_schema", output_schema)
+    refs_meta: list[ReferenceMetaView] = []
+    for b in resolved:
+        if not b.get("attach_as_reference") or b.get("slot"):
+            continue
+        if b["type"] not in ("document", "folder"):
+            continue
+        rendered = render_for_type(b["type"], b.get("blobs") or [])
+        heading = b.get("display_name") or b.get("resource_slug") or b["resource_id"]
+        body = rendered.get("text") or ""
+        if body:
+            segments.append(
+                ReferenceSegment(path=b["resource_id"], heading=heading, content=body)
+            )
+        refs_meta.append(
+            {
+                "binding_id": b["binding_id"],
+                "resource_id": b["resource_id"],
+                "version_id": b["version_id"],
+                "display_name": b.get("display_name"),
+            }
+        )
 
-    # Validation contract — validators hint only; schema is intentionally
-    # omitted (already appended above from the binding).  The preview shows
-    # what the model actually sees including post-hoc validator hints that the
-    # executor appends at runtime via rendering.append().
-    validation_block, validation_view = _validation_block_for_preview(agent_versions, resources, agent_id)
-    if validation_block:
-        composed = composed.rstrip() + "\n\n" + validation_block
+    if output_schema and output_schema.get("text"):
+        try:
+            parsed_output = load_json_schema(output_schema["text"])
+            schema_sha = hashlib.sha256(
+                output_schema["text"].encode()
+            ).hexdigest()
+            segments.append(
+                OutputSchemaSegment(schema=parsed_output, schema_sha=schema_sha)
+            )
+        except (TypeError, ValueError, SchemaError):
+            pass
 
+    composition = PromptComposition(
+        segments=tuple(segments),
+        diagnostics=CompositionDiagnostics(
+            unresolved_markers=result.unresolved_markers,
+            warnings=result.warnings,
+        ),
+        bundle_sha="",  # not needed for preview
+        user="",
+    )
+    composed = composition.text
+
+    # ── Build binding-aware char breakdown ────────────────────────────────────
+    # The composer's to_preview_result() breakdown omits binding IDs; the
+    # preview surface exposes them for UI charting. We build our own here
+    # using the same segment traversal but attaching DB-sourced IDs.
+    ref_segs = composition.references
     parts: list[CharBreakdownPart] = [
         {"label": "prompt template", "chars": len(base_prompt)},
     ]
-    if input_schema_chars > 0 and input_schema is not None:
-        parts.append(
-            {
-                "label": "input_schema block",
-                "chars": input_schema_chars,
-                "binding_id": input_schema["binding_id"],
-                "resource_id": input_schema["resource_id"],
-                "version_id": input_schema["version_id"],
+
+    if input_schema and input_schema.get("text"):
+        try:
+            parsed_input_for_chars = load_json_schema(input_schema["text"])
+            block = append_input_schema("", parsed_input_for_chars)
+            parts.append(
+                {
+                    "label": "input_schema block",
+                    "chars": len(block) + 2,
+                    "binding_id": input_schema["binding_id"],
+                    "resource_id": input_schema["resource_id"],
+                    "version_id": input_schema["version_id"],
+                }
+            )
+        except (TypeError, ValueError, SchemaError):
+            pass
+
+    if ref_segs:
+        # Build per-reference chars (first absorbs the "## References\n\n" header).
+        ref_binding_map = {
+            b["resource_id"]: b
+            for b in resolved
+            if b.get("attach_as_reference") and not b.get("slot")
+            and b["type"] in ("document", "folder")
+        }
+        for i, seg in enumerate(ref_segs):
+            section = seg.render_section()
+            chars = len(section) + 2
+            if i == 0:
+                chars += len("## References\n\n")
+            b = ref_binding_map.get(seg.path)
+            entry: CharBreakdownPart = {
+                "label": seg.heading,
+                "chars": chars,
             }
-        )
-    if refs_text:
-        parts.extend(per_ref_chars)
-    # Validator-sourced blocks share the "validator:" prefix so they're
-    # visually grouped in the composer breakdown chart — schema (implicit
-    # validator), rules, and the validation hint all originate from the
-    # validation contract surface.
-    if output_schema_chars > 0 and output_schema is not None:
-        parts.append(
-            {
-                "label": "validator: output schema (json-schema gate)",
-                "kind": "validator",
-                "chars": output_schema_chars,
-                "binding_id": output_schema["binding_id"],
-                "resource_id": output_schema["resource_id"],
-                "version_id": output_schema["version_id"],
-            }
-        )
-    if validation_block:
-        parts.append(
-            {
-                "label": "validator: constraints + post-hoc validators",
-                "kind": "validator",
-                "chars": len(validation_block) + 2,
-            }
-        )
+            if b:
+                entry["binding_id"] = b["binding_id"]
+                entry["resource_id"] = b["resource_id"]
+                entry["version_id"] = b["version_id"]
+            parts.append(entry)
+
+    if output_schema and output_schema.get("text"):
+        try:
+            parsed_output_for_chars = load_json_schema(output_schema["text"])
+            block = append_schema("", parsed_output_for_chars)
+            parts.append(
+                {
+                    "label": "validator: output schema (json-schema gate)",
+                    "kind": "validator",
+                    "chars": len(block) + 2,
+                    "binding_id": output_schema["binding_id"],
+                    "resource_id": output_schema["resource_id"],
+                    "version_id": output_schema["version_id"],
+                }
+            )
+        except (TypeError, ValueError, SchemaError):
+            pass
 
     return {
         "rendered_prompt": composed,
@@ -588,7 +519,7 @@ def render_agent_prompt_preview(
         "references": refs_meta,
         "input_schema": input_schema,
         "output_schema": output_schema,
-        "validation": validation_view,
+        "validation": None,
         "raw_text_output": raw_text_output,
         "char_breakdown": parts,
         "total_chars": len(composed),

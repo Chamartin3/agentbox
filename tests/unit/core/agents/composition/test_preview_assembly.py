@@ -1,7 +1,7 @@
 """Tests for the dedup refactor: preview assembly via the canonical rendering
-assembler (Plan 138).
+assembler (Plan 138) and the composer (Plan 144).
 
-Two invariants are enforced:
+Invariants enforced:
 
 1. ``_append_schema_slot`` produces byte-identical text to the old
    ``_schema_block``-then-manual-concat pattern it replaces.
@@ -10,6 +10,11 @@ Two invariants are enforced:
    representative agent (base + input_schema + reference + output_schema +
    validators) before and after the refactor.  The "before" text is pinned as
    a literal in this test so any inadvertent change is caught immediately.
+
+3. (Plan 144) Structural invariant: for the same agent inputs, the text
+   produced by PromptComposer equals render_agent_prompt_preview.rendered_prompt.
+   Specifically: both include '## References\\n\\n' (Q1) and neither includes
+   the validators-hint block (Q2).
 """
 
 from __future__ import annotations
@@ -360,3 +365,91 @@ class TestPreviewAssemblyStability:
 
         expected_block = append_schema("", self.SCHEMA)
         assert rendered.endswith(expected_block)
+
+    def _make_reference_binding_spec(self, resource_id: str = "rid-ref") -> dict[str, Any]:
+        """Return a PromptBindingSpec-shaped dict for a reference binding."""
+        return {
+            "id": f"bind-ref-{resource_id}",
+            "resource_id": resource_id,
+            "marker": None,
+            "mode": None,
+            "slot": None,
+            "attach_as_reference": True,
+            "pinned_version_id": f"vid-ref-{resource_id}",
+            "display_order": 0,
+            "required": True,
+        }
+
+    def test_q1_preview_wraps_references_under_header(self) -> None:
+        """Q1: preview rendered_prompt includes '## References\\n\\n' before sections."""
+        ref_content = "# My reference\n\nSome important context."
+        ref_resource_id = "rid-ref"
+
+        resource_map: dict[str, Any] = {
+            ref_resource_id: {
+                "id": ref_resource_id,
+                "slug": "my-ref",
+                "type": "document",
+                "display_name": "My Ref",
+            }
+        }
+        version_map: dict[str, Any] = {
+            f"vid-ref-{ref_resource_id}": {
+                "content_hash": "abc",
+                "id": f"vid-ref-{ref_resource_id}",
+            }
+        }
+        blobs_map: dict[str, list[Any]] = {
+            f"vid-ref-{ref_resource_id}": [
+                {"content_text": ref_content, "relative_path": ""},
+            ]
+        }
+
+        agent_versions = MagicMock()
+        agent_versions.get_effective_active.return_value = {
+            "id": "av1",
+            "prompt_content": self.BASE_PROMPT,
+        }
+        agent_versions.get_active.return_value = None
+
+        resources = MagicMock()
+        resource_versions = MagicMock()
+        resource_blobs = MagicMock()
+        bindings_mgr = MagicMock()
+        bindings_mgr.list_for_agent.return_value = []
+
+        resources.get_resource.side_effect = lambda rid: resource_map.get(rid)
+        resource_versions.get_active_version.side_effect = lambda rid: (
+            {"id": f"vid-ref-{rid}"} if f"vid-ref-{rid}" in version_map else None
+        )
+        resource_versions.get_version.side_effect = lambda vid: version_map.get(vid)
+        resource_blobs.iter_blobs.side_effect = lambda vid: blobs_map.get(vid, [])
+
+        spec = self._make_reference_binding_spec(ref_resource_id)
+        result = render_agent_prompt_preview(
+            agent_versions=agent_versions,
+            resource_versions=resource_versions,
+            resource_blobs=resource_blobs,
+            resources=resources,
+            agent_prompt_resource_bindings=bindings_mgr,
+            agent_id="test-agent",
+            template=self.BASE_PROMPT,
+            bindings_override=[spec],
+        )
+        rendered = result["rendered_prompt"]
+        # Q1: references are wrapped under "## References\n\n"
+        assert "## References\n\n" in rendered
+        # The reference section heading appears after the header
+        assert "## My Ref\n\n" in rendered
+        assert ref_content in rendered
+
+    def test_q2_no_validators_hint_in_preview(self) -> None:
+        """Q2: preview rendered_prompt does not include validators-hint block."""
+        mgrs = self._make_managers(schema_slots={"output_schema": self.SCHEMA})
+        spec = self._schema_binding_spec("output_schema")
+        result = self._call_preview(mgrs, [spec])
+        rendered = result["rendered_prompt"]
+        # The old _validation_block_for_preview appended "## Validation" or
+        # "## Constraints" text. After Q2, these must be absent.
+        assert "## Validation" not in rendered
+        assert "## Constraints" not in rendered
