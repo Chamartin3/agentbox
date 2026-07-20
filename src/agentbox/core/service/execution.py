@@ -21,6 +21,7 @@ from typing import Any, cast
 
 from agentbox.core.data.jsontypes import RawJson
 from agentbox.core.agents import (
+    BuildManagers,
     build_prompt,
     engine_load_failure as backend_load_failure,
     list_engines as backends,
@@ -521,7 +522,14 @@ class ExecutionService(Service):
             if webhook_url is not None:
                 agent = agent.model_copy(update={"webhook_url": webhook_url})
             composed = build_prompt(
-                db=executor.db,
+                managers=BuildManagers(
+                    agent_prompt_resource_bindings=executor.db.agent_prompt_resource_bindings,
+                    resources=executor.db.resources,
+                    resource_versions=executor.db.resource_versions,
+                    resource_blobs=executor.db.resource_blobs,
+                    agent_versions=executor.db.agent_versions,
+                    agent_version_files=executor.db.agent_version_files,
+                ),
                 settings=executor.settings,
                 agent=agent,
                 input_=input_,
@@ -546,7 +554,14 @@ class ExecutionService(Service):
         if webhook_url is not None:
             agent = agent.model_copy(update={"webhook_url": webhook_url})
         composed = build_prompt(
-            db=executor.db,
+            managers=BuildManagers(
+                agent_prompt_resource_bindings=executor.db.agent_prompt_resource_bindings,
+                resources=executor.db.resources,
+                resource_versions=executor.db.resource_versions,
+                resource_blobs=executor.db.resource_blobs,
+                agent_versions=executor.db.agent_versions,
+                agent_version_files=executor.db.agent_version_files,
+            ),
             settings=executor.settings,
             agent=agent,
             input_="",
@@ -603,7 +618,14 @@ class ExecutionService(Service):
                 variables = None
 
         composed = build_prompt(
-            db=executor.db,
+            managers=BuildManagers(
+                agent_prompt_resource_bindings=executor.db.agent_prompt_resource_bindings,
+                resources=executor.db.resources,
+                resource_versions=executor.db.resource_versions,
+                resource_blobs=executor.db.resource_blobs,
+                agent_versions=executor.db.agent_versions,
+                agent_version_files=executor.db.agent_version_files,
+            ),
             settings=executor.settings,
             agent=agent,
             input_=rec.input or "",

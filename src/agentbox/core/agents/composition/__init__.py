@@ -5,6 +5,7 @@ resolving resource bindings, rendering previews, and validating output.
 """
 
 from agentbox.core.agents.composition.build import (
+    BuildManagers,
     build_prompt,
     build_runtime_view,
     resolve_agent_prompt_bindings,
@@ -43,6 +44,7 @@ from agentbox.core.agents.composition.rendering import (
 )
 
 __all__ = [
+    "BuildManagers",
     "build_prompt",
     "build_runtime_view",
     "resolve_agent_prompt_bindings",

@@ -6,6 +6,7 @@ and assembles the complete prompt structure for the executor.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from collections.abc import Iterator
@@ -48,6 +49,8 @@ from agentbox.core.data.composition import (
 )
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,
+    AgentVersionFileManager,
+    AgentVersionManager,
     ResourceBlobManager,
     ResourceManager,
     ResourceVersionManager,
@@ -59,41 +62,57 @@ logger = logging.getLogger(__name__)
 # ── value types ───────────────────────────────────────────────────────
 
 
+@dataclasses.dataclass(frozen=True)
+class BuildManagers:
+    """The specific managers the prompt-build store adapter reads.
+
+    Passed instead of the whole ``Database`` so no store object crosses the
+    composition boundary (UNIFIED rule #4).
+    """
+
+    agent_prompt_resource_bindings: AgentPromptResourceBindingManager
+    resources: ResourceManager
+    resource_versions: ResourceVersionManager
+    resource_blobs: ResourceBlobManager
+    agent_versions: AgentVersionManager
+    agent_version_files: AgentVersionFileManager
+
+
 class _DbStoreAdapter:
     """Duck-typed shim satisfying the store interface used by prompt
     composition internals (``load_bundle_from_bindings``,
     ``_resolve_output_config``, ``check_output``).
     """
 
-    def __init__(self, db: Any) -> None:
-        self._db = db
+    def __init__(self, mgrs: BuildManagers) -> None:
+        self._mgrs = mgrs
 
     def list_prompt_bindings(self, agent_id: str) -> list[AgentPromptBindingRow]:
-        return self._db.agent_prompt_resource_bindings.list_for_agent(agent_id)
+        return self._mgrs.agent_prompt_resource_bindings.list_for_agent(agent_id)
 
     def get_repo_resource(self, resource_id: str) -> RepoResourceRow | None:
-        return self._db.resources.get_resource(resource_id)
+        return self._mgrs.resources.get_resource(resource_id)
 
     def get_active_repo_version(self, resource_id: str) -> ResourceVersionRow | None:
-        return self._db.resource_versions.get_active_version(resource_id)
+        return self._mgrs.resource_versions.get_active_version(resource_id)
 
     def get_repo_version(self, version_id: str) -> ResourceVersionRow | None:
-        return self._db.resource_versions.get_version(version_id)
+        return self._mgrs.resource_versions.get_version(version_id)
 
     def iter_repo_blobs(self, version_id: str) -> Iterator[ResourceBlobRow]:
-        return self._db.resource_blobs.iter_blobs(version_id)
+        return self._mgrs.resource_blobs.iter_blobs(version_id)
 
     def read_repo_blob(self, version_id: str, relative_path: str = "") -> Any:
-        return self._db.resource_blobs.get_blob(version_id, relative_path)
+        return self._mgrs.resource_blobs.get_blob(version_id, relative_path)
 
     def get_active_version(self, agent_id: str) -> Any:
-        return self._db.agent_versions.get_active(agent_id)
+        return self._mgrs.agent_versions.get_active(agent_id)
 
     def latest_version(self, agent_id: str) -> Any:
-        return self._db.agent_versions.get_latest(agent_id)
+        return self._mgrs.agent_versions.get_latest(agent_id)
 
     def list_version_files(self, version_id: int) -> Any:
-        return self._db.agent_version_files.list_for_version(version_id)
+        return self._mgrs.agent_version_files.list_for_version(version_id)
 
 
 def build_runtime_view(agent: AgentDef, *, store: Any = None) -> AgentRuntimeView:
@@ -234,7 +253,7 @@ def _resolve_prompt_bindings(store: Any, agent_id: str) -> list[ResolvedBindingV
 
 def build_prompt(
     *,
-    db: Any,
+    managers: BuildManagers,
     settings: Settings,
     agent: AgentDef,
     input_: str,
@@ -248,7 +267,7 @@ def build_prompt(
     needs — it should *not* drill into ``core.agents`` submodule
     internals for any of the returned data.
     """
-    store = _DbStoreAdapter(db)
+    store = _DbStoreAdapter(managers)
     snapshot_entries: list[PromptEmbedSnapshotEntry] = []
     agent_copied = False
 
