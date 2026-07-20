@@ -165,8 +165,13 @@ class RunStepLoop:
         schema_validated_via: str | None = None
 
         with session:
+            # Check DB-resolved schema content first (binding-authoritative),
+            # then fall back to the legacy path field and composition schema.
+            _python_cfg = rendered.python_agent_config
             has_schema = bool(
-                view.output_schema_path
+                (_python_cfg is not None and _python_cfg.output_schema_content is not None)
+                or view.output_schema_content is not None
+                or view.output_schema_path
                 or (composed is not None and isinstance(composed.composed_schema, dict))
                 or view.json_schema is not None
                 or bool(view.validators)

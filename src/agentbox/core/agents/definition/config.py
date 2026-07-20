@@ -102,10 +102,11 @@ class PythonAgentConfig:
 
     Lives at ``agent_versions.config_json["python"]``.
 
-    ``output_schema_path`` is included here because it's part of how
-    the runtime locates the schema for the executor's validation loop.
-    Long-term it should move to a binding; for now we keep the
-    path-based contract.
+    ``output_schema_path`` is the *import/authoring* boundary: it is written
+    when importing from TOML or when an API caller supplies a path. At runtime
+    the executor resolves the schema from the DB binding (``slot='output_schema'``
+    on ``agent_prompt_resource_bindings``) rather than reading the file.
+    The path field remains here for backward-compat serialisation.
     """
 
     agent_module: str | None = None

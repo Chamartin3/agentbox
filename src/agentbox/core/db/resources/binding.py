@@ -112,6 +112,73 @@ class AgentPromptResourceBindingManager(Manager[AgentPromptResourceBinding]):
             )
             return [cast(AgentPromptBindingRow, dict(r._mapping)) for r in rows]
 
+    def get_slot_binding(
+        self, agent_id: str, slot: str
+    ) -> AgentPromptBindingRow | None:
+        """Return the binding for the given slot, or None if absent."""
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                agent_prompt_resource_bindings.select()
+                .where(
+                    agent_prompt_resource_bindings.c.agent_id == agent_id,
+                    agent_prompt_resource_bindings.c.slot == slot,
+                )
+            ).first()
+            return cast(AgentPromptBindingRow, dict(row._mapping)) if row else None
+
+    def upsert_slot_binding(
+        self,
+        agent_id: str,
+        slot: str,
+        resource_id: str,
+        version_id: str,
+        *,
+        reason: str,
+        actor: str | None = None,
+    ) -> AgentPromptBindingRow:
+        """Insert or replace the binding for a specific slot.
+
+        Unlike ``replace_for_agent``, this method only touches the one slot
+        row; all other bindings for the agent are preserved.  The slot must
+        be a valid :class:`~agentbox.core.data.constants.PromptSlot` value.
+
+        ``version_id`` is always stored as ``pinned_version_id`` so the
+        runtime resolver can find the blob without an extra version-pointer
+        lookup.
+        """
+        PromptSlot.coerce(slot, label="prompt-binding slot")
+        reason = _validate_reason(reason)
+        now = now_iso()
+        with self._engine.begin() as conn:
+            # Delete any existing binding for this slot on this agent.
+            conn.execute(
+                agent_prompt_resource_bindings.delete().where(
+                    agent_prompt_resource_bindings.c.agent_id == agent_id,
+                    agent_prompt_resource_bindings.c.slot == slot,
+                )
+            )
+            row_id = uuid.uuid4().hex
+            conn.execute(
+                agent_prompt_resource_bindings.insert().values(
+                    id=row_id,
+                    agent_id=agent_id,
+                    resource_id=resource_id,
+                    marker=None,
+                    mode=None,
+                    slot=slot,
+                    attach_as_reference=0,
+                    pinned_version_id=version_id,
+                    display_order=0,
+                    required=1,
+                    changelog=reason,
+                    created_at=now,
+                    created_by=actor,
+                )
+            )
+        binding = self.get_slot_binding(agent_id, slot)
+        assert binding is not None, f"just-upserted slot binding {slot!r} must be retrievable"
+        return binding
+
     def replace_for_agent(
         self,
         agent_id: str,

@@ -208,19 +208,26 @@ class AgentRuntimeView:
     and validation.  No execution code should call ``.from_agent()``
     directly — the compose-prompt facade returns this as part of
     :class:`ComposedPrompt`.
+
+    ``output_schema_content`` carries the resolved JSON bytes of the output
+    schema resolved from the DB binding (``slot='output_schema'``).
+    It supersedes ``output_schema_path`` for runtime resolution — the
+    path field is kept only for the import/authoring boundary.
     """
 
     max_validation_retries: int = 0
     max_error_retries: int = 0
     output_validation_engine: str = "both"
     output_schema_path: str | None = None
+    output_schema_content: bytes | None = None
     json_schema: JsonSchemaDict | None = None
     validators: tuple[ValidatorConfig, ...] = ()
 
     @property
     def has_schema(self) -> bool:
         return (
-            self.output_schema_path is not None
+            self.output_schema_content is not None
+            or self.output_schema_path is not None
             or self.json_schema is not None
             or bool(self.validators)
         )

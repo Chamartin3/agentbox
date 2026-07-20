@@ -52,14 +52,20 @@ class RuntimeConfigView:
 
 @dataclass(frozen=True)
 class PythonAgentConfigView:
-    """Engine-local view of agent python config (``agent_module``, schema path).
+    """Engine-local view of agent python config (``agent_module``, schema content).
 
     This is the only slice of ``core.agents.definition.PythonAgentConfig``
     that backends consume.
+
+    ``output_schema_content`` carries the resolved JSON bytes of the output
+    schema from the DB binding (``slot='output_schema'``).  It supersedes
+    ``output_schema_path`` for runtime use; the path is kept as a
+    backward-compat fallback for agents that have not yet been migrated.
     """
 
     agent_module: str | None = None
     output_schema_path: str | None = None
+    output_schema_content: bytes | None = None
 
 
 @dataclass(frozen=True)

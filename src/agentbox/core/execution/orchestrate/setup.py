@@ -12,7 +12,10 @@ from agentbox.core.agents import resolve_engine
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
 from agentbox.core.db import (
+    AgentPromptResourceBindingManager,
     AgentToolGrantManager,
+    ResourceBlobManager,
+    ResourceVersionManager,
     SessionManager,
     WorkspaceFileResourceBindingManager,
     WorkspaceManager,
@@ -46,6 +49,45 @@ class SetupManagers:
     workspace_mcp_policies: WorkspaceMcpPolicyManager
     workspace_mcp_overrides: WorkspaceMcpOverrideManager
     workspace_mcp_tool_overrides: WorkspaceMcpToolOverrideManager
+    agent_prompt_resource_bindings: AgentPromptResourceBindingManager
+    resource_versions: ResourceVersionManager
+    resource_blobs: ResourceBlobManager
+
+
+def _resolve_output_schema_content(
+    agent_id: str,
+    bindings_mgr: AgentPromptResourceBindingManager,
+    versions_mgr: ResourceVersionManager,
+    blobs_mgr: ResourceBlobManager,
+) -> bytes | None:
+    """Resolve the output-schema JSON bytes from the DB binding.
+
+    Looks up the ``output_schema`` slot binding for *agent_id* and returns
+    the blob content of the pinned or active version.  Returns ``None`` when
+    no binding exists (agent has no DB-authoritative schema yet).
+    """
+    bindings = bindings_mgr.list_for_agent(agent_id)
+    for b in bindings:
+        if b.get("slot") == "output_schema":
+            version_id: str | None = b.get("pinned_version_id") or None
+            if not version_id:
+                # No pinned version — resolve via the active version pointer.
+                active = versions_mgr.get_active_version(b["resource_id"])
+                if active is None:
+                    logger.debug(
+                        "output_schema binding for agent %r has no active version; skipping",
+                        agent_id,
+                    )
+                    continue
+                version_id = active["id"]
+            # Try the root blob first (relative_path=""), then "schema.json".
+            blob = blobs_mgr.get_blob(version_id, "") or blobs_mgr.get_blob(
+                version_id, "schema.json"
+            )
+            if blob is not None:
+                content: bytes = blob["content"]
+                return content
+    return None
 
 
 def _composed_view(composed: Any | None) -> ComposedView | None:
@@ -156,9 +198,16 @@ class RunSetup:
             ),
         )
         python_config_raw = agent_config_json.get("python", {}) or {}
+        output_schema_content = _resolve_output_schema_content(
+            agent.id,
+            self._mgrs.agent_prompt_resource_bindings,
+            self._mgrs.resource_versions,
+            self._mgrs.resource_blobs,
+        )
         python_agent_config_view = PythonAgentConfigView(
             agent_module=python_config_raw.get("agent_module"),
             output_schema_path=python_config_raw.get("output_schema_path"),
+            output_schema_content=output_schema_content,
         )
 
         ws_id = agent.workspace
