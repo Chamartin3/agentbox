@@ -48,9 +48,10 @@ async def test_close_idempotent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stdio_not_implemented() -> None:
-    client = McpClient("test", command=["echo"], transport="stdio")
-    with pytest.raises(NotImplementedError):
+async def test_stdio_no_command_raises_mcp_error() -> None:
+    """stdio transport with no command raises McpError (not NotImplementedError)."""
+    client = McpClient("test", transport="stdio")
+    with pytest.raises(McpError, match="requires a command"):
         await client.initialize()
 
 

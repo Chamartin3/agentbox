@@ -37,6 +37,9 @@ class McpError(Exception):
         super().__init__(message)
 
 
+_STDIO_TIMEOUT = 30.0  # seconds — matches the default httpx timeout on the http path
+
+
 class McpClient:
     """Minimal async MCP client over HTTP/SSE/stdio transports.
 
@@ -62,6 +65,24 @@ class McpClient:
         )
         self._initialized = False
         self._request_id = 0
+        # stdio state — set by _ensure_proc(), cleared by close()
+        self._proc: asyncio.subprocess.Process | None = None
+
+    async def _ensure_proc(self) -> asyncio.subprocess.Process:
+        """Lazily spawn the stdio subprocess; return existing proc if alive."""
+        if self._proc is not None and self._proc.returncode is None:
+            return self._proc
+        if not self._command:
+            raise McpError(
+                f"stdio transport requires a command for server {self.server_name}"
+            )
+        self._proc = await asyncio.create_subprocess_exec(
+            *self._command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        return self._proc
 
     async def initialize(self) -> dict:
         if self._transport in ("http", "sse") and self._url:
@@ -76,7 +97,16 @@ class McpClient:
             self._initialized = True
             return result
         if self._transport == "stdio":
-            raise NotImplementedError("stdio transport not yet implemented")
+            result = await self._jsonrpc(
+                "initialize",
+                {
+                    "protocolVersion": MCP_PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": _CLIENT_INFO,
+                },
+            )
+            self._initialized = True
+            return result
         raise McpError(
             f"unsupported transport: {self._transport} for server {self.server_name}"
         )
@@ -111,7 +141,7 @@ class McpClient:
             assert self._url is not None, "http/sse transport requires a URL"
             return await self._http_request(body)
         if self._transport == "stdio":
-            return self._stdio_request(body)
+            return await self._stdio_request(body)
         raise McpError(f"unsupported transport: {self._transport}")
 
     async def _http_request(self, body: dict) -> dict:
@@ -141,8 +171,110 @@ class McpClient:
 
         return data.get("result", {})
 
-    def _stdio_request(self, body: dict) -> dict:
-        raise NotImplementedError("stdio transport not yet implemented")
+    async def _stdio_request(self, body: dict) -> dict:
+        """Send one Content-Length-framed JSON-RPC request and read the reply.
+
+        The MCP stdio transport uses the same framing as the Language Server
+        Protocol: headers terminated by ``\\r\\n\\r\\n``, then a JSON body of
+        exactly ``Content-Length`` bytes.
+        """
+        proc = await self._ensure_proc()
+        assert proc.stdin is not None, "subprocess stdin must be a pipe"
+        assert proc.stdout is not None, "subprocess stdout must be a pipe"
+
+        # --- write ---
+        payload = json.dumps(body).encode()
+        frame = f"Content-Length: {len(payload)}\r\n\r\n".encode() + payload
+        try:
+            proc.stdin.write(frame)
+            await asyncio.wait_for(proc.stdin.drain(), timeout=_STDIO_TIMEOUT)
+        except TimeoutError as exc:
+            raise McpError(
+                f"stdio write timed out for server {self.server_name}"
+            ) from exc
+        except OSError as exc:
+            raise McpError(
+                f"stdio write error for server {self.server_name}: {exc}"
+            ) from exc
+
+        # --- read headers ---
+        try:
+            raw_headers = await asyncio.wait_for(
+                self._read_stdio_headers(proc.stdout), timeout=_STDIO_TIMEOUT
+            )
+        except TimeoutError as exc:
+            raise McpError(
+                f"stdio response timed out for server {self.server_name}"
+            ) from exc
+
+        content_length = self._parse_content_length(raw_headers)
+
+        # --- read body ---
+        try:
+            raw_body = await asyncio.wait_for(
+                proc.stdout.readexactly(content_length), timeout=_STDIO_TIMEOUT
+            )
+        except TimeoutError as exc:
+            raise McpError(
+                f"stdio body read timed out for server {self.server_name}"
+            ) from exc
+        except asyncio.IncompleteReadError as exc:
+            raise McpError(
+                f"stdio connection closed mid-body for server {self.server_name}"
+            ) from exc
+
+        # --- parse ---
+        try:
+            data: dict = json.loads(raw_body)
+        except json.JSONDecodeError as exc:
+            raise McpError(f"invalid json from stdio server: {exc}") from exc
+
+        # --- validate id match ---
+        req_id = body.get("id")
+        if data.get("id") != req_id:
+            raise McpError(
+                f"stdio response id mismatch: expected {req_id}, got {data.get('id')}"
+            )
+
+        if "error" in data:
+            err = data["error"]
+            raise McpError(err.get("message", "unknown error"), err.get("code", -1))
+
+        return data.get("result", {})
+
+    @staticmethod
+    async def _read_stdio_headers(
+        reader: asyncio.StreamReader,
+    ) -> list[str]:
+        """Read lines until the blank line that terminates the header block."""
+        headers: list[str] = []
+        while True:
+            raw = await reader.readline()
+            if not raw:
+                raise McpError("stdio server closed connection during headers")
+            line = raw.decode(errors="replace").rstrip("\r\n")
+            if line == "":
+                # blank line — end of headers
+                break
+            headers.append(line)
+        return headers
+
+    @staticmethod
+    def _parse_content_length(headers: list[str]) -> int:
+        """Extract the Content-Length value from a list of header strings."""
+        for h in headers:
+            if h.lower().startswith("content-length:"):
+                value = h.split(":", 1)[1].strip()
+                try:
+                    length = int(value)
+                except ValueError as exc:
+                    raise McpError(
+                        f"invalid Content-Length value: {value!r}"
+                    ) from exc
+                if length < 0:
+                    raise McpError(f"negative Content-Length: {length}")
+                return length
+        raise McpError("stdio response missing Content-Length header")
 
     async def _sse_listen(self, callback: Callable[[], None]) -> None:
         if not self._url:
@@ -163,6 +295,12 @@ class McpClient:
 
     async def close(self) -> None:
         await self._http.aclose()
+        if self._proc is not None:
+            with contextlib.suppress(Exception):
+                self._proc.terminate()
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(self._proc.wait(), timeout=5.0)
+            self._proc = None
 
 
 # ── One-shot discovery (spawn server, list tools) ───────────────────────────
