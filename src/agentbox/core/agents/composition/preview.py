@@ -294,21 +294,48 @@ def _validation_block_for_preview(
     return rendered, view
 
 
-def _schema_block(slot: str, schema_view: SchemaSlotView | None) -> str:
+def _append_schema_slot(
+    composed: str,
+    slot: str,
+    schema_view: SchemaSlotView | None,
+) -> tuple[str, int]:
+    """Append the schema block for *slot* to *composed* using the canonical
+    runtime assembler (``rendering.append_input_schema`` /
+    ``rendering.append_schema``).
+
+    Returns ``(new_composed, chars_added)`` where ``chars_added`` counts the
+    separator ``\\n\\n`` plus the block — matching the ``+2`` convention used
+    in the char-breakdown table.  Returns the unchanged *composed* and 0 when
+    the view is absent or its text is empty.
+
+    Using the runtime assembler here (rather than a local re-implementation)
+    ensures that the schema text appended during preview is byte-identical to
+    what ``bundle.compose_from_source`` appends at runtime — single source of
+    truth for the append order and formatting.
+    """
     if not schema_view or not schema_view.get("text"):
-        return ""
+        return composed, 0
     text = schema_view["text"]
     parsed: JsonSchemaDict | None
     try:
         parsed = json.loads(text)
     except (TypeError, ValueError):
         parsed = None
+    prev_rstripped_len = len(composed.rstrip())
     if isinstance(parsed, dict):
         if slot == "input_schema":
-            return append_input_schema("", parsed)
-        return append_schema("", parsed)
-    header = "# Input Format" if slot == "input_schema" else "# Required Output"
-    return f"{header}\n\n## JSON Schema\n\n```json\n{text}\n```"
+            composed = append_input_schema(composed, parsed)
+        else:
+            composed = append_schema(composed, parsed)
+    else:
+        # Fallback for malformed / non-dict schema content: raw JSON fence.
+        # Matches the historical _schema_block fallback text so existing
+        # callers see the same output.
+        header = "# Input Format" if slot == "input_schema" else "# Required Output"
+        block_fb = f"{header}\n\n## JSON Schema\n\n```json\n{text}\n```"
+        composed = composed.rstrip() + "\n\n" + block_fb
+    chars_added = len(composed) - prev_rstripped_len
+    return composed, chars_added
 
 
 def _read_text(path: Path) -> str:
@@ -493,21 +520,22 @@ def render_agent_prompt_preview(
     output_schema = _schema_for_slot(resolved, "output_schema")
     raw_text_output = output_schema is None
 
-    input_schema_block = _schema_block("input_schema", input_schema)
-    if input_schema_block:
-        composed = composed.rstrip() + "\n\n" + input_schema_block
+    # --- Text assembly via canonical runtime assembler ---
+    # All schema blocks are appended through the same rendering.append_*
+    # primitives the runtime path uses, so preview and runtime can never
+    # silently diverge in formatting.  Char counts are derived from the
+    # length delta so we don't compute the block twice.
+    composed, input_schema_chars = _append_schema_slot(composed, "input_schema", input_schema)
 
     if refs_text:
         composed = composed.rstrip() + "\n\n" + refs_text
 
-    output_schema_block = _schema_block("output_schema", output_schema)
-    if output_schema_block:
-        composed = composed.rstrip() + "\n\n" + output_schema_block
+    composed, output_schema_chars = _append_schema_slot(composed, "output_schema", output_schema)
 
-    # Validation contract — rules + a short validators hint, mirroring
-    # what core.agents.composition.rendering.append() does at runtime so the
-    # preview reflects what the model actually sees. The schema piece is
-    # intentionally omitted (already rendered above from the binding).
+    # Validation contract — validators hint only; schema is intentionally
+    # omitted (already appended above from the binding).  The preview shows
+    # what the model actually sees including post-hoc validator hints that the
+    # executor appends at runtime via rendering.append().
     validation_block, validation_view = _validation_block_for_preview(agent_versions, resources, agent_id)
     if validation_block:
         composed = composed.rstrip() + "\n\n" + validation_block
@@ -515,11 +543,11 @@ def render_agent_prompt_preview(
     parts: list[CharBreakdownPart] = [
         {"label": "prompt template", "chars": len(base_prompt)},
     ]
-    if input_schema_block and input_schema is not None:
+    if input_schema_chars > 0 and input_schema is not None:
         parts.append(
             {
                 "label": "input_schema block",
-                "chars": len(input_schema_block) + 2,
+                "chars": input_schema_chars,
                 "binding_id": input_schema["binding_id"],
                 "resource_id": input_schema["resource_id"],
                 "version_id": input_schema["version_id"],
@@ -531,12 +559,12 @@ def render_agent_prompt_preview(
     # visually grouped in the composer breakdown chart — schema (implicit
     # validator), rules, and the validation hint all originate from the
     # validation contract surface.
-    if output_schema_block and output_schema is not None:
+    if output_schema_chars > 0 and output_schema is not None:
         parts.append(
             {
                 "label": "validator: output schema (json-schema gate)",
                 "kind": "validator",
-                "chars": len(output_schema_block) + 2,
+                "chars": output_schema_chars,
                 "binding_id": output_schema["binding_id"],
                 "resource_id": output_schema["resource_id"],
                 "version_id": output_schema["version_id"],
