@@ -135,9 +135,21 @@ def _summarize_content(items: Any, include_bodies: bool) -> list[ContentPart]:
                     tool_use_id=c.get("tool_use_id"),
                 )
             )
+        elif t == "redacted_thinking":
+            # Encrypted thinking (Anthropic redacts some extended-thinking
+            # blocks); the ``data`` field is opaque ciphertext, so classify it
+            # as thinking with a stable marker rather than dumping the blob.
+            body = "[redacted thinking]"
+            parts.append(
+                ContentPart(
+                    type=ContentBlockType.THINKING,
+                    byte_len=len(body),
+                    body=body if include_bodies else None,
+                )
+            )
         else:
-            # ponytail: unknown block → labeled placeholder so new Anthropic
-            # block types stay visible instead of silently dropping to empty
+            # Unknown block → labeled placeholder so any future Anthropic block
+            # type stays visible instead of silently dropping to empty.
             placeholder = f"[unhandled block: {t}]"
             parts.append(
                 ContentPart(

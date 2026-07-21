@@ -16,6 +16,7 @@ from collections.abc import Callable
 from typing import TypedDict
 
 import httpx
+from pydantic import BaseModel, ConfigDict, Field
 
 _log = logging.getLogger(__name__)
 
@@ -35,6 +36,40 @@ class McpError(Exception):
     def __init__(self, message: str, code: int = -1) -> None:
         self.code = code
         super().__init__(message)
+
+
+class _JsonRpcError(BaseModel):
+    """JSON-RPC 2.0 error object."""
+
+    code: int = -1
+    message: str = "unknown error"
+
+
+class _JsonRpcResponse(BaseModel):
+    """JSON-RPC 2.0 response envelope. ``result`` stays open JSON — its shape is
+    method-specific and narrowed by the caller (``initialize`` / ``list_tools``).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: int | None = None
+    result: RawJson = Field(default_factory=dict)
+    error: _JsonRpcError | None = None
+
+
+def _raw_tool(row: RawJson) -> McpRawTool:
+    """Narrow one open-JSON tool descriptor into the typed ``McpRawTool``."""
+    tool: McpRawTool = {}
+    name = row.get("name")
+    if isinstance(name, str):
+        tool["name"] = name
+    description = row.get("description")
+    if isinstance(description, str):
+        tool["description"] = description
+    schema = row.get("inputSchema")
+    if isinstance(schema, dict):
+        tool["inputSchema"] = schema
+    return tool
 
 
 _STDIO_TIMEOUT = 30.0  # seconds — matches the default httpx timeout on the http path
@@ -84,7 +119,7 @@ class McpClient:
         )
         return self._proc
 
-    async def initialize(self) -> dict:
+    async def initialize(self) -> RawJson:
         if self._transport in ("http", "sse") and self._url:
             result = await self._jsonrpc(
                 "initialize",
@@ -115,7 +150,10 @@ class McpClient:
         if not self._initialized:
             await self.initialize()
         result = await self._jsonrpc("tools/list", {})
-        return result.get("tools", [])
+        raw_tools = result.get("tools")
+        if not isinstance(raw_tools, list):
+            return []
+        return [_raw_tool(row) for row in raw_tools if isinstance(row, dict)]
 
     async def subscribe_changes(self, callback: Callable[[], None]) -> None:
         if self._transport == "sse" and self._url:
@@ -124,13 +162,10 @@ class McpClient:
                 lambda t: t.exception() if not t.cancelled() else None
             )
 
-    # ponytail: JSON-RPC request/response stay bare `dict`. Typing them
-    # `dict[str, RawJsonValue]` cascades unfixably without a banned cast —
-    # `list_tools` would have to coerce RawJsonValue into `list[McpRawTool]`,
-    # and nested literals (`_CLIENT_INFO`) hit dict-invariance. Real fix:
-    # a pydantic JSON-RPC envelope model — add it when this file gains a 3rd
-    # JSON-RPC method or the first untyped-field bug ships.
-    async def _jsonrpc(self, method: str, params: dict) -> dict:
+    # The request body stays a plain ``dict`` (built locally from literals and
+    # serialized straight to the wire); the response is validated through the
+    # typed ``_JsonRpcResponse`` envelope below.
+    async def _jsonrpc(self, method: str, params: dict) -> RawJson:
         self._request_id += 1
         body = {
             "jsonrpc": "2.0",
@@ -145,7 +180,7 @@ class McpClient:
             return await self._stdio_request(body)
         raise McpError(f"unsupported transport: {self._transport}")
 
-    async def _http_request(self, body: dict) -> dict:
+    async def _http_request(self, body: dict) -> RawJson:
         assert self._url is not None, "http_request requires a URL"
         try:
             resp = await self._http.post(
@@ -166,13 +201,12 @@ class McpClient:
         except json.JSONDecodeError as exc:
             raise McpError(f"invalid json response: {exc}") from exc
 
-        if "error" in data:
-            err = data["error"]
-            raise McpError(err.get("message", "unknown error"), err.get("code", -1))
+        env = _JsonRpcResponse.model_validate(data)
+        if env.error is not None:
+            raise McpError(env.error.message, env.error.code)
+        return env.result
 
-        return data.get("result", {})
-
-    async def _stdio_request(self, body: dict) -> dict:
+    async def _stdio_request(self, body: dict) -> RawJson:
         """Send one Content-Length-framed JSON-RPC request and read the reply.
 
         The MCP stdio transport uses the same framing as the Language Server
@@ -226,22 +260,19 @@ class McpClient:
 
         # --- parse ---
         try:
-            data: dict = json.loads(raw_body)
+            data = json.loads(raw_body)
         except json.JSONDecodeError as exc:
             raise McpError(f"invalid json from stdio server: {exc}") from exc
 
-        # --- validate id match ---
+        env = _JsonRpcResponse.model_validate(data)
         req_id = body.get("id")
-        if data.get("id") != req_id:
+        if env.id != req_id:
             raise McpError(
-                f"stdio response id mismatch: expected {req_id}, got {data.get('id')}"
+                f"stdio response id mismatch: expected {req_id}, got {env.id}"
             )
-
-        if "error" in data:
-            err = data["error"]
-            raise McpError(err.get("message", "unknown error"), err.get("code", -1))
-
-        return data.get("result", {})
+        if env.error is not None:
+            raise McpError(env.error.message, env.error.code)
+        return env.result
 
     @staticmethod
     async def _read_stdio_headers(
