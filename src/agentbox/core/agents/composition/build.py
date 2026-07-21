@@ -273,7 +273,7 @@ def build_prompt(
 
     # ---- Stage 1: composition ------------------------------------------
     # Every agent must have a composition block (enforced by the 0011
-    # migration and all creation paths since plan 147).
+    # migration and all creation paths).
     if agent.composition is None:
         raise ValueError(
             f"agent {agent.id!r} has no composition block. "

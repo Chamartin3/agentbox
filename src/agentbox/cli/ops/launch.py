@@ -1,6 +1,6 @@
 """Launch helpers — shared session logic for interactive backend sessions.
 
-Provides ``_launch_session`` (the core launch logic), workspace/creds
+Provides ``launch_session`` (the core launch logic), workspace/creds
 resolution, MCP config generation, and per-runner launchers. These are
 shared by ``agentbox run`` (interactive mode) and ``agentbox ops shell``.
 
@@ -52,7 +52,7 @@ def _require_binary(runner: str, ops: OpsRenderer) -> None:
         raise typer.Exit(127)
 
 
-def _launch_session(
+def launch_session(
     obj: CLIContext,
     *,
     runner: str,

@@ -282,7 +282,7 @@ class ExecutionService(Service):
         return self._webhooks.list_for_run(run_id)
 
     # ══════════════════════════════════════════════════════════════════
-    # Transcript helpers (moved from tool bodies in plan 106_01)
+    # Transcript helpers (moved from tool bodies)
     # ══════════════════════════════════════════════════════════════════
 
     def get_transcript(self, run_id: str, limit: int, offset: int) -> dict:

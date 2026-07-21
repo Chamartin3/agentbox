@@ -83,21 +83,21 @@ from agentbox.core.execution.orchestrate.executor import RunExecutor as RunExecu
 # ── Cross-cutting agents service ──────────────────────────────────────
 from agentbox.core.service.agents import AgentService as AgentService
 
-# ── Execution service (plan 088) ───────────────────────────────────────
+# ── Execution service ───────────────────────────────────────
 from agentbox.core.service.execution import ExecutionService as ExecutionService
 
-# ── Evaluation service (plan 093 — analytics) ──────────────────────────
+# ── Evaluation service (analytics) ──────────────────────────
 from agentbox.core.service.evaluation import EvaluationService as EvaluationService
 from agentbox.core.data.feedback import ActivityRange as ActivityRange
 
-# ── Engines service (plan 091) ─────────────────────────────────────────
+# ── Engines service ─────────────────────────────────────────
 from agentbox.core.service.engines import EngineService as EngineService
 from agentbox.core.service.engines import ProfileNotFound as ProfileNotFound
 
 # ── System service ────────────────────────────────────────────────────
 from agentbox.core.service.system import SystemService as SystemService
 
-# ── Resources service (plan 090) ────────────────────────────────────────
+# ── Resources service ────────────────────────────────────────
 from agentbox.core.service.resources import ResourceService as ResourceService
 from agentbox.core.service.resources import InvalidResource as InvalidResource
 from agentbox.core.service.resources import ResourceNotFound as ResourceNotFound
@@ -112,9 +112,9 @@ from agentbox.core.workspaces.workdir import reset as reset
 from agentbox.core.workspaces.workdir import resolve_path as resolve_path
 from agentbox.core.workspaces.tooling.mcp import McpRegistry as McpRegistry
 
-# ── WorkspaceService (Plan 089) ────────────────────────────────────────
+# ── WorkspaceService ────────────────────────────────────────
 from agentbox.core.service.workspaces import WorkspaceService as WorkspaceService
 from agentbox.core.service.workspaces import render_env_doc_preview as render_env_doc_preview
 
-# ── DiagnosticsService (Plan 131) ──────────────────────────────────────
+# ── DiagnosticsService ──────────────────────────────────────
 from agentbox.core.service.diagnostics import DiagnosticsService as DiagnosticsService

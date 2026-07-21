@@ -247,7 +247,7 @@ class RunnerProfileManager(Manager[RunnerProfile]):
             return self._row_to_model(row) if row else None
 
     # ------------------------------------------------------------------
-    # Aggregate stats — read-only cross-table queries (plan 093)
+    # Aggregate stats — read-only cross-table queries
     # ------------------------------------------------------------------
 
     def stats_for_profile(

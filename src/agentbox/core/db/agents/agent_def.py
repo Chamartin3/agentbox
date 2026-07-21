@@ -6,7 +6,7 @@ into a ``core.data`` shape — no business logic (that stays in Services).
 
 It exists so callers that need an ``AgentDef`` never reach for the ``Database``
 object or compose two managers by hand: it IS the purpose-specific manager for
-this cross-table read (plan 109 Phase A0; relocated off ``Database.get_agent_def``).
+this cross-table read (relocated off ``Database.get_agent_def``).
 """
 from __future__ import annotations
 

@@ -28,7 +28,7 @@ class DispatchStore(Protocol):
     Narrower than ``RunStore`` — only the four methods actually invoked
     during completion dispatch. ``ExecutionService`` satisfies this
     protocol structurally; the gutted ``SessionStore`` does not (those
-    methods were removed in plan 088).
+    methods were removed).
 
     The domain must NOT import ``agentbox.core.service``, so this
     protocol is defined here rather than referencing ``ExecutionService``

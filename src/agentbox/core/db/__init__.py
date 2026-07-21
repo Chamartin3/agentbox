@@ -1,7 +1,7 @@
 """Core.db facade — managers only.
 
 The public interface of ``agentbox.core.db`` is exclusively the Manager
-classes (plan 109).  Import managers from here:
+classes.  Import managers from here:
 
     from agentbox.core.db import RunManager, AgentManager, WorkspaceManager
 

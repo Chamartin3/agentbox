@@ -9,8 +9,7 @@ from pathlib import Path
 import typer
 
 from agentbox.cli.shared import CLIContext, resolve_agent
-# TODO(cli-arch): launch orchestration → Service (plans 089/101)
-from agentbox.cli.ops.launch import _launch_session
+from agentbox.cli.ops.launch import launch_session
 from agentbox.core import service as ws_core
 from agentbox.core.service import WorkspaceNotFound
 
@@ -39,7 +38,7 @@ def _delegate_shell(obj: CLIContext, name: str | None, *, generate: bool) -> int
             workspace_arg = name
         else:
             agent_arg = name
-    return _launch_session(
+    return launch_session(
         obj=obj,
         runner="shell",
         agent=agent_arg,

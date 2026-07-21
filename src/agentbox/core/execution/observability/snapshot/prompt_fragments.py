@@ -10,7 +10,7 @@ A fragment list is built before the runner executes and stored alongside the
 run. Each fragment records `source` (who supplied the text) and `injected_by`
 (what layer pushes it into the model context), so the UI can group them.
 
-Moved out of ``core/agents/composition/capture.py`` (plan 120): fragment
+Moved out of ``core/agents/composition/capture.py``: fragment
 capture is an execution-observability concern, not part of the agents domain.
 """
 

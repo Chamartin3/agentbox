@@ -49,7 +49,7 @@ class BackendName(CatalogEnum):
 
     @property
     def runner_kind(self) -> str:
-        """RunnerKind string passed to ``_launch_session``."""
+        """RunnerKind string passed to ``launch_session``."""
         return _BACKEND_RUNNER_MAP[self]
 
     @classmethod

@@ -49,7 +49,7 @@ def schedule_webhook(
     compatibility with callers that still pass a ``SessionStore``; it is
     not forwarded to dispatch — an :class:`ExecutionService` is constructed
     internally instead, since the run-lifecycle methods required by dispatch
-    were removed from ``SessionStore`` in plan 088.
+    were removed from ``SessionStore``.
     """
     settings = get_settings()
     exec_svc = ExecutionService()

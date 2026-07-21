@@ -1,4 +1,4 @@
-"""EvaluationService — run/agent analytics (plan 093).
+"""EvaluationService — run/agent analytics.
 
 The read-only analytics domain: usage & cost aggregates, activity summaries,
 paginated/rich run listings, filtered stats, and runner-profile stats.

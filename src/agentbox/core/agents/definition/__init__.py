@@ -3,7 +3,7 @@
 ``config.py`` holds the structured accessors (``ExecutionConfig`` /
 ``RuntimeConfig`` / ``PythonAgentConfig``) over ``agent_versions.config_json``
 plus the ``build_config_json_payload`` writer. ``tools.py`` holds the
-tool-grant surface (populated by plan 122).
+tool-grant surface.
 """
 
 from agentbox.core.agents.definition.config import (

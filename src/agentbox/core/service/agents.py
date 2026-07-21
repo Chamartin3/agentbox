@@ -2,8 +2,7 @@
 
 Stateful: the ``Database`` (managers) is resolved internally by ``Service``
 from settings — never passed in. Methods take only their domain arguments,
-never ``db`` or ``store``. This is the agent slice of the manager migration
-that plan 064_03 left unfinished: logic lives on the managers, this object
+never ``db`` or ``store``. This is the agent slice of the manager migration: logic lives on the managers, this object
 is the surface.
 
     svc = AgentService()
@@ -11,8 +10,7 @@ is the surface.
 
 Exposes the full agent surface — meta/lifecycle, versions, prompts,
 grants, and sync — over the managers. (The incremental port off the
-former ``SessionStore`` mixins is complete; that store was gutted in
-plan 088.)"""
+former ``SessionStore`` mixins is complete; that store was gutted.)"""
 from __future__ import annotations
 
 import difflib

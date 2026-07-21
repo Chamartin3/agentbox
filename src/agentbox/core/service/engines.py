@@ -285,7 +285,7 @@ class EngineService(Service):
         self._db.runner_profiles.clear_agent_profile(agent_id)
 
     # ------------------------------------------------------------------
-    # Profile stats (delegates to EvaluationService — plan 093)
+    # Profile stats (delegates to EvaluationService)
     # ------------------------------------------------------------------
 
     def get_profile_stats(

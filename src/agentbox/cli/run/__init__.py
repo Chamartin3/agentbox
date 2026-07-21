@@ -28,13 +28,13 @@ import httpx
 import typer
 import websockets
 
-from agentbox.cli.ops.launch import _launch_session
+from agentbox.cli.ops.launch import launch_session
 from agentbox.cli.shared import CLIContext
 from agentbox.cli.shared.context import Renderers
 from agentbox.core.data.constants import BackendName
 
-# Mapping from BackendName values to RunnerKind strings used by _launch_session.
-# "token" passes through and is rejected by _launch_session with a clear message.
+# Mapping from BackendName values to RunnerKind strings used by launch_session.
+# "token" passes through and is rejected by launch_session with a clear message.
 
 
 async def _stream(renderers: Renderers, api: str, run_id: str) -> None:
@@ -177,7 +177,7 @@ def run_cmd(
         raise typer.Exit(2)
 
     sys.exit(
-        _launch_session(
+        launch_session(
             obj=obj,
             runner=runner,
             agent=agent,

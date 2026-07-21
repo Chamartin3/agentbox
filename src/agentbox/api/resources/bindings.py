@@ -1,4 +1,4 @@
-"""Agent + workspace resource binding routes (Plans 02 + 03).
+"""Agent + workspace resource binding routes.
 
 Thin HTTP layer: parses requests, delegates to ResourceService, maps domain errors.
 Workspace mutations trigger ``WorkspaceService.build_workspace`` as a best-effort
