@@ -37,7 +37,7 @@ from agentbox.core.agents import PromptDoc
 from agentbox.core.agents import PromptError as PromptError
 from agentbox.core.agents import build_config_json_payload
 from agentbox.core.agents import available_tools, effective_tools, resolve_engine
-from agentbox.core.agents import compose_from_source, load_bundle_from_bindings
+from agentbox.core.agents import compose_from_source, load_bundle_from_bindings, inline_to_composition
 from agentbox.core.agents import engine_load_failure as backend_load_failure
 from agentbox.core.agents import list_engines
 from agentbox.core.engines import effective_backend
@@ -435,6 +435,11 @@ def create_agent_record(
         source_path=None,
         source_format=None,
     )
+    # Always emit a composition block so Stage-1 of build_prompt is always taken.
+    # Agents created without an explicit composition block get the minimal
+    # CompositionConfig() defaults — BindingsBundleSource reads prompt_content
+    # directly and ignores the path fields.
+    agent_def = inline_to_composition(agent_def)
     config_payload = {
         **agent_def.model_dump(mode="json", exclude_none=True),
         **build_config_json_payload(agent_def),
@@ -1283,6 +1288,31 @@ def _config_hash(config_json: dict) -> str:
     ).hexdigest()
 
 
+def _ensure_composition_in_config(config_json: dict) -> dict:
+    """Return config_json with a default composition block if absent.
+
+    All creation paths must call this so every stored version has a
+    composition block and ``build_prompt``'s Stage-1 guard never fires.
+    The default block matches ``CompositionConfig()`` defaults; at runtime
+    ``BindingsBundleSource`` reads ``prompt_content`` directly and ignores
+    the path fields.
+    """
+    if "composition" in config_json:
+        return config_json
+    return {
+        **config_json,
+        "composition": {
+            "system": "prompts/system.md",
+            "references": [],
+            "user_template": None,
+            "input_schema": None,
+            "output_schema": None,
+            "transport": "system_message",
+            "output_validation": "strict",
+        },
+    }
+
+
 def _hash_content(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -1573,6 +1603,8 @@ class AgentService(Service):
         """Create a new agent with its v1 draft + agent_meta row."""
         if self._versions.exists_for_agent(agent_id):
             raise ValueError(f"Agent {agent_id!r} already exists")
+        # Always ensure a composition block so build_prompt's Stage-1 guard passes.
+        config_json = _ensure_composition_in_config(config_json)
         vid = self._versions.insert_version(
             agent_id=agent_id,
             version=1,
@@ -1618,6 +1650,8 @@ class AgentService(Service):
         """Append a new draft version. No existence check; clears deleted_at."""
         latest = self._versions.get_latest(agent_id)
         next_version = (latest.get("version") or 0) + 1 if latest else 1
+        # Always ensure a composition block so build_prompt's Stage-1 guard passes.
+        config_json = _ensure_composition_in_config(config_json)
         vid = self._versions.insert_version(
             agent_id=agent_id,
             version=next_version,
@@ -2551,6 +2585,8 @@ class AgentService(Service):
         pass the filename stem. Raises ``ValueError`` if the agent exists.
         """
         agent = parse_agent(text, fmt, agent_id=agent_id)
+        # Always ensure a composition block is present.
+        agent = inline_to_composition(agent)
         config_json = {
             **agent.model_dump(mode="json", exclude_none=True),
             **build_config_json_payload(agent),
@@ -2623,6 +2659,8 @@ class AgentService(Service):
             source_path=None,
             source_format=None,
         )
+        # Always emit a composition block so Stage-1 of build_prompt is always taken.
+        agent_def = inline_to_composition(agent_def)
         config_payload = {
             **agent_def.model_dump(mode="json", exclude_none=True),
             **build_config_json_payload(agent_def),

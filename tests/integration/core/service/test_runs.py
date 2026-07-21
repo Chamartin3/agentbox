@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import pytest
 
+from agentbox.core.agents.composition.synthesizer import inline_to_composition
 from agentbox.core.data import AgentDef
 from agentbox.core.config import load_settings
 from agentbox.core.db.database import Database
@@ -50,6 +51,8 @@ class _FakeExecutor:
 
 def _seed_agent(store: Database, agent_id: str = "alpha") -> None:
     agent = AgentDef.model_validate({"id": agent_id, "description": "x"})
+    # Ensure a composition block is present so build_prompt's Stage-1 gate passes.
+    agent = inline_to_composition(agent)
     with _w.catch_warnings():
         _w.simplefilter("ignore", category=UserWarning)
         config_json = agent.model_dump_json()
@@ -61,7 +64,8 @@ def _seed_agent(store: Database, agent_id: str = "alpha") -> None:
         prompt_snapshot="",
         content_hash="x",
         config_json=config_json,
-        prompt_content="",
+        # BindingsBundleSource requires a non-empty prompt_content.
+        prompt_content="test agent prompt",
         source="manifest",
     )
     AgentService().activate_version(agent_id, row["id"])

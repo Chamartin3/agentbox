@@ -270,11 +270,18 @@ def build_prompt(
     """
     store = _DbStoreAdapter(managers)
     snapshot_entries: list[PromptEmbedSnapshotEntry] = []
-    agent_copied = False
 
     # ---- Stage 1: composition ------------------------------------------
+    # Every agent must have a composition block (enforced by the 0011
+    # migration and all creation paths since plan 147).
+    if agent.composition is None:
+        raise ValueError(
+            f"agent {agent.id!r} has no composition block. "
+            "Run `agentbox ops migrate upgrade` to apply the 0011 migration "
+            "and ensure all creation paths call inline_to_composition()."
+        )
+
     composition_result = None
-    system_text: str | None = None
     system_base: str | None = None
     composed_schema: JsonSchemaDict | None = None
     composed_input_schema: JsonSchemaDict | None = None
@@ -282,84 +289,71 @@ def build_prompt(
     composed_references: tuple[ComposedReference, ...] | None = None
     composed_bundle_sha: str | None = None
 
-    if agent.composition is not None and variables is not None:
-        bundle = load_bundle_from_bindings(agent_id=agent.id, store=store)
-        if bundle.source is None:
-            raise ValueError(f"Bundle for {agent.id!r} has no source")
+    bundle = load_bundle_from_bindings(agent_id=agent.id, store=store)
+    if bundle.source is None:
+        raise ValueError(f"Bundle for {agent.id!r} has no source")
 
-        _pc = PromptComposer().compose(bundle.source, variables)
+    # When variables is None (legacy raw-input_ path), compose without
+    # template substitution so the system prompt is returned verbatim.
+    _render = variables is not None
+    _vars: dict[str, str] = variables if variables is not None else {}
+    _pc = PromptComposer().compose(bundle.source, _vars, render=_render)
 
-        # _pc.text is always a str (never None); system_text follows suite.
-        _composed_text: str = _pc.text
-        if _pc.output_schema is not None:
-            engine = ExecutionConfig.from_agent(agent).output_validation_engine
-            _composed_text = append_validation_engine_hint(_composed_text, engine)
-        system_text = _composed_text
+    # _pc.text is always a str (never None); system_text follows suite.
+    _composed_text: str = _pc.text
+    if _pc.output_schema is not None:
+        engine = ExecutionConfig.from_agent(agent).output_validation_engine
+        _composed_text = append_validation_engine_hint(_composed_text, engine)
+    system_text = _composed_text
 
-        system_base = _pc.base if _pc.base else None
-        composed_schema = _pc.output_schema
-        composed_input_schema = _pc.input_schema
-        composed_user = _pc.user
-        composed_references = tuple(
-            s.to_composed_reference() for s in _pc.references
-        )
-        composed_bundle_sha = _pc.bundle_sha
+    system_base = _pc.base if _pc.base else None
+    composed_schema = _pc.output_schema
+    composed_input_schema = _pc.input_schema
+    composed_user = _pc.user
+    composed_references = tuple(
+        s.to_composed_reference() for s in _pc.references
+    )
+    composed_bundle_sha = _pc.bundle_sha
 
-        # Build a ComposeResult for backward-compatible composition_result field.
-        composition_result = ComposeResult(
-            system=_pc.text,
-            user=_pc.user,
-            schema=_pc.output_schema,
-            schema_sha=_pc.output_schema_sha,
-            bundle_sha=_pc.bundle_sha,
-            system_base=_pc.base,
-            references=composed_references,
-            input_schema=_pc.input_schema,
-        )
+    # Build a ComposeResult for backward-compatible composition_result field.
+    composition_result = ComposeResult(
+        system=_pc.text,
+        user=_pc.user,
+        schema=_pc.output_schema,
+        schema_sha=_pc.output_schema_sha,
+        bundle_sha=_pc.bundle_sha,
+        system_base=_pc.base,
+        references=composed_references,
+        input_schema=_pc.input_schema,
+    )
 
-        agent = agent.model_copy(deep=True)
-        agent_copied = True
+    agent = agent.model_copy(deep=True)
+    if variables is not None:
         input_ = _pc.user
 
     # ---- Stage 1b: validation-mode from agent.composition ---------------
-    validation_mode: str | None = None
-    if agent.composition is not None:
-        validation_mode = agent.composition.output_validation
+    # composition is guaranteed non-None by the guard above (model_copy preserves it).
+    _composition = agent.composition
+    assert _composition is not None  # narrowing for type-checkers
+    validation_mode: str | None = _composition.output_validation
 
     # ---- Stage 2: prompt-resource binding substitution ------------------
     prompt_bindings: list[ResolvedBindingView] = []
     try:
         prompt_bindings = _resolve_prompt_bindings(store, agent.id)
         if prompt_bindings:
-            if system_text is not None:
-                resolution = resolve_prompt(system_text, prompt_bindings)
-                system_text = resolution.rendered_prompt
-                snapshot_entries.extend(
-                    prompt_resolution_to_snapshot(resolution)
+            # system_text is always set after Stage 1 (composition is required).
+            resolution = resolve_prompt(system_text, prompt_bindings)
+            system_text = resolution.rendered_prompt
+            snapshot_entries.extend(
+                prompt_resolution_to_snapshot(resolution)
+            )
+            for marker in resolution.unresolved_markers:
+                logger.warning(
+                    "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
+                    marker,
+                    agent.id,
                 )
-                for marker in resolution.unresolved_markers:
-                    logger.warning(
-                        "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
-                        marker,
-                        agent.id,
-                    )
-            else:
-                inline_prompt = agent.prompt
-                if inline_prompt:
-                    resolution = resolve_prompt(inline_prompt, prompt_bindings)
-                    agent = agent.model_copy(
-                        update={"prompt": resolution.rendered_prompt}
-                    )
-                    agent_copied = True
-                    snapshot_entries.extend(
-                        prompt_resolution_to_snapshot(resolution)
-                    )
-                    for marker in resolution.unresolved_markers:
-                        logger.warning(
-                            "executor: unresolved prompt resource marker {{resource:%s}} for agent %r",
-                            marker,
-                            agent.id,
-                        )
     except Exception:
         logger.exception(
             "executor: prompt resource binding resolution failed for agent %r",
@@ -372,8 +366,8 @@ def build_prompt(
         composed_schema = out_cfg.json_schema
 
     if out_cfg.validators or isinstance(out_cfg.json_schema, dict):
-        base_for_contract = system_text if system_text is not None else (agent.prompt or "")
-        system_text = _append_output_contract(base_for_contract, out_cfg)
+        # system_text is always set after Stage 1 (composition is required).
+        system_text = _append_output_contract(system_text, out_cfg)
 
         if system_base is not None:
             constraints_only = _OutputConfig(json_schema=None, validators=out_cfg.validators)
@@ -420,15 +414,7 @@ def build_prompt(
             logger.error("executor: %s", msg)
             raise ValueError(msg) from exc
 
-    # Ensure the returned agent is a fresh copy whenever composed state
-    # is non-trivial.
-    if not agent_copied and (
-        system_text is not None
-        or system_base is not None
-        or composed_schema is not None
-        or validation_mode is not None
-    ):
-        agent = agent.model_copy(deep=True)
+    # agent_copied is always True (Stage 1 always calls model_copy).
 
     # Build the runtime view from the resolved config.
     runtime_view = build_runtime_view(agent, store=store)

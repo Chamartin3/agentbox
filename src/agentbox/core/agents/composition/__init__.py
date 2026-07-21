@@ -40,6 +40,9 @@ from agentbox.core.agents.composition.preview import (
     preview,
     render_agent_prompt_preview,
 )
+from agentbox.core.agents.composition.synthesizer import (
+    inline_to_composition,
+)
 from agentbox.core.agents.composition.resolver import (
     resolve_prompt,
 )
@@ -81,6 +84,7 @@ __all__ = [
     "ReferencePreview",
     "preview",
     "render_agent_prompt_preview",
+    "inline_to_composition",
     "resolve_prompt",
     "render_document",
     "render_folder_manifest",
