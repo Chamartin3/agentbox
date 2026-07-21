@@ -315,8 +315,8 @@ def def_export(
     """Export DB agents to on-disk agent files.
 
     ``claude_code``/``opencode`` write a single ``<agent_id>.md`` (frontmatter
-    + prompt); ``agentbox`` writes the portable ``<agent_id>.toml`` (+
-    ``<agent_id>.prompt.md``). Idempotent.
+    + prompt); ``codex`` writes the Codex subagent ``<agent_id>.toml``
+    (name / description / developer_instructions). Idempotent.
     """
     obj: CLIContext = ctx.obj
     base = Path(out_dir).expanduser()
