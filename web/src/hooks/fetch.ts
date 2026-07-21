@@ -9,7 +9,7 @@ export interface FetchState<T> {
 }
 
 export function useFetch<T>(
-  loader: () => Promise<T>,
+  loader: (signal: AbortSignal) => Promise<T>,
   deps: ReadonlyArray<unknown> = [],
 ): FetchState<T> {
   const [data, setData] = useState<T | null>(null);
@@ -18,28 +18,32 @@ export function useFetch<T>(
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
   const seq = useRef(0);
+  const ctrl = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
+    ctrl.current?.abort();
+    const ac = (ctrl.current = new AbortController());
     const my = ++seq.current;
     setLoading(true);
     try {
-      const result = await loaderRef.current();
+      const result = await loaderRef.current(ac.signal);
       if (seq.current === my) {
         setData(result);
         setError(null);
       }
     } catch (e) {
+      if (ac.signal.aborted) return; // superseded or unmounted — not an error
       if (seq.current === my) {
         setError(e instanceof Error ? e : new Error(String(e)));
       }
     } finally {
       if (seq.current === my) setLoading(false);
     }
-    // ponytail: stale-response guard via seq counter, no AbortController until a slow endpoint actually needs cancellation
   }, []);
 
   useEffect(() => {
     refresh();
+    return () => ctrl.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
