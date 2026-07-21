@@ -1,4 +1,4 @@
-"""Resource repo commands — list, show, upload, versions, publish, rollback, preview-modes, migrate-composition."""
+"""Resource repo commands — list, show, upload, versions, publish, rollback, preview-modes."""
 
 from __future__ import annotations
 

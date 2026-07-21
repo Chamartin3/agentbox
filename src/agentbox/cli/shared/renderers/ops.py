@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from rich.panel import Panel
@@ -86,63 +86,6 @@ class OpsRenderer(Renderer):
         _add(settings.mcp_cache_dir, data, "mcp_cache/")
 
         self.con.print(tree)
-
-    # ------------------------------------------------------------------
-    # migrate
-    # ------------------------------------------------------------------
-
-    def migration_table(
-        self, title: str, results: dict[str, dict[str, bool]]
-    ) -> None:
-        """Render a ws-perms migration results table."""
-        table = RichTable(
-            title=title,
-            title_style="bold",
-            header_style="bold cyan",
-            padding=(0, 1),
-        )
-        table.add_column("Workspace", style="bold")
-        table.add_column("Migrated", justify="center")
-        table.add_column("Backup", justify="center")
-
-        for ws_name, result in results.items():
-            migrated = (
-                Text("✓", style="green")
-                if result["migrated"]
-                else Text("·", style="dim")
-            )
-            backed_up = (
-                Text("✓", style="green")
-                if result["backed_up"]
-                else Text("·", style="dim")
-            )
-            table.add_row(ws_name, migrated, backed_up)
-
-        self.con.print(table)
-
-    def migration_import_table(self, title: str) -> RichTable:
-        """Create a table structure for import-manifest results."""
-        table = RichTable(
-            title=title,
-            title_style="bold",
-            header_style="bold cyan",
-            padding=(0, 1),
-        )
-        table.add_column("Section")
-        table.add_column("Key", style="bold")
-        table.add_column("Action", justify="center")
-        return table
-
-    def migration_composition_table(self, summary: Mapping[str, int]) -> None:
-        """Render a composition migration summary table."""
-        table = RichTable(
-            title="Composition Migration", header_style="bold cyan", padding=(0, 2)
-        )
-        table.add_column("Metric", style="bold")
-        table.add_column("Count", justify="right")
-        for k, v in summary.items():
-            table.add_row(k, str(v))
-        self.con.print(table)
 
     # ------------------------------------------------------------------
     # resources: repo
