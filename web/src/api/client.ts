@@ -695,42 +695,6 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // ---- shared resources ----------------------------------------------------
-
-  listResources: (params?: ResourceQuery) => {
-    const p = new URLSearchParams();
-    if (params?.kind) {
-      if (Array.isArray(params.kind)) params.kind.forEach((k) => p.append('kind', k));
-      else p.set('kind', params.kind);
-    }
-    if (params?.q) p.set('q', params.q);
-    if (params?.limit != null) p.set('limit', String(params.limit));
-    if (params?.offset != null) p.set('offset', String(params.offset));
-    const qs = p.toString();
-    return req<ResourcesPage>(`/api/resources${qs ? `?${qs}` : ''}`);
-  },
-
-  getResource: (id: string) => req<SharedResource>(`/api/resources/${id}`),
-
-  getResourceVersions: (id: string) => req<ResourcesPage>(`/api/resources/${id}/versions`),
-
-  createResource: (body: CreateResourcePayload) =>
-    req<SharedResource>('/api/resources', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  createResourceVersion: (id: string, body: CreateResourceVersionPayload) =>
-    req<SharedResource>(`/api/resources/${id}/versions`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  activateResourceVersion: (id: string, version: number) =>
-    req<SharedResource>(`/api/resources/${id}/activate`, {
-      method: 'POST',
-      body: JSON.stringify({ version }),
-    }),
 
   // mcp manifest
   getMcpManifest: () => req<Record<string, unknown>>('/api/mcp/manifest'),

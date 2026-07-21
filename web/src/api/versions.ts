@@ -1,6 +1,6 @@
 /**
  * Typed client for agent versioning API endpoints.
- * Consumed by: AgentVersions, AgentVersionDiff, CommentThread, RatingStars components.
+ * Consumed by: AgentVersions, AgentVersionDiff components.
  */
 
 import { apiRequest, apiRequestOrNull } from './http';
