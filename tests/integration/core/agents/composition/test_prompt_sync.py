@@ -12,7 +12,7 @@ class TestSyncPromptFromDisk:
         )
         assert result is not None
         assert result["version"] == 1
-        assert result["is_draft"] == 0
+        assert "is_draft" not in result
         assert result["author"] == "filesystem"
         assert result["changelog"] == "Imported from disk"
         assert result["content_hash"] is not None
@@ -51,7 +51,6 @@ class TestSyncPromptFromDisk:
                     content="legacy",
                     author="system",
                     changelog="",
-                    is_draft=0,
                     content_hash=None,
                     created_at="2025-01-01T00:00:00",
                 )

@@ -183,43 +183,40 @@ def test_grant_validation_and_revoke_missing(svc: AgentService) -> None:
 
 
 # ── prompts ────────────────────────────────────────────────────────────
-def test_prompt_draft_publish_and_reads(svc: AgentService) -> None:
-    d = svc.save_prompt_draft("bot", "hello", author="alice")
-    assert d["version"] == 1 and d["is_draft"] == 1
-    assert svc.get_prompt_draft("bot")["content"] == "hello"
-    # saving again replaces the draft, reusing the freed version slot
-    d2 = svc.save_prompt_draft("bot", "hello v2")
-    assert d2["version"] == 1 and d2["content"] == "hello v2"
-    pub = svc.publish_prompt("bot", changelog="ship", author="alice")
-    assert pub["is_draft"] == 0 and pub["changelog"] == "ship"
-    assert svc.get_prompt_draft("bot") is None
+def test_save_prompt_version_and_reads(svc: AgentService) -> None:
+    """save_prompt_version writes a version; latest is current."""
+    v1 = svc.save_prompt_version("bot", "hello", author="alice")
+    assert v1["version"] == 1
+    assert "is_draft" not in v1
+    # Latest = current.
+    assert svc.get_latest_committed_prompt("bot")["content"] == "hello"
+    # Save with changed content creates v2.
+    v2 = svc.save_prompt_version("bot", "hello v2", author="alice")
+    assert v2["version"] == 2 and v2["content"] == "hello v2"
     assert svc.get_latest_committed_prompt("bot")["content"] == "hello v2"
-    assert [p["version"] for p in svc.list_prompt_versions("bot")] == [1]
-    assert svc.get_prompt_version("bot", 1)["content"] == "hello v2"
+    assert [p["version"] for p in svc.list_prompt_versions("bot")] == [2, 1]
+    assert svc.get_prompt_version("bot", 1)["content"] == "hello"
+    assert svc.get_prompt_version("bot", 2)["content"] == "hello v2"
 
 
-def test_publish_prompt_without_draft_raises(svc: AgentService) -> None:
-    with pytest.raises(ValueError):
-        svc.publish_prompt("ghost")
+def test_save_prompt_version_identical_is_noop(svc: AgentService) -> None:
+    """Identical content produces no extra version."""
+    v1 = svc.save_prompt_version("bot", "same content")
+    v2 = svc.save_prompt_version("bot", "same content")
+    assert v1["version"] == v2["version"]
+    assert len(svc.list_prompt_versions("bot")) == 1
 
 
 def test_rollback_prompt(svc: AgentService) -> None:
-    svc.save_prompt_draft("bot", "v1 content")
-    svc.publish_prompt("bot")  # v1 committed
-    svc.save_prompt_draft("bot", "v2 content")
-    svc.publish_prompt("bot")  # v2 committed
+    svc.save_prompt_version("bot", "v1 content")
+    svc.save_prompt_version("bot", "v2 content")
     new = svc.rollback_prompt("bot", 1)
     assert new["content"] == "v1 content"
-    assert new["version"] == 3 and new["is_draft"] == 0
+    assert new["version"] == 3
+    assert "is_draft" not in new
     assert "Rollback to version 1" in new["changelog"]
     with pytest.raises(ValueError):
         svc.rollback_prompt("bot", 99)  # missing target
-
-
-def test_rollback_prompt_rejects_draft_target(svc: AgentService) -> None:
-    svc.save_prompt_draft("bot", "draft only")  # v1 draft
-    with pytest.raises(ValueError):
-        svc.rollback_prompt("bot", 1)
 
 
 def test_sync_prompt_from_disk(svc: AgentService) -> None:

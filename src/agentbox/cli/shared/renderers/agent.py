@@ -247,23 +247,6 @@ class AgentRenderer(Renderer):
             )
         self.print(table)
 
-    def prompt_drafts_table(self, rows: Sequence[dict[str, object]]) -> None:
-        """Render a table of prompt drafts."""
-        if not rows:
-            return
-
-        table = Table(title="Drafts", header_style="bold yellow")
-        table.add_column("#", style="dim", justify="right")
-        table.add_column("Author")
-        table.add_column("Updated")
-        for v in rows:
-            table.add_row(
-                str(v.get("version", "")),
-                str(v.get("author", "")),
-                str(v.get("updated_at", "")),
-            )
-        self.print(table)
-
     # ------------------------------------------------------------------
     # Tool grants
     # ------------------------------------------------------------------
@@ -418,14 +401,6 @@ class AgentRenderer(Renderer):
     def prompt_updated(self, agent_id: str) -> None:
         """Print success message for prompt update."""
         self.success(f"updated agent {agent_id!r} prompt")
-
-    def prompt_draft_saved(self, agent_id: str) -> None:
-        """Print success message for prompt draft save."""
-        self.success(f"saved draft for {agent_id!r}")
-
-    def prompt_published(self, agent_id: str) -> None:
-        """Print success message for prompt publish."""
-        self.success(f"published {agent_id!r} prompt")
 
     def prompt_rolled_back(self, agent_id: str, target_version: int) -> None:
         """Print success message for prompt rollback."""

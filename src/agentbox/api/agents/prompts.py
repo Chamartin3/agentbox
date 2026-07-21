@@ -2,6 +2,10 @@
 
 Thin HTTP layer: delegates to ``AgentService`` prompt-doc methods and maps
 ``AgentNotFound`` / ``PromptError`` / ``ValueError`` to HTTPException.
+
+Write model: PUT /prompt is the single write path — it captures a new
+version when content changed (content-hash dedup).  There is no draft/
+publish two-step.  Rollback inserts a new version cloning an older one.
 """
 
 from __future__ import annotations
@@ -58,7 +62,7 @@ class PromptBody(BaseModel):
 
 @router.put("/agents/{agent_id}/prompt")
 def put_prompt(agent_id: str, body: PromptBody) -> _PromptDocResult:
-    """Capture a new committed prompt version if content changed."""
+    """Capture a new prompt version if content changed (content-hash dedup)."""
     try:
         doc = get_agent_service().put_prompt_doc(agent_id, body.content)
     except AgentNotFound as exc:
@@ -98,54 +102,8 @@ def get_version(agent_id: str, version: int) -> PromptVersionDetail | None:
 
 
 # ---------------------------------------------------------------------------
-# Draft / publish / rollback
+# Rollback
 # ---------------------------------------------------------------------------
-
-
-class DraftBody(BaseModel):
-    content: str
-    author: str = "system"
-
-
-@router.post("/agents/{agent_id}/prompt/draft")
-def save_draft(agent_id: str, body: DraftBody) -> _PromptDocResult:
-    try:
-        doc = get_agent_service().save_prompt_draft_doc(
-            agent_id, body.content, author=body.author
-        )
-    except AgentNotFound as exc:
-        raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
-    return {
-        "path": doc.path,
-        "content": doc.content,
-        "size": doc.size,
-        "mtime": doc.mtime,
-    }
-
-
-class PublishBody(BaseModel):
-    changelog: str = ""
-    author: str = "system"
-
-
-@router.post("/agents/{agent_id}/prompt/publish")
-def publish_prompt(agent_id: str, body: PublishBody) -> _PromptDocResult:
-    try:
-        doc = get_agent_service().publish_prompt_doc(
-            agent_id, changelog=body.changelog, author=body.author
-        )
-    except AgentNotFound as exc:
-        raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
-    except ValueError as exc:
-        raise HTTPException(400, {"code": "no_draft", "detail": str(exc)}) from exc
-    except PromptError as exc:
-        _raise_prompt_error(exc)
-    return {
-        "path": doc.path,
-        "content": doc.content,
-        "size": doc.size,
-        "mtime": doc.mtime,
-    }
 
 
 class RollbackBody(BaseModel):

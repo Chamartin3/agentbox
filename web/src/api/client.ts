@@ -304,7 +304,6 @@ export interface CreateResourceVersionPayload {
 
 export interface PromptVersionSummary {
   version: number;
-  is_draft: boolean;
   created_at: string;
   author: string;
   changelog: string;
@@ -314,7 +313,6 @@ export interface PromptVersionSummary {
 export interface PromptVersionList {
   agent_id: string;
   active_version: number | null;
-  draft_version: number | null;
   versions: PromptVersionSummary[];
 }
 
@@ -590,16 +588,6 @@ export const api = {
   listPromptVersions: (id: string) => req<PromptVersionList>(`/api/agents/${id}/prompt/versions`),
   getPromptVersion: (id: string, version: number) =>
     req<PromptVersionDetail>(`/api/agents/${id}/prompt/versions/${version}`),
-  savePromptDraft: (id: string, content: string, author?: string) =>
-    req<PromptDoc>(`/api/agents/${id}/prompt/draft`, {
-      method: 'POST',
-      body: JSON.stringify({ content, author: author || 'system' }),
-    }),
-  publishPrompt: (id: string, changelog?: string, author?: string) =>
-    req<PromptDoc>(`/api/agents/${id}/prompt/publish`, {
-      method: 'POST',
-      body: JSON.stringify({ changelog: changelog || '', author: author || 'system' }),
-    }),
   rollbackPrompt: (id: string, targetVersion: number, author?: string) =>
     req<PromptDoc>(`/api/agents/${id}/prompt/rollback`, {
       method: 'POST',

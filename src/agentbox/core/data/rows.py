@@ -25,7 +25,6 @@ class PromptVersionRow(TypedDict):
     content: str
     author: str
     changelog: str
-    is_draft: int
     content_hash: str | None
     created_at: str
 
@@ -768,7 +767,6 @@ class _PromptVersionFields(TypedDict, total=False):
     content: str
     author: str
     changelog: str
-    is_draft: int
     content_hash: str | None
     created_at: str
 

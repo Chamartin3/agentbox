@@ -153,7 +153,7 @@ export default function AgentNew() {
         changelog,
       });
 
-      navigate(`/agents/${result.agent_id}?draft=1`);
+      navigate(`/agents/${result.agent_id}`);
     } catch (e) {
       const err = e as ApiError;
       const detail = err.detail as Record<string, unknown> | string | null;

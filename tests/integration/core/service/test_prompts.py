@@ -1,8 +1,8 @@
 """Tests for ``core.service.agents.prompts`` — the use-case wrappers.
 
-Both the REST routes and MCP tools now go through this module, so we
-pin: agent-not-found raises ``AgentNotFound``; reading reads from DB;
-writing captures a version.
+Model: versions are immutable; the latest version is current; a "save"
+writes a new version only when content changed (content-hash dedup).
+There is no draft/publish two-step.
 """
 
 from __future__ import annotations
@@ -71,6 +71,19 @@ def test_put_prompt_creates_version(store: Database) -> None:
     assert any(v["content"] == "new body" for v in versions)
 
 
+def test_put_prompt_identical_content_is_noop(store: Database) -> None:
+    """Saving identical content twice does not create a second version."""
+    _seed_agent(store, "alpha", prompt_content="")
+    prompts_service.put_prompt(
+        "alpha", "body", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions,
+    )
+    prompts_service.put_prompt(
+        "alpha", "body", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions,
+    )
+    versions = AgentService().list_prompt_versions("alpha")
+    assert len(versions) == 1
+
+
 def test_list_versions_raises_when_unknown(store: Database) -> None:
     with pytest.raises(AgentNotFound):
         prompts_service.list_versions("missing", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions)
@@ -82,7 +95,7 @@ def test_list_versions_returns_shape_when_empty(store: Database) -> None:
     assert payload["agent_id"] == "alpha"
     assert payload["versions"] == []
     assert payload["active_version"] is None
-    assert payload["draft_version"] is None
+    assert "draft_version" not in payload
 
 
 def test_get_version_returns_none_when_missing(store: Database) -> None:
@@ -90,14 +103,59 @@ def test_get_version_returns_none_when_missing(store: Database) -> None:
     assert prompts_service.get_version("alpha", 42, agent_defs=store.agent_defs, prompt_versions=store.prompt_versions) is None
 
 
-def test_save_draft_then_get_version_roundtrip(store: Database) -> None:
+def test_save_creates_version_latest_is_current(store: Database) -> None:
+    """save_prompt_version inserts a version; the latest version is current."""
     _seed_agent(store, "alpha")
-    prompts_service.save_draft("alpha", "draft body", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions, author="tester")
-    payload = prompts_service.list_versions("alpha", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions)
-    assert payload["draft_version"] is not None
-    fetched = prompts_service.get_version(
-        "alpha", payload["draft_version"], agent_defs=store.agent_defs, prompt_versions=store.prompt_versions
+    svc = AgentService()
+    v1 = svc.save_prompt_version("alpha", "first body", author="tester")
+    assert v1["version"] == 1
+    assert v1["content"] == "first body"
+
+    # Latest is current.
+    latest = svc.get_latest_prompt("alpha")
+    assert latest is not None
+    assert latest["version"] == 1
+
+    # Save a second version.
+    v2 = svc.save_prompt_version("alpha", "second body", author="tester")
+    assert v2["version"] == 2
+
+    latest2 = svc.get_latest_prompt("alpha")
+    assert latest2 is not None
+    assert latest2["version"] == 2
+
+    # All versions are listed newest first.
+    all_versions = svc.list_prompt_versions("alpha")
+    assert [v["version"] for v in all_versions] == [2, 1]
+
+
+def test_save_identical_content_is_noop(store: Database) -> None:
+    """Identical content produces no extra version."""
+    _seed_agent(store, "alpha")
+    svc = AgentService()
+    row1 = svc.save_prompt_version("alpha", "same body")
+    row2 = svc.save_prompt_version("alpha", "same body")
+    # No new row; same version returned.
+    assert row1["version"] == row2["version"]
+    assert len(svc.list_prompt_versions("alpha")) == 1
+
+
+def test_version_detail_has_no_is_draft_field(store: Database) -> None:
+    """PromptVersionDetail must not carry an is_draft field."""
+    _seed_agent(store, "alpha")
+    svc = AgentService()
+    svc.save_prompt_version("alpha", "content")
+    detail = prompts_service.get_version(
+        "alpha", 1, agent_defs=store.agent_defs, prompt_versions=store.prompt_versions
     )
-    assert fetched is not None
-    assert fetched["content"] == "draft body"
-    assert fetched["is_draft"] is True
+    assert detail is not None
+    assert "is_draft" not in detail
+
+
+def test_list_versions_payload_has_no_draft_version_key(store: Database) -> None:
+    """PromptVersionListResult must not carry a draft_version field."""
+    _seed_agent(store, "alpha")
+    payload = prompts_service.list_versions(
+        "alpha", agent_defs=store.agent_defs, prompt_versions=store.prompt_versions
+    )
+    assert "draft_version" not in payload

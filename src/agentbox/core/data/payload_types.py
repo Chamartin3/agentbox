@@ -397,7 +397,6 @@ class PromptVersionSummary(TypedDict):
     """One entry in ``PromptVersionListResult.versions``."""
 
     version: int
-    is_draft: bool
     created_at: str
     author: str
     changelog: str
@@ -405,11 +404,13 @@ class PromptVersionSummary(TypedDict):
 
 
 class PromptVersionListResult(TypedDict):
-    """Return shape of ``prompts.list_versions()``."""
+    """Return shape of ``prompts.list_versions()``.
+
+    ``active_version`` is the latest version number (latest = current).
+    """
 
     agent_id: str
     active_version: int | None
-    draft_version: int | None
     versions: list[PromptVersionSummary]
 
 
@@ -417,7 +418,6 @@ class PromptVersionDetail(TypedDict):
     """Return shape of ``prompts.get_version()``."""
 
     version: int
-    is_draft: bool
     created_at: str
     author: str
     changelog: str

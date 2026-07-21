@@ -232,38 +232,24 @@ export default function AgentDetailPage() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
-        if (promptDirty) saveDraft();
+        if (promptDirty) savePrompt();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [promptDirty, prompt]);
 
-  const saveDraft = async () => {
+  const savePrompt = async () => {
     if (!id) return;
     try {
-      const v = await versionsApi.savePromptRevision(id, prompt, changelog || 'draft from UI', false);
+      const v = await versionsApi.savePromptRevision(id, prompt, changelog || 'save from UI', true);
       setPromptDirty(false);
       setChangelog('');
-      flash('ok', `draft v${v.version} created`);
+      flash('ok', `saved v${v.version}`);
       await loadVersions();
       await loadAgent();
     } catch (e) {
-      flash('error', `draft save failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const publish = async () => {
-    if (!id) return;
-    try {
-      const v = await versionsApi.savePromptRevision(id, prompt, changelog || 'publish from UI', true);
-      setPromptDirty(false);
-      setChangelog('');
-      flash('ok', `published v${v.version}`);
-      await loadVersions();
-      await loadAgent();
-    } catch (e) {
-      flash('error', `publish failed: ${e instanceof Error ? e.message : String(e)}`);
+      flash('error', `save failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -385,12 +371,12 @@ export default function AgentDetailPage() {
                     </span>
                   )}
                   <button
-                    onClick={saveDraft}
+                    onClick={savePrompt}
                     disabled={!promptDirty || loadingPrompt}
                     className="primary"
                     style={{ fontSize: 11, padding: '4px 10px' }}
                   >
-                    Save Draft
+                    Save
                   </button>
                 </div>
               </div>
@@ -415,8 +401,8 @@ export default function AgentDetailPage() {
                       placeholder="Changelog (optional)"
                       style={{ flex: 1, maxWidth: 300 }}
                     />
-                    <button onClick={publish} disabled={loadingPrompt}>
-                      Publish
+                    <button onClick={savePrompt} disabled={loadingPrompt}>
+                      Save
                     </button>
                   </div>
 

@@ -613,12 +613,9 @@ def list_versions(
     """Return the version-list payload for the prompt-versions endpoint."""
     _resolve_or_raise(agent_id, agent_defs=agent_defs)
     versions = prompt_versions.list_for_agent(agent_id)
-    committed = [v for v in versions if not v["is_draft"]]
-    drafts = [v for v in versions if v["is_draft"]]
     version_summaries: list[PromptVersionSummary] = [
         PromptVersionSummary(
             version=v["version"],
-            is_draft=bool(v["is_draft"]),
             created_at=v["created_at"],
             author=v["author"],
             changelog=v["changelog"],
@@ -628,8 +625,7 @@ def list_versions(
     ]
     return PromptVersionListResult(
         agent_id=agent_id,
-        active_version=committed[0]["version"] if committed else None,
-        draft_version=drafts[0]["version"] if drafts else None,
+        active_version=versions[0]["version"] if versions else None,
         versions=version_summaries,
     )
 
@@ -648,7 +644,6 @@ def get_version(
         return None
     return PromptVersionDetail(
         version=v["version"],
-        is_draft=bool(v["is_draft"]),
         created_at=v["created_at"],
         author=v["author"],
         changelog=v["changelog"],
@@ -665,61 +660,15 @@ def put_prompt(
     prompt_versions: PromptVersionManager,
     author: str = "api",
 ) -> PromptDoc:
-    """Capture a new committed prompt version when content changed."""
+    """Capture a new prompt version when content changed (content-hash dedup)."""
     _resolve_or_raise(agent_id, agent_defs=agent_defs)
-    new_hash = hashlib.sha256(content.encode()).hexdigest()
-    latest = prompt_versions.get_latest_committed(agent_id)
-    if latest is not None:
-        existing_hash = latest.get("content_hash") or hashlib.sha256(
-            latest["content"].encode()
-        ).hexdigest()
-        if existing_hash != new_hash:
-            prompt_versions.insert_committed(
-                agent_id,
-                content=content,
-                content_hash=new_hash,
-                author=author,
-                changelog="prompt update",
-                created_at=now_iso(),
-                delete_drafts=False,
-            )
-    else:
-        prompt_versions.insert_committed(
-            agent_id,
-            content=content,
-            content_hash=new_hash,
-            author=author,
-            changelog="initial prompt",
-            created_at=now_iso(),
-            delete_drafts=False,
-        )
-    return PromptDoc(path="", content=content, size=len(content.encode("utf-8")), mtime=now_iso())
-
-
-def save_draft(
-    agent_id: str,
-    content: str,
-    *,
-    agent_defs: AgentDefManager,
-    prompt_versions: PromptVersionManager,
-    author: str = "system",
-) -> PromptDoc:
-    """Save a draft prompt version for an agent."""
-    _resolve_or_raise(agent_id, agent_defs=agent_defs)
-    return _prompts.save_draft(agent_id, prompt_versions, content, author=author)
-
-
-def publish(
-    agent_id: str,
-    *,
-    agent_defs: AgentDefManager,
-    prompt_versions: PromptVersionManager,
-    changelog: str = "",
-    author: str = "system",
-) -> PromptDoc:
-    """Publish the current draft as a committed version."""
-    _resolve_or_raise(agent_id, agent_defs=agent_defs)
-    return _prompts.publish(agent_id, prompt_versions, changelog=changelog, author=author)
+    return _prompts.save_version(
+        agent_id,
+        prompt_versions,
+        content,
+        author=author,
+        changelog="prompt update",
+    )
 
 
 def rollback(
@@ -730,7 +679,7 @@ def rollback(
     prompt_versions: PromptVersionManager,
     author: str = "system",
 ) -> PromptDoc:
-    """Roll back to a previous committed version."""
+    """Roll back by inserting a new version cloning ``target_version``'s content."""
     _resolve_or_raise(agent_id, agent_defs=agent_defs)
     return _prompts.rollback(agent_id, prompt_versions, target_version=target_version, author=author)
 
@@ -1984,58 +1933,52 @@ class AgentService(Service):
     def get_prompt_version(self, agent_id: str, version: int) -> PromptVersionRow | None:
         return self._prompts.get_by_number(agent_id, version)
 
+    def get_latest_prompt(self, agent_id: str) -> PromptVersionRow | None:
+        """Return the latest prompt version row (latest = current)."""
+        return self._prompts.get_latest(agent_id)
+
+    # Backward-compatible alias — callers still use the old name.
     def get_latest_committed_prompt(self, agent_id: str) -> PromptVersionRow | None:
-        return self._prompts.get_latest_committed(agent_id)
+        return self._prompts.get_latest(agent_id)
 
-    def get_prompt_draft(self, agent_id: str) -> PromptVersionRow | None:
-        return self._prompts.get_draft(agent_id)
-
-    def save_prompt_draft(
-        self, agent_id: str, content: str, author: str = "system"
+    def save_prompt_version(
+        self, agent_id: str, content: str, author: str = "system", changelog: str = "prompt update"
     ) -> PromptVersionRow:
-        """Save or replace the agent's single prompt draft."""
-        return self._prompts.replace_draft(
+        """Insert a new prompt version if content changed (content-hash dedup).
+
+        Returns the latest row (new or existing) after the upsert.
+        """
+        new_hash = _hash_content(content)
+        latest = self._prompts.get_latest(agent_id)
+        if latest is not None:
+            existing_hash = latest.get("content_hash") or _hash_content(latest["content"])
+            if existing_hash == new_hash:
+                return latest  # no-op
+        return self._prompts.insert_version(
             agent_id,
             content=content,
-            content_hash=_hash_content(content),
+            content_hash=new_hash,
             author=author,
-            changelog="",
+            changelog=changelog,
             created_at=now_iso(),
         )
-
-    def publish_prompt(
-        self, agent_id: str, changelog: str = "", author: str = "system"
-    ) -> PromptVersionRow:
-        """Commit the current draft as a published version. Raises if none."""
-        draft = self._prompts.get_draft(agent_id)
-        if not draft:
-            raise ValueError(f"No draft found for agent {agent_id!r}")
-        self._prompts.patch(
-            draft["id"], is_draft=0, changelog=changelog, created_at=now_iso()
-        )
-        result = self._prompts.get_by_number(agent_id, draft["version"])
-        assert result is not None, f"prompt version {draft['version']} not found after publish for agent {agent_id!r}"
-        return result
 
     def rollback_prompt(
         self, agent_id: str, target_version: int, author: str = "system"
     ) -> PromptVersionRow:
-        """Commit a new version copying ``target_version``'s content."""
+        """Insert a new version cloning ``target_version``'s content."""
         target = self._prompts.get_by_number(agent_id, target_version)
         if not target:
             raise ValueError(
                 f"Version {target_version} not found for agent {agent_id!r}"
             )
-        if target["is_draft"]:
-            raise ValueError(f"Cannot rollback to a draft version ({target_version})")
-        return self._prompts.insert_committed(
+        return self._prompts.insert_version(
             agent_id,
             content=target["content"],
             content_hash=_hash_content(target["content"]),
             author=author,
             changelog=f"Rollback to version {target_version}",
             created_at=now_iso(),
-            delete_drafts=True,
         )
 
     # ── API prompt-payload methods (for api/agents/prompts.py) ────────
@@ -2055,7 +1998,7 @@ class AgentService(Service):
     def put_prompt_doc(
         self, agent_id: str, content: str, *, author: str = "api"
     ) -> PromptDoc:
-        """Capture a new committed prompt version when content changed."""
+        """Capture a new prompt version when content changed (content-hash dedup)."""
         return put_prompt(
             agent_id,
             content,
@@ -2083,34 +2026,10 @@ class AgentService(Service):
             prompt_versions=self._prompts,
         )
 
-    def save_prompt_draft_doc(
-        self, agent_id: str, content: str, *, author: str = "system"
-    ) -> PromptDoc:
-        """Save a draft prompt version and return the API payload shape."""
-        return save_draft(
-            agent_id,
-            content,
-            agent_defs=self._db.agent_defs,
-            prompt_versions=self._prompts,
-            author=author,
-        )
-
-    def publish_prompt_doc(
-        self, agent_id: str, *, changelog: str = "", author: str = "system"
-    ) -> PromptDoc:
-        """Publish the current draft as a committed version (API payload shape)."""
-        return publish(
-            agent_id,
-            agent_defs=self._db.agent_defs,
-            prompt_versions=self._prompts,
-            changelog=changelog,
-            author=author,
-        )
-
     def rollback_prompt_doc(
         self, agent_id: str, target_version: int, *, author: str = "system"
     ) -> PromptDoc:
-        """Roll back to a previous committed version (API payload shape)."""
+        """Roll back by inserting a new version cloning ``target_version``'s content."""
         return rollback(
             agent_id,
             target_version,
@@ -2129,10 +2048,10 @@ class AgentService(Service):
         """Capture an on-disk prompt as a committed version if it changed.
 
         Returns ``None`` (leaving the DB untouched) when the content matches
-        the latest committed version by hash.
+        the latest version by hash.
         """
         new_hash = _hash_content(content)
-        latest = self._prompts.get_latest_committed(agent_id)
+        latest = self._prompts.get_latest(agent_id)
         if latest is not None:
             existing_hash = latest.get("content_hash") or _hash_content(
                 latest["content"]
@@ -2142,14 +2061,13 @@ class AgentService(Service):
             default_changelog = "Out-of-band file edit"
         else:
             default_changelog = "Imported from disk"
-        return self._prompts.insert_committed(
+        return self._prompts.insert_version(
             agent_id,
             content=content,
             content_hash=new_hash,
             author=author,
             changelog=changelog if changelog is not None else default_changelog,
             created_at=now_iso(),
-            delete_drafts=False,
         )
 
     # ── sync metadata ──────────────────────────────────────────────────

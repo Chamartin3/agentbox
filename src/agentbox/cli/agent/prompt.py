@@ -1,4 +1,4 @@
-"""Agent prompts — show, edit, log, draft, publish, rollback."""
+"""Agent prompts — show, edit, log, save, rollback."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from agentbox.core.service import (
 
 prompt_app = typer.Typer(
     name="prompt",
-    help="Manage system prompts: show, edit, log, draft, publish, rollback.",
+    help="Manage system prompts: show, edit, log, save, rollback.",
     no_args_is_help=True,
 )
 
@@ -23,7 +23,7 @@ def prompt_show(
     ctx: typer.Context,
     agent_id: str = typer.Argument(..., help="Agent ID"),
     version: int | None = typer.Option(
-        None, "--version", help="Show a specific committed version"
+        None, "--version", help="Show a specific version"
     ),
 ) -> None:
     """Show the active system prompt for an agent (or a specific version)."""
@@ -84,8 +84,7 @@ def prompt_log(
         obj.render.agent.error(f"unknown agent {agent_id!r}")
         raise typer.Exit(1)
 
-    committed: list[dict[str, object]] = [dict(v) for v in all_versions if not v.get("is_draft")]
-    drafts: list[dict[str, object]] = [dict(v) for v in all_versions if v.get("is_draft")]
+    versions: list[dict[str, object]] = [dict(v) for v in all_versions]
 
     if version is not None:
         ver = obj.agents.get_prompt_version(agent_id, version)
@@ -99,55 +98,29 @@ def prompt_log(
         )
         return
 
-    if not committed and not drafts:
+    if not versions:
         obj.render.agent.warn("No prompt versions.")
         return
 
-    if committed:
-        obj.render.agent.prompt_versions_table("Committed", committed)
-
-    if drafts:
-        obj.render.agent.prompt_drafts_table(drafts)
+    obj.render.agent.prompt_versions_table("Versions", versions)
 
 
-@prompt_app.command("draft")
-def prompt_draft(
+@prompt_app.command("save")
+def prompt_save(
     ctx: typer.Context,
     agent_id: str = typer.Argument(..., help="Agent ID"),
-    content: str = typer.Argument(..., help="Draft content"),
+    content: str = typer.Argument(..., help="Prompt content"),
     author: str = typer.Option("cli", "--author", help="Author identifier"),
+    changelog: str = typer.Option("", "--changelog", help="Change description"),
 ) -> None:
-    """Save a draft prompt (not published until publish is called)."""
+    """Save a prompt version (no-op if content unchanged)."""
     obj: CLIContext = ctx.obj
     try:
-        obj.agents.save_prompt_draft(agent_id, content, author=author)
+        obj.agents.save_prompt_version(agent_id, content, author=author, changelog=changelog or "prompt update")
     except AgentNotFound:
         obj.render.agent.error(f"unknown agent {agent_id!r}")
         raise typer.Exit(1)
-    obj.render.agent.prompt_draft_saved(agent_id)
-
-
-@prompt_app.command("publish")
-def prompt_publish(
-    ctx: typer.Context,
-    agent_id: str = typer.Argument(..., help="Agent ID"),
-    changelog: str = typer.Option("", "--changelog", help="Publish reason"),
-    author: str = typer.Option("cli", "--author", help="Author identifier"),
-) -> None:
-    """Publish the current draft as the active prompt."""
-    obj: CLIContext = ctx.obj
-    try:
-        obj.agents.publish_prompt(agent_id, changelog=changelog, author=author)
-    except AgentNotFound:
-        obj.render.agent.error(f"unknown agent {agent_id!r}")
-        raise typer.Exit(1)
-    except ValueError as exc:
-        obj.render.agent.error(f"no draft to publish: {exc}")
-        raise typer.Exit(1)
-    except PromptError as exc:
-        obj.render.agent.error(f"{exc.code}: {exc.detail}")
-        raise typer.Exit(1)
-    obj.render.agent.prompt_published(agent_id)
+    obj.render.agent.prompt_updated(agent_id)
 
 
 @prompt_app.command("rollback")
