@@ -35,7 +35,7 @@ DEFAULT_EXCLUDES = (
     "node_modules/*",
     ".venv/*",
 )
-MAX_BYTES_PER_BLOB = 50 * 1024 * 1024  # 50 MB cap per blob (plan §Open questions)
+MAX_BYTES_PER_BLOB = 50 * 1024 * 1024  # 50 MB cap per blob
 
 
 def _is_text_mime(mime: str | None) -> bool:
