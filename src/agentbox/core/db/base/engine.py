@@ -15,7 +15,7 @@ from pathlib import Path
 import agentbox
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, inspect
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.constants import RunStatus
@@ -91,8 +91,16 @@ def _run_alembic_migrations(engine: Engine, db_path: Path) -> None:
 
         if migrations_dir is not None:
             alembic_cfg.set_main_option("script_location", str(migrations_dir))
-            command.upgrade(alembic_cfg, "head")
-            logger.debug("alembic: upgraded to head")
+            if inspect(engine).has_table("alembic_version"):
+                command.upgrade(alembic_cfg, "head")
+                logger.debug("alembic: upgraded to head")
+            else:
+                # Fresh DB: 0001 materializes the schema from live entity
+                # metadata, so replaying 0002+ against an already-current
+                # schema breaks. Build directly and stamp head instead.
+                metadata.create_all(engine)
+                command.stamp(alembic_cfg, "head")
+                logger.debug("alembic: fresh database — created schema and stamped head")
         else:
             logger.warning(
                 "alembic: migrations directory not found in %s — falling back to create_all",

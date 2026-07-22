@@ -152,7 +152,7 @@ def test_run_interactive_dispatches_to_launch_session(
         launch_calls.append(dict(kwargs))
         return 0
 
-    monkeypatch.setattr(_run_mod, "_launch_session", _mock_launch_session)
+    monkeypatch.setattr(_run_mod, "launch_session", _mock_launch_session)
 
     # CliRunner intercepts sys.exit() — result.exit_code reflects the return value
     result = runner.invoke(app, ["run", "claude-agent"])
@@ -171,7 +171,7 @@ def test_run_interactive_backend_flag(store_fixture, monkeypatch: pytest.MonkeyP
         launch_calls.append(dict(kwargs))
         return 0
 
-    monkeypatch.setattr(_run_mod, "_launch_session", _mock_launch_session)
+    monkeypatch.setattr(_run_mod, "launch_session", _mock_launch_session)
 
     result = runner.invoke(app, ["run", "--backend", "claude", "--ephemeral"])
     assert len(launch_calls) > 0 or result.exit_code == 0, (
