@@ -80,12 +80,42 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
     def add_agent_version_rating(
         version_id: int, rating: int, reason: str = "", rater: str = "mcp"
     ) -> dict:
-        """Rate an agent version (1–5)."""
+        """Rate an agent version (1–5).
+
+        A non-empty ``reason`` is also stored as a version comment (the ratings
+        table has no reason column, so previously it was silently dropped).
+        """
         if not 1 <= rating <= 5:
             return {"error": "rating must be 1–5"}
         try:
             ctx.agents.set_rating(version_id, rating, rater=rater)
-            return {"version_id": version_id, "rating": rating, "rater": rater}
+            comment = None
+            if reason and reason.strip():
+                comment = ctx.agents.add_comment(version_id, rater, reason)
+            return {
+                "version_id": version_id,
+                "rating": rating,
+                "rater": rater,
+                "comment": comment,
+            }
+        except Exception as exc:
+            return {"error": str(exc), "version_id": version_id}
+
+    @mcp.tool
+    def add_agent_version_comment(
+        version_id: int, body: str, author: str = "mcp"
+    ) -> dict:
+        """Append a text comment to an agent version.
+
+        ``body`` is required and non-empty; ``author`` defaults to ``"mcp"`` —
+        pass a reviewer/agent name for provenance. Registered comments are
+        returned by ``list_agent_version_ratings``.
+        """
+        if not body or not body.strip():
+            return {"error": "empty_body"}
+        try:
+            row = ctx.agents.add_comment(version_id, author, body)
+            return {"version_id": version_id, "comment": row}
         except Exception as exc:
             return {"error": str(exc), "version_id": version_id}
 

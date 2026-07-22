@@ -470,8 +470,12 @@ class AgentVersionRatingManager(Manager[AgentVersionRating]):
 			return _rating_row(row) if row else None
 
 	def insert(self, **fields: Unpack[_AgentVersionRatingFields]) -> None:
+		# ``version_id`` is the PK (one rating per version) — INSERT OR REPLACE
+		# so re-rating updates in place instead of raising an IntegrityError.
 		with self._engine.begin() as conn:
-			conn.execute(agent_version_ratings.insert().values(**fields))
+			conn.execute(
+				agent_version_ratings.insert().prefix_with("OR REPLACE").values(**fields)
+			)
 
 
 class AgentVersionCommentManager(Manager[AgentVersionComment]):
