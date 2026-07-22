@@ -53,9 +53,11 @@ COPY --from=web /web/dist /opt/agentbox/src/agentbox/ui/static/dist
 
 RUN pip install --no-cache-dir -e . websockets
 
-# Writable, appuser-owned dirs. Backends create their own state dirs at
-# runtime under the home dir — no backend-specific paths pre-created here.
-RUN mkdir -p /data /project \
+# Writable, appuser-owned dirs. The opencode state dir is pre-created so that
+# consumers bind-mounting an auth.json into ~/.local/share/opencode/ don't make
+# Docker auto-create the parent chain as root — which would leave opencode (the
+# appuser process) unable to mkdir its log/repos siblings at runtime.
+RUN mkdir -p /data /project /home/appuser/.local/share/opencode /home/appuser/.config/opencode \
  && chown -R appuser:appuser /data /opt/agentbox /home/appuser
 
 # Generic entrypoint runs any drop-in bootstrap scripts then execs the CMD.

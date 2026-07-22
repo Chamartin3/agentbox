@@ -251,19 +251,24 @@ def def_edit(
 
     updated.source_path = current.source_path
     updated.source_format = current.source_format
-    snapshot = obj.agents.build_snapshot(updated)
-    rec = obj.agents.create_version(
+    # Persist through the SAME service path as ``agent def new`` so the DB-first
+    # fields (``config_json`` + ``prompt_content``) are written. The previous
+    # ``create_version(content_snapshot=..., prompt_snapshot="")`` call left both
+    # NULL, and DB-first resolution then read an empty, broken agent.
+    rec = obj.agents.add_agent_version(
         agent_id=updated.id,
-        source_path=str(updated.source_path) if updated.source_path else "",
-        source_format=(
-            updated.source_format.value if updated.source_format else "unknown"
-        ),
-        content_snapshot=snapshot,
-        prompt_snapshot="",
-        content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
+        config_json={
+            **updated.model_dump(mode="json", exclude_none=True),
+            **obj.agents.build_config_payload(updated),
+        },
+        prompt_content=updated.prompt,
         author=author,
         changelog=changelog,
-        files=None,
+        source="cli",
+        source_path=str(updated.source_path) if updated.source_path else None,
+        source_format=(
+            updated.source_format.value if updated.source_format else None
+        ),
     )
     obj.render.agent.version_edit_new(updated.id, rec["version"])
 

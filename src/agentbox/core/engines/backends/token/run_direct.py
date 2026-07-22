@@ -15,6 +15,7 @@ the original 993-LOC module.
 from __future__ import annotations
 
 import contextlib
+import inspect
 import json
 import time
 from collections.abc import AsyncIterator
@@ -22,6 +23,13 @@ from typing import Any
 
 from pydantic import ValidationError
 from pydantic_ai import Agent, NativeOutput, PromptedOutput, RunContext
+
+# pydantic-ai dropped the ``output_retries`` kwarg in 2.19; the output-only
+# retry budget now lives under the unified ``retries`` param as
+# ``retries={"output": N}``. Detect the installed API once at import.
+_AGENT_HAS_OUTPUT_RETRIES = (
+    "output_retries" in inspect.signature(Agent.__init__).parameters
+)
 # OpenAIChatModel is pydantic-ai's canonical class; the old OpenAIModel name is
 # now a deprecated subclass. Import the canonical name (aliased for local use).
 from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
@@ -215,7 +223,13 @@ async def run_direct_agent_mode(
     if wrapped_output_type is not None:
         common_kwargs["output_type"] = wrapped_output_type
     if isinstance(output_retries, int) and output_retries > 0:
-        common_kwargs["output_retries"] = output_retries
+        # ``retries={"output": N}`` (pydantic-ai >=2.19) is the exact successor
+        # of the old ``output_retries=N`` — an output-only budget that leaves
+        # per-tool retries at their default.
+        if _AGENT_HAS_OUTPUT_RETRIES:
+            common_kwargs["output_retries"] = output_retries
+        else:
+            common_kwargs["retries"] = {"output": output_retries}
 
     # Runner-profile ``params`` map 1:1 onto pydantic-ai ModelSettings keys
     # (max_tokens, temperature, extra_body, ...). Passing them as model_settings

@@ -36,6 +36,16 @@ from agentbox.core.tools.grants import GrantViolation, check_capability
 
 logger = logging.getLogger(__name__)
 
+# Aliases mapping ``new_name -> canonical_name`` for tools whose canonical name
+# contains a ``.`` (illegal in OpenAI function-call names). Passed to
+# ``MCPToolset.renamed`` so OpenAI-compatible providers see e.g. ``http_fetch``
+# while dispatch still targets the server's ``http.fetch``.
+_OPENAI_SAFE_TOOL_NAMES = {
+    tool.value.replace(".", "_"): tool.value
+    for tool in CanonicalTool
+    if "." in tool.value
+}
+
 
 def _coerce_to_text(result: Any) -> str:
     """Flatten an MCP tool result to a string for Ollama compatibility.
@@ -118,7 +128,14 @@ def build_host_env_toolsets(
             id=HOST_ENV_SERVER_NAME,
             process_tool_call=_stringify_tool_result,
         )
-        return [toolset]
+        # OpenAI-compat shim (sibling of the Ollama shims above). OpenAI's
+        # function-calling API rejects tool names that don't match
+        # ``^[a-zA-Z0-9_-]+$`` — so the bare canonical names (``fs.read``,
+        # ``http.fetch``) 400 the request before the model can call anything.
+        # Present dot-free aliases (``fs_read``, ``http_fetch``) and let
+        # ``renamed`` translate back to the canonical name on dispatch. Unmapped
+        # tools keep their name, so this is safe for the whole catalog.
+        return [toolset.renamed(_OPENAI_SAFE_TOOL_NAMES)]
     except Exception:
         logger.warning(
             "token backend: could not build host-env MCP toolset; "

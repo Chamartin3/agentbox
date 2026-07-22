@@ -202,7 +202,16 @@ def boot_import_resources(
 def sync_workspace_registry() -> StartupReport:
     """Prune phantom workspace rows that no real subsystem references."""
     try:
-        pruned = WorkspaceService().prune_phantoms(keep={"default"})
+        # A workspace named by an active agent's ``workspace`` field is not a
+        # phantom: without its registry row, run setup resolves the name to
+        # ``<project_root>/<name>`` (typically unwritable) instead of the
+        # intended ``<workspaces_root>/<name>``. Keep every referenced name.
+        referenced = {
+            agent.workspace
+            for agent in AgentService().list_all_agents()
+            if agent.workspace and agent.workspace != "<ephemeral>"
+        }
+        pruned = WorkspaceService().prune_phantoms(keep={"default", *referenced})
     except Exception as exc:
         _log.exception("workspaces registry sync failed")
         return _error("sync_workspace_registry", exc)

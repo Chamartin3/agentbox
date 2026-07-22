@@ -7,6 +7,7 @@ from typing import Any
 from agentbox.core.data.constants import BackendName
 import agentbox.core.engines.providers.anthropic as anthropic
 import agentbox.core.engines.providers.cli as cli
+import agentbox.core.engines.providers.deepseek as deepseek
 import agentbox.core.engines.providers.google as google
 import agentbox.core.engines.providers.ollama as ollama
 import agentbox.core.engines.providers.openai as openai
@@ -73,6 +74,7 @@ def _initialize_providers() -> None:
     _PROVIDERS["google"] = google.GoogleAdapter()
     _PROVIDERS["openrouter"] = openrouter.OpenRouterAdapter()
     _PROVIDERS["xai"] = xai.XAIAdapter()
+    _PROVIDERS["deepseek"] = deepseek.DeepSeekAdapter()
     _PROVIDERS["ollama"] = ollama.OllamaAdapter()
     _PROVIDERS[BackendName.CODEX] = cli.CodexCLIAdapter()
 

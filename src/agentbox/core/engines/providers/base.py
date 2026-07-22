@@ -38,6 +38,7 @@ class Provider(str, Enum):  # noqa: UP042
     GOOGLE = "google"
     OPENROUTER = "openrouter"
     XAI = "xai"
+    DEEPSEEK = "deepseek"
     OLLAMA = "ollama"
     CODEX = "codex"
 

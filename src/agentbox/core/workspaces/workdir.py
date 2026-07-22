@@ -78,7 +78,12 @@ def resolve_path(
             row_path = row.get("path") if row else None
             if row_path:
                 return settings.project_root / row_path, False
-        return settings.project_root / agent.workspace, False
+        # Bare named workspace (unregistered, or registered without an explicit
+        # relative path) lives under the writable workspaces root — matching
+        # resolve_launch_target and the omitted-workspace case below. Resolving
+        # it to ``<project_root>/<name>`` would land outside the mounted, writable
+        # workspaces dir and fail with PermissionError at mkdir.
+        return settings.workspaces_root / agent.workspace, False
 
     return settings.workspaces_root / agent.id, False
 
