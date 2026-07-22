@@ -55,6 +55,7 @@ from agentbox.core.db.workspaces import (
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
     WorkspaceMcpToolOverrideManager,
+    WorkspaceCredentialManager,
     WorkspaceReadManager,
     WorkspaceRuntimePermissionManager,
     WorkspaceSubagentManager,
@@ -72,6 +73,7 @@ from agentbox.core.db.system import (
     ApiTokenManager,
     HostEnvCallLogManager,
     HostEnvProfileManager,
+    ManagedCredentialManager,
     McpToolDiscoveryCacheManager,
     SettingManager,
 )
@@ -106,6 +108,7 @@ __all__ = [
     "WorkspaceMcpOverrideManager",
     "WorkspaceMcpPolicyManager",
     "WorkspaceMcpToolOverrideManager",
+    "WorkspaceCredentialManager",
     "WorkspaceReadManager",
     "WorkspaceRuntimePermissionManager",
     "WorkspaceSubagentManager",
@@ -122,6 +125,7 @@ __all__ = [
     "ApiTokenManager",
     "HostEnvCallLogManager",
     "HostEnvProfileManager",
+    "ManagedCredentialManager",
     "McpToolDiscoveryCacheManager",
     "SettingManager",
 ]

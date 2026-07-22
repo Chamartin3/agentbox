@@ -7,7 +7,6 @@ events from the OpenCode subprocess directly.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -23,6 +22,7 @@ from agentbox.core.data.events import (
     RunEvent,
 )
 from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.engines.backends.credenv import build_run_env
 from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.opencode.render import build_opencode_items
 from agentbox.core.engines.backends.opencode.tools import (
@@ -215,7 +215,7 @@ class OpenCodeBackend(BackendAdapter):
             argv += ["--model", model]
         argv += extra_args
 
-        env = dict(os.environ)
+        env = build_run_env(creds)
         env["PWD"] = str(workdir)
 
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)

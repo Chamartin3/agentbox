@@ -20,6 +20,7 @@ from agentbox.core.data.events import (
     TimeoutEvent,
 )
 from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.engines.backends.credenv import build_run_env
 from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.claude_code.render import (
     _runtime_config_view_from_agent,
@@ -112,7 +113,9 @@ class ClaudeCodeBackend(BackendAdapter):
         argv += ["--output-format", "json", "--permission-mode", "bypassPermissions"]
         argv += extra_args
 
-        env = dict(os.environ)
+        env = build_run_env(creds)
+        # claude_code authenticates via OAuth (CLAUDE_CONFIG_DIR); an ambient
+        # ANTHROPIC_API_KEY would override it, so always drop it.
         for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             env.pop(k, None)
 

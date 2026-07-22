@@ -8,6 +8,7 @@ from agentbox.api.context import APIContext
 from agentbox.core.config import Settings, load_settings
 from agentbox.core.service import (
     AgentService,
+    CredentialService,
     EngineService,
     EvaluationService,
     ExecutionService,
@@ -90,4 +91,5 @@ def get_api_context() -> APIContext:
         engines=EngineService(),
         evaluation=EvaluationService(),
         system=SystemService(),
+        credentials=CredentialService(),
     )

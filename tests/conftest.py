@@ -241,6 +241,11 @@ def _scrub_agentbox_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in list(os.environ):
         if key.startswith("AGENTBOX_") and key != "AGENTBOX_DEBUG":
             monkeypatch.delenv(key, raising=False)
+    # Deterministic Fernet key from env so secret encryption never falls back
+    # to writing a master.key file under the (unwritable) default creds_dir.
+    monkeypatch.setenv(
+        "AGENTBOX_SECRET_KEY", "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+    )
 
 
 @pytest.fixture(autouse=True)

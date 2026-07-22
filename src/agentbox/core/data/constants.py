@@ -344,3 +344,25 @@ Cross-domain constant: consumed by both the claude_code engine adapter and
 the workspaces layer. Lives here (the leaf) so neither domain imports the
 other.
 """
+
+# ── Provider credential env vars ──────────────────────────────────────────────
+
+PROVIDER_KEY_ENV_VARS: frozenset[str] = frozenset(
+    {
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "GOOGLE_API_KEY",
+        "XAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "OPENROUTER_API_KEY",
+    }
+)
+"""Provider API-key env vars that leak from the container env into every run.
+
+The executor scrubs these from a run's base env and re-injects only the
+credentials the run's workspace enabled — turning "every agent sees every
+key" into per-workspace least privilege. Lives in the data leaf so both the
+engine adapters and the execution layer can read it without importing each
+other.
+"""

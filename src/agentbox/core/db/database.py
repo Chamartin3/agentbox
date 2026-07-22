@@ -65,10 +65,12 @@ from agentbox.core.db.system import (
     ApiTokenManager,
     HostEnvCallLogManager,
     HostEnvProfileManager,
+    ManagedCredentialManager,
     McpToolDiscoveryCacheManager,
     SettingManager,
 )
 from agentbox.core.db.workspaces import (
+    WorkspaceCredentialManager,
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
     WorkspaceManager,
@@ -145,6 +147,7 @@ class Database:
         self.workspace_mcp_tool_overrides = WorkspaceMcpToolOverrideManager(self._engine)
         self.workspace_mcp_policies = WorkspaceMcpPolicyManager(self._engine)
         self.workspace_runtime_permissions = WorkspaceRuntimePermissionManager(self._engine)
+        self.workspace_credentials = WorkspaceCredentialManager(self._engine)
         self.workspace_subagents = WorkspaceSubagentManager(self._engine)
         self.workspace_read = WorkspaceReadManager(self._engine)
 
@@ -161,6 +164,7 @@ class Database:
 
         # System domain
         self.api_tokens = ApiTokenManager(self._engine)
+        self.managed_credentials = ManagedCredentialManager(self._engine)
         self.settings = SettingManager(self._engine)
         self.host_env_profiles = HostEnvProfileManager(self._engine)
         self.host_env_call_log = HostEnvCallLogManager(self._engine)

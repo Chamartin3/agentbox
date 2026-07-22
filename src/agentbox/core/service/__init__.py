@@ -97,6 +97,9 @@ from agentbox.core.service.engines import ProfileNotFound as ProfileNotFound
 # ── System service ────────────────────────────────────────────────────
 from agentbox.core.service.system import SystemService as SystemService
 
+# ── Credential service ────────────────────────────────────────────────
+from agentbox.core.service.credentials import CredentialService as CredentialService
+
 # ── Resources service ────────────────────────────────────────
 from agentbox.core.service.resources import ResourceService as ResourceService
 from agentbox.core.service.resources import InvalidResource as InvalidResource

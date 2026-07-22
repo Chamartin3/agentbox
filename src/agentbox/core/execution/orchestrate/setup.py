@@ -229,6 +229,20 @@ class RunSetup:
 
         ws_id = agent.workspace
 
+        # Per-workspace credential materialization. A workspace that has
+        # enabled ≥1 credential opts into least privilege: `creds` becomes the
+        # exact env-var set that workspace granted, and the adapter scrubs all
+        # other provider keys. An unconfigured workspace → `creds=None` → the
+        # run inherits the full container env (legacy, non-breaking).
+        # Lazy import avoids a load-time core.execution ↔ core.service cycle.
+        from agentbox.core.service.credentials import CredentialService  # noqa: PLC0415
+
+        creds: dict[str, str] | None = None
+        if ws_id:
+            _cs = CredentialService()
+            if _cs.list_workspace_credentials(ws_id):
+                creds = _cs.resolve_env_for_workspace(ws_id)
+
         def _try_backend(name: str) -> "BackendAdapter | None":
             try:
                 return resolve_engine(name)
@@ -270,6 +284,7 @@ class RunSetup:
             rendered = adapter.render(
                 agent,
                 workdir,
+                creds=creds,
                 runner_config=runner_config,
                 composed=_composed_view(composed),
                 runtime_config=runtime_config_view,

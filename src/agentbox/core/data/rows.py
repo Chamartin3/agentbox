@@ -621,6 +621,51 @@ class ApiTokenWithSecret(ApiTokenRow):
     secret: str
 
 
+class ManagedCredentialRow(TypedDict):
+    """A full row from ``managed_credentials`` (includes encrypted secret)."""
+
+    id: str
+    label: str
+    kind: str  # "api_key" | "login"
+    env_var: str | None
+    secret_encrypted: str
+    last_four: str
+    created_at: str
+    updated_at: str
+
+
+class ManagedCredentialPublicRow(TypedDict):
+    """Public view of a managed credential — never carries the secret."""
+
+    id: str
+    label: str
+    kind: str
+    env_var: str | None
+    last_four: str
+    created_at: str
+    updated_at: str
+
+
+class WorkspaceCredentialRow(TypedDict):
+    """A row from ``workspace_credentials`` — one enabled credential per workspace."""
+
+    workspace_id: str
+    credential_id: str
+    created_at: str
+    created_by: str | None
+
+
+class CredentialInventoryEntry(TypedDict):
+    """One credential the system knows about, from any source. Never a value."""
+
+    id: str
+    label: str
+    kind: str  # "api_key" | "login"
+    source: str  # "file" | "env" | "db"
+    env_var: str | None
+    state: str  # "present" | "missing" | "invalid"
+
+
 class HostEnvProfileRow(TypedDict):
     """A row from ``host_env_profiles``."""
 

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from agentbox.core.service import (
     AgentService,
+    CredentialService,
     EngineService,
     EvaluationService,
     ExecutionService,
@@ -35,3 +36,4 @@ class APIContext:
     engines: EngineService
     evaluation: EvaluationService
     system: SystemService
+    credentials: CredentialService

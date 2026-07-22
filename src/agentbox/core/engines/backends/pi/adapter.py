@@ -8,7 +8,6 @@ from __future__ import annotations
 from agentbox.core.data.jsontypes import RawJson
 
 import json
-import os
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -27,6 +26,7 @@ from agentbox.core.data.events import (
     UsageEvent,
 )
 from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.engines.backends.credenv import build_run_env
 from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.streaming.jsonl import stream_jsonl_subprocess
 from agentbox.core.data import CanonicalTool
@@ -254,7 +254,7 @@ class PiBackend(BackendAdapter):
 
         argv = build_pi_argv(model, extra_args, None)
 
-        env = dict(os.environ)
+        env = build_run_env(creds)
 
         # Inject a per-run custom-provider config so pi can reach a local
         # (non-cloud) provider like ollama. pi reads models.json from its agent

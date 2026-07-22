@@ -13,13 +13,9 @@ pure DB reads and writes.
 """
 from __future__ import annotations
 
-import base64
-import hashlib
 import json as _json
 import secrets as _secrets
 import uuid
-
-from cryptography.fernet import Fernet, InvalidToken
 
 from pathlib import Path
 
@@ -31,6 +27,7 @@ from agentbox.core.data.rows import (
     ApiTokenWithSecret,
     HostEnvCallLogRow,
 )
+from agentbox.core.service.crypto import fernet as _fernet
 from agentbox.core.service.base import Service
 
 
@@ -220,7 +217,7 @@ class SystemService(Service):
             raise ValueError("secret must be at least 4 characters")
         token_id = uuid.uuid4().hex
         ts = now_iso()
-        encrypted = self._fernet().encrypt(secret.encode()).decode()
+        encrypted = _fernet().encrypt(secret.encode()).decode()
         last_four = secret[-4:]
         return self._db.api_tokens.insert_token(
             token_id=token_id,
@@ -246,7 +243,7 @@ class SystemService(Service):
         if len(secret) < 4:
             raise ValueError("secret must be at least 4 characters")
         ts = now_iso()
-        encrypted = self._fernet().encrypt(secret.encode()).decode()
+        encrypted = _fernet().encrypt(secret.encode()).decode()
         last_four = secret[-4:]
         result = self._db.api_tokens.update_token_secret(
             token_id, encrypted, last_four, ts
@@ -259,19 +256,8 @@ class SystemService(Service):
         """Delete an API token. Returns True if a row was deleted."""
         return self._db.api_tokens.delete_token(token_id)
 
-    def reveal_api_token(self, token_id: str) -> str | None:
-        """Decrypt and return the plaintext secret. Use with extreme care."""
-        raw = self._db.api_tokens.get_token_secret_encrypted(token_id)
-        if raw is None:
-            return None
-        try:
-            return self._fernet().decrypt(raw.encode()).decode()
-        except InvalidToken:
-            return None
-
-    def _fernet(self) -> Fernet:
-        """Return a Fernet instance keyed from env or per-DB persisted key."""
-        return Fernet(_fernet_key(self))
+    # No reveal/extract path: token secrets flow in (create/rotate) and are
+    # used internally, never returned to a caller or a terminal.
 
     # ══════════════════════════════════════════════════════════════════
     # Host-env call log
@@ -306,33 +292,3 @@ class SystemService(Service):
     def list_host_env_calls_for_run(self, run_id: str) -> list[HostEnvCallLogRow]:
         """List all host-env call log entries for a run."""
         return self._db.host_env_call_log.list_calls_for_run(run_id)
-
-
-# ------------------------------------------------------------------
-# Fernet key derivation (module-level, extracted from ApiTokensMixin)
-# ------------------------------------------------------------------
-
-
-def _fernet_key(service: SystemService) -> bytes:
-    """Return a Fernet key. Prefers ``AGENTBOX_SECRET_KEY``; falls back to
-    a per-DB key persisted under settings(secrets, fernet_key).
-    """
-    env_val = SETTINGS.secret_key
-    if env_val:
-        try:
-            Fernet(env_val.encode())
-            return env_val.encode()
-        except (ValueError, Exception):
-            digest = hashlib.sha256(env_val.encode()).digest()
-            return base64.urlsafe_b64encode(digest)
-
-    existing = service.get_setting("secrets", "fernet_key")
-    if existing:
-        if isinstance(existing, bytes):
-            return existing
-        if isinstance(existing, str):
-            return existing.encode()
-    # No valid key stored → generate
-    new_key = Fernet.generate_key()
-    service.set_setting("secrets", "fernet_key", new_key.decode(), author="system")
-    return new_key

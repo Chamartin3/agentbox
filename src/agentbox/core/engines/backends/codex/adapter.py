@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from agentbox.core.data.jsontypes import RawJson
 
-import os
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -16,6 +15,7 @@ from typing import Any, ClassVar
 
 from agentbox.core.data.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.engines.backends.base import BackendAdapter
+from agentbox.core.engines.backends.credenv import build_run_env
 from agentbox.core.data import RenderedConfig
 from agentbox.core.data.workenv import Item
 from agentbox.core.engines.backends.codex.render import build_codex_items
@@ -160,7 +160,7 @@ class CodexBackend(BackendAdapter):
                 native_tools = [translate_tool(t, _CODEX_TOOLS) for t in effective_tools]
                 argv += ["--allowedTools", *native_tools]
 
-        env = dict(os.environ)
+        env = build_run_env(creds)
 
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 

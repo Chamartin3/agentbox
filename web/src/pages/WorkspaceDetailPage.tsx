@@ -8,16 +8,13 @@ import WorkspaceResourcesEditor from '../components/workspace/WorkspaceResources
 import WorkspaceSkillsEditor from '../components/workspace/WorkspaceSkillsEditor';
 import SubagentsEditor from '../components/workspace/SubagentsEditor';
 import WorkspaceMcpEditor from '../components/workspace/WorkspaceMcpEditor';
-import WorkspaceHostEnvEditor from '../components/workspace/WorkspaceHostEnvEditor';
+import WorkspaceCredentialsEditor from '../components/workspace/WorkspaceCredentialsEditor';
+import FileTree from '../components/workspace/FileTree';
+import Modal from '../components/common/Modal';
 
 interface WorkspaceFile {
   path: string;
   size: number;
-}
-
-interface GeneratedConfig {
-  path: string;
-  exists: boolean;
 }
 
 interface SkillItem {
@@ -40,7 +37,6 @@ export default function WorkspaceDetailPage() {
   // NOT belong on this page anymore.
   const [permissions, setPermissions] = useState<Record<string, any>>({});
   const [permissionsSaving, setPermissionsSaving] = useState(false);
-  const [builtinTools, setBuiltinTools] = useState<string[]>([]);
   const [subagentCount, setSubagentCount] = useState(0);
   const [bindingCount, setBindingCount] = useState(0);
 
@@ -54,10 +50,9 @@ export default function WorkspaceDetailPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [ws, perms, mcp, sk, subagents, bindings] = await Promise.all([
+      const [ws, perms, sk, subagents, bindings] = await Promise.all([
         api.getWorkspaceByName(id),
         api.getWorkspacePermissionsByName(id),
-        api.getWorkspaceMcpToolsByName(id),
         api.listWorkspaceSkillsByName(id),
         subagentsApi.list(id),
         apiRequestOrNull<{ items: unknown[] }>(
@@ -66,9 +61,6 @@ export default function WorkspaceDetailPage() {
       ]);
       setData(ws);
       setPermissions((perms as any).permissions || {});
-      // The MCP tools endpoint still ships the built-in-tools allow-list
-      // (it's the same registry); MCP groups are no longer rendered here.
-      setBuiltinTools((mcp as any).builtin_tools || []);
       setSkills((sk as any).skills || []);
       setSubagentCount(subagents.items?.length || 0);
       setBindingCount((bindings as any).items?.length || 0);
@@ -120,13 +112,6 @@ export default function WorkspaceDetailPage() {
     }
   };
 
-  const toggleBuiltinTool = (tool: string) => {
-    const current = new Set<string>(permissions.allowed_builtin_tools || []);
-    if (current.has(tool)) current.delete(tool);
-    else current.add(tool);
-    setPermissions({ ...permissions, allowed_builtin_tools: Array.from(current) });
-  };
-
   const toggleFlag = (key: string) => {
     setPermissions({ ...permissions, [key]: !permissions[key] });
   };
@@ -169,8 +154,6 @@ export default function WorkspaceDetailPage() {
   if (!data) return <p className="dim">workspace not found</p>;
 
   const files: WorkspaceFile[] = data.files || [];
-  const configs: Record<string, GeneratedConfig> = data.generated_configs || {};
-  const builtinEnabled = new Set<string>(permissions.allowed_builtin_tools || []);
 
   return (
     <div className="stack">
@@ -217,11 +200,6 @@ export default function WorkspaceDetailPage() {
           <div className="kpi-label">Files</div>
           <div className="kpi-value">{files.length}</div>
         </div>
-        <div className="kpi">
-          <div className="kpi-label">Built-in tools</div>
-          <div className="kpi-value">{builtinEnabled.size}</div>
-          <div className="kpi-sub">/ {builtinTools.length} possible</div>
-        </div>
       </div>
 
       {/* Each editor renders its own card chrome (heading + panel). The
@@ -231,6 +209,7 @@ export default function WorkspaceDetailPage() {
       <WorkspaceResourcesEditor workspaceId={id!} />
       <WorkspaceSkillsEditor workspaceId={id!} />
       <SubagentsEditor workspaceId={id!} />
+      <WorkspaceCredentialsEditor workspaceId={id!} />
 
       {/* 4. Capabilities — single section bundling everything that controls
           what the agent CAN do at runtime. The previous "MCP Tool Groups"
@@ -283,28 +262,8 @@ export default function WorkspaceDetailPage() {
           </div>
         </div>
 
-        {/* 4b. Built-in tools — managed via allowed_builtin_tools, distinct
-            from MCP tools which are managed below. */}
-        <div style={{ marginBottom: 16 }}>
-          <h4 className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-            Built-in tools
-          </h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {builtinTools.map((tool) => {
-              const isActive = builtinEnabled.has(tool);
-              return (
-                <button
-                  key={tool}
-                  className={isActive ? 'primary' : ''}
-                  style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12 }}
-                  onClick={() => toggleBuiltinTool(tool)}
-                >
-                  {tool}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* Built-in tools are governed by each agent's configuration, not the
+            workspace — so they're intentionally not editable here. */}
 
         {/* 4c. MCP servers & tools — DB-backed, the single source of truth
             for per-server enable + per-tool grants. */}
@@ -315,108 +274,66 @@ export default function WorkspaceDetailPage() {
           <WorkspaceMcpEditor workspaceId={id!} />
         </div>
 
-        {/* 4d. Host-env capability grants */}
-        <div>
-          <h4 className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-            Host-env capabilities
-          </h4>
-          <WorkspaceHostEnvEditor workspaceId={id!} />
-        </div>
+        {/* Host-env capability grants are authorized per-agent (the agent's
+            tool_grants is the sole authorization surface — see
+            /api/agents/{id}/host-env), so they are not configured here. */}
       </section>
 
-      {/* 5. Files — user files only. CLAUDE.md / AGENTS.md / .agentbox/
-          / permissions/ are render artifacts and live in their own
-          sections, so they're filtered server-side. */}
+      {/* 5. Files — user files only, as a tree. CLAUDE.md / AGENTS.md /
+          .agentbox/ / .claude/ / .opencode/ / .codex/ / permissions/ are
+          render artifacts, filtered server-side. Clicking a file opens it
+          in a modal. */}
       <section className="section">
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <h3 style={{ margin: 0 }}>Files ({files.length})</h3>
-          {Object.keys(configs).length > 0 && (
-            <span className="dim" style={{ fontSize: 11 }}>
-              {Object.values(configs).filter((c) => c.exists).length}/
-              {Object.keys(configs).length} generated configs ready
-            </span>
-          )}
-        </div>
+        <h3 style={{ margin: 0, marginBottom: 8 }}>Files ({files.length})</h3>
         {files.length === 0 ? (
           <p className="dim">No user files yet.</p>
         ) : (
-          <div className="stack" style={{ gap: 8 }}>
-            <table style={{ fontSize: 12 }}>
-              <tbody>
-                {files.map((f) => (
-                  <tr
-                    key={f.path}
-                    style={{
-                      cursor: 'pointer',
-                      background: selectedFile === f.path ? 'rgba(88,166,255,0.1)' : undefined,
-                    }}
-                    onClick={() => openFile(f.path)}
-                  >
-                    <td>
-                      <button className="link-btn">{f.path}</button>
-                    </td>
-                    <td style={{ textAlign: 'right' }} className="dim">{f.size}b</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {selectedFile && (
-              <div className="stack" style={{ gap: 8 }}>
-                <div className="row between">
-                  <span style={{ fontWeight: 500, fontSize: 12 }}>
-                    {selectedFile}
-                    {fileDirty && <span className="dirty" style={{ marginLeft: 6 }}>●</span>}
-                  </span>
-                  <button onClick={saveFile} disabled={fileSaving || !fileDirty} className="primary" style={{ fontSize: 12, padding: '3px 10px' }}>
-                    {fileSaving ? 'saving…' : 'save'}
-                  </button>
-                </div>
-                {fileLoading ? (
-                  <p className="dim">loading…</p>
-                ) : (
-                  <textarea
-                    value={fileContent}
-                    onChange={(e) => {
-                      setFileContent(e.target.value);
-                      setFileDirty(true);
-                    }}
-                    style={{
-                      minHeight: 150,
-                      fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
-                      fontSize: 11,
-                      lineHeight: 1.5,
-                      resize: 'vertical',
-                    }}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Generated configs as a compact status strip — the actual
-            artifacts live under .agentbox/generated/ and are rewritten on
-            every "generate configs" / save-permissions call. */}
-        {Object.keys(configs).length > 0 && (
-          <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <div className="row" style={{ gap: 8, flexWrap: 'wrap', fontSize: 11 }}>
-              {Object.entries(configs).map(([name, cfg]) => (
-                <span
-                  key={name}
-                  className="pill"
-                  style={{
-                    background: cfg.exists ? '#1f6f3a' : '#5a2424',
-                    color: '#fff',
-                  }}
-                  title={cfg.path}
-                >
-                  {name} {cfg.exists ? '✓' : '✗'}
-                </span>
-              ))}
-            </div>
-          </div>
+          <FileTree files={files} onOpen={openFile} />
         )}
       </section>
+
+      {selectedFile && (
+        <Modal
+          title={
+            <span>
+              {selectedFile}
+              {fileDirty && <span className="dirty" style={{ marginLeft: 6 }}>●</span>}
+            </span>
+          }
+          onClose={() => setSelectedFile(null)}
+          wide
+          footer={
+            <button
+              onClick={saveFile}
+              disabled={fileSaving || !fileDirty}
+              className="primary"
+              style={{ fontSize: 12, padding: '4px 12px' }}
+            >
+              {fileSaving ? 'saving…' : 'save'}
+            </button>
+          }
+        >
+          {fileLoading ? (
+            <p className="dim">loading…</p>
+          ) : (
+            <textarea
+              value={fileContent}
+              onChange={(e) => {
+                setFileContent(e.target.value);
+                setFileDirty(true);
+              }}
+              style={{
+                width: '100%',
+                minHeight: 320,
+                fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
+                fontSize: 12,
+                lineHeight: 1.5,
+                resize: 'vertical',
+              }}
+            />
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

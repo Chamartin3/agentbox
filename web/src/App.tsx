@@ -12,6 +12,7 @@ const AgentNew = lazy(() => import('./pages/AgentNew'));
 const WorkspacesSection = lazy(() => import('./pages/WorkspacesSection'));
 const WorkspaceDetailPage = lazy(() => import('./pages/WorkspaceDetailPage'));
 const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'));
+const CredentialsPage = lazy(() => import('./pages/CredentialsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <NavLink to="/agents">agents</NavLink>
           <NavLink to="/runs">runs</NavLink>
           <NavLink to="/workspaces">workspaces</NavLink>
+          <NavLink to="/credentials">credentials</NavLink>
           <NavLink to="/settings">settings</NavLink>
         </nav>
       </header>
@@ -46,6 +48,9 @@ export default function App() {
           <Route path="/workspaces/resources" element={<WorkspacesSection />} />
           <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
           <Route path="/workspaces/resources/:id" element={<ResourceDetailPage />} />
+
+          {/* Credentials (global inventory + UI-added secrets). */}
+          <Route path="/credentials" element={<CredentialsPage />} />
 
           {/* Settings (providers/runners are a sub-section). */}
           <Route path="/settings" element={<SettingsPage />} />

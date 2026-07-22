@@ -42,6 +42,7 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "WorkspaceMcpPolicyManager",
         "WorkspaceMcpToolOverrideManager",
         "WorkspaceRuntimePermissionManager",
+        "WorkspaceCredentialManager",
         "WorkspaceSubagentManager",
         # resources managers
         "ActiveResourceVersionManager",
@@ -54,6 +55,7 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         "RunnerProfileManager",
         # system managers
         "ApiTokenManager",
+        "ManagedCredentialManager",
         "HostEnvCallLogManager",
         "HostEnvProfileManager",
         "McpToolDiscoveryCacheManager",

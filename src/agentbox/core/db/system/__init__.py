@@ -17,6 +17,10 @@ from agentbox.core.db.system.host_env_profile import (
     HostEnvProfile,
     HostEnvProfileManager,
 )
+from agentbox.core.db.system.managed_credential import (
+    ManagedCredential,
+    ManagedCredentialManager,
+)
 from agentbox.core.db.system.mcp_discovery_cache import (
     McpToolDiscoveryCache,
     McpToolDiscoveryCacheManager,
@@ -30,6 +34,9 @@ __all__ = [
     # api_token entity + manager
     "ApiToken",
     "ApiTokenManager",
+    # managed_credential entity + manager
+    "ManagedCredential",
+    "ManagedCredentialManager",
     # host_env_call entity + manager
     "HostEnvCallLog",
     "HostEnvCallLogManager",

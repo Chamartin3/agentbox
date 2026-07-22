@@ -30,6 +30,7 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "agent_versions",
         "agents",
         "api_tokens",
+        "managed_credentials",
         "host_env_call_log",
         "host_env_profiles",
         "mcp_tool_discovery_cache",
@@ -52,6 +53,7 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "workspace_mcp_policies",
         "workspace_mcp_tool_overrides",
         "workspace_runtime_permissions",
+        "workspace_credentials",
         "workspace_subagents",
         "workspaces",
     }

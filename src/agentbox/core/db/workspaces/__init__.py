@@ -16,6 +16,7 @@ from agentbox.core.db.workspaces.mcp_override import (
 )
 from agentbox.core.db.workspaces.runtime_permission import WorkspaceRuntimePermission
 from agentbox.core.db.workspaces.subagent import WorkspaceSubagent
+from agentbox.core.db.workspaces.workspace_credential import WorkspaceCredential
 
 # Managers
 from agentbox.core.db.workspaces.workspace import WorkspaceManager
@@ -28,6 +29,7 @@ from agentbox.core.db.workspaces.mcp_override import (
 from agentbox.core.db.workspaces.runtime_permission import WorkspaceRuntimePermissionManager
 from agentbox.core.db.workspaces.subagent import WorkspaceSubagentManager
 from agentbox.core.db.workspaces.read import WorkspaceReadManager
+from agentbox.core.db.workspaces.workspace_credential import WorkspaceCredentialManager
 
 __all__ = [
     # entities
@@ -39,6 +41,7 @@ __all__ = [
     "WorkspaceMcpToolOverride",
     "WorkspaceRuntimePermission",
     "WorkspaceSubagent",
+    "WorkspaceCredential",
     # managers
     "WorkspaceManager",
     "WorkspaceEnvDocManager",
@@ -49,4 +52,5 @@ __all__ = [
     "WorkspaceRuntimePermissionManager",
     "WorkspaceSubagentManager",
     "WorkspaceReadManager",
+    "WorkspaceCredentialManager",
 ]
