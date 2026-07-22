@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AgentDef } from '../api/client';
+import { AgentDef, type RunnerProfile } from '../api/client';
 import { AgentSortKey, SortDir } from '../api/enums';
 import { useAgent, useAgents, useAgentActions } from '../hooks/agents';
 import { useRunnerProfiles } from '../hooks/runnerProfiles';
+import RunnerProfilePickerModal from '../components/runner/RunnerProfilePickerModal';
+import { ProfileDisplay } from '../components/runner/ProfileDisplay';
 
 function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void }) {
   const { data, loading } = useAgent(agent.id);
@@ -67,6 +69,7 @@ export default function AgentsPage() {
   const [savingProfile, setSavingProfile] = useState<string | null>(null);
   const [togglingDisabled, setTogglingDisabled] = useState<string | null>(null);
   const [selected, setSelected] = useState<AgentDef | null>(null);
+  const [profileModalAgent, setProfileModalAgent] = useState<AgentDef | null>(null);
 
   const agentsQ = useAgents({ includeDisabled });
   const profilesQ = useRunnerProfiles();
@@ -93,12 +96,16 @@ export default function AgentsPage() {
       if (profileId) await actions.setRunnerProfile(agentId, profileId);
       else await actions.clearRunnerProfile(agentId);
       await agentsQ.refresh();
+      setProfileModalAgent(null);
     } catch (e) {
       console.error(e);
     } finally {
       setSavingProfile(null);
     }
   };
+
+  const profileById = (id: string | null | undefined): RunnerProfile | undefined =>
+    id ? profiles.find((p) => p.id === id) : undefined;
 
   const runnerKinds = Array.from(new Set(agents.map((a) => a.runner.kind))).sort();
 
@@ -174,9 +181,7 @@ export default function AgentsPage() {
         <thead>
           <tr>
             <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Id)}>ID{ind(AgentSortKey.Id)}</th>
-            <th style={{ cursor: 'pointer' }} onClick={() => toggleSort(AgentSortKey.Runner)}>Runner{ind(AgentSortKey.Runner)}</th>
-            <th>Profile</th>
-            <th>Session</th>
+            <th>Runner profile</th>
             <th>Workspace</th>
             <th>Description</th>
             <th>v</th>
@@ -204,28 +209,21 @@ export default function AgentsPage() {
                   </span>
                 )}
               </td>
-              <td><span className="tag">{a.runner.kind}</span></td>
               <td onClick={(e) => e.stopPropagation()}>
-                <select
-                  value={a.runner_profile_id || ''}
+                <button
+                  className="profile-trigger"
                   disabled={savingProfile === a.id}
-                  onChange={(e) => void onChangeProfile(a.id, e.target.value)}
-                  style={{ fontSize: 12, maxWidth: 220 }}
-                  title={a.runner_profile_id || 'system default'}
+                  onClick={() => setProfileModalAgent(a)}
+                  title="Change runner profile"
                 >
-                  <option value="">— system default —</option>
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}{p.model ? ` · ${p.model}` : ''}
-                    </option>
-                  ))}
-                </select>
+                  <ProfileDisplay profile={profileById(a.runner_profile_id)} fallbackKind={a.runner.kind} compact />
+                  <span className="profile-trigger-edit">✎</span>
+                </button>
               </td>
-              <td className="dim">{a.session_mode}</td>
               <td className="dim">
-                {a.workspace === '<ephemeral>'
-                  ? <span className="pill eph">ephemeral</span>
-                  : (a.workspace || <span className="dim">auto</span>)}
+                {a.workspace && a.workspace !== '<ephemeral>'
+                  ? a.workspace
+                  : <span className="dim">default</span>}
               </td>
               <td>{a.description}</td>
               <td onClick={(e) => e.stopPropagation()} className="dim" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
@@ -254,7 +252,7 @@ export default function AgentsPage() {
             </tr>
           ))}
           {pageRows.length === 0 && (
-            <tr><td colSpan={10} className="dim" style={{ textAlign: 'center', padding: 24 }}>no agents match</td></tr>
+            <tr><td colSpan={8} className="dim" style={{ textAlign: 'center', padding: 24 }}>no agents match</td></tr>
           )}
         </tbody>
       </table>
@@ -269,6 +267,16 @@ export default function AgentsPage() {
 
       {selected && (
         <PromptDrawer agent={selected} onClose={() => setSelected(null)} />
+      )}
+
+      {profileModalAgent && (
+        <RunnerProfilePickerModal
+          boundId={profileModalAgent.runner_profile_id ?? null}
+          busy={savingProfile === profileModalAgent.id}
+          onPick={(id) => void onChangeProfile(profileModalAgent.id, id)}
+          onCreated={(p) => void onChangeProfile(profileModalAgent.id, p.id)}
+          onClose={() => setProfileModalAgent(null)}
+        />
       )}
     </div>
   );

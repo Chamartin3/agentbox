@@ -1,0 +1,187 @@
+/* Shared runner-profile styling — imported by ProfileDisplay so it loads on
+   every page that shows a profile (agent detail card, agents table, picker). */
+
+/* Harness/provider/model read as labelled mono badges */
+.runner-badge {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  white-space: nowrap;
+}
+/* Per-harness colour: --h drives all three channels, defaults to accent.
+   data-harness on the badge selects the family hue. */
+.runner-badge--harness {
+  --h: var(--accent);
+  color: var(--h);
+  border-color: color-mix(in srgb, var(--h) 45%, transparent);
+  background: color-mix(in srgb, var(--h) 14%, transparent);
+}
+.runner-badge--harness[data-harness="claude_code"],
+.runner-badge--harness[data-harness="claude-code"] { --h: #d98a4b; } /* amber */
+.runner-badge--harness[data-harness="opencode"]    { --h: #a371f7; } /* violet */
+.runner-badge--harness[data-harness="token"],
+.runner-badge--harness[data-harness="pydantic_ai"] { --h: #e34ba9; } /* pydantic pink */
+.runner-badge--harness[data-harness="subprocess"]  { --h: #8b949e; } /* gray */
+/* Per-provider colour: --p drives all channels, defaults to muted fg. */
+.runner-badge--provider {
+  --p: var(--fg-muted);
+  color: var(--p);
+  border-color: color-mix(in srgb, var(--p) 40%, transparent);
+  background: color-mix(in srgb, var(--p) 12%, transparent);
+  text-transform: capitalize;
+}
+.runner-badge--provider[data-provider="openai"]     { --p: #10a37f; }
+.runner-badge--provider[data-provider="anthropic"]  { --p: #cc785c; }
+.runner-badge--provider[data-provider="google"]     { --p: #4285f4; }
+.runner-badge--provider[data-provider="xai"]        { --p: #7aa2f7; }
+.runner-badge--provider[data-provider="openrouter"] { --p: #8b7cf6; }
+.runner-badge--provider[data-provider="deepseek"]   { --p: #4d6bfe; }
+.runner-badge--provider[data-provider="ollama"]     { --p: #c9d1d9; }
+.runner-badge--model {
+  color: var(--green, #3fb950);
+  border-color: color-mix(in srgb, var(--green, #3fb950) 45%, transparent);
+  background: color-mix(in srgb, var(--green, #3fb950) 12%, transparent);
+}
+
+/* Vertical profile summary: name on one line, badges beneath. Reused
+   everywhere a profile is shown. */
+.profile-display {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.profile-display-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-display-name.dim { font-weight: 500; color: var(--fg-muted); }
+.profile-display-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Clickable profile trigger (card action / table cell) */
+.profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  max-width: 340px;
+}
+.profile-trigger:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--bg);
+}
+.profile-trigger .profile-trigger-edit {
+  font-size: 12px;
+  color: var(--fg-muted);
+  opacity: 0;
+  flex-shrink: 0;
+}
+.profile-trigger:hover .profile-trigger-edit { opacity: 1; }
+
+/* Filterable profile table inside the picker modal */
+.profile-table-filter {
+  width: 100%;
+  margin-bottom: 10px;
+}
+.profile-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.profile-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  font-weight: 500;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.profile-table tbody tr { cursor: pointer; }
+.profile-table tr.pick-row { cursor: pointer; }
+.profile-table tr.pick-row:hover td { background: var(--bg); }
+.profile-table tr.pick-row.selected td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.profile-table .pick-name { font-weight: 600; color: var(--fg); white-space: nowrap; }
+.profile-table .pick-check { color: var(--accent); margin-left: 6px; }
+
+/* ── Modal overlay ───────────────────────────────────────────────────
+   Lives here (not just RunnerProfilesPage.css) so the runner picker
+   overlays properly wherever it's opened — e.g. the agent detail page. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 48px 16px 16px;
+  z-index: 100;
+  overflow-y: auto;
+}
+.modal {
+  width: min(720px, 100%);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 64px);
+}
+.modal--wide { width: min(920px, 100%); }
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2, .modal-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.modal-close:hover { background: var(--bg-secondary); color: var(--fg); }
+.modal-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-radius: 0 0 8px 8px;
+}

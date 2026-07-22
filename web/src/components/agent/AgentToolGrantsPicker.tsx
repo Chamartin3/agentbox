@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { apiRequest } from "../../api/http";
 
 interface CatalogItem {
@@ -20,7 +20,31 @@ interface Grant {
 
 interface Props {
   agentId: string;
-  workspaceId: string | null;
+  workspaceId: string | null | undefined;
+}
+
+// Collapse the raw canonical namespaces into a few intuitive buckets.
+const CATEGORY: Record<string, string> = {
+  fs: "files",
+  shell: "system",
+  env: "system",
+  agentbox: "system",
+  agent: "system",
+  http: "web",
+  web: "web",
+  git: "git",
+  todo: "tasks",
+};
+
+function category(name: string): string {
+  const dot = name.indexOf(".");
+  const ns = dot > 0 ? name.slice(0, dot) : "other";
+  return CATEGORY[ns] ?? "other";
+}
+
+function shortName(name: string): string {
+  const dot = name.indexOf(".");
+  return dot > 0 ? name.slice(dot + 1) : name;
 }
 
 export function AgentToolGrantsPicker({ agentId, workspaceId }: Props) {
@@ -29,11 +53,19 @@ export function AgentToolGrantsPicker({ agentId, workspaceId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedTool, setSelectedTool] = useState<string>("");
-  const [grantReason, setGrantReason] = useState("");
-  const [grantLoading, setGrantLoading] = useState(false);
+  // Local selection = desired granted set. Diffed against activeGrants on apply.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [reason, setReason] = useState("");
+  const [applying, setApplying] = useState(false);
 
-  const [revokeReason, setRevokeReason] = useState<Record<string, string>>({});
+  // Filters
+  const [query, setQuery] = useState("");
+  const [catFilter, setCatFilter] = useState<string>("all");
+
+  // Browse-all: union with the global catalog
+  const [showAll, setShowAll] = useState(false);
+  const [allTools, setAllTools] = useState<CatalogItem[]>([]);
+  const [allToolsLoaded, setAllToolsLoaded] = useState(false);
 
   const catalogUrl = workspaceId
     ? `/api/workspaces/${workspaceId}/available_tools`
@@ -48,6 +80,7 @@ export function AgentToolGrantsPicker({ agentId, workspaceId }: Props) {
       ]);
       setAvailableTools(catalog.items ?? []);
       setActiveGrants(grants.items ?? []);
+      setSelected(new Set((grants.items ?? []).map((g) => g.tool_name)));
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -56,194 +89,223 @@ export function AgentToolGrantsPicker({ agentId, workspaceId }: Props) {
     }
   };
 
-  useEffect(() => {
-    refresh();
-  }, [agentId, workspaceId]);
+  useEffect(() => { void refresh(); }, [agentId, workspaceId]);
 
-  const grantedNames = new Set(activeGrants.map((g) => g.tool_name));
-  const installedNames = new Set(availableTools.map((t) => t.name));
+  const toggleBrowseAll = async () => {
+    if (!showAll && !allToolsLoaded) {
+      try {
+        const catalog = await apiRequest<{ items: CatalogItem[] }>("/api/agent_tools");
+        setAllTools(catalog.items ?? []);
+        setAllToolsLoaded(true);
+      } catch (e) {
+        setError(String(e));
+        return;
+      }
+    }
+    setShowAll((v) => !v);
+  };
 
-  // Ungranted tools that are installed in the environment.
-  const ungrantedTools = availableTools.filter((t) => !grantedNames.has(t.name));
+  const grantedNames = useMemo(() => new Set(activeGrants.map((g) => g.tool_name)), [activeGrants]);
+  const installedNames = useMemo(() => new Set(availableTools.map((t) => t.name)), [availableTools]);
 
-  // Grants whose tool is NOT in the installed catalog (unbacked).
-  const unbackedGrants = activeGrants.filter(
-    (g) => workspaceId && !installedNames.has(g.tool_name),
+  const fullCatalog: CatalogItem[] = useMemo(() => {
+    const base = showAll
+      ? [...availableTools, ...allTools.filter((t) => !installedNames.has(t.name))]
+      : [...availableTools];
+    for (const g of activeGrants) {
+      if (!base.some((t) => t.name === g.tool_name)) {
+        base.push({ name: g.tool_name, description: "granted — not installed in this workspace", kind: "unbacked" });
+      }
+    }
+    return base;
+  }, [showAll, availableTools, allTools, installedNames, activeGrants]);
+
+  const categories = useMemo(() => {
+    const set = new Set(fullCatalog.map((t) => category(t.name)));
+    return [...set].sort((a, b) => (a === "other" ? 1 : b === "other" ? -1 : a.localeCompare(b)));
+  }, [fullCatalog]);
+
+  const matchesText = (t: CatalogItem) => {
+    const q = query.trim().toLowerCase();
+    return !q || t.name.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q);
+  };
+
+  // Enabled = currently selected (respects text filter, ignores category tab
+  // so you never lose sight of what's on). Available = the rest (both filters).
+  const enabledList = useMemo(
+    () => fullCatalog.filter((t) => selected.has(t.name) && matchesText(t)).sort((a, b) => a.name.localeCompare(b.name)),
+    [fullCatalog, selected, query],
+  );
+  const availableList = useMemo(
+    () =>
+      fullCatalog
+        .filter((t) => !selected.has(t.name) && matchesText(t))
+        .filter((t) => catFilter === "all" || category(t.name) === catFilter)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [fullCatalog, selected, query, catFilter],
   );
 
-  const handleGrant = async () => {
-    if (!selectedTool || grantReason.trim().length < 3) return;
-    setGrantLoading(true);
+  const toggle = (name: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+
+  const selectAllAvailable = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const t of availableList) if (installedNames.has(t.name)) next.add(t.name);
+      return next;
+    });
+  const clearAllEnabled = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const t of enabledList) next.delete(t.name);
+      return next;
+    });
+
+  const toGrant = [...selected].filter((n) => !grantedNames.has(n));
+  const toRevoke = [...grantedNames].filter((n) => !selected.has(n));
+  const dirty = toGrant.length + toRevoke.length;
+
+  const apply = async () => {
+    if (reason.trim().length < 3 || !dirty) return;
+    setApplying(true);
     try {
-      await apiRequest(`/api/agents/${agentId}/tool_grants`, {
-        method: "POST",
-        body: JSON.stringify({
-          tool_name: selectedTool,
-          changelog: grantReason,
-          workspace_id: workspaceId,
-        }),
-      });
-      setSelectedTool("");
-      setGrantReason("");
+      for (const name of toGrant) {
+        await apiRequest(`/api/agents/${agentId}/tool_grants`, {
+          method: "POST",
+          body: JSON.stringify({ tool_name: name, changelog: reason, workspace_id: workspaceId }),
+        });
+      }
+      for (const name of toRevoke) {
+        await apiRequest(`/api/agents/${agentId}/tool_grants/${name}`, {
+          method: "DELETE",
+          body: JSON.stringify({ changelog: reason }),
+        });
+      }
+      setReason("");
       await refresh();
     } catch (e) {
       setError(String(e));
     } finally {
-      setGrantLoading(false);
+      setApplying(false);
     }
   };
 
-  const handleRevoke = async (toolName: string) => {
-    const reason = revokeReason[toolName]?.trim();
-    if (!reason || reason.length < 3) return;
-    try {
-      await apiRequest(
-        `/api/agents/${agentId}/tool_grants/${toolName}`,
-        {
-          method: "DELETE",
-          body: JSON.stringify({ changelog: reason }),
-        },
-      );
-      setRevokeReason((prev) => ({ ...prev, [toolName]: "" }));
-      await refresh();
-    } catch (e) {
-      setError(String(e));
-    }
+  const resetSelection = () => setSelected(new Set(grantedNames));
+
+  const renderBox = (t: CatalogItem) => {
+    const isInstalled = installedNames.has(t.name);
+    const isGranted = grantedNames.has(t.name);
+    const isSelected = selected.has(t.name);
+    const disabled = !isInstalled && !isGranted;
+    const changed = isSelected !== isGranted;
+    return (
+      <label
+        key={t.name}
+        className={[
+          "tool-box",
+          isSelected ? "tool-box--on" : "tool-box--off",
+          disabled ? "tool-box--disabled" : "",
+          changed ? "tool-box--changed" : "",
+        ].filter(Boolean).join(" ")}
+        title={t.description || (disabled ? `not installed in workspace ${workspaceId}` : undefined)}
+      >
+        <input type="checkbox" checked={isSelected} disabled={disabled} onChange={() => toggle(t.name)} />
+        <span className="tool-box-name">{shortName(t.name)}</span>
+        <span className="tool-box-group">{category(t.name)}</span>
+      </label>
+    );
   };
 
-  if (loading) return <div>Loading tool grants…</div>;
+  if (loading) return <div className="tools-panel"><div style={{ padding: "12px 0" }}>Loading tools…</div></div>;
 
   return (
-    <div className="agent-tool-grants">
-      <h3>Tool Authorization</h3>
-      <p className="muted">
-        Authorize which tools this agent may call at runtime. This is the{" "}
-        <strong>single</strong> authorization surface — workspace provisioning
-        (MCP servers, host capabilities) controls <em>availability</em>, not
-        permission.
-      </p>
-      {workspaceId && (
-        <p className="muted" style={{ fontSize: 11 }}>
-          Available tools sourced from the <em>installed</em> catalog of
-          workspace <code>{workspaceId}</code>.
+    <div className="tools-panel">
+      <div className="tools-panel-header">
+        <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
+          <h3 style={{ margin: 0 }}>Tools</h3>
+          <span className="tools-count">{grantedNames.size} enabled</span>
+          <span className="dim" style={{ fontSize: 11 }}>of {installedNames.size} available</span>
+        </div>
+        <button onClick={() => void toggleBrowseAll()} style={{ fontSize: 11, padding: "2px 8px" }}>
+          {showAll ? "hide global catalog" : "browse all"}
+        </button>
+      </div>
+
+      {workspaceId && showAll && (
+        <p className="dim tools-source">Global-catalog tools not installed in this workspace are shown disabled.</p>
+      )}
+      {error && <div className="tools-error">{error}</div>}
+
+      <input
+        className="tools-filter tools-filter--full"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="filter tools…"
+      />
+
+      {/* Enabled — the agent's current toolset, shown apart from the catalog */}
+      <div className="tools-subhead">
+        <span className="tools-subhead-title">Enabled</span>
+        <span className="tools-subhead-count">{enabledList.length}</span>
+        {enabledList.length > 0 && (
+          <button className="tools-linkbtn" onClick={clearAllEnabled}>clear all</button>
+        )}
+      </div>
+      {enabledList.length === 0 ? (
+        <p className="dim tools-empty">No tools enabled yet — pick from the catalog below.</p>
+      ) : (
+        <div className="tools-grid tools-grid--enabled">{enabledList.map(renderBox)}</div>
+      )}
+
+      {/* Available — the rest of the catalog, grouped by category tabs */}
+      <div className="tools-subhead">
+        <span className="tools-subhead-title">Available</span>
+        <span className="tools-subhead-count">{availableList.length}</span>
+        <div className="tools-type-tabs">
+          <button className={`tools-type-tab${catFilter === "all" ? " active" : ""}`} onClick={() => setCatFilter("all")}>all</button>
+          {categories.map((c) => (
+            <button key={c} className={`tools-type-tab${catFilter === c ? " active" : ""}`} onClick={() => setCatFilter(c)}>{c}</button>
+          ))}
+        </div>
+        {availableList.some((t) => installedNames.has(t.name)) && (
+          <button className="tools-linkbtn" onClick={selectAllAvailable}>select all</button>
+        )}
+      </div>
+      {availableList.length === 0 ? (
+        <p className="dim tools-empty">
+          {fullCatalog.length === 0
+            ? workspaceId ? "No tools installed in this workspace." : "No shared tools registered."
+            : "Everything here is already enabled or filtered out."}
         </p>
-      )}
-      {error && <div className="error">{error}</div>}
-
-      {/* Unbacked grant warnings */}
-      {unbackedGrants.length > 0 && (
-        <section style={{ marginBottom: 12 }}>
-          <h4 style={{ color: "orange" }}>
-            ⚠ Unbacked Grants ({unbackedGrants.length})
-          </h4>
-          <div className="dim" style={{ fontSize: 11, marginBottom: 6 }}>
-            These tools are granted but not currently installed in the
-            workspace. They will have no effect until provisioning catches up.
-          </div>
-          {unbackedGrants.map((g) => (
-            <div key={g.tool_name} className="grant-row" style={{ opacity: 0.7 }}>
-              <span className="tool-name">{g.tool_name}</span>
-              <span className="grant-meta" style={{ color: "orange" }}>
-                not available in this environment
-              </span>
-              <input
-                type="text"
-                placeholder="Reason to revoke (required)"
-                value={revokeReason[g.tool_name] ?? ""}
-                onChange={(e) =>
-                  setRevokeReason((prev) => ({
-                    ...prev,
-                    [g.tool_name]: e.target.value,
-                  }))
-                }
-              />
-              <button
-                onClick={() => handleRevoke(g.tool_name)}
-                disabled={
-                  (revokeReason[g.tool_name]?.trim().length ?? 0) < 3
-                }
-              >
-                Revoke
-              </button>
-            </div>
-          ))}
-        </section>
+      ) : (
+        <div className="tools-grid">{availableList.map(renderBox)}</div>
       )}
 
-      {/* Active (backed) grants */}
-      <section>
-        <h4>Active Grants ({activeGrants.length})</h4>
-        {activeGrants.length === 0 && <p className="muted">No tools granted.</p>}
-        {activeGrants
-          .filter((g) => !unbackedGrants.includes(g))
-          .map((grant) => (
-            <div key={grant.tool_name} className="grant-row">
-              <span className="tool-name">{grant.tool_name}</span>
-              <span className="grant-meta">
-                granted {new Date(grant.granted_at).toLocaleDateString()}
-                {grant.granted_by && ` by ${grant.granted_by}`}
-              </span>
-              <input
-                type="text"
-                placeholder="Reason to revoke (required)"
-                value={revokeReason[grant.tool_name] ?? ""}
-                onChange={(e) =>
-                  setRevokeReason((prev) => ({
-                    ...prev,
-                    [grant.tool_name]: e.target.value,
-                  }))
-                }
-              />
-              <button
-                onClick={() => handleRevoke(grant.tool_name)}
-                disabled={
-                  (revokeReason[grant.tool_name]?.trim().length ?? 0) < 3
-                }
-              >
-                Revoke
-              </button>
-            </div>
-          ))}
-      </section>
-
-      {ungrantedTools.length > 0 && (
-        <section>
-          <h4>Grant a Tool</h4>
-          <select
-            value={selectedTool}
-            onChange={(e) => setSelectedTool(e.target.value)}
-          >
-            <option value="">— select a tool —</option>
-            {ungrantedTools.map((t) => (
-              <option key={t.name} value={t.name} title={t.description}>
-                {t.name}{" "}
-                {t.kind && `(${t.kind === "host_env" ? "host_env" : t.kind})`}
-              </option>
-            ))}
-          </select>
+      {/* Apply bar — only when there are pending changes */}
+      {dirty > 0 && (
+        <div className="tools-apply-bar">
+          <span className="tools-apply-summary">
+            {toGrant.length > 0 && <span className="tools-diff-grant">+{toGrant.length}</span>}
+            {toRevoke.length > 0 && <span className="tools-diff-revoke">−{toRevoke.length}</span>}
+            <span className="dim" style={{ marginLeft: 6 }}>pending</span>
+          </span>
           <input
-            type="text"
-            placeholder="Reason (required, min 3 chars)"
-            value={grantReason}
-            onChange={(e) => setGrantReason(e.target.value)}
+            className="tools-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && reason.trim().length >= 3) void apply(); }}
+            placeholder="reason (required, min 3 chars)"
           />
-          <button
-            onClick={handleGrant}
-            disabled={
-              !selectedTool || grantReason.trim().length < 3 || grantLoading
-            }
-          >
-            {grantLoading ? "Granting…" : "Grant"}
+          <button className="primary" disabled={reason.trim().length < 3 || applying} onClick={() => void apply()}>
+            {applying ? "applying…" : `apply ${dirty} change${dirty === 1 ? "" : "s"}`}
           </button>
-        </section>
-      )}
-
-      {ungrantedTools.length === 0 && availableTools.length === 0 && (
-        <p className="muted">
-          {workspaceId
-            ? "No tools or resources are installed in this workspace."
-            : "No shared tools are registered. Consumer apps register tools via the agentbox.agent_tools entry-point group."}
-        </p>
+          <button onClick={resetSelection} disabled={applying}>reset</button>
+        </div>
       )}
     </div>
   );

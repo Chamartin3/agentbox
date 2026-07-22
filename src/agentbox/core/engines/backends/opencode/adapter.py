@@ -26,13 +26,15 @@ from agentbox.core.data.events import (
 from agentbox.core.engines.backends.base import BackendAdapter
 from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.opencode.render import build_opencode_items
-from agentbox.core.engines.backends.opencode.tools import NATIVE_TOOLS as _OPENCODE_TOOLS
+from agentbox.core.engines.backends.opencode.tools import (
+    NATIVE_BUILTINS as _OPENCODE_BUILTINS,
+    NATIVE_TOOLS as _OPENCODE_TOOLS,
+)
 from agentbox.core.engines.backends.opencode.session import (  # noqa: F401
     parse_event_stream_with_thinking,
     strip_code_fences,
 )
 from agentbox.core.data import CanonicalTool
-from agentbox.core.tools.translation import render_allowed_tools
 from agentbox.core.data.workenv import Item, WorkspaceConfig
 
 __all__ = [
@@ -115,6 +117,38 @@ def _merge_opencode_json(path: Path, provider_block: OpenCodeProviderBlock) -> N
     path.write_text(json.dumps(data, indent=2) + "\n")
 
 
+def _opencode_tool_gates(
+    allowed: set[CanonicalTool], forbidden: set[CanonicalTool]
+) -> dict[str, bool]:
+    """Map every gated opencode builtin to its enabled/disabled flag.
+
+    opencode auto-injects all builtins under --dangerously-skip-permissions, so
+    the allow-list is enforced by explicitly disabling everything it does not
+    grant. An empty allow-list therefore yields "no builtins" — the behaviour a
+    headless envelope agent needs. ``skill`` is not in NATIVE_BUILTINS and stays
+    enabled (governed separately).
+    """
+    granted = {_OPENCODE_TOOLS[t] for t in (allowed - forbidden) if t in _OPENCODE_TOOLS}
+    return {str(tool): tool in granted for tool in _OPENCODE_BUILTINS}
+
+
+def _merge_opencode_tools(path: Path, tool_gates: dict[str, bool]) -> None:
+    """Merge builtin enable/disable flags into opencode.json's ``tools`` map.
+
+    Preserves entries the workspace generator wrote (e.g. ``skill: true``);
+    our explicit gates win on conflict. Idempotent.
+    """
+    data: dict = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    data.setdefault("tools", {}).update(tool_gates)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
 class OpenCodeBackend(BackendAdapter):
     name = _NAME
     conversation_format: ClassVar[str | None] = "opencode-session"
@@ -182,15 +216,19 @@ class OpenCodeBackend(BackendAdapter):
 
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)
 
-        # Effective tools = (agent ∩ available) − forbidden (canonical).
-        effective_tools: set[str] = set()
-        if runtime_config is not None:
-            effective_tools = render_allowed_tools(
-                allowed=runtime_config.allowed_tools,
-                workspace=ws_allowed_tools,
-                forbidden=runtime_config.forbidden_tools,
-                native=_OPENCODE_TOOLS.keys(),
-            )
+        # Gate opencode's auto-injected builtins by the agent allow-list.
+        # Empty allow-list ⇒ no builtins (opencode would otherwise expose bash,
+        # write, webfetch, … under --dangerously-skip-permissions). Written into
+        # opencode.json since the CLI has no allow-list flag — only a tools map.
+        allowed: set[CanonicalTool] = set(
+            getattr(runtime_config, "allowed_tools", None) or ()
+        )
+        forbidden: set[CanonicalTool] = set(
+            getattr(runtime_config, "forbidden_tools", None) or ()
+        )
+        tool_gates = _opencode_tool_gates(allowed, forbidden)
+        _merge_opencode_tools(workdir / "opencode.json", tool_gates)
+        effective_tools = sorted(name for name, on in tool_gates.items() if on)
 
         return RenderedConfig(
             argv=argv,

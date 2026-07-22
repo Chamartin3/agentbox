@@ -45,6 +45,7 @@ export default function ActivityPage() {
   const [selected, setSelected] = useState<AgentRun | null>(null);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [runs, setRuns] = useState<AgentRun[]>([]);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -113,6 +114,14 @@ export default function ActivityPage() {
     }
     return out;
   }, [rawSeries, range]);
+
+  const PAGE_SIZE = 10;
+  const pageCount = Math.max(1, Math.ceil(runs.length / PAGE_SIZE));
+  const pageRuns = runs.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  // Clamp when the underlying list shrinks (filter change / auto-refresh).
+  useEffect(() => { if (page > pageCount - 1) setPage(pageCount - 1); }, [pageCount, page]);
+  // Filters/range trigger a reload — jump back to the first page.
+  useEffect(() => { setPage(0); }, [range, actionFilter, executorFilter, stateFilter]);
 
   const actionOptions = useMemo(
     () => Array.from(new Set(byAction.map((b) => b.action_name))).sort(),
@@ -295,7 +304,7 @@ export default function ActivityPage() {
           <section className="section">
             <h2 style={{ border: 'none' }}>Recent runs</h2>
             <RunsTable
-              items={runs.map((r): RunRow => ({
+              items={pageRuns.map((r): RunRow => ({
                 id: r.id,
                 agent_id: r.action_name,
                 status: r.state,
@@ -319,6 +328,15 @@ export default function ActivityPage() {
                 if (found) setSelected(found);
               }}
             />
+            {runs.length > PAGE_SIZE && (
+              <div className="row" style={{ gap: 12, alignItems: 'center', justifyContent: 'flex-end', marginTop: 12 }}>
+                <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>← prev</button>
+                <span className="dim" style={{ fontSize: 12 }}>
+                  {page * PAGE_SIZE + 1}–{Math.min(runs.length, (page + 1) * PAGE_SIZE)} of {runs.length}
+                </span>
+                <button disabled={page >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}>next →</button>
+              </div>
+            )}
           </section>
         </>
       )}

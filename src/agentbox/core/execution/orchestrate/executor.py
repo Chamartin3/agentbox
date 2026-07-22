@@ -129,6 +129,8 @@ class RunExecutor:
         runner_embedded: bool = False,
         runner_profile: str | None = None,
         runner_config: dict[str, Any] | None = None,
+        fresh_workspace: bool = False,
+        session_mode: str | None = None,
     ) -> str:
         """Drive a single run from an already-composed prompt.
 
@@ -141,8 +143,9 @@ class RunExecutor:
         agent = composed.agent
         input_ = composed.input_
 
-        workdir, session_id = self._setup.prepare_workdir(
-            agent, session_id, workspace_override
+        workdir, session_id, dispose_workdir = self._setup.prepare_workdir(
+            agent, session_id, workspace_override,
+            session_mode=session_mode, fresh_workspace=fresh_workspace,
         )
         if backend is None and runner_override is not None:
             backend = runner_override
@@ -320,6 +323,7 @@ class RunExecutor:
             _run_loop=_run_loop,
             broadcasters=self._broadcasters,
             tasks=self._tasks, run_tasks=self._run_tasks,
+            dispose_workdir=dispose_workdir,
         )
         return run_id
 

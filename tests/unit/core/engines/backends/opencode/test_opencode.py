@@ -180,3 +180,73 @@ def test_effective_model_from_runner_config_is_passed() -> None:
 
     model_idx = rendered.argv.index("--model")
     assert rendered.argv[model_idx + 1] == "opencode/big-pickle"
+
+
+# ── Native-builtin gating (empty allow-list ⇒ no builtins) ──────────────────
+
+import json  # noqa: E402
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+
+import pytest  # noqa: E402
+
+from agentbox.core.data import CanonicalTool  # noqa: E402
+from agentbox.core.data.backends import RuntimeConfigView  # noqa: E402
+from agentbox.core.engines.backends.opencode.tools import (  # noqa: E402
+    NATIVE_BUILTINS,
+    OpenCodeTool,
+)
+
+
+def _tools_map(tmp_path: Path, runtime: RuntimeConfigView | None) -> dict:
+    OpenCodeBackend().render(
+        _make_agent(), tmp_path, runtime_config=runtime
+    )
+    return json.loads((tmp_path / "opencode.json").read_text())["tools"]
+
+
+def test_empty_allowlist_disables_all_builtins(tmp_path: Path) -> None:
+    tools = _tools_map(tmp_path, RuntimeConfigView())
+    for builtin in NATIVE_BUILTINS:
+        assert tools[str(builtin)] is False, builtin
+    # the skill bridge is never gated
+    assert "skill" not in NATIVE_BUILTINS
+    assert tools.get("skill", True) is True
+
+
+def test_allowlist_enables_only_granted_builtins(tmp_path: Path) -> None:
+    tools = _tools_map(
+        tmp_path,
+        RuntimeConfigView(allowed_tools=(CanonicalTool.SHELL_EXEC,)),
+    )
+    assert tools[str(OpenCodeTool.BASH)] is True
+    assert tools[str(OpenCodeTool.WEBFETCH)] is False
+    assert tools[str(OpenCodeTool.WRITE)] is False
+
+
+def test_forbidden_overrides_allowed(tmp_path: Path) -> None:
+    tools = _tools_map(
+        tmp_path,
+        RuntimeConfigView(
+            allowed_tools=(CanonicalTool.SHELL_EXEC, CanonicalTool.HTTP_FETCH),
+            forbidden_tools=(CanonicalTool.SHELL_EXEC,),
+        ),
+    )
+    assert tools[str(OpenCodeTool.BASH)] is False
+    assert tools[str(OpenCodeTool.WEBFETCH)] is True
+
+
+@pytest.mark.skipif(shutil.which("opencode") is None, reason="opencode CLI not installed")
+def test_native_builtins_match_live_opencode(tmp_path: Path) -> None:
+    """Guard against opencode adding a builtin we don't gate (a tool leak)."""
+    out = subprocess.run(
+        ["opencode", "debug", "agent", "build"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    live = set(json.loads(out.stdout)["tools"])
+    gated = {str(t) for t in NATIVE_BUILTINS} | {"skill"}
+    leaked = live - gated
+    assert not leaked, f"opencode exposes ungated builtins: {sorted(leaked)}"

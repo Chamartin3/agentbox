@@ -13,14 +13,111 @@
 }
 
 .agent-title h1 {
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
 }
 
 .agent-description {
-  margin: 0;
+  margin: 8px 0 0;
   color: var(--fg-muted);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.4;
+  max-width: 70ch;
 }
+
+.agent-description-editable {
+  cursor: text;
+  border-radius: 4px;
+  padding: 3px 6px;
+  margin: 8px -6px 0;
+}
+.agent-description-editable:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.agent-desc-input {
+  display: block;
+  margin-top: 8px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--fg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 6px 8px;
+  width: 100%;
+  max-width: 70ch;
+  resize: none;         /* height is driven by JS auto-grow */
+  overflow: hidden;
+}
+
+.agent-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.agent-tags-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+/* Subtler tag input — reads as inline chips, not a boxed form field.
+   Border only hints on hover/focus. */
+.tag-chip-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  padding: 2px 2px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  min-height: 26px;
+  min-width: 200px;
+  cursor: text;
+}
+.tag-chip-input:hover {
+  border-color: var(--border);
+}
+.tag-chip-input:focus-within {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+/* Icon button (pencil) — square, quiet until hovered */
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.runner-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+/* (profile-choice / profile-cell / runner-badge styles moved to
+   components/runner/runner.css so they load on the agents list too.) */
 
 .agent-metadata {
   display: flex;
@@ -141,30 +238,378 @@
   }
 }
 
+/* Flat sections, not nested boxes — the tab panel is the only container.
+   Legend reads as a section header with a thin underline. */
 .config-fieldset {
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 12px 16px 16px;
-  margin: 12px 0;
+  border: 0;
+  padding: 0;
+  margin: 22px 0 0;
 }
+.config-fieldset:first-of-type { margin-top: 4px; }
 
 .config-fieldset > legend {
-  padding: 0 6px;
+  display: block;
+  width: 100%;
+  padding: 0 0 6px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
   font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+
+/* Runner profile + workspace side by side; wrap on narrow viewports. */
+.config-two-col {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+.config-two-col > * {
+  flex: 1 1 320px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+/* Inside .config-fieldset, every .field stacks label-on-top so each column
+   gets the full width for its input instead of reserving 160px for the label. */
+.config-fieldset .field {
+  display: block;
+  margin-bottom: 12px;
+}
+.config-fieldset .field > label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.config-fieldset .field > input,
+.config-fieldset .field > select {
+  width: 100%;
+}
+.config-fieldset .field .field-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: none;
+}
+
+/* Workspace radio */
+.workspace-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.workspace-radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.workspace-radio-option input[type="radio"] {
+  flex-shrink: 0;
+  width: auto;
+  cursor: pointer;
+}
+
+/* Runner profile card */
+.runner-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.runner-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin: 0;
+  flex: 1;
+}
+.runner-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.runner-fact dt {
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--fg-muted);
 }
-
-/* Inside .config-fieldset, a .row of .field stacks label-on-top so each
-   column gets the full width for its input instead of reserving 160px
-   for the label. */
-.config-fieldset .row > .field {
-  display: block;
+.runner-fact dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fg);
 }
-.config-fieldset .row > .field > label {
-  display: block;
+
+/* (.runner-badge* moved to components/runner/runner.css) */
+
+/* Save bar — appears only when the form is dirty */
+.config-savebar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 0;
   margin-bottom: 4px;
+  background: var(--bg-elevated);
+}
+.config-savebar .dirty {
+  color: var(--yellow);
+  font-size: 12px;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin: 4px 0 0;
+}
+.runner-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Advanced execution details */
+.config-advanced {
+  margin: 12px 0;
+}
+.config-advanced > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--fg-muted);
+  user-select: none;
+  padding: 4px 0;
+  list-style: disclosure-closed;
+}
+.config-advanced[open] > summary {
+  list-style: disclosure-open;
+  margin-bottom: 4px;
+}
+
+/* ── Tools panel ─────────────────────────────────────────────────── */
+/* Flat section, matching .config-fieldset — no box, header carries the rule. */
+.tools-panel {
+  border: 0;
+  padding: 0;
+  margin: 22px 0 0;
+}
+.tools-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.tools-panel-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.tools-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 10px;
+  padding: 1px 9px;
+}
+.tools-source {
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.tools-error {
+  color: var(--red, #e5534b);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.tools-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.tools-filter {
+  flex: 0 1 200px;
+  min-width: 140px;
+}
+.tools-filter--full {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* Enabled / Available subheaders */
+.tools-subhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.tools-subhead:first-of-type { margin-top: 4px; }
+.tools-subhead-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg);
+}
+.tools-subhead-count {
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0 7px;
+}
+.tools-subhead .tools-type-tabs { margin-left: 4px; }
+.tools-linkbtn {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.tools-linkbtn:hover { color: var(--fg); border-color: var(--fg-muted); }
+.tools-empty {
+  font-size: 12px;
+  margin: 2px 0 4px;
+}
+.tools-grid--enabled .tool-box {
+  /* enabled block reads as "on" already — keep the check subtle, not loud */
+}
+.tools-type-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+.tools-type-tab {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.tools-type-tab:hover {
+  color: var(--fg);
+  border-color: var(--fg-muted);
+}
+.tools-type-tab.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.tools-bulk {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Checkbox grid */
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+}
+.tool-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color 0.1s, background 0.1s;
+}
+.tool-box:hover {
+  border-color: var(--fg-muted);
+}
+.tool-box input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.tool-box-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-box-group {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.tool-box--on {
+  background: color-mix(in srgb, var(--green, #3fb950) 12%, transparent);
+  border-color: color-mix(in srgb, var(--green, #3fb950) 45%, transparent);
+}
+.tool-box--on .tool-box-name {
+  color: var(--fg);
+}
+.tool-box--off .tool-box-name {
+  color: var(--fg-muted);
+}
+.tool-box--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tool-box--changed {
+  outline: 1px dashed var(--accent);
+  outline-offset: 1px;
+}
+
+/* Apply bar */
+.tools-apply-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+}
+.tools-apply-summary {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.tools-diff-grant { color: var(--green, #3fb950); font-weight: 600; }
+.tools-diff-revoke { color: var(--red, #e5534b); font-weight: 600; }
+.tools-reason {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Composition tab — flat sections with a shared title style.

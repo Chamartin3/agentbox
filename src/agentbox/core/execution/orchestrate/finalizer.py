@@ -45,11 +45,9 @@ def cleanup_run_dir(run_dir: Path | None) -> None:
     shutil.rmtree(run_dir, ignore_errors=True)
 
 
-def cleanup_workdir(agent: AgentDef, workdir: Path) -> None:
-    """Remove an ephemeral, non-persistent workdir after the run ends."""
-    if agent.workspace != "<ephemeral>":
-        return
-    if agent.session_mode == "persistent":
+def cleanup_workdir(workdir: Path, dispose: bool) -> None:
+    """Remove the workdir when it is a throwaway (dispose=True)."""
+    if not dispose:
         return
     with contextlib.suppress(OSError):
         shutil.rmtree(workdir.parent, ignore_errors=True)
@@ -130,6 +128,7 @@ class RunFinalizer:
         workdir: Path,
         run_dir: Path,
         step_result: "StepResult | None",
+        dispose_workdir: bool = False,
     ) -> None:
         """Terminal-state persist + webhook + cleanup."""
         # Re-persist conversation_uri for runners that discover their
@@ -202,7 +201,7 @@ class RunFinalizer:
         with contextlib.suppress(Exception):
             cleanup_run_dir(run_dir)
         with contextlib.suppress(Exception):
-            cleanup_workdir(agent, workdir)
+            cleanup_workdir(workdir, dispose_workdir)
 
 
 __all__ = ["RunFinalizer", "cleanup_run_dir", "cleanup_workdir"]

@@ -20,7 +20,6 @@ vi.mock('@/api/client', async () => {
 vi.mock('@/api/api_tokens', () => ({
   apiTokens: { listSafe: vi.fn() },
 }));
-// Modal pulls in a lot; we only smoke-test the section itself.
 vi.mock('@/components/runner/RunnerProfileModal', () => ({
   default: () => <div data-testid="modal" />,
 }));
@@ -50,31 +49,46 @@ describe('RunnerProfileSection', () => {
     tok.listSafe.mockResolvedValue([]);
   });
 
-  it('shows the bound profile in the select after load', async () => {
+  it('shows the bound profile name and backend in the card after load', async () => {
     render(wrap(<RunnerProfileSection agentId="a1" />));
     await waitFor(() => expect(screen.queryByText(/loading/)).toBeNull());
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
-    expect(select.value).toBe('p2');
-    expect(screen.getByText(/bound to/)).not.toBeNull();
+    // Card shows profile name and friendly harness label
+    expect(screen.getByText('claude-fast')).not.toBeNull();
+    expect(screen.getByText('Claude Code')).not.toBeNull();
+    // No combobox visible by default
+    expect(screen.queryByRole('combobox')).toBeNull();
   });
 
-  it('changing to "" clears the bound profile', async () => {
+  it('pencil opens the pick-or-create modal; "System default" clears the binding', async () => {
     m.clearAgentRunnerProfile.mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(wrap(<RunnerProfileSection agentId="a1" />));
     await waitFor(() => expect(screen.queryByText(/loading/)).toBeNull());
 
-    await user.selectOptions(screen.getByRole('combobox'), '');
+    await user.click(screen.getByRole('button', { name: /Change runner profile/i }));
+    // Modal lists profiles in a filterable table + a system-default row (async)
+    expect(screen.getByRole('dialog')).not.toBeNull();
+    await user.click(await screen.findByText(/System default/i));
     await waitFor(() => expect(m.clearAgentRunnerProfile).toHaveBeenCalledWith('a1'));
   });
 
-  it('changing to another profile calls setAgentRunnerProfile', async () => {
+  it('picking another profile row calls setAgentRunnerProfile', async () => {
     m.setAgentRunnerProfile.mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(wrap(<RunnerProfileSection agentId="a1" />));
     await waitFor(() => expect(screen.queryByText(/loading/)).toBeNull());
 
-    await user.selectOptions(screen.getByRole('combobox'), 'p1');
+    await user.click(screen.getByRole('button', { name: /Change runner profile/i }));
+    await user.click(await screen.findByText(/gpt-default/i));
     await waitFor(() => expect(m.setAgentRunnerProfile).toHaveBeenCalledWith('a1', 'p1'));
+  });
+
+  it('offers a create-new-profile action in the modal', async () => {
+    const user = userEvent.setup();
+    render(wrap(<RunnerProfileSection agentId="a1" />));
+    await waitFor(() => expect(screen.queryByText(/loading/)).toBeNull());
+
+    await user.click(screen.getByRole('button', { name: /Change runner profile/i }));
+    expect(await screen.findByRole('button', { name: /create new profile/i })).not.toBeNull();
   });
 });

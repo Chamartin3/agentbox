@@ -139,8 +139,18 @@ class RunSetup:
         agent: AgentDef,
         session_id: str | None,
         workspace_override: str | None = None,
-    ) -> tuple[Path, str | None]:
+        *,
+        session_mode: str | None = None,
+        fresh_workspace: bool = False,
+    ) -> tuple[Path, str | None, bool]:
+        """Resolve the run workdir.
+
+        Returns (path, session_id, dispose_after_run).
+        dispose_after_run=True means the workdir is a throwaway temp dir and
+        should be deleted once the run finishes.
+        """
         ws_lookup = self._mgrs.workspaces
+        effective_mode = session_mode or "headless"
 
         if workspace_override:
             original = agent.workspace
@@ -151,31 +161,38 @@ class RunSetup:
                 agent.workspace = original
             if not ephemeral:
                 path.mkdir(parents=True, exist_ok=True)
-                return path, session_id
+                return path, session_id, False
 
         path, ephemeral = resolve_path(agent, self.settings, ws_lookup)
-        if not ephemeral:
+
+        # fresh_workspace forces a throwaway dir regardless of what the agent
+        # declares; it never wipes named/provisioned workspace directories.
+        if not ephemeral and not fresh_workspace:
             path.mkdir(parents=True, exist_ok=True)
-            return path, session_id
-        if agent.session_mode == "persistent":
-            if session_id:
+            return path, session_id, False
+
+        if effective_mode == "persistent":
+            # Persistent: reuse or create a durable session workdir.
+            if not fresh_workspace and session_id:
                 existing = self._mgrs.sessions.get_dict(session_id)
                 if existing and existing["workdir"]:
                     self._mgrs.sessions.touch(session_id)
-                    return Path(existing["workdir"]), session_id
+                    return Path(existing["workdir"]), session_id, False
             self.settings.sessions_dir.mkdir(parents=True, exist_ok=True)
-            sid = self._mgrs.sessions.create_session(agent.id, agent.session_mode, None)
+            sid = self._mgrs.sessions.create_session(agent.id, effective_mode, None)
             wd = self.settings.sessions_dir / sid / "workdir"
             wd.mkdir(parents=True, exist_ok=True)
             self._mgrs.sessions.set_workdir(sid, str(wd))
-            return wd, sid
+            return wd, sid, False
+
+        # headless ephemeral: temp dir deleted after the run.
         self.settings.runs_dir.mkdir(parents=True, exist_ok=True)
         wd = (
             Path(tempfile.mkdtemp(prefix="run-", dir=self.settings.runs_dir))
             / "workdir"
         )
         wd.mkdir(parents=True, exist_ok=True)
-        return wd, None
+        return wd, None, True
 
     # ------------------------------------------------------------------ backend
     def select_backend(

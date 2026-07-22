@@ -238,6 +238,7 @@ def launch_background_task(
     broadcasters: dict[str, RunBroadcaster],
     tasks: set,
     run_tasks: dict[str, asyncio.Task],
+    dispose_workdir: bool = False,
 ) -> str:
     """Create broadcaster, capture prompt fragments, and launch the run task."""
     broadcaster = RunBroadcaster()
@@ -269,6 +270,7 @@ def launch_background_task(
             finalizer,
             effective=effective,
             composed=composed,
+            dispose_workdir=dispose_workdir,
         )
     )
     tasks.add(task)

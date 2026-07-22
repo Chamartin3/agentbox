@@ -10,8 +10,8 @@ const req = apiRequest as unknown as ReturnType<typeof vi.fn>;
 
 const TOOLS = {
   items: [
-    { name: 'fs.read', description: 'read files', capability: 'fs', tags: [] },
-    { name: 'shell.exec', description: 'run shell', capability: 'shell', tags: [] },
+    { name: 'fs.read', description: 'read files', kind: 'builtin' },
+    { name: 'shell.exec', description: 'run shell', kind: 'builtin' },
   ],
 };
 const GRANTS = {
@@ -34,49 +34,63 @@ const mockLoad = () => {
   });
 };
 
+const box = (short: string) =>
+  screen.getByText(short).closest('label')!.querySelector('input') as HTMLInputElement;
+
 describe('AgentToolGrantsPicker', () => {
   beforeEach(mockLoad);
 
-  it('lists active grants and ungranted tools', async () => {
-    render(<AgentToolGrantsPicker agentId="a1" />);
+  it('renders a checkbox per tool with the granted one enabled and a live count', async () => {
+    render(<AgentToolGrantsPicker agentId="a1" workspaceId={null} />);
     await waitFor(() => expect(screen.queryByText(/Loading/)).toBeNull());
-    expect(screen.getByText('fs.read')).not.toBeNull();
-    // ungranted shell.exec appears as <option>
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
-    expect(Array.from(select.options).map((o) => o.value)).toContain('shell.exec');
+
+    // Short names shown; granted count reflected
+    expect(screen.getByText('read')).not.toBeNull();
+    expect(screen.getByText('exec')).not.toBeNull();
+    expect(screen.getByText('1 enabled')).not.toBeNull();
+
+    expect(box('read').checked).toBe(true);   // fs.read granted
+    expect(box('exec').checked).toBe(false);  // shell.exec ungranted
   });
 
-  it('grant button stays disabled until reason is long enough', async () => {
+  it('toggling a tool reveals the apply bar, disabled until reason is long enough', async () => {
     const user = userEvent.setup();
-    render(<AgentToolGrantsPicker agentId="a1" />);
+    render(<AgentToolGrantsPicker agentId="a1" workspaceId={null} />);
     await waitFor(() => expect(screen.queryByText(/Loading/)).toBeNull());
 
-    const select = screen.getByRole('combobox');
-    await user.selectOptions(select, 'shell.exec');
-    const grantBtn = screen.getByRole('button', { name: 'Grant' }) as HTMLButtonElement;
-    expect(grantBtn.disabled).toBe(true);
+    await user.click(box('exec'));
+    const applyBtn = screen.getByRole('button', { name: /apply 1 change/i }) as HTMLButtonElement;
+    expect(applyBtn.disabled).toBe(true);
 
-    await user.type(screen.getByPlaceholderText(/Reason \(required/), 'ok!');
-    expect(grantBtn.disabled).toBe(false);
+    await user.type(screen.getByPlaceholderText(/reason \(required/i), 'ok!');
+    expect(applyBtn.disabled).toBe(false);
   });
 
-  it('POSTs a grant with tool name and reason', async () => {
+  it('applies pending grants and revokes with one shared reason', async () => {
     const user = userEvent.setup();
-    render(<AgentToolGrantsPicker agentId="a1" />);
+    render(<AgentToolGrantsPicker agentId="a1" workspaceId={null} />);
     await waitFor(() => expect(screen.queryByText(/Loading/)).toBeNull());
 
-    await user.selectOptions(screen.getByRole('combobox'), 'shell.exec');
-    await user.type(screen.getByPlaceholderText(/Reason \(required/), 'needed');
-    await user.click(screen.getByRole('button', { name: 'Grant' }));
+    await user.click(box('exec'));   // grant shell.exec
+    await user.click(box('read'));   // revoke fs.read
+    await user.type(screen.getByPlaceholderText(/reason \(required/i), 'needed');
+    await user.click(screen.getByRole('button', { name: /apply 2 changes/i }));
 
     await waitFor(() =>
       expect(req).toHaveBeenCalledWith(
         '/api/agents/a1/tool_grants',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ tool_name: 'shell.exec', changelog: 'needed' }),
+          body: JSON.stringify({ tool_name: 'shell.exec', changelog: 'needed', workspace_id: null }),
         }),
       ),
+    );
+    expect(req).toHaveBeenCalledWith(
+      '/api/agents/a1/tool_grants/fs.read',
+      expect.objectContaining({
+        method: 'DELETE',
+        body: JSON.stringify({ changelog: 'needed' }),
+      }),
     );
   });
 });

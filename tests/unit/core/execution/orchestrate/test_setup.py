@@ -284,9 +284,10 @@ class TestPrepareWorkdir:
             "agentbox.core.execution.orchestrate.setup.resolve_path",
             return_value=(expected_path, False),  # (path, ephemeral=False)
         ):
-            path, session_id = setup.prepare_workdir(agent, session_id="sess-1")
+            path, session_id, dispose = setup.prepare_workdir(agent, session_id="sess-1")
 
         assert path == expected_path
         assert session_id == "sess-1"
+        assert dispose is False
         # db.sessions.create_session must not be called to create a session for a named workspace
         mock_store.sessions.create_session.assert_not_called()

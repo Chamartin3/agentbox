@@ -145,6 +145,8 @@ def run_cmd(
         body: dict[str, object] = {"agent": agent, "input": prompt}
         if session_id:
             body["session_id"] = session_id
+        if ephemeral:
+            body["fresh_workspace"] = True
         resp = httpx.post(f"{api}/api/runs", json=body, timeout=30)
         resp.raise_for_status()
         run_id = resp.json()["run_id"]

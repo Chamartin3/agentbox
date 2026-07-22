@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api, AgentDef, ApiError } from '../api/client';
 import { useAgentActions } from '../hooks/agents';
@@ -6,6 +6,7 @@ import { useRunsPage, useRunStats } from '../hooks/runs';
 import { versionsApi, VersionSummary } from '../api/versions';
 import AgentVersions from './AgentVersions';
 import AgentConfigEditor from '../components/agent/AgentConfigEditor';
+import { AgentTagsEditor } from '../components/agent/AgentTagsEditor';
 import MarkdownEditor from '../components/common/MarkdownEditor';
 import RunsTable, { RunRow } from '../components/runs/RunsTable';
 import RunsDashboard from '../components/runs/RunsDashboard';
@@ -187,6 +188,49 @@ export default function AgentDetailPage() {
   const { toast, flash } = useToast();
   const agentActions = useAgentActions();
 
+  // Inline-editable description in the header
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descInput, setDescInput] = useState('');
+  const descInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  const startEditDesc = () => {
+    setDescInput(agent?.description ?? '');
+    setEditingDesc(true);
+    setTimeout(() => {
+      descInputRef.current?.select();
+      autoGrow(descInputRef.current);
+    }, 0);
+  };
+  const commitDesc = async () => {
+    if (!agent) return;
+    setEditingDesc(false);
+    const trimmed = descInput.trim();
+    if (trimmed === (agent.description ?? '')) return;
+    try {
+      const res = await agentActions.patch(agent.id, { description: trimmed } as Partial<AgentDef>);
+      setAgent(res.agent);
+      flash('ok', 'description saved');
+    } catch (e) {
+      flash('error', `failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const handleTagsChange = async (newTags: string[]) => {
+    if (!agent) return;
+    try {
+      const res = await agentActions.patch(agent.id, { tags: newTags } as Partial<AgentDef>);
+      setAgent(res.agent);
+    } catch (e) {
+      flash('error', `tag update failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   const [prompt, setPrompt] = useState<string>('');
   const [promptDirty, setPromptDirty] = useState(false);
   const [loadingPrompt, setLoadingPrompt] = useState(false);
@@ -282,7 +326,32 @@ export default function AgentDetailPage() {
       <header className="agent-header">
         <div className="agent-title">
           <h1>{agent.id}</h1>
-          {agent.description && <p className="agent-description">{agent.description}</p>}
+          {editingDesc ? (
+            <textarea
+              ref={descInputRef}
+              className="agent-desc-input"
+              value={descInput}
+              rows={1}
+              onChange={(e) => { setDescInput(e.target.value); autoGrow(e.currentTarget); }}
+              onBlur={commitDesc}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void commitDesc(); }
+                if (e.key === 'Escape') setEditingDesc(false);
+              }}
+            />
+          ) : (
+            <p
+              className="agent-description agent-description-editable"
+              onClick={startEditDesc}
+              title="click to edit"
+            >
+              {agent.description || <span className="dim">no description — click to add</span>}
+            </p>
+          )}
+          <div className="agent-tags-row">
+            <span className="agent-tags-label">tags</span>
+            <AgentTagsEditor tags={agent.tags} onChange={(t) => void handleTagsChange(t)} />
+          </div>
         </div>
         <div className="agent-metadata">
           <span className="tag">{agent.source_format || 'unknown'}</span>

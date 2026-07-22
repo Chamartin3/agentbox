@@ -77,7 +77,7 @@ def patch_agent(
     On-disk files are not written by this endpoint — use
     ``POST /api/agents/{id}/export`` for that.
     """
-    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    patch = body.model_dump(exclude_unset=True)
     try:
         updated = ctx.agents.patch_agent_config(agent_id, patch)
     except AgentServiceError as exc:

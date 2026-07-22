@@ -91,63 +91,30 @@ class TestCleanupRunDir:
 
 
 class TestCleanupWorkdir:
-    def test_skips_non_ephemeral_workspace(
-        self, tmp_path: Path, make_agent: Callable[..., MagicMock]
-    ) -> None:
-        """cleanup_workdir must not remove workdirs that belong to a named workspace."""
-        # Arrange
-        agent = make_agent(workspace="production-ws", session_mode="stateless")
+    def test_skips_when_dispose_false(self, tmp_path: Path) -> None:
+        """cleanup_workdir must not remove anything when dispose=False."""
         workdir = tmp_path / "work"
         workdir.mkdir()
 
-        # Act
-        cleanup_workdir(agent, workdir)
+        cleanup_workdir(workdir, dispose=False)
 
-        # Assert
         assert workdir.exists()
 
-    def test_skips_persistent_session_even_when_workspace_is_ephemeral(
-        self, tmp_path: Path, make_agent: Callable[..., MagicMock]
-    ) -> None:
-        """cleanup_workdir must preserve workdirs with session_mode='persistent' — history must survive the run."""
-        # Arrange
-        agent = make_agent(workspace="<ephemeral>", session_mode="persistent")
-        workdir = tmp_path / "parent" / "work"
-        workdir.mkdir(parents=True)
-
-        # Act
-        cleanup_workdir(agent, workdir)
-
-        # Assert
-        assert workdir.exists()
-
-    def test_removes_parent_dir_for_ephemeral_stateless_session(
-        self, tmp_path: Path, make_agent: Callable[..., MagicMock]
-    ) -> None:
-        """cleanup_workdir removes workdir.parent for ephemeral, stateless sessions."""
-        # Arrange
-        agent = make_agent(workspace="<ephemeral>", session_mode="stateless")
+    def test_removes_parent_dir_when_dispose_true(self, tmp_path: Path) -> None:
+        """cleanup_workdir removes workdir.parent when dispose=True."""
         parent = tmp_path / "run-scratch"
         workdir = parent / "agent-work"
         workdir.mkdir(parents=True)
 
-        # Act
-        cleanup_workdir(agent, workdir)
+        cleanup_workdir(workdir, dispose=True)
 
-        # Assert
         assert not parent.exists()
 
-    def test_tolerates_missing_parent_dir_for_ephemeral_stateless(
-        self, tmp_path: Path, make_agent: Callable[..., MagicMock]
-    ) -> None:
-        """cleanup_workdir must not raise when the ephemeral workdir's parent is already absent."""
-        # Arrange
-        agent = make_agent(workspace="<ephemeral>", session_mode="stateless")
+    def test_tolerates_missing_parent_when_dispose_true(self, tmp_path: Path) -> None:
+        """cleanup_workdir must not raise when the workdir's parent is already absent."""
         workdir = tmp_path / "run-already-gone" / "work"
-        # Neither parent nor workdir is created
 
-        # Act / Assert — no exception
-        cleanup_workdir(agent, workdir)
+        cleanup_workdir(workdir, dispose=True)
 
 
 # ---------------------------------------------------------------------------
@@ -500,14 +467,14 @@ class TestRunFinalizerCleanupDelegation:
         # Assert
         mock_cleanup_run.assert_called_once_with(run_dir)
 
-    def test_calls_cleanup_workdir_with_agent_and_workdir(
+    def test_calls_cleanup_workdir_with_workdir_and_dispose(
         self,
         tmp_path: Path,
         run_finalize: Callable[..., None],
         make_agent: Callable[..., MagicMock],
         make_step_result: Callable[..., object],
     ) -> None:
-        """finalize must pass agent and workdir to cleanup_workdir so ephemeral dirs are removed."""
+        """finalize must pass workdir and dispose_workdir to cleanup_workdir."""
         # Arrange
         agent = make_agent()
         workdir = tmp_path / "agent-work"
@@ -521,7 +488,8 @@ class TestRunFinalizerCleanupDelegation:
                 agent=agent,
                 workdir=workdir,
                 step_result=make_step_result(),
+                dispose_workdir=True,
             )
 
         # Assert
-        mock_cleanup_work.assert_called_once_with(agent, workdir)
+        mock_cleanup_work.assert_called_once_with(workdir, True)

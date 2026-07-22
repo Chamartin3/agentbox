@@ -23,8 +23,8 @@ class TestTranslateTool:
     # --- Canonical → native (direct lookup) ---
 
     def test_canonical_to_opencode(self):
-        assert translate_tool("fs.read", OPENCODE_TOOLS) == "read_file"
-        assert translate_tool("shell.exec", OPENCODE_TOOLS) == "run_command"
+        assert translate_tool("fs.read", OPENCODE_TOOLS) == "read"
+        assert translate_tool("shell.exec", OPENCODE_TOOLS) == "bash"
 
     def test_canonical_to_claude(self):
         assert translate_tool("fs.read", CLAUDE_TOOLS) == "Read"
@@ -37,8 +37,8 @@ class TestTranslateTool:
         assert translate_tool("Bash", CLAUDE_TOOLS) == "Bash"
 
     def test_opencode_native_idempotent(self):
-        assert translate_tool("read_file", OPENCODE_TOOLS) == "read_file"
-        assert translate_tool("run_command", OPENCODE_TOOLS) == "run_command"
+        assert translate_tool("read", OPENCODE_TOOLS) == "read"
+        assert translate_tool("bash", OPENCODE_TOOLS) == "bash"
 
     # --- Names native to another backend are NOT cross-translated ---
 
@@ -46,8 +46,8 @@ class TestTranslateTool:
         # "Read" is native to Claude Code but not to OpenCode → passthrough.
         assert translate_tool("Read", OPENCODE_TOOLS) == "Read"
         assert translate_tool("Bash", OPENCODE_TOOLS) == "Bash"
-        assert translate_tool("read_file", CLAUDE_TOOLS) == "read_file"
-        assert translate_tool("run_command", CLAUDE_TOOLS) == "run_command"
+        assert translate_tool("read", CLAUDE_TOOLS) == "read"
+        assert translate_tool("bash", CLAUDE_TOOLS) == "bash"
 
     # --- MCP-prefix rewrite ---
 
@@ -174,5 +174,5 @@ class TestCodexNativeNames:
         assert translate_tool("LS", CODEX_TOOLS) == "LS"
 
     def test_opencode_native_to_codex_passthrough(self):
-        # "read_file" is native to OpenCode, not codex → passthrough.
-        assert translate_tool("read_file", CODEX_TOOLS) == "read_file"
+        # "read" is native to OpenCode, not codex → passthrough.
+        assert translate_tool("read", CODEX_TOOLS) == "read"

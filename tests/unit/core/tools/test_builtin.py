@@ -54,9 +54,9 @@ class TestBackendNames:
             ("shell.exec", CLAUDE_TOOLS, "Bash"),
             ("http.fetch", CLAUDE_TOOLS, "WebFetch"),
             ("web.search", CLAUDE_TOOLS, "WebSearch"),
-            ("fs.read", OPENCODE_TOOLS, "read_file"),
-            ("fs.write", OPENCODE_TOOLS, "write_file"),
-            ("shell.exec", OPENCODE_TOOLS, "run_command"),
+            ("fs.read", OPENCODE_TOOLS, "read"),
+            ("fs.write", OPENCODE_TOOLS, "write"),
+            ("shell.exec", OPENCODE_TOOLS, "bash"),
         ],
     )
     def test_parity_matrix(
@@ -71,5 +71,5 @@ class TestBackendNames:
         assert translate_tool("no.such.tool", CLAUDE_TOOLS) == "no.such.tool"
 
     def test_foreign_native_passthrough(self):
-        # "read_file" is native to OpenCode, not Claude → passthrough.
-        assert translate_tool("read_file", CLAUDE_TOOLS) == "read_file"
+        # "read" is native to OpenCode, not Claude → passthrough.
+        assert translate_tool("read", CLAUDE_TOOLS) == "read"

@@ -28,6 +28,7 @@ async def _run(
     finalizer: RunFinalizer,
     effective: EffectiveRunnerConfig | None = None,
     composed: ComposedPrompt | None = None,
+    dispose_workdir: bool = False,
 ) -> None:
     step_result = None
     try:
@@ -53,4 +54,5 @@ async def _run(
             workdir=workdir,
             run_dir=run_dir,
             step_result=step_result,
+            dispose_workdir=dispose_workdir,
         )
