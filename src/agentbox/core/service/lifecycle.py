@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass, field, replace
-from typing import Final
 
-from agentbox.core.config import SETTINGS, Settings
+from agentbox.core.config import Settings
 from agentbox.core.data import RunRecord
 from agentbox.core.data.manifests.workspaces import McpServerSpec
 from agentbox.core.db.seeds.engines import seed_default_runner_profiles
@@ -32,11 +32,6 @@ from agentbox.core.workspaces.tooling.mcp import McpRegistry
 from agentbox.core.workspaces.tooling.mcp.registry import McpServerConfig
 
 _log = logging.getLogger(__name__)
-
-# Env-var feature flags. Single source of truth for boot-time gates.
-ENV_IMPORT_ON_START: Final[str] = "AGENTBOX_IMPORT_ON_START"
-ENV_SKIP_DEFAULT_PROFILES: Final[str] = "AGENTBOX_SKIP_DEFAULT_PROFILES"
-ENV_SKIP_RESOURCE_IMPORT: Final[str] = "AGENTBOX_SKIP_RESOURCE_IMPORT"
 
 
 @dataclass(frozen=True)
@@ -160,7 +155,8 @@ def sync_project_mcp_servers(
 
 def seed_runner_profiles() -> StartupReport:
     """Idempotent seed of the default runner profiles."""
-    if SETTINGS.skip_default_profiles:
+    # Boot knob (deployment/test only, not a user setting): skip seeding.
+    if os.environ.get("AGENTBOX_SKIP_DEFAULT_PROFILES"):
         return StartupReport()
     try:
         created = seed_default_runner_profiles()
@@ -176,7 +172,8 @@ def boot_import_resources(
     settings: Settings,
 ) -> StartupReport:
     """Populate the central resource repository from on-disk layout."""
-    if SETTINGS.skip_resource_import:
+    # Boot knob (deployment/test only, not a user setting): skip repo import.
+    if os.environ.get("AGENTBOX_SKIP_RESOURCE_IMPORT"):
         return StartupReport()
 
     try:

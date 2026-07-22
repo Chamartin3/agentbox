@@ -14,7 +14,6 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
-from agentbox.core.config import SETTINGS
 from agentbox.core.data import RawJsonValue
 
 from agentbox.core.data.events import (
@@ -245,13 +244,15 @@ class PiBackend(BackendAdapter):
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
-        model = getattr(runner_config, "model", None) or SETTINGS.pi_model
+        # No terminal fallback: the runner profile supplies the model, else pi
+        # picks its own default (model=None).
+        model = getattr(runner_config, "model", None)
         extra_args = list(getattr(runner_config, "extra_args", None) or [])
 
         provider = getattr(runner_config, "provider", None)
         model = _normalize_pi_model_id(model, provider)
 
-        argv = build_pi_argv(model, extra_args, SETTINGS.pi_model)
+        argv = build_pi_argv(model, extra_args, None)
 
         env = dict(os.environ)
 

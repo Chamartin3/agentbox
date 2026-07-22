@@ -14,8 +14,10 @@ from pathlib import Path
 import pytest
 from agentbox.core.agents import RuntimeConfig
 from agentbox.core.data import AgentDef
+from agentbox.core.data.profiles import RunnerProfileCreate
 from agentbox.core.db.database import Database
 from agentbox.core.service.agents import AgentService
+from agentbox.core.service.engines import EngineService
 
 
 def _seed_agent(store: Database, agent_id: str, kind: str = "token") -> None:
@@ -90,16 +92,17 @@ def test_short_changelog_raises(store: Database) -> None:
         AgentService().forbid_tool("a.gent", "shell.exec", "ab")
 
 
-def test_list_effective_tools_excludes_forbidden(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # The backend is resolved from the runner profile / settings default now,
-    # not runner.kind — so drive it via AGENTBOX_DEFAULT_BACKEND. claude_code's
+def test_list_effective_tools_excludes_forbidden(tmp_path: Path) -> None:
+    # The backend is resolved from the runner profile cascade now, not
+    # runner.kind — so bind a claude_code profile to the agent. claude_code's
     # native tools include shell.exec; forbidding it must drop it from the
     # effective list while other native tools remain.
-    monkeypatch.setenv("AGENTBOX_DEFAULT_BACKEND", "claude_code")
     store = Database(tmp_path / "agentbox.sqlite")
     _seed_agent(store, "cc.agent", kind="claude_code")
+    profile = EngineService().create_profile(
+        RunnerProfileCreate(name="cc", backend="claude_code")
+    )
+    EngineService().set_agent_runner_profile("cc.agent", profile.id)
     AgentService().forbid_tool("cc.agent", "shell.exec", "deny shell")
 
     names = {t["name"] for t in AgentService().list_effective_tools("cc.agent")}

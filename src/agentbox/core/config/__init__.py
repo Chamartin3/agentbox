@@ -54,14 +54,8 @@ class Settings:
         mcp_port           →  8766                        (AGENTBOX_MCP_PORT)
         mcp_discovery_ttl  →  86400                       (AGENTBOX_MCP_DISCOVERY_TTL)
 
-    Startup / lifecycle:
-        import_on_start    →  False                       (AGENTBOX_IMPORT_ON_START)
-        skip_default_profiles → False                     (AGENTBOX_SKIP_DEFAULT_PROFILES)
-        skip_resource_import  → False                     (AGENTBOX_SKIP_RESOURCE_IMPORT)
-
     Misc:
         extra_skill_roots  →  ""                          (AGENTBOX_EXTRA_SKILL_ROOTS)
-        keep_run_dirs      →  False                       (AGENTBOX_KEEP_RUN_DIRS)
         in_container       →  False                       (AGENTBOX_IN_CONTAINER)
         ollama_url_rewrite →  None                        (AGENTBOX_OLLAMA_URL_REWRITE)
     """
@@ -128,54 +122,10 @@ class Settings:
     def mcp_discovery_ttl(self) -> int:
         return int(os.environ.get("AGENTBOX_MCP_DISCOVERY_TTL", "86400"))
 
-    # Startup / lifecycle
-    @property
-    def import_on_start(self) -> bool:
-        return _bool_env("AGENTBOX_IMPORT_ON_START")
-
-    @property
-    def skip_default_profiles(self) -> bool:
-        return bool(os.environ.get("AGENTBOX_SKIP_DEFAULT_PROFILES"))
-
-    @property
-    def skip_resource_import(self) -> bool:
-        return bool(os.environ.get("AGENTBOX_SKIP_RESOURCE_IMPORT"))
-
-    @property
-    def default_backend(self) -> str:
-        """Terminal fallback backend when no runner profile resolves.
-
-        The single source of truth for an agent's backend is the runner
-        profile cascade (per-run override → per-run profile → agent-bound
-        profile → system-default profile). This settings value is the last
-        resort below all of those — it replaced the legacy per-agent
-        ``runner.kind``. Overridable via ``AGENTBOX_DEFAULT_BACKEND``.
-        """
-        return os.environ.get("AGENTBOX_DEFAULT_BACKEND", "token")
-
-    # Backend default models — the fallback model a backend uses when the
-    # runner config omits one. Overridable per backend via AGENTBOX_*_MODEL.
-    # ``None`` means "let the backend's own CLI/SDK pick its default".
-    @property
-    def opencode_model(self) -> str:
-        return os.environ.get("AGENTBOX_OPENCODE_MODEL", "opencode/deepseek-v4-flash-free")
-
-    @property
-    def codex_model(self) -> str | None:
-        return os.environ.get("AGENTBOX_CODEX_MODEL") or None
-
-    @property
-    def pi_model(self) -> str | None:
-        return os.environ.get("AGENTBOX_PI_MODEL") or None
-
     # Misc
     @property
     def extra_skill_roots(self) -> str:
         return os.environ.get("AGENTBOX_EXTRA_SKILL_ROOTS", "")
-
-    @property
-    def keep_run_dirs(self) -> bool:
-        return _bool_env("AGENTBOX_KEEP_RUN_DIRS")
 
     @property
     def in_container(self) -> bool:

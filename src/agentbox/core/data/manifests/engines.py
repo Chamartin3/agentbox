@@ -12,7 +12,7 @@ from agentbox.core.data.constants import (
 
 class RunnerSpec(BaseModel):
     # An agent's backend is no longer declared here. It is resolved by the one
-    # runner resolver (bound profile → system-default → Settings.default_backend);
+    # runner resolver (bound profile → system-default → the module-level default backend);
     # RunnerSpec carries only non-backend runner settings.
 
     # --- Shared across all runners ---

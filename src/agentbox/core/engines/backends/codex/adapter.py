@@ -14,8 +14,6 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, ClassVar
 
-from agentbox.core.config import SETTINGS
-
 from agentbox.core.data.events import DoneEvent, LogEvent, RunEvent, TextEvent, UsageEvent
 from agentbox.core.engines.backends.base import BackendAdapter
 from agentbox.core.data import RenderedConfig
@@ -146,10 +144,12 @@ class CodexBackend(BackendAdapter):
         **kwargs: Any,
     ) -> RenderedConfig:
         agent_runner = getattr(agent, "runner", None)
-        model = getattr(runner_config, "model", None) or SETTINGS.codex_model
+        # No terminal fallback: the runner profile supplies the model, else the
+        # codex CLI picks its own default (model=None).
+        model = getattr(runner_config, "model", None)
         extra_args = list(getattr(runner_config, "extra_args", None) or [])
 
-        argv = build_codex_argv(model, extra_args, SETTINGS.codex_model)
+        argv = build_codex_argv(model, extra_args, None)
 
         if runtime_config is not None:
             effective_tools = intersect_allowed_tools(

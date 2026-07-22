@@ -241,7 +241,6 @@ def _scrub_agentbox_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in list(os.environ):
         if key.startswith("AGENTBOX_") and key != "AGENTBOX_DEBUG":
             monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("AGENTBOX_IMPORT_ON_START", "1")
 
 
 @pytest.fixture(autouse=True)

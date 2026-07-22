@@ -20,11 +20,12 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Any, cast
 
-from agentbox.core.config import SETTINGS, Settings
+from agentbox.core.config import Settings
 from agentbox.core.data import UsagePayload
 from agentbox.core.data import AgentDef, RunRecord
 from agentbox.core.db import RunManager, UsageManager, WebhookDeliveryManager
@@ -40,7 +41,8 @@ def cleanup_run_dir(run_dir: Path | None) -> None:
     """Remove the per-run scratch dir unless ``AGENTBOX_KEEP_RUN_DIRS=1``."""
     if run_dir is None:
         return
-    if SETTINGS.keep_run_dirs:
+    # Debug knob (dev/local only, not a user setting): keep run dirs for inspection.
+    if os.environ.get("AGENTBOX_KEEP_RUN_DIRS", "").lower() in {"1", "true", "yes"}:
         return
     shutil.rmtree(run_dir, ignore_errors=True)
 

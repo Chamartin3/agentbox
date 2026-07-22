@@ -260,7 +260,7 @@ class EngineService(Service):
 
         A thin backend projection of ``RunnerProfileResolver.resolve()`` with
         no per-run overrides: agent-bound profile → system-default profile →
-        ``Settings.default_backend``. This is the one entry point every
+        ``the module-level default backend``. This is the one entry point every
         non-run caller (save validation, tool resolution, CLI dispatch,
         display, observability) uses to read "the agent's backend". It never
         consults the legacy ``runner.kind``.

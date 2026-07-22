@@ -131,16 +131,7 @@ def _deployment_groups() -> dict[str, list[DeploymentEntry]]:
             e("mcp_port", "AGENTBOX_MCP_PORT", s.mcp_port),
             e("mcp_discovery_ttl", "AGENTBOX_MCP_DISCOVERY_TTL", s.mcp_discovery_ttl),
         ],
-        "Backend models": [
-            e("opencode_model", "AGENTBOX_OPENCODE_MODEL", s.opencode_model),
-            e("codex_model", "AGENTBOX_CODEX_MODEL", s.codex_model),
-            e("pi_model", "AGENTBOX_PI_MODEL", s.pi_model),
-        ],
-        "Flags": [
-            e("import_on_start", "AGENTBOX_IMPORT_ON_START", s.import_on_start),
-            e("skip_default_profiles", "AGENTBOX_SKIP_DEFAULT_PROFILES", s.skip_default_profiles),
-            e("skip_resource_import", "AGENTBOX_SKIP_RESOURCE_IMPORT", s.skip_resource_import),
-            e("keep_run_dirs", "AGENTBOX_KEEP_RUN_DIRS", s.keep_run_dirs),
+        "Environment": [
             e("in_container", "AGENTBOX_IN_CONTAINER", s.in_container),
             e("ollama_url_rewrite", "AGENTBOX_OLLAMA_URL_REWRITE", s.ollama_url_rewrite),
         ],

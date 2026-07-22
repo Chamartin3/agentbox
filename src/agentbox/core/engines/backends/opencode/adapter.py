@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any, ClassVar, TypedDict
 
 from agentbox.core.data.jsontypes import RawJson
-from agentbox.core.config import SETTINGS
 
 from agentbox.core.engines.backends.opencode.stream import _run_opencode_stream
 
@@ -44,6 +43,11 @@ __all__ = [
 ]
 
 _NAME = "opencode"
+
+# Terminal fallback model when neither the runner config nor a runner profile
+# supplies one. The system-default runner profile is the real source of truth;
+# this only guards the case where no profile resolves at all.
+_DEFAULT_MODEL = "opencode/deepseek-v4-flash-free"
 
 
 class _OpenCodeProviderOptions(TypedDict):
@@ -188,7 +192,7 @@ class OpenCodeBackend(BackendAdapter):
             or getattr(agent_runner, "extra_args", None)
             or []
         )
-        model = getattr(runner_config, "model", None) or SETTINGS.opencode_model
+        model = getattr(runner_config, "model", None) or _DEFAULT_MODEL
 
         provider = getattr(runner_config, "provider", None)
         model = _normalize_model_id(model, provider)

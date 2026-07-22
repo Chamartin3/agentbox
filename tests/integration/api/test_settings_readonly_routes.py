@@ -10,9 +10,9 @@ def test_deployment_view_lists_env_config_without_leaking_secrets(client: Any) -
     assert r.status_code == 200
     groups = r.json()["groups"]
     # Grouped, and the well-known knobs are present.
-    assert {"Paths", "Server", "MCP", "Backend models", "Flags"} <= set(groups)
+    assert {"Paths", "Server", "MCP", "Environment"} <= set(groups)
     names = {e["name"] for g in groups.values() for e in g}
-    assert {"data_dir", "host", "port", "mcp_transport", "opencode_model"} <= names
+    assert {"data_dir", "host", "port", "mcp_transport"} <= names
     # Secrets are masked to set/unset — never the raw value.
     server = {e["name"]: e["value"] for e in groups["Server"]}
     assert server["webhook_secret"] in {"set", "unset"}
