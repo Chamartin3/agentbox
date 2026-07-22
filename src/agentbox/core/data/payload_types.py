@@ -292,6 +292,7 @@ class RunDetailPayload(TypedDict):
     configured_model: str | None
     reported_model: str | None
     prompt_version_id: int | None
+    rating: int | None
 
 
 class PaginatedRunItem(RunPagedRow, total=False):

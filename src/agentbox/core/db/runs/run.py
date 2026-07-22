@@ -29,11 +29,13 @@ from agentbox.core.data.rows import (
     RunPagedRow,
     RunStatsRow,
     RunUpdateFields,
+    RunVersionStats,
 )
 from agentbox.core.data.payload_types import RunnerSnapshot
 from agentbox.core.data._util import now_iso
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.agents.version import AgentVersion
+from agentbox.core.db.runs.comment import run_comments
 from agentbox.core.db.runs.usage import Usage
 
 
@@ -76,6 +78,7 @@ class Run(Entity, table=True):
     mcp_snapshot: Optional[str] = Field(default=None)
     runner_snapshot: Optional[str] = Field(default=None)
     prompt_version_id: Optional[int] = Field(foreign_key="prompt_versions.id", default=None)
+    rating: Optional[int] = Field(default=None)
 
     __table_args__ = tableargs(
         Index("runs_by_agent", "agent_id", "created_at"),
@@ -191,6 +194,49 @@ class RunManager(Manager[Run]):
     def set_status(self, run_id: str, status: str) -> None:
         """Directly set the status column on a run."""
         self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(status=status))
+
+    def set_rating(self, run_id: str, rating: int | None) -> None:
+        """Set the 0-5 star run rating (``None`` clears it)."""
+        self._query(sa_update(Run).where(getattr(Run, "id") == run_id).values(rating=rating))
+
+    def version_stats(self, agent_id: str) -> dict[int, RunVersionStats]:
+        """Per-agent-version aggregates over this agent's runs: run count,
+        average run rating (over rated runs), and total run comments. Keyed by
+        ``agent_version_id``.
+        """
+        out: dict[int, RunVersionStats] = {}
+        with self._engine.connect() as conn:
+            for r in conn.execute(
+                select(
+                    runs.c.agent_version_id,
+                    func.count().label("run_count"),
+                    func.avg(runs.c.rating).label("avg_rating"),
+                )
+                .where(runs.c.agent_id == agent_id)
+                .where(runs.c.agent_version_id.is_not(None))
+                .group_by(runs.c.agent_version_id)
+            ):
+                out[r.agent_version_id] = {
+                    "run_count": r.run_count,
+                    "avg_rating": float(r.avg_rating) if r.avg_rating is not None else None,
+                    "comment_count": 0,
+                }
+            for c in conn.execute(
+                select(
+                    runs.c.agent_version_id,
+                    func.count(run_comments.c.id).label("comment_count"),
+                )
+                .select_from(runs.join(run_comments, run_comments.c.run_id == runs.c.id))
+                .where(runs.c.agent_id == agent_id)
+                .where(runs.c.agent_version_id.is_not(None))
+                .group_by(runs.c.agent_version_id)
+            ):
+                entry = out.setdefault(
+                    c.agent_version_id,
+                    {"run_count": 0, "avg_rating": None, "comment_count": 0},
+                )
+                entry["comment_count"] = c.comment_count
+        return out
 
     def list_runs_by_agent(
         self, limit: int = 50, agent_id: str | None = None
@@ -627,7 +673,7 @@ class RunManager(Manager[Run]):
                 func.coalesce(usage.c.model, "unknown").label("reported_model"),
                 usage.c.input_tokens, usage.c.output_tokens, usage.c.cache_read_tokens,
                 usage.c.cache_write_tokens.label("cache_creation_tokens"), usage.c.cost_usd,
-                runs.c.runner_profile_id, runs.c.runner_snapshot,
+                runs.c.runner_profile_id, runs.c.runner_snapshot, runs.c.rating,
             )
             .select_from(runs.outerjoin(usage, usage.c.run_id == runs.c.id))
             .where(runs.c.created_at >= since_iso)

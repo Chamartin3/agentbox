@@ -170,6 +170,9 @@ export default function AgentVersions({ agentId: propAgentId }: AgentVersionsPro
             <th style={{ padding: '6px 8px' }}>Changelog</th>
             <th style={{ padding: '6px 8px', width: 120 }}>Author</th>
             <th style={{ padding: '6px 8px', width: 140 }}>Created</th>
+            <th style={{ padding: '6px 8px', width: 60, textAlign: 'right' }} title="Total runs on this version">Runs</th>
+            <th style={{ padding: '6px 8px', width: 70, textAlign: 'right' }} title="Average run rating (0-5)">Avg ★</th>
+            <th style={{ padding: '6px 8px', width: 80, textAlign: 'right' }} title="Total run comments">Comments</th>
             <th style={{ padding: '6px 8px', width: 110 }}></th>
           </tr>
         </thead>
@@ -208,6 +211,19 @@ export default function AgentVersions({ agentId: propAgentId }: AgentVersionsPro
                 <td style={{ padding: '6px 8px', fontSize: 11 }} className="dim">{v.author || '—'}</td>
                 <td style={{ padding: '6px 8px', fontSize: 11 }} className="dim">
                   {new Date(v.created_at).toLocaleString()}
+                </td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: 12 }}>
+                  {v.run_count ?? 0}
+                </td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: 12 }}>
+                  {v.avg_rating != null ? (
+                    <span style={{ color: '#d4af37' }}>{v.avg_rating.toFixed(1)}★</span>
+                  ) : (
+                    <span className="dim">—</span>
+                  )}
+                </td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: 12 }}>
+                  {v.comment_count ? `💬 ${v.comment_count}` : <span className="dim">—</span>}
                 </td>
                 <td style={{ padding: '6px 8px', textAlign: 'right' }}>
                   {!isActive && (

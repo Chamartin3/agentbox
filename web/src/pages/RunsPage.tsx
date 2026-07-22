@@ -214,6 +214,7 @@ function RunsTab() {
         cache_creation_tokens: r.cache_write_tokens ?? null,
         cost_usd: r.cost_usd ?? null,
         duration_ms: r.duration_ms ?? null,
+        rating: r.rating ?? null,
       })),
     [items],
   );
@@ -266,7 +267,7 @@ function RunsTab() {
 
       <RunsTable
         items={runRows}
-        columns={['run', 'status', 'started', 'duration', 'agent_version', 'runner_model', 'tokens']}
+        columns={['run', 'status', 'started', 'duration', 'agent_version', 'runner_model', 'tokens', 'rating']}
         emptyMessage={anyFilter ? 'no runs match these filters' : 'no runs yet'}
         loading={loading}
       />

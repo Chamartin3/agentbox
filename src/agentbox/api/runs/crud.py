@@ -19,6 +19,7 @@ from agentbox.api.runs.schemas import (
     CreateRunBody,
     PostOutcomeBody,
     RunCommentBody,
+    RunRatingBody,
     SnapshotBody,
 )
 from agentbox.api.runs.webhooks import schedule_webhook
@@ -58,6 +59,8 @@ async def create_run(body: CreateRunBody) -> RunCreatedResult:
             runner_profile=body.runner_profile,
             runner_config=body.runner_config,
             runner_embedded=body.runner_embedded,
+            fresh_workspace=body.fresh_workspace,
+            session_mode=body.session_mode,
         )
     except AgentNotFound as exc:
         raise HTTPException(404, f"unknown agent {exc.agent_id!r}") from exc
@@ -220,6 +223,28 @@ def add_comment(run_id: str, body: RunCommentBody) -> RunCommentRow:
         return ExecutionService().add_comment(
             run_id, author=body.author, body=body.body
         )
+    except RunNotFound as exc:
+        raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
+
+
+@router.put("/{run_id}/rating")
+def set_run_rating(run_id: str, body: RunRatingBody) -> dict:
+    """Set the run's 0-5 star rating."""
+    try:
+        ExecutionService().set_run_rating(run_id, body.rating)
+        return {"rating": body.rating}
+    except RunNotFound as exc:
+        raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.delete("/{run_id}/rating")
+def clear_run_rating(run_id: str) -> dict:
+    """Clear the run's rating."""
+    try:
+        ExecutionService().set_run_rating(run_id, None)
+        return {"rating": None}
     except RunNotFound as exc:
         raise HTTPException(404, f"unknown run {exc.run_id!r}") from exc
 

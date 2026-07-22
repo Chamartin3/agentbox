@@ -1,7 +1,7 @@
 """Request/response models for the /runs API."""
 
 from __future__ import annotations
-from typing import Any
+from typing import Any, Literal
 
 from agentbox.core.data.payload_types import UsagePayload
 from pydantic import BaseModel
@@ -21,6 +21,8 @@ class CreateRunBody(BaseModel):
     runner_profile: str | None = None
     runner_config: dict[str, Any] | None = None
     runner_embedded: bool = False
+    fresh_workspace: bool = False
+    session_mode: Literal["headless", "persistent"] | None = None
 
 
 class CompleteRunBody(BaseModel):
@@ -50,10 +52,15 @@ class RunCommentBody(BaseModel):
     body: str
 
 
+class RunRatingBody(BaseModel):
+    rating: int
+
+
 __all__ = [
     "CompleteRunBody",
     "CreateRunBody",
     "PostOutcomeBody",
     "RunCommentBody",
+    "RunRatingBody",
     "SnapshotBody",
 ]

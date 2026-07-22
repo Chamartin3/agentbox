@@ -13,6 +13,9 @@ export interface VersionSummary {
   is_legacy: boolean;
   is_active: boolean;
   created_at: string;
+  run_count?: number | null;
+  avg_rating?: number | null;
+  comment_count?: number | null;
 }
 
 export interface VersionListResponse {

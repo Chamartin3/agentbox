@@ -20,6 +20,7 @@ from agentbox.core.service import (
     AgentVersionRow,
 )
 from agentbox.core.service.agents import AgentNotFound
+from agentbox.core.service.execution import ExecutionService
 
 router = APIRouter(prefix="/api/agents/{agent_id}/versions", tags=["versions"])
 
@@ -34,6 +35,9 @@ class _VersionSummaryItem(TypedDict):
     is_legacy: bool
     is_active: bool
     created_at: str
+    run_count: int
+    avg_rating: float | None
+    comment_count: int
 
 
 class _VersionListResult(TypedDict):
@@ -85,6 +89,7 @@ def list_agent_versions(agent_id: str) -> _VersionListResult:
     latest = svc.latest_version(agent_id)
     active_id = active["id"] if active else None
     active_version_num = active["version"] if active else None
+    stats = ExecutionService().version_run_stats(agent_id)
     enriched: list[_VersionSummaryItem] = [
         _VersionSummaryItem(
             id=v["id"],
@@ -94,6 +99,9 @@ def list_agent_versions(agent_id: str) -> _VersionListResult:
             is_legacy=v.get("is_legacy", False),
             is_active=v["id"] == active_id,
             created_at=v["created_at"],
+            run_count=(stats.get(v["id"]) or {}).get("run_count", 0),
+            avg_rating=(stats.get(v["id"]) or {}).get("avg_rating"),
+            comment_count=(stats.get(v["id"]) or {}).get("comment_count", 0),
         )
         for v in versions
     ]

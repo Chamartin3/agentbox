@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { fmtCost, fmtMs, fmtNum, fmtRelative } from '../../util/format';
 import { StatusPill } from '../common/StatusPill';
+import RunRatingStars from './RunRatingStars';
 
 // Re-export so existing imports (`import { StatusPill } from '../components/RunsTable'`)
 // keep working. New code should import from '../common/StatusPill' directly.
@@ -27,6 +28,7 @@ export interface RunRow {
   cache_read_tokens?: number | null;
   cache_creation_tokens?: number | null;
   cost_usd?: number | null;
+  rating?: number | null;
 }
 
 export type RunsColumn =
@@ -43,6 +45,7 @@ export type RunsColumn =
   | 'duration'
   | 'tokens'
   | 'cost'
+  | 'rating'
   | 'open';
 
 const DEFAULT_COLUMNS: RunsColumn[] = [
@@ -68,6 +71,7 @@ const COLUMN_HEADER: Record<RunsColumn, string> = {
   duration: 'Duration',
   tokens: 'Tokens',
   cost: 'Cost',
+  rating: 'Rating',
   open: '',
 };
 
@@ -199,6 +203,12 @@ export default function RunsTable({
       }
       case 'cost':
         return fmtCost(r.cost_usd);
+      case 'rating':
+        return (
+          <span onClick={stop}>
+            <RunRatingStars runId={r.id} initialRating={r.rating ?? null} />
+          </span>
+        );
       case 'open':
         return (
           <span onClick={stop}>

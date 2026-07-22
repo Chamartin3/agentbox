@@ -234,6 +234,14 @@ class WebhookDeliveryRow(TypedDict):
     ts: str
 
 
+class RunVersionStats(TypedDict):
+    """Per-agent-version aggregates over its runs (:py:meth:`RunManager.version_stats`)."""
+
+    run_count: int
+    avg_rating: float | None
+    comment_count: int
+
+
 class RichRunRow(TypedDict):
     """A row returned by :py:meth:`RunManager.list_runs_rich` (runs + usage join)."""
 
@@ -252,6 +260,7 @@ class RichRunRow(TypedDict):
     cost_usd: float | None
     runner_profile_id: str | None
     runner_snapshot: str | None
+    rating: int | None
 
 
 class RunPagedRow(TypedDict):
@@ -286,6 +295,7 @@ class RunPagedRow(TypedDict):
     mcp_snapshot: str | None
     runner_snapshot: str | None
     prompt_version_id: int | None
+    rating: int | None
     # usage columns (NULL when no usage row for this run)
     input_tokens: int | None
     output_tokens: int | None

@@ -6,6 +6,7 @@ import { useRun, useRunPrompt, useRunActions } from '../hooks/runs';
 import EventStream from '../components/runs/EventStream';
 import ConversationView from '../components/runs/ConversationView';
 import RunCommentThread from '../components/runs/RunCommentThread';
+import RunRatingStars from '../components/runs/RunRatingStars';
 import { StatusPill } from '../components/common/StatusPill';
 import { fmtCost, fmtDt, fmtMs, fmtNum, fmtRelative } from '../util/format';
 import type { LooseStreamEvent } from '../api/events';
@@ -551,6 +552,7 @@ export default function RunDetailPage() {
           </h1>
         </div>
         <StatusPill status={run.status} />
+        <RunRatingStars runId={run.id} initialRating={run.rating ?? null} />
         {runnerKind && <span className="stat">runner<strong>{runnerKind}</strong></span>}
         {runnerProfileName && <span className="stat">profile<strong>{runnerProfileName}</strong></span>}
         {modelName && <span className="stat">model<strong>{modelName}</strong></span>}

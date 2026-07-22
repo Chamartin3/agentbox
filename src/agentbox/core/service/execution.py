@@ -55,6 +55,7 @@ from agentbox.core.data.payload_types import (
 )
 from agentbox.core.data.rows import (
     RunCommentRow,
+    RunVersionStats,
     SessionRow,
     WebhookDeliveryRow,
 )
@@ -496,6 +497,8 @@ class ExecutionService(Service):
         runner_profile: str | None = None,
         runner_config: dict | None = None,
         runner_embedded: bool = False,
+        fresh_workspace: bool = False,
+        session_mode: str | None = None,
     ) -> RunCreatedResult:
         """Validate input, resolve the agent, and dispatch to the executor.
 
@@ -545,6 +548,8 @@ class ExecutionService(Service):
                 backend=backend,
                 runner_profile=runner_profile,
                 runner_config=runner_config,
+                fresh_workspace=fresh_workspace,
+                session_mode=session_mode,
             )
             return {"run_id": run_id, "agent": agent.id}
 
@@ -578,6 +583,8 @@ class ExecutionService(Service):
             runner_profile=runner_profile,
             runner_config=runner_config,
             runner_embedded=runner_embedded,
+            fresh_workspace=fresh_workspace,
+            session_mode=session_mode,
         )
         return {"run_id": run_id, "agent": agent.id}
 
@@ -819,8 +826,21 @@ class ExecutionService(Service):
             "configured_model": configured_model,
             "reported_model": reported_model,
             "prompt_version_id": base_dict["prompt_version_id"],
+            "rating": base_dict.get("rating"),
         }
         return {"run": run_payload, "usage": usage}
+
+    def set_run_rating(self, run_id: str, rating: int | None) -> None:
+        """Set the run's 0-5 star rating (``None`` clears it)."""
+        if rating is not None and not (0 <= rating <= 5):
+            raise ValueError(f"rating must be 0-5, got {rating}")
+        if self.get_run(run_id) is None:
+            raise RunNotFound(run_id)
+        self._runs.set_rating(run_id, rating)
+
+    def version_run_stats(self, agent_id: str) -> dict[int, RunVersionStats]:
+        """Per-version run aggregates (run count, avg rating, comment count)."""
+        return self._runs.version_stats(agent_id)
 
     def get_run_prompt_fragments(self, run_id: str) -> RunPromptFragmentsResult:
         rec = self.get_run(run_id)

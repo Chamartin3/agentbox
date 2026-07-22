@@ -47,6 +47,7 @@ export interface RunRecord {
   cost_usd?: number | null;
   model?: string | null;
   duration_ms?: number | null;
+  rating?: number | null;
 }
 
 export interface UsageRecord {
