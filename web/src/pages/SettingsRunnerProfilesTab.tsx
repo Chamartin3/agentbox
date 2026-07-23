@@ -3,6 +3,7 @@ import { api, type RunnerProvider } from '../api/client';
 import Toast from '../components/common/Toast';
 import RunnerProfilesPage from './RunnerProfilesPage';
 import { RuntimeDefaultsForm, type ToastState } from './SettingsBaseTab';
+import { HarnessBadge, ProviderBadge } from '../components/runner/RunnerBadges';
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -52,8 +53,12 @@ function ProvidersSection({ onToast }: { onToast: (t: ToastState) => void }) {
         ) : (
           providers.map((p) => (
             <tr key={p.id}>
-              <td><code>{p.id}</code> <span className="dim">{p.label}</span></td>
-              <td>{p.compatible_backends.map((b) => <span key={b} className="tag" style={{ marginRight: 4 }}>{b}</span>)}</td>
+              <td><ProviderBadge provider={p.id} /> <span className="dim">{p.label}</span></td>
+              <td>
+                <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
+                  {p.compatible_backends.map((b) => <HarnessBadge key={b} backend={b} />)}
+                </div>
+              </td>
               <td>
                 {models[p.id]
                   ? <span title={models[p.id].join(', ')}>{models[p.id].length} model(s)</span>

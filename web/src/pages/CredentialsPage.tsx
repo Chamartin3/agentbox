@@ -1,29 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Toast from '../components/common/Toast';
 import { ApiError } from '../api/http';
 import {
   credentialsApi,
   CredentialInventoryEntry,
   CredentialKind,
-  CredentialState,
 } from '../api/credentials';
 
 type ToastState = { kind: 'ok' | 'error'; msg: string } | null;
 
-function StateBadge({ state }: { state: CredentialState }) {
-  if (state === 'present')
-    return <span style={{ color: '#3fb950' }} title="present">● present</span>;
-  if (state === 'invalid')
+// What a missing row hands to the add form to pre-fill it.
+export interface CredentialPrefill {
+  id: string;
+  label: string;
+  kind: CredentialKind;
+  env_var: string | null;
+  token: number; // bump to force the form to re-read even for the same id
+}
+
+// State shown as "how it's provided" (source) when present, so a green badge
+// reads "env" / "file" / "db" instead of a bare "present".
+function StateBadge({ entry, onAdd }: { entry: CredentialInventoryEntry; onAdd: () => void }) {
+  if (entry.state === 'present')
+    return <span style={{ color: '#3fb950' }} title={`present via ${entry.source}`}>● {entry.source}</span>;
+  if (entry.state === 'invalid')
     return <span style={{ color: '#d29922' }} title="invalid">⚠ invalid</span>;
-  return <span className="dim" title="missing">○ missing</span>;
+  return (
+    <button
+      onClick={onAdd}
+      title="click to add this credential"
+      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--link)', font: 'inherit' }}
+    >
+      ○ missing · add
+    </button>
+  );
 }
 
 function AddCredentialForm({
   onCreated,
   onToast,
+  prefill,
 }: {
   onCreated: () => void;
   onToast: (t: ToastState) => void;
+  prefill: CredentialPrefill | null;
 }) {
   const [id, setId] = useState('');
   const [label, setLabel] = useState('');
@@ -31,6 +51,16 @@ function AddCredentialForm({
   const [envVar, setEnvVar] = useState('');
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Pull identifying fields from a clicked missing row; secret stays blank.
+  useEffect(() => {
+    if (!prefill) return;
+    setId(prefill.id);
+    setLabel(prefill.label);
+    setKind(prefill.kind);
+    setEnvVar(prefill.env_var ?? '');
+    setSecret('');
+  }, [prefill]);
 
   const isApiKey = kind === 'api_key';
 
@@ -117,6 +147,13 @@ export default function CredentialsPage({ embedded = false }: { embedded?: boole
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
+  const [prefill, setPrefill] = useState<CredentialPrefill | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const addFromRow = (c: CredentialInventoryEntry) => {
+    setPrefill({ id: c.id, label: c.label, kind: c.kind, env_var: c.env_var, token: Date.now() });
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   async function reload() {
     setLoading(true);
@@ -187,7 +224,7 @@ export default function CredentialsPage({ embedded = false }: { embedded?: boole
                 {items.map((c) => (
                   <tr key={c.id}>
                     <td style={{ padding: '2px 8px' }}>
-                      <StateBadge state={c.state} />
+                      <StateBadge entry={c} onAdd={() => addFromRow(c)} />
                     </td>
                     <td style={{ padding: '2px 8px' }}>
                       <code>{c.id}</code>
@@ -213,7 +250,9 @@ export default function CredentialsPage({ embedded = false }: { embedded?: boole
         </div>
       )}
 
-      <AddCredentialForm onCreated={reload} onToast={setToast} />
+      <div ref={formRef}>
+        <AddCredentialForm onCreated={reload} onToast={setToast} prefill={prefill} />
+      </div>
 
       {toast && <Toast kind={toast.kind} msg={toast.msg} />}
     </div>

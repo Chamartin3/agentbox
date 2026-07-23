@@ -8,9 +8,9 @@ import ProjectMcpEditor from '../components/settings/ProjectMcpEditor';
 import Toast from '../components/common/Toast';
 
 const TABS = [
-  { key: 'credentials', label: 'Credentials' },
-  { key: 'runner-profiles', label: 'Runner profiles' },
   { key: 'general', label: 'General' },
+  { key: 'runner-profiles', label: 'Runner profiles' },
+  { key: 'credentials', label: 'Credentials' },
   { key: 'deployment', label: 'Deployment info' },
 ] as const;
 
@@ -35,7 +35,7 @@ function GeneralTab() {
 export default function SettingsPage() {
   const { tab } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
-  const active: TabKey = TABS.some((t) => t.key === tab) ? (tab as TabKey) : 'credentials';
+  const active: TabKey = TABS.some((t) => t.key === tab) ? (tab as TabKey) : TABS[0].key;
 
   return (
     <div className="stack">

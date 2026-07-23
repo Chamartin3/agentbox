@@ -246,3 +246,28 @@ def test_credential_method_detect_called() -> None:
     register(cm)
     assert cm.detect() == CredentialState.PRESENT
     assert len(called) == 1
+
+
+# ── Claude Code detection: dotfile candidate + env-var fallback ─────────────
+
+
+def test_detect_claude_finds_canonical_dotfile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from agentbox.core.engines.backends.claude_code import credentials as cc
+
+    cred = tmp_path / cc.CRED_FILENAME  # ".credentials.json"
+    cred.write_text('{"token": "abc"}', encoding="utf-8")
+    monkeypatch.setattr(cc, "_claude_cred_candidates", lambda: [cred])
+    assert cc._detect_claude() == CredentialState.PRESENT
+
+
+def test_detect_claude_env_var_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agentbox.core.engines.backends.claude_code import credentials as cc
+
+    # No credential file present anywhere.
+    monkeypatch.setattr(cc, "_claude_cred_candidates", lambda: [])
+    for var in cc.AUTH_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+    assert cc._detect_claude() == CredentialState.MISSING
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-xxxxxxxxxxxxxxxx")
+    assert cc._detect_claude() == CredentialState.PRESENT
