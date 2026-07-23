@@ -35,7 +35,10 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
       setInfo((p) => ({ ...p, [name]: res }));
       if (res.error) onToast({ kind: 'error', msg: `${name}: ${res.error}` });
     } catch (e) {
-      onToast({ kind: 'error', msg: `introspect failed: ${(e as Error).message}` });
+      const msg = (e as Error).message;
+      // Keep the modal useful: surface the failure inside it, not just a toast.
+      setInfo((p) => ({ ...p, [name]: { server: name, tools: [], resources: [], error: msg } }));
+      onToast({ kind: 'error', msg: `introspect failed: ${msg}` });
     } finally {
       setInspectBusy(false);
     }

@@ -117,7 +117,9 @@ async def _introspect(spec: McpServerSpec) -> IntrospectResult:
     try:
         raw_tools = await client.list_tools()
         raw_resources = await client.list_resources()
-    except McpError as exc:
+    except (McpError, OSError) as exc:
+        # McpError = protocol/transport failure; OSError = command not found /
+        # spawn failure. Either way, report it in the modal, never 500.
         return {"server": spec.name, "tools": [], "resources": [], "error": str(exc)}
     finally:
         await client.close()
