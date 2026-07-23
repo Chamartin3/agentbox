@@ -1,6 +1,5 @@
 import SettingsBaseTab from './SettingsBaseTab';
 import SettingsApiTokensTab from './SettingsApiTokensTab';
-import SettingsSecretsTab from './SettingsSecretsTab';
 import SettingsDeploymentTab from './SettingsDeploymentTab';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -21,9 +20,9 @@ export default function SettingsPage() {
       <Section title="Base">
         <SettingsBaseTab />
       </Section>
-      <Section title="Secrets">
-        <SettingsSecretsTab />
-      </Section>
+      {/* Secrets / .env moved to the dedicated Credentials tab (unified
+          inventory). API tokens stay here — they are inbound auth, not
+          provider credentials. */}
       <Section title="API tokens">
         <SettingsApiTokensTab />
       </Section>
