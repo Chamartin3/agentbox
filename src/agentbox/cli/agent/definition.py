@@ -1,8 +1,12 @@
-"""Agent definitions — ls, show, new, edit, rm, export."""
+"""Agent definitions — ls, show, new, edit, rm.
+
+Export/import moved to the ``mat`` command group (``agentbox mat export/import
+agent``), the single source of truth for agent materialization — it adds
+dest-safety and dedup-on-import that this thin path never had.
+"""
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -10,25 +14,12 @@ import typer
 
 from agentbox.cli.shared import CLIContext, resolve_agent
 from agentbox.core.service import AgentDef
-from agentbox.core.service.agent_formats import AgentFileFormat
 from agentbox.core.service.engines import ProfileNotFound
-
-
-def _list_agent_ids(obj: CLIContext) -> list[str]:
-    rows = obj.agents.list_agents_with_latest()
-    return [r["agent_id"] for r in rows]
-
-
-def _export_one(
-    agent: AgentDef, base: Path, obj: CLIContext, fmt: AgentFileFormat
-) -> None:
-    for path in obj.agents.export_agent(agent, base, fmt):
-        obj.render.agent.dim(f"  {path}")
 
 
 definition_app = typer.Typer(
     name="def",
-    help="List, show, create, edit, delete, and export agents.",
+    help="List, show, create, edit, and delete agents.",
     no_args_is_help=True,
 )
 
@@ -297,86 +288,3 @@ def def_rm(
         obj.render.agent.agent_not_found(agent_id)
         raise typer.Exit(1)
     obj.render.agent.agent_deleted(agent_id)
-
-
-# ---------------------------------------------------------------------------
-# export
-# ---------------------------------------------------------------------------
-
-
-@definition_app.command("export")
-def def_export(
-    ctx: typer.Context,
-    agent_id: str | None = typer.Option(
-        None, "--agent", "-a", help="Export a single agent. Omit to export all."
-    ),
-    out_dir: str = typer.Option(
-        ".", "--out", "-o", help="Output directory (default: current directory)."
-    ),
-    fmt: AgentFileFormat = typer.Option(
-        AgentFileFormat.claude_code, "--format", "-f", help="Agent file format."
-    ),
-) -> None:
-    """Export DB agents to on-disk agent files.
-
-    ``claude_code``/``opencode`` write a single ``<agent_id>.md`` (frontmatter
-    + prompt); ``codex`` writes the Codex subagent ``<agent_id>.toml``
-    (name / description / developer_instructions). Idempotent.
-    """
-    obj: CLIContext = ctx.obj
-    base = Path(out_dir).expanduser()
-
-    if agent_id:
-        agent = obj.agents.get_agent_def(agent_id)
-        if agent is None:
-            obj.render.agent.agent_not_found(agent_id)
-            raise typer.Exit(1)
-        _export_one(agent, base, obj, fmt)
-    else:
-        agents = _list_agent_ids(obj)
-        if not agents:
-            obj.render.agent.warn("no agents found")
-            return
-        for aid in agents:
-            agent = obj.agents.get_agent_def(aid)
-            if agent is None:
-                continue
-            _export_one(agent, base, obj, fmt)
-    obj.render.agent.agent_exported(str(base.resolve()))
-
-
-# ---------------------------------------------------------------------------
-# import
-# ---------------------------------------------------------------------------
-
-
-@definition_app.command("import")
-def def_import(
-    ctx: typer.Context,
-    path: Path = typer.Argument(
-        ..., exists=True, readable=True, help="Agent file to import."
-    ),
-    fmt: AgentFileFormat = typer.Option(
-        AgentFileFormat.claude_code, "--format", "-f", help="Agent file format."
-    ),
-    author: str = typer.Option("cli", "--author", help="Author identifier."),
-    changelog: str = typer.Option("imported", "--changelog", help="Changelog."),
-) -> None:
-    """Import an agent file into the DB as a new agent.
-
-    The id comes from the file's ``name`` frontmatter (claude_code) or the
-    filename stem (opencode). Fails if the agent already exists.
-    """
-    obj: CLIContext = ctx.obj
-    try:
-        rec = obj.agents.import_agent(
-            path.read_text(encoding="utf-8"),
-            fmt,
-            agent_id=path.stem,
-            author=author,
-            changelog=changelog,
-        )
-    except Exception as exc:
-        obj.render.agent.error(f"import failed: {exc}")
-        raise typer.Exit(1) from exc
-    obj.render.agent.agent_created(rec["agent_id"], rec["version"], rec["id"])

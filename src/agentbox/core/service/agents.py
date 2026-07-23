@@ -108,7 +108,6 @@ from agentbox.core.db import (
 )
 from agentbox.core.db.agents.agent import AgentRunnerProfile as _AgentRunnerProfile
 from agentbox.core.db.runs.run import Run as _Run
-from agentbox.core.service.agent_formats import AgentFileFormat, dump_agent, parse_agent
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines import EngineService
 from agentbox.core.tools import SharedToolRegistry, ToolSpec
@@ -2467,54 +2466,6 @@ class AgentService(Service):
                 cur[p] = nxt
             cur = nxt
         cur[parts[-1]] = value
-
-    @staticmethod
-    def export_agent(
-        agent: AgentDef,
-        base: Path,
-        fmt: AgentFileFormat = AgentFileFormat.claude_code,
-    ) -> list[Path]:
-        """Write ``agent`` into ``base`` in ``fmt`` (claude_code/opencode/agentbox).
-
-        Returns the paths written, in order, so callers own the reporting.
-        """
-        base.mkdir(parents=True, exist_ok=True)
-        written: list[Path] = []
-        for name, content in dump_agent(agent, fmt):
-            path = base / name
-            path.write_text(content, encoding="utf-8")
-            written.append(path)
-        return written
-
-    def import_agent(
-        self,
-        text: str,
-        fmt: AgentFileFormat = AgentFileFormat.claude_code,
-        *,
-        agent_id: str | None = None,
-        author: str = "cli",
-        changelog: str = "imported",
-    ) -> AgentVersionRow:
-        """Parse an agent file (``fmt``) and create it as a new DB agent.
-
-        ``agent_id`` seeds the id for formats that carry none (opencode) —
-        pass the filename stem. Raises ``ValueError`` if the agent exists.
-        """
-        agent = parse_agent(text, fmt, agent_id=agent_id)
-        # Always ensure a composition block is present.
-        agent = inline_to_composition(agent)
-        config_json = {
-            **agent.model_dump(mode="json", exclude_none=True),
-            **build_config_json_payload(agent),
-        }
-        return self.create_agent(
-            agent_id=agent.id,
-            config_json=config_json,
-            prompt_content=agent.prompt or None,
-            author=author,
-            changelog=changelog,
-            source="cli",
-        )
 
     def require_agent_exists(self, agent_id: str) -> None:
         """Raise ``AgentNotFound`` when the agent has no usable version."""

@@ -23,7 +23,7 @@ def test_agent_help() -> None:
 def test_agent_def_help() -> None:
     result = runner.invoke(app, ["agent", "def", "--help"])
     assert result.exit_code == 0
-    for cmd in ("ls", "show", "new", "edit", "rm", "export"):
+    for cmd in ("ls", "show", "new", "edit", "rm"):
         assert cmd in result.output
 
 

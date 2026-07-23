@@ -121,3 +121,8 @@ from agentbox.core.service.workspaces import render_env_doc_preview as render_en
 
 # ── DiagnosticsService ──────────────────────────────────────
 from agentbox.core.service.diagnostics import DiagnosticsService as DiagnosticsService
+
+# ── MaterializationService ───────────────────────────────────
+from agentbox.core.service.materialization_io import MaterializationService as MaterializationService
+from agentbox.core.data.payload_types import ExportReport as ExportReport
+from agentbox.core.data.payload_types import ImportReport as ImportReport

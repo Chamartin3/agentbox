@@ -11,6 +11,7 @@ JSON unions. JSON-schema documents use the structural ``JsonSchemaDict``.
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
@@ -1370,6 +1371,44 @@ class McpStdioServerSpec(TypedDict):
     env: McpServerEnv
 
 
+# ── Materialization CLI shapes ────────────────────────────────────────────────
+
+
+class ExportAction(str, Enum):
+    written = "written"
+    overwritten = "overwritten"
+
+
+class ImportAction(str, Enum):
+    created = "created"
+    version_added = "version_added"
+    unchanged = "unchanged"
+    collision_skipped = "collision_skipped"
+
+
+class ExportedFile(TypedDict):
+    path: str  # relative to dest_dir
+    action: ExportAction
+
+
+class ExportReport(TypedDict):
+    dest: str
+    files: list[ExportedFile]
+    agents: list[str]  # agent IDs exported
+
+
+class ImportOutcome(TypedDict):
+    item_id: str  # agent ID or skill slug
+    action: ImportAction
+    version: NotRequired[int]
+    collision_with: NotRequired[str]  # only when action == collision_skipped
+
+
+class ImportReport(TypedDict):
+    source: str
+    outcomes: list[ImportOutcome]
+
+
 __all__ = [
     "LaunchMcpServer",
     "LaunchTarget",
@@ -1487,4 +1526,10 @@ __all__ = [
     "WorkspaceBindingItemsResult",
     "WorkspaceBindingSpec",
     "WorkspaceResourcesResult",
+    "ExportAction",
+    "ImportAction",
+    "ExportedFile",
+    "ExportReport",
+    "ImportOutcome",
+    "ImportReport",
 ]
