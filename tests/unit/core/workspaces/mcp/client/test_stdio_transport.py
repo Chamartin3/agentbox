@@ -1,7 +1,7 @@
 """Unit tests for McpClient stdio transport.
 
 Uses a fake in-process stdio server (asyncio pipes) to verify
-Content-Length framing, JSON-RPC request/response, and close() cleanup
+newline-delimited JSON-RPC framing, request/response, and close() cleanup
 without spawning real subprocesses.
 """
 
@@ -22,8 +22,8 @@ from agentbox.core.workspaces.tooling.mcp.transport import McpClient, McpError
 
 
 def _frame(payload: bytes) -> bytes:
-    """Wrap *payload* in a Content-Length frame."""
-    return f"Content-Length: {len(payload)}\r\n\r\n".encode() + payload
+    """Frame *payload* as one newline-delimited JSON-RPC message."""
+    return payload + b"\n"
 
 
 def _jsonrpc_response(req_id: int, result: dict) -> bytes:
@@ -72,36 +72,24 @@ async def _make_fake_proc(
 
 
 # ---------------------------------------------------------------------------
-# _parse_content_length — static helper
+# framing — the response reader must skip notifications and log noise
 # ---------------------------------------------------------------------------
 
 
-class TestParseContentLength:
-    def test_standard_header(self) -> None:
-        result = McpClient._parse_content_length(["Content-Length: 42"])
-        assert result == 42
+@pytest.mark.asyncio
+async def test_stdio_skips_notifications_and_noise() -> None:
+    """The reader ignores non-JSON lines and id-less notifications, returning
+    the response whose id matches the request."""
+    noise = b"Starting server...\n"
+    notification = json.dumps({"jsonrpc": "2.0", "method": "log", "params": {}}).encode() + b"\n"
+    init_response = _jsonrpc_response(1, {"protocolVersion": "2024-11-05"})
+    mock_proc, reader, writer = await _make_fake_proc(noise, notification, init_response)
 
-    def test_case_insensitive(self) -> None:
-        result = McpClient._parse_content_length(["content-length: 7"])
-        assert result == 7
+    client = McpClient("test-server", transport="stdio", command=["fake-mcp"])
+    with patch.object(client, "_ensure_proc", AsyncMock(return_value=mock_proc)):
+        result = await client.initialize()
 
-    def test_extra_headers_ignored(self) -> None:
-        result = McpClient._parse_content_length(
-            ["Content-Type: application/json", "Content-Length: 100"]
-        )
-        assert result == 100
-
-    def test_missing_raises(self) -> None:
-        with pytest.raises(McpError, match="missing Content-Length"):
-            McpClient._parse_content_length([])
-
-    def test_non_integer_raises(self) -> None:
-        with pytest.raises(McpError, match="invalid Content-Length"):
-            McpClient._parse_content_length(["Content-Length: abc"])
-
-    def test_negative_raises(self) -> None:
-        with pytest.raises(McpError, match="negative Content-Length"):
-            McpClient._parse_content_length(["Content-Length: -1"])
+    assert result == {"protocolVersion": "2024-11-05"}
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +158,47 @@ async def test_stdio_list_tools_empty() -> None:
         tools = await client.list_tools()
 
     assert tools == []
+
+
+# ---------------------------------------------------------------------------
+# list_resources() — stdio path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_stdio_list_resources_returns_resources() -> None:
+    """list_resources() calls initialize then resources/list and narrows rows."""
+    resources_payload = [
+        {"uri": "file:///a.txt", "name": "a", "description": "first", "mimeType": "text/plain"},
+        {"uri": "file:///b.txt", "name": "b"},
+    ]
+    init_response = _jsonrpc_response(1, {"protocolVersion": "2024-11-05"})
+    list_response = _jsonrpc_response(2, {"resources": resources_payload})
+
+    mock_proc, reader, writer = await _make_fake_proc(init_response, list_response)
+
+    client = McpClient("test-server", transport="stdio", command=["fake-mcp"])
+    with patch.object(client, "_ensure_proc", AsyncMock(return_value=mock_proc)):
+        resources = await client.list_resources()
+
+    assert [r["uri"] for r in resources] == ["file:///a.txt", "file:///b.txt"]
+    assert resources[0]["description"] == "first"
+    assert "description" not in resources[1]  # absent fields are dropped, not None
+
+
+@pytest.mark.asyncio
+async def test_stdio_list_resources_unsupported_returns_empty() -> None:
+    """A server without resources replies method-not-found → returns []."""
+    init_response = _jsonrpc_response(1, {"protocolVersion": "2024-11-05"})
+    err_response = _jsonrpc_error_response(2, -32601, "Method not found")
+
+    mock_proc, reader, writer = await _make_fake_proc(init_response, err_response)
+
+    client = McpClient("test-server", transport="stdio", command=["fake-mcp"])
+    with patch.object(client, "_ensure_proc", AsyncMock(return_value=mock_proc)):
+        resources = await client.list_resources()
+
+    assert resources == []
 
 
 # ---------------------------------------------------------------------------

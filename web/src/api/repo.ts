@@ -214,7 +214,8 @@ export interface McpServerView {
   enabled: boolean;
   config: Record<string, unknown>;
   disabled_tools: string[];
-  source: 'default' | 'override';
+  source: 'default' | 'override' | 'override_only';
+  tools?: string[];
 }
 
 export interface EffectiveMcp {
@@ -251,6 +252,11 @@ export const workspaceMcpApi = {
       `/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/servers/${encodeURIComponent(serverName)}/tools/${encodeURIComponent(toolName)}`,
       { method: 'PUT', body: JSON.stringify({ enabled }) },
     ),
+  removeServer: (workspaceId: string, serverName: string) =>
+    req<{ deleted: string; removed: boolean }>(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/servers/${encodeURIComponent(serverName)}`,
+      { method: 'DELETE' },
+    ),
   refresh: (workspaceId: string) =>
     req<{ invalidated: number }>(
       `/api/workspaces/${encodeURIComponent(workspaceId)}/mcp/refresh`,
@@ -258,36 +264,39 @@ export const workspaceMcpApi = {
     ),
 };
 
-// --- Host-env grants (Plan 06) ---
+// --- Project-global MCP servers (shared by all workspaces) ---
 
-export interface HostEnvCapability {
+export type McpTransport = 'http' | 'sse' | 'stdio';
+
+export interface ProjectMcpServer {
   name: string;
-  description: string;
-  grant_schema: Record<string, unknown>;
-  default_granted: boolean;
+  url: string | null;
+  transport: McpTransport;
+  command: string[] | null;
+  cache_ttl: number;
 }
 
-export interface HostEnvGrants {
-  grants: Record<string, Record<string, unknown>>;
-  profile_id: string | null;
+export interface McpIntrospection {
+  server: string;
+  tools: Array<{ name: string; description: string }>;
+  resources: Array<{ uri: string; name: string; description: string }>;
+  error: string | null;
 }
 
-export const hostEnvApi = {
-  capabilities: () =>
-    req<{ capabilities: HostEnvCapability[] }>(`/api/host-env/capabilities`),
-  getWorkspace: (workspaceId: string) =>
-    req<HostEnvGrants>(`/api/workspaces/${encodeURIComponent(workspaceId)}/host-env`),
-  setWorkspace: (
-    workspaceId: string,
-    overrides: Record<string, Record<string, unknown>>,
-    reason: string,
-    profile_id?: string | null,
-  ) =>
-    req<HostEnvGrants>(
-      `/api/workspaces/${encodeURIComponent(workspaceId)}/host-env`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({ overrides, profile_id, reason }),
-      },
-    ),
+export const projectMcpApi = {
+  list: () => req<{ servers: ProjectMcpServer[] }>(`/api/project/mcp-servers`),
+  upsert: (name: string, spec: Partial<ProjectMcpServer>) =>
+    req<ProjectMcpServer>(`/api/project/mcp-servers/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, ...spec }),
+    }),
+  remove: (name: string) =>
+    req<{ deleted: string }>(`/api/project/mcp-servers/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    }),
+  // Live connect-and-read: lists the server's tools + resources on demand.
+  introspect: (name: string) =>
+    req<McpIntrospection>(`/api/project/mcp-servers/${encodeURIComponent(name)}/introspect`, {
+      method: 'POST',
+    }),
 };

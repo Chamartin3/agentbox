@@ -32,6 +32,15 @@ class McpRawTool(TypedDict, total=False):
     inputSchema: RawJson
 
 
+class McpRawResource(TypedDict, total=False):
+    """Raw resource descriptor as returned by an MCP server's ``resources/list``."""
+
+    uri: str
+    name: str
+    description: str
+    mimeType: str
+
+
 class McpError(Exception):
     def __init__(self, message: str, code: int = -1) -> None:
         self.code = code
@@ -70,6 +79,16 @@ def _raw_tool(row: RawJson) -> McpRawTool:
     if isinstance(schema, dict):
         tool["inputSchema"] = schema
     return tool
+
+
+def _raw_resource(row: RawJson) -> McpRawResource:
+    """Narrow one open-JSON resource descriptor into ``McpRawResource``."""
+    res: McpRawResource = {}
+    for key in ("uri", "name", "description", "mimeType"):
+        val = row.get(key)
+        if isinstance(val, str):
+            res[key] = val  # type: ignore[literal-required]
+    return res
 
 
 _STDIO_TIMEOUT = 30.0  # seconds — matches the default httpx timeout on the http path
@@ -141,6 +160,9 @@ class McpClient:
                 },
             )
             self._initialized = True
+            # MCP requires the client to acknowledge initialize before the
+            # server will serve requests. Notifications carry no id / reply.
+            await self._stdio_notify("notifications/initialized", {})
             return result
         raise McpError(
             f"unsupported transport: {self._transport} for server {self.server_name}"
@@ -154,6 +176,20 @@ class McpClient:
         if not isinstance(raw_tools, list):
             return []
         return [_raw_tool(row) for row in raw_tools if isinstance(row, dict)]
+
+    async def list_resources(self) -> list[McpRawResource]:
+        """List the server's resources. Returns ``[]`` when the server does not
+        implement ``resources/list`` (it replies with a method-not-found error)."""
+        if not self._initialized:
+            await self.initialize()
+        try:
+            result = await self._jsonrpc("resources/list", {})
+        except McpError:
+            return []
+        raw = result.get("resources")
+        if not isinstance(raw, list):
+            return []
+        return [_raw_resource(row) for row in raw if isinstance(row, dict)]
 
     async def subscribe_changes(self, callback: Callable[[], None]) -> None:
         if self._transport == "sse" and self._url:
@@ -206,107 +242,65 @@ class McpClient:
             raise McpError(env.error.message, env.error.code)
         return env.result
 
-    async def _stdio_request(self, body: dict) -> RawJson:
-        """Send one Content-Length-framed JSON-RPC request and read the reply.
-
-        The MCP stdio transport uses the same framing as the Language Server
-        Protocol: headers terminated by ``\\r\\n\\r\\n``, then a JSON body of
-        exactly ``Content-Length`` bytes.
-        """
+    async def _stdio_write(self, message: dict) -> None:
+        """Write one newline-delimited JSON-RPC message to the subprocess."""
         proc = await self._ensure_proc()
         assert proc.stdin is not None, "subprocess stdin must be a pipe"
-        assert proc.stdout is not None, "subprocess stdout must be a pipe"
-
-        # --- write ---
-        payload = json.dumps(body).encode()
-        frame = f"Content-Length: {len(payload)}\r\n\r\n".encode() + payload
+        payload = (json.dumps(message) + "\n").encode()
         try:
-            proc.stdin.write(frame)
+            proc.stdin.write(payload)
             await asyncio.wait_for(proc.stdin.drain(), timeout=_STDIO_TIMEOUT)
-        except TimeoutError as exc:
-            raise McpError(
-                f"stdio write timed out for server {self.server_name}"
-            ) from exc
-        except OSError as exc:
+        except (TimeoutError, OSError) as exc:
             raise McpError(
                 f"stdio write error for server {self.server_name}: {exc}"
             ) from exc
 
-        # --- read headers ---
-        try:
-            raw_headers = await asyncio.wait_for(
-                self._read_stdio_headers(proc.stdout), timeout=_STDIO_TIMEOUT
-            )
-        except TimeoutError as exc:
-            raise McpError(
-                f"stdio response timed out for server {self.server_name}"
-            ) from exc
+    async def _stdio_notify(self, method: str, params: dict) -> None:
+        """Fire-and-forget a JSON-RPC notification (no id, no reply)."""
+        await self._stdio_write({"jsonrpc": "2.0", "method": method, "params": params})
 
-        content_length = self._parse_content_length(raw_headers)
+    async def _stdio_request(self, body: dict) -> RawJson:
+        """Send one newline-delimited JSON-RPC request and read the reply.
 
-        # --- read body ---
-        try:
-            raw_body = await asyncio.wait_for(
-                proc.stdout.readexactly(content_length), timeout=_STDIO_TIMEOUT
-            )
-        except TimeoutError as exc:
-            raise McpError(
-                f"stdio body read timed out for server {self.server_name}"
-            ) from exc
-        except asyncio.IncompleteReadError as exc:
-            raise McpError(
-                f"stdio connection closed mid-body for server {self.server_name}"
-            ) from exc
+        The MCP stdio transport frames each message as a single line of JSON
+        (messages MUST NOT contain embedded newlines) — NOT the LSP-style
+        ``Content-Length`` header framing. Servers interleave notifications
+        and log noise, so read lines until the response whose ``id`` matches
+        the request; skip everything else.
+        """
+        proc = await self._ensure_proc()
+        assert proc.stdout is not None, "subprocess stdout must be a pipe"
+        await self._stdio_write(body)
 
-        # --- parse ---
-        try:
-            data = json.loads(raw_body)
-        except json.JSONDecodeError as exc:
-            raise McpError(f"invalid json from stdio server: {exc}") from exc
-
-        env = _JsonRpcResponse.model_validate(data)
         req_id = body.get("id")
-        if env.id != req_id:
-            raise McpError(
-                f"stdio response id mismatch: expected {req_id}, got {env.id}"
-            )
-        if env.error is not None:
-            raise McpError(env.error.message, env.error.code)
-        return env.result
-
-    @staticmethod
-    async def _read_stdio_headers(
-        reader: asyncio.StreamReader,
-    ) -> list[str]:
-        """Read lines until the blank line that terminates the header block."""
-        headers: list[str] = []
         while True:
-            raw = await reader.readline()
+            try:
+                raw = await asyncio.wait_for(
+                    proc.stdout.readline(), timeout=_STDIO_TIMEOUT
+                )
+            except TimeoutError as exc:
+                raise McpError(
+                    f"stdio response timed out for server {self.server_name}"
+                ) from exc
             if not raw:
-                raise McpError("stdio server closed connection during headers")
-            line = raw.decode(errors="replace").rstrip("\r\n")
-            if line == "":
-                # blank line — end of headers
-                break
-            headers.append(line)
-        return headers
-
-    @staticmethod
-    def _parse_content_length(headers: list[str]) -> int:
-        """Extract the Content-Length value from a list of header strings."""
-        for h in headers:
-            if h.lower().startswith("content-length:"):
-                value = h.split(":", 1)[1].strip()
-                try:
-                    length = int(value)
-                except ValueError as exc:
-                    raise McpError(
-                        f"invalid Content-Length value: {value!r}"
-                    ) from exc
-                if length < 0:
-                    raise McpError(f"negative Content-Length: {length}")
-                return length
-        raise McpError("stdio response missing Content-Length header")
+                raise McpError(
+                    f"stdio server {self.server_name} closed connection"
+                )
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # non-JSON log line on stdout — skip
+            if not isinstance(data, dict) or "id" not in data:
+                continue  # a notification or unrelated message
+            env = _JsonRpcResponse.model_validate(data)
+            if env.id != req_id:
+                continue  # reply to a different in-flight request
+            if env.error is not None:
+                raise McpError(env.error.message, env.error.code)
+            return env.result
 
     async def _sse_listen(self, callback: Callable[[], None]) -> None:
         if not self._url:

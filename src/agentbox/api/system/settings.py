@@ -49,10 +49,7 @@ class PatchSettingsResult(TypedDict):
 # which keeps casual writes from creating sprawl.
 KNOWN_SECTIONS = (
     "runtime_defaults",
-    "workspace_defaults",
     "mcp_global",
-    "webhook",
-    "telemetry",
     "secrets",
 )
 

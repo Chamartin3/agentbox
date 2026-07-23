@@ -112,7 +112,7 @@ function AddCredentialForm({
   );
 }
 
-export default function CredentialsPage() {
+export default function CredentialsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [items, setItems] = useState<CredentialInventoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -154,7 +154,7 @@ export default function CredentialsPage() {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <h1 style={{ margin: 0 }}>Credentials</h1>
+      {!embedded && <h1 style={{ margin: 0 }}>Credentials</h1>}
       <p className="dim" style={{ fontSize: 12, margin: 0 }}>
         Read-only sources (file/env) come from the host/compose; values are never shown. Add UI credentials below.
       </p>
