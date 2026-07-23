@@ -84,3 +84,22 @@ def test_run_startup_tasks_handles_seed_profiles_flag(
     # Second pass must seed nothing (idempotent).
     second = run_startup_tasks(settings, manifest=None)
     assert second.runner_profiles_seeded == 0
+
+
+def test_run_startup_tasks_creates_default_workspace(
+    lifecycle_env: Settings,
+) -> None:
+    from agentbox.core.data.constants import DEFAULT_WORKSPACE_NAME
+    from agentbox.core.service.workspaces import WorkspaceService
+
+    # Act — fresh store has no workspaces.
+    run_startup_tasks(lifecycle_env, manifest=None)
+
+    # Assert — the protected default now exists...
+    svc = WorkspaceService()
+    assert svc.get_workspace(DEFAULT_WORKSPACE_NAME) is not None
+
+    # ...and a second run is idempotent (no error, no duplicate insert).
+    report = run_startup_tasks(lifecycle_env, manifest=None)
+    assert report.errors == []
+    assert svc.get_workspace(DEFAULT_WORKSPACE_NAME) is not None
