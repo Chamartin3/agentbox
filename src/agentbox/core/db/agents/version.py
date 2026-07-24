@@ -5,6 +5,7 @@ Maps to the ``agent_versions``, ``agent_version_files``,
 """
 from __future__ import annotations
 
+import json
 from typing import Optional, Unpack
 
 from sqlalchemy import JSON, Row, func, select, update as sa_update
@@ -47,6 +48,12 @@ class AgentVersion(Entity, table=True):
 	is_legacy: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
 	created_at: str = Field(nullable=False)
 	config_json: Optional[str] = Field(default=None)
+	# FK-checked mirror of the config's ``workspace`` ref. Nullable — NULL means
+	# "no named workspace" → the agent falls back to the default workspace. Only
+	# ever holds an existing workspace name (derived + coerced on write), so it
+	# can never dangle. Declared FK → workspaces.name (enforced once the global
+	# SQLite foreign_keys pragma is enabled; see plan for the cleanup that unblocks it).
+	workspace_name: Optional[str] = Field(default=None, foreign_key="workspaces.name", nullable=True)
 	prompt_content: Optional[str] = Field(default=None)
 	source: str = Field(nullable=False, default="manifest", sa_column_kwargs={"server_default": "manifest"})
 	resolved_tool_grants: Optional[list[str]] = Field(default=None, sa_type=JSON)
@@ -111,6 +118,29 @@ agent_version_comments = AgentVersionComment.__table__
 active_agent_versions = ActiveAgentVersion.__table__
 
 
+def _derive_workspace_name(conn: Connection, config_json: str | None) -> str | None:
+	"""The FK-valid workspace ref for a version: the config's ``workspace`` when
+	it names an existing workspace row, else ``None`` (→ default). Coercing here
+	keeps the ``workspace_name`` column from ever holding a phantom ref,
+	regardless of which caller mints the version."""
+	if not config_json:
+		return None
+	try:
+		ref = json.loads(config_json).get("workspace")
+	except (ValueError, TypeError):
+		return None
+	if not isinstance(ref, str) or not ref or ref == "<ephemeral>":
+		return None
+	# Lazy import: workspaces ↔ agents.version form an import cycle at module
+	# load; by call time both are fully initialized.
+	from agentbox.core.db.workspaces.workspace import Workspace  # noqa: PLC0415
+
+	exists = conn.execute(
+		select(Workspace.__table__.c.name).where(Workspace.__table__.c.name == ref)
+	).first()
+	return ref if exists is not None else None
+
+
 def _version_row(row: Row) -> AgentVersionRow:
 	"""Shape an ``agent_versions`` row into the ``AgentVersionRow`` contract.
 
@@ -132,6 +162,7 @@ def _version_row(row: Row) -> AgentVersionRow:
 		is_legacy=bool(m["is_legacy"]),
 		created_at=m["created_at"],
 		config_json=m["config_json"],
+		workspace_name=m["workspace_name"],
 		prompt_content=m["prompt_content"],
 		source=m["source"],
 		resolved_tool_grants=m["resolved_tool_grants"],
@@ -372,6 +403,8 @@ class AgentVersionManager(Manager[AgentVersion]):
 		of them do. ``activated_at`` must be supplied when ``activate_for`` is.
 		"""
 		with self._engine.begin() as conn:
+			if "workspace_name" not in fields:
+				fields["workspace_name"] = _derive_workspace_name(conn, fields.get("config_json"))
 			result = conn.execute(agent_versions.insert().values(**fields))
 			pk = result.inserted_primary_key
 			assert pk is not None
@@ -399,6 +432,9 @@ class AgentVersionManager(Manager[AgentVersion]):
 	def patch(self, version_id: int, **values: Unpack[_AgentVersionFields]) -> None:
 		"""Update the supplied columns on one version row."""
 		with self._engine.begin() as conn:
+			# Keep workspace_name in lockstep with config_json edits.
+			if "config_json" in values and "workspace_name" not in values:
+				values["workspace_name"] = _derive_workspace_name(conn, values.get("config_json"))
 			conn.execute(
 				agent_versions.update()
 				.where(agent_versions.c.id == version_id)

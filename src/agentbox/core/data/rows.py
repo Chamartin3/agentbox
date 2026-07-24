@@ -48,6 +48,7 @@ class AgentVersionRow(TypedDict):
     is_legacy: bool
     created_at: str
     config_json: str | None
+    workspace_name: str | None
     prompt_content: str | None
     source: str
     resolved_tool_grants: list[str] | None
@@ -797,6 +798,7 @@ class _AgentVersionFields(TypedDict, total=False):
     is_legacy: int
     created_at: str
     config_json: str | None
+    workspace_name: str | None
     prompt_content: str | None
     source: str
     resolved_tool_grants: list[str] | None
