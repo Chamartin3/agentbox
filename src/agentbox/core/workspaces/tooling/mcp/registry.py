@@ -233,3 +233,44 @@ class McpRegistry:
             return data.get("tools", [])
         except (json.JSONDecodeError, OSError):
             return None
+
+    def is_cache_fresh(self, server_name: str, ttl: int = _CACHE_TTL) -> bool:
+        """Return True if the on-disk cache for *server_name* exists and was
+        written within the last *ttl* seconds.  Returns False on any missing
+        or unreadable cache file, or if the ``cached_at`` timestamp is absent.
+        """
+        path = self._cache_path(server_name)
+        if not path.is_file():
+            return False
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return False
+        cached_at = data.get("cached_at")
+        if not cached_at:
+            return False
+        try:
+            age = time.time() - time.mktime(time.strptime(cached_at, "%Y-%m-%dT%H:%M:%SZ"))
+            return age < ttl
+        except (ValueError, OverflowError):
+            return False
+
+    def hydrate_from_cache(self) -> None:
+        """Populate the manifest from every per-server tool cache on disk.
+
+        Discovery usually runs in a throwaway registry (startup, a run, or
+        the workspace ``/mcp/refresh`` endpoint) that only writes the
+        per-server cache — the long-lived API-singleton registry's manifest
+        is never touched, so ``available_tools`` reports zero MCP tools even
+        after a successful sync. Loading the cache here bridges that gap
+        without a live re-connect. Idempotent; call it on the read path.
+        """
+        all_tools: dict[str, list[Tool]] = dict(self._manifest.servers)
+        for path in sorted(self.cache_dir.glob("*.json")):
+            cached = self._load_cache(path.stem)
+            if cached:
+                all_tools[path.stem] = [
+                    Tool(**t) if isinstance(t, dict) else t for t in cached
+                ]
+        if all_tools:
+            self._manifest.set_servers(all_tools)

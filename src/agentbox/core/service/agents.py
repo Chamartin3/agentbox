@@ -118,6 +118,8 @@ from agentbox.core.service.engines import EngineService
 from agentbox.core.tools import SharedToolRegistry, ToolSpec
 from agentbox.core.workspaces import workdir as ws
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from collections.abc import Callable
 from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
@@ -1926,13 +1928,18 @@ class AgentService(Service):
         # Resolve workspace availability catalog
         workspace_catalog: list[ToolInfo] = []
         if workspace_id:
+            # Hydrate the MCP registry from the on-disk cache so that
+            # discovered tools are included in the availability surface
+            # without requiring a live server connection or manual refresh.
+            mcp_registry = McpRegistry(load_settings().mcp_cache_dir)
+            mcp_registry.hydrate_from_cache()
             callables = resolve_workspace_callables(
                 workspace_id,
                 self._db.workspace_file_resource_bindings,
                 self._db.workspace_mcp_policies,
                 self._db.workspace_mcp_overrides,
                 self._db.workspace_mcp_tool_overrides,
-                mcp_registry=None,
+                mcp_registry=mcp_registry,
                 declared_tools=declared_tools,
             )
 
@@ -2690,28 +2697,26 @@ class AgentService(Service):
                 400, "unknown_workspace", f"workspace {workspace!r} does not exist"
             )
 
-    def _catalog_names_for_workspace(self, workspace: str) -> set[str]:
-        """Canonical tool/resource names installed in *workspace* (MCP + host-env
-        + resource bindings) — the same catalog the tool-grants picker shows."""
-        from agentbox.core.service.workspaces import WorkspaceService  # noqa: PLC0415
-        from agentbox.core.workspaces.tooling.mcp import McpRegistry  # noqa: PLC0415
-
-        registry = McpRegistry(load_settings().mcp_cache_dir)
-        registry.hydrate_from_cache()
-        return {
-            c.name
-            for c in WorkspaceService().installed_callables(workspace, mcp_registry=registry)
-        }
-
-    def _prune_grants_to_workspace(self, agent_id: str, workspace: str | None) -> list[str]:
+    def _prune_grants_to_workspace(
+        self,
+        agent_id: str,
+        workspace: str | None,
+        catalog_resolver: Callable[[str], set[str]] | None,
+    ) -> list[str]:
         """Revoke active grants whose tool isn't in *workspace*'s catalog.
 
         No-op for null / ``"<ephemeral>"`` (the catalog is the global set).
         Soft-revoke (keeps audit history). Returns the pruned tool names.
+
+        ``catalog_resolver`` is injected by the caller (API layer) to avoid
+        an upward import edge ``service.agents -> service.workspaces``.  When
+        ``None``, prune is a no-op (same semantics as the ephemeral guard).
         """
         if not workspace or workspace == "<ephemeral>":
             return []
-        catalog = self._catalog_names_for_workspace(workspace)
+        if catalog_resolver is None:
+            return []
+        catalog = catalog_resolver(workspace)
         pruned: list[str] = []
         for tool in sorted(self.active_grants(agent_id)):
             if tool not in catalog:
@@ -2724,7 +2729,12 @@ class AgentService(Service):
                 pruned.append(tool)
         return pruned
 
-    def patch_agent_config(self, agent_id: str, patch: dict) -> tuple[AgentDef, list[str]]:
+    def patch_agent_config(
+        self,
+        agent_id: str,
+        patch: dict,
+        catalog_resolver: Callable[[str], set[str]] | None = None,
+    ) -> tuple[AgentDef, list[str]]:
         """Merge ``patch`` onto the active def, mint + activate a new version.
 
         Returns the updated def plus any tool grants pruned because the agent's
@@ -2805,7 +2815,7 @@ class AgentService(Service):
 
         pruned: list[str] = []
         if updated.workspace != prior_workspace:
-            pruned = self._prune_grants_to_workspace(agent_id, updated.workspace)
+            pruned = self._prune_grants_to_workspace(agent_id, updated.workspace, catalog_resolver)
 
         return updated, pruned
 
