@@ -186,6 +186,7 @@ class OpenCodeBackend(BackendAdapter):
         ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
+        extra_env: dict[str, str] | None = kwargs.pop("extra_env", None)
         agent_runner = getattr(agent, "runner", None)
         extra_args = list(
             getattr(runner_config, "extra_args", None)
@@ -215,7 +216,7 @@ class OpenCodeBackend(BackendAdapter):
             argv += ["--model", model]
         argv += extra_args
 
-        env = build_run_env(creds)
+        env = build_run_env(creds, extra=extra_env)
         env["PWD"] = str(workdir)
 
         timeout_seconds = getattr(agent_runner, "timeout_seconds", None)

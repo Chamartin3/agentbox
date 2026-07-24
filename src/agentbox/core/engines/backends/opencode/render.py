@@ -39,10 +39,16 @@ def _mcp_entries(servers: list[McpRef]) -> dict[str, McpRemote | McpLocal]:
         url = srv.config.get("url")
         command = srv.config.get("command")
         transport = srv.config.get("transport", "stdio")
+        exclude = sorted(srv.disabled_tools) if srv.disabled_tools else None
         if url:
             entries[srv.name] = McpRemote(
-                type="remote" if transport == "http" else transport, url=url
+                type="remote" if transport == "http" else transport,
+                url=url,
+                exclude=exclude,
             )
         elif command:
-            entries[srv.name] = McpLocal(command=command)
+            entries[srv.name] = McpLocal(
+                command=command,
+                exclude=exclude,
+            )
     return entries

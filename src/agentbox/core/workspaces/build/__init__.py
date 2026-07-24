@@ -57,6 +57,35 @@ from agentbox.core.workspaces.build.engine import render
 logger = logging.getLogger(__name__)
 
 
+def _patch_opencode_json_with_mcp(
+    opencode_json: Path,
+    extra_mcp_servers: Mapping[str, McpStdioServerSpec],
+) -> None:
+    """Mirror intrinsic MCP specs into opencode.json's ``mcp`` block.
+
+    opencode reads ``opencode.json``, not ``.mcp.json``, so the run-scoped
+    intrinsic servers (host_env / agent_tools) must be injected here too.
+
+    Option B: env vars from each spec are NOT placed in the ``mcp`` block
+    (opencode has no per-server ``environment`` field in its schema).  They
+    travel through the opencode subprocess env instead.
+    """
+    if not opencode_json.exists() or not extra_mcp_servers:
+        return
+    oc_data = json.loads(opencode_json.read_text(encoding="utf-8"))
+    oc_data.setdefault("mcp", {})
+    for name, spec in extra_mcp_servers.items():
+        oc_data["mcp"][name] = {
+            "type": "local",
+            "command": [spec["command"], *spec["args"]],
+            "enabled": True,
+        }
+    opencode_json.write_text(
+        json.dumps(oc_data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
 # ── Recipe fan-out + registry wiring (dissolved from construct.py + factory.py) ─
 
 # (engine, config) -> extra native config items for that engine.
@@ -333,6 +362,11 @@ class WorkspaceBuilder:
         mcp_json.write_text(
             json.dumps(mcp_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
+
+        # Mirror the .mcp.json intrinsic-server injection into opencode.json
+        # so the opencode backend also sees host-env / agent-tools via its
+        # native `mcp` block (opencode reads opencode.json, not .mcp.json).
+        _patch_opencode_json_with_mcp(target_dir / "opencode.json", extra_mcp_servers or {})
 
         # ── 4. Orphan reconcile (persistent only) ─────────────────────────
         if persistent:
