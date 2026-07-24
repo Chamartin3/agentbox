@@ -19,10 +19,30 @@ function ProvidersSection({ onToast }: { onToast: (t: ToastState) => void }) {
   const [providers, setProviders] = useState<RunnerProvider[]>([]);
   const [models, setModels] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     api.listRunnerProviders().then(setProviders).catch((e) => onToast({ kind: 'error', msg: `load providers: ${e.message}` }));
   }, [onToast]);
+
+  // Fetches models for all model-listing providers on mount (uses backend cache).
+  useEffect(() => {
+    if (providers.length === 0) return;
+    const fetchAllModels = async () => {
+      const listing = providers.filter((p) => p.supports_model_listing);
+      const results = await Promise.allSettled(
+        listing.map((p) =>
+          api.listProviderModels(p.id).then((rows) => ({ id: p.id, models: rows.map((r) => (r as any).name || r.id) }))
+        ),
+      );
+      const batch: Record<string, string[]> = {};
+      for (const r of results) {
+        if (r.status === 'fulfilled') batch[r.value.id] = r.value.models;
+      }
+      setModels((prev) => ({ ...batch, ...prev }));
+    };
+    fetchAllModels();
+  }, [providers]);
 
   const fetchModels = async (id: string) => {
     setBusy(id);
@@ -60,9 +80,34 @@ function ProvidersSection({ onToast }: { onToast: (t: ToastState) => void }) {
                 </div>
               </td>
               <td>
-                {models[p.id]
-                  ? <span title={models[p.id].join(', ')}>{models[p.id].length} model(s)</span>
-                  : <span className="dim">—</span>}
+                {models[p.id] ? (
+                  <div>
+                    <button
+                      className="link"
+                      style={{ fontSize: 12, padding: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--link)' }}
+                      onClick={() => setExpanded((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
+                    >
+                      {models[p.id].length} model(s)
+                    </button>
+                    {expanded[p.id] && (
+                      <ul style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 11, color: 'var(--dim)' }}>
+                        {models[p.id].map((m) => <li key={m}>{m}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  p.supports_model_listing ? (
+                    <button
+                      className="dim"
+                      style={{ fontSize: 11, padding: 0, background: 'none', border: 'none', cursor: 'pointer' }}
+                      onClick={() => fetchModels(p.id)}
+                    >
+                      — click to fetch
+                    </button>
+                  ) : (
+                    <span className="dim">—</span>
+                  )
+                )}
               </td>
               <td style={{ textAlign: 'right' }}>
                 {p.supports_model_listing ? (

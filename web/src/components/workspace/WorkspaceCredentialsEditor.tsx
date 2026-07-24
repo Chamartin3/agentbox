@@ -54,6 +54,10 @@ export default function WorkspaceCredentialsEditor({ workspaceId }: Props) {
     }
   };
 
+  // "missing" credentials aren't configured on the host — they can't be
+  // enabled, so hiding them keeps the list to what's actually usable.
+  const visible = data?.available.filter((c) => c.state !== 'missing') ?? [];
+
   return (
     <section className="section">
       <div className="row between" style={{ marginBottom: 8 }}>
@@ -77,11 +81,11 @@ export default function WorkspaceCredentialsEditor({ workspaceId }: Props) {
 
       {loading ? (
         <p className="dim" style={{ fontSize: 12 }}>loading…</p>
-      ) : !data || data.available.length === 0 ? (
-        <p className="dim" style={{ fontSize: 12 }}>No credentials available.</p>
+      ) : !visible || visible.length === 0 ? (
+        <p className="dim" style={{ fontSize: 12 }}>No configured credentials.</p>
       ) : (
         <div className="stack" style={{ gap: 6 }}>
-          {data.available.map((c) => (
+          {visible.map((c) => (
             <label key={c.id} className="row" style={{ gap: 8, cursor: 'pointer', alignItems: 'center' }}>
               <input type="checkbox" checked={enabled.has(c.id)} onChange={() => toggle(c.id)} />
               <code style={{ fontSize: 12 }}>{c.id}</code>

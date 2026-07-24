@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { fmtCost, fmtMs, fmtNum, fmtRelative } from '../../util/format';
 import { StatusPill } from '../common/StatusPill';
+import { TypePill, STATUS_COLORS } from '../common/chips';
 import RunRatingStars from './RunRatingStars';
 
 // Re-export so existing imports (`import { StatusPill } from '../components/RunsTable'`)
@@ -186,7 +187,7 @@ export default function RunsTable({
         );
       }
       case 'status':
-        return <StatusPill status={r.status} />;
+        return <TypePill value={r.status} colors={STATUS_COLORS} />;
       case 'started':
         return <span className="dim" title={r.started_at || ''}>{fmtRelative(r.started_at)}</span>;
       case 'finished':

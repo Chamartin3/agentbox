@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { repoApi, RepoResource, RepoType } from '../api/repo';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
+import { FilterChipBar, NameCell, TypePill, TYPE_COLORS } from '../components/common/chips';
 
 // Canonical resource types. Mirrors backend `ResourceType` StrEnum
 // (core/constants.py). Single source of truth across UI + API.
@@ -13,14 +13,6 @@ const TYPE_OPTIONS: Array<{ value: RepoType | ''; label: string }> = [
   { value: 'schema', label: 'schema' },
   { value: 'script', label: 'script' },
 ];
-
-const TYPE_COLORS: Record<RepoType, { bg: string; fg: string }> = {
-  document: { bg: '#dbeafe', fg: '#1e3a8a' },
-  folder:   { bg: '#fef3c7', fg: '#92400e' },
-  skill:    { bg: '#dcfce7', fg: '#14532d' },
-  schema:   { bg: '#ede9fe', fg: '#4c1d95' },
-  script:   { bg: '#fee2e2', fg: '#7f1d1d' },
-};
 
 function fmtDate(s: string): string {
   const d = new Date(s);
@@ -50,21 +42,12 @@ export default function ResourcesPage() {
       sortable: true,
       accessor: (r) => r.display_name || r.slug,
       render: (r) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Link to={`/workspaces/resources/${r.id}`} style={{ fontWeight: 600 }}>
-            {r.display_name || r.slug}
-          </Link>
-          <span className="dim" style={{ fontSize: 11, fontFamily: 'monospace' }}>
-            {r.slug}
-          </span>
-          {r.description ? (
-            <span className="dim" style={{ fontSize: 12 }}>
-              {r.description.length > 80
-                ? `${r.description.slice(0, 80)}…`
-                : r.description}
-            </span>
-          ) : null}
-        </div>
+        <NameCell
+          to={`/workspaces/resources/${r.id}`}
+          title={r.display_name || r.slug}
+          sub={r.slug}
+          description={r.description || undefined}
+        />
       ),
     },
     {
@@ -72,27 +55,13 @@ export default function ResourcesPage() {
       header: 'Type',
       sortable: true,
       accessor: (r) => r.type,
-      render: (r) => {
-        const c = TYPE_COLORS[r.type] || { bg: '#f3f4f6', fg: '#374151' };
-        return (
-          <button
-            type="button"
-            onClick={() => setTypeFilter(r.type)}
-            className="pill"
-            style={{
-              background: c.bg,
-              color: c.fg,
-              border: 'none',
-              cursor: 'pointer',
-              padding: '2px 8px',
-              fontSize: 12,
-            }}
-            title={`filter by type: ${r.type}`}
-          >
-            {r.type}
-          </button>
-        );
-      },
+      render: (r) => (
+        <TypePill
+          value={r.type}
+          colors={TYPE_COLORS}
+          onClick={() => setTypeFilter(r.type)}
+        />
+      ),
     },
     {
       key: 'tags',
@@ -177,42 +146,7 @@ export default function ResourcesPage() {
         })}
       </div>
 
-      {activeChips.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span className="dim" style={{ fontSize: 12 }}>active filters:</span>
-          {activeChips.map((c) => (
-            <span
-              key={c.key}
-              style={{
-                padding: '2px 8px',
-                fontSize: 11,
-                background: '#f3f4f6',
-                borderRadius: 12,
-                display: 'inline-flex',
-                gap: 4,
-                alignItems: 'center',
-              }}
-            >
-              {c.label}
-              <button
-                type="button"
-                onClick={c.clear}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-                aria-label={`clear ${c.label}`}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      {activeChips.length > 0 && <FilterChipBar chips={activeChips} />}
 
       <DataTable<RepoResource>
         mode="server"
