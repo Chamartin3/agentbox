@@ -149,6 +149,23 @@ def test_rollback_clones_files_and_activates(svc: AgentService) -> None:
         svc.rollback_to("bot", 99, "missing target", author="carol")
 
 
+def test_prune_grants_to_workspace(svc: AgentService, monkeypatch: pytest.MonkeyPatch) -> None:
+    svc.create_agent("ws-agent", {"id": "ws-agent"}, author="alice", changelog="init")
+    svc.grant_tool("ws-agent", "fs.read", "grant A", actor="alice")
+    svc.grant_tool("ws-agent", "fs.write", "grant B", actor="alice")
+    assert svc.active_grants("ws-agent") == {"fs.read", "fs.write"}
+
+    # New workspace catalog backs only fs.read → fs.write is pruned, fs.read kept.
+    monkeypatch.setattr(svc, "_catalog_names_for_workspace", lambda _ws: {"fs.read"})
+    assert svc._prune_grants_to_workspace("ws-agent", "ws2") == ["fs.write"]
+    assert svc.active_grants("ws-agent") == {"fs.read"}
+
+    # Null / ephemeral workspace → the catalog is the global set, so never prune.
+    assert svc._prune_grants_to_workspace("ws-agent", None) == []
+    assert svc._prune_grants_to_workspace("ws-agent", "<ephemeral>") == []
+    assert svc.active_grants("ws-agent") == {"fs.read"}
+
+
 def test_grant_revoke_reactivate(svc: AgentService) -> None:
     # The agent must exist — agent_tool_grants.agent_id is an enforced FK now.
     svc.create_agent("a1", {"id": "a1"}, author="alice", changelog="init")

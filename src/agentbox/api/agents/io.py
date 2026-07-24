@@ -19,6 +19,7 @@ class _PatchAgentResult(TypedDict):
     """Response shape of PATCH /api/agents/{agent_id}."""
 
     agent: dict
+    pruned_tools: list[str]  # grants revoked because the workspace changed
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -79,10 +80,10 @@ def patch_agent(
     """
     patch = body.model_dump(exclude_unset=True)
     try:
-        updated = ctx.agents.patch_agent_config(agent_id, patch)
+        updated, pruned_tools = ctx.agents.patch_agent_config(agent_id, patch)
     except AgentServiceError as exc:
         detail: object = (
             exc.detail if exc.code == "empty_patch" else {"code": exc.code, "detail": exc.detail}
         )
         raise HTTPException(exc.status_code, detail) from exc
-    return {"agent": updated.model_dump()}
+    return {"agent": updated.model_dump(), "pruned_tools": pruned_tools}

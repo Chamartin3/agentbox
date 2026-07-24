@@ -20,7 +20,6 @@ import json as _json
 import logging
 import types
 import uuid
-from collections.abc import Mapping
 from agentbox.core.agents import (
     CompositionPreview,
     PreviewError as PreviewError,
@@ -1622,7 +1621,7 @@ class AgentService(Service):
         latest = self._versions.get_latest(agent_id)
         next_version = (latest.get("version") or 0) + 1 if latest else 1
         # Always ensure a composition block so build_prompt's Stage-1 guard passes.
-        config_json = _ensure_composition_in_config(config_json)
+        config_json = cast(dict, _ensure_composition_in_config(config_json))
         vid = self._versions.insert_version(
             agent_id=agent_id,
             version=next_version,
@@ -1795,7 +1794,7 @@ class AgentService(Service):
             raise ValueError(f"Agent {agent_id!r} has no active version")
 
         # Decode the current config_json
-        cfg = _decode_config_json_free((active_row or {}).get("config_json"))
+        cfg = cast(dict, _decode_config_json_free((active_row or {}).get("config_json")))
 
         # Ensure runtime section exists
         cfg.setdefault("runtime", {})
@@ -1864,7 +1863,7 @@ class AgentService(Service):
             raise ValueError(f"Agent {agent_id!r} has no active version")
 
         # Decode the current config_json
-        cfg = _decode_config_json_free((active_row or {}).get("config_json"))
+        cfg = cast(dict, _decode_config_json_free((active_row or {}).get("config_json")))
 
         # Get current forbidden_tools list
         current_forbidden = set(cfg.get("runtime", {}).get("forbidden_tools", []))
@@ -2187,7 +2186,7 @@ class AgentService(Service):
         source: str = "manifest",
     ) -> AgentVersionRow:
         """Insert a fully-specified version (+ its files) atomically."""
-        prepared = _prepare_files(files) if files else []
+        prepared = cast(list[dict], _prepare_files(files)) if files else []
         vid = self._versions.insert_version(
             files=prepared or None,
             agent_id=agent_id,
@@ -2244,10 +2243,10 @@ class AgentService(Service):
     def insert_version_files(self, version_id: int, files: list[dict]) -> None:
         prepared = _prepare_files(files)
         if prepared:
-            self._files.insert_files(version_id, prepared)
+            self._files.insert_files(version_id, cast(list[dict], prepared))
 
     def replace_version_files(self, version_id: int, files: list[dict]) -> None:
-        self._files.replace_files(version_id, _prepare_files(files) if files else [])
+        self._files.replace_files(version_id, cast(list[dict], _prepare_files(files)) if files else [])
 
     def delete_version_files(self, version_id: int) -> None:
         self._files.delete_for_version(version_id)
@@ -2691,9 +2690,45 @@ class AgentService(Service):
                 400, "unknown_workspace", f"workspace {workspace!r} does not exist"
             )
 
-    def patch_agent_config(self, agent_id: str, patch: dict) -> AgentDef:
+    def _catalog_names_for_workspace(self, workspace: str) -> set[str]:
+        """Canonical tool/resource names installed in *workspace* (MCP + host-env
+        + resource bindings) — the same catalog the tool-grants picker shows."""
+        from agentbox.core.service.workspaces import WorkspaceService  # noqa: PLC0415
+        from agentbox.core.workspaces.tooling.mcp import McpRegistry  # noqa: PLC0415
+
+        registry = McpRegistry(load_settings().mcp_cache_dir)
+        registry.hydrate_from_cache()
+        return {
+            c.name
+            for c in WorkspaceService().installed_callables(workspace, mcp_registry=registry)
+        }
+
+    def _prune_grants_to_workspace(self, agent_id: str, workspace: str | None) -> list[str]:
+        """Revoke active grants whose tool isn't in *workspace*'s catalog.
+
+        No-op for null / ``"<ephemeral>"`` (the catalog is the global set).
+        Soft-revoke (keeps audit history). Returns the pruned tool names.
+        """
+        if not workspace or workspace == "<ephemeral>":
+            return []
+        catalog = self._catalog_names_for_workspace(workspace)
+        pruned: list[str] = []
+        for tool in sorted(self.active_grants(agent_id)):
+            if tool not in catalog:
+                self.revoke_tool(
+                    agent_id,
+                    tool,
+                    f"pruned: not available in workspace {workspace!r}",
+                    actor="api:patch",
+                )
+                pruned.append(tool)
+        return pruned
+
+    def patch_agent_config(self, agent_id: str, patch: dict) -> tuple[AgentDef, list[str]]:
         """Merge ``patch`` onto the active def, mint + activate a new version.
 
+        Returns the updated def plus any tool grants pruned because the agent's
+        workspace changed to one whose catalog no longer backs them.
         Raises ``AgentServiceError`` (HTTP-shaped) on any failure.
         """
         if not patch:
@@ -2702,6 +2737,7 @@ class AgentService(Service):
         current = self.resolve_agent(agent_id)
         if current is None:
             raise AgentServiceError(404, "unknown_agent", agent_id)
+        prior_workspace = current.workspace
 
         merged = _apply_patch_to_agent(current.model_dump(mode="python"), patch)
         try:
@@ -2767,7 +2803,11 @@ class AgentService(Service):
             proxy_path=str(updated.source_path) if updated.source_path else None,
         )
 
-        return updated
+        pruned: list[str] = []
+        if updated.workspace != prior_workspace:
+            pruned = self._prune_grants_to_workspace(agent_id, updated.workspace)
+
+        return updated, pruned
 
     def normalize_validator_entries(
         self, direction: str, entries: list[dict]
@@ -2807,7 +2847,7 @@ class AgentService(Service):
         if current is None:
             raise AgentServiceError(404, "unknown_agent", agent_id)
 
-        explicit: dict[str, list[dict]] = {}
+        explicit: dict[str, object] = {}
         if input_validators is not None:
             explicit["input"] = self.normalize_validator_entries(
                 "input", input_validators

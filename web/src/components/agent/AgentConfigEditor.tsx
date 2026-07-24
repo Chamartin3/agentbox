@@ -6,7 +6,7 @@ import { AgentToolGrantsPicker } from './AgentToolGrantsPicker';
 
 interface Props {
   agent: AgentDef;
-  onSaved: (updated: AgentDef) => void;
+  onSaved: (updated: AgentDef, prunedTools?: string[]) => void;
   onError: (msg: string) => void;
 }
 
@@ -97,7 +97,7 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
 
     try {
       const res = await patchAgent(agent.id, patch as Partial<AgentDef>);
-      onSaved(res.agent);
+      onSaved(res.agent, res.pruned_tools);
     } catch (e) {
       const err = e as ApiError;
       onError(`patch failed: ${JSON.stringify(err.detail)}`);

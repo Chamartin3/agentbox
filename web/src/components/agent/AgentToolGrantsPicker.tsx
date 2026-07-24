@@ -42,6 +42,13 @@ function category(name: string): string {
   return CATEGORY[ns] ?? "other";
 }
 
+// Source group for an item: MCP callables get their own per-server group
+// ("mcp: <server>") so it's obvious which tools come from a linked MCP server;
+// everything else falls back to the namespace bucket.
+function categoryOf(t: CatalogItem): string {
+  return t.server ? `mcp: ${t.server}` : category(t.name);
+}
+
 function shortName(name: string): string {
   const dot = name.indexOf(".");
   return dot > 0 ? name.slice(dot + 1) : name;
@@ -121,7 +128,7 @@ export function AgentToolGrantsPicker({ agentId, workspaceId }: Props) {
   }, [showAll, availableTools, allTools, installedNames, activeGrants]);
 
   const categories = useMemo(() => {
-    const set = new Set(fullCatalog.map((t) => category(t.name)));
+    const set = new Set(fullCatalog.map((t) => categoryOf(t)));
     return [...set].sort((a, b) => (a === "other" ? 1 : b === "other" ? -1 : a.localeCompare(b)));
   }, [fullCatalog]);
 
@@ -140,7 +147,7 @@ export function AgentToolGrantsPicker({ agentId, workspaceId }: Props) {
     () =>
       fullCatalog
         .filter((t) => !selected.has(t.name) && matchesText(t))
-        .filter((t) => catFilter === "all" || category(t.name) === catFilter)
+        .filter((t) => catFilter === "all" || categoryOf(t) === catFilter)
         .sort((a, b) => a.name.localeCompare(b.name)),
     [fullCatalog, selected, query, catFilter],
   );
@@ -216,7 +223,7 @@ export function AgentToolGrantsPicker({ agentId, workspaceId }: Props) {
       >
         <input type="checkbox" checked={isSelected} disabled={disabled} onChange={() => toggle(t.name)} />
         <span className="tool-box-name">{shortName(t.name)}</span>
-        <span className="tool-box-group">{category(t.name)}</span>
+        <span className="tool-box-group">{categoryOf(t)}</span>
       </label>
     );
   };

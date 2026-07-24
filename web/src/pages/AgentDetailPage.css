@@ -264,13 +264,18 @@
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: flex-start;
 }
 .config-two-col > * {
   flex: 1 1 320px;
   margin-top: 12px;
   margin-bottom: 12px;
   min-width: 0;
+}
+/* Both columns are .config-fieldset; without this the left one matches
+   :first-of-type (margin-top 4px) and its legend sits 8px above the right (E). */
+.config-two-col > .config-fieldset {
+  margin-top: 12px;
 }
 
 /* Inside .config-fieldset, every .field stacks label-on-top so each column
@@ -397,11 +402,12 @@
 }
 
 /* ── Tools panel ─────────────────────────────────────────────────── */
-/* Flat section, matching .config-fieldset — no box, header carries the rule. */
+/* Flat section, matching .config-fieldset — no box, header carries the rule.
+   Bottom margin (D) separates the catalog from the Execution fieldset below. */
 .tools-panel {
   border: 0;
   padding: 0;
-  margin: 22px 0 0;
+  margin: 22px 0 20px;
 }
 .tools-panel-header {
   display: flex;
@@ -498,12 +504,14 @@
 .tools-type-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   flex: 1;
 }
+/* Group tabs (A): larger tap targets + a clearer active state. */
 .tools-type-tab {
-  font-size: 11px;
-  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--bg);
@@ -515,9 +523,10 @@
   border-color: var(--fg-muted);
 }
 .tools-type-tab.active {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
   border-color: var(--accent);
   color: var(--accent);
+  font-weight: 600;
 }
 .tools-bulk {
   display: flex;

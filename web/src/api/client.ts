@@ -140,6 +140,8 @@ export interface AgentDef {
   last_run_at?: string | null;
   last_activity_at?: string | null;
   resolved_workspace?: string;
+  /** False when a named workspace ref has no matching workspaces row (orphan). */
+  workspace_exists?: boolean;
   version?: number | null;
   total_versions?: number | null;
   active_version?: number | null;
@@ -573,7 +575,7 @@ export const api = {
       `/api/manifest/runner-models?kind=${encodeURIComponent(kind)}`,
     ),
   patchAgent: (id: string, body: Partial<AgentDef> & { runner?: Partial<RunnerSpec> }) =>
-    req<{ agent: AgentDef }>(`/api/agents/${id}`, {
+    req<{ agent: AgentDef; pruned_tools?: string[] }>(`/api/agents/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
@@ -645,6 +647,13 @@ export const api = {
     req<Record<string, unknown>>(`/api/workspaces/by-name/${name}/file`, {
       method: 'PUT',
       body: JSON.stringify({ path, content }),
+    }),
+  getWorkspaceEnvVars: (id: string) =>
+    req<Record<string, string>>(`/api/workspaces/${encodeURIComponent(id)}/env-vars`),
+  setWorkspaceEnvVars: (id: string, vars: Record<string, string>) =>
+    req<Record<string, string>>(`/api/workspaces/${encodeURIComponent(id)}/env-vars`, {
+      method: 'PUT',
+      body: JSON.stringify({ vars }),
     }),
 
   // ---- agent lifecycle (DB-only creation, publish, draft, rollback) --------
