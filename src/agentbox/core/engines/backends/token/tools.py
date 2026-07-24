@@ -24,15 +24,18 @@ import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
-from fastmcp.client.transports import StdioTransport
+from fastmcp.client.transports import StdioTransport, StreamableHttpTransport
+from pydantic_ai import RunContext, ToolDefinition as _ToolDefinition
 from pydantic_ai.mcp import MCPToolset
+from pydantic_ai.toolsets.abstract import AbstractToolset
 
 from agentbox.core.data.constants import HOST_ENV_SERVER_NAME
 from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.mcp_servers.specs import host_env_server_spec
 from agentbox.core.tools.grants import GrantViolation, check_capability
+from agentbox.core.workspaces.tooling.launch import resolve_mcp_launch_command
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +85,8 @@ def build_host_env_toolsets(
     workspace_id: str | None,
     workdir: str | Path | None,
     db_path: str | Path | None,
+    *,
+    extra_env: dict[str, str] | None = None,
 ) -> list[MCPToolset]:
     """Connect to the host-env stdio MCP server as pydantic-ai toolset(s).
 
@@ -120,6 +125,8 @@ def build_host_env_toolsets(
         # (Claude) merges with the process env itself; pydantic-ai's stdio
         # transport does not, so merge here.
         env = {**os.environ, **spec["env"]}
+        if extra_env:
+            env.update(extra_env)
         transport = StdioTransport(
             command=spec["command"], args=list(spec["args"]), env=env
         )
@@ -143,6 +150,95 @@ def build_host_env_toolsets(
             exc_info=True,
         )
         return []
+
+
+class _McpServerSpec(TypedDict, total=False):
+    """Minimal schema for an MCP server spec (resolve_workspace_mcp output)."""
+
+    name: str
+    # config is an opaque dict; its values (command list, url str, etc.) are
+    # consumed by transport constructors that accept the concrete types.
+    config: dict
+    disabled_tools: list[str]
+
+
+def build_external_mcp_toolsets(
+    servers: list[_McpServerSpec] | None,
+    allowed_tools: set[str] | None,
+    *,
+    extra_env: dict[str, str] | None = None,
+) -> list[AbstractToolset]:
+    """Build one pydantic-ai ``MCPToolset`` per attached EXTERNAL MCP server.
+
+    ``servers`` items are ``{name, config: {command|url, transport, ...},
+    disabled_tools: [...]}`` as resolved by ``resolve_workspace_mcp`` (project +
+    workspace-enabled servers). This is the token/direct-path analogue of the
+    ``.mcp.json`` route that MCP-aware backends use — without it the raw
+    pydantic-ai path can never call an external server's tools (it fabricates).
+
+    Exposure-time authorization: each toolset is ``.filtered`` to the granted
+    subset — a tool is offered to the model only when it is NOT workspace-disabled
+    AND (``allowed_tools is None`` [no agent-level restriction] OR the tool is in
+    ``allowed_tools``). A denied tool is never presented, satisfying "scope at
+    exposure, not call time".
+
+    stdio servers (``command: [uvx|npx, ...]``) are spawned via ``StdioTransport``
+    (list → command head + args tail); remote (``url``) servers use fastmcp's HTTP
+    transport when available, else are skipped with a warning. Results are
+    stringified for Ollama-compat, same as the host-env toolset.
+    """
+    if not servers:
+        return []
+    if os.environ.get("AGENTBOX_TOKEN_MCP_TOOLS", "1") == "0":
+        return []
+    out: list[AbstractToolset] = []
+    for srv in servers:
+        name = srv.get("name") or "mcp"
+        cfg = srv.get("config") or {}
+        disabled = set(srv.get("disabled_tools") or [])
+        try:
+            command = cfg.get("command")
+            url = cfg.get("url")
+            if command:
+                stdio_env = {**os.environ}
+                if extra_env:
+                    stdio_env.update(extra_env)
+                launched = resolve_mcp_launch_command(
+                    list(command), env=stdio_env
+                )
+                transport: StdioTransport | StreamableHttpTransport = (
+                    StdioTransport(
+                        command=launched["command"],
+                        args=launched["args"],
+                        env=launched["env"],
+                    )
+                )
+            elif url:
+                transport = StreamableHttpTransport(url=url)
+            else:
+                continue
+            toolset = MCPToolset(
+                transport, id=name, process_tool_call=_stringify_tool_result
+            )
+
+            def _expose(
+                ctx: RunContext[object],
+                tool_def: _ToolDefinition,
+                _allowed: set[str] | None = allowed_tools,
+                _disabled: set[str] = disabled,
+            ) -> bool:
+                if tool_def.name in _disabled:
+                    return False
+                return _allowed is None or tool_def.name in _allowed
+
+            out.append(toolset.filtered(_expose))
+        except Exception:
+            logger.warning(
+                "token backend: could not build external MCP toolset %r",
+                name,
+                exc_info=True,
+            )
+    return out
 
 
 def build_host_env_tools(

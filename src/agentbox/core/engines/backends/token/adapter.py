@@ -97,6 +97,7 @@ class TokenBackend(BackendAdapter):
         ws_allowed_tools: set[CanonicalTool] | None = None,
         **kwargs: Any,
     ) -> RenderedConfig:
+        extra_env: dict[str, str] | None = kwargs.pop("extra_env", None)
         python_cfg = (
             python_agent_config
             if python_agent_config is not None
@@ -187,6 +188,9 @@ class TokenBackend(BackendAdapter):
         )
         if isinstance(_max_retries, int) and _max_retries > 0:
             agent_meta["output_retries"] = _max_retries
+
+        if extra_env:
+            agent_meta["extra_env"] = extra_env
 
         return RenderedConfig(
             cwd=Path("."),
@@ -285,6 +289,13 @@ class TokenBackend(BackendAdapter):
             workdir=rendered.agent_meta.get("host_env_workdir"),
             db_path=rendered.agent_meta.get("host_env_db_path"),
             model_params=rendered.agent_meta.get("params"),
+            external_mcp_servers=rendered.agent_meta.get("external_mcp_servers"),
+            external_mcp_allowed_tools=(
+                set(_emt)
+                if (_emt := rendered.agent_meta.get("external_mcp_allowed_tools")) is not None
+                else None
+            ),
+            extra_env=rendered.agent_meta.get("extra_env"),
         ):
             yield ev
 
