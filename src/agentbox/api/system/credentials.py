@@ -8,6 +8,7 @@ secrets flow in and are materialized into runs, never returned to a caller.
 
 from __future__ import annotations
 
+import re
 from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,11 +29,21 @@ class InventoryResult(TypedDict):
 
 
 class AddBody(BaseModel):
-    id: str = Field(..., min_length=1)
+    # id is derived when omitted: env_var for api_key, else a slug of label.
+    id: str | None = None
     label: str = Field(..., min_length=1)
     kind: str = Field(..., pattern="^(api_key|login)$")
     env_var: str | None = None
     secret: str = Field(..., min_length=1)
+
+
+def _derive_id(body: AddBody) -> str:
+    """Autogenerate a stable credential id from env_var or the label slug."""
+    if body.id and body.id.strip():
+        return body.id.strip()
+    if body.kind == "api_key" and body.env_var:
+        return body.env_var.strip()
+    return re.sub(r"[^a-z0-9]+", "_", body.label.lower()).strip("_")
 
 
 @router.get("")
@@ -48,9 +59,12 @@ def add_credential(
     body: AddBody,
     ctx: APIContext = Depends(get_api_context),
 ) -> ManagedCredentialPublicRow:
+    credential_id = _derive_id(body)
+    if not credential_id:
+        raise HTTPException(400, "cannot derive credential id; provide env_var or a label")
     try:
         return ctx.credentials.add_credential(
-            credential_id=body.id,
+            credential_id=credential_id,
             label=body.label,
             kind=body.kind,
             env_var=body.env_var,

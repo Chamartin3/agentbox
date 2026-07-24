@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 _MODEL_CACHE: dict[
     tuple[str, str | None, str | None, str | None], tuple[Any, float]
 ] = {}
-_CACHE_TTL_SECONDS = 60
+_CACHE_TTL_SECONDS = 3600  # 1-hour cache — cold-load pages have data without a live round-trip
 
 
 def _cache_key(
@@ -100,19 +100,27 @@ def refresh_opencode_providers() -> list[str]:
         existing = _PROVIDERS.get(prefix)
         if existing is not None:
             compat = list(existing.descriptor.compatible_backends or [])
-            if BackendName.OPENCODE in compat:
-                # A first-class adapter already covers this prefix for the
-                # opencode backend (e.g. Ollama) — don't shadow it.
-                continue
-            # An HTTP/token-only adapter owns the bare id (e.g. ``openai``).
-            # Register the opencode-side view under a namespaced id so both
-            # remain available.
-            descriptor_id = f"opencode-{prefix}"
-        else:
-            descriptor_id = prefix
-        _PROVIDERS[descriptor_id] = cli.OpenCodeCLIAdapter(
+            if BackendName.OPENCODE not in compat:
+                # A first-class (HTTP/token) adapter already owns this prefix
+                # (e.g. ``openai``, ``deepseek``). opencode drives the *same*
+                # provider, so mark that existing provider opencode-compatible
+                # rather than cloning a confusing ``opencode-<prefix>`` sibling.
+                # model_copy shadows the (ClassVar) descriptor on this instance
+                # only, keeping the adapter class pristine for fresh instances.
+                # setattr: shadow the ClassVar descriptor on this instance only
+                # (the ProviderAdapter protocol types ``descriptor`` read-only).
+                setattr(
+                    existing,
+                    "descriptor",
+                    existing.descriptor.model_copy(
+                        update={"compatible_backends": [*compat, BackendName.OPENCODE]}
+                    ),
+                )
+            continue
+        # No first-class adapter owns this prefix — register the opencode view.
+        _PROVIDERS[prefix] = cli.OpenCodeCLIAdapter(
             cli_prefix=prefix,
-            descriptor_id=descriptor_id,
+            descriptor_id=prefix,
         )
 
     # Invalidate any cached model listings — provider set just changed.

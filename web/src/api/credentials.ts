@@ -24,7 +24,7 @@ export interface CredentialListResponse {
 }
 
 export interface CreateCredentialBody {
-  id: string;
+  id?: string; // derived server-side from env_var/label when omitted
   label: string;
   kind: CredentialKind;
   env_var?: string | null;

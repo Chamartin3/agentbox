@@ -294,39 +294,49 @@ class TestProviderRegistry:
             assert [model.id for model in models] == ["ollama/llama3", "ollama/mistral"]
 
     def test_refresh_opencode_providers_registers_discovered_prefixes(self) -> None:
-        """refresh_opencode_providers() adds one adapter per discovered prefix.
+        """refresh_opencode_providers() reconciles discovery with the registry.
 
-        Verifies the namespace-collision rule: bare ``openai`` is owned by
-        the HTTP adapter, so the opencode side is registered as
-        ``opencode-openai``; ``ollama`` declares opencode compat so it is
-        left untouched.
+        A prefix already owned by a first-class HTTP adapter (``openai``) is
+        NOT cloned into an ``opencode-openai`` sibling — instead the existing
+        provider is marked opencode-compatible. Unowned prefixes register a
+        fresh OpenCodeCLIAdapter under their bare id.
         """
-        with patch.object(
-            cli,
-            "discover_opencode_providers",
-            return_value=["openai", "ollama", "opencode", "opencode-go"],
-        ):
-            discovered = registry.refresh_opencode_providers()
+        openai_before = list(
+            registry.get_provider("openai").descriptor.compatible_backends  # type: ignore[union-attr]
+        )
+        try:
+            with patch.object(
+                cli,
+                "discover_opencode_providers",
+                return_value=["openai", "ollama", "opencode", "opencode-go"],
+            ):
+                discovered = registry.refresh_opencode_providers()
 
-        assert discovered == ["openai", "ollama", "opencode", "opencode-go"]
-        # HTTP openai keeps the bare id; opencode side gets a namespaced id.
-        assert isinstance(registry.get_provider("openai"), object)
-        assert registry.get_provider("openai").descriptor.compatible_backends == ["token"]  # type: ignore[union-attr]
-        opencode_openai = registry.get_provider("opencode-openai")
-        assert opencode_openai is not None
-        assert opencode_openai.descriptor.compatible_backends == ["opencode"]
-        # Ollama opencode-compat adapter is preserved untouched.
-        ollama = registry.get_provider("ollama")
-        assert ollama is not None
-        assert "opencode" in (ollama.descriptor.compatible_backends or [])
-        # Bare opencode prefix registers as itself.
-        bare = registry.get_provider("opencode")
-        assert bare is not None
-        assert isinstance(bare, cli.OpenCodeCLIAdapter)
-        assert bare.cli_prefix == "opencode"
-
-        # Restore real state for subsequent tests.
-        registry.refresh_opencode_providers()
+            assert discovered == ["openai", "ollama", "opencode", "opencode-go"]
+            # HTTP openai keeps its bare id and gains opencode compatibility;
+            # no namespaced clone is registered.
+            assert registry.get_provider("opencode-openai") is None
+            openai = registry.get_provider("openai")
+            assert openai is not None
+            assert "token" in openai.descriptor.compatible_backends
+            assert "opencode" in openai.descriptor.compatible_backends
+            # Ollama already declared opencode compat — left untouched.
+            ollama = registry.get_provider("ollama")
+            assert ollama is not None
+            assert "opencode" in (ollama.descriptor.compatible_backends or [])
+            # Unowned opencode prefix registers as its own CLI adapter.
+            bare = registry.get_provider("opencode")
+            assert bare is not None
+            assert isinstance(bare, cli.OpenCodeCLIAdapter)
+            assert bare.cli_prefix == "opencode"
+        finally:
+            # Restore the shared openai descriptor + drop the mock's cli adapters.
+            registry.get_provider("openai").descriptor = (  # type: ignore[union-attr]
+                registry.get_provider("openai").descriptor.model_copy(  # type: ignore[union-attr]
+                    update={"compatible_backends": openai_before}
+                )
+            )
+            registry.refresh_opencode_providers()
 
     def test_ollama_url_rewrite_swaps_localhost_inside_container(
         self, monkeypatch: pytest.MonkeyPatch
