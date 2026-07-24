@@ -274,11 +274,15 @@ class EngineService(Service):
 
         Returns the full profile data for the bound profile id.
         """
+        # Validate first: the binding column is an enforced FK now, so a missing
+        # profile would raise IntegrityError on insert. get_profile raises the
+        # 404-mapped ProfileNotFound instead.
+        profile = self.get_profile(profile_id)
         now = now_iso()
         self._db.runner_profiles.set_agent_profile(
             agent_id, profile_id, created_at=now, updated_at=now,
         )
-        return self.get_profile(profile_id)
+        return profile
 
     def clear_agent_runner_profile(self, agent_id: str) -> None:
         """Remove the profile binding for *agent_id*."""

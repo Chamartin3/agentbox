@@ -15,7 +15,7 @@ from pathlib import Path
 import agentbox
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, func, inspect
+from sqlalchemy import create_engine, event, func, inspect
 from sqlalchemy.engine import Engine
 
 from agentbox.core.data.constants import RunStatus
@@ -50,15 +50,18 @@ def init_engine(db_path: Path) -> Engine:
         future=True,
     )
 
+    # Migrations run on this engine with FK enforcement OFF (SQLite default) —
+    # alembic's batch table-rebuilds require it, and 0016 cleans orphans here.
     _run_alembic_migrations(engine, db_path)
     engine.dispose()
 
-    # Re-create so the caller gets a fresh engine.
+    # Re-create so the caller gets a fresh engine — this one enforces FKs.
     engine = create_engine(
         f"sqlite:///{db_path}",
         connect_args={"check_same_thread": False},
         future=True,
     )
+    _enable_foreign_keys(engine)
     # NOTE: reaping is NOT done here. Every process that opens the DB calls
     # init_engine — including tool subprocesses (e.g. the agentbox-host-env MCP
     # server) spawned by a live run. Reaping on each engine init makes such a
@@ -66,6 +69,22 @@ def init_engine(db_path: Path) -> Engine:
     # uses a tool. The API server reaps real orphans on startup via
     # run_startup_tasks -> reap_orphan_runs (see api/app.py _on_startup).
     return engine
+
+
+def _enable_foreign_keys(engine: Engine) -> None:
+    """Enforce SQLite foreign keys on every connection from this engine.
+
+    SQLite defaults ``foreign_keys`` OFF and it's per-connection, so it must be
+    set on each new DBAPI connection. Applied only to the runtime engine (not
+    the migration engine) so ON DELETE CASCADE fires and dangling children can
+    never be inserted, without disturbing alembic batch migrations.
+    """
+
+    @event.listens_for(engine, "connect")
+    def _set_fk_pragma(dbapi_conn: object, _record: object) -> None:
+        cur = dbapi_conn.cursor()  # type: ignore[attr-defined]
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
 
 
 def _run_alembic_migrations(engine: Engine, db_path: Path) -> None:

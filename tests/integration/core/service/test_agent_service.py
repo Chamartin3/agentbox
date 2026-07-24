@@ -150,6 +150,8 @@ def test_rollback_clones_files_and_activates(svc: AgentService) -> None:
 
 
 def test_grant_revoke_reactivate(svc: AgentService) -> None:
+    # The agent must exist — agent_tool_grants.agent_id is an enforced FK now.
+    svc.create_agent("a1", {"id": "a1"}, author="alice", changelog="init")
     svc.grant_tool("a1", "fs.read", "initial grant", actor="alice")
     assert svc.active_grants("a1") == {"fs.read"}
 
