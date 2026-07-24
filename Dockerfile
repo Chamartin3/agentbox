@@ -51,7 +51,7 @@ COPY alembic.ini ./alembic.ini
 # Drop the SPA into the place FastAPI expects.
 COPY --from=web /web/dist /opt/agentbox/src/agentbox/ui/static/dist
 
-RUN pip install --no-cache-dir -e . websockets
+RUN pip install --no-cache-dir -e . websockets uv
 
 # Writable, appuser-owned dirs. The opencode state dir is pre-created so that
 # consumers bind-mounting an auth.json into ~/.local/share/opencode/ don't make
