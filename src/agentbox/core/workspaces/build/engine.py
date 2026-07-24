@@ -10,6 +10,7 @@ import string
 from pathlib import Path
 
 from agentbox.core.workspaces.build._paths import safe_dest
+from agentbox.core.workspaces.tooling.launch import resolve_mcp_launch_command
 from agentbox.core.data.workenv import McpRef, ResourceRef, WorkspaceConfig
 from agentbox.core.data.workenv import Item, RenderedDir, Role, WrittenItem
 from agentbox.core.data.workenv import Recipe
@@ -181,7 +182,19 @@ def _build_mcp_json(
                 entry["type"] = transport
                 entry["url"] = url
             elif command:
-                entry["command"] = command
+                # Resolve through the shared launcher so the config-file
+                # path and the token in-process path launch the same binary.
+                launched = resolve_mcp_launch_command(list(command))
+                entry["command"] = launched["command"]
+                if launched["args"]:
+                    entry["args"] = launched["args"]
+
+            # Per-server tool scoping: when the workspace has disabled specific
+            # tools on this server, emit the claude_code-native `tools.exclude`
+            # block so the .mcp.json consumer never sees those tools.
+            if srv.disabled_tools:
+                entry["tools"] = {"exclude": sorted(srv.disabled_tools)}
+
             mcp_servers[srv.name] = entry
     return {"mcpServers": mcp_servers}
 

@@ -134,6 +134,61 @@ class TestRenderClaude:
                 == "http://localhost:8080"
             )
 
+    def test_render_mcp_config_disabled_tools(self) -> None:
+        """Per-server disabled_tools emit the claude_code-native tools.exclude block."""
+        config = _make_fixture_config(
+            mcp_servers=[
+                McpRef(
+                    name="time-server",
+                    config={"url": "http://localhost:8080"},
+                    disabled_tools=["convert_time"],
+                ),
+                McpRef(
+                    name="filesystem",
+                    config={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]},
+                    disabled_tools=["write_file", "create_directory"],
+                ),
+            ],
+        )
+        recipe = load_recipe("claude_code")
+        with tempfile.TemporaryDirectory() as td:
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
+
+            mcp_file = Path(td) / ".mcp.json"
+            assert mcp_file.exists()
+            mcp_data = json.loads(mcp_file.read_text())
+
+            time_srv = mcp_data["mcpServers"]["time-server"]
+            assert "tools" in time_srv
+            assert time_srv["tools"]["exclude"] == ["convert_time"]
+
+            fs_srv = mcp_data["mcpServers"]["filesystem"]
+            assert "tools" in fs_srv
+            assert fs_srv["tools"]["exclude"] == [
+                "create_directory",
+                "write_file",
+            ]
+
+    def test_render_mcp_config_no_tools_when_empty_disabled(self) -> None:
+        """No tools key is emitted when disabled_tools is empty."""
+        config = _make_fixture_config(
+            mcp_servers=[
+                McpRef(
+                    name="time-server",
+                    config={"url": "http://localhost:8080"},
+                    disabled_tools=[],
+                ),
+            ],
+        )
+        recipe = load_recipe("claude_code")
+        with tempfile.TemporaryDirectory() as td:
+            render(Path(td), config, recipe, extra_items=_get_extra_items("claude_code", config))
+
+            mcp_file = Path(td) / ".mcp.json"
+            mcp_data = json.loads(mcp_file.read_text())
+            time_srv = mcp_data["mcpServers"]["time-server"]
+            assert "tools" not in time_srv
+
     def test_render_permissions(self) -> None:
         config = _make_fixture_config()
         recipe = load_recipe("claude_code")
