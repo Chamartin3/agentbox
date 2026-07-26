@@ -29,7 +29,6 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "agent_version_ratings",
         "agent_versions",
         "agents",
-        "api_tokens",
         "managed_credentials",
         "host_env_call_log",
         "host_env_profiles",

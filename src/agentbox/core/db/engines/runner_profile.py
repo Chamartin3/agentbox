@@ -52,7 +52,6 @@ class RunnerProfile(Entity, table=True):
     extra_args_json: str = Field(nullable=False, default="[]", sa_column_kwargs={"server_default": "[]"})
     is_enabled: int = Field(nullable=False, default=1, sa_column_kwargs={"server_default": "1"})
     is_system_default: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
-    api_token_id: Optional[str] = Field(foreign_key="api_tokens.id", default=None)
     created_at: str = Field(nullable=False)
     updated_at: str = Field(nullable=False)
 
@@ -105,7 +104,6 @@ class RunnerProfileManager(Manager[RunnerProfile]):
             model=m.get("model"),
             base_url=m.get("base_url"),
             api_key_env=m.get("api_key_env"),
-            api_token_id=m.get("api_token_id"),
             output_mode=m.get("output_mode") or "auto",
             params=_json.loads(m.get("params_json") or "{}"),
             headers=_json.loads(m.get("headers_json") or "{}"),

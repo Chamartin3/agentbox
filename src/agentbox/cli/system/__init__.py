@@ -1,4 +1,4 @@
-"""System CLI commands: doctor, env-doc, host env, MCP, health, settings, tokens, project."""
+"""System CLI commands: doctor, env-doc, host env, MCP, health, settings, project."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from agentbox.cli.system.host import host_env_app as _host_app
 from agentbox.cli.system.mcp import mcp_app as _mcp_app
 from agentbox.cli.system.project import project_app
 from agentbox.cli.system.settings import settings_app
-from agentbox.cli.system.tokens import tokens_app
 
 app = typer.Typer(
     name="system",
@@ -39,8 +38,5 @@ project_app.callback()(group_callback)
 
 app.add_typer(settings_app, name="settings")
 settings_app.callback()(group_callback)
-
-app.add_typer(tokens_app, name="tokens")
-tokens_app.callback()(group_callback)
 
 __all__ = ["app"]

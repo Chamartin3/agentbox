@@ -333,7 +333,6 @@ export interface RunnerProfile {
   model: string | null;
   base_url: string | null;
   api_key_env: string | null;
-  api_token_id: string | null;
   params: Record<string, unknown>;
   headers: Record<string, string>;
   extra_args: string[];
@@ -352,7 +351,6 @@ export interface RunnerProfileCreate {
   model?: string | null;
   base_url?: string | null;
   api_key_env?: string | null;
-  api_token_id?: string | null;
   params?: Record<string, unknown>;
   headers?: Record<string, string>;
   extra_args?: string[];

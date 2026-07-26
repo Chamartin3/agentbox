@@ -23,7 +23,6 @@ class RunnerProfile(BaseModel):
     model: str | None = None
     base_url: str | None = None
     api_key_env: str | None = None
-    api_token_id: str | None = None
     output_mode: str = "auto"
     params: ModelParams = Field(default_factory=ModelParams)
     headers: dict[str, str] = Field(default_factory=dict)
@@ -45,7 +44,6 @@ class RunnerProfileCreate(BaseModel):
     model: str | None = None
     base_url: str | None = None
     api_key_env: str | None = None
-    api_token_id: str | None = None
     output_mode: str = "auto"
     params: ModelParams = Field(default_factory=ModelParams)
     headers: dict[str, str] = Field(default_factory=dict)
@@ -64,7 +62,6 @@ class RunnerProfilePatch(BaseModel):
     model: str | None = None
     base_url: str | None = None
     api_key_env: str | None = None
-    api_token_id: str | None = None
     output_mode: str | None = None
     params: ModelParams | None = None
     headers: dict[str, str] | None = None

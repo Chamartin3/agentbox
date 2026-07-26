@@ -9,7 +9,6 @@ import {
 import Toast from '../components/common/Toast';
 import RunnerProfileModal from '../components/runner/RunnerProfileModal';
 import { HarnessBadge, ProviderBadge, ModelBadge } from '../components/runner/RunnerBadges';
-import { apiTokens as apiTokensClient } from '../api/api_tokens';
 import './RunnerProfilesPage.css';
 
 function errMsg(e: unknown, fallback: string): string {
@@ -32,14 +31,12 @@ export default function RunnerProfilesPage({ embedded = false }: { embedded?: bo
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [editingProfile, setEditingProfile] = useState<RunnerProfile | undefined>(undefined);
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
-  const [apiTokens, setApiTokens] = useState<Array<{ id: string; name: string; environment: string }>>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadProfiles();
     loadProviders();
     loadBackends();
-    apiTokensClient.listSafe().then(setApiTokens);
   }, []);
 
   useEffect(() => {
@@ -222,7 +219,6 @@ export default function RunnerProfilesPage({ embedded = false }: { embedded?: bo
           profile={editingProfile}
           backends={backends}
           providers={providers}
-          apiTokens={apiTokens}
           onClose={closeForm}
           onSaved={handleSaved}
           onDelete={formMode === 'edit' ? handleDelete : undefined}

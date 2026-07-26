@@ -1,31 +1,10 @@
-"""Pydantic models for system domain (API tokens, settings, host env configuration)."""
+"""Pydantic models for system domain (settings, host env configuration)."""
 
 from typing import Any
 
 from pydantic import BaseModel
 
 from agentbox.core.data.base import Timestamped
-
-
-class ApiTokenRow(Timestamped):
-    """A full row from ``api_tokens`` (includes encrypted secret)."""
-
-    id: str
-    environment: str
-    name: str
-    secret_encrypted: str
-    last_four: str
-    updated_at: str
-
-
-class ApiTokenPublicRow(Timestamped):
-    """Public view returned by :py:meth:`ApiTokenManager.insert_token` (no secret)."""
-
-    id: str
-    environment: str
-    name: str
-    last_four: str
-    updated_at: str
 
 
 class HostEnvProfileRow(Timestamped):

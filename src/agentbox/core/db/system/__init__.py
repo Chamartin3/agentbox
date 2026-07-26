@@ -1,14 +1,10 @@
-"""System domain — API tokens, host-env profiles, MCP discovery, settings.
+"""System domain — host-env profiles, MCP discovery, settings, credentials.
 
 One file per table (entity + manager together). The manager is the public
 surface; the entity is importable directly for cross-domain FK references.
 """
 from __future__ import annotations
 
-from agentbox.core.db.system.api_token import (
-    ApiToken,
-    ApiTokenManager,
-)
 from agentbox.core.db.system.host_env_call import (
     HostEnvCallLog,
     HostEnvCallLogManager,
@@ -31,9 +27,6 @@ from agentbox.core.db.system.setting import (
 )
 
 __all__ = [
-    # api_token entity + manager
-    "ApiToken",
-    "ApiTokenManager",
     # managed_credential entity + manager
     "ManagedCredential",
     "ManagedCredentialManager",

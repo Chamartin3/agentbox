@@ -70,7 +70,7 @@ def test_ops_help() -> None:
 def test_system_help() -> None:
     result = runner.invoke(app, ["system", "--help"])
     assert result.exit_code == 0
-    for sub in ("doctor", "env", "health", "host", "mcp", "project", "settings", "tokens"):
+    for sub in ("doctor", "env", "health", "host", "mcp", "project", "settings"):
         assert sub in result.output
 
 
@@ -114,10 +114,6 @@ def test_system_health_help() -> None:
     assert "check" in result.output
 
 
-def test_system_tokens_help() -> None:
-    result = runner.invoke(app, ["system", "tokens", "--help"])
-    assert result.exit_code == 0
-    assert "ls" in result.output
 
 
 def test_work_mcp_help() -> None:

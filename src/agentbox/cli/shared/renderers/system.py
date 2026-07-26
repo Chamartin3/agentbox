@@ -19,7 +19,6 @@ from agentbox.core.service import (
     HostEnvProfileRow,
     McpServerSpec,
     AgentHostEnvGrantRow,
-    ApiTokenRow,
 )
 
 
@@ -50,44 +49,6 @@ class SystemRenderer(Renderer):
     def settings_patched(self, section: str) -> None:
         """Print confirmation after patching a settings section."""
         self.success(f"patched section {section!r}")
-
-    # ------------------------------------------------------------------
-    # Tokens
-    # ------------------------------------------------------------------
-
-    def tokens_table(self, items: Sequence[ApiTokenRow]) -> None:
-        """Render a table of API tokens."""
-        if not items:
-            self.dim("no tokens")
-            return
-
-        table = self.table("API Tokens", "ID", "Name", "Environment", "Created")
-        for t in items:
-            table.add_row(
-                t["id"][:12],
-                t.get("name", ""),
-                t.get("environment", ""),
-                t.get("created_at", ""),
-            )
-        self.print(table)
-
-    def token_created(self, token_id: str, environment: str, secret: str) -> None:
-        """Print confirmation for a created token, including the secret."""
-        self.success(f"created token {token_id!r} for environment {environment!r}")
-        self.print(f"[bold yellow]secret (save this):[/bold yellow] {secret}")
-
-    def token_rotated(self, token_id: str, secret: str) -> None:
-        """Print confirmation for a rotated token, including the new secret."""
-        self.success(f"rotated token {token_id!r}")
-        self.print(f"[bold yellow]new secret (save this):[/bold yellow] {secret}")
-
-    def token_not_found(self, token_id: str) -> None:
-        """Print error when a token is not found."""
-        self.error(f"token {token_id!r} not found")
-
-    def token_deleted(self, token_id: str) -> None:
-        """Print confirmation after deleting a token."""
-        self.warn(f"deleted token {token_id!r}")
 
     # ------------------------------------------------------------------
     # MCP servers (manifest MCP)

@@ -149,7 +149,6 @@ class EngineService(Service):
             "model": data.model,
             "base_url": data.base_url,
             "api_key_env": data.api_key_env,
-            "api_token_id": data.api_token_id,
             "output_mode": data.output_mode,
             "params_json": _json.dumps(data.params),
             "headers_json": _json.dumps(data.headers),
@@ -202,8 +201,6 @@ class EngineService(Service):
             values["api_key_env"] = patch.api_key_env
         if patch.output_mode is not None:
             values["output_mode"] = patch.output_mode
-        if patch.api_token_id is not None:
-            values["api_token_id"] = patch.api_token_id or None
         if patch.params is not None:
             values["params_json"] = _json.dumps(patch.params)
         if patch.headers is not None:

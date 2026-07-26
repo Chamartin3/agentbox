@@ -57,7 +57,6 @@ export interface RunnerProfileModalProps {
   profile?: RunnerProfile;
   backends: RunnerBackend[];
   providers: RunnerProvider[];
-  apiTokens: Array<{ id: string; name: string; environment: string }>;
   onClose: () => void;
   onSaved: (profile: RunnerProfile) => void;
   onDelete?: (id: string) => void;
@@ -69,7 +68,6 @@ export default function RunnerProfileModal({
   profile,
   backends,
   providers,
-  apiTokens,
   onClose,
   onSaved,
   onDelete,
@@ -166,7 +164,6 @@ export default function RunnerProfileModal({
         model: formData.model ? encodeModel(formData.model, formData.provider, formData.backend) : null,
         base_url: formData.base_url || null,
         api_key_env: formData.api_key_env || null,
-        api_token_id: formData.api_token_id || null,
         params: formData.params || {},
         headers: formData.headers || {},
         extra_args: formData.extra_args || [],
@@ -195,7 +192,6 @@ export default function RunnerProfileModal({
               : null,
         base_url: credentialsUnlocked ? (formData.base_url ?? undefined) : undefined,
         api_key_env: credentialsUnlocked ? (formData.api_key_env ?? undefined) : undefined,
-        api_token_id: formData.api_token_id ?? undefined,
         params: formData.params || undefined,
         headers: formData.headers || undefined,
         extra_args: formData.extra_args || undefined,
@@ -420,20 +416,6 @@ export default function RunnerProfileModal({
                   placeholder={currentProvider?.default_api_key_env || 'OPENAI_API_KEY'}
                   disabled={!credentialsEditable}
                 />
-              </div>
-              <div className="form-field full">
-                <label>Assigned API Token</label>
-                <select
-                  value={formData.api_token_id || ''}
-                  onChange={(e) => handleFormChange('api_token_id', e.target.value || null)}
-                >
-                  <option value="">— none —</option>
-                  {apiTokens.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.environment} / {t.name}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
             {mode === 'edit' && !credentialsUnlocked && (

@@ -593,35 +593,6 @@ class ResourceBlobRow(TypedDict):
 # ── System domain row shapes ───────────────────────────────────────────────
 
 
-class ApiTokenRow(TypedDict):
-    """A full row from ``api_tokens`` (includes encrypted secret)."""
-
-    id: str
-    environment: str
-    name: str
-    secret_encrypted: str
-    last_four: str
-    created_at: str
-    updated_at: str
-
-
-class ApiTokenPublicRow(TypedDict):
-    """Public view returned by :py:meth:`ApiTokenManager.insert_token` (no secret)."""
-
-    id: str
-    environment: str
-    name: str
-    last_four: str
-    created_at: str
-    updated_at: str
-
-
-class ApiTokenWithSecret(ApiTokenRow):
-    """A token row plus the one-time plaintext ``secret`` (rotate/create result)."""
-
-    secret: str
-
-
 class ManagedCredentialRow(TypedDict):
     """A full row from ``managed_credentials`` (includes encrypted secret)."""
 

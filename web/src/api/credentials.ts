@@ -1,7 +1,6 @@
 // Typed client for the /api/credentials endpoints and the per-workspace
-// /api/workspaces/{id}/credentials enablement endpoints. Mirrors the
-// convention in api/api_tokens.ts — a single object of thin apiRequest
-// wrappers.
+// /api/workspaces/{id}/credentials enablement endpoints. A single object
+// of thin apiRequest wrappers.
 
 import { apiRequest } from './http';
 

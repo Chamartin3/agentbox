@@ -1,7 +1,7 @@
 """Symmetric encryption for secrets at rest (Fernet).
 
-One place to derive the encryption key, used by every secret store
-(``api_tokens``, ``managed_credentials``). The key is resolved from
+One place to derive the encryption key, used by the ``managed_credentials``
+secret store. The key is resolved from
 *outside* the database it protects:
 
 1. ``AGENTBOX_SECRET_KEY`` — a real Fernet key, or any string (hashed to

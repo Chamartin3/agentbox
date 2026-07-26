@@ -5,7 +5,6 @@ import { credentialsApi, type CredentialInventoryEntry } from '../api/credential
 import Toast from '../components/common/Toast';
 import RunnerProfilesPage from './RunnerProfilesPage';
 import CredentialsPage, { type CredentialPrefill } from './CredentialsPage';
-import SettingsApiTokensTab from './SettingsApiTokensTab';
 import { type ToastState } from './SettingsBaseTab';
 import { HarnessBadge, ProviderBadge } from '../components/runner/RunnerBadges';
 
@@ -375,9 +374,6 @@ export default function SettingsRunnerProfilesTab() {
       </Section>
       <Section title="Credentials">
         <CredentialsPage embedded externalPrefill={credPrefill} />
-      </Section>
-      <Section title="API tokens">
-        <SettingsApiTokensTab />
       </Section>
       <Section title="Profiles">
         <RunnerProfilesPage embedded />
