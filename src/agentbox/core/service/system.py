@@ -17,6 +17,7 @@ import json as _json
 import secrets as _secrets
 import uuid
 
+from collections.abc import Mapping
 from pathlib import Path
 
 from agentbox.core.config import SETTINGS
@@ -46,7 +47,7 @@ class SystemService(Service):
     # Settings
     # ══════════════════════════════════════════════════════════════════
 
-    def get_settings_section(self, section: str) -> dict:
+    def get_settings_section(self, section: str) -> Mapping[str, object]:
         """Return all ``{key: value}`` pairs in a section (deserialised)."""
         return self._db.settings.get_settings_section(section)
 
@@ -81,7 +82,7 @@ class SystemService(Service):
         patch: dict,
         *,
         author: str | None = None,
-    ) -> dict:
+    ) -> Mapping[str, object]:
         """Apply a partial patch to a section. Returns the full section."""
         for key, value in patch.items():
             self.set_setting(section, key, value, author=author)

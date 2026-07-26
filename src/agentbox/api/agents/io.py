@@ -27,16 +27,26 @@ class _PatchAgentResult(TypedDict):
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
-def _make_catalog_resolver(ctx: APIContext) -> Callable[[str], set[str]]:
-    """Return a resolver that lists callable names installed in a workspace.
+def _make_catalog_resolver(ctx: APIContext) -> Callable[[str | None], set[str]]:
+    """Return a resolver that lists callable names available in a workspace.
 
     Built at the API layer where both AgentService and WorkspaceService are
     legitimately available, so the resolver can be injected into
     ``patch_agent_config`` without creating a forbidden
     ``service.agents -> service.workspaces`` import edge.
+
+    A null/empty workspace is the dedicated per-agent workspace: its
+    availability surface is the global agent-tools catalog (builtin canonical
+    vocabulary + shared registry), exactly the ``/api/agent_tools`` pick-list
+    the UI shows for it — no MCP / host-env / resource tools. Grants for those
+    must prune when an agent moves onto a dedicated workspace.
     """
 
-    def resolve(workspace: str) -> set[str]:
+    def resolve(workspace: str | None) -> set[str]:
+        if not workspace:
+            from agentbox.core.tools import BUILTIN_TOOLS, SharedToolRegistry
+
+            return {t.name.value for t in BUILTIN_TOOLS} | {s.name for s in SharedToolRegistry.all()}
         registry = McpRegistry(load_settings().mcp_cache_dir)
         registry.hydrate_from_cache()
         return {
@@ -61,7 +71,6 @@ class _RunnerPatch(BaseModel):
     timeout_seconds: int | None = None
     agent_module: str | None = None
     output_schema_path: str | None = None
-    output_validation_engine: str | None = None
     max_validation_retries: int | None = None
     max_error_retries: int | None = None
 

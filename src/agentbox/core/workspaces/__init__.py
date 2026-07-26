@@ -17,6 +17,7 @@ from pathlib import Path
 
 from agentbox.core.config import Settings
 from agentbox.core.data import AgentDef
+from agentbox.core.data.constants import DEFAULT_WORKSPACE_NAME
 from agentbox.core.data.payload_types import EnvDocRenderEntry, McpStdioServerSpec
 from agentbox.core.data.workenv import EffectivePermissionsOverlay
 from agentbox.core.db import WorkspaceReadManager
@@ -58,7 +59,7 @@ class Workspaces:
 
     def build(
         self,
-        workspace_id: str = "default",
+        workspace_id: str = DEFAULT_WORKSPACE_NAME,
         *,
         into: Path | None = None,
         engines: Collection[str] | None = None,
@@ -98,7 +99,7 @@ class Workspaces:
             extra_mcp_servers=extra_mcp_servers,
         )
 
-    def inspect(self, workspace_id: str = "default") -> WorkspaceInspection:
+    def inspect(self, workspace_id: str = DEFAULT_WORKSPACE_NAME) -> WorkspaceInspection:
         """Summarize composed state plus the last persistent build's provenance."""
         blueprint = self._composer.compose(workspace_id)
         workdir = resolve_workspace_workdir(self._reads, self._settings, workspace_id)

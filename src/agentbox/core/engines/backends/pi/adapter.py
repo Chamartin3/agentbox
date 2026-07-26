@@ -31,6 +31,7 @@ from agentbox.core.data import RenderedConfig
 from agentbox.core.engines.backends.streaming.jsonl import stream_jsonl_subprocess
 from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.translation import intersect_allowed_tools
+from agentbox.core.engines.backends.pi.tools import NATIVE_TOOLS
 
 _NAME = "pi"
 
@@ -219,6 +220,9 @@ def _int_or_zero(v: object) -> int:
 class PiBackend(BackendAdapter):
     name = _NAME
     conversation_format: ClassVar[str | None] = "pi-session"
+    universal_provider: ClassVar[bool] = True  # pydantic-ai drives any provider with an API key
+    supports_mcp: ClassVar[bool] = False  # pi v0.75.4 has no built-in MCP support
+    NATIVE_TOOLS = NATIVE_TOOLS  # noqa: N815 — canonical-tool → pi-name mapping
 
     def __init__(self) -> None:
         self._session_id: str | None = None

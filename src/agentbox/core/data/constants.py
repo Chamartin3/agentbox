@@ -234,13 +234,6 @@ class ValidationMode(StrEnum):
     NONE = "none"
 
 
-# Engines a config can *select* (always picks one — ``none`` is a runtime
-# outcome on ``ValidationEvent``, not a configurable choice).
-ConfiguredValidationMode = Literal[
-    ValidationMode.JSONSCHEMA, ValidationMode.PYDANTIC, ValidationMode.BOTH
-]
-
-
 class LogLevel(StrEnum):
     """Severity for ``LogEvent`` and stream-session logging."""
 
@@ -273,6 +266,12 @@ class McpPolicy(CatalogEnum):
 
     ALLOW_ALL_UNLESS_DISABLED = "allow_all_unless_disabled"
     DENY_ALL_UNLESS_ENABLED = "deny_all_unless_enabled"
+
+
+#: The protected baseline workspace. Not deletable; used as the fallback
+#: workspace id across the workspaces layer. Single source of truth for the
+#: name so it isn't spelled as a literal "default" in a dozen places.
+DEFAULT_WORKSPACE_NAME = "default"
 
 
 class ValidatorKind(CatalogEnum):

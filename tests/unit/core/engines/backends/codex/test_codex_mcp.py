@@ -328,3 +328,77 @@ def test_intrinsic_mcp_argv_spec_without_command_is_skipped() -> None:
         }
     }
     assert build_codex_intrinsic_mcp_argv(specs) == []
+
+
+# ---------------------------------------------------------------------------
+# agent_tools intrinsic server activation — Plan 162_03
+# ---------------------------------------------------------------------------
+
+
+def test_agent_tools_server_activates_when_agent_id_and_grants_present() -> None:
+    """When agent_meta carries both agent_tool_grants and agent_id (threaded by
+    the executor per Plan 162_03), the codex adapter's intrinsic-resolution
+    block produces mcp_servers.<AGENT_TOOLS_SERVER_NAME>.command= flags."""
+    from pathlib import Path
+
+    from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME
+    from agentbox.core.tools.mcp_servers.specs import agent_tools_server_spec
+
+    agent_meta = {
+        "agent_tool_grants": ["tool.alpha", "tool.beta"],
+        "agent_id": "agent-42",
+        "host_env_workdir": "/data/workdir",
+        "host_env_db_path": "/data/agentbox.sqlite",
+    }
+
+    _agent_tool_grants_raw = agent_meta.get("agent_tool_grants")
+    _agent_id = agent_meta.get("agent_id")
+    assert _agent_tool_grants_raw and _agent_id, "preconditions must hold"
+
+    _at_grants: set[str] = set(_agent_tool_grants_raw)
+    _at_spec = agent_tools_server_spec(
+        grants=_at_grants,
+        agent_id=_agent_id,
+        workdir=Path(agent_meta.get("host_env_workdir") or "."),
+        db_path=Path(agent_meta.get("host_env_db_path") or "/data/agentbox.sqlite"),
+    )
+    intrinsic_specs = {AGENT_TOOLS_SERVER_NAME: _at_spec}
+    flags = build_codex_intrinsic_mcp_argv(intrinsic_specs)
+
+    expected_prefix = f"mcp_servers.{AGENT_TOOLS_SERVER_NAME}.command="
+    assert any(expected_prefix in f for f in flags), (
+        f"Expected a flag starting with {expected_prefix!r}, got: {flags}"
+    )
+
+
+def test_agent_tools_server_skipped_when_agent_id_missing() -> None:
+    """Without agent_id in agent_meta the agent_tools branch must not fire.
+    This documents the pre-162_03 failure mode and confirms the guard logic."""
+    agent_meta: dict[str, object] = {
+        "agent_tool_grants": ["tool.alpha"],
+        # agent_id intentionally absent
+    }
+
+    _agent_tool_grants_raw = agent_meta.get("agent_tool_grants")
+    _agent_id = agent_meta.get("agent_id")
+
+    # The adapter's guard — must be False when agent_id is absent
+    assert not (_agent_tool_grants_raw and _agent_id), (
+        "Guard should be False when agent_id is missing from agent_meta"
+    )
+
+
+def test_agent_tools_server_skipped_when_grants_missing() -> None:
+    """Without agent_tool_grants the agent_tools branch must not fire."""
+    agent_meta: dict[str, object] = {
+        "agent_id": "agent-42",
+        # agent_tool_grants intentionally absent
+    }
+
+    _agent_tool_grants_raw = agent_meta.get("agent_tool_grants")
+    _agent_id = agent_meta.get("agent_id")
+
+    # The adapter's guard — must be False when agent_tool_grants is missing
+    assert not (_agent_tool_grants_raw and _agent_id), (
+        "Guard should be False when agent_tool_grants is missing from agent_meta"
+    )

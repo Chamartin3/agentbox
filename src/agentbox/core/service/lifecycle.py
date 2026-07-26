@@ -264,7 +264,7 @@ def dispatch_orphan_webhooks(
     try:
         svc = ExecutionService()
         pending_raw = svc.list_orphaned_unnotified_runs()
-        pending = [RunRecord(**r) for r in pending_raw] if pending_raw else []
+        pending = [RunRecord(**r.model_dump()) for r in pending_raw] if pending_raw else []
     except Exception as exc:
         _log.exception("orphan dispatch lookup failed")
         return _error("dispatch_orphan_webhooks", exc)

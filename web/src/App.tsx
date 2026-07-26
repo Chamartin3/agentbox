@@ -51,7 +51,7 @@ export default function App() {
           <Route path="/settings/:tab" element={<SettingsPage />} />
 
           {/* Legacy redirects (credentials + runner profiles moved into Settings). */}
-          <Route path="/credentials" element={<Navigate to="/settings/credentials" replace />} />
+          <Route path="/credentials" element={<Navigate to="/settings/runner-profiles" replace />} />
           <Route path="/runs/profiles" element={<Navigate to="/settings/runner-profiles" replace />} />
           <Route path="/runners" element={<Navigate to="/settings/runner-profiles" replace />} />
           <Route path="/runner-profiles" element={<Navigate to="/settings/runner-profiles" replace />} />

@@ -512,7 +512,6 @@ class ExecutionSection(TypedDict):
 
     max_validation_retries: int
     max_error_retries: int
-    output_validation_engine: str
 
 
 class RuntimeSection(TypedDict):
@@ -553,6 +552,33 @@ class ConfigJsonPayload(TypedDict):
     python: PythonSection
 
 
+class McpServerConfig(TypedDict, total=False):
+    """Config block inside an external MCP server entry.
+
+    Either ``url`` (HTTP/SSE) or ``command`` + optional ``args``/``env``
+    (stdio) will be present — the two transport forms are mutually exclusive.
+    ``transport`` and ``env`` are optional stdio-only fields.
+    """
+
+    url: str
+    command: list[str]
+    env: dict[str, str]
+    transport: str
+
+
+class ExternalMcpServer(TypedDict, total=False):
+    """Shape of one entry in the ``external_mcp_servers`` list.
+
+    Produced by the executor's MCP-resolution block and stored in
+    ``AgentMetaDict.external_mcp_servers``.  Consumed by backend
+    adapters (codex, token) to inject MCP server config into the run.
+    """
+
+    name: str
+    config: McpServerConfig
+    disabled_tools: list[str]
+
+
 class AgentMetaDict(TypedDict, total=False):
     """Backend-specific agent metadata built by ``TokenBackend.render()``.
 
@@ -580,6 +606,9 @@ class AgentMetaDict(TypedDict, total=False):
     host_env_workspace_id: str | None
     host_env_workdir: str | None
     host_env_db_path: str | None
+    external_mcp_servers: list[ExternalMcpServer] | None
+    external_mcp_allowed_tools: list[str] | None
+    extra_env: dict[str, str] | None
 
 
 class RenderMetadata(TypedDict):
@@ -1009,6 +1038,108 @@ class RunLogsResult(TypedDict):
     has_more: bool
 
 
+class TranscriptResult(TypedDict):
+    """Return shape of ``ExecutionService.get_transcript()``."""
+
+    items: list[RawJson]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
+
+
+# ── Agent-service result shapes ────────────────────────────────────────────
+
+
+class EnrichedAgentRow(TypedDict, total=False):
+    """One enriched agent row returned by ``_enrich_agent`` / ``list_agents_enriched``.
+
+    Includes all fields from ``AgentDef.model_dump()`` plus run/workspace/profile
+    enrichment. ``total=False`` because conditional fields may be absent.
+    """
+
+    # AgentDef core fields
+    id: str
+    description: str
+    runner: object
+    prompt: str | None
+    composition: object | None
+    tools: list[str]
+    tags: list[str]
+    workspace: str | None
+    session_mode: str
+    webhook_url: str | None
+    source_path: str | None
+    source_format: str | None
+
+    # Enrichment fields
+    resolved_workspace: str
+    workspace_exists: bool
+    run_count: int
+    last_run_at: str | None
+    runner_profile_id: str | None
+    model: str | None
+    model_provider: str | None
+    updated_at: str | None
+    version: int | None
+    last_activity_at: str | None
+    disabled_at: str | None
+
+
+class AgentDetailResult(TypedDict):
+    """Return shape of ``get_agent_detail()``."""
+
+    agent: object  # AgentDef.model_dump()
+    prompt: str
+    composed_system: str | None
+    composed_user: str | None
+    runner_profile_id: str | None
+    model: str | None
+    model_provider: str | None
+    workspace: object  # {path, ephemeral, generated_configs}
+    current_version: int | None
+    versions: object  # list of version dicts
+    disabled_at: str | None
+
+
+class VersionConfig(TypedDict, total=False):
+    """A deserialized agent version ``config_json`` — fields from AgentDef
+    plus execution sections. ``total=False`` because not all versions
+    carry every key.
+    """
+
+    # AgentDef core fields
+    id: str
+    description: str
+    runner: object
+    prompt: str | None
+    composition: object
+    tools: list[str]
+    tags: list[str]
+    workspace: str | None
+    session_mode: str
+    webhook_url: str | None
+    source_path: str | None
+    source_format: str | None
+    # Execution sections
+    execution: object
+    runtime: object
+    python: object
+    # Validator entries
+    validators: object
+
+
+class VersionFileEntry(TypedDict):
+    """One prepared file entry from ``_prepare_files``."""
+
+    relative_path: str
+    kind: str
+    content: str
+    sha256: str
+    position: int
+    source_uri: NotRequired[str | None]
+
+
 # ── Workspace-service result shapes ─────────────────────────────────────────
 
 
@@ -1097,6 +1228,9 @@ class ResolvedMcpServer(TypedDict):
     config: McpServerConfigView | None
     disabled_tools: list[str]
     source: str
+    # Discovered tool names (from the MCP discovery cache). Present only on
+    # the UI-facing view (resolve_workspace_mcp_view); omitted when undiscovered.
+    tools: NotRequired[list[str]]
 
 
 class ResolvedWorkspaceMcp(TypedDict):
@@ -1253,6 +1387,9 @@ class SubagentRowsResult(TypedDict):
 class WorkspaceFileInfo(TypedDict):
     path: str
     size: int
+    # Slug of the resource binding that materialized this file, or None for a
+    # plain on-disk (discovered) file.
+    resource: NotRequired[str | None]
 
 
 class WorkspaceDetail(TypedDict):
@@ -1454,6 +1591,7 @@ __all__ = [
     "WorkspaceFileWrite",
     "WorkspaceListItem",
     "WorkspaceMcpToolsResult",
+    "AgentDetailResult",
     "AgentDiffResult",
     "ChangedEntry",
     "DiffValue",
@@ -1470,6 +1608,7 @@ __all__ = [
     "EnrichedPromptBindingRow",
     "EnrichedRunRow",
     "EnrichedRunsResult",
+    "EnrichedAgentRow",
     "EnrichedWorkspaceBindingRow",
     "ExecutionSection",
     "GrantConfig",
@@ -1520,9 +1659,12 @@ __all__ = [
     "RunFacetsResult",
     "RunLogsResult",
     "RunPromptFragmentsResult",
+    "TranscriptResult",
     "PaginatedRunItem",
     "PaginatedRunsResult",
     "ValidationView",
+    "VersionConfig",
+    "VersionFileEntry",
     "WorkspaceBindingItemsResult",
     "WorkspaceBindingSpec",
     "WorkspaceResourcesResult",
@@ -1532,4 +1674,6 @@ __all__ = [
     "ExportReport",
     "ImportOutcome",
     "ImportReport",
+    "ExternalMcpServer",
+    "McpServerConfig",
 ]

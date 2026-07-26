@@ -15,8 +15,17 @@ const DEFAULT_WS = '__default__';
 export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
   const { patch: patchAgent } = useAgentActions();
 
+  // Bumped after a successful save so the tool picker re-fetches its grants
+  // (a workspace-change prune revokes grants server-side; without this the
+  // picker would keep showing the now-removed tools).
+  const [reloadToken, setReloadToken] = useState(0);
+
   const [workspaceOptions, setWorkspaceOptions] = useState<string[]>([]);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+
+  // Backend id of the agent's bound runner profile (null = no profile / unknown).
+  // Used to pass harnessBackendId into AgentToolGrantsPicker for MCP-aware filtering.
+  const [harnessBackendId, setHarnessBackendId] = useState<string | null>(null);
 
   // "" (null) → default auto workspace; otherwise a named workspace.
   const [workspace, setWorkspace] = useState(agent.workspace || '');
@@ -28,9 +37,6 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
     String(agent.runner.max_validation_retries),
   );
   const [maxErrorRetries, setMaxErrorRetries] = useState(String(agent.runner.max_error_retries));
-  const [validationEngine, setValidationEngine] = useState<string>(
-    agent.runner.output_validation_engine || 'both',
-  );
 
   useEffect(() => {
     setWorkspace(agent.workspace || '');
@@ -38,7 +44,6 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
     setTimeoutSec(agent.runner.timeout_seconds == null ? '' : String(agent.runner.timeout_seconds));
     setMaxValidationRetries(String(agent.runner.max_validation_retries));
     setMaxErrorRetries(String(agent.runner.max_error_retries));
-    setValidationEngine(agent.runner.output_validation_engine || 'both');
   }, [agent]);
 
   useEffect(() => {
@@ -58,6 +63,17 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
     return () => { cancelled = true; };
   }, []);
 
+  // Resolve the bound runner profile's backend id so the picker can filter tools.
+  useEffect(() => {
+    let cancelled = false;
+    api.getAgentRunnerProfile(agent.id)
+      .then((profile) => {
+        if (!cancelled) setHarnessBackendId(profile?.backend ?? null);
+      })
+      .catch(() => { if (!cancelled) setHarnessBackendId(null); });
+    return () => { cancelled = true; };
+  }, [agent.id]);
+
   const currentWsValue = workspace.trim() || null;
   const originalWsValue = agent.workspace || null;
 
@@ -66,8 +82,7 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
     webhookUrl !== (agent.webhook_url || '') ||
     timeout !== (agent.runner.timeout_seconds == null ? '' : String(agent.runner.timeout_seconds)) ||
     maxValidationRetries !== String(agent.runner.max_validation_retries) ||
-    maxErrorRetries !== String(agent.runner.max_error_retries) ||
-    validationEngine !== (agent.runner.output_validation_engine || 'both');
+    maxErrorRetries !== String(agent.runner.max_error_retries);
 
   const save = async () => {
     const patch: Record<string, unknown> = {};
@@ -90,14 +105,12 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
       const n = parseInt(maxErrorRetries, 10);
       if (Number.isFinite(n) && n >= 0) runnerPatch.max_error_retries = n;
     }
-    if (validationEngine !== (agent.runner.output_validation_engine || 'both')) {
-      runnerPatch.output_validation_engine = validationEngine;
-    }
     if (Object.keys(runnerPatch).length) patch.runner = runnerPatch;
 
     try {
       const res = await patchAgent(agent.id, patch as Partial<AgentDef>);
       onSaved(res.agent, res.pruned_tools);
+      setReloadToken((t) => t + 1);
     } catch (e) {
       const err = e as ApiError;
       onError(`patch failed: ${JSON.stringify(err.detail)}`);
@@ -146,10 +159,8 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
         </fieldset>
       </div>
 
-      {/* ---- Tools (catalog served by the selected workspace) ---------- */}
-      <AgentToolGrantsPicker agentId={agent.id} workspaceId={workspace || null} />
-
-      {/* ---- Execution (runtime knobs) --------------------------------- */}
+      {/* ---- Execution (runtime knobs) — kept above Tools so the tool
+             catalog can grow downward without pushing these off-screen. -- */}
       <fieldset className="config-fieldset">
         <legend>execution</legend>
 
@@ -167,18 +178,6 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
             <label>timeout (seconds)</label>
             <input value={timeout} onChange={(e) => setTimeoutSec(e.target.value)} placeholder="none" />
           </div>
-          <div className="field" style={{ flex: 1 }}>
-            <label>output validation</label>
-            <select
-              value={validationEngine}
-              onChange={(e) => setValidationEngine(e.target.value)}
-              style={{ width: '100%' }}
-            >
-              <option value="both">both (jsonschema → pydantic)</option>
-              <option value="jsonschema">jsonschema only</option>
-              <option value="pydantic">pydantic only</option>
-            </select>
-          </div>
         </div>
 
         <div className="row" style={{ gap: 12 }}>
@@ -192,6 +191,18 @@ export default function AgentConfigEditor({ agent, onSaved, onError }: Props) {
           </div>
         </div>
       </fieldset>
+
+      {/* ---- Tools — catalog previews the *selected* (dropdown) workspace so
+             you can see what the new workspace offers before saving. Grants are
+             only pruned on save (backend); reverting the dropdown touches
+             nothing. reloadToken forces a re-fetch after a save prunes. ------- */}
+      <AgentToolGrantsPicker
+        agentId={agent.id}
+        workspaceId={workspace || null}
+        savedWorkspaceId={agent.workspace || null}
+        harnessBackendId={harnessBackendId}
+        reloadToken={reloadToken}
+      />
     </section>
   );
 }

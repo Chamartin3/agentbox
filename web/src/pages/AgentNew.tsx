@@ -136,7 +136,6 @@ export default function AgentNew() {
       settings_path: null,
       config_path: null,
       command: null,
-      output_validation_engine: 'both' as const,
       max_validation_retries: 1,
       max_error_retries: 0,
     };

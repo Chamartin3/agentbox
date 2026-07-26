@@ -35,7 +35,7 @@ _AGENT_HAS_OUTPUT_RETRIES = (
 from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from agentbox.core.data.payload_types import GrantConfig, JsonSchemaDict, ModelParams, RefSection
+from agentbox.core.data.payload_types import ExternalMcpServer, GrantConfig, JsonSchemaDict, ModelParams, RefSection
 from agentbox.core.data.constants import LogLevel, MessageRole, RunStatus
 from agentbox.core.data.events import (
     DoneEvent,
@@ -106,7 +106,7 @@ async def run_direct_agent_mode(
     workdir: str | None = None,
     db_path: str | None = None,
     model_params: ModelParams | None = None,
-    external_mcp_servers: list[dict] | None = None,
+    external_mcp_servers: list[ExternalMcpServer] | None = None,
     external_mcp_allowed_tools: set[str] | None = None,
     extra_env: dict[str, str] | None = None,
 ) -> AsyncIterator[RunEvent]:

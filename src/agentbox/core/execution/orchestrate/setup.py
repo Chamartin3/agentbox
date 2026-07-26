@@ -243,6 +243,18 @@ class RunSetup:
             if _cs.list_workspace_credentials(ws_id):
                 creds = _cs.resolve_env_for_workspace(ws_id)
 
+        # Per-workspace custom shell env vars. Resolved alongside credentials
+        # and merged into the subprocess env via build_run_env(extra=...).
+        # These are plaintext workspace config, not secrets — creds always win.
+        from agentbox.core.service.workspaces import WorkspaceService  # noqa: PLC0415
+
+        extra_env: dict[str, str] | None = None
+        if ws_id:
+            _ws = WorkspaceService()
+            ws_env = _ws.get_env_vars(ws_id)
+            if ws_env:
+                extra_env = dict(ws_env)
+
         def _try_backend(name: str) -> "BackendAdapter | None":
             try:
                 return resolve_engine(name)
@@ -271,6 +283,7 @@ class RunSetup:
                     self._mgrs.workspace_mcp_tool_overrides,
                     self._mcp_registry,
                     declared_tools=adapter.declared_tools(),
+                    project_server_names=[s.name for s in self._mgrs.settings.get_project_mcp_servers()],
                 )
                 if ws_id
                 else []
@@ -290,6 +303,7 @@ class RunSetup:
                 runtime_config=runtime_config_view,
                 python_agent_config=python_agent_config_view,
                 ws_allowed_tools=ws_allowed_tools,
+                extra_env=extra_env,
             )
             return adapter, rendered
 

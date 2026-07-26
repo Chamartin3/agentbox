@@ -930,6 +930,7 @@ class WorkspaceService(Service):
             self._mcp_overrides,
             self._mcp_tool_overrides,
             mcp_registry,
+            project_server_names=[s.name for s in self._db.settings.get_project_mcp_servers()],
         )
 
     def mcp_callables(
@@ -944,6 +945,7 @@ class WorkspaceService(Service):
             self._mcp_overrides,
             self._mcp_tool_overrides,
             mcp_registry,
+            project_server_names=[s.name for s in self._db.settings.get_project_mcp_servers()],
         )
 
     def host_env_callables(self, workspace_id: str) -> list[CallableItem]:

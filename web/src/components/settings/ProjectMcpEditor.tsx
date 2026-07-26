@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
 import { projectMcpApi, ProjectMcpServer, McpIntrospection } from '../../api/repo';
+import { ApiError } from '../../api/http';
 import Modal from '../common/Modal';
+
+// FastAPI errors come back as {detail: "..."}; pull the string out for a toast.
+function errMsg(e: unknown): string {
+  if (e instanceof ApiError) {
+    const d = e.detail;
+    if (d && typeof d === 'object' && 'detail' in d) return String((d as { detail: unknown }).detail);
+    return typeof d === 'string' ? d : e.message;
+  }
+  return (e as Error).message;
+}
 
 // Global (project-level) MCP servers shared by all workspaces. Table + add/remove,
 // plus on-demand introspection (tools + resources) in a modal.
@@ -14,6 +25,7 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
   const [info, setInfo] = useState<Record<string, McpIntrospection>>({});
   const [inspecting, setInspecting] = useState<string | null>(null);
   const [inspectBusy, setInspectBusy] = useState(false);
+  const [toolFilter, setToolFilter] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -28,12 +40,15 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const introspect = async (name: string) => {
+  const introspect = async (name: string, refresh = false) => {
     setInspectBusy(true);
     try {
-      const res = await projectMcpApi.introspect(name);
+      const res = await projectMcpApi.introspect(name, refresh);
       setInfo((p) => ({ ...p, [name]: res }));
       if (res.error) onToast({ kind: 'error', msg: `${name}: ${res.error}` });
+      // A live refresh rewrites the server-side cache; reload so the table
+      // counts reflect it without reopening each modal.
+      else if (refresh) void load();
     } catch (e) {
       const msg = (e as Error).message;
       // Keep the modal useful: surface the failure inside it, not just a toast.
@@ -46,6 +61,7 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
 
   const openInspect = async (name: string) => {
     setInspecting(name);
+    setToolFilter('');
     if (!info[name]) await introspect(name);
   };
 
@@ -59,13 +75,15 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
       : { command: value.split(/\s+/), transport: 'stdio', url: null };
     setBusy(true);
     try {
-      await projectMcpApi.upsert(name, spec);
+      // The server is probed before it is saved; a broken/uninstalled command
+      // is rejected here (422) and the modal stays open so it can be fixed.
+      const saved = await projectMcpApi.upsert(name, spec);
       setAdding(false);
       setForm({ name: '', kind: 'command', value: '' });
-      onToast({ kind: 'ok', msg: `${name} added` });
+      onToast({ kind: 'ok', msg: `${name} added — ${saved.tool_count ?? 0} tools` });
       await load();
     } catch (e) {
-      onToast({ kind: 'error', msg: `save failed: ${(e as Error).message}` });
+      onToast({ kind: 'error', msg: `could not add ${name}: ${errMsg(e)}` });
     } finally {
       setBusy(false);
     }
@@ -112,14 +130,20 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
           </thead>
           <tbody>
             {servers.map((s) => {
+              // Prefer this-session introspection; else the counts the list
+              // endpoint returns from the persisted cache; else nothing yet.
               const seen = info[s.name];
+              const toolN = seen ? seen.tools.length : s.tool_count;
+              const resN = seen ? seen.resources.length : s.resource_count;
+              const label =
+                toolN != null ? `${toolN} tools · ${resN ?? 0} resources` : 'inspect';
               return (
                 <tr key={s.name}>
                   <td><code>{s.name}</code></td>
                   <td><code style={{ fontSize: 11 }}>{s.url || (s.command || []).join(' ')}</code></td>
                   <td>
                     <button onClick={() => openInspect(s.name)} disabled={busy} style={{ fontSize: 11 }}>
-                      {seen ? `${seen.tools.length} tools · ${seen.resources.length} resources` : 'inspect'}
+                      {label}
                     </button>
                   </td>
                   <td style={{ textAlign: 'right' }}>
@@ -134,10 +158,11 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
 
       {inspecting && (
         <Modal
+          wide
           title={`${inspecting} — tools & resources`}
           onClose={() => setInspecting(null)}
           footer={
-            <button onClick={() => introspect(inspecting)} disabled={inspectBusy}>
+            <button onClick={() => introspect(inspecting, true)} disabled={inspectBusy}>
               {inspectBusy ? 'refreshing…' : '↻ refresh'}
             </button>
           }
@@ -147,34 +172,78 @@ export default function ProjectMcpEditor({ onToast }: { onToast: (t: { kind: 'ok
           ) : current?.error ? (
             <p style={{ color: 'crimson', fontSize: 12 }}>{current.error}</p>
           ) : current ? (
-            <div className="stack" style={{ gap: 12 }}>
-              <div className="stack" style={{ gap: 4 }}>
-                <strong style={{ fontSize: 12 }}>Tools ({current.tools.length})</strong>
-                {current.tools.length === 0 ? (
-                  <span className="dim" style={{ fontSize: 12 }}>none</span>
-                ) : (
-                  current.tools.map((t) => (
-                    <div key={t.name} style={{ fontSize: 12 }}>
-                      <code>{t.name}</code>
-                      {t.description && <span className="dim"> — {t.description}</span>}
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="stack" style={{ gap: 4 }}>
-                <strong style={{ fontSize: 12 }}>Resources ({current.resources.length})</strong>
-                {current.resources.length === 0 ? (
-                  <span className="dim" style={{ fontSize: 12 }}>none</span>
-                ) : (
-                  current.resources.map((r) => (
-                    <div key={r.uri} style={{ fontSize: 12 }}>
-                      <code>{r.name || r.uri}</code>
-                      {r.description && <span className="dim"> — {r.description}</span>}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            (() => {
+              const q = toolFilter.trim().toLowerCase();
+              const tools = q
+                ? current.tools.filter(
+                    (t) =>
+                      t.name.toLowerCase().includes(q) ||
+                      (t.description ?? '').toLowerCase().includes(q),
+                  )
+                : current.tools;
+              return (
+                <div className="stack" style={{ gap: 12 }}>
+                  {current.tools.length > 8 && (
+                    <input
+                      autoFocus
+                      placeholder={`Filter ${current.tools.length} tools…`}
+                      value={toolFilter}
+                      onChange={(e) => setToolFilter(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  )}
+                  <div className="stack" style={{ gap: 0 }}>
+                    <strong style={{ fontSize: 12, marginBottom: 4 }}>
+                      Tools ({q ? `${tools.length}/${current.tools.length}` : current.tools.length})
+                    </strong>
+                    {current.tools.length === 0 ? (
+                      <span className="dim" style={{ fontSize: 12 }}>none</span>
+                    ) : tools.length === 0 ? (
+                      <span className="dim" style={{ fontSize: 12 }}>no match for “{toolFilter}”</span>
+                    ) : (
+                      tools.map((t) => (
+                        <div
+                          key={t.name}
+                          style={{ padding: '6px 0', borderTop: '1px solid var(--border)' }}
+                        >
+                          <code style={{ fontSize: 12 }}>{t.name}</code>
+                          {t.description && (
+                            <div
+                              className="dim"
+                              title={t.description}
+                              style={{
+                                fontSize: 12,
+                                marginTop: 2,
+                                whiteSpace: 'pre-wrap',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {t.description}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="stack" style={{ gap: 4 }}>
+                    <strong style={{ fontSize: 12 }}>Resources ({current.resources.length})</strong>
+                    {current.resources.length === 0 ? (
+                      <span className="dim" style={{ fontSize: 12 }}>none</span>
+                    ) : (
+                      current.resources.map((r) => (
+                        <div key={r.uri} style={{ fontSize: 12 }}>
+                          <code>{r.name || r.uri}</code>
+                          {r.description && <span className="dim" title={r.description}> — {r.description}</span>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           ) : null}
         </Modal>
       )}

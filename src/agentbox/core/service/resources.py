@@ -17,7 +17,7 @@ import io
 import json
 import zipfile
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from jsonschema import Draft202012Validator
 
@@ -781,6 +781,41 @@ class ResourceService(Service):
     # -----------------------------------------------------------------------
     # Workspace skill bindings
     # -----------------------------------------------------------------------
+
+    def workspace_resource_roots(self, workspace_id: str) -> dict[str, str]:
+        """Map each bound resource's materialized target root (relative workdir
+        path) → its slug, so the file view can tell resource-backed files from
+        plain on-disk ones. Resolution mirrors the builder's placement."""
+        from agentbox.core.data.payload_types import BindingDict
+        from agentbox.core.engines.backends.recipe_loader import (
+            list_recipes,
+            load_recipe,
+        )
+        from agentbox.core.workspaces.build.bindings import binding_target_roots
+
+        recipes = [load_recipe(e) for e in list_recipes()]
+        out: dict[str, str] = {}
+        for b in self._file_bindings.list_for_workspace(workspace_id):
+            resource = self._resources.get_resource(b["resource_id"])
+            if not resource:
+                continue
+            active = self._resource_versions.get_active_version(b["resource_id"])
+            raw_meta = active.get("source_metadata") if active else None
+            source_meta = json.loads(raw_meta) if isinstance(raw_meta, str) else None
+            bd = cast(
+                BindingDict,
+                {
+                    "type": resource["type"],
+                    "display_name": resource.get("display_name") or "",
+                    "target_path": b.get("target_path"),
+                    "source_metadata": source_meta,
+                    "skill_meta": None,
+                },
+            )
+            for root in binding_target_roots(bd, recipes):
+                if root:
+                    out[root.strip("/")] = resource["slug"]
+        return out
 
     def list_workspace_skill_bindings(self, workspace_id: str) -> SkillBindingsResult:
         """Return all skill resources with a 'bound' flag for the workspace."""

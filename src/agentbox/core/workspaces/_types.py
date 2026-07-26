@@ -6,9 +6,9 @@ Cross-domain shapes go in core/data/payload_types.py.
 
 from __future__ import annotations
 
-from typing import Any, NotRequired, TypedDict
+from typing import NotRequired, TypedDict
 
-from agentbox.core.data.payload_types import GrantConfig
+from agentbox.core.data.payload_types import GrantConfig, McpServerConfig
 
 
 # ── Workspace MCP resolution ──
@@ -19,7 +19,7 @@ class WorkspaceMcpServerConfig(TypedDict):
 
     name: str
     enabled: bool
-    config: dict[str, Any] | None
+    config: McpServerConfig | None
     disabled_tools: list[str]
     source: str  # "default" | "override" | "override_only"
 

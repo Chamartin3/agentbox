@@ -882,3 +882,27 @@ h2 { font-size: 15px; color: var(--fg-muted); border-bottom: 1px solid var(--bor
   color: var(--fg-muted);
   font-weight: 500;
 }
+
+/* Entity cards — shared by the workspace Skills / Subagents editors. */
+.entity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+.entity-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.entity-card-name {
+  font-weight: 500;
+  font-size: 13px;
+}
+.entity-card-desc {
+  font-size: 12px;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

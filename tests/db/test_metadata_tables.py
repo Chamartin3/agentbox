@@ -48,6 +48,7 @@ EXPECTED_TABLES: frozenset[str] = frozenset(
         "webhook_deliveries",
         "workspace_env_doc_versions",
         "workspace_env_docs",
+        "workspace_env_vars",
         "workspace_file_resource_bindings",
         "workspace_mcp_overrides",
         "workspace_mcp_policies",

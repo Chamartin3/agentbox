@@ -236,6 +236,62 @@ def test_forbidden_overrides_allowed(tmp_path: Path) -> None:
     assert tools[str(OpenCodeTool.WEBFETCH)] is True
 
 
+def test_build_opencode_items_includes_intrinsic_server(tmp_path: Path) -> None:
+    """Option B: intrinsic server in opencode.json mcp block has no environment key.
+
+    When the workspace builder mirrors extra_mcp_servers into opencode.json,
+    it writes ``{type, command, enabled}`` only — grants env vars are not put into
+    the MCP block (they go into the opencode subprocess env, not per-server env).
+    """
+    from agentbox.core.workspaces.build import _patch_opencode_json_with_mcp
+
+    host_env_spec = {
+        "command": "uvx",
+        "args": ["agentbox-host-env-server"],
+        "env": {
+            "AGENTBOX_HOST_ENV_GRANTS_JSON": '["read_file"]',
+            "AGENTBOX_HOST_ENV_WORKSPACE_ID": "ws-test",
+            "AGENTBOX_DB_PATH": "/data/agentbox.db",
+        },
+    }
+    extra_mcp = {"agentbox_host_env": host_env_spec}
+
+    # Seed opencode.json so the injection branch runs
+    opencode_json = tmp_path / "opencode.json"
+    opencode_json.write_text(json.dumps({"$schema": "https://opencode.ai/config.json", "mcp": {}}))
+
+    _patch_opencode_json_with_mcp(opencode_json, extra_mcp)
+
+    data = json.loads(opencode_json.read_text())
+    assert "agentbox_host_env" in data["mcp"]
+    entry = data["mcp"]["agentbox_host_env"]
+    assert entry["type"] == "local"
+    assert entry["enabled"] is True
+    # Option B: env vars are NOT in the mcp block — they go into the process env
+    assert "environment" not in entry
+    assert "env" not in entry
+
+
+def test_mcp_entries_disabled_tools_omit_tool(tmp_path: Path) -> None:
+    """McpRef with disabled_tools produces McpLocal with exclude list."""
+    from agentbox.core.engines.backends.opencode.render import _mcp_entries
+    from agentbox.core.data.workenv import McpRef
+
+    servers = [
+        McpRef(
+            name="time-server",
+            config={"command": ["uvx", "mcp-server-time"]},
+            disabled_tools=["convert_time"],
+        )
+    ]
+    result = _mcp_entries(servers)
+    assert "time-server" in result
+    entry = result["time-server"]
+    # The McpLocal exclude list carries the disabled tool
+    assert hasattr(entry, "exclude")
+    assert entry.exclude == ["convert_time"]
+
+
 @pytest.mark.skipif(shutil.which("opencode") is None, reason="opencode CLI not installed")
 def test_native_builtins_match_live_opencode(tmp_path: Path) -> None:
     """Guard against opencode adding a builtin we don't gate (a tool leak)."""

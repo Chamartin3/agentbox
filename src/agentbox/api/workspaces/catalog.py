@@ -73,8 +73,11 @@ def _item_as_dict(item: CallableItem) -> AvailableToolsItem:
         if item.policy is not None:
             d["grant_schema"] = item.policy
     elif item.kind == "resource" and item.policy is not None:
-        d["resource_id"] = item.policy.get("resource_id", "")
-        d["target_path"] = item.policy.get("target_path", "")
+        # `or ""` (not `.get(k, "")`): a binding row may carry the key with a
+        # None value, which the default-arg form would pass straight through
+        # and trip the `str` response contract → 500.
+        d["resource_id"] = item.policy.get("resource_id") or ""
+        d["target_path"] = item.policy.get("target_path") or ""
     return d
 
 
@@ -89,5 +92,9 @@ def list_available_tools(
     The agent's authorization pick-list is drawn from this catalog.
     ``/api/agent_tools`` remains the global taxonomy reference.
     """
+    # Discovery may have run in a throwaway registry (a run, or /mcp/refresh)
+    # after this singleton was built — reload the on-disk cache so freshly
+    # discovered MCP tools show up without a server restart.
+    mcp_registry.hydrate_from_cache()
     items = svc.installed_callables(workspace_id, mcp_registry=mcp_registry)
     return {"items": [_item_as_dict(i) for i in items]}

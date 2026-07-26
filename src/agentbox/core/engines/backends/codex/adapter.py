@@ -219,7 +219,7 @@ class CodexBackend(BackendAdapter):
                 ),
             )
             intrinsic_specs[HOST_ENV_SERVER_NAME] = _he_spec
-            intrinsic_env.update(_he_spec["env"])
+            intrinsic_env.update({k: v for k, v in _he_spec["env"].items() if isinstance(v, str)})
 
         _agent_tool_grants_raw = rendered.agent_meta.get("agent_tool_grants")
         _agent_id = rendered.agent_meta.get("agent_id")
@@ -234,7 +234,7 @@ class CodexBackend(BackendAdapter):
                 ),
             )
             intrinsic_specs[AGENT_TOOLS_SERVER_NAME] = _at_spec
-            intrinsic_env.update(_at_spec["env"])
+            intrinsic_env.update({k: v for k, v in _at_spec["env"].items() if isinstance(v, str)})
 
         if intrinsic_specs:
             mcp_flags += build_codex_intrinsic_mcp_argv(intrinsic_specs)

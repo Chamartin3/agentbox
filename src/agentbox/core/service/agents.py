@@ -1941,6 +1941,7 @@ class AgentService(Service):
                 self._db.workspace_mcp_tool_overrides,
                 mcp_registry=mcp_registry,
                 declared_tools=declared_tools,
+                project_server_names=[s.name for s in self._db.settings.get_project_mcp_servers()],
             )
 
             workspace_catalog = [
@@ -2701,18 +2702,21 @@ class AgentService(Service):
         self,
         agent_id: str,
         workspace: str | None,
-        catalog_resolver: Callable[[str], set[str]] | None,
+        catalog_resolver: Callable[[str | None], set[str]] | None,
     ) -> list[str]:
         """Revoke active grants whose tool isn't in *workspace*'s catalog.
 
-        No-op for null / ``"<ephemeral>"`` (the catalog is the global set).
-        Soft-revoke (keeps audit history). Returns the pruned tool names.
+        A null workspace is the dedicated per-agent workspace: the resolver
+        returns the global agent-tools catalog for it, so MCP / host-env /
+        resource grants (absent there) are pruned just like any other
+        workspace change. Only ``"<ephemeral>"`` is exempt (its run allows the
+        full set). Soft-revoke (keeps audit history). Returns pruned names.
 
         ``catalog_resolver`` is injected by the caller (API layer) to avoid
         an upward import edge ``service.agents -> service.workspaces``.  When
         ``None``, prune is a no-op (same semantics as the ephemeral guard).
         """
-        if not workspace or workspace == "<ephemeral>":
+        if workspace == "<ephemeral>":
             return []
         if catalog_resolver is None:
             return []
@@ -2733,7 +2737,7 @@ class AgentService(Service):
         self,
         agent_id: str,
         patch: dict,
-        catalog_resolver: Callable[[str], set[str]] | None = None,
+        catalog_resolver: Callable[[str | None], set[str]] | None = None,
     ) -> tuple[AgentDef, list[str]]:
         """Merge ``patch`` onto the active def, mint + activate a new version.
 

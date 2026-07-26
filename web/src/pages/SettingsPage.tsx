@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import CredentialsPage from './CredentialsPage';
-import SettingsApiTokensTab from './SettingsApiTokensTab';
 import SettingsDeploymentTab from './SettingsDeploymentTab';
 import SettingsRunnerProfilesTab from './SettingsRunnerProfilesTab';
 import ProjectMcpEditor from '../components/settings/ProjectMcpEditor';
@@ -9,8 +7,7 @@ import Toast from '../components/common/Toast';
 
 const TABS = [
   { key: 'general', label: 'General' },
-  { key: 'runner-profiles', label: 'Runner profiles' },
-  { key: 'credentials', label: 'Credentials' },
+  { key: 'runner-profiles', label: 'Runners & credentials' },
   { key: 'deployment', label: 'Deployment info' },
 ] as const;
 
@@ -53,15 +50,6 @@ export default function SettingsPage() {
       </div>
       <div className="tab-content">
         <div className="tab-pane stack" style={{ gap: 16 }}>
-          {active === 'credentials' && (
-            <>
-              <CredentialsPage embedded />
-              <section className="stack" style={{ gap: 12, marginTop: 12 }}>
-                <h2 style={{ margin: 0, borderBottom: '1px solid #30363d', paddingBottom: 6 }}>API tokens</h2>
-                <SettingsApiTokensTab />
-              </section>
-            </>
-          )}
           {active === 'runner-profiles' && <SettingsRunnerProfilesTab />}
           {active === 'general' && <GeneralTab />}
           {active === 'deployment' && <SettingsDeploymentTab />}

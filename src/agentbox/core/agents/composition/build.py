@@ -33,7 +33,7 @@ from agentbox.core.agents.validation import (
 )
 from agentbox.core.agents.composition.rendering import (
     append as _append_output_contract,
-    append_validation_engine_hint,
+    append_validation_hint,
 )
 from jsonschema.exceptions import SchemaError
 
@@ -128,7 +128,6 @@ def build_runtime_view(agent: AgentDef, *, store: Any = None) -> AgentRuntimeVie
     return AgentRuntimeView(
         max_validation_retries=exec_cfg.max_validation_retries,
         max_error_retries=exec_cfg.max_error_retries,
-        output_validation_engine=exec_cfg.output_validation_engine,
         output_schema_path=python_cfg.output_schema_path,
         json_schema=out_cfg.json_schema,
         validators=out_cfg.validators,
@@ -302,8 +301,7 @@ def build_prompt(
     # _pc.text is always a str (never None); system_text follows suite.
     _composed_text: str = _pc.text
     if _pc.output_schema is not None:
-        engine = ExecutionConfig.from_agent(agent).output_validation_engine
-        _composed_text = append_validation_engine_hint(_composed_text, engine)
+        _composed_text = append_validation_hint(_composed_text)
     system_text = _composed_text
 
     system_base = _pc.base if _pc.base else None

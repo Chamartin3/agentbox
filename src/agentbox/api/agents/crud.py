@@ -8,7 +8,7 @@ from typing import TypedDict
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from agentbox.core.data.jsontypes import RawJson
+from agentbox.core.data.payload_types import AgentDetailResult, EnrichedAgentRow
 from agentbox.api.deps import get_agent_service, get_engine_service
 from agentbox.api.runs.webhooks import schedule_agent_event_webhook
 from agentbox.core.service import RunnerProfile
@@ -86,7 +86,7 @@ class _RollbackVersionResult(TypedDict):
 
 
 @router.get("")
-def list_agents(include_disabled: bool = False) -> list[RawJson]:
+def list_agents(include_disabled: bool = False) -> list[EnrichedAgentRow]:
     """List agents from the DB (one row per agent_id, latest version).
 
     DB-as-source-of-truth: every agent that has ever been imported into
@@ -100,7 +100,7 @@ def list_agents(include_disabled: bool = False) -> list[RawJson]:
 
 
 @router.get("/{agent_id}")
-def get_agent(agent_id: str) -> _GetAgentResult:
+def get_agent(agent_id: str) -> AgentDetailResult:
     detail = get_agent_service().get_agent_detail(agent_id)
     if detail is None:
         raise HTTPException(404)

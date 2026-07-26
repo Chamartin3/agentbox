@@ -73,6 +73,7 @@ from agentbox.core.db.workspaces import (
     WorkspaceCredentialManager,
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
+    WorkspaceEnvVarManager,
     WorkspaceManager,
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
@@ -96,6 +97,7 @@ class Database:
             db.agent_runner_profiles, db.prompt_versions, db.agent_tool_grants,
             db.agent_sync, db.agent_config_events
         db.workspaces, db.workspace_env_docs, db.workspace_env_doc_versions,
+            db.workspace_env_vars,
             db.workspace_mcp_overrides, db.workspace_mcp_tool_overrides,
             db.workspace_mcp_policies,
             db.workspace_runtime_permissions, db.workspace_subagents,
@@ -148,6 +150,7 @@ class Database:
         self.workspace_mcp_policies = WorkspaceMcpPolicyManager(self._engine)
         self.workspace_runtime_permissions = WorkspaceRuntimePermissionManager(self._engine)
         self.workspace_credentials = WorkspaceCredentialManager(self._engine)
+        self.workspace_env_vars = WorkspaceEnvVarManager(self._engine)
         self.workspace_subagents = WorkspaceSubagentManager(self._engine)
         self.workspace_read = WorkspaceReadManager(self._engine)
 

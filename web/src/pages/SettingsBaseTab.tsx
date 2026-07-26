@@ -37,9 +37,6 @@ function inputRow(label: string, child: React.ReactNode) {
 export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => void }) {
   const section = 'runtime_defaults';
   const [timeout, setTimeoutS] = useState<number | ''>('');
-  const [opencode, setOpencode] = useState('');
-  const [codex, setCodex] = useState('');
-  const [pi, setPi] = useState('');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -47,9 +44,6 @@ export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => v
       .then((d) => {
         const v = d.values || {};
         setTimeoutS(typeof v.timeout_seconds === 'number' ? v.timeout_seconds : '');
-        setOpencode(typeof v.default_model_opencode === 'string' ? v.default_model_opencode : '');
-        setCodex(typeof v.default_model_codex === 'string' ? v.default_model_codex : '');
-        setPi(typeof v.default_model_pi === 'string' ? v.default_model_pi : '');
         setLoaded(true);
       })
       .catch((e) => onToast({ kind: 'error', msg: `load failed: ${e.message}` }));
@@ -57,11 +51,10 @@ export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => v
 
   async function save() {
     try {
+      // Merge-patch: only the timeout. Per-harness default models are edited
+      // in the Harnesses table below (same runtime_defaults section).
       await patchSection(section, {
         timeout_seconds: timeout === '' ? null : Number(timeout),
-        default_model_opencode: opencode || null,
-        default_model_codex: codex || null,
-        default_model_pi: pi || null,
       });
       onToast({ kind: 'ok', msg: 'runtime defaults saved' });
     } catch (e) {
@@ -73,9 +66,6 @@ export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => v
 
   return (
     <div className="stack" style={{ gap: 8 }}>
-      <p className="dim" style={{ fontSize: 12, margin: 0 }}>
-        Backends read these on every run — no restart needed.
-      </p>
       {inputRow(
         'timeout_seconds',
         <input
@@ -85,20 +75,8 @@ export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => v
           placeholder="1200"
         />,
       )}
-      {inputRow(
-        'default_model_opencode',
-        <input type="text" value={opencode} onChange={(e) => setOpencode(e.target.value)} placeholder="opencode/…" />,
-      )}
-      {inputRow(
-        'default_model_codex',
-        <input type="text" value={codex} onChange={(e) => setCodex(e.target.value)} placeholder="(none)" />,
-      )}
-      {inputRow(
-        'default_model_pi',
-        <input type="text" value={pi} onChange={(e) => setPi(e.target.value)} placeholder="(none)" />,
-      )}
       <div>
-        <button onClick={save}>save</button>
+        <button onClick={save}>save timeout</button>
       </div>
     </div>
   );

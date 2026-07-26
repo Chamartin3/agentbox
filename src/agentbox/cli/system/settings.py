@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 import typer
 
@@ -31,7 +32,7 @@ def settings_show(
     """Show settings for a section."""
     obj: CLIContext = ctx.obj
     data = obj.system.get_settings_section(section)
-    obj.render.system.settings_section_view(section, data)
+    obj.render.system.settings_section_view(section, cast(dict, data))
 
 
 @settings_app.command("patch")

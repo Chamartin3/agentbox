@@ -26,7 +26,7 @@ Boundaries
 - This module lives in ``core/agents/composition/`` (render logic — domain,
   not data).
 - ``build_prompt`` in ``build.py`` calls the composer and then independently
-  applies ``append_validation_engine_hint`` on the resulting text;
+  applies ``append_validation_hint`` on the resulting text;
   that post-composer step is NOT part of the segments and does not affect the
   structural invariant.
 - ``to_preview_result()`` takes an optional ``refs_meta`` override so the

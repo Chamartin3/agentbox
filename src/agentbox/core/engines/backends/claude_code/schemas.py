@@ -7,6 +7,22 @@ Covers every JSON artifact that agentbox generates or ships as a default:
   - user-config.json     (UI preferences seeded into the creds volume)
 
 Pinned to Claude Code 2.1.111.
+
+## MCP per-server tool scoping
+
+Claude Code does not document a per-server ``tools`` key in ``.mcp.json``.
+The confirmed mechanism for MCP tool scoping is the ``--allowedTools`` CLI
+flag, which accepts ``mcp__<server>__<tool>`` and ``mcp__<server>__*``
+patterns (ref: ``claude --help``; 143+ occurrences of ``mcp__`` in the
+2.1.186 binary).
+
+``ClaudeMcpServerHttp`` and ``ClaudeMcpServerStdio`` therefore carry a
+``tools`` field (``extra = "ignore"`` is the pydantic default) so that
+emitted entries which include ``{"tools": {"exclude": [...]}}`` pass
+schema validation. If a future probe confirms that Claude Code honors this
+key natively, the field definition below already covers it. If the field
+is silently ignored by the CLI, the adapter's ``--allowedTools`` path
+(``adapter.py:101-111``) is the authoritative enforcement point.
 """
 
 from __future__ import annotations
@@ -60,11 +76,23 @@ class ClaudeSettingsConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ClaudeMcpToolsScope(BaseModel):
+    """Per-server tool scope block.
+
+    Claude Code 2.1.111+ may honor ``{"tools": {"exclude": [...]}}`` on MCP
+    server entries in ``.mcp.json``.  The confirmed enforcement mechanism
+    is ``--allowedTools mcp__<server>__<tool>`` (see module docstring).
+    """
+
+    exclude: list[str] = Field(default_factory=list)
+
+
 class ClaudeMcpServerHttp(BaseModel):
     """Remote MCP server entry (http or sse transport)."""
 
     type: Literal["http", "sse"]
     url: str
+    tools: ClaudeMcpToolsScope | None = None
 
 
 class ClaudeMcpServerStdio(BaseModel):
@@ -72,6 +100,7 @@ class ClaudeMcpServerStdio(BaseModel):
 
     command: str
     args: list[str] = Field(default_factory=list)
+    tools: ClaudeMcpToolsScope | None = None
 
 
 ClaudeMcpServerEntry = Annotated[

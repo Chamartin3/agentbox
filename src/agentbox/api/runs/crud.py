@@ -92,7 +92,7 @@ def list_runs(
     limit: int = 50,
     offset: int = 0,
     paginated: bool = False,
-) -> list[RawJson] | PaginatedRunsResult:
+) -> list[dict[str, object]] | PaginatedRunsResult:
     """List runs. See ``ExecutionService.list_runs_enriched`` for the shape."""
     result = ExecutionService().list_runs_enriched(
         agent=agent,

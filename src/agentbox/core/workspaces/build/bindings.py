@@ -161,6 +161,15 @@ def _resolve_target_path(b: BindingDict) -> str:
     return target_path or display_name
 
 
+def binding_target_roots(b: BindingDict, recipes: Iterable[Recipe]) -> list[str]:
+    """Relative workdir path(s) a binding materializes into — the reverse of
+    what the builder writes. Skills fan out per engine recipe; everything else
+    resolves to a single file/dir root. Used to label resource-backed files."""
+    if ResourceType(b["type"]) == ResourceType.SKILL:
+        return _skill_targets(b, recipes)
+    return [_resolve_target_path(b)]
+
+
 
 
 def _materialize_one(

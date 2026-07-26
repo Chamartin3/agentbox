@@ -24,7 +24,7 @@ import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any
 
 from fastmcp.client.transports import StdioTransport, StreamableHttpTransport
 from pydantic_ai import RunContext, ToolDefinition as _ToolDefinition
@@ -32,6 +32,7 @@ from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.toolsets.abstract import AbstractToolset
 
 from agentbox.core.data.constants import HOST_ENV_SERVER_NAME
+from agentbox.core.data.payload_types import ExternalMcpServer
 from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.mcp_servers.specs import host_env_server_spec
 from agentbox.core.tools.grants import GrantViolation, check_capability
@@ -87,7 +88,7 @@ def build_host_env_toolsets(
     db_path: str | Path | None,
     *,
     extra_env: dict[str, str] | None = None,
-) -> list[MCPToolset]:
+) -> list[AbstractToolset]:
     """Connect to the host-env stdio MCP server as pydantic-ai toolset(s).
 
     This is the parity path: it spawns the *same* host-env server (same spec as
@@ -152,18 +153,8 @@ def build_host_env_toolsets(
         return []
 
 
-class _McpServerSpec(TypedDict, total=False):
-    """Minimal schema for an MCP server spec (resolve_workspace_mcp output)."""
-
-    name: str
-    # config is an opaque dict; its values (command list, url str, etc.) are
-    # consumed by transport constructors that accept the concrete types.
-    config: dict
-    disabled_tools: list[str]
-
-
 def build_external_mcp_toolsets(
-    servers: list[_McpServerSpec] | None,
+    servers: list[ExternalMcpServer] | None,
     allowed_tools: set[str] | None,
     *,
     extra_env: dict[str, str] | None = None,

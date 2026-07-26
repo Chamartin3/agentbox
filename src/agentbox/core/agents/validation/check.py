@@ -18,12 +18,10 @@ from agentbox.core.agents.validation.schema import (
     resolve_output_config,
     resolve_schema,
 )
-from agentbox.core.agents.definition import ExecutionConfig
 from agentbox.core.config import SETTINGS
 from agentbox.core.data.composition import ComposedPrompt, ValidationResult
 from agentbox.core.data.payload_types import JsonSchemaDict
 from agentbox.core.data._util import extract_json
-from agentbox.core.engines.schema import json_schema_to_pydantic_model
 
 import httpx
 
@@ -95,38 +93,6 @@ def validate_jsonschema(output: str, schema: dict[str, Any]) -> ValidationResult
             ok=False, error=format_jsonschema_error(exc), engine="jsonschema"
         )
     return ValidationResult(ok=True, engine="jsonschema")
-
-
-def validate_pydantic(output: str, schema: dict[str, Any]) -> ValidationResult:
-    """Run Pydantic validation — catches cross-field constraints jsonschema can't.
-
-    NOTE: this builds a *throwaway* pydantic model from the JSON Schema
-    dict, which drops ``@model_validator`` rules and most ``Field(...)``
-    constraints (they don't exist in JSON Schema). For cross-field
-    invariants to actually run, configure the agent's two-gate output
-    contract (``config_json["output"]``) with an HTTP validator callback.
-    """
-    try:
-        instance = json.loads(extract_json(output))
-    except json.JSONDecodeError as exc:
-        return ValidationResult(
-            ok=False, error=f"output is not valid JSON: {exc}", engine="pydantic"
-        )
-
-    try:
-        model = json_schema_to_pydantic_model(schema, model_name="OutputModel")
-    except Exception as exc:
-        return ValidationResult(
-            ok=False,
-            error=f"cannot build pydantic model from schema: {exc}",
-            engine="pydantic",
-        )
-
-    try:
-        model.model_validate(instance)
-        return ValidationResult(ok=True, engine="pydantic")
-    except Exception as exc:
-        return ValidationResult(ok=False, error=str(exc), engine="pydantic")
 
 
 def run_json_schema(schema: dict[str, Any], output: str) -> ValidationResult:
@@ -338,11 +304,10 @@ def check_output(
     """
     rv = composed.runtime_view if composed is not None else None
     if rv is not None:
-        json_schema, validators, engine_name = rv.json_schema, rv.validators, rv.output_validation_engine
+        json_schema, validators = rv.json_schema, rv.validators
     else:
         oc = resolve_output_config(None, agent)
         json_schema, validators = oc.json_schema, oc.validators
-        engine_name = ExecutionConfig.from_agent(agent).output_validation_engine
 
     if json_schema is not None or validators:
         if not output:
@@ -374,18 +339,9 @@ def check_output(
             engine="none",
         )
 
-    if engine_name == "jsonschema":
-        return validate_jsonschema(output, schema)
-    if engine_name == "pydantic":
-        return validate_pydantic(output, schema)
-
-    js = validate_jsonschema(output, schema)
-    if not js.ok:
-        return js
-    py = validate_pydantic(output, schema)
-    if not py.ok:
-        return py
-    return ValidationResult(ok=True, engine="both")
+    # Legacy on-disk-schema path: structural jsonschema is the whole contract.
+    # Semantic checks live in the http/script validators (the two-gate path).
+    return validate_jsonschema(output, schema)
 
 
 __all__ = [
@@ -395,5 +351,4 @@ __all__ = [
     "format_jsonschema_error",
     "run_json_schema",
     "validate_jsonschema",
-    "validate_pydantic",
 ]

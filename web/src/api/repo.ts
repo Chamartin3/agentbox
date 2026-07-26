@@ -274,6 +274,11 @@ export interface ProjectMcpServer {
   transport: McpTransport;
   command: string[] | null;
   cache_ttl: number;
+  // From the persisted introspection cache; null when never introspected.
+  tool_count: number | null;
+  resource_count: number | null;
+  // Set by the probe on upsert: why the server could not be run, else null.
+  error?: string | null;
 }
 
 export interface McpIntrospection {
@@ -294,9 +299,10 @@ export const projectMcpApi = {
     req<{ deleted: string }>(`/api/project/mcp-servers/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     }),
-  // Live connect-and-read: lists the server's tools + resources on demand.
-  introspect: (name: string) =>
-    req<McpIntrospection>(`/api/project/mcp-servers/${encodeURIComponent(name)}/introspect`, {
-      method: 'POST',
-    }),
+  // Served from the persisted cache; pass refresh to force a live re-read.
+  introspect: (name: string, refresh = false) =>
+    req<McpIntrospection>(
+      `/api/project/mcp-servers/${encodeURIComponent(name)}/introspect${refresh ? '?refresh=true' : ''}`,
+      { method: 'POST' },
+    ),
 };

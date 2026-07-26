@@ -9,7 +9,7 @@ PATCH /api/settings/{section}    — partial patch; only listed keys change.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from dotenv import dotenv_values
 from fastapi import APIRouter, Depends
@@ -172,12 +172,15 @@ def get_section(
     stored = ctx.system.get_settings_section(section)
     seeded = dict(SECTION_DEFAULTS.get(section, {}))
     seeded.update(stored)
-    return {
-        "section": section,
-        "values": seeded,
-        "defaults": SECTION_DEFAULTS.get(section, {}),
-        "overrides": stored,
-    }
+    return cast(
+        GetSettingsResult,
+        {
+            "section": section,
+            "values": seeded,
+            "defaults": SECTION_DEFAULTS.get(section, {}),
+            "overrides": stored,
+        },
+    )
 
 
 @router.patch("/{section}")
@@ -187,4 +190,4 @@ def patch_section(
     ctx: APIContext = Depends(get_api_context),
 ) -> PatchSettingsResult:
     updated = ctx.system.update_settings_section(section, body.values)
-    return {"section": section, "values": updated}
+    return cast(PatchSettingsResult, {"section": section, "values": updated})

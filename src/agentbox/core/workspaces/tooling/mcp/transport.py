@@ -94,6 +94,17 @@ def _raw_resource(row: RawJson) -> McpRawResource:
 _STDIO_TIMEOUT = 30.0  # seconds — matches the default httpx timeout on the http path
 
 
+def _parse_sse_json(text: str) -> RawJson:
+    """Extract the JSON-RPC payload from an SSE response (first `data:` line)."""
+    for line in text.splitlines():
+        if line.startswith("data:"):
+            try:
+                return json.loads(line[len("data:") :].strip())
+            except json.JSONDecodeError as exc:
+                raise McpError(f"invalid sse json response: {exc}") from exc
+    raise McpError("sse response contained no data line")
+
+
 class McpClient:
     """Minimal async MCP client over HTTP/SSE/stdio transports.
 
@@ -119,6 +130,9 @@ class McpClient:
         )
         self._initialized = False
         self._request_id = 0
+        # Streamable HTTP is stateful: initialize returns an Mcp-Session-Id that
+        # must be echoed on every later request, or the server 400s.
+        self._session_id: str | None = None
         # stdio state — set by _ensure_proc(), cleared by close()
         self._proc: asyncio.subprocess.Process | None = None
 
@@ -149,6 +163,9 @@ class McpClient:
                 },
             )
             self._initialized = True
+            # Same handshake contract as stdio: acknowledge initialize before
+            # the server will serve tools/list. Carries the captured session id.
+            await self._http_notify("notifications/initialized", {})
             return result
         if self._transport == "stdio":
             result = await self._jsonrpc(
@@ -216,26 +233,46 @@ class McpClient:
             return await self._stdio_request(body)
         raise McpError(f"unsupported transport: {self._transport}")
 
+    def _http_headers(self) -> dict[str, str]:
+        # MCP Streamable HTTP: server may answer with JSON or an SSE stream, so
+        # the client must accept both or it 406s. The session id (once issued by
+        # initialize) must ride along on every later request or the server 400s.
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if self._session_id is not None:
+            headers["Mcp-Session-Id"] = self._session_id
+        return headers
+
     async def _http_request(self, body: dict) -> RawJson:
         assert self._url is not None, "http_request requires a URL"
         try:
             resp = await self._http.post(
-                self._url,
-                json=body,
-                headers={"Content-Type": "application/json"},
+                self._url, json=body, headers=self._http_headers()
             )
         except httpx.TimeoutException as exc:
             raise McpError(f"request timed out: {exc}") from exc
         except httpx.HTTPError as exc:
             raise McpError(f"http request failed: {exc}") from exc
 
+        # Capture the session id the server hands back on initialize.
+        session = resp.headers.get("mcp-session-id")
+        if session:
+            self._session_id = session
+
         if resp.status_code != 200:
             raise McpError(f"http {resp.status_code}: {resp.text}")
 
-        try:
-            data = resp.json()
-        except json.JSONDecodeError as exc:
-            raise McpError(f"invalid json response: {exc}") from exc
+        # Streamable HTTP servers reply with either application/json or an SSE
+        # stream; for a single request the SSE body is one `data:` JSON line.
+        if "text/event-stream" in resp.headers.get("content-type", ""):
+            data = _parse_sse_json(resp.text)
+        else:
+            try:
+                data = resp.json()
+            except json.JSONDecodeError as exc:
+                raise McpError(f"invalid json response: {exc}") from exc
 
         env = _JsonRpcResponse.model_validate(data)
         if env.error is not None:
@@ -258,6 +295,21 @@ class McpClient:
     async def _stdio_notify(self, method: str, params: dict) -> None:
         """Fire-and-forget a JSON-RPC notification (no id, no reply)."""
         await self._stdio_write({"jsonrpc": "2.0", "method": method, "params": params})
+
+    async def _http_notify(self, method: str, params: dict) -> None:
+        """POST a JSON-RPC notification. The server replies 202 with no body —
+        it is not a request, so we don't parse a result, only surface transport
+        errors."""
+        assert self._url is not None, "http_notify requires a URL"
+        body = {"jsonrpc": "2.0", "method": method, "params": params}
+        try:
+            resp = await self._http.post(
+                self._url, json=body, headers=self._http_headers()
+            )
+        except httpx.HTTPError as exc:
+            raise McpError(f"http notify failed: {exc}") from exc
+        if resp.status_code >= 400:
+            raise McpError(f"http {resp.status_code}: {resp.text}")
 
     async def _stdio_request(self, body: dict) -> RawJson:
         """Send one newline-delimited JSON-RPC request and read the reply.

@@ -116,7 +116,6 @@ export interface RunnerSpec {
   extra_args: string[];
   timeout_seconds: number | null;
   output_schema_path: string | null;
-  output_validation_engine: 'jsonschema' | 'pydantic' | 'both';
   max_validation_retries: number;
   max_error_retries: number;
 }
@@ -393,6 +392,9 @@ export interface RunnerBackend {
   default_model: string | null;
   compatible_providers: string[];
   accepts_no_provider: boolean;
+  universal?: boolean;
+  supports_mcp: boolean;
+  native_tools: string[];
 }
 
 

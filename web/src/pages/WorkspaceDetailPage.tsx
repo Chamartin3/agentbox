@@ -1,20 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
-import { apiRequestOrNull } from '../api/http';
-import { subagentsApi } from '../api/repo';
+import { apiRequest as req, apiRequestOrNull } from '../api/http';
+import { subagentsApi, type RepoResource } from '../api/repo';
+import { ConflictPolicy, MaterializeMode, RepoType as RepoTypeEnum } from '../api/enums';
 import EnvDocEditor from '../components/workspace/EnvDocEditor';
-import WorkspaceResourcesEditor from '../components/workspace/WorkspaceResourcesEditor';
 import WorkspaceSkillsEditor from '../components/workspace/WorkspaceSkillsEditor';
 import SubagentsEditor from '../components/workspace/SubagentsEditor';
 import WorkspaceMcpEditor from '../components/workspace/WorkspaceMcpEditor';
 import WorkspaceCredentialsEditor from '../components/workspace/WorkspaceCredentialsEditor';
+import WorkspaceEnvVarsEditor from '../components/workspace/WorkspaceEnvVarsEditor';
+import ResourcePicker from '../components/resources/ResourcePicker';
 import FileTree from '../components/workspace/FileTree';
 import Modal from '../components/common/Modal';
 
 interface WorkspaceFile {
   path: string;
   size: number;
+  resource?: string | null;
+}
+
+// Same default the Resource bindings editor uses, so both entry points agree.
+function defaultTargetPath(r: RepoResource): string {
+  if (r.type === RepoTypeEnum.Skill) return `.claude/skills/${r.slug.replace(/^skill:/, '')}`;
+  return r.slug.replace(/^(document|folder):/, '');
 }
 
 interface SkillItem {
@@ -46,6 +55,54 @@ export default function WorkspaceDetailPage() {
   const [fileLoading, setFileLoading] = useState(false);
   const [fileDirty, setFileDirty] = useState(false);
   const [fileSaving, setFileSaving] = useState(false);
+
+  // Add-resource-with-mapping flow, surfaced from the Files section.
+  const [picking, setPicking] = useState(false);
+  const [pendingMap, setPendingMap] = useState<{ resource: RepoResource; target: string }[] | null>(null);
+  const [savingMap, setSavingMap] = useState(false);
+
+  const onPickResources = (rs: RepoResource[]) => {
+    setPendingMap(rs.map((r) => ({ resource: r, target: defaultTargetPath(r) })));
+    setPicking(false);
+  };
+
+  // PUT replaces bindings wholesale, so merge the new mappings onto the
+  // current ones (fetched fresh to avoid clobbering edits from the
+  // Resource bindings editor).
+  const saveMappings = async () => {
+    if (!pendingMap) return;
+    setSavingMap(true);
+    try {
+      const cur = await req<{ items: any[] }>(`/api/workspaces/${encodeURIComponent(id)}/resources`);
+      const existing = (cur.items || []).map((b: any, i: number) => ({
+        resource_id: b.resource_id,
+        target_path: b.target_path || null,
+        materialize_mode: b.materialize_mode,
+        on_conflict: b.on_conflict,
+        pinned_version_id: b.pinned_version_id || null,
+        display_order: i,
+      }));
+      const added = pendingMap.map((m, i) => ({
+        resource_id: m.resource.id,
+        target_path: m.target.trim() || null,
+        materialize_mode:
+          m.resource.type === RepoTypeEnum.Skill ? MaterializeMode.Symlink : MaterializeMode.Copy,
+        on_conflict: ConflictPolicy.Error,
+        pinned_version_id: null,
+        display_order: existing.length + i,
+      }));
+      await req(`/api/workspaces/${encodeURIComponent(id)}/resources`, {
+        method: 'PUT',
+        body: JSON.stringify({ bindings: [...existing, ...added], reason: 'files: add resource' }),
+      });
+      setPendingMap(null);
+      await load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingMap(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -206,10 +263,10 @@ export default function WorkspaceDetailPage() {
           page used to wrap them in an outer <section className="section">
           which produced visible card-in-card nesting. */}
       <EnvDocEditor workspaceId={id!} />
-      <WorkspaceResourcesEditor workspaceId={id!} />
       <WorkspaceSkillsEditor workspaceId={id!} />
       <SubagentsEditor workspaceId={id!} />
       <WorkspaceCredentialsEditor workspaceId={id!} />
+      <WorkspaceEnvVarsEditor workspaceId={id!} />
 
       {/* 4. Capabilities — single section bundling everything that controls
           what the agent CAN do at runtime. The previous "MCP Tool Groups"
@@ -284,13 +341,62 @@ export default function WorkspaceDetailPage() {
           render artifacts, filtered server-side. Clicking a file opens it
           in a modal. */}
       <section className="section">
-        <h3 style={{ margin: 0, marginBottom: 8 }}>Files ({files.length})</h3>
+        <div className="row between" style={{ marginBottom: 8 }}>
+          <h3 style={{ margin: 0 }}>Files ({files.length})</h3>
+          <button onClick={() => setPicking(true)}>+ add resource</button>
+        </div>
         {files.length === 0 ? (
-          <p className="dim">No user files yet.</p>
+          <p className="dim">No user files yet. Add a resource to map it into the workspace.</p>
         ) : (
           <FileTree files={files} onOpen={openFile} />
         )}
       </section>
+
+      {picking && (
+        <ResourcePicker allowUpload onPick={onPickResources} onClose={() => setPicking(false)} />
+      )}
+
+      {pendingMap && (
+        <Modal
+          title="Map resources into the workspace"
+          onClose={() => setPendingMap(null)}
+          footer={
+            <div className="row" style={{ gap: 8 }}>
+              <button className="primary" onClick={saveMappings} disabled={savingMap}>
+                {savingMap ? 'saving…' : 'save'}
+              </button>
+              <button onClick={() => setPendingMap(null)} disabled={savingMap}>cancel</button>
+            </div>
+          }
+        >
+          <table style={{ fontSize: 12, width: '100%' }}>
+            <thead>
+              <tr><th>resource</th><th>target path</th></tr>
+            </thead>
+            <tbody>
+              {pendingMap.map((m, i) => (
+                <tr key={m.resource.id}>
+                  <td>
+                    <code>{m.resource.slug}</code>
+                    <span className="tag" style={{ marginLeft: 4 }}>{m.resource.type}</span>
+                  </td>
+                  <td>
+                    <input
+                      value={m.target}
+                      onChange={(e) =>
+                        setPendingMap((pm) =>
+                          pm!.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)),
+                        )
+                      }
+                      style={{ width: '100%', padding: '2px 6px', fontFamily: 'monospace', fontSize: 12 }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Modal>
+      )}
 
       {selectedFile && (
         <Modal

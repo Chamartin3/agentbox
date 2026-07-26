@@ -37,6 +37,39 @@ const mockLoad = () => {
 const box = (short: string) =>
   screen.getByText(short).closest('label')!.querySelector('input') as HTMLInputElement;
 
+// Catalog with MCP-server items and host_env items mixed in
+const TOOLS_WITH_MCP = {
+  items: [
+    { name: 'fs.read', description: 'read files', kind: 'builtin' },
+    { name: 'shell.exec', description: 'run shell', kind: 'builtin' },
+    { name: 'mcp_tool.search', description: 'mcp search', kind: 'mcp', server: 'my_mcp_server' },
+    { name: 'host_env.list', description: 'host env list', kind: 'host_env' },
+  ],
+};
+
+const EMPTY_GRANTS = { items: [] };
+
+// Backend descriptors
+const NATIVE_ONLY_BACKEND = {
+  id: 'pi',
+  label: 'PI',
+  default_model: null,
+  compatible_providers: [],
+  accepts_no_provider: true,
+  supports_mcp: false,
+  native_tools: ['fs.read', 'shell.exec'],
+};
+
+const MCP_CAPABLE_BACKEND = {
+  id: 'claude-code',
+  label: 'Claude Code',
+  default_model: null,
+  compatible_providers: ['anthropic'],
+  accepts_no_provider: false,
+  supports_mcp: true,
+  native_tools: [],
+};
+
 describe('AgentToolGrantsPicker', () => {
   beforeEach(mockLoad);
 
@@ -92,5 +125,59 @@ describe('AgentToolGrantsPicker', () => {
         body: JSON.stringify({ changelog: 'needed' }),
       }),
     );
+  });
+
+  it('native-only harness: hides mcp and host_env items and shows native-only notice', async () => {
+    req.mockReset();
+    req.mockImplementation((path: string) => {
+      if (path === '/api/agent_tools') return Promise.resolve(TOOLS_WITH_MCP);
+      if (path.endsWith('/tool_grants')) return Promise.resolve(EMPTY_GRANTS);
+      if (path === '/api/runner-backends') return Promise.resolve([NATIVE_ONLY_BACKEND]);
+      return Promise.resolve({});
+    });
+
+    render(<AgentToolGrantsPicker agentId="a1" workspaceId={null} harnessBackendId="pi" />);
+    await waitFor(() => expect(screen.queryByText(/Loading/)).toBeNull());
+    // Wait for the backend descriptor to load (second effect)
+    await waitFor(() =>
+      expect(screen.queryByText(/runs native tools only/i)).not.toBeNull(),
+    );
+
+    // Native tools should be visible
+    expect(screen.queryByText('read')).not.toBeNull();   // fs.read → "read"
+    expect(screen.queryByText('exec')).not.toBeNull();   // shell.exec → "exec"
+
+    // MCP-server item must not be rendered
+    expect(screen.queryByText('search')).toBeNull();     // mcp_tool.search → "search"
+
+    // host_env item must not be rendered
+    expect(screen.queryByText('list')).toBeNull();       // host_env.list → "list"
+
+    // Native-only notice
+    expect(screen.getByText(/runs native tools only/i)).not.toBeNull();
+  });
+
+  it('MCP-capable harness: renders mcp and host_env items, no native-only notice', async () => {
+    req.mockReset();
+    req.mockImplementation((path: string) => {
+      if (path === '/api/agent_tools') return Promise.resolve(TOOLS_WITH_MCP);
+      if (path.endsWith('/tool_grants')) return Promise.resolve(EMPTY_GRANTS);
+      if (path === '/api/runner-backends') return Promise.resolve([MCP_CAPABLE_BACKEND]);
+      return Promise.resolve({});
+    });
+
+    render(
+      <AgentToolGrantsPicker agentId="a1" workspaceId={null} harnessBackendId="claude-code" />,
+    );
+    await waitFor(() => expect(screen.queryByText(/Loading/)).toBeNull());
+
+    // All catalog items visible
+    expect(screen.queryByText('read')).not.toBeNull();
+    expect(screen.queryByText('exec')).not.toBeNull();
+    expect(screen.queryByText('search')).not.toBeNull();  // mcp item
+    expect(screen.queryByText('list')).not.toBeNull();    // host_env item
+
+    // No native-only notice
+    expect(screen.queryByText(/runs native tools only/i)).toBeNull();
   });
 });
