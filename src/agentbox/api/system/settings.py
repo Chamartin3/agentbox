@@ -60,6 +60,10 @@ KNOWN_SECTIONS = (
 SECTION_DEFAULTS: dict[str, dict] = {
     "runtime_defaults": {
         "timeout_seconds": 1200,
+        # Applied as the initial values when a NEW agent is created. Runtime
+        # always reads the agent's own config, never these — see AgentNew.tsx.
+        "max_error_retries": 0,
+        "max_validation_retries": 1,
         "default_model_opencode": "opencode/deepseek-v4-flash-free",
         "default_model_codex": None,
         "default_model_pi": None,

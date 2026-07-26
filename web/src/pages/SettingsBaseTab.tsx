@@ -37,6 +37,8 @@ function inputRow(label: string, child: React.ReactNode) {
 export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => void }) {
   const section = 'runtime_defaults';
   const [timeout, setTimeoutS] = useState<number | ''>('');
+  const [errorRetries, setErrorRetries] = useState<number | ''>('');
+  const [validationRetries, setValidationRetries] = useState<number | ''>('');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -44,6 +46,8 @@ export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => v
       .then((d) => {
         const v = d.values || {};
         setTimeoutS(typeof v.timeout_seconds === 'number' ? v.timeout_seconds : '');
+        setErrorRetries(typeof v.max_error_retries === 'number' ? v.max_error_retries : '');
+        setValidationRetries(typeof v.max_validation_retries === 'number' ? v.max_validation_retries : '');
         setLoaded(true);
       })
       .catch((e) => onToast({ kind: 'error', msg: `load failed: ${e.message}` }));
@@ -51,10 +55,13 @@ export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => v
 
   async function save() {
     try {
-      // Merge-patch: only the timeout. Per-harness default models are edited
-      // in the Harnesses table below (same runtime_defaults section).
+      // Merge-patch. These are the defaults a new agent starts with; runtime
+      // always reads the agent's own values. Per-harness default models are
+      // edited in the Harnesses table below (same runtime_defaults section).
       await patchSection(section, {
         timeout_seconds: timeout === '' ? null : Number(timeout),
+        max_error_retries: errorRetries === '' ? null : Number(errorRetries),
+        max_validation_retries: validationRetries === '' ? null : Number(validationRetries),
       });
       onToast({ kind: 'ok', msg: 'runtime defaults saved' });
     } catch (e) {
@@ -64,19 +71,31 @@ export function RuntimeDefaultsForm({ onToast }: { onToast: (t: ToastState) => v
 
   if (!loaded) return <p className="dim">loading…</p>;
 
+  const numInput = (
+    value: number | '',
+    set: (v: number | '') => void,
+    placeholder: string,
+  ) => (
+    <input
+      type="number"
+      min="0"
+      value={value}
+      onChange={(e) => set(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+      placeholder={placeholder}
+    />
+  );
+
   return (
     <div className="stack" style={{ gap: 8 }}>
-      {inputRow(
-        'timeout_seconds',
-        <input
-          type="number"
-          value={timeout}
-          onChange={(e) => setTimeoutS(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-          placeholder="1200"
-        />,
-      )}
+      <p className="dim" style={{ fontSize: 12, margin: 0 }}>
+        Defaults applied when a new agent is created. Each agent keeps its own copy —
+        editing these never changes existing agents.
+      </p>
+      {inputRow('timeout_seconds', numInput(timeout, setTimeoutS, '1200'))}
+      {inputRow('max_error_retries', numInput(errorRetries, setErrorRetries, '0'))}
+      {inputRow('max_validation_retries', numInput(validationRetries, setValidationRetries, '1'))}
       <div>
-        <button onClick={save}>save timeout</button>
+        <button onClick={save}>save runtime defaults</button>
       </div>
     </div>
   );

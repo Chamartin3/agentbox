@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, ApiError, RunnerKind } from '../api/client';
+import { apiRequest } from '../api/http';
 
 // ---- validation helpers ---------------------------------------------------
 
@@ -40,6 +41,8 @@ export default function AgentNew() {
   const [runnerKind, setRunnerKind] = useState<RunnerKind>('claude_code');
   const [model, setModel] = useState('');
   const [timeoutSec, setTimeoutSec] = useState('600');
+  const [maxErrorRetries, setMaxErrorRetries] = useState('0');
+  const [maxValidationRetries, setMaxValidationRetries] = useState('1');
   const [outputSchemaPath, setOutputSchemaPath] = useState('');
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -77,6 +80,23 @@ export default function AgentNew() {
       });
     return () => { cancelled = true; };
   }, [runnerKind]);
+
+  // Pre-fill runner defaults from the global runtime_defaults (Settings page).
+  // These seed a new agent; the agent then keeps its own copy and runtime reads
+  // from the agent, never from these globals.
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<{ values?: Record<string, unknown> }>('/api/settings/runtime_defaults')
+      .then((d) => {
+        if (cancelled) return;
+        const v = d.values || {};
+        if (typeof v.timeout_seconds === 'number') setTimeoutSec(String(v.timeout_seconds));
+        if (typeof v.max_error_retries === 'number') setMaxErrorRetries(String(v.max_error_retries));
+        if (typeof v.max_validation_retries === 'number') setMaxValidationRetries(String(v.max_validation_retries));
+      })
+      .catch(() => { /* fall back to the hardcoded defaults above */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // ---- navigation ----------------------------------------------------------
 
@@ -136,8 +156,8 @@ export default function AgentNew() {
       settings_path: null,
       config_path: null,
       command: null,
-      max_validation_retries: 1,
-      max_error_retries: 0,
+      max_validation_retries: parseInt(maxValidationRetries, 10) || 0,
+      max_error_retries: parseInt(maxErrorRetries, 10) || 0,
     };
 
     try {
@@ -272,6 +292,27 @@ export default function AgentNew() {
         />
       </div>
 
+      <div className="row" style={{ gap: 12 }}>
+        <div className="field" style={{ flex: 1 }}>
+          <label>max error retries</label>
+          <input
+            type="number"
+            min="0"
+            value={maxErrorRetries}
+            onChange={(e) => setMaxErrorRetries(e.target.value)}
+          />
+        </div>
+        <div className="field" style={{ flex: 1 }}>
+          <label>max validation retries</label>
+          <input
+            type="number"
+            min="0"
+            value={maxValidationRetries}
+            onChange={(e) => setMaxValidationRetries(e.target.value)}
+          />
+        </div>
+      </div>
+
       <div className="field">
         <label>output_schema_path</label>
         <input
@@ -376,6 +417,8 @@ export default function AgentNew() {
               {renderReviewRow('runner.kind', runnerKind)}
               {renderReviewRow('runner.model', model || '(default)')}
               {renderReviewRow('runner.timeout_seconds', timeoutSec)}
+              {renderReviewRow('runner.max_error_retries', maxErrorRetries)}
+              {renderReviewRow('runner.max_validation_retries', maxValidationRetries)}
               {renderReviewRow('runner.output_schema_path', outputSchemaPath)}
               {renderReviewRow('prompt', promptMode === 'inline' ? `${prompt.slice(0, 80)}${prompt.length > 80 ? '…' : ''}` : '(none)')}
               {renderReviewRow('tools', tools.length ? tools.join(', ') : '(none)')}
