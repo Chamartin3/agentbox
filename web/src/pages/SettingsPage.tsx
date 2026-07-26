@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SettingsDeploymentTab from './SettingsDeploymentTab';
 import SettingsRunnerProfilesTab from './SettingsRunnerProfilesTab';
+import { RuntimeDefaultsForm } from './SettingsBaseTab';
 import ProjectMcpEditor from '../components/settings/ProjectMcpEditor';
 import Toast from '../components/common/Toast';
 
@@ -15,17 +16,25 @@ type TabKey = (typeof TABS)[number]['key'];
 
 function GeneralTab() {
   const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
+  const showToast = (t: { kind: 'ok' | 'error'; msg: string } | null) => {
+    setToast(t);
+    if (t) setTimeout(() => setToast(null), 4000);
+  };
   return (
-    <section className="stack" style={{ gap: 8, border: '1px solid #30363d', padding: 12, borderRadius: 6 }}>
-      <h3 style={{ margin: 0 }}>Global MCPs</h3>
-      <ProjectMcpEditor
-        onToast={(t) => {
-          setToast(t);
-          setTimeout(() => setToast(null), 4000);
-        }}
-      />
+    <div className="stack" style={{ gap: 16 }}>
+      <section className="stack" style={{ gap: 8, border: '1px solid #30363d', padding: 12, borderRadius: 6 }}>
+        <h3 style={{ margin: 0 }}>Agent defaults</h3>
+        <p className="dim" style={{ fontSize: 12, margin: 0 }}>
+          Seed values for newly created agents (timeout and retry limits).
+        </p>
+        <RuntimeDefaultsForm onToast={showToast} />
+      </section>
+      <section className="stack" style={{ gap: 8, border: '1px solid #30363d', padding: 12, borderRadius: 6 }}>
+        <h3 style={{ margin: 0 }}>Global MCPs</h3>
+        <ProjectMcpEditor onToast={showToast} />
+      </section>
       {toast && <Toast kind={toast.kind} msg={toast.msg} />}
-    </section>
+    </div>
   );
 }
 

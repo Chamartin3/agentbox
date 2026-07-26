@@ -6,7 +6,7 @@ import Toast from '../components/common/Toast';
 import RunnerProfilesPage from './RunnerProfilesPage';
 import CredentialsPage, { type CredentialPrefill } from './CredentialsPage';
 import SettingsApiTokensTab from './SettingsApiTokensTab';
-import { RuntimeDefaultsForm, type ToastState } from './SettingsBaseTab';
+import { type ToastState } from './SettingsBaseTab';
 import { HarnessBadge, ProviderBadge } from '../components/runner/RunnerBadges';
 
 // Backends whose default model the runtime actually reads (runtime_defaults keys).
@@ -367,9 +367,6 @@ export default function SettingsRunnerProfilesTab() {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <Section title="Run timeout" hint="Max wall-clock per run. Backends consult this on every run.">
-        <RuntimeDefaultsForm onToast={setToast} />
-      </Section>
       <Section title="Harnesses" hint="Agentic runners: authentication, compatible providers, and default model (consulted on every run).">
         <HarnessesSection onToast={setToast} onAddCredential={setCredPrefill} />
       </Section>
