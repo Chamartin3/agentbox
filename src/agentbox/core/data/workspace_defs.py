@@ -53,7 +53,7 @@ class WorkspaceFile(BaseModel):
 
 
 class WorkspaceDef(BaseModel):
-    """Named workspace definition from agentbox.toml."""
+    """Named workspace definition."""
 
     name: str
     """Unique identifier used by agents to reference this workspace."""

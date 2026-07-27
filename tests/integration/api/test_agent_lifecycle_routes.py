@@ -162,7 +162,6 @@ class TestRollbackVersion:
         svc.create_version(
             agent_id="test-agent",
             source_path="test.toml",
-            source_format="standalone_toml",
             content_snapshot='{"id": "test-agent-v2"}',
             prompt_snapshot="v2 prompt",
             content_hash="v2hash",

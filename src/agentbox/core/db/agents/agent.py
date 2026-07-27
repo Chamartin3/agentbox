@@ -45,7 +45,6 @@ class AgentMeta(Entity, table=True):
 	sync_mode: str = Field(nullable=False, default="off", sa_column_kwargs={"server_default": "off"})
 	export_to_disk: int = Field(nullable=False, default=0, sa_column_kwargs={"server_default": "0"})
 	source_path: Optional[str] = Field(default=None)
-	source_format: Optional[str] = Field(default=None)
 	created_at: str = Field(nullable=False)
 	updated_at: str = Field(nullable=False)
 	deleted_at: Optional[str] = Field(default=None)
@@ -75,7 +74,6 @@ def _meta_row(row: Row) -> AgentMetaRow:
 		sync_mode=m["sync_mode"],
 		export_to_disk=m["export_to_disk"],
 		source_path=m["source_path"],
-		source_format=m["source_format"],
 		created_at=m["created_at"],
 		updated_at=m["updated_at"],
 		deleted_at=m["deleted_at"],

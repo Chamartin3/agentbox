@@ -21,7 +21,7 @@ from agentbox.core.agents.composition.bundle import (
 )
 from agentbox.core.agents.composition.composer import PromptComposer
 from agentbox.core.agents.composition.synthesizer import inline_to_composition
-from agentbox.core.data.manifests.agents import AgentDef, CompositionConfig
+from agentbox.core.data.agent_defs import AgentDef, CompositionConfig
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

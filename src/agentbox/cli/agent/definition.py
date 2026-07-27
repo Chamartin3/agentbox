@@ -241,7 +241,6 @@ def def_edit(
         raise typer.Exit(2) from exc
 
     updated.source_path = current.source_path
-    updated.source_format = current.source_format
     # Persist through the SAME service path as ``agent def new`` so the DB-first
     # fields (``config_json`` + ``prompt_content``) are written. The previous
     # ``create_version(content_snapshot=..., prompt_snapshot="")`` call left both
@@ -257,9 +256,6 @@ def def_edit(
         changelog=changelog,
         source="cli",
         source_path=str(updated.source_path) if updated.source_path else None,
-        source_format=(
-            updated.source_format.value if updated.source_format else None
-        ),
     )
     obj.render.agent.version_edit_new(updated.id, rec["version"])
 

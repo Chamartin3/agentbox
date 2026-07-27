@@ -20,7 +20,6 @@ def _insert(mgr: AgentVersionManager, agent_id: str, workspace: str | None) -> i
         agent_id=agent_id,
         version=1,
         source_path="",
-        source_format="db",
         content_snapshot="{}",
         prompt_snapshot="",
         content_hash="h",

@@ -266,7 +266,7 @@ def test_resolve_launch_target_agent_ephemeral_workspace(store: Database) -> Non
     """Agent with workspace='<ephemeral>' → tmp dir + is_ephemeral=True."""
     import shutil
 
-    from agentbox.core.data.manifests.agents import AgentDef
+    from agentbox.core.data.agent_defs import AgentDef
     from agentbox.core.service.workspaces import WorkspaceService
 
     agent_def = AgentDef(id="test-agent", workspace="<ephemeral>")
@@ -299,7 +299,7 @@ def test_resolve_launch_mcp_servers_filters_disabled_and_no_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Only enabled servers with a url or command survive the filter."""
-    from agentbox.core.data.manifests.workspaces import McpServerSpec
+    from agentbox.core.data.workspace_defs import McpServerSpec
     from agentbox.core.service.workspaces import WorkspaceService
     from agentbox.core.service.system import SystemService
 

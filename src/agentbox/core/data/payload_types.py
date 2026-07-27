@@ -1070,7 +1070,6 @@ class EnrichedAgentRow(TypedDict, total=False):
     session_mode: str
     webhook_url: str | None
     source_path: str | None
-    source_format: str | None
 
     # Enrichment fields
     resolved_workspace: str
@@ -1120,7 +1119,6 @@ class VersionConfig(TypedDict, total=False):
     session_mode: str
     webhook_url: str | None
     source_path: str | None
-    source_format: str | None
     # Execution sections
     execution: object
     runtime: object

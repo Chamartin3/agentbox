@@ -16,7 +16,7 @@ def _make_agent(db: Database, agent_id: str) -> None:
         created_at=now, updated_at=now,
     )
     db.agent_versions.insert_version(
-        agent_id=agent_id, version=1, source_path="a.toml", source_format="yaml",
+        agent_id=agent_id, version=1, source_path="a.toml",
         content_snapshot="s", prompt_snapshot="p", content_hash="h",
         author="t", changelog="c", is_legacy=0, created_at=now,
         activate_for=agent_id, activated_at=now,

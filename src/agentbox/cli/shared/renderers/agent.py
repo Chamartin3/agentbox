@@ -66,10 +66,6 @@ class AgentRenderer(Renderer):
         grid.add_row("id", agent.id)
         grid.add_row("description", agent.description or "\u2014")
         grid.add_row(
-            "source_format",
-            agent.source_format.value if agent.source_format else "\u2014",
-        )
-        grid.add_row(
             "source_path",
             str(agent.source_path) if agent.source_path else "\u2014",
         )

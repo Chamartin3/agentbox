@@ -17,7 +17,7 @@ from agentbox.core.data.payload_types import (
     PromptEmbedSnapshotEntry,
     ResolvedBindingView,
 )
-from agentbox.core.data.manifests.agents import AgentDef
+from agentbox.core.data.agent_defs import AgentDef
 
 
 # ──────────────────────────────────────────────────────────────────────────

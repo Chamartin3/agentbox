@@ -1,31 +1,16 @@
-"""Agent definition models loaded from agentbox.toml."""
+"""Agent definition models (DB-backed)."""
 
 from __future__ import annotations
 
 import contextlib
-import enum
 import json as _json
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentbox.core.data.constants import SessionMode
-from agentbox.core.data.manifests.engines import RunnerSpec
+from agentbox.core.data.engine_defs import RunnerSpec
 from agentbox.core.data.rows import AgentVersionRow
-
-
-class AgentSource(enum.StrEnum):
-    """Format and location of an agent definition's source file."""
-
-    INLINE_TOML = "inline_toml"
-    """Agent defined as an ``[[agents]]`` block inside ``agentbox.toml``."""
-    STANDALONE_TOML = "standalone_toml"
-    """Agent defined in a separate ``.toml`` file under ``agents.d/``."""
-    MARKDOWN = "markdown"
-    """Agent defined as a markdown file with YAML frontmatter under ``agents.d/``."""
-    BUNDLE = "bundle"
-    """Agent defined as a bundle directory: ``<bundle_dir>/<id>/agent.toml`` with
-    a ``[composition]`` block declaring system prompt, references, and schemas."""
 
 
 class SharedRef(BaseModel):
@@ -123,8 +108,7 @@ class AgentDef(BaseModel):
 
     unsupported_backends: list[str] = Field(default_factory=list)
     """Backend names that this agent cannot run on. When set, those
-    backends are skipped during automatic backend selection (see
-    ``backend_preference`` on ``ProjectManifest``)."""
+    backends are skipped during automatic backend selection."""
 
     claude_agent: bool = True
     """False means pydantic-only — no external Claude/OpenCode config."""
@@ -147,18 +131,8 @@ class AgentDef(BaseModel):
     a global default is configured."""
 
     source_path: Path | None = None
-    """Absolute path to the source file this agent was loaded from.
-
-    Used by ``ManifestWriter`` to dispatch to the correct writer.
-    Set automatically by ``DefinitionLoader``; *None* for agents
-    created programmatically without a backing file.
-    """
-
-    source_format: AgentSource | None = None
-    """Format of the source file (inline TOML, standalone TOML, markdown).
-
-    Set automatically by ``DefinitionLoader``; *None* for agents
-    created programmatically.
+    """Absolute path to a source file this agent was loaded from, if any.
+    *None* for agents created programmatically (the normal DB-only case).
     """
 
     @classmethod

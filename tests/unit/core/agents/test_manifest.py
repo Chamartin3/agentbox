@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 
-from agentbox.core.data.manifests.agents import AgentDef, CompositionConfig
-from agentbox.core.data.manifests.engines import RunnerSpec
-from agentbox.core.data.manifests.system import ProjectManifest
-from agentbox.core.data.manifests.workspaces import WorkspaceDef
+from agentbox.core.data.agent_defs import AgentDef, CompositionConfig
+from agentbox.core.data.engine_defs import RunnerSpec
+from agentbox.core.data.workspace_defs import WorkspaceDef
 
 
 class TestRunnerSpec:
@@ -66,10 +65,3 @@ class TestWorkspaceDef:
         assert ws.name == "my-ws"
         assert ws.path == "/tmp/ws"
         assert ws.description == ""
-
-
-class TestProjectManifest:
-    def test_minimal(self) -> None:
-        pm = ProjectManifest()
-        assert pm.workspaces == []
-        assert pm.agents == []

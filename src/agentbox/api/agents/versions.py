@@ -58,7 +58,6 @@ class _VersionDetailResult(TypedDict):
     author: str
     changelog: str
     source_path: str
-    source_format: str
     content_snapshot: str
     prompt_snapshot: str
     content_hash: str
@@ -129,7 +128,6 @@ def get_agent_version(agent_id: str, version: int) -> _VersionDetailResult:
         "author": v["author"],
         "changelog": v["changelog"],
         "source_path": v["source_path"],
-        "source_format": v["source_format"],
         "content_snapshot": v["content_snapshot"],
         "prompt_snapshot": v["prompt_snapshot"],
         "content_hash": v["content_hash"],
@@ -214,7 +212,6 @@ def create_agent_version(agent_id: str, body: NewVersionBody) -> AgentVersionRow
     return svc.create_version(
         agent_id=agent_id,
         source_path=str(agent.source_path) if agent.source_path else "",
-        source_format=(agent.source_format.value if agent.source_format else "unknown"),
         content_snapshot=body.content_snapshot,
         prompt_snapshot=body.prompt_snapshot,
         content_hash="",

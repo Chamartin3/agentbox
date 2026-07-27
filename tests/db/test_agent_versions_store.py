@@ -25,7 +25,6 @@ def _build_version(
     return store.create_version(
         agent_id=agent_id,
         source_path="/tmp/test.md",
-        source_format="markdown",
         content_snapshot='{"id": "test-agent"}',
         prompt_snapshot="Be helpful.",
         content_hash="abc123",
@@ -41,7 +40,6 @@ class TestAgentVersionsMixin:
         assert v["version"] == 1
         assert v["agent_id"] == "test-agent"
         assert v["author"] == "system"
-        assert v["source_format"] == "markdown"
 
     def test_latest_version_returns_newest(self, svc: AgentService) -> None:
         _build_version(svc, author="v1")
@@ -93,7 +91,6 @@ class TestAgentVersionsMixin:
         svc.create_version(
             agent_id="diff-agent",
             source_path="/tmp/test.md",
-            source_format="markdown",
             content_snapshot='{"id": "old"}',
             prompt_snapshot="Old prompt",
             content_hash="aaa",
@@ -102,7 +99,6 @@ class TestAgentVersionsMixin:
         svc.create_version(
             agent_id="diff-agent",
             source_path="/tmp/test.md",
-            source_format="markdown",
             content_snapshot='{"id": "new", "extra": true}',
             prompt_snapshot="New prompt",
             content_hash="bbb",
@@ -173,7 +169,6 @@ class TestAgentLifecycle:
             changelog="Initial version",
             source="ui",
             source_path="/tmp/agent.toml",
-            source_format="toml",
             sync_mode="watch",
             export_to_disk=True,
         )
@@ -380,7 +375,6 @@ class TestAgentLifecycle:
         v2_dict = svc.create_version(
             agent_id="rollback-agent",
             source_path="/tmp/test.md",
-            source_format="markdown",
             content_snapshot='{"id": "rollback-agent", "value": 2}',
             prompt_snapshot="Updated prompt",
             content_hash="def456",
@@ -430,7 +424,6 @@ class TestAgentLifecycle:
         v2 = svc.create_version(
             agent_id="rollback-files",
             source_path="/tmp/test.md",
-            source_format="markdown",
             content_snapshot='{"id": "rollback-files"}',
             prompt_snapshot="v2",
             content_hash="xyz",

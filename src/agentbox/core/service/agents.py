@@ -392,7 +392,6 @@ def _refresh_meta(
     sync_mode: str,
     export_to_disk: bool,
     source_path: str | None,
-    source_format: str | None,
     clear_deleted: bool,
 ) -> None:
     now = now_iso()
@@ -401,7 +400,6 @@ def _refresh_meta(
             "sync_mode": sync_mode,
             "export_to_disk": int(export_to_disk),
             "source_path": source_path,
-            "source_format": source_format,
             "updated_at": now,
         }
         if clear_deleted:
@@ -413,7 +411,6 @@ def _refresh_meta(
             sync_mode=sync_mode,
             export_to_disk=int(export_to_disk),
             source_path=source_path,
-            source_format=source_format,
             created_at=now,
             updated_at=now,
         )
@@ -448,7 +445,6 @@ def create_agent_record(
         session_mode=cast(SessionMode, session_mode or "headless"),
         webhook_url=webhook_url,
         source_path=None,
-        source_format=None,
     )
     # Always emit a composition block so Stage-1 of build_prompt is always taken.
     # Agents created without an explicit composition block get the minimal
@@ -472,7 +468,6 @@ def create_agent_record(
             agent_id=agent_id,
             version=next_v,
             source_path=None or "",
-            source_format=None or "",
             content_snapshot="",
             prompt_snapshot="",
             content_hash=_version_config_hash(config_payload),
@@ -487,7 +482,7 @@ def create_agent_record(
         _refresh_meta(
             agent_meta, agent_id,
             sync_mode="off", export_to_disk=False,
-            source_path=None, source_format=None,
+            source_path=None,
             clear_deleted=True,
         )
         result = agent_versions.get_by_id(vid)
@@ -501,7 +496,6 @@ def create_agent_record(
             agent_id=agent_id,
             version=1,
             source_path=None or "",
-            source_format=None or "",
             content_snapshot="",
             prompt_snapshot="",
             content_hash=_version_config_hash(config_payload),
@@ -516,7 +510,7 @@ def create_agent_record(
         _refresh_meta(
             agent_meta, agent_id,
             sync_mode="off", export_to_disk=False,
-            source_path=None, source_format=None,
+            source_path=None,
             clear_deleted=False,
         )
         result = agent_versions.get_by_id(vid)
@@ -788,7 +782,6 @@ def patch_agent_config(
         raise AgentServiceError(400, "validation_failed", str(exc)) from exc
     _validate_runner_against_registry(updated, runner_profiles)
     updated.source_path = current.source_path
-    updated.source_format = current.source_format
 
     snapshot = build_agent_snapshot(updated)
     config_json = build_config_json_str(updated)
@@ -816,9 +809,6 @@ def patch_agent_config(
             agent_id=updated.id,
             version=agent_versions.next_version(updated.id),
             source_path=str(updated.source_path) if updated.source_path else "",
-            source_format=(
-                updated.source_format.value if updated.source_format else "unknown"
-            ),
             content_snapshot=snapshot,
             prompt_snapshot=carried_prompt_snapshot,
             content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
@@ -1030,9 +1020,6 @@ def put_agent_validation(
             agent_id=current.id,
             version=agent_versions.next_version(current.id),
             source_path=str(current.source_path) if current.source_path else "",
-            source_format=(
-                current.source_format.value if current.source_format else "unknown"
-            ),
             content_snapshot=snapshot,
             prompt_snapshot="",
             content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
@@ -1103,7 +1090,6 @@ def branch_draft(
         agent_id=agent_id,
         version=agent_versions.next_version(agent_id),
         source_path=active.get("source_path") or "",
-        source_format=active.get("source_format") or "",
         content_snapshot=active.get("content_snapshot") or "",
         prompt_snapshot=active.get("prompt_snapshot") or "",
         content_hash=active.get("content_hash") or "",
@@ -1172,7 +1158,6 @@ def rollback_to(
         agent_id=agent_id,
         version=next_v,
         source_path=target.get("source_path") or "",
-        source_format=target.get("source_format") or "",
         content_snapshot=target.get("content_snapshot") or "",
         prompt_snapshot=target.get("prompt_snapshot") or "",
         content_hash=target.get("content_hash") or "",
@@ -1431,7 +1416,6 @@ class AgentService(Service):
                 "sync_mode": "off",
                 "export_to_disk": 0,
                 "source_path": None,
-                "source_format": None,
                 "created_at": now,
                 "updated_at": now,
                 column: now,
@@ -1471,7 +1455,6 @@ class AgentService(Service):
         sync_mode: str | None = None,
         export_to_disk: bool | None = None,
         source_path: str | None = None,
-        source_format: str | None = None,
     ) -> AgentMetaRow | None:
         """Patch supplied meta fields. None if the agent has no meta row."""
         if self._meta.get_meta(agent_id) is None:
@@ -1483,8 +1466,6 @@ class AgentService(Service):
             values["export_to_disk"] = int(export_to_disk)
         if source_path is not None:
             values["source_path"] = source_path
-        if source_format is not None:
-            values["source_format"] = source_format
         self._meta.patch(agent_id, **values)
         return self._meta.get_meta(agent_id)
 
@@ -1521,7 +1502,6 @@ class AgentService(Service):
         sync_mode: str,
         export_to_disk: bool,
         source_path: str | None,
-        source_format: str | None,
         clear_deleted: bool,
     ) -> None:
         """Upsert agent_meta alongside a version write.
@@ -1541,7 +1521,6 @@ class AgentService(Service):
                 "sync_mode": sync_mode,
                 "export_to_disk": int(export_to_disk),
                 "source_path": source_path,
-                "source_format": source_format,
                 "updated_at": now,
             }
             if clear_deleted:
@@ -1553,7 +1532,6 @@ class AgentService(Service):
                 sync_mode=sync_mode,
                 export_to_disk=int(export_to_disk),
                 source_path=source_path,
-                source_format=source_format,
                 created_at=now,
                 updated_at=now,
             )
@@ -1568,7 +1546,6 @@ class AgentService(Service):
         changelog: str,
         source: str = "ui",
         source_path: str | None = None,
-        source_format: str | None = None,
         sync_mode: str = "off",
         export_to_disk: bool = False,
     ) -> AgentVersionRow:
@@ -1581,7 +1558,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=1,
             source_path=source_path or "",
-            source_format=source_format or "",
             content_snapshot="",
             prompt_snapshot="",
             content_hash=_config_hash(config_json),
@@ -1598,7 +1574,6 @@ class AgentService(Service):
             sync_mode=sync_mode,
             export_to_disk=export_to_disk,
             source_path=source_path,
-            source_format=source_format,
             clear_deleted=False,
         )
         result = self._versions.get_by_id(vid)
@@ -1615,7 +1590,6 @@ class AgentService(Service):
         changelog: str,
         source: str = "ui",
         source_path: str | None = None,
-        source_format: str | None = None,
         sync_mode: str = "off",
         export_to_disk: bool = False,
     ) -> AgentVersionRow:
@@ -1628,7 +1602,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=next_version,
             source_path=source_path or "",
-            source_format=source_format or "",
             content_snapshot="",
             prompt_snapshot="",
             content_hash=_config_hash(config_json),
@@ -1645,7 +1618,6 @@ class AgentService(Service):
             sync_mode=sync_mode,
             export_to_disk=export_to_disk,
             source_path=source_path,
-            source_format=source_format,
             clear_deleted=True,
         )
         result = self._versions.get_by_id(vid)
@@ -1697,7 +1669,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=next_v,
             source_path=target.get("source_path") or "",
-            source_format=target.get("source_format") or "",
             content_snapshot=target.get("content_snapshot") or "",
             prompt_snapshot=target.get("prompt_snapshot") or "",
             content_hash=target.get("content_hash") or "",
@@ -1823,7 +1794,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=self._versions.next_version(agent_id),
             source_path=(active_row or {}).get("source_path") or "",
-            source_format=(active_row or {}).get("source_format") or "unknown",
             content_snapshot=(active_row or {}).get("content_snapshot") or "",
             prompt_snapshot=carried_prompt_snapshot,
             content_hash=(active_row or {}).get("content_hash") or "",
@@ -1890,7 +1860,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=self._versions.next_version(agent_id),
             source_path=(active_row or {}).get("source_path") or "",
-            source_format=(active_row or {}).get("source_format") or "unknown",
             content_snapshot=(active_row or {}).get("content_snapshot") or "",
             prompt_snapshot=carried_prompt_snapshot,
             content_hash=(active_row or {}).get("content_hash") or "",
@@ -2181,7 +2150,6 @@ class AgentService(Service):
         self,
         agent_id: str,
         source_path: str,
-        source_format: str,
         content_snapshot: str,
         prompt_snapshot: str,
         content_hash: str,
@@ -2200,7 +2168,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=self._versions.next_version(agent_id),
             source_path=source_path,
-            source_format=source_format,
             content_snapshot=content_snapshot,
             prompt_snapshot=prompt_snapshot,
             content_hash=content_hash,
@@ -2228,7 +2195,6 @@ class AgentService(Service):
         metadata from the agent's current definition.
 
         Convenience over ``create_version``: resolves the agent, fills
-        ``source_path``/``source_format`` and empty prompt/hash snapshots, so
         callers pass only the snapshot. Raises ``AgentNotFound`` if unknown.
         """
         agent = self.get_agent_def(agent_id)
@@ -2237,7 +2203,6 @@ class AgentService(Service):
         return self.create_version(
             agent_id=agent_id,
             source_path=str(agent.source_path) if agent.source_path else "",
-            source_format=agent.source_format.value if agent.source_format else "unknown",
             content_snapshot=content_snapshot,
             prompt_snapshot="",
             content_hash="",
@@ -2281,7 +2246,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=self._versions.next_version(agent_id),
             source_path=active.get("source_path") or "",
-            source_format=active.get("source_format") or "",
             content_snapshot=active.get("content_snapshot") or "",
             prompt_snapshot=active.get("prompt_snapshot") or "",
             content_hash=active.get("content_hash") or "",
@@ -2329,7 +2293,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=self._versions.next_version(agent_id),
             source_path=active.get("source_path") or "",
-            source_format=active.get("source_format") or "",
             content_snapshot=active.get("content_snapshot") or "",
             prompt_snapshot=prompt_content,
             content_hash="",
@@ -2376,7 +2339,6 @@ class AgentService(Service):
             agent_id=agent_id,
             version=self._versions.next_version(agent_id),
             source_path=active.get("source_path") or "",
-            source_format=active.get("source_format") or "",
             content_snapshot=active.get("content_snapshot") or "",
             prompt_snapshot=active.get("prompt_snapshot") or "",
             content_hash=hashlib.sha256(new_config_str.encode("utf-8")).hexdigest(),
@@ -2556,7 +2518,6 @@ class AgentService(Service):
             session_mode=session_mode or SessionMode.HEADLESS,
             webhook_url=webhook_url,
             source_path=None,
-            source_format=None,
         )
         self._assert_workspace_exists(agent_def.workspace)
         # Always emit a composition block so Stage-1 of build_prompt is always taken.
@@ -2574,7 +2535,6 @@ class AgentService(Service):
                 changelog=changelog,
                 source="ui",
                 source_path=None,
-                source_format=None,
                 sync_mode="off",
                 export_to_disk=False,
             )
@@ -2587,7 +2547,6 @@ class AgentService(Service):
                 changelog=changelog,
                 source="ui",
                 source_path=None,
-                source_format=None,
                 sync_mode="off",
                 export_to_disk=False,
             )
@@ -2666,7 +2625,6 @@ class AgentService(Service):
         sync_mode: str | None = None,
         export_to_disk: bool | None = None,
         source_path: str | None = None,
-        source_format: str | None = None,
     ) -> AgentMetaRow | None:
         """Update agent metadata fields (alias of ``update_meta``)."""
         return self.update_meta(
@@ -2674,7 +2632,6 @@ class AgentService(Service):
             sync_mode=sync_mode,
             export_to_disk=export_to_disk,
             source_path=source_path,
-            source_format=source_format,
         )
 
     # ── config patch + validation ──────────────────────────────────────
@@ -2761,7 +2718,6 @@ class AgentService(Service):
         self._assert_workspace_exists(updated.workspace)
         _validate_runner_against_registry(updated, self._db.runner_profiles)
         updated.source_path = current.source_path
-        updated.source_format = current.source_format
 
         snapshot = build_agent_snapshot(updated)
         config_json = build_config_json_str(updated)
@@ -2788,9 +2744,6 @@ class AgentService(Service):
             new_version = self.create_version(
                 agent_id=updated.id,
                 source_path=str(updated.source_path) if updated.source_path else "",
-                source_format=(
-                    updated.source_format.value if updated.source_format else "unknown"
-                ),
                 content_snapshot=snapshot,
                 prompt_snapshot=carried_prompt_snapshot,
                 content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
@@ -2896,9 +2849,6 @@ class AgentService(Service):
             new_version = self.create_version(
                 agent_id=current.id,
                 source_path=str(current.source_path) if current.source_path else "",
-                source_format=(
-                    current.source_format.value if current.source_format else "unknown"
-                ),
                 content_snapshot=snapshot,
                 prompt_snapshot="",
                 content_hash=hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),

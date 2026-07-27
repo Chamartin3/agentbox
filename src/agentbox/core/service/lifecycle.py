@@ -20,7 +20,7 @@ from dataclasses import dataclass, field, replace
 from agentbox.core.config import Settings
 from agentbox.core.data import RunRecord
 from agentbox.core.data.constants import DEFAULT_WORKSPACE_NAME
-from agentbox.core.data.manifests.workspaces import McpServerSpec
+from agentbox.core.data.workspace_defs import McpServerSpec
 from agentbox.core.db.seeds.engines import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
 from agentbox.core.service.agents import AgentService

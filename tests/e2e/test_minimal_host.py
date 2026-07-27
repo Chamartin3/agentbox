@@ -99,7 +99,6 @@ def test_run_with_db_seeded_noop_agent(
     row = AgentService().create_version(
         agent_id="noop",
         source_path="",
-        source_format="db_only",
         content_snapshot=config_json,
         prompt_snapshot="",
         content_hash="x",

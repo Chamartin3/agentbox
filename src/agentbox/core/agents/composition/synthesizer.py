@@ -20,7 +20,7 @@ used.  Both originate from the same ``agent_versions.prompt_content`` column.
 
 from __future__ import annotations
 
-from agentbox.core.data.manifests.agents import AgentDef, CompositionConfig
+from agentbox.core.data.agent_defs import AgentDef, CompositionConfig
 
 
 def inline_to_composition(agent: AgentDef) -> AgentDef:

@@ -39,7 +39,6 @@ class AgentVersionRow(TypedDict):
     agent_id: str
     version: int
     source_path: str
-    source_format: str
     content_snapshot: str
     prompt_snapshot: str
     content_hash: str
@@ -88,7 +87,6 @@ class AgentMetaRow(TypedDict):
     sync_mode: str
     export_to_disk: int
     source_path: str | None
-    source_format: str | None
     created_at: str
     updated_at: str
     deleted_at: str | None
@@ -706,7 +704,6 @@ class _AgentMetaFields(TypedDict, total=False):
     sync_mode: str
     export_to_disk: int
     source_path: str | None
-    source_format: str | None
     created_at: str
     updated_at: str
     deleted_at: str | None
@@ -719,7 +716,6 @@ class _AgentMetaPatchFields(TypedDict, total=False):
     sync_mode: str
     export_to_disk: int
     source_path: str | None
-    source_format: str | None
     updated_at: str
     deleted_at: str | None
     disabled_at: str | None
@@ -760,7 +756,6 @@ class _AgentVersionFields(TypedDict, total=False):
     agent_id: str
     version: int
     source_path: str
-    source_format: str
     content_snapshot: str
     prompt_snapshot: str
     content_hash: str

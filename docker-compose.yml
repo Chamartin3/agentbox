@@ -5,9 +5,8 @@
 #   include:
 #     - libs/agentbox/docker-compose.yml
 #
-# All project-level config is now DB-backed (SQLite in the agentbox-data
-# volume).  Run ``agentbox migrate import-manifest`` once if migrating from
-# a legacy agentbox.toml file.
+# All project-level config is DB-backed (SQLite in the agentbox-data volume):
+# agents, workspaces, and settings live in the database, not in files.
 #
 # Optional env — add the corresponding volumes block to your override file
 #   when you need these mounts (see "Optional bind-mounts" in README):

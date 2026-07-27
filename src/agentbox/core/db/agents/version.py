@@ -39,7 +39,6 @@ class AgentVersion(Entity, table=True):
 	agent_id: str = Field(nullable=False)
 	version: int = Field(nullable=False)
 	source_path: str = Field(nullable=False)
-	source_format: str = Field(nullable=False)
 	content_snapshot: str = Field(nullable=False)
 	prompt_snapshot: str = Field(nullable=False)
 	content_hash: str = Field(nullable=False)
@@ -153,7 +152,6 @@ def _version_row(row: Row) -> AgentVersionRow:
 		agent_id=m["agent_id"],
 		version=m["version"],
 		source_path=m["source_path"],
-		source_format=m["source_format"],
 		content_snapshot=m["content_snapshot"],
 		prompt_snapshot=m["prompt_snapshot"],
 		content_hash=m["content_hash"],

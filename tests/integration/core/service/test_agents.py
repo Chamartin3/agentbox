@@ -32,7 +32,6 @@ def _seed_db_agent(store: Database, agent_id: str) -> None:
     row = AgentService().create_version(
         agent_id=agent_id,
         source_path="",
-        source_format="db_only",
         content_snapshot=config_json,
         prompt_snapshot="",
         content_hash="x",
@@ -81,7 +80,6 @@ def test_list_all_agents_skips_invalid_snapshots(
     AgentService().create_version(
         agent_id="broken",
         source_path="",
-        source_format="db_only",
         content_snapshot="",
         prompt_snapshot="",
         content_hash="x",

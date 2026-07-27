@@ -17,7 +17,7 @@ from agentbox.core.agents.composition.build import (
     BuildManagers,
     build_prompt,
 )
-from agentbox.core.data.manifests.agents import AgentDef
+from agentbox.core.data.agent_defs import AgentDef
 from agentbox.core.config import load_settings
 
 

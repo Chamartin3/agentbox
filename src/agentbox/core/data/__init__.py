@@ -142,14 +142,12 @@ from agentbox.core.data.payload_types import (
     UsagePayload,
     ValidationView,
 )
-from agentbox.core.data.manifests.agents import (
+from agentbox.core.data.agent_defs import (
     AgentDef,
-    AgentSource,
     CompositionConfig,
 )
-from agentbox.core.data.manifests.engines import RunnerSpec
-from agentbox.core.data.manifests.system import ProjectManifest
-from agentbox.core.data.manifests.workspaces import McpServerSpec, WorkspaceDef, WorkspaceFile
+from agentbox.core.data.engine_defs import RunnerSpec
+from agentbox.core.data.workspace_defs import McpServerSpec, WorkspaceDef, WorkspaceFile
 from agentbox.core.data.profiles import (
     RunnerProfile,
     RunnerProfileCreate,
@@ -266,7 +264,6 @@ __all__ = [
     "AgentMetaDict",
     "AgentValidationResult",
     "AgentMetaRow",
-    "AgentSource",
     "AgentSyncRow",
     "AgentToolGrantRow",
     "AgentVersionCommentRow",
@@ -291,7 +288,6 @@ __all__ = [
     "HostEnvProfileRow",
     "McpServerSpec",
     "McpSnapshot",
-    "ProjectManifest",
     "PromptVersionDetail",
     "PromptVersionListResult",
     "PromptVersionSummary",

@@ -35,7 +35,6 @@ def _seed_version(db: Database, agent_id: str = "a1", version: int = 1, vid: int
         agent_id=agent_id,
         version=version,
         source_path="mem",
-        source_format="inline",
         content_snapshot="{}",
         prompt_snapshot="hi",
         content_hash="deadbeef",

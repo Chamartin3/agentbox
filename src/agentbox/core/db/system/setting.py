@@ -13,7 +13,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlmodel import Field
 
 from agentbox.core.data.jsontypes import RawJson
-from agentbox.core.data.manifests.workspaces import McpServerSpec
+from agentbox.core.data.workspace_defs import McpServerSpec
 from agentbox.core.data.rows import SettingKeyRow
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.manager import Manager

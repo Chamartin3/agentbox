@@ -30,7 +30,6 @@ def _seed_agent(
     row = AgentService().create_version(
         agent_id=agent_id,
         source_path="",
-        source_format="db_only",
         content_snapshot=config_json,
         prompt_snapshot="",
         content_hash="x",

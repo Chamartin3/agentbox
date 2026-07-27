@@ -38,7 +38,6 @@ def test_json_blob_roundtrip() -> None:
         agent_id="test-agent",
         version=1,
         source_path="/dev/null",
-        source_format="toml",
         content_snapshot="{}",
         prompt_snapshot="",
         content_hash="abc123",
