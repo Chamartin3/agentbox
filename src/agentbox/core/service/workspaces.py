@@ -192,7 +192,6 @@ class WorkspaceService(Service):
         self._mcp_tool_overrides = self._db.workspace_mcp_tool_overrides
         self._runtime_permissions = self._db.workspace_runtime_permissions
         self._subagents = self._db.workspace_subagents
-        self._env_vars = self._db.workspace_env_vars
         self._discovery_cache = self._db.mcp_tool_discovery_cache
         self._subagents = self._db.workspace_subagents
         self._ws_facade = Workspaces(self._db.workspace_read, self._settings)
@@ -969,38 +968,6 @@ class WorkspaceService(Service):
         return self._subagents.replace_for_workspace(
             workspace_id, subagents, actor=actor
         )
-
-    # ═══════════════════════════════════════════════════════════════════
-    # Custom env vars (per-workspace shell environment injection)
-    # ═══════════════════════════════════════════════════════════════════
-
-    _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-    def get_env_vars(self, workspace_id: str) -> dict[str, str]:
-        """Return the workspace's custom shell env vars as ``{KEY: VALUE}``."""
-        return self._env_vars.list_for_workspace(workspace_id)
-
-    def set_env_vars(
-        self,
-        workspace_id: str,
-        pairs: dict[str, str],
-        *,
-        actor: str | None = None,
-    ) -> dict[str, str]:
-        """Replace the full env-var set for a workspace.
-
-        Keys must match ``^[A-Za-z_][A-Za-z0-9_]*$`` — shell-invalid names
-        (e.g. ``1BAD``, ``has-dash``, ``has space``) are rejected.
-
-        Returns the new ``{KEY: VALUE}`` mapping.
-        """
-        for key in pairs:
-            if not self._ENV_KEY_RE.match(key):
-                raise ValueError(
-                    f"invalid env-var key {key!r}: must match "
-                    f"^[A-Za-z_][A-Za-z0-9_]*$"
-                )
-        return self._env_vars.replace_for_workspace(workspace_id, pairs)
 
     # ═══════════════════════════════════════════════════════════════════
     # Workspace path resolution (from files.py)

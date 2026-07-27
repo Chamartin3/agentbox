@@ -26,6 +26,9 @@ class WorkspaceCredential(Entity, table=True):
     credential_id: str = Field(primary_key=True)
     created_at: str = Field(nullable=False)
     created_by: Optional[str] = Field(default=None)
+    # Per-workspace remap: expose this credential's secret under this env-var
+    # name instead of the credential's default. NULL = use the default.
+    env_var_override: Optional[str] = Field(default=None)
 
 
 workspace_credentials = WorkspaceCredential.__table__
@@ -46,11 +49,31 @@ class WorkspaceCredentialManager(Manager[WorkspaceCredential]):
             ).all()
         return sorted(r._mapping["credential_id"] for r in rows)
 
+    def get_overrides(self, workspace_id: str) -> dict[str, str]:
+        """credential_id → env-var-name override, for rows that set one."""
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                workspace_credentials.select().where(
+                    workspace_credentials.c.workspace_id == workspace_id
+                )
+            ).all()
+        return {
+            r._mapping["credential_id"]: r._mapping["env_var_override"]
+            for r in rows
+            if r._mapping["env_var_override"]
+        }
+
     def set_enabled(
-        self, workspace_id: str, credential_ids: list[str], *, actor: str | None = None
+        self,
+        workspace_id: str,
+        credential_ids: list[str],
+        *,
+        overrides: dict[str, str] | None = None,
+        actor: str | None = None,
     ) -> list[str]:
-        """Replace the enabled set for a workspace. Returns the new set."""
+        """Replace the enabled set (+ env-var overrides) for a workspace."""
         now = now_iso()
+        overrides = overrides or {}
         wanted = sorted(set(credential_ids))
         with self._engine.begin() as conn:
             conn.execute(
@@ -65,6 +88,7 @@ class WorkspaceCredentialManager(Manager[WorkspaceCredential]):
                         credential_id=cid,
                         created_at=now,
                         created_by=actor,
+                        env_var_override=(overrides.get(cid) or None),
                     )
                 )
         return wanted

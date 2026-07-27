@@ -51,7 +51,6 @@ from agentbox.core.db.workspaces import (
     # workspaces
     WorkspaceEnvDocManager,
     WorkspaceEnvDocVersionManager,
-    WorkspaceEnvVarManager,
     WorkspaceManager,
     WorkspaceMcpOverrideManager,
     WorkspaceMcpPolicyManager,
@@ -104,7 +103,6 @@ __all__ = [
     # workspaces
     "WorkspaceEnvDocManager",
     "WorkspaceEnvDocVersionManager",
-    "WorkspaceEnvVarManager",
     "WorkspaceManager",
     "WorkspaceMcpOverrideManager",
     "WorkspaceMcpPolicyManager",

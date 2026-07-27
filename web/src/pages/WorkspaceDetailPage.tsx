@@ -8,8 +8,7 @@ import EnvDocEditor from '../components/workspace/EnvDocEditor';
 import WorkspaceSkillsEditor from '../components/workspace/WorkspaceSkillsEditor';
 import SubagentsEditor from '../components/workspace/SubagentsEditor';
 import WorkspaceMcpEditor from '../components/workspace/WorkspaceMcpEditor';
-import WorkspaceCredentialsEditor from '../components/workspace/WorkspaceCredentialsEditor';
-import WorkspaceEnvVarsEditor from '../components/workspace/WorkspaceEnvVarsEditor';
+import WorkspaceSecretsEditor from '../components/workspace/WorkspaceSecretsEditor';
 import ResourcePicker from '../components/resources/ResourcePicker';
 import FileTree from '../components/workspace/FileTree';
 import Modal from '../components/common/Modal';
@@ -265,8 +264,7 @@ export default function WorkspaceDetailPage() {
       <EnvDocEditor workspaceId={id!} />
       <WorkspaceSkillsEditor workspaceId={id!} />
       <SubagentsEditor workspaceId={id!} />
-      <WorkspaceCredentialsEditor workspaceId={id!} />
-      <WorkspaceEnvVarsEditor workspaceId={id!} />
+      <WorkspaceSecretsEditor workspaceId={id!} />
 
       {/* 4. Capabilities — single section bundling everything that controls
           what the agent CAN do at runtime. The previous "MCP Tool Groups"

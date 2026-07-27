@@ -113,16 +113,25 @@ class CredentialService(Service):
         """Credential ids enabled for a workspace."""
         return self._db.workspace_credentials.list_enabled(workspace_id)
 
+    def list_workspace_overrides(self, workspace_id: str) -> dict[str, str]:
+        """credential_id → env-var-name override for a workspace."""
+        return self._db.workspace_credentials.get_overrides(workspace_id)
+
     def set_workspace_credentials(
-        self, workspace_id: str, credential_ids: list[str], *, actor: str | None = None
+        self,
+        workspace_id: str,
+        credential_ids: list[str],
+        *,
+        overrides: dict[str, str] | None = None,
+        actor: str | None = None,
     ) -> list[str]:
-        """Replace the enabled set for a workspace. Validates ids exist."""
+        """Replace the enabled set (+ env-var overrides). Validates ids exist."""
         known = self._inventory_ids()
         unknown = [c for c in credential_ids if c not in known]
         if unknown:
             raise ValueError(f"unknown credential ids: {unknown}")
         return self._db.workspace_credentials.set_enabled(
-            workspace_id, credential_ids, actor=actor
+            workspace_id, credential_ids, overrides=overrides, actor=actor
         )
 
     # ── Materialization (internal decrypt; executor-only) ─────────────────
@@ -138,6 +147,8 @@ class CredentialService(Service):
         enabled = set(self._db.workspace_credentials.list_enabled(workspace_id))
         if not enabled:
             return {}
+        # Per-workspace remap: expose a credential under a chosen env-var name.
+        overrides = self._db.workspace_credentials.get_overrides(workspace_id)
         out: dict[str, str] = {}
         # Registry env credentials (provider keys): pass through from the
         # container env only when the credential is enabled for this workspace.
@@ -147,7 +158,7 @@ class CredentialService(Service):
                 continue
             env_var = _registry_env_var(cm)
             if env_var and os.environ.get(env_var):
-                out[env_var] = os.environ[env_var]
+                out[overrides.get(cm.backend) or env_var] = os.environ[env_var]
         # UI-added api_key credentials: decrypt.
         for row in self._db.managed_credentials.list_public():
             if row["id"] not in enabled:
@@ -158,7 +169,7 @@ class CredentialService(Service):
             if not enc:
                 continue
             try:
-                out[row["env_var"]] = crypto.decrypt(enc)
+                out[overrides.get(row["id"]) or row["env_var"]] = crypto.decrypt(enc)
             except InvalidToken:
                 continue
         return out

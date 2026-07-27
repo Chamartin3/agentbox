@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { repoApi, RepoResource, RepoType } from '../api/repo';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
 import ResourcePicker from '../components/resources/ResourcePicker';
+import { TypePill } from '../components/common/chips';
 
 const TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: 'all types' },
@@ -45,7 +46,7 @@ export default function RepoResourcesPage() {
         </Link>
       ),
     },
-    { key: 'type', header: 'Type', render: (r) => <span className="tag">{r.type}</span> },
+    { key: 'type', header: 'Type', render: (r) => <TypePill value={r.type} /> },
     { key: 'display_name', header: 'Name', render: (r) => r.display_name },
     {
       key: 'tags',

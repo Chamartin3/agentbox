@@ -81,15 +81,11 @@ export default function WorkspacesPage() {
     },
     {
       key: 'agents',
-      header: 'Agents',
+      header: 'Subagents',
       sortable: true,
       accessor: (w) => w.agent_count,
-      render: (w) =>
-        w.agents.length === 0 ? (
-          <span className="dim">none</span>
-        ) : (
-          <span className="dim">{w.agents.join(', ')}</span>
-        ),
+      align: 'right',
+      render: (w) => w.agent_count,
     },
     { key: 'file_count', header: 'Files', sortable: true, accessor: (w) => w.file_count, align: 'right' },
     { key: 'skill_count', header: 'Skills', sortable: true, accessor: (w) => w.skill_count, align: 'right' },

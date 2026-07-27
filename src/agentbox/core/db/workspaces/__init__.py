@@ -1,7 +1,7 @@
 """Workspaces domain — entities and managers merged.
 
 Maps to the ``workspaces``, ``workspace_env_docs``, ``workspace_env_doc_versions``,
-``workspace_env_vars``, ``workspace_mcp_overrides``, ``workspace_mcp_tool_overrides``,
+``workspace_mcp_overrides``, ``workspace_mcp_tool_overrides``,
 ``workspace_mcp_policies``, ``workspace_runtime_permissions``, and
 ``workspace_subagents`` tables.
 """
@@ -10,7 +10,6 @@ from __future__ import annotations
 # Entities
 from agentbox.core.db.workspaces.workspace import Workspace
 from agentbox.core.db.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion
-from agentbox.core.db.workspaces.env_var import WorkspaceEnvVar
 from agentbox.core.db.workspaces.mcp_override import (
     WorkspaceMcpOverride,
     WorkspaceMcpPolicy,
@@ -23,7 +22,6 @@ from agentbox.core.db.workspaces.workspace_credential import WorkspaceCredential
 # Managers
 from agentbox.core.db.workspaces.workspace import WorkspaceManager
 from agentbox.core.db.workspaces.env_doc import WorkspaceEnvDocManager, WorkspaceEnvDocVersionManager
-from agentbox.core.db.workspaces.env_var import WorkspaceEnvVarManager
 from agentbox.core.db.workspaces.mcp_override import (
     WorkspaceMcpOverrideManager,
     WorkspaceMcpToolOverrideManager,
@@ -39,7 +37,6 @@ __all__ = [
     "Workspace",
     "WorkspaceEnvDoc",
     "WorkspaceEnvDocVersion",
-    "WorkspaceEnvVar",
     "WorkspaceMcpOverride",
     "WorkspaceMcpPolicy",
     "WorkspaceMcpToolOverride",
@@ -50,7 +47,6 @@ __all__ = [
     "WorkspaceManager",
     "WorkspaceEnvDocManager",
     "WorkspaceEnvDocVersionManager",
-    "WorkspaceEnvVarManager",
     "WorkspaceMcpOverrideManager",
     "WorkspaceMcpToolOverrideManager",
     "WorkspaceMcpPolicyManager",

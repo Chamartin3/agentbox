@@ -45,7 +45,6 @@ _SATELLITE_TABLES: tuple[str, ...] = (
     "workspace_mcp_policies",
     "workspace_env_docs",
     "workspace_env_doc_versions",
-    "workspace_env_vars",
     "workspace_file_resource_bindings",
     "workspace_runtime_permissions",
 )
@@ -154,7 +153,6 @@ class WorkspaceManager(Manager[Workspace]):
         """
         # Import here to avoid circular imports with sibling modules
         from agentbox.core.db.workspaces.env_doc import WorkspaceEnvDoc, WorkspaceEnvDocVersion  # noqa: PLC0415
-        from agentbox.core.db.workspaces.env_var import WorkspaceEnvVar  # noqa: PLC0415
         from agentbox.core.db.workspaces.mcp_override import (  # noqa: PLC0415
             WorkspaceMcpOverride,
             WorkspaceMcpPolicy,
@@ -172,7 +170,6 @@ class WorkspaceManager(Manager[Workspace]):
             WorkspaceMcpPolicy.__table__,
             WorkspaceSubagent.__table__,
             WorkspaceRuntimePermission.__table__,
-            WorkspaceEnvVar.__table__,
             WorkspaceFileResourceBinding.__table__,
         ]
         with self._engine.begin() as conn:

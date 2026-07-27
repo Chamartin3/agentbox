@@ -33,6 +33,8 @@ export interface CreateCredentialBody {
 export interface WorkspaceCredentials {
   available: CredentialInventoryEntry[];
   enabled: string[];
+  // credential_id → env-var name it's exposed under in this workspace
+  overrides: Record<string, string>;
 }
 
 export const credentialsApi = {
@@ -60,9 +62,10 @@ export const credentialsApi = {
   setForWorkspace: (
     workspaceId: string,
     enabled: string[],
+    overrides: Record<string, string> = {},
   ): Promise<WorkspaceCredentials> =>
     apiRequest<WorkspaceCredentials>(
       `/api/workspaces/${encodeURIComponent(workspaceId)}/credentials`,
-      { method: 'PUT', body: JSON.stringify({ enabled }) },
+      { method: 'PUT', body: JSON.stringify({ enabled, overrides }) },
     ),
 };

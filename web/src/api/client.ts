@@ -649,14 +649,6 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ path, content }),
     }),
-  getWorkspaceEnvVars: (id: string) =>
-    req<Record<string, string>>(`/api/workspaces/${encodeURIComponent(id)}/env-vars`),
-  setWorkspaceEnvVars: (id: string, vars: Record<string, string>) =>
-    req<Record<string, string>>(`/api/workspaces/${encodeURIComponent(id)}/env-vars`, {
-      method: 'PUT',
-      body: JSON.stringify({ vars }),
-    }),
-
   // ---- agent lifecycle (DB-only creation, publish, draft, rollback) --------
 
   createAgent: (payload: AgentCreatePayload) =>
