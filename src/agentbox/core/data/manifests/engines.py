@@ -4,12 +4,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from agentbox.core.data.constants import (
-    ConfiguredValidationMode,
-    ValidationMode,
-)
-
-
 class RunnerSpec(BaseModel):
     # An agent's backend is no longer declared here. It is resolved by the one
     # runner resolver (bound profile → system-default → the module-level default backend);
@@ -61,14 +55,6 @@ class RunnerSpec(BaseModel):
     # --- Output validation & retry ---
 
     output_schema_path: str | None = None
-
-    output_validation_engine: ConfiguredValidationMode = ValidationMode.BOTH
-    """Which engine(s) to use when validating output against the schema.
-
-    ``"jsonschema"`` — jsonschema only (legacy behaviour).
-    ``"pydantic"`` — pydantic_core only (stricter type checks).
-    ``"both"`` — jsonschema first, then pydantic (default, strictest).
-    """
 
     max_validation_retries: int = 0
     max_error_retries: int = 0

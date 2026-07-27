@@ -45,9 +45,6 @@ class _ValidatorShim:
         self, output: str, agent, workdir: Path
     ) -> tuple[bool, str, str]:
         agent.__dict__["_config_json"] = {
-            "execution": {
-                "output_validation_engine": agent.runner.output_validation_engine,
-            },
             "python": {"output_schema_path": agent.runner.output_schema_path},
         }
         r = check_output(agent, workdir, output)

@@ -1,5 +1,5 @@
 import type { RunnerProfile } from '../../api/client';
-import { harnessLabel, providerLabel } from './runnerLabels';
+import { HarnessBadge, ProviderBadge, ModelBadge } from './RunnerBadges';
 import './runner.css';
 
 interface Props {
@@ -28,7 +28,7 @@ export function ProfileDisplay({ profile, fallbackKind, compact }: Props) {
       <div className="profile-display">
         <span className="profile-display-name dim">System default</span>
         <div className="profile-display-badges">
-          <span className="runner-badge runner-badge--harness" data-harness={fallbackKind ?? undefined}>{harnessLabel(fallbackKind)}</span>
+          <HarnessBadge backend={fallbackKind} />
         </div>
       </div>
     );
@@ -40,9 +40,9 @@ export function ProfileDisplay({ profile, fallbackKind, compact }: Props) {
         {profile.is_system_default && <span className="dim" style={{ marginLeft: 6, fontWeight: 400 }}>[default]</span>}
       </span>
       <div className="profile-display-badges">
-        <span className="runner-badge runner-badge--harness" data-harness={profile.backend ?? undefined}>{harnessLabel(profile.backend)}</span>
-        <span className="runner-badge runner-badge--provider" data-provider={providerLabel(profile).toLowerCase()}>{providerLabel(profile)}</span>
-        <span className="runner-badge runner-badge--model">{profile.model || 'default'}</span>
+        <HarnessBadge backend={profile.backend} />
+        <ProviderBadge backend={profile.backend} provider={profile.provider} />
+        <ModelBadge model={profile.model} />
       </div>
     </div>
   );

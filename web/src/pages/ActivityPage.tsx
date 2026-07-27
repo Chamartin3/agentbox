@@ -23,6 +23,19 @@ import RunDetailDrawer from '../components/runs/RunDetailDrawer';
 import { fmtCost, fmtMs, fmtNum } from '../util/format';
 
 const RANGES: ActivityRange[] = ['7d', '30d', '90d'];
+const RUNS_LIMITS = [25, 50, 100, 200];
+const ACTION_PAGE_SIZE = 8;
+
+type ActionSortKey = 'action_name' | 'total' | 'failures' | 'avg_duration_ms' | 'tokens';
+type ByActionRow = ActivitySummary['by_action'][number];
+
+function actionSortValue(row: ByActionRow, key: ActionSortKey): number | string {
+  switch (key) {
+    case 'action_name': return row.action_name;
+    case 'tokens': return row.total_input_tokens + row.total_output_tokens;
+    default: return row[key];
+  }
+}
 
 function fmtDateTick(iso: string): string {
   const d = new Date(iso);
@@ -45,7 +58,15 @@ export default function ActivityPage() {
   const [selected, setSelected] = useState<AgentRun | null>(null);
   const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [runs, setRuns] = useState<AgentRun[]>([]);
+  const [runsLimit, setRunsLimit] = useState(50);
   const [page, setPage] = useState(0);
+  // "By action" table controls: text filter, sort column/dir, pagination.
+  const [actionQuery, setActionQuery] = useState('');
+  const [actionSort, setActionSort] = useState<{ key: ActionSortKey; dir: 'asc' | 'desc' }>({
+    key: 'total',
+    dir: 'desc',
+  });
+  const [actionPage, setActionPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -65,7 +86,7 @@ export default function ActivityPage() {
           action: actionFilter || undefined,
           executor: executorFilter || undefined,
           state: stateFilter || undefined,
-          limit: 50,
+          limit: runsLimit,
         }),
       ]);
       setSummary(s);
@@ -82,7 +103,7 @@ export default function ActivityPage() {
     const h = setInterval(load, 8000);
     return () => clearInterval(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range, actionFilter, executorFilter, stateFilter]);
+  }, [range, actionFilter, executorFilter, stateFilter, runsLimit]);
 
   const totals = summary?.totals;
   const rawSeries = summary?.series ?? [];
@@ -122,6 +143,36 @@ export default function ActivityPage() {
   useEffect(() => { if (page > pageCount - 1) setPage(pageCount - 1); }, [pageCount, page]);
   // Filters/range trigger a reload — jump back to the first page.
   useEffect(() => { setPage(0); }, [range, actionFilter, executorFilter, stateFilter]);
+
+  const byActionView = useMemo(() => {
+    const q = actionQuery.trim().toLowerCase();
+    const filtered = q
+      ? byAction.filter((r) => r.action_name.toLowerCase().includes(q))
+      : byAction;
+    const { key, dir } = actionSort;
+    const sorted = [...filtered].sort((a, b) => {
+      const av = actionSortValue(a, key);
+      const bv = actionSortValue(b, key);
+      const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : av - (bv as number);
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [byAction, actionQuery, actionSort]);
+
+  const actionPageCount = Math.max(1, Math.ceil(byActionView.length / ACTION_PAGE_SIZE));
+  const byActionPage = byActionView.slice(
+    actionPage * ACTION_PAGE_SIZE,
+    actionPage * ACTION_PAGE_SIZE + ACTION_PAGE_SIZE,
+  );
+  useEffect(() => { if (actionPage > actionPageCount - 1) setActionPage(actionPageCount - 1); }, [actionPageCount, actionPage]);
+  useEffect(() => { setActionPage(0); }, [actionQuery, actionSort, range]);
+
+  const toggleActionSort = (key: ActionSortKey) =>
+    setActionSort((s) =>
+      s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' },
+    );
+  const sortArrow = (key: ActionSortKey) =>
+    actionSort.key === key ? (actionSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
 
   const actionOptions = useMemo(
     () => Array.from(new Set(byAction.map((b) => b.action_name))).sort(),
@@ -229,21 +280,30 @@ export default function ActivityPage() {
 
           <div className="grid-2">
             <section className="section">
-              <h2 style={{ borderBottom: 'none' }}>By action</h2>
+              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <h2 style={{ borderBottom: 'none', margin: 0 }}>By action</h2>
+                <input
+                  type="search"
+                  placeholder="filter actions…"
+                  value={actionQuery}
+                  onChange={(e) => setActionQuery(e.target.value)}
+                  style={{ maxWidth: 180 }}
+                />
+              </div>
               <table>
                 <thead>
                   <tr>
-                    <th>Action</th>
-                    <th style={{ textAlign: 'right' }}>Runs</th>
-                    <th style={{ textAlign: 'right' }}>Fail</th>
-                    <th style={{ textAlign: 'right' }}>Avg dur</th>
-                    <th style={{ textAlign: 'right' }}>Tokens</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => toggleActionSort('action_name')}>Action{sortArrow('action_name')}</th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => toggleActionSort('total')}>Runs{sortArrow('total')}</th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => toggleActionSort('failures')}>Fail{sortArrow('failures')}</th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => toggleActionSort('avg_duration_ms')}>Avg dur{sortArrow('avg_duration_ms')}</th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => toggleActionSort('tokens')}>Tokens{sortArrow('tokens')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {byAction.length === 0 ? (
-                    <tr><td colSpan={5} className="dim">no runs in range</td></tr>
-                  ) : byAction.map((row) => (
+                  {byActionView.length === 0 ? (
+                    <tr><td colSpan={5} className="dim">{actionQuery ? 'no matching actions' : 'no runs in range'}</td></tr>
+                  ) : byActionPage.map((row) => (
                     <tr
                       key={row.action_name}
                       onClick={() => navigate(`/runs?agent=${encodeURIComponent(row.action_name)}`)}
@@ -263,6 +323,15 @@ export default function ActivityPage() {
                   ))}
                 </tbody>
               </table>
+              {byActionView.length > ACTION_PAGE_SIZE && (
+                <div className="row" style={{ gap: 12, alignItems: 'center', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button disabled={actionPage === 0} onClick={() => setActionPage((p) => Math.max(0, p - 1))}>← prev</button>
+                  <span className="dim" style={{ fontSize: 12 }}>
+                    {actionPage * ACTION_PAGE_SIZE + 1}–{Math.min(byActionView.length, (actionPage + 1) * ACTION_PAGE_SIZE)} of {byActionView.length}
+                  </span>
+                  <button disabled={actionPage >= actionPageCount - 1} onClick={() => setActionPage((p) => Math.min(actionPageCount - 1, p + 1))}>next →</button>
+                </div>
+              )}
             </section>
 
             <section className="section">
@@ -302,7 +371,15 @@ export default function ActivityPage() {
           </div>
 
           <section className="section">
-            <h2 style={{ border: 'none' }}>Recent runs</h2>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <h2 style={{ border: 'none', margin: 0 }}>Recent runs</h2>
+              <label className="dim" style={{ fontSize: 12, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                show
+                <select value={runsLimit} onChange={(e) => setRunsLimit(Number(e.target.value))}>
+                  {RUNS_LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+            </div>
             <RunsTable
               items={pageRuns.map((r): RunRow => ({
                 id: r.id,

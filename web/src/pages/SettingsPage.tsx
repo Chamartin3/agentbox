@@ -1,34 +1,69 @@
-import SettingsBaseTab from './SettingsBaseTab';
-import SettingsApiTokensTab from './SettingsApiTokensTab';
+import { useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import SettingsDeploymentTab from './SettingsDeploymentTab';
+import SettingsRunnerProfilesTab from './SettingsRunnerProfilesTab';
+import { RuntimeDefaultsForm } from './SettingsBaseTab';
+import ProjectMcpEditor from '../components/settings/ProjectMcpEditor';
+import Toast from '../components/common/Toast';
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const TABS = [
+  { key: 'general', label: 'General' },
+  { key: 'runner-profiles', label: 'Runners & credentials' },
+  { key: 'deployment', label: 'Deployment info' },
+] as const;
+
+type TabKey = (typeof TABS)[number]['key'];
+
+function GeneralTab() {
+  const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
+  const showToast = (t: { kind: 'ok' | 'error'; msg: string } | null) => {
+    setToast(t);
+    if (t) setTimeout(() => setToast(null), 4000);
+  };
   return (
-    <section className="stack" style={{ gap: 12, marginTop: 24 }}>
-      <h2 style={{ margin: 0, borderBottom: '1px solid #30363d', paddingBottom: 6 }}>
-        {title}
-      </h2>
-      {children}
-    </section>
+    <div className="stack" style={{ gap: 16 }}>
+      <section className="stack" style={{ gap: 8, border: '1px solid #30363d', padding: 12, borderRadius: 6 }}>
+        <h3 style={{ margin: 0 }}>Agent defaults</h3>
+        <p className="dim" style={{ fontSize: 12, margin: 0 }}>
+          Seed values for newly created agents (timeout and retry limits).
+        </p>
+        <RuntimeDefaultsForm onToast={showToast} />
+      </section>
+      <section className="stack" style={{ gap: 8, border: '1px solid #30363d', padding: 12, borderRadius: 6 }}>
+        <h3 style={{ margin: 0 }}>Global MCPs</h3>
+        <ProjectMcpEditor onToast={showToast} />
+      </section>
+      {toast && <Toast kind={toast.kind} msg={toast.msg} />}
+    </div>
   );
 }
 
 export default function SettingsPage() {
+  const { tab } = useParams<{ tab?: string }>();
+  const navigate = useNavigate();
+  const active: TabKey = TABS.some((t) => t.key === tab) ? (tab as TabKey) : TABS[0].key;
+
   return (
     <div className="stack">
       <h1>Settings</h1>
-      <Section title="Base">
-        <SettingsBaseTab />
-      </Section>
-      {/* Secrets / .env moved to the dedicated Credentials tab (unified
-          inventory). API tokens stay here — they are inbound auth, not
-          provider credentials. */}
-      <Section title="API tokens">
-        <SettingsApiTokensTab />
-      </Section>
-      <Section title="Deployment">
-        <SettingsDeploymentTab />
-      </Section>
+      <div className="tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            className={`tab-button ${active === t.key ? 'active' : ''}`}
+            onClick={() => navigate(`/settings/${t.key}`)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="tab-content">
+        <div className="tab-pane stack" style={{ gap: 16 }}>
+          {active === 'runner-profiles' && <SettingsRunnerProfilesTab />}
+          {active === 'general' && <GeneralTab />}
+          {active === 'deployment' && <SettingsDeploymentTab />}
+        </div>
+      </div>
     </div>
   );
 }

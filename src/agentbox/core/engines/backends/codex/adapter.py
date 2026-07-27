@@ -18,6 +18,16 @@ from agentbox.core.engines.backends.base import BackendAdapter
 from agentbox.core.engines.backends.credenv import build_run_env
 from agentbox.core.data import RenderedConfig
 from agentbox.core.data.workenv import Item
+from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME, HOST_ENV_SERVER_NAME
+from agentbox.core.data.payload_types import McpStdioServerSpec
+from agentbox.core.engines.backends.codex.mcp import (
+    build_codex_intrinsic_mcp_argv,
+    mcp_flags_from_agent_meta,
+)
+from agentbox.core.tools.mcp_servers.specs import (
+    agent_tools_server_spec,
+    host_env_server_spec,
+)
 from agentbox.core.engines.backends.codex.render import build_codex_items
 from agentbox.core.engines.backends.codex.tools import NATIVE_TOOLS as _CODEX_TOOLS
 from agentbox.core.engines.backends.streaming.jsonl import stream_jsonl_subprocess
@@ -113,6 +123,8 @@ def _int_or_zero(v: object) -> int:
 class CodexBackend(BackendAdapter):
     name = _NAME
     conversation_format: ClassVar[str | None] = "codex-session"
+    supports_mcp: ClassVar[bool] = False  # codex has no native MCP support today
+    NATIVE_TOOLS = _CODEX_TOOLS  # noqa: N815 — canonical-tool → codex-name mapping
 
     def __init__(self) -> None:
         self._session_id: str | None = None
@@ -182,18 +194,69 @@ class CodexBackend(BackendAdapter):
             yield DoneEvent(run_id=run_id, ok=False, error="codex CLI not found")
             return
 
+        # Inject MCP server config flags derived from the executor-resolved
+        # external_mcp_servers stored in agent_meta.  Codex has no per-server
+        # allow-list, so we only emit the server coordinates here; canonical-
+        # tool scoping is handled by --allowedTools (set during render).
+        mcp_flags = mcp_flags_from_agent_meta(rendered.agent_meta)
+
+        # Re-resolve intrinsic MCP servers (host_env, agent_tools) from the
+        # raw grant inputs stored in agent_meta by the executor, matching the
+        # token backend's Option-B re-resolution pattern.  The server specs are
+        # converted to -c TOML flags, and their env vars are merged into the
+        # codex subprocess environment so that the spawned server processes
+        # inherit the grant context.
+        intrinsic_env: dict[str, str] = {}
+        intrinsic_specs: dict[str, McpStdioServerSpec] = {}
+        _host_env_grants = rendered.agent_meta.get("host_env_grants")
+        if _host_env_grants:
+            _he_spec = host_env_server_spec(
+                grants=_host_env_grants,
+                workspace_id=rendered.agent_meta.get("host_env_workspace_id") or "",
+                workdir=Path(rendered.agent_meta.get("host_env_workdir") or "."),
+                db_path=Path(
+                    rendered.agent_meta.get("host_env_db_path") or "/data/agentbox.sqlite"
+                ),
+            )
+            intrinsic_specs[HOST_ENV_SERVER_NAME] = _he_spec
+            intrinsic_env.update({k: v for k, v in _he_spec["env"].items() if isinstance(v, str)})
+
+        _agent_tool_grants_raw = rendered.agent_meta.get("agent_tool_grants")
+        _agent_id = rendered.agent_meta.get("agent_id")
+        if _agent_tool_grants_raw and _agent_id:
+            _at_grants: set[str] = set(_agent_tool_grants_raw)
+            _at_spec = agent_tools_server_spec(
+                grants=_at_grants,
+                agent_id=_agent_id,
+                workdir=Path(rendered.agent_meta.get("host_env_workdir") or "."),
+                db_path=Path(
+                    rendered.agent_meta.get("host_env_db_path") or "/data/agentbox.sqlite"
+                ),
+            )
+            intrinsic_specs[AGENT_TOOLS_SERVER_NAME] = _at_spec
+            intrinsic_env.update({k: v for k, v in _at_spec["env"].items() if isinstance(v, str)})
+
+        if intrinsic_specs:
+            mcp_flags += build_codex_intrinsic_mcp_argv(intrinsic_specs)
+
+        argv = list(rendered.argv) + mcp_flags
+
         yield LogEvent(
             run_id=run_id,
-            message=f"$ {' '.join(rendered.argv)} (cwd={rendered.cwd})",
+            message=f"$ {' '.join(argv)} (cwd={rendered.cwd})",
         )
 
         timeout = rendered.agent_meta.get("timeout_seconds")
 
+        # Merge intrinsic server env vars into the subprocess environment so
+        # that codex can pass them to the MCP server subprocesses it spawns.
+        subprocess_env = {**dict(rendered.env), **intrinsic_env}
+
         async for ev, sid in stream_jsonl_subprocess(
             run_id=run_id,
-            argv=list(rendered.argv),
+            argv=argv,
             cwd=rendered.cwd,
-            env=dict(rendered.env),
+            env=subprocess_env,
             timeout=timeout,
             parse_event=parse_codex_event,
             stdin_data=input.encode("utf-8"),

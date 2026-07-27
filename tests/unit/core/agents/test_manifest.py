@@ -20,12 +20,10 @@ class TestRunnerSpec:
             timeout_seconds=120,
             max_error_retries=2,
             max_validation_retries=3,
-            output_validation_engine="jsonschema",
         )
         assert spec.timeout_seconds == 120
         assert spec.max_error_retries == 2
         assert spec.max_validation_retries == 3
-        assert spec.output_validation_engine == "jsonschema"
 
 
 class TestAgentDef:

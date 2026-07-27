@@ -35,7 +35,7 @@ _AGENT_HAS_OUTPUT_RETRIES = (
 from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from agentbox.core.data.payload_types import GrantConfig, JsonSchemaDict, ModelParams, RefSection
+from agentbox.core.data.payload_types import ExternalMcpServer, GrantConfig, JsonSchemaDict, ModelParams, RefSection
 from agentbox.core.data.constants import LogLevel, MessageRole, RunStatus
 from agentbox.core.data.events import (
     DoneEvent,
@@ -50,6 +50,7 @@ from agentbox.core.engines.schema import json_schema_to_pydantic_model
 from agentbox.core.engines.backends.token.schema import _json_schema_to_pydantic_model
 from agentbox.core.engines.backends.token.tools import (
     build_host_env_toolsets,
+    build_external_mcp_toolsets,
     build_host_env_tools,
 )
 from agentbox.core.engines.backends.token.stream import (
@@ -105,6 +106,9 @@ async def run_direct_agent_mode(
     workdir: str | None = None,
     db_path: str | None = None,
     model_params: ModelParams | None = None,
+    external_mcp_servers: list[ExternalMcpServer] | None = None,
+    external_mcp_allowed_tools: set[str] | None = None,
+    extra_env: dict[str, str] | None = None,
 ) -> AsyncIterator[RunEvent]:
     """Drive a directly-constructed ``pydantic_ai.Agent`` to completion."""
     # Build result_type from output schema when present. The strict
@@ -249,14 +253,22 @@ async def run_direct_agent_mode(
     # backend uses (full grant-enforced capability surface, single source). If
     # that's unavailable, fall back to the in-process fs.read/fs.list tools.
     mcp_toolsets = build_host_env_toolsets(
-        host_env_grants, workspace_id, workdir, db_path
+        host_env_grants, workspace_id, workdir, db_path,
+        extra_env=extra_env,
     )
-    if mcp_toolsets:
-        common_kwargs["toolsets"] = mcp_toolsets
+    # External (project/workspace-attached) MCP servers — the parity fix so the
+    # direct path can invoke e.g. mcp-server-time, not just host-env tools.
+    external_toolsets = build_external_mcp_toolsets(
+        external_mcp_servers, external_mcp_allowed_tools,
+        extra_env=extra_env,
+    )
+    all_toolsets = mcp_toolsets + external_toolsets
+    if all_toolsets:
+        common_kwargs["toolsets"] = all_toolsets
         yield LogEvent(
             run_id=run_id,
-            message=f"token backend: wired host-env MCP toolset "
-            f"({len(mcp_toolsets)} server(s))",
+            message=f"token backend: wired {len(mcp_toolsets)} host-env + "
+            f"{len(external_toolsets)} external MCP toolset(s)",
         )
     else:
         host_env_tools = build_host_env_tools(host_env_grants, agent_tool_grants)

@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
+import { NameCell } from '../components/common/chips';
+
+// Convention: the workspace literally named "default" is the protected
+// baseline env — not deletable, styled distinctly. No schema flag needed.
+const DEFAULT_WORKSPACE = 'default';
 
 interface WorkspaceItem {
   name: string;
@@ -56,22 +60,32 @@ export default function WorkspacesPage() {
       sortable: true,
       accessor: (w) => w.name,
       render: (w) => (
-        <Link to={`/workspaces/${w.name}`}>
-          <strong>{w.name}</strong>
-        </Link>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <NameCell
+              to={`/workspaces/${w.name}`}
+              title={w.name}
+              sub={w.path}
+            />
+            {w.name === DEFAULT_WORKSPACE && (
+              <span
+                className="pill"
+                style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11, marginTop: 2 }}
+              >
+                default
+              </span>
+            )}
+          </span>
+        </div>
       ),
     },
     {
       key: 'agents',
-      header: 'Agents',
+      header: 'Subagents',
       sortable: true,
       accessor: (w) => w.agent_count,
-      render: (w) =>
-        w.agents.length === 0 ? (
-          <span className="dim">none</span>
-        ) : (
-          <span className="dim">{w.agents.join(', ')}</span>
-        ),
+      align: 'right',
+      render: (w) => w.agent_count,
     },
     { key: 'file_count', header: 'Files', sortable: true, accessor: (w) => w.file_count, align: 'right' },
     { key: 'skill_count', header: 'Skills', sortable: true, accessor: (w) => w.skill_count, align: 'right' },
@@ -83,28 +97,15 @@ export default function WorkspacesPage() {
       align: 'right',
     },
     {
-      key: 'exists',
-      header: 'Status',
-      sortable: true,
-      accessor: (w) => (w.exists ? 'ready' : 'missing'),
-      render: (w) =>
-        w.exists ? (
-          <span className="pill" style={{ background: '#d1fae5', color: '#065f46' }}>ready</span>
-        ) : (
-          <span className="pill" style={{ background: '#fee2e2', color: '#991b1b' }}>missing</span>
-        ),
-    },
-    {
-      key: 'open',
+      key: 'actions',
       header: '',
-      render: (w) => (
-        <span style={{ whiteSpace: 'nowrap' }}>
-          <Link to={`/workspaces/${w.name}`}>open →</Link>
+      render: (w) =>
+        // The default workspace is protected — no delete affordance.
+        w.name === DEFAULT_WORKSPACE ? null : (
           <button
             type="button"
             onClick={() => handleDelete(w.name)}
             style={{
-              marginLeft: 12,
               padding: '2px 8px',
               fontSize: 12,
               background: 'transparent',
@@ -116,8 +117,7 @@ export default function WorkspacesPage() {
           >
             delete
           </button>
-        </span>
-      ),
+        ),
     },
   ];
 

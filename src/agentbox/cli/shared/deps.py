@@ -45,6 +45,7 @@ from agentbox.core.service import (  # noqa: E402
     SystemService,
 )
 from agentbox.core.service.resources import ResourceService  # noqa: E402
+from agentbox.core.service.materialization_io import MaterializationService  # noqa: E402
 
 
 @lru_cache(maxsize=1)
@@ -86,3 +87,9 @@ def get_workspace_service() -> WorkspaceService:
 def get_diagnostics_service() -> DiagnosticsService:
     """Diagnostics service — uncached, self-wiring."""
     return DiagnosticsService()
+
+
+@lru_cache(maxsize=1)
+def get_materialization_service() -> MaterializationService:
+    """Materialization service — cached, self-wiring."""
+    return MaterializationService()

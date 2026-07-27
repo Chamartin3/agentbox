@@ -418,10 +418,15 @@ export default function AgentDetailPage() {
           <div className="tab-pane stack">
             <AgentConfigEditor
               agent={agent}
-              onSaved={(updated) => {
+              onSaved={(updated, prunedTools) => {
                 setAgent(updated);
                 loadAgent();
-                flash('ok', 'agent updated');
+                flash(
+                  'ok',
+                  prunedTools && prunedTools.length
+                    ? `agent updated · removed ${prunedTools.length} tool${prunedTools.length === 1 ? '' : 's'} not in this workspace`
+                    : 'agent updated',
+                );
               }}
               onError={(msg) => flash('error', msg)}
             />

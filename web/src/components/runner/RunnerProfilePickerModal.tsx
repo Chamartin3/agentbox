@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type RunnerBackend, type RunnerProfile, type RunnerProvider } from '../../api/client';
-import { apiTokens as apiTokensClient } from '../../api/api_tokens';
 import RunnerProfileModal from './RunnerProfileModal';
 import { harnessLabel, providerLabel } from './runnerLabels';
 import './runner.css';
@@ -22,7 +21,6 @@ export default function RunnerProfilePickerModal({ boundId, onPick, onCreated, o
   const [profiles, setProfiles] = useState<RunnerProfile[]>([]);
   const [providers, setProviders] = useState<RunnerProvider[]>([]);
   const [backends, setBackends] = useState<RunnerBackend[]>([]);
-  const [apiTokens, setApiTokens] = useState<Array<{ id: string; name: string; environment: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [query, setQuery] = useState('');
@@ -30,17 +28,15 @@ export default function RunnerProfilePickerModal({ boundId, onPick, onCreated, o
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [list, provs, bes, toks] = await Promise.all([
+      const [list, provs, bes] = await Promise.all([
         api.listRunnerProfiles(),
         api.listRunnerProviders().catch(() => []),
         api.listRunnerBackends().catch(() => []),
-        apiTokensClient.listSafe().catch(() => []),
       ]);
       if (cancelled) return;
       setProfiles(list);
       setProviders(provs);
       setBackends(bes);
-      setApiTokens(toks);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -131,7 +127,6 @@ export default function RunnerProfilePickerModal({ boundId, onPick, onCreated, o
           mode="create"
           backends={backends}
           providers={providers}
-          apiTokens={apiTokens}
           onClose={() => setShowCreate(false)}
           onSaved={(p) => { setShowCreate(false); onCreated(p); }}
           onError={() => { /* surfaced inside the create modal */ }}

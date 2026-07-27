@@ -174,11 +174,10 @@ class OpenCodeCLIAdapter:
         label: str | None = None,
     ) -> None:
         # ``cli_prefix`` is what we pass to ``opencode models <prefix>`` and
-        # what every returned model id is prefixed with on disk. The
-        # registry id (``descriptor_id``) may differ when a bare prefix
-        # would collide with a first-class HTTP provider — e.g. catalog
-        # prefix ``openai`` is registered as ``opencode-openai`` so it
-        # doesn't shadow the token-backend OpenAI adapter.
+        # what every returned model id is prefixed with on disk. A CLI adapter
+        # is only registered for a prefix that no first-class adapter already
+        # owns; when one does (e.g. ``deepseek``), the registry instead marks
+        # that provider opencode-compatible rather than cloning it here.
         self.cli_prefix = cli_prefix
         self.provider_id = descriptor_id or cli_prefix
         self.label = label or f"OpenCode · {cli_prefix}"
@@ -192,6 +191,7 @@ class OpenCodeCLIAdapter:
             requires_api_key=False,
             supports_base_url=False,
             supports_model_listing=True,
+            discovered=True,
         )
 
     async def list_models(self, config: Any) -> list[ProviderModel]:

@@ -79,9 +79,13 @@ from agentbox.core.data._util import now_iso
 from agentbox.core.data.constants import SessionMode
 from agentbox.core.data.constants import ValidatorKind
 from agentbox.core.data.payload_types import (
+    AgentDetailResult,
+    EnrichedAgentRow,
     HttpValidatorView,
     ScriptValidatorView,
     ValidationView,
+    VersionConfig,
+    VersionFileEntry,
 )
 from agentbox.core.data.payload_types import PromptVersionDetail, PromptVersionListResult, PromptVersionSummary
 from agentbox.core.data.payload_types import ToolInfo
@@ -98,6 +102,7 @@ from agentbox.core.db import (
 from agentbox.core.db import (
     AgentSyncManager,
     RunnerProfileManager,
+    WorkspaceManager,
 )
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,
@@ -108,12 +113,13 @@ from agentbox.core.db import (
 )
 from agentbox.core.db.agents.agent import AgentRunnerProfile as _AgentRunnerProfile
 from agentbox.core.db.runs.run import Run as _Run
-from agentbox.core.service.agent_formats import AgentFileFormat, dump_agent, parse_agent
 from agentbox.core.service.base import Service
 from agentbox.core.service.engines import EngineService
 from agentbox.core.tools import SharedToolRegistry, ToolSpec
 from agentbox.core.workspaces import workdir as ws
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from collections.abc import Callable
 from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
@@ -200,13 +206,21 @@ def _enrich_agent(
     run_counts: dict[str, int],
     last_run_at: dict[str, str],
     profile_bindings: dict[str, str],
-) -> dict:
+    existing_workspaces: set[str],
+) -> EnrichedAgentRow:
     try:
         # None WorkspaceLookupStore — ws.resolve_path falls back to the
         # settings-based path when no workspace row lookup is available.
         workspace_str = str(ws.resolve_path(agent, settings, None)[0])
     except Exception:
         workspace_str = ""
+    # A named workspace ref must resolve to a real workspaces row. Null/empty
+    # (dedicated per-agent) and "<ephemeral>" are always valid. Anything else
+    # that isn't in the registry is an orphan (e.g. deleted workspace).
+    ws_name = agent.workspace
+    workspace_exists = (
+        not ws_name or ws_name == "<ephemeral>" or ws_name in existing_workspaces
+    )
     active = agent_versions.get_active(agent.id)
     latest = agent_versions.get_latest(agent.id)
     dumped = agent.model_dump()
@@ -220,6 +234,7 @@ def _enrich_agent(
     data = {
         **dumped,
         "resolved_workspace": workspace_str,
+        "workspace_exists": workspace_exists,
         "run_count": run_counts.get(agent.id, 0),
         "last_run_at": last_run_at.get(agent.id),
         "runner_profile_id": profile_id,
@@ -235,7 +250,7 @@ def _enrich_agent(
     )
     meta = agent_meta.get_meta(agent.id) or {}
     data["disabled_at"] = meta.get("disabled_at")
-    return data
+    return cast(EnrichedAgentRow, data)
 
 
 def list_agents_enriched(
@@ -245,8 +260,9 @@ def list_agents_enriched(
     engine: Engine,
     settings: Settings,
     include_disabled: bool = False,
-) -> list[dict]:
+) -> list[EnrichedAgentRow]:
     run_counts, last_run_at, profile_bindings = _aggregate_run_metadata(engine)
+    existing_workspaces = {w["name"] for w in WorkspaceManager(engine).list_all()}
     return [
         _enrich_agent(
             agent,
@@ -256,6 +272,7 @@ def list_agents_enriched(
             run_counts=run_counts,
             last_run_at=last_run_at,
             profile_bindings=profile_bindings,
+            existing_workspaces=existing_workspaces,
         )
         for agent in list_all_agents(
             agent_versions=agent_versions,
@@ -279,7 +296,7 @@ def get_agent_detail(
     agent_version_files: AgentVersionFileManager,
     agent_prompt_resource_bindings: AgentPromptResourceBindingManager,
     settings: Settings,
-) -> dict | None:
+) -> AgentDetailResult | None:
     agent = agent_defs.get(agent_id)
     if agent is None:
         return None
@@ -685,21 +702,21 @@ def rollback(
 _FORBIDDEN_PATCH_KEYS = {"id"}
 
 
-def decode_config_json(raw: Any) -> dict:
+def decode_config_json(raw: Any) -> VersionConfig:
     if raw is None:
-        return {}
+        return cast(VersionConfig, {})
     if isinstance(raw, dict):
-        return raw
+        return cast(VersionConfig, raw)
     if isinstance(raw, str):
         try:
             parsed = _json.loads(raw)
         except (ValueError, TypeError):
-            return {}
-        return parsed if isinstance(parsed, dict) else {}
-    return {}
+            return cast(VersionConfig, {})
+        return cast(VersionConfig, parsed) if isinstance(parsed, dict) else cast(VersionConfig, {})
+    return cast(VersionConfig, {})
 
 
-def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
+def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> VersionConfig:
     out = dict(agent_dump)
     for k, v in patch.items():
         if k in _FORBIDDEN_PATCH_KEYS:
@@ -714,7 +731,7 @@ def _apply_patch_to_agent(agent_dump: dict, patch: dict) -> dict:
             out["composition"] = base
         else:
             out[k] = v
-    return out
+    return cast(VersionConfig, out)
 
 
 def _validate_runner_against_registry(
@@ -849,7 +866,7 @@ def patch_agent_config(
     return updated
 
 
-def normalize_validator_entries(direction: str, entries: list[dict]) -> list[dict]:
+def normalize_validator_entries(direction: str, entries: list[dict]) -> list[HttpValidatorView | ScriptValidatorView]:
     out: list[dict] = []
     for i, entry in enumerate(entries):
         if not isinstance(entry, dict):
@@ -920,10 +937,10 @@ def normalize_validator_entries(direction: str, entries: list[dict]) -> list[dic
             if pinned:
                 row["pinned_version_id"] = pinned
             out.append(row)
-    return out
+    return cast(list[HttpValidatorView | ScriptValidatorView], out)
 
 
-def _validators_view(cfg: dict, direction: str) -> ValidationView | None:
+def _validators_view(cfg: VersionConfig, direction: str) -> ValidationView | None:
     section = cfg.get(direction)
     if not isinstance(section, dict):
         return None
@@ -981,7 +998,7 @@ def put_agent_validation(
     if current is None:
         raise AgentServiceError(404, "unknown_agent", agent_id)
 
-    explicit: dict[str, list[dict]] = {}
+    explicit: dict[str, object] = {}
     if input_validators is not None:
         explicit["input"] = normalize_validator_entries("input", input_validators)
     if output_validators is not None:
@@ -1235,7 +1252,7 @@ def _config_hash(config_json: dict) -> str:
     ).hexdigest()
 
 
-def _ensure_composition_in_config(config_json: dict) -> dict:
+def _ensure_composition_in_config(config_json: dict) -> VersionConfig:
     """Return config_json with a default composition block if absent.
 
     All creation paths must call this so every stored version has a
@@ -1245,26 +1262,29 @@ def _ensure_composition_in_config(config_json: dict) -> dict:
     the path fields.
     """
     if "composition" in config_json:
-        return config_json
-    return {
-        **config_json,
-        "composition": {
-            "system": "prompts/system.md",
-            "references": [],
-            "user_template": None,
-            "input_schema": None,
-            "output_schema": None,
-            "transport": "system_message",
-            "output_validation": "strict",
+        return cast(VersionConfig, config_json)
+    return cast(
+        VersionConfig,
+        {
+            **config_json,
+            "composition": {
+                "system": "prompts/system.md",
+                "references": [],
+                "user_template": None,
+                "input_schema": None,
+                "output_schema": None,
+                "transport": "system_message",
+                "output_validation": "strict",
+            },
         },
-    }
+    )
 
 
 def _hash_content(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-def _prepare_files(files: list[dict]) -> list[dict]:
+def _prepare_files(files: list[dict]) -> list[VersionFileEntry]:
     """Validate + normalize file rows (dedupe, kind check, sha256, position)."""
     prepared: list[dict] = []
     seen: set[str] = set()
@@ -1294,7 +1314,7 @@ def _prepare_files(files: list[dict]) -> list[dict]:
                 "position": int(f.get("position", i)),
             }
         )
-    return prepared
+    return cast(list[VersionFileEntry], prepared)
 
 
 def _text_diff(a: str, b: str) -> str:
@@ -1332,6 +1352,7 @@ class AgentService(Service):
 
     def __init__(self) -> None:
         super().__init__()
+        self._agents = self._db.agents
         self._meta = self._db.agent_meta
         self._versions = self._db.agent_versions
         self._active = self._db.active_agent_versions
@@ -1511,6 +1532,10 @@ class AgentService(Service):
         Manager a shared-transaction API if that window ever matters.
         """
         now = now_iso()
+        # Ensure the canonical ``agents`` identity row exists — it's the FK
+        # parent for tool/host-env grants (enforced now). Idempotent.
+        if self._agents.get(agent_id) is None:
+            self._agents.create(id=agent_id, name=agent_id, created_at=now)
         if self._meta.get_meta(agent_id) is not None:
             values: _AgentMetaPatchFields = {
                 "sync_mode": sync_mode,
@@ -1551,7 +1576,7 @@ class AgentService(Service):
         if self._versions.exists_for_agent(agent_id):
             raise ValueError(f"Agent {agent_id!r} already exists")
         # Always ensure a composition block so build_prompt's Stage-1 guard passes.
-        config_json = _ensure_composition_in_config(config_json)
+        config_json = cast(dict, _ensure_composition_in_config(config_json))
         vid = self._versions.insert_version(
             agent_id=agent_id,
             version=1,
@@ -1598,7 +1623,7 @@ class AgentService(Service):
         latest = self._versions.get_latest(agent_id)
         next_version = (latest.get("version") or 0) + 1 if latest else 1
         # Always ensure a composition block so build_prompt's Stage-1 guard passes.
-        config_json = _ensure_composition_in_config(config_json)
+        config_json = cast(dict, _ensure_composition_in_config(config_json))
         vid = self._versions.insert_version(
             agent_id=agent_id,
             version=next_version,
@@ -1771,7 +1796,7 @@ class AgentService(Service):
             raise ValueError(f"Agent {agent_id!r} has no active version")
 
         # Decode the current config_json
-        cfg = _decode_config_json_free((active_row or {}).get("config_json"))
+        cfg = cast(dict, _decode_config_json_free((active_row or {}).get("config_json")))
 
         # Ensure runtime section exists
         cfg.setdefault("runtime", {})
@@ -1840,7 +1865,7 @@ class AgentService(Service):
             raise ValueError(f"Agent {agent_id!r} has no active version")
 
         # Decode the current config_json
-        cfg = _decode_config_json_free((active_row or {}).get("config_json"))
+        cfg = cast(dict, _decode_config_json_free((active_row or {}).get("config_json")))
 
         # Get current forbidden_tools list
         current_forbidden = set(cfg.get("runtime", {}).get("forbidden_tools", []))
@@ -1903,14 +1928,20 @@ class AgentService(Service):
         # Resolve workspace availability catalog
         workspace_catalog: list[ToolInfo] = []
         if workspace_id:
+            # Hydrate the MCP registry from the on-disk cache so that
+            # discovered tools are included in the availability surface
+            # without requiring a live server connection or manual refresh.
+            mcp_registry = McpRegistry(load_settings().mcp_cache_dir)
+            mcp_registry.hydrate_from_cache()
             callables = resolve_workspace_callables(
                 workspace_id,
                 self._db.workspace_file_resource_bindings,
                 self._db.workspace_mcp_policies,
                 self._db.workspace_mcp_overrides,
                 self._db.workspace_mcp_tool_overrides,
-                mcp_registry=None,
+                mcp_registry=mcp_registry,
                 declared_tools=declared_tools,
+                project_server_names=[s.name for s in self._db.settings.get_project_mcp_servers()],
             )
 
             workspace_catalog = [
@@ -2163,7 +2194,7 @@ class AgentService(Service):
         source: str = "manifest",
     ) -> AgentVersionRow:
         """Insert a fully-specified version (+ its files) atomically."""
-        prepared = _prepare_files(files) if files else []
+        prepared = cast(list[dict], _prepare_files(files)) if files else []
         vid = self._versions.insert_version(
             files=prepared or None,
             agent_id=agent_id,
@@ -2220,10 +2251,10 @@ class AgentService(Service):
     def insert_version_files(self, version_id: int, files: list[dict]) -> None:
         prepared = _prepare_files(files)
         if prepared:
-            self._files.insert_files(version_id, prepared)
+            self._files.insert_files(version_id, cast(list[dict], prepared))
 
     def replace_version_files(self, version_id: int, files: list[dict]) -> None:
-        self._files.replace_files(version_id, _prepare_files(files) if files else [])
+        self._files.replace_files(version_id, cast(list[dict], _prepare_files(files)) if files else [])
 
     def delete_version_files(self, version_id: int) -> None:
         self._files.delete_for_version(version_id)
@@ -2468,54 +2499,6 @@ class AgentService(Service):
             cur = nxt
         cur[parts[-1]] = value
 
-    @staticmethod
-    def export_agent(
-        agent: AgentDef,
-        base: Path,
-        fmt: AgentFileFormat = AgentFileFormat.claude_code,
-    ) -> list[Path]:
-        """Write ``agent`` into ``base`` in ``fmt`` (claude_code/opencode/agentbox).
-
-        Returns the paths written, in order, so callers own the reporting.
-        """
-        base.mkdir(parents=True, exist_ok=True)
-        written: list[Path] = []
-        for name, content in dump_agent(agent, fmt):
-            path = base / name
-            path.write_text(content, encoding="utf-8")
-            written.append(path)
-        return written
-
-    def import_agent(
-        self,
-        text: str,
-        fmt: AgentFileFormat = AgentFileFormat.claude_code,
-        *,
-        agent_id: str | None = None,
-        author: str = "cli",
-        changelog: str = "imported",
-    ) -> AgentVersionRow:
-        """Parse an agent file (``fmt``) and create it as a new DB agent.
-
-        ``agent_id`` seeds the id for formats that carry none (opencode) —
-        pass the filename stem. Raises ``ValueError`` if the agent exists.
-        """
-        agent = parse_agent(text, fmt, agent_id=agent_id)
-        # Always ensure a composition block is present.
-        agent = inline_to_composition(agent)
-        config_json = {
-            **agent.model_dump(mode="json", exclude_none=True),
-            **build_config_json_payload(agent),
-        }
-        return self.create_agent(
-            agent_id=agent.id,
-            config_json=config_json,
-            prompt_content=agent.prompt or None,
-            author=author,
-            changelog=changelog,
-            source="cli",
-        )
-
     def require_agent_exists(self, agent_id: str) -> None:
         """Raise ``AgentNotFound`` when the agent has no usable version."""
         if self.get_agent_def(agent_id) is not None:
@@ -2575,6 +2558,7 @@ class AgentService(Service):
             source_path=None,
             source_format=None,
         )
+        self._assert_workspace_exists(agent_def.workspace)
         # Always emit a composition block so Stage-1 of build_prompt is always taken.
         agent_def = inline_to_composition(agent_def)
         config_payload = {
@@ -2695,13 +2679,70 @@ class AgentService(Service):
 
     # ── config patch + validation ──────────────────────────────────────
     @staticmethod
-    def decode_config_json(raw: Any) -> dict:
+    def decode_config_json(raw: Any) -> VersionConfig:
         """Best-effort decode of a stored ``config_json`` blob to a dict."""
         return _decode_config_json_free(raw)
 
-    def patch_agent_config(self, agent_id: str, patch: dict) -> AgentDef:
+    def _assert_workspace_exists(self, workspace: str | None) -> None:
+        """Reject a named workspace ref that has no ``workspaces`` row.
+
+        Null/empty (dedicated per-agent workspace) and ``"<ephemeral>"`` are
+        always allowed; any other name must exist in the registry so agents
+        can never point at a phantom workspace (which would silently load no
+        MCP tools at runtime).
+        """
+        if not workspace or workspace == "<ephemeral>":
+            return
+        if self._db.workspaces.get_by_name(workspace) is None:
+            raise AgentServiceError(
+                400, "unknown_workspace", f"workspace {workspace!r} does not exist"
+            )
+
+    def _prune_grants_to_workspace(
+        self,
+        agent_id: str,
+        workspace: str | None,
+        catalog_resolver: Callable[[str | None], set[str]] | None,
+    ) -> list[str]:
+        """Revoke active grants whose tool isn't in *workspace*'s catalog.
+
+        A null workspace is the dedicated per-agent workspace: the resolver
+        returns the global agent-tools catalog for it, so MCP / host-env /
+        resource grants (absent there) are pruned just like any other
+        workspace change. Only ``"<ephemeral>"`` is exempt (its run allows the
+        full set). Soft-revoke (keeps audit history). Returns pruned names.
+
+        ``catalog_resolver`` is injected by the caller (API layer) to avoid
+        an upward import edge ``service.agents -> service.workspaces``.  When
+        ``None``, prune is a no-op (same semantics as the ephemeral guard).
+        """
+        if workspace == "<ephemeral>":
+            return []
+        if catalog_resolver is None:
+            return []
+        catalog = catalog_resolver(workspace)
+        pruned: list[str] = []
+        for tool in sorted(self.active_grants(agent_id)):
+            if tool not in catalog:
+                self.revoke_tool(
+                    agent_id,
+                    tool,
+                    f"pruned: not available in workspace {workspace!r}",
+                    actor="api:patch",
+                )
+                pruned.append(tool)
+        return pruned
+
+    def patch_agent_config(
+        self,
+        agent_id: str,
+        patch: dict,
+        catalog_resolver: Callable[[str | None], set[str]] | None = None,
+    ) -> tuple[AgentDef, list[str]]:
         """Merge ``patch`` onto the active def, mint + activate a new version.
 
+        Returns the updated def plus any tool grants pruned because the agent's
+        workspace changed to one whose catalog no longer backs them.
         Raises ``AgentServiceError`` (HTTP-shaped) on any failure.
         """
         if not patch:
@@ -2710,12 +2751,14 @@ class AgentService(Service):
         current = self.resolve_agent(agent_id)
         if current is None:
             raise AgentServiceError(404, "unknown_agent", agent_id)
+        prior_workspace = current.workspace
 
         merged = _apply_patch_to_agent(current.model_dump(mode="python"), patch)
         try:
             updated = AgentDef.model_validate(merged)
         except Exception as exc:
             raise AgentServiceError(400, "validation_failed", str(exc)) from exc
+        self._assert_workspace_exists(updated.workspace)
         _validate_runner_against_registry(updated, self._db.runner_profiles)
         updated.source_path = current.source_path
         updated.source_format = current.source_format
@@ -2774,11 +2817,15 @@ class AgentService(Service):
             proxy_path=str(updated.source_path) if updated.source_path else None,
         )
 
-        return updated
+        pruned: list[str] = []
+        if updated.workspace != prior_workspace:
+            pruned = self._prune_grants_to_workspace(agent_id, updated.workspace, catalog_resolver)
+
+        return updated, pruned
 
     def normalize_validator_entries(
         self, direction: str, entries: list[dict]
-    ) -> list[dict]:
+    ) -> list[HttpValidatorView | ScriptValidatorView]:
         """Validate + canonicalize inline validator entries for a direction."""
         return _normalize_validator_entries_free(direction, entries)
 
@@ -2814,7 +2861,7 @@ class AgentService(Service):
         if current is None:
             raise AgentServiceError(404, "unknown_agent", agent_id)
 
-        explicit: dict[str, list[dict]] = {}
+        explicit: dict[str, object] = {}
         if input_validators is not None:
             explicit["input"] = self.normalize_validator_entries(
                 "input", input_validators
@@ -2880,7 +2927,7 @@ class AgentService(Service):
     # ── enriched read views (cross-domain) ─────────────────────────────
     def list_agents_enriched(
         self, include_disabled: bool = False, *, settings: Any = None
-    ) -> list[dict]:
+    ) -> list[EnrichedAgentRow]:
         """Latest-version snapshot per agent enriched with run/profile/workspace."""
         return _list_agents_enriched_free(
             agent_versions=self._versions,
@@ -2890,7 +2937,7 @@ class AgentService(Service):
             include_disabled=include_disabled,
         )
 
-    def get_agent_detail(self, agent_id: str, *, settings: Any = None) -> dict | None:
+    def get_agent_detail(self, agent_id: str, *, settings: Any = None) -> AgentDetailResult | None:
         """Full agent detail (prompt, composition preview, versions, workspace)."""
         return _get_agent_detail_free(
             agent_id,

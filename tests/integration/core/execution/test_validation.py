@@ -9,7 +9,6 @@ from agentbox.core.agents.validation import (
     ValidationResult,
     check_output,
     validate_jsonschema,
-    validate_pydantic,
 )
 from agentbox.core.data._util import extract_json
 from agentbox.core.data.composition import ComposedPrompt
@@ -20,12 +19,10 @@ class _FakeAgent:
     def __init__(
         self,
         output_schema_path: str | None = None,
-        engine: str = "jsonschema",
     ) -> None:
         self.composition = None
         # config_json is the sole source of truth — mirror runner fields here.
         self.__dict__["_config_json"] = {
-            "execution": {"output_validation_engine": engine},
             "python": {"output_schema_path": output_schema_path},
         }
 
@@ -88,7 +85,7 @@ def test_validate_output_empty_when_schema_required(tmp_path: Path) -> None:
 
 def test_validate_output_uses_composed_schema(tmp_path: Path) -> None:
     """Composed schema beats reading from disk — works for DB-only agents."""
-    agent = _FakeAgent(engine="jsonschema")
+    agent = _FakeAgent()
     composed = ComposedPrompt(composed_schema=_SCHEMA)
     result = check_output(agent, tmp_path, '{"name": "x"}', composed=composed)
     assert result.ok
@@ -99,7 +96,7 @@ def test_validate_output_falls_back_to_disk_schema(tmp_path: Path) -> None:
     """When composed schema isn't set, load from runner.output_schema_path."""
     schema_file = tmp_path / "schema.json"
     schema_file.write_text(json.dumps(_SCHEMA))
-    agent = _FakeAgent(output_schema_path="schema.json", engine="jsonschema")
+    agent = _FakeAgent(output_schema_path="schema.json")
     result = check_output(agent, tmp_path, '{"name": "x"}')
     assert result.ok
 
@@ -112,18 +109,3 @@ def test_validate_output_missing_schema_file(tmp_path: Path) -> None:
     assert "not found" in result.error
 
 
-def test_validate_output_both_engines(tmp_path: Path) -> None:
-    """``both`` runs jsonschema first then pydantic — failure attribution
-    matters for the retry prompt."""
-    agent = _FakeAgent(engine="both")
-    composed = ComposedPrompt(composed_schema=_SCHEMA)
-    result = check_output(agent, tmp_path, '{"name": "x"}', composed=composed)
-    assert result.ok
-    assert result.engine == "both"
-
-
-def test_validate_pydantic_smoke() -> None:
-    """Pydantic validation runs via the shared helper. Single smoke test —
-    deep coverage lives in ``test_pydantic_validate``."""
-    result = validate_pydantic('{"name": "x"}', _SCHEMA)
-    assert result.engine == "pydantic"

@@ -9,8 +9,8 @@ Two families of renderers, both turning something into prompt text:
 
 2. **Output-contract fragments** (``render`` / ``append`` /
    ``append_input_schema`` / ``append_schema`` /
-   ``append_validation_engine_hint``) — turn the *validation contract*
-   (``OutputConfig`` / input+output schema / validation-engine hint) into
+   ``append_validation_hint``) — turn the *validation contract*
+   (``OutputConfig`` / input+output schema / validation hint) into
    system-prompt text. ``core.agents.validation`` owns declaring and checking
    that contract; rendering it INTO the prompt is a composition concern and
    lives here. One place so every backend produces byte-identical fragments.
@@ -195,33 +195,18 @@ def append_schema(text: str, schema: JsonSchemaDict) -> str:
     return f"{base}\n\n{block}" if base else block
 
 
-def append_validation_engine_hint(text: str, engine: str) -> str:
-    """Append a short note about which validation engine will be enforced.
+def append_validation_hint(text: str) -> str:
+    """Append a short note that the output is validated against the schema.
 
-    This tells the LLM how strictly its output will be checked so it can
-    self-correct before emitting.
+    This tells the LLM its output will be checked so it can self-correct
+    before emitting. Semantic checks (cross-field rules) are enforced
+    separately by any http/script validators on the output contract.
     """
-    hints = {
-        "jsonschema": (
-            "## Validation\n\nYour output will be validated against the schema "
-            "above using JSON Schema. All required fields must be present and "
-            "types must match."
-        ),
-        "pydantic": (
-            "## Validation\n\nYour output will be validated using strict "
-            "type checking (pydantic). Required fields, string lengths, and "
-            "type constraints are enforced — missing or malformed fields will "
-            "cause the run to fail."
-        ),
-        "both": (
-            "## Validation\n\nYour output will be validated twice: first "
-            "against the JSON Schema above, then through strict type checking "
-            "(pydantic). Required fields, string lengths, type constraints, "
-            "and structural rules are all enforced — any violation causes "
-            "the run to fail."
-        ),
-    }
-    hint = hints.get(engine, hints["both"])
+    hint = (
+        "## Validation\n\nYour output will be validated against the schema "
+        "above. All required fields must be present and types must match — "
+        "any violation causes the run to fail."
+    )
     base = (text or "").rstrip()
     return f"{base}\n\n{hint}" if base else hint
 
@@ -230,7 +215,7 @@ __all__ = [
     "append",
     "append_input_schema",
     "append_schema",
-    "append_validation_engine_hint",
+    "append_validation_hint",
     "render",
     "render_document",
     "render_folder_manifest",

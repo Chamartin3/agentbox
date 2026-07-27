@@ -217,7 +217,6 @@ class AgentRuntimeView:
 
     max_validation_retries: int = 0
     max_error_retries: int = 0
-    output_validation_engine: str = "both"
     output_schema_path: str | None = None
     output_schema_content: bytes | None = None
     json_schema: JsonSchemaDict | None = None

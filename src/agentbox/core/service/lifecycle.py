@@ -19,6 +19,7 @@ from dataclasses import dataclass, field, replace
 
 from agentbox.core.config import Settings
 from agentbox.core.data import RunRecord
+from agentbox.core.data.constants import DEFAULT_WORKSPACE_NAME
 from agentbox.core.data.manifests.workspaces import McpServerSpec
 from agentbox.core.db.seeds.engines import seed_default_runner_profiles
 from agentbox.core.execution.dispatch import dispatch_completion
@@ -196,6 +197,29 @@ def boot_import_resources(
     )
 
 
+def ensure_default_workspace() -> StartupReport:
+    """Guarantee the protected ``default`` workspace always exists.
+
+    It's the fallback target (``workspace_id="default"``) and is protected from
+    deletion, but nothing created it — so a fresh/imported DB could lack it.
+    Idempotent: only creates the row when missing.
+    """
+    try:
+        svc = WorkspaceService()
+        if svc.get_workspace(DEFAULT_WORKSPACE_NAME) is None:
+            svc.create_workspace(
+                DEFAULT_WORKSPACE_NAME,
+                description="Default workspace.",
+                source="db",
+                actor="startup",
+            )
+            _log.info("created the %r workspace", DEFAULT_WORKSPACE_NAME)
+    except Exception as exc:
+        _log.exception("ensure default workspace failed")
+        return _error("ensure_default_workspace", exc)
+    return StartupReport()
+
+
 def sync_workspace_registry() -> StartupReport:
     """Prune phantom workspace rows that no real subsystem references."""
     try:
@@ -240,7 +264,7 @@ def dispatch_orphan_webhooks(
     try:
         svc = ExecutionService()
         pending_raw = svc.list_orphaned_unnotified_runs()
-        pending = [RunRecord(**r) for r in pending_raw] if pending_raw else []
+        pending = [RunRecord(**r.model_dump()) for r in pending_raw] if pending_raw else []
     except Exception as exc:
         _log.exception("orphan dispatch lookup failed")
         return _error("dispatch_orphan_webhooks", exc)
@@ -277,6 +301,7 @@ def run_startup_tasks(
     report = _merge(report, sync_project_mcp_servers(settings))
     report = _merge(report, seed_runner_profiles())
     report = _merge(report, boot_import_resources(settings))
+    report = _merge(report, ensure_default_workspace())
     report = _merge(report, sync_workspace_registry())
     report = _merge(report, reap_orphan_runs())
     report = _merge(report, dispatch_orphan_webhooks(settings))

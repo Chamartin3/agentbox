@@ -12,7 +12,6 @@ from agentbox.core.agents.validation.check import (
     format_jsonschema_error,
     run_json_schema,
     validate_jsonschema,
-    validate_pydantic,
 )
 from agentbox.core.agents.validation.schema import (
     OutputConfig,
@@ -36,5 +35,4 @@ __all__ = [
     "resolve_schema",
     "run_json_schema",
     "validate_jsonschema",
-    "validate_pydantic",
 ]

@@ -70,7 +70,6 @@ from agentbox.core.db.resources import (
     WorkspaceFileResourceBindingManager,
 )
 from agentbox.core.db.system import (
-    ApiTokenManager,
     HostEnvCallLogManager,
     HostEnvProfileManager,
     ManagedCredentialManager,
@@ -122,7 +121,6 @@ __all__ = [
     # engines
     "RunnerProfileManager",
     # system
-    "ApiTokenManager",
     "HostEnvCallLogManager",
     "HostEnvProfileManager",
     "ManagedCredentialManager",

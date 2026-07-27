@@ -116,7 +116,6 @@ export interface RunnerSpec {
   extra_args: string[];
   timeout_seconds: number | null;
   output_schema_path: string | null;
-  output_validation_engine: 'jsonschema' | 'pydantic' | 'both';
   max_validation_retries: number;
   max_error_retries: number;
 }
@@ -140,6 +139,8 @@ export interface AgentDef {
   last_run_at?: string | null;
   last_activity_at?: string | null;
   resolved_workspace?: string;
+  /** False when a named workspace ref has no matching workspaces row (orphan). */
+  workspace_exists?: boolean;
   version?: number | null;
   total_versions?: number | null;
   active_version?: number | null;
@@ -332,7 +333,6 @@ export interface RunnerProfile {
   model: string | null;
   base_url: string | null;
   api_key_env: string | null;
-  api_token_id: string | null;
   params: Record<string, unknown>;
   headers: Record<string, string>;
   extra_args: string[];
@@ -351,7 +351,6 @@ export interface RunnerProfileCreate {
   model?: string | null;
   base_url?: string | null;
   api_key_env?: string | null;
-  api_token_id?: string | null;
   params?: Record<string, unknown>;
   headers?: Record<string, string>;
   extra_args?: string[];
@@ -383,6 +382,7 @@ export interface RunnerProvider {
   supports_model_listing: boolean;
   default_base_url: string | null;
   default_api_key_env: string | null;
+  discovered: boolean;
 }
 
 export interface RunnerBackend {
@@ -391,6 +391,9 @@ export interface RunnerBackend {
   default_model: string | null;
   compatible_providers: string[];
   accepts_no_provider: boolean;
+  universal?: boolean;
+  supports_mcp: boolean;
+  native_tools: string[];
 }
 
 
@@ -573,7 +576,7 @@ export const api = {
       `/api/manifest/runner-models?kind=${encodeURIComponent(kind)}`,
     ),
   patchAgent: (id: string, body: Partial<AgentDef> & { runner?: Partial<RunnerSpec> }) =>
-    req<{ agent: AgentDef }>(`/api/agents/${id}`, {
+    req<{ agent: AgentDef; pruned_tools?: string[] }>(`/api/agents/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
@@ -646,7 +649,6 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ path, content }),
     }),
-
   // ---- agent lifecycle (DB-only creation, publish, draft, rollback) --------
 
   createAgent: (payload: AgentCreatePayload) =>

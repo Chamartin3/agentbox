@@ -24,7 +24,6 @@ class TestAgentRuntimeView:
         view = build_runtime_view(agent, store=None)
         assert view.max_validation_retries == 0
         assert view.max_error_retries == 0
-        assert view.output_validation_engine == "both"
         assert view.json_schema is None
         assert view.validators == ()
         assert view.has_schema is False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,7 +11,9 @@ from pydantic import BaseModel
 
 from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
+from agentbox.core.config import load_settings
 from agentbox.core.service.agents import AgentServiceError
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +22,39 @@ class _PatchAgentResult(TypedDict):
     """Response shape of PATCH /api/agents/{agent_id}."""
 
     agent: dict
+    pruned_tools: list[str]  # grants revoked because the workspace changed
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
+
+
+def _make_catalog_resolver(ctx: APIContext) -> Callable[[str | None], set[str]]:
+    """Return a resolver that lists callable names available in a workspace.
+
+    Built at the API layer where both AgentService and WorkspaceService are
+    legitimately available, so the resolver can be injected into
+    ``patch_agent_config`` without creating a forbidden
+    ``service.agents -> service.workspaces`` import edge.
+
+    A null/empty workspace is the dedicated per-agent workspace: its
+    availability surface is the global agent-tools catalog (builtin canonical
+    vocabulary + shared registry), exactly the ``/api/agent_tools`` pick-list
+    the UI shows for it — no MCP / host-env / resource tools. Grants for those
+    must prune when an agent moves onto a dedicated workspace.
+    """
+
+    def resolve(workspace: str | None) -> set[str]:
+        if not workspace:
+            from agentbox.core.tools import BUILTIN_TOOLS, SharedToolRegistry
+
+            return {t.name.value for t in BUILTIN_TOOLS} | {s.name for s in SharedToolRegistry.all()}
+        registry = McpRegistry(load_settings().mcp_cache_dir)
+        registry.hydrate_from_cache()
+        return {
+            c.name
+            for c in ctx.workspaces.installed_callables(workspace, mcp_registry=registry)
+        }
+
+    return resolve
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +71,6 @@ class _RunnerPatch(BaseModel):
     timeout_seconds: int | None = None
     agent_module: str | None = None
     output_schema_path: str | None = None
-    output_validation_engine: str | None = None
     max_validation_retries: int | None = None
     max_error_retries: int | None = None
 
@@ -79,10 +112,12 @@ def patch_agent(
     """
     patch = body.model_dump(exclude_unset=True)
     try:
-        updated = ctx.agents.patch_agent_config(agent_id, patch)
+        updated, pruned_tools = ctx.agents.patch_agent_config(
+            agent_id, patch, catalog_resolver=_make_catalog_resolver(ctx)
+        )
     except AgentServiceError as exc:
         detail: object = (
             exc.detail if exc.code == "empty_patch" else {"code": exc.code, "detail": exc.detail}
         )
         raise HTTPException(exc.status_code, detail) from exc
-    return {"agent": updated.model_dump()}
+    return {"agent": updated.model_dump(), "pruned_tools": pruned_tools}

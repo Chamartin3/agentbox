@@ -14,15 +14,10 @@ from __future__ import annotations
 
 import json as _json
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
-from agentbox.core.data.constants import ConfiguredValidationMode, ValidationMode
 from agentbox.core.data.payload_types import ConfigJsonPayload
 from agentbox.core.data import CanonicalTool
-
-_CONFIGURED_ENGINES = frozenset(
-    {ValidationMode.JSONSCHEMA, ValidationMode.PYDANTIC, ValidationMode.BOTH}
-)
 
 
 def _config_section(agent: Any, section: str) -> dict[str, Any]:
@@ -56,22 +51,13 @@ class ExecutionConfig:
 
     max_validation_retries: int = 0
     max_error_retries: int = 0
-    output_validation_engine: ConfiguredValidationMode = ValidationMode.BOTH
 
     @classmethod
     def from_agent(cls, agent: Any) -> ExecutionConfig:
         sub = _config_section(agent, "execution")
-        raw_engine = sub.get("output_validation_engine") or ValidationMode.BOTH
-        engine = cast(
-            ConfiguredValidationMode,
-            ValidationMode(raw_engine)
-            if raw_engine in _CONFIGURED_ENGINES
-            else ValidationMode.BOTH,
-        )
         return cls(
             max_validation_retries=int(sub.get("max_validation_retries") or 0),
             max_error_retries=int(sub.get("max_error_retries") or 0),
-            output_validation_engine=engine,
         )
 
 
@@ -137,7 +123,6 @@ def build_config_json_payload(agent: Any) -> ConfigJsonPayload:
         "execution": {
             "max_validation_retries": exec_cfg.max_validation_retries,
             "max_error_retries": exec_cfg.max_error_retries,
-            "output_validation_engine": exec_cfg.output_validation_engine,
         },
         "runtime": {
             "mcp_config_path": runtime_cfg.mcp_config_path,

@@ -71,7 +71,9 @@ def get_executor() -> RunExecutor:
 @lru_cache(maxsize=1)
 def get_mcp_registry() -> McpRegistry:
     settings = get_settings()
-    return McpRegistry(settings.mcp_cache_dir)
+    registry = McpRegistry(settings.mcp_cache_dir)
+    registry.hydrate_from_cache()
+    return registry
 
 
 # ── API context — the single Depends for all routes ─────────────────────

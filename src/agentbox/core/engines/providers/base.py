@@ -83,6 +83,9 @@ class ProviderDescriptor(BaseModel):
     default_base_url: str | None = None
     default_api_key_env: str | None = None
     config_schema: RawJson = Field(default_factory=dict)
+    discovered: bool = False
+    """True when this provider only exists because a CLI (opencode) reported it
+    at runtime, vs a preconfigured first-class adapter shipped with agentbox."""
 
 
 class ProviderAdapter(Protocol):

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   RunsFacets,
   RunsPage as RunsPageData,
@@ -9,9 +9,6 @@ import {
 import { RunsFilterKey, RunStatus } from '../api/enums';
 import RunsTable, { RunRow } from '../components/runs/RunsTable';
 import RunsDashboard from '../components/runs/RunsDashboard';
-import RunnerProfilesPage from './RunnerProfilesPage';
-import { RuntimeDefaultsForm, type ToastState } from './SettingsBaseTab';
-import Toast from '../components/common/Toast';
 
 const PAGE_SIZE = 25;
 
@@ -54,57 +51,10 @@ function filtersToQuery(f: { agent: string; status: string; executor: string; q:
 }
 
 export default function RunsPage() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const activeTab: 'runs' | 'profiles' = location.pathname.startsWith('/runs/profiles')
-    ? 'profiles'
-    : 'runs';
-  const [toast, setToast] = useState<ToastState>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
   return (
     <div className="stack">
       <h1>Runs</h1>
-      <div className="tabs">
-        <button
-          className={`tab-button ${activeTab === 'runs' ? 'active' : ''}`}
-          onClick={() => navigate('/runs')}
-        >
-          Runs
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'profiles' ? 'active' : ''}`}
-          onClick={() => navigate('/runs/profiles')}
-        >
-          Runner profiles
-        </button>
-      </div>
-      <div className="tab-content">
-        {activeTab === 'runs' ? (
-          <div className="tab-pane stack">
-            <RunsTab />
-          </div>
-        ) : (
-          <div className="tab-pane stack">
-            <section className="stack" style={{ gap: 8, border: '1px solid #30363d', padding: 12, borderRadius: 6 }}>
-              <h3 style={{ margin: 0 }}>Runtime defaults</h3>
-              <p className="dim" style={{ fontSize: 12, margin: 0 }}>
-                Default model per backend + runner timeout. Backends consult these on every run.
-              </p>
-              <RuntimeDefaultsForm onToast={setToast} />
-            </section>
-            <section className="stack" style={{ gap: 8, border: '1px solid #30363d', padding: 12, borderRadius: 6 }}>
-              <h3 style={{ margin: 0 }}>Profiles</h3>
-              <RunnerProfilesPage embedded />
-            </section>
-          </div>
-        )}
-      </div>
-      {toast && <Toast kind={toast.kind} msg={toast.msg} />}
+      <RunsTab />
     </div>
   );
 }

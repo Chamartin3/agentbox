@@ -6,6 +6,7 @@ import { useAgent, useAgents, useAgentActions } from '../hooks/agents';
 import { useRunnerProfiles } from '../hooks/runnerProfiles';
 import RunnerProfilePickerModal from '../components/runner/RunnerProfilePickerModal';
 import { ProfileDisplay } from '../components/runner/ProfileDisplay';
+import { NameCell, TypePill } from '../components/common/chips';
 
 function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void }) {
   const { data, loading } = useAgent(agent.id);
@@ -24,7 +25,11 @@ function PromptDrawer({ agent, onClose }: { agent: AgentDef; onClose: () => void
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
           <span className="tag">{agent.runner.kind}</span>
           {agent.model && <span className="tag">{agent.model}</span>}
-          {agent.workspace && <span className="tag">{agent.workspace}</span>}
+          {agent.workspace && agent.workspace !== '<ephemeral>' ? (
+            <Link className="tag" to={`/workspaces/${encodeURIComponent(agent.workspace)}`}>{agent.workspace}</Link>
+          ) : agent.workspace ? (
+            <span className="tag">{agent.workspace}</span>
+          ) : null}
         </div>
         <div className="code-block">
           <div className="code-block-bar">
@@ -198,14 +203,10 @@ export default function AgentsPage() {
               onClick={() => setSelected(a)}
             >
               <td onClick={(e) => e.stopPropagation()}>
-                <Link to={`/agents/${a.id}`}><strong>{a.id}</strong></Link>
+                <NameCell to={`/agents/${a.id}`} title={a.id} />
                 {a.disabled_at && (
-                  <span
-                    className="pill"
-                    title={`disabled at ${a.disabled_at}`}
-                    style={{ marginLeft: 6, background: '#c0392b', color: '#fff', fontSize: 10 }}
-                  >
-                    disabled
+                  <span style={{ marginLeft: 6 }}>
+                    <TypePill value="disabled" label="disabled" colors={{ disabled: { bg: '#c0392b', fg: '#fff' } }} />
                   </span>
                 )}
               </td>
@@ -220,9 +221,11 @@ export default function AgentsPage() {
                   <span className="profile-trigger-edit">✎</span>
                 </button>
               </td>
-              <td className="dim">
+              <td className="dim" onClick={(e) => e.stopPropagation()}>
                 {a.workspace && a.workspace !== '<ephemeral>'
-                  ? a.workspace
+                  ? (a.workspace_exists === false
+                      ? <span className="pill" title="workspace does not exist — MCP tools will not load" style={{ background: '#c0392b', color: '#fff', fontSize: 10 }}>{a.workspace} · missing</span>
+                      : <Link to={`/workspaces/${encodeURIComponent(a.workspace)}`}>{a.workspace}</Link>)
                   : <span className="dim">default</span>}
               </td>
               <td>{a.description}</td>

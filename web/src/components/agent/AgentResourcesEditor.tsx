@@ -613,16 +613,16 @@ export default function AgentResourcesEditor({
                   <td style={{ padding: '3px 6px' }}>
                     {isOutput && onChangeOutputValidation && (
                       <div className="row" style={{ gap: 4, alignItems: 'center', fontSize: 11 }}>
-                        <span className="dim">validation:</span>
+                        <span className="dim">on mismatch:</span>
                         <select
                           value={outputValidation || 'strict'}
                           onChange={(e) => onChangeOutputValidation(e.target.value)}
                           style={{ fontSize: 11, padding: '1px 4px' }}
-                          title="How the executor responds when output does not match the schema"
+                          title="What the executor does when output fails the schema. strict = fail the run + retry · warn = pass but flag · off = skip validation"
                         >
-                          <option value="strict">strict</option>
-                          <option value="warn">warn</option>
-                          <option value="off">off</option>
+                          <option value="strict">strict — fail + retry</option>
+                          <option value="warn">warn — pass, flagged</option>
+                          <option value="off">off — skip</option>
                         </select>
                       </div>
                     )}

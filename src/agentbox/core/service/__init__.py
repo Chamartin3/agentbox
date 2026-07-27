@@ -40,8 +40,6 @@ from agentbox.core.data import WorkspaceDef as WorkspaceDef
 from agentbox.core.data import AgentVersionRow as AgentVersionRow
 from agentbox.core.data import AgentVersionCommentRow as AgentVersionCommentRow
 from agentbox.core.data import AgentVersionRatingRow as AgentVersionRatingRow
-from agentbox.core.data import ApiTokenPublicRow as ApiTokenPublicRow
-from agentbox.core.data import ApiTokenRow as ApiTokenRow
 from agentbox.core.data import EnvDocRow as EnvDocRow
 from agentbox.core.data import HostEnvCallLogRow as HostEnvCallLogRow
 from agentbox.core.data import HostEnvProfileRow as HostEnvProfileRow
@@ -121,3 +119,8 @@ from agentbox.core.service.workspaces import render_env_doc_preview as render_en
 
 # ── DiagnosticsService ──────────────────────────────────────
 from agentbox.core.service.diagnostics import DiagnosticsService as DiagnosticsService
+
+# ── MaterializationService ───────────────────────────────────
+from agentbox.core.service.materialization_io import MaterializationService as MaterializationService
+from agentbox.core.data.payload_types import ExportReport as ExportReport
+from agentbox.core.data.payload_types import ImportReport as ImportReport

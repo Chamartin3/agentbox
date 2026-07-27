@@ -54,7 +54,6 @@ EXPECTED_EXPORTS: frozenset[str] = frozenset(
         # engines managers
         "RunnerProfileManager",
         # system managers
-        "ApiTokenManager",
         "ManagedCredentialManager",
         "HostEnvCallLogManager",
         "HostEnvProfileManager",

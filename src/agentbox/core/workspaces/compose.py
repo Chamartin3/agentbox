@@ -271,16 +271,23 @@ class WorkspaceComposer:
             o["server_name"]: o for o in self._read.list_mcp_overrides(workspace_id)
         }
         tool_overrides = self._read.list_mcp_tool_overrides(workspace_id)
-        mcp_servers: list[McpRef] = []
-        for srv in project_servers:
-            override = server_overrides.get(srv.name)
-            if override is not None and override["enabled"] is False:
-                continue
-            disabled = [
+
+        def _disabled_for(name: str) -> list[str]:
+            return [
                 t["tool_name"]
                 for t in tool_overrides
-                if t["server_name"] == srv.name and not t["enabled"]
+                if t["server_name"] == name and not t["enabled"]
             ]
+
+        mcp_servers: list[McpRef] = []
+        project_names: set[str] = set()
+        for srv in project_servers:
+            project_names.add(srv.name)
+            override = server_overrides.get(srv.name)
+            # enabled is stored as int 0/1 — `is False` never matches, so an
+            # excluded server was silently materialized. Truthiness is correct.
+            if override is not None and not override["enabled"]:
+                continue
             mcp_servers.append(
                 McpRef(
                     name=srv.name,
@@ -293,7 +300,21 @@ class WorkspaceComposer:
                         }.items()
                         if v is not None
                     },
-                    disabled_tools=disabled,
+                    disabled_tools=_disabled_for(srv.name),
+                )
+            )
+
+        # Workspace-only servers: overrides with no matching project server.
+        # Added directly to this workspace; materialize them when enabled.
+        for name, override in server_overrides.items():
+            if name in project_names or not override["enabled"]:
+                continue
+            cfg = dict(override.get("config_overrides") or {})
+            mcp_servers.append(
+                McpRef(
+                    name=name,
+                    config={k: v for k, v in cfg.items() if v is not None},
+                    disabled_tools=_disabled_for(name),
                 )
             )
 

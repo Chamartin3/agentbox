@@ -1,42 +1,37 @@
-"""SystemService — settings, API tokens, project config, host-env call log.
+"""SystemService — settings, project config, host-env call log.
 
 Consolidates the system domain: every operation that used to live on the
-``SessionStore`` mixins (SettingsMixin, ProjectConfigMixin, ApiTokensMixin,
+``SessionStore`` mixins (SettingsMixin, ProjectConfigMixin,
 HostEnvCallLogMixin) and the free functions in ``system_admin.py``.
 
 Extends ``Service`` (self-wiring ``Database`` from settings). Callers
 construct with no arguments: ``SystemService()``.
 
-Token secret generation, Fernet encryption, JSON encoding/decoding, and
-timestamp stamps all live here as service policy — managers only do
-pure DB reads and writes.
+JSON encoding/decoding and timestamp stamps live here as service
+policy — managers only do pure DB reads and writes.
 """
 from __future__ import annotations
 
 import json as _json
-import secrets as _secrets
 import uuid
 
+from collections.abc import Mapping
 from pathlib import Path
 
 from agentbox.core.config import SETTINGS
 from agentbox.core.data import McpServerSpec, now_iso
 from agentbox.core.data.rows import (
-    ApiTokenPublicRow,
-    ApiTokenRow,
-    ApiTokenWithSecret,
     HostEnvCallLogRow,
 )
-from agentbox.core.service.crypto import fernet as _fernet
 from agentbox.core.service.base import Service
 
 
 class SystemService(Service):
     """Public API for the system/config domain.
 
-    Settings, project MCP servers, shared assets, API tokens, and host-env
-    call log all live here. Construction is zero-argument — ``Database``
-    is resolved internally from settings.
+    Settings, project MCP servers, shared assets, and host-env call log
+    all live here. Construction is zero-argument — ``Database`` is
+    resolved internally from settings.
     """
 
     def __init__(self) -> None:
@@ -46,7 +41,7 @@ class SystemService(Service):
     # Settings
     # ══════════════════════════════════════════════════════════════════
 
-    def get_settings_section(self, section: str) -> dict:
+    def get_settings_section(self, section: str) -> Mapping[str, object]:
         """Return all ``{key: value}`` pairs in a section (deserialised)."""
         return self._db.settings.get_settings_section(section)
 
@@ -81,7 +76,7 @@ class SystemService(Service):
         patch: dict,
         *,
         author: str | None = None,
-    ) -> dict:
+    ) -> Mapping[str, object]:
         """Apply a partial patch to a section. Returns the full section."""
         for key, value in patch.items():
             self.set_setting(section, key, value, author=author)
@@ -189,75 +184,6 @@ class SystemService(Service):
         """Return the project name (defaults to ``"default"``)."""
         value = self.get_setting(self.PROJ_RUNTIME, "project_name", default="default")
         return str(value) if value else "default"
-
-    # ══════════════════════════════════════════════════════════════════
-    # API tokens
-    # ══════════════════════════════════════════════════════════════════
-
-    def list_api_tokens(
-        self, *, environment: str | None = None
-    ) -> list[ApiTokenRow]:
-        """List API tokens, optionally filtered by environment."""
-        return self._db.api_tokens.list_tokens(environment=environment)
-
-    def create_api_token(
-        self,
-        name: str,
-        *,
-        environment: str = "production",
-        secret: str | None = None,
-    ) -> ApiTokenPublicRow:
-        """Create a new API token. The plaintext secret is returned only here.
-
-        When *secret* is not provided, a 256-bit URL-safe secret is generated.
-        """
-        if secret is None:
-            secret = _secrets.token_urlsafe(32)
-        if len(secret) < 4:
-            raise ValueError("secret must be at least 4 characters")
-        token_id = uuid.uuid4().hex
-        ts = now_iso()
-        encrypted = _fernet().encrypt(secret.encode()).decode()
-        last_four = secret[-4:]
-        return self._db.api_tokens.insert_token(
-            token_id=token_id,
-            environment=environment,
-            name=name,
-            secret_encrypted=encrypted,
-            last_four=last_four,
-            created_at=ts,
-            updated_at=ts,
-        )
-
-    def rename_api_token(self, token_id: str, name: str) -> ApiTokenRow | None:
-        """Rename an API token. Returns the updated row or None."""
-        ts = now_iso()
-        return self._db.api_tokens.update_token_name(token_id, name, ts)
-
-    def rotate_api_token(
-        self, token_id: str, *, secret: str | None = None
-    ) -> ApiTokenWithSecret | None:
-        """Rotate a token's secret. Returns the updated row (with plaintext secret) or None."""
-        if secret is None:
-            secret = _secrets.token_urlsafe(32)
-        if len(secret) < 4:
-            raise ValueError("secret must be at least 4 characters")
-        ts = now_iso()
-        encrypted = _fernet().encrypt(secret.encode()).decode()
-        last_four = secret[-4:]
-        result = self._db.api_tokens.update_token_secret(
-            token_id, encrypted, last_four, ts
-        )
-        if result is not None:
-            return {**result, "secret": secret}
-        return None
-
-    def delete_api_token(self, token_id: str) -> bool:
-        """Delete an API token. Returns True if a row was deleted."""
-        return self._db.api_tokens.delete_token(token_id)
-
-    # No reveal/extract path: token secrets flow in (create/rotate) and are
-    # used internally, never returned to a caller or a terminal.
 
     # ══════════════════════════════════════════════════════════════════
     # Host-env call log

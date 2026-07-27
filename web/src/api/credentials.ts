@@ -1,7 +1,6 @@
 // Typed client for the /api/credentials endpoints and the per-workspace
-// /api/workspaces/{id}/credentials enablement endpoints. Mirrors the
-// convention in api/api_tokens.ts — a single object of thin apiRequest
-// wrappers.
+// /api/workspaces/{id}/credentials enablement endpoints. A single object
+// of thin apiRequest wrappers.
 
 import { apiRequest } from './http';
 
@@ -24,7 +23,7 @@ export interface CredentialListResponse {
 }
 
 export interface CreateCredentialBody {
-  id: string;
+  id?: string; // derived server-side from env_var/label when omitted
   label: string;
   kind: CredentialKind;
   env_var?: string | null;
@@ -34,6 +33,8 @@ export interface CreateCredentialBody {
 export interface WorkspaceCredentials {
   available: CredentialInventoryEntry[];
   enabled: string[];
+  // credential_id → env-var name it's exposed under in this workspace
+  overrides: Record<string, string>;
 }
 
 export const credentialsApi = {
@@ -61,9 +62,10 @@ export const credentialsApi = {
   setForWorkspace: (
     workspaceId: string,
     enabled: string[],
+    overrides: Record<string, string> = {},
   ): Promise<WorkspaceCredentials> =>
     apiRequest<WorkspaceCredentials>(
       `/api/workspaces/${encodeURIComponent(workspaceId)}/credentials`,
-      { method: 'PUT', body: JSON.stringify({ enabled }) },
+      { method: 'PUT', body: JSON.stringify({ enabled, overrides }) },
     ),
 };

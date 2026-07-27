@@ -149,7 +149,6 @@ class EngineService(Service):
             "model": data.model,
             "base_url": data.base_url,
             "api_key_env": data.api_key_env,
-            "api_token_id": data.api_token_id,
             "output_mode": data.output_mode,
             "params_json": _json.dumps(data.params),
             "headers_json": _json.dumps(data.headers),
@@ -202,8 +201,6 @@ class EngineService(Service):
             values["api_key_env"] = patch.api_key_env
         if patch.output_mode is not None:
             values["output_mode"] = patch.output_mode
-        if patch.api_token_id is not None:
-            values["api_token_id"] = patch.api_token_id or None
         if patch.params is not None:
             values["params_json"] = _json.dumps(patch.params)
         if patch.headers is not None:
@@ -274,11 +271,15 @@ class EngineService(Service):
 
         Returns the full profile data for the bound profile id.
         """
+        # Validate first: the binding column is an enforced FK now, so a missing
+        # profile would raise IntegrityError on insert. get_profile raises the
+        # 404-mapped ProfileNotFound instead.
+        profile = self.get_profile(profile_id)
         now = now_iso()
         self._db.runner_profiles.set_agent_profile(
             agent_id, profile_id, created_at=now, updated_at=now,
         )
-        return self.get_profile(profile_id)
+        return profile
 
     def clear_agent_runner_profile(self, agent_id: str) -> None:
         """Remove the profile binding for *agent_id*."""

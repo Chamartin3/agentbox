@@ -40,8 +40,10 @@ from agentbox.core.execution.retry import pump_into_session  # noqa: F401
 from agentbox.core.data import RenderedConfig
 from agentbox.core.workspaces import Workspaces
 from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.workspaces.tooling.servers import resolve_workspace_mcp_helper
+from agentbox.core.db.config import load_project_mcp_servers
 from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME, HOST_ENV_SERVER_NAME
-from agentbox.core.data.payload_types import McpStdioServerSpec
+from agentbox.core.data.payload_types import ExternalMcpServer, McpStdioServerSpec
 from agentbox.core.tools.mcp_servers.specs import (
     agent_tools_server_spec,
     host_env_server_spec,
@@ -252,9 +254,20 @@ class RunExecutor:
         _raw_cwd = rendered.cwd
         if not _raw_cwd.is_absolute():
             _raw_cwd = run_dir / _raw_cwd
+        # Option B: thread grants env vars from each intrinsic MCP spec into the
+        # opencode subprocess env so the servers it spawns inherit the grants.
+        # Grants are shared globally across all MCP children — per-server
+        # isolation needs McpLocal.environment if required later.
+        _mcp_env: dict[str, str] = {}
+        for _spec in _extra_mcp.values():
+            for _k, _v in (_spec.get("env") or {}).items():
+                if isinstance(_v, str):
+                    _mcp_env[_k] = _v
+        _merged_env = dict(rendered.env)
+        _merged_env.update(_mcp_env)
         rendered = RenderedConfig(
             argv=rendered.argv,
-            env=rendered.env,
+            env=_merged_env,
             cwd=_raw_cwd,
             agent_meta=rendered.agent_meta,
             model=rendered.model,
@@ -262,6 +275,7 @@ class RunExecutor:
         _resource_snapshot_entries = _prompt_snapshot_entries + _workspace_snapshot_entries
 
         if _host_env_grants:
+            rendered.agent_meta["agent_id"] = agent.id
             rendered.agent_meta["host_env_grants"] = _host_env_grants
             rendered.agent_meta["agent_tool_grants"] = (
                 sorted(_agent_tool_grants) if _agent_tool_grants else None
@@ -269,6 +283,43 @@ class RunExecutor:
             rendered.agent_meta["host_env_workspace_id"] = _workspace_id or ""
             rendered.agent_meta["host_env_workdir"] = str(workdir)
             rendered.agent_meta["host_env_db_path"] = str(self.settings.db_path)
+
+        # External (project/workspace-attached) MCP servers → thread to backends
+        # that read agent_meta (the token direct path). Config-file backends
+        # (claude_code/opencode) already receive these via the workspace build;
+        # this closes the gap so every harness can invoke external MCP tools.
+        try:
+            _project = load_project_mcp_servers(db=self.db)
+            _manifest = [
+                {"name": s.name, "config": s.model_dump(exclude={"name"})}
+                for s in _project
+            ]
+            _resolved_mcp = resolve_workspace_mcp_helper(
+                self.db.workspace_mcp_policies,
+                self.db.workspace_mcp_overrides,
+                self.db.workspace_mcp_tool_overrides,
+                _wsid,
+                _manifest,
+            )
+            _external_mcp: list[ExternalMcpServer] = [
+                {
+                    "name": s["name"],
+                    "config": s.get("config") or {},
+                    "disabled_tools": s.get("disabled_tools") or [],
+                }
+                for s in _resolved_mcp.get("servers", [])
+                if s.get("enabled")
+            ]
+        except Exception:
+            logger.debug("external MCP resolution failed", exc_info=True)
+            _external_mcp = []
+        if _external_mcp:
+            rendered.agent_meta["external_mcp_servers"] = _external_mcp
+            # Exposure-time scoping: granted tool names (empty grants → no
+            # agent-level restriction, mirroring host-env semantics).
+            rendered.agent_meta["external_mcp_allowed_tools"] = (
+                sorted(_agent_tool_grants) if _agent_tool_grants else None
+            )
 
         transcripts_dir = self.settings.data_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)

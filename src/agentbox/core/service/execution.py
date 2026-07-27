@@ -41,6 +41,7 @@ from agentbox.core.data import (
 from agentbox.core.data.payload_types import (
     CancelRunResult,
     LogEntry,
+    PaginatedRunsResult,
     PromptFragmentPayload,
     RerunResult,
     RunCommentsResult,
@@ -48,10 +49,11 @@ from agentbox.core.data.payload_types import (
     RunDetailPayload,
     RunDetailResult,
     RunFacetsResult,
-    RunnerSnapshotView,
     RunLifecycleResult,
     RunLogsResult,
     RunPromptFragmentsResult,
+    RunnerSnapshotView,
+    TranscriptResult,
 )
 from agentbox.core.data.rows import (
     RunCommentRow,
@@ -163,9 +165,9 @@ class ExecutionService(Service):
         """Set post-run outcome status on a run row."""
         self._runs.set_post_outcome(run_id, ok, error_kind, errors)
 
-    def list_orphaned_unnotified_runs(self) -> list[dict]:
+    def list_orphaned_unnotified_runs(self) -> list[Run]:
         """Return runs whose error contains 'orphaned' and have no post_status."""
-        return [r.model_dump() for r in self._runs.list_orphaned_unnotified()]
+        return self._runs.list_orphaned_unnotified()
 
     def reap_orphan_runs(self) -> int:
         """Mark all ``running`` rows as ``incomplete``. Returns count."""
@@ -181,12 +183,9 @@ class ExecutionService(Service):
 
     def list_runs(
         self, limit: int = 50, agent_id: str | None = None
-    ) -> list[dict]:
+    ) -> list[Run]:
         """List recent runs (optionally filtered by agent_id)."""
-        return [
-            r.model_dump()
-            for r in self._runs.list_runs_by_agent(limit=limit, agent_id=agent_id)
-        ]
+        return self._runs.list_runs_by_agent(limit=limit, agent_id=agent_id)
 
     def list_run_summaries(
         self, limit: int = 50, agent_id: str | None = None
@@ -286,7 +285,7 @@ class ExecutionService(Service):
     # Transcript helpers (moved from tool bodies)
     # ══════════════════════════════════════════════════════════════════
 
-    def get_transcript(self, run_id: str, limit: int, offset: int) -> dict:
+    def get_transcript(self, run_id: str, limit: int, offset: int) -> TranscriptResult:
         """Paginated JSONL transcript for a run.
 
         Returns ``{items, total, limit, offset, has_more}``.  Items are raw
@@ -677,7 +676,7 @@ class ExecutionService(Service):
         offset: int = 0,
         paginated: bool = False,
         with_usage: bool = False,
-    ) -> list[dict] | dict:
+    ) -> list[dict[str, object]] | PaginatedRunsResult:
         """Backward-compatible run listing enriched with agent version + usage.
 
         ``agent_versions`` defaults to ``self._db.agent_versions`` when not
@@ -689,13 +688,13 @@ class ExecutionService(Service):
         if not paginated and not any(
             [status, executor, q, since, until, offset, agent_version]
         ):
-            result: list[dict] = [
-                self._enrich_with_version(_agent_versions, r)
+            result: list[dict[str, object]] = [
+                self._enrich_with_version(_agent_versions, cast(Mapping[str, object], r.model_dump()))
                 for r in self.list_runs(limit=limit, agent_id=agent)
             ]
             if with_usage:
                 for d in result:
-                    d["usage"] = self.get_usage(d["id"])
+                    d["usage"] = self.get_usage(cast(str, d["id"]))
             return result
         items, total = EvaluationService().list_runs_paged(
             agent_id=agent,
@@ -711,14 +710,17 @@ class ExecutionService(Service):
         enriched = [self._enrich_with_version(_agent_versions, r) for r in items]
         if with_usage:
             for d in enriched:
-                d["usage"] = self.get_usage(str(d["id"]))
-        return {
-            "items": enriched,
-            "total": total,
-            "offset": offset,
-            "limit": limit,
-            "has_more": offset + len(items) < total,
-        }
+                d["usage"] = self.get_usage(cast(str, d["id"]))
+        return cast(
+            PaginatedRunsResult,
+            {
+                "items": enriched,
+                "total": total,
+                "offset": offset,
+                "limit": limit,
+                "has_more": offset + len(items) < total,
+            },
+        )
 
     def run_stats(
         self,

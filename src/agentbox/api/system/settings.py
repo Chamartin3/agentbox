@@ -9,7 +9,7 @@ PATCH /api/settings/{section}    — partial patch; only listed keys change.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from dotenv import dotenv_values
 from fastapi import APIRouter, Depends
@@ -49,10 +49,7 @@ class PatchSettingsResult(TypedDict):
 # which keeps casual writes from creating sprawl.
 KNOWN_SECTIONS = (
     "runtime_defaults",
-    "workspace_defaults",
     "mcp_global",
-    "webhook",
-    "telemetry",
     "secrets",
 )
 
@@ -63,6 +60,10 @@ KNOWN_SECTIONS = (
 SECTION_DEFAULTS: dict[str, dict] = {
     "runtime_defaults": {
         "timeout_seconds": 1200,
+        # Applied as the initial values when a NEW agent is created. Runtime
+        # always reads the agent's own config, never these — see AgentNew.tsx.
+        "max_error_retries": 0,
+        "max_validation_retries": 1,
         "default_model_opencode": "opencode/deepseek-v4-flash-free",
         "default_model_codex": None,
         "default_model_pi": None,
@@ -175,12 +176,15 @@ def get_section(
     stored = ctx.system.get_settings_section(section)
     seeded = dict(SECTION_DEFAULTS.get(section, {}))
     seeded.update(stored)
-    return {
-        "section": section,
-        "values": seeded,
-        "defaults": SECTION_DEFAULTS.get(section, {}),
-        "overrides": stored,
-    }
+    return cast(
+        GetSettingsResult,
+        {
+            "section": section,
+            "values": seeded,
+            "defaults": SECTION_DEFAULTS.get(section, {}),
+            "overrides": stored,
+        },
+    )
 
 
 @router.patch("/{section}")
@@ -190,4 +194,4 @@ def patch_section(
     ctx: APIContext = Depends(get_api_context),
 ) -> PatchSettingsResult:
     updated = ctx.system.update_settings_section(section, body.values)
-    return {"section": section, "values": updated}
+    return cast(PatchSettingsResult, {"section": section, "values": updated})

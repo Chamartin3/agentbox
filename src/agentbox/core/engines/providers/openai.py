@@ -18,7 +18,10 @@ class OpenAIAdapter(HTTPProviderAdapter):
     descriptor = ProviderDescriptor(
         id=Provider.OPENAI.value,
         label="OpenAI",
-        compatible_backends=[BackendName.TOKEN],
+        # codex is the OpenAI Codex CLI harness — it runs OpenAI models, so it
+        # belongs here as a harness of the openai vendor, not as its own
+        # provider. opencode is appended dynamically at discovery time.
+        compatible_backends=[BackendName.TOKEN, BackendName.CODEX],
         requires_api_key=True,
         supports_base_url=True,
         supports_model_listing=True,

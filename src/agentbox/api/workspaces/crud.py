@@ -19,7 +19,6 @@ from agentbox.core.data.payload_types import (
     SkillsListResult,
     WorkspaceDeleteResult,
     WorkspaceDetail,
-    WorkspaceFileInfo,
     WorkspaceFileRead,
     WorkspaceFileWrite,
     WorkspaceListItem,
@@ -35,7 +34,6 @@ from agentbox.api.schemas import PaginatedEnvelope, paginate_list
 from agentbox.api.deps import get_mcp_registry, get_settings, get_workspace_service
 from agentbox.core.config import Settings
 from agentbox.core.data.rows import WorkspaceRow
-from agentbox.core.service.workspaces import is_user_file
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.data.errors import (
     WorkspaceExists,
@@ -141,22 +139,7 @@ def get_workspace_by_name(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> WorkspaceDetail:
     try:
-        ws_path, _ = svc.resolve_workspace_path(name, settings=settings)
-        files: list[WorkspaceFileInfo] = []
-        if ws_path.exists():
-            for p in sorted(ws_path.rglob("*")):
-                if p.is_file():
-                    rel = str(p.relative_to(ws_path))
-                    if not is_user_file(rel):
-                        continue
-                    files.append({"path": rel, "size": p.stat().st_size})
-        return {
-            "name": name,
-            "path": str(ws_path),
-            "exists": ws_path.exists(),
-            "files": files,
-            "generated_configs": {},
-        }
+        return svc.get_workspace_by_name(name, settings=settings)
     except WorkspaceNotFound:
         _raise_not_found(name)
 

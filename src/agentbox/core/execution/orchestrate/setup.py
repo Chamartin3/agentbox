@@ -271,6 +271,7 @@ class RunSetup:
                     self._mgrs.workspace_mcp_tool_overrides,
                     self._mcp_registry,
                     declared_tools=adapter.declared_tools(),
+                    project_server_names=[s.name for s in self._mgrs.settings.get_project_mcp_servers()],
                 )
                 if ws_id
                 else []
@@ -290,6 +291,7 @@ class RunSetup:
                 runtime_config=runtime_config_view,
                 python_agent_config=python_agent_config_view,
                 ws_allowed_tools=ws_allowed_tools,
+                extra_env=None,
             )
             return adapter, rendered
 

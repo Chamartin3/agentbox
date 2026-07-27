@@ -16,9 +16,6 @@ def validate_via_config():
 
     def _validate(output, agent, workdir) -> tuple[bool, str, str]:
         agent.__dict__["_config_json"] = {
-            "execution": {
-                "output_validation_engine": agent.runner.output_validation_engine,
-            },
             "python": {"output_schema_path": agent.runner.output_schema_path},
         }
         r = check_output(agent, workdir, output)

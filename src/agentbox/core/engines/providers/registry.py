@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 _MODEL_CACHE: dict[
     tuple[str, str | None, str | None, str | None], tuple[Any, float]
 ] = {}
-_CACHE_TTL_SECONDS = 60
+_CACHE_TTL_SECONDS = 3600  # 1-hour cache — cold-load pages have data without a live round-trip
 
 
 def _cache_key(
@@ -76,7 +76,9 @@ def _initialize_providers() -> None:
     _PROVIDERS["xai"] = xai.XAIAdapter()
     _PROVIDERS["deepseek"] = deepseek.DeepSeekAdapter()
     _PROVIDERS["ollama"] = ollama.OllamaAdapter()
-    _PROVIDERS[BackendName.CODEX] = cli.CodexCLIAdapter()
+    # NB: codex is intentionally NOT a provider — it is a harness (the OpenAI
+    # Codex CLI) that runs OpenAI models. It appears in openai.compatible_backends
+    # and its model catalog is listed via _listing_adapter() when backend=codex.
 
 
 def refresh_opencode_providers() -> list[str]:
@@ -100,19 +102,27 @@ def refresh_opencode_providers() -> list[str]:
         existing = _PROVIDERS.get(prefix)
         if existing is not None:
             compat = list(existing.descriptor.compatible_backends or [])
-            if BackendName.OPENCODE in compat:
-                # A first-class adapter already covers this prefix for the
-                # opencode backend (e.g. Ollama) — don't shadow it.
-                continue
-            # An HTTP/token-only adapter owns the bare id (e.g. ``openai``).
-            # Register the opencode-side view under a namespaced id so both
-            # remain available.
-            descriptor_id = f"opencode-{prefix}"
-        else:
-            descriptor_id = prefix
-        _PROVIDERS[descriptor_id] = cli.OpenCodeCLIAdapter(
+            if BackendName.OPENCODE not in compat:
+                # A first-class (HTTP/token) adapter already owns this prefix
+                # (e.g. ``openai``, ``deepseek``). opencode drives the *same*
+                # provider, so mark that existing provider opencode-compatible
+                # rather than cloning a confusing ``opencode-<prefix>`` sibling.
+                # model_copy shadows the (ClassVar) descriptor on this instance
+                # only, keeping the adapter class pristine for fresh instances.
+                # setattr: shadow the ClassVar descriptor on this instance only
+                # (the ProviderAdapter protocol types ``descriptor`` read-only).
+                setattr(
+                    existing,
+                    "descriptor",
+                    existing.descriptor.model_copy(
+                        update={"compatible_backends": [*compat, BackendName.OPENCODE]}
+                    ),
+                )
+            continue
+        # No first-class adapter owns this prefix — register the opencode view.
+        _PROVIDERS[prefix] = cli.OpenCodeCLIAdapter(
             cli_prefix=prefix,
-            descriptor_id=descriptor_id,
+            descriptor_id=prefix,
         )
 
     # Invalidate any cached model listings — provider set just changed.
@@ -145,6 +155,24 @@ def get_provider(provider_id: str) -> ProviderAdapter | None:
     return _PROVIDERS.get(provider_id)
 
 
+def _listing_adapter(provider_id: str, backend: str | None) -> ProviderAdapter | None:
+    """Adapter that lists ``provider_id``'s models *as seen by* ``backend``.
+
+    A vendor's model catalog depends on the harness that runs it: the token
+    backend reads the vendor's HTTP ``/models``; the opencode/codex CLIs each
+    report their own catalog. So listing is dispatched by harness, not just by
+    provider — this is what lets one vendor row show models grouped per harness.
+    """
+    if backend == BackendName.CODEX:
+        return cli.CodexCLIAdapter()
+    if backend == BackendName.OPENCODE:
+        existing = _PROVIDERS.get(provider_id)
+        if isinstance(existing, cli.OpenCodeCLIAdapter):
+            return existing
+        return cli.OpenCodeCLIAdapter(cli_prefix=provider_id)
+    return _PROVIDERS.get(provider_id)
+
+
 async def list_models(
     provider_id: str, config: Any, refresh: bool = False
 ) -> list[ProviderModel]:
@@ -162,13 +190,13 @@ async def list_models(
         ValueError: If provider not found or config missing required fields.
         Exception: For HTTP errors (passed through).
     """
-    adapter = get_provider(provider_id)
-    if not adapter:
-        raise ValueError(f"Provider not found: {provider_id}")
-
     base_url = config.base_url if config else None
     api_key_env = config.api_key_env if config else None
     backend = config.backend if config else None
+
+    adapter = _listing_adapter(provider_id, backend)
+    if not adapter:
+        raise ValueError(f"Provider not found: {provider_id}")
 
     if not refresh:
         cached = _get_cached_models(provider_id, base_url, api_key_env, backend)

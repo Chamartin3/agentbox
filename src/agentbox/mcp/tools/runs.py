@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 from pydantic import BaseModel
 
 from agentbox.core.data import NotFoundResult, RunErrorResult, RunLogsResult, RunOutputResult, UsagePayload
+from agentbox.core.data.payload_types import TranscriptResult
 from agentbox.mcp.context import MCPContext
 from agentbox.mcp.schemas import clamp_limit
 
@@ -68,7 +69,7 @@ def register(mcp: FastMCP, ctx: MCPContext) -> None:
         }
 
     @mcp.tool
-    def get_run_transcript(run_id: str, limit: int = 200, offset: int = 0) -> dict:
+    def get_run_transcript(run_id: str, limit: int = 200, offset: int = 0) -> TranscriptResult:
         """Paginated slice of the JSONL transcript for a run."""
         limit = clamp_limit(limit)
         return ctx.execution.get_transcript(run_id, limit, offset)

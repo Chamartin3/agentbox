@@ -70,3 +70,28 @@ def context_filenames() -> list[str]:
     return sorted(n for n in names if n)
 
 
+def engine_artifact_paths() -> tuple[frozenset[str], frozenset[str]]:
+    """Files/dirs the builder writes for every engine, read from each recipe's
+    ``layout`` so the set tracks the registered backends automatically.
+
+    Returns ``(root_files, dir_prefixes)``. A layout value is a path template
+    for an artifact the builder materializes (``CLAUDE.md``, ``.mcp.json``,
+    ``.claude/agents/{name}.md`` …). Root-level filenames become exact-match
+    ``root_files``; any nested or per-``{name}`` path contributes its
+    top-level directory (``.claude/``, ``.opencode/``, ``.codex/``) as a
+    ``dir_prefix``.
+    """
+    root_files: set[str] = set()
+    dir_prefixes: set[str] = set()
+    for engine in list_recipes():
+        for value in load_recipe(engine).layout.values():
+            if not value:
+                continue
+            head = value.split("{", 1)[0]  # drop per-name placeholder tail
+            if "/" in head:
+                dir_prefixes.add(head.split("/", 1)[0] + "/")
+            else:
+                root_files.add(head)
+    return frozenset(root_files), frozenset(dir_prefixes)
+
+

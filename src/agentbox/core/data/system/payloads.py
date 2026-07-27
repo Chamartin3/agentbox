@@ -96,7 +96,6 @@ class ExecutionSection(TypedDict):
 
     max_validation_retries: int
     max_error_retries: int
-    output_validation_engine: str
 
 
 class RuntimeSection(TypedDict):

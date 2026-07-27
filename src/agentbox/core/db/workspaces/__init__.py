@@ -1,8 +1,9 @@
 """Workspaces domain — entities and managers merged.
 
 Maps to the ``workspaces``, ``workspace_env_docs``, ``workspace_env_doc_versions``,
-``workspace_mcp_overrides``, ``workspace_mcp_tool_overrides``, ``workspace_mcp_policies``,
-``workspace_runtime_permissions``, and ``workspace_subagents`` tables.
+``workspace_mcp_overrides``, ``workspace_mcp_tool_overrides``,
+``workspace_mcp_policies``, ``workspace_runtime_permissions``, and
+``workspace_subagents`` tables.
 """
 from __future__ import annotations
 

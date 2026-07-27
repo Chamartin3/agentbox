@@ -62,7 +62,6 @@ from agentbox.core.db.runs import (
     WebhookDeliveryManager,
 )
 from agentbox.core.db.system import (
-    ApiTokenManager,
     HostEnvCallLogManager,
     HostEnvProfileManager,
     ManagedCredentialManager,
@@ -103,7 +102,7 @@ class Database:
             db.active_resource_versions,
             db.agent_prompt_resource_bindings, db.workspace_file_resource_bindings
         db.runner_profiles
-        db.api_tokens, db.settings, db.host_env_profiles, db.host_env_call_log,
+        db.settings, db.host_env_profiles, db.host_env_call_log,
             db.mcp_tool_discovery_cache
     """
 
@@ -163,7 +162,6 @@ class Database:
         self.runner_profiles = RunnerProfileManager(self._engine)
 
         # System domain
-        self.api_tokens = ApiTokenManager(self._engine)
         self.managed_credentials = ManagedCredentialManager(self._engine)
         self.settings = SettingManager(self._engine)
         self.host_env_profiles = HostEnvProfileManager(self._engine)

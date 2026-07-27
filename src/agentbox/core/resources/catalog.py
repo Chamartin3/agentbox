@@ -21,7 +21,8 @@ def resolve_resource_callables(
             name=(b.get("target_path") or b.get("resource_id") or ""),
             kind="resource",
             description=f"Resource binding: {b.get('resource_id', '')}",
-            policy={"resource_id": b.get("resource_id", ""), "target_path": b.get("target_path", "")},
+            # `or ""` guards against a row whose key is present but None.
+            policy={"resource_id": b.get("resource_id") or "", "target_path": b.get("target_path") or ""},
         )
         for b in bindings
     ]

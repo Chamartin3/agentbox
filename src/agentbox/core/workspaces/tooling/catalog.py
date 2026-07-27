@@ -88,6 +88,7 @@ def resolve_workspace_callables(
     mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
     mcp_registry: McpRegistry | None = None,
     declared_tools: list[CanonicalTool] | None = None,
+    project_server_names: list[str] | None = None,
 ) -> list[CallableItem]:
     """Return every callable item available in *workspace_id* — the availability
     surface (what exists), never authorization (who may).
@@ -100,7 +101,10 @@ def resolve_workspace_callables(
     """
     return enumerate_callables([
         _declared_tool_callables(declared_tools),
-        resolve_mcp_callables(workspace_id, mcp_policies, mcp_overrides, mcp_tool_overrides, mcp_registry),
+        resolve_mcp_callables(
+            workspace_id, mcp_policies, mcp_overrides, mcp_tool_overrides,
+            mcp_registry, project_server_names,
+        ),
         resolve_host_env_callables(),
         resolve_resource_callables(workspace_id, workspace_file_resource_bindings),
         _builtin_complement_callables(),
@@ -113,23 +117,32 @@ def resolve_mcp_callables(
     mcp_overrides: WorkspaceMcpOverrideManager,
     mcp_tool_overrides: WorkspaceMcpToolOverrideManager,
     mcp_registry: McpRegistry | None,
+    project_server_names: list[str] | None = None,
 ) -> list[CallableItem]:
     """Return CallableItems for every enabled, non-disabled MCP tool.
 
     Reads MCP policy, server overrides, and tool overrides from the
     respective managers, then cross-references with ``McpToolManifest``
     (tool names + descriptions).
+
+    The server *universe* is *project_server_names* (the project-level MCP
+    servers) plus any per-workspace override servers — the same set the
+    ``/mcp/servers`` view resolves. This must NOT be the whole discovery
+    cache (``mcp_registry.manifest.servers``): a stale cache entry for a
+    server no workspace configures would otherwise leak into every
+    workspace under an allow-all policy. ``None`` keeps the legacy
+    global-manifest behaviour for callers that haven't been scoped yet.
     """
     if mcp_registry is None:
         return []
 
-    # Build the manifest-servers list.
-    manifest_servers: list[dict] = [
-        {"name": name, "config": {}}
-        for name in mcp_registry.manifest.servers
-    ]
-    if not manifest_servers:
-        return []
+    # Build the server-universe list — scoped to configured servers.
+    base_names = (
+        list(project_server_names)
+        if project_server_names is not None
+        else list(mcp_registry.manifest.servers)
+    )
+    manifest_servers: list[dict] = [{"name": name, "config": {}} for name in base_names]
 
     # Resolve MCP policy and overrides from managers.
     policy = mcp_policies.get_policy(workspace_id)

@@ -23,10 +23,22 @@ from collections.abc import Mapping
 from agentbox.core.data.constants import PROVIDER_KEY_ENV_VARS
 
 
-def build_run_env(creds: Mapping[str, str] | None) -> dict[str, str]:
-    """Base env for a run's agent subprocess (see module docstring)."""
-    if creds is None:
+def build_run_env(
+    creds: Mapping[str, str] | None,
+    *,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Base env for a run's agent subprocess (see module docstring).
+
+    *extra* is merged after ``os.environ`` (provider-key stripped) but
+    before *creds* — so workspace custom env vars are visible, but
+    credential-managed provider keys always win over same-named vars.
+    """
+    if creds is None and extra is None:
         return dict(os.environ)
     env = {k: v for k, v in os.environ.items() if k not in PROVIDER_KEY_ENV_VARS}
-    env.update(creds)
+    if extra:
+        env.update(extra)
+    if creds:
+        env.update(creds)
     return env

@@ -186,6 +186,17 @@ class WorkspaceMcpOverrideManager(Manager[WorkspaceMcpOverride]):
         assert row is not None
         return cast(WorkspaceMcpOverrideRow, dict(row._mapping))
 
+    def delete_override(self, workspace_id: str, server_name: str) -> bool:
+        """Delete a workspace's server override. Returns True if a row was removed."""
+        with self._engine.begin() as conn:
+            result = conn.execute(
+                workspace_mcp_overrides.delete().where(
+                    (workspace_mcp_overrides.c.workspace_id == workspace_id)
+                    & (workspace_mcp_overrides.c.server_name == server_name)
+                )
+            )
+        return result.rowcount > 0
+
 
 class WorkspaceMcpToolOverrideManager(Manager[WorkspaceMcpToolOverride]):
     """Manager for the ``workspace_mcp_tool_overrides`` table."""

@@ -9,10 +9,13 @@ validation, cross-manager orchestration.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import re
 import shutil
 import tempfile
+from functools import lru_cache
 from dataclasses import replace
 from contextlib import contextmanager, suppress
 from pathlib import Path
@@ -20,7 +23,7 @@ from collections.abc import Collection, Iterator
 from typing import Any
 
 from agentbox.core.config import Settings, load_settings
-from agentbox.core.data.constants import McpPolicy
+from agentbox.core.data.constants import DEFAULT_WORKSPACE_NAME, McpPolicy
 from agentbox.core.data import AgentDef, EnvDocPreviewResult, EnvDocRow
 from agentbox.core.data.payload_types import (
     EffectivePermissions,
@@ -66,6 +69,7 @@ from agentbox.core.data.rows import (
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.tooling.catalog import resolve_host_env_callables, resolve_workspace_callables
 from agentbox.core.workspaces.tooling.catalog import resolve_mcp_callables
+from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry, McpServerConfig
 from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
 from agentbox.core.service.system import SystemService
@@ -99,15 +103,24 @@ from agentbox.core.data.errors import (
 
 logger = logging.getLogger(__name__)
 
-_FILE_HIDE_PREFIXES = (
-    ".agentbox/",
-    ".claude/",
-    ".opencode/",
-    "permissions/",
-    "skills/",
-)
+# Internal artifacts the builder/executor writes that no engine recipe
+# declares (agentbox metadata, legacy permission/skill materialization dirs).
+# Everything engine-specific — CLAUDE.md, AGENTS.md, .mcp.json, opencode.json,
+# .claude/, .opencode/, .codex/ — is derived from the recipe layouts below,
+# so a new backend needs no edit here.
+_INTERNAL_HIDE_PREFIXES = (".agentbox/", "permissions/", "skills/")
 
-_RENDERED_ARTIFACT_FILES = frozenset({"CLAUDE.md", "AGENTS.md"})
+
+@lru_cache(maxsize=1)
+def _artifact_matchers() -> tuple[frozenset[str], tuple[str, ...]]:
+    """``(exact_files, dir_prefixes)`` of non-user files, hidden from the
+    workspace file view. Engine config artifacts come from the recipes; the
+    internal dirs are appended. Cached — recipes load once per process."""
+    from agentbox.core.engines.backends.recipe_loader import engine_artifact_paths
+
+    root_files, dir_prefixes = engine_artifact_paths()
+    prefixes = tuple(sorted(set(dir_prefixes) | set(_INTERNAL_HIDE_PREFIXES)))
+    return root_files, prefixes
 
 _READ_PREFIXES: frozenset[str] = frozenset(
     {"list_", "get_", "search_", "check_", "select_", "find_"}
@@ -139,11 +152,23 @@ def _is_read_tool(tool: str) -> bool:
 
 
 def is_user_file(rel_path: str) -> bool:
-    if rel_path in _RENDERED_ARTIFACT_FILES:
+    exact_files, dir_prefixes = _artifact_matchers()
+    if rel_path in exact_files:
         return False
     return not any(
-        rel_path == p.rstrip("/") or rel_path.startswith(p) for p in _FILE_HIDE_PREFIXES
+        rel_path == p.rstrip("/") or rel_path.startswith(p) for p in dir_prefixes
     )
+
+
+def _match_resource_root(rel_path: str, roots: dict[str, str]) -> str | None:
+    """Return the slug of the resource that owns *rel_path* (exact file or a
+    file under a folder root), preferring the most specific root, else None."""
+    best: str | None = None
+    best_len = -1
+    for root, slug in roots.items():
+        if (rel_path == root or rel_path.startswith(root + "/")) and len(root) > best_len:
+            best, best_len = slug, len(root)
+    return best
 
 
 # ── WorkspaceService ───────────────────────────────────────────────────
@@ -181,6 +206,35 @@ class WorkspaceService(Service):
         except Exception:
             return {}
 
+    def _get_skill_counts(self) -> dict[str, int]:
+        """{workspace: associated-skill count} — bound skill resources, not
+        on-disk SKILL.md discovery (the table shows what's configured)."""
+        try:
+            return self._db.workspace_file_resource_bindings.count_skills_by_workspace()
+        except Exception:
+            return {}
+
+    def _agents_by_workspace(self) -> dict[str, list[str]]:
+        """Map named-workspace → agent ids that reference it.
+
+        ponytail: counts latest-version-per-agent; a soft-deleted agent could
+        linger. Filter via agent_meta if that ever proves wrong.
+        """
+        out: dict[str, list[str]] = {}
+        try:
+            rows = self._db.agent_versions.list_latest_per_agent()
+        except Exception:
+            return out
+        for row in rows:
+            try:
+                agent = AgentDef.from_db_row(row)
+            except Exception:
+                continue
+            ws = agent.workspace
+            if ws and ws != "<ephemeral>":
+                out.setdefault(ws, []).append(agent.id)
+        return out
+
     # ═══════════════════════════════════════════════════════════════════
     # Workspace registry (from WorkspacesMixin + registry.py)
     # ═══════════════════════════════════════════════════════════════════
@@ -202,6 +256,8 @@ class WorkspaceService(Service):
             }
 
         resource_counts = self._get_resource_counts()
+        skill_counts = self._get_skill_counts()
+        agents_map = self._agents_by_workspace()
 
         result: list[WorkspaceListItem] = []
         for ws_row in registry:
@@ -209,12 +265,11 @@ class WorkspaceService(Service):
             rel_path = ws_row.get("path")
             ws_path = _s.project_root / rel_path if rel_path else ws_root / name
             file_count = 0
-            skill_count = 0
             if ws_path.exists():
                 for p in ws_path.rglob("*"):
                     if p.is_file() and is_user_file(str(p.relative_to(ws_path))):
                         file_count += 1
-                skill_count = len(discover_skills(ws_path))
+            agents = agents_map.get(name, [])
             result.append(
                 {
                     "name": name,
@@ -222,10 +277,10 @@ class WorkspaceService(Service):
                     "description": ws_row.get("description"),
                     "source": ws_row.get("source"),
                     "kind": "named",
-                    "agents": [],
-                    "agent_count": 0,
+                    "agents": agents,
+                    "agent_count": len(agents),
                     "file_count": file_count,
-                    "skill_count": skill_count,
+                    "skill_count": skill_counts.get(name, 0),
                     "resource_count": resource_counts.get(name, 0),
                     "exists": ws_path.exists(),
                     "on_disk": name in disk_ids,
@@ -283,6 +338,10 @@ class WorkspaceService(Service):
         settings: Settings | None = None,
         purge_disk: bool = False,
     ) -> WorkspaceDeleteResult:
+        if name == DEFAULT_WORKSPACE_NAME:
+            raise ValueError(
+                f"the {DEFAULT_WORKSPACE_NAME!r} workspace is protected and cannot be deleted"
+            )
         existing = self._workspaces.get_by_name(name)
         if existing is None:
             raise WorkspaceNotFound(name)
@@ -347,6 +406,14 @@ class WorkspaceService(Service):
         settings: Settings | None = None,
     ) -> WorkspaceDetail:
         ws_path, _ = self.resolve_workspace_path(name, settings=settings)
+        # Map materialized target roots → resource slug so files can be tagged
+        # as resource-backed vs plain on-disk. Best-effort — never block the
+        # file listing on resource resolution.
+        roots: dict[str, str] = {}
+        with suppress(Exception):
+            from agentbox.core.service.resources import ResourceService
+
+            roots = ResourceService().workspace_resource_roots(name)
         files: list[WorkspaceFileInfo] = []
         if ws_path.exists():
             for p in sorted(ws_path.rglob("*")):
@@ -354,7 +421,13 @@ class WorkspaceService(Service):
                     rel = str(p.relative_to(ws_path))
                     if not is_user_file(rel):
                         continue
-                    files.append({"path": rel, "size": p.stat().st_size})
+                    files.append(
+                        {
+                            "path": rel,
+                            "size": p.stat().st_size,
+                            "resource": _match_resource_root(rel, roots),
+                        }
+                    )
         return {
             "name": name,
             "path": str(ws_path),
@@ -497,6 +570,12 @@ class WorkspaceService(Service):
             actor=actor,
         )
 
+    def delete_mcp_server_override(self, workspace_id: str, server_name: str) -> bool:
+        """Remove a workspace MCP override. For a workspace-only server this
+        deletes it entirely; for an inherited server it clears the override
+        (reverting to the default policy). Returns True if a row was removed."""
+        return self._mcp_overrides.delete_override(workspace_id, server_name)
+
     def list_mcp_tool_overrides(self, workspace_id: str) -> list[WorkspaceMcpToolOverrideRow]:
         return self._mcp_tool_overrides.list_for_workspace(workspace_id)
 
@@ -511,6 +590,43 @@ class WorkspaceService(Service):
     ) -> WorkspaceMcpToolOverrideRow:
         return self._mcp_tool_overrides.set_override(
             workspace_id, server_name, tool_name, enabled=enabled, actor=actor
+        )
+
+    def _discovered_tool_names(
+        self, server_names: Collection[str]
+    ) -> dict[str, list[str]]:
+        """Read discovered tool names per server from the MCP discovery cache
+        (``{mcp_cache_dir}/{name}.json``, populated by ``sync_servers``).
+        Missing/unreadable/empty caches are simply skipped."""
+        cache_dir = self._settings.mcp_cache_dir
+        out: dict[str, list[str]] = {}
+        for name in server_names:
+            path = cache_dir / f"{name}.json"
+            if not path.is_file():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            names = [t.get("name", "") for t in data.get("tools", []) if t.get("name")]
+            if names:
+                out[name] = names
+        return out
+
+    def resolve_workspace_mcp_view(
+        self,
+        workspace_id: str,
+        *,
+        settings: Settings | None = None,
+    ) -> ResolvedWorkspaceMcp:
+        """``resolve_workspace_mcp`` enriched with discovered tool names read
+        from the discovery cache — the shape the workspace UI consumes."""
+        servers = SystemService().get_project_mcp_servers()
+        names: set[str] = {s.name for s in servers}
+        names |= {o["server_name"] for o in self._mcp_overrides.list_for_workspace(workspace_id)}
+        discovered = self._discovered_tool_names(names)
+        return self.resolve_workspace_mcp(
+            workspace_id, discovered_tools=discovered, settings=settings
         )
 
     def resolve_workspace_mcp(
@@ -554,9 +670,10 @@ class WorkspaceService(Service):
                 enabled = policy == "allow_all_unless_disabled"
             base_cfg = manifest_entry.get("config") if manifest_entry else None
             cfg = _shallow_merge(base_cfg, (override or {}).get("config_overrides"))
+            server_tools = list(discovered_tools.get(name, [])) if discovered_tools else []
             disabled_tools: list[str] = []
-            if enabled and discovered_tools:
-                for tool in discovered_tools.get(name, []):
+            if enabled and server_tools:
+                for tool in server_tools:
                     flag = tool_overrides.get((name, tool))
                     if flag is False:
                         disabled_tools.append(tool)
@@ -570,6 +687,7 @@ class WorkspaceService(Service):
                     "config": cfg,
                     "disabled_tools": disabled_tools,
                     "source": source,
+                    "tools": server_tools,
                 }
             )
         return {"servers": out_servers, "policy": policy}
@@ -619,6 +737,36 @@ class WorkspaceService(Service):
         for s in resolved.get("servers", []):
             removed += self._discovery_cache.invalidate_server_cache(s["name"])
         return {"invalidated": removed}
+
+    async def sync_mcp_discovery(self, workspace_id: str) -> McpDiscoveryRefreshResult:
+        """Connect to this workspace's enabled MCP servers and (re)populate the
+        discovery cache with their tool lists. Returns the total tool count
+        discovered. Servers that can't be reached contribute 0 (no failure).
+        """
+        resolved = self.resolve_workspace_mcp(workspace_id)
+        specs: list[McpServerConfig] = []
+        for s in resolved.get("servers", []):
+            if not s.get("enabled"):
+                continue
+            cfg: dict = dict(s.get("config") or {})
+            spec: McpServerConfig = {
+                "name": s["name"],
+                "transport": cfg.get("transport", "stdio"),
+            }
+            url = cfg.get("url")
+            command = cfg.get("command")
+            if url:
+                spec["url"] = url
+            if command:
+                spec["command"] = list(command)
+            specs.append(spec)
+        registry = McpRegistry(self._settings.mcp_cache_dir)
+        with suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(registry.sync_servers(specs), timeout=45)
+        discovered = self._discovered_tool_names(
+            {n for s in specs if (n := s.get("name"))}
+        )
+        return {"invalidated": sum(len(v) for v in discovered.values())}
 
     def refresh_workspace_mcp_cache(self, workspace_id: str) -> list[McpServerCacheStatus]:
         """Invalidate the on-disk MCP discovery cache for every server visible
@@ -781,6 +929,7 @@ class WorkspaceService(Service):
             self._mcp_overrides,
             self._mcp_tool_overrides,
             mcp_registry,
+            project_server_names=[s.name for s in self._db.settings.get_project_mcp_servers()],
         )
 
     def mcp_callables(
@@ -795,6 +944,7 @@ class WorkspaceService(Service):
             self._mcp_overrides,
             self._mcp_tool_overrides,
             mcp_registry,
+            project_server_names=[s.name for s in self._db.settings.get_project_mcp_servers()],
         )
 
     def host_env_callables(self, workspace_id: str) -> list[CallableItem]:

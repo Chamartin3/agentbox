@@ -18,12 +18,14 @@ class McpRemote(BaseModel):
     type: str = "remote"
     url: str
     enabled: bool = True
+    exclude: list[str] | None = None
 
 
 class McpLocal(BaseModel):
     type: str = "local"
     command: list[str]
     enabled: bool = True
+    exclude: list[str] | None = None
 
 
 class AgentEntry(BaseModel):

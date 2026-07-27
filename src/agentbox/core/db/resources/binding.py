@@ -274,6 +274,22 @@ class WorkspaceFileResourceBindingManager(Manager[WorkspaceFileResourceBinding])
             )
             return {r._mapping["workspace_id"]: int(r._mapping["n"]) for r in rows}
 
+    def count_skills_by_workspace(self) -> dict[str, int]:
+        """Return {workspace_id: skill_binding_count} — only skill-type bindings.
+
+        The workspaces table shows *associated* skills (bound skill
+        resources), not on-disk SKILL.md discovery.
+        """
+        b = workspace_file_resource_bindings
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(b.c.workspace_id, func.count().label("n"))
+                .select_from(b.join(resources_table, resources_table.c.id == b.c.resource_id))
+                .where(resources_table.c.type == "skill")
+                .group_by(b.c.workspace_id)
+            )
+            return {r._mapping["workspace_id"]: int(r._mapping["n"]) for r in rows}
+
     def replace_for_workspace(
         self,
         workspace_id: str,
