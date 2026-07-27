@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 
 from agentbox.core.data.payload_types import McpDiscoveryRefreshResult, ResolvedWorkspaceMcp
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.mcp.registry import McpRegistry
 
 from typing import Annotated, TypedDict
 

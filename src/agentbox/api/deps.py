@@ -17,7 +17,7 @@ from agentbox.core.service import (
     WorkspaceService,
 )
 from agentbox.core.execution.orchestrate.executor import RunExecutor
-from agentbox.core.workspaces.tooling.mcp import McpRegistry
+from agentbox.core.mcp import McpRegistry
 
 
 @lru_cache(maxsize=1)
@@ -63,9 +63,22 @@ def get_workspace_service() -> WorkspaceService:
     return WorkspaceService()
 
 
+def _resolve_workspace_creds(ws_id: str) -> dict[str, str] | None:
+    cs = CredentialService()
+    if cs.list_workspace_credentials(ws_id):
+        return cs.resolve_env_for_workspace(ws_id)
+    return None
+
+
 @lru_cache(maxsize=1)
 def get_executor() -> RunExecutor:
-    return RunExecutor(get_settings(), get_mcp_registry())
+    # Inject service-backed resolvers so core.execution never imports core.service.
+    return RunExecutor(
+        get_settings(),
+        get_mcp_registry(),
+        resolve_workspace_creds=_resolve_workspace_creds,
+        project_mcp_servers=lambda: SystemService().get_project_mcp_servers(),
+    )
 
 
 @lru_cache(maxsize=1)

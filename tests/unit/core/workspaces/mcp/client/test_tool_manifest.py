@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agentbox.core.workspaces.tooling.mcp.manifest import McpToolManifest, Tool
+from agentbox.core.mcp.manifest import McpToolManifest, Tool
 
 
 def _manifest() -> McpToolManifest:

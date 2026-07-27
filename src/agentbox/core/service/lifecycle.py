@@ -29,8 +29,8 @@ from agentbox.core.service.resources import ResourceService
 from agentbox.core.service.system import SystemService
 from agentbox.core.service.workspaces import WorkspaceService
 from agentbox.core.tools import discover_tools
-from agentbox.core.workspaces.tooling.mcp import McpRegistry
-from agentbox.core.workspaces.tooling.mcp.registry import McpServerConfig
+from agentbox.core.mcp import McpRegistry
+from agentbox.core.mcp.registry import McpServerConfig
 
 _log = logging.getLogger(__name__)
 

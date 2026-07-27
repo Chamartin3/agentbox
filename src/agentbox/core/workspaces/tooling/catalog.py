@@ -27,7 +27,7 @@ from agentbox.core.tools.builtin import BUILTIN_TOOLS, get_builtin
 from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.capabilities import CAPABILITIES
 from agentbox.core.tools.catalog import CallableItem, enumerate_callables
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.mcp.registry import McpRegistry
 
 __all__ = [
     "resolve_workspace_callables",

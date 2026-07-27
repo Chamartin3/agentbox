@@ -10,7 +10,7 @@ import string
 from pathlib import Path
 
 from agentbox.core.workspaces.build._paths import safe_dest
-from agentbox.core.workspaces.tooling.launch import resolve_mcp_launch_command
+from agentbox.core.mcp.launch import resolve_mcp_launch_command
 from agentbox.core.data.workenv import McpRef, ResourceRef, WorkspaceConfig
 from agentbox.core.data.workenv import Item, RenderedDir, Role, WrittenItem
 from agentbox.core.data.workenv import Recipe

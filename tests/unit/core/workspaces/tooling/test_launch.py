@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from agentbox.core.workspaces.tooling.launch import resolve_mcp_launch_command
+from agentbox.core.mcp.launch import resolve_mcp_launch_command
 
 
 def test_empty_argv_raises() -> None:

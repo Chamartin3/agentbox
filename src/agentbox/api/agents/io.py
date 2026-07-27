@@ -13,7 +13,7 @@ from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
 from agentbox.core.config import load_settings
 from agentbox.core.service.agents import AgentServiceError
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.mcp.registry import McpRegistry
 
 logger = logging.getLogger(__name__)
 

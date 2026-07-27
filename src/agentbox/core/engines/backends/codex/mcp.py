@@ -29,7 +29,7 @@ Phase 0 findings (verified 2026-07-31):
 from __future__ import annotations
 
 from agentbox.core.data.payload_types import AgentMetaDict, ExternalMcpServer, McpServerConfig, McpStdioServerSpec
-from agentbox.core.workspaces.tooling.launch import resolve_mcp_launch_command
+from agentbox.core.mcp.launch import resolve_mcp_launch_command
 
 
 def _toml_string(s: str) -> str:

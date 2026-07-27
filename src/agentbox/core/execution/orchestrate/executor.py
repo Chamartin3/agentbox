@@ -7,6 +7,7 @@ concrete manager instances and passes those to its sub-components. No
 """
 
 from __future__ import annotations
+from collections.abc import Callable
 from typing import Any
 
 import asyncio
@@ -37,9 +38,9 @@ from agentbox.core.data.composition import ComposedPrompt, RunSpec
 from agentbox.core.execution.observability.snapshot import SnapshotManagers, SnapshotWriter
 from agentbox.core.execution.orchestrate.steploop import RunStepLoop
 from agentbox.core.execution.retry import pump_into_session  # noqa: F401
-from agentbox.core.data import RenderedConfig
+from agentbox.core.data import McpServerSpec, RenderedConfig
 from agentbox.core.workspaces import Workspaces
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.mcp.registry import McpRegistry
 from agentbox.core.workspaces.tooling.servers import resolve_workspace_mcp_helper
 from agentbox.core.db.config import load_project_mcp_servers
 from agentbox.core.data.constants import AGENT_TOOLS_SERVER_NAME, HOST_ENV_SERVER_NAME
@@ -61,6 +62,8 @@ class RunExecutor:
         mcp_registry: "McpRegistry | None" = None,
         *,
         db: Database | None = None,
+        resolve_workspace_creds: Callable[[str], dict[str, str] | None] | None = None,
+        project_mcp_servers: Callable[[], list[McpServerSpec]] | None = None,
     ) -> None:
         # Self-wire the store from settings (like Services); ``db`` stays an
         # optional injection point for tests. DI never opens the store.
@@ -89,6 +92,8 @@ class RunExecutor:
             ),
             settings,
             mcp_registry,
+            resolve_workspace_creds=resolve_workspace_creds,
+            project_mcp_servers=project_mcp_servers,
         )
         self._snapshots = SnapshotWriter(
             SnapshotManagers(

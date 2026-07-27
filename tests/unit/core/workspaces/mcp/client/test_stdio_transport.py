@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agentbox.core.workspaces.tooling.mcp.transport import McpClient, McpError
+from agentbox.core.mcp.transport import McpClient, McpError
 
 
 # ---------------------------------------------------------------------------

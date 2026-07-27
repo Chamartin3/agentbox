@@ -15,8 +15,8 @@ from typing import Literal, TypedDict
 
 from agentbox.core.data import JsonSchemaDict, McpHealthReportDict, McpServerHealthDict, validate_json_schema
 from jsonschema.exceptions import SchemaError
-from agentbox.core.workspaces.tooling.mcp.manifest import McpToolManifest, Tool
-from agentbox.core.workspaces.tooling.mcp.transport import McpClient
+from agentbox.core.mcp.manifest import McpToolManifest, Tool
+from agentbox.core.mcp.transport import McpClient
 
 logger = logging.getLogger(__name__)
 

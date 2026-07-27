@@ -24,7 +24,7 @@ from agentbox.api.context import APIContext
 from agentbox.api.deps import get_api_context
 from agentbox.core.config import load_settings
 from agentbox.core.service import McpServerSpec
-from agentbox.core.workspaces.tooling.mcp.transport import McpClient, McpError
+from agentbox.core.mcp.transport import McpClient, McpError
 
 router = APIRouter(prefix="/api/project", tags=["project"])
 

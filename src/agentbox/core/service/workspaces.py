@@ -69,7 +69,7 @@ from agentbox.core.data.rows import (
 from agentbox.core.tools.catalog import CallableItem
 from agentbox.core.workspaces.tooling.catalog import resolve_host_env_callables, resolve_workspace_callables
 from agentbox.core.workspaces.tooling.catalog import resolve_mcp_callables
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry, McpServerConfig
+from agentbox.core.mcp.registry import McpRegistry, McpServerConfig
 from agentbox.core.resources.skills import discover_skills, find_skill
 from agentbox.core.service.base import Service
 from agentbox.core.service.system import SystemService

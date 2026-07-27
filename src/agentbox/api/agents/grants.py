@@ -17,7 +17,7 @@ from agentbox.api.deps import get_agent_service, get_mcp_registry, get_resource_
 from agentbox.core.data.rows import AgentToolGrantRow
 from agentbox.core.service import AgentService
 from agentbox.core.service.workspaces import WorkspaceService
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.mcp.registry import McpRegistry
 
 router = APIRouter(prefix="/api/agents", tags=["agent-tool-grants"])
 

@@ -36,7 +36,7 @@ from agentbox.core.data.payload_types import ExternalMcpServer
 from agentbox.core.data import CanonicalTool
 from agentbox.core.tools.mcp_servers.specs import host_env_server_spec
 from agentbox.core.tools.grants import GrantViolation, check_capability
-from agentbox.core.workspaces.tooling.launch import resolve_mcp_launch_command
+from agentbox.core.mcp.launch import resolve_mcp_launch_command
 
 logger = logging.getLogger(__name__)
 

@@ -109,7 +109,7 @@ from agentbox.core.workspaces.workdir import ensure as ensure
 from agentbox.core.workspaces.workdir import info as info
 from agentbox.core.workspaces.workdir import reset as reset
 from agentbox.core.workspaces.workdir import resolve_path as resolve_path
-from agentbox.core.workspaces.tooling.mcp import McpRegistry as McpRegistry
+from agentbox.core.mcp import McpRegistry as McpRegistry
 
 # ── WorkspaceService ────────────────────────────────────────
 from agentbox.core.service.workspaces import WorkspaceService as WorkspaceService

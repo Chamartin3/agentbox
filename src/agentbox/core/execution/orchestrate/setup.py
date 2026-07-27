@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from agentbox.core.agents import resolve_engine
 from agentbox.core.config import Settings
-from agentbox.core.data import AgentDef
+from agentbox.core.data import AgentDef, McpServerSpec
 from agentbox.core.db import (
     AgentPromptResourceBindingManager,
     AgentToolGrantManager,
@@ -32,7 +33,7 @@ from agentbox.core.execution.orchestrate.generator import (
 )
 from agentbox.core.data import CanonicalTool
 from agentbox.core.workspaces import resolve_path
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.mcp.registry import McpRegistry
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
 
 logger = logging.getLogger(__name__)
@@ -128,10 +129,18 @@ class RunSetup:
         mgrs: SetupManagers,
         settings: Settings,
         mcp_registry: "McpRegistry | None",
+        *,
+        resolve_workspace_creds: Callable[[str], dict[str, str] | None] | None = None,
+        project_mcp_servers: Callable[[], list[McpServerSpec]] | None = None,
     ) -> None:
         self._mgrs = mgrs
         self.settings = settings
         self._mcp_registry = mcp_registry
+        # Injected by the DI layer (which may touch core.service); keeps
+        # core.execution from importing the service layer. None → creds
+        # inherit the full container env and no project MCP servers are added.
+        self._resolve_workspace_creds = resolve_workspace_creds
+        self._project_mcp_servers = project_mcp_servers
 
     # ------------------------------------------------------------------ workdir
     def prepare_workdir(
@@ -205,8 +214,6 @@ class RunSetup:
     ) -> tuple["BackendAdapter", RenderedConfig]:
         # Resolve cross-domain values before render so backends don't
         # import from agents / workspaces / resources domains directly.
-        from agentbox.core.service.system import SystemService  # noqa: PLC0415
-
         agent_config_json = _read_agent_config_json(agent)
         runtime_config_view = RuntimeConfigView(
             allowed_tools=tuple(
@@ -236,14 +243,11 @@ class RunSetup:
         # exact env-var set that workspace granted, and the adapter scrubs all
         # other provider keys. An unconfigured workspace → `creds=None` → the
         # run inherits the full container env (legacy, non-breaking).
-        # Lazy import avoids a load-time core.execution ↔ core.service cycle.
-        from agentbox.core.service.credentials import CredentialService  # noqa: PLC0415
-
-        creds: dict[str, str] | None = None
-        if ws_id:
-            _cs = CredentialService()
-            if _cs.list_workspace_credentials(ws_id):
-                creds = _cs.resolve_env_for_workspace(ws_id)
+        creds: dict[str, str] | None = (
+            self._resolve_workspace_creds(ws_id)
+            if ws_id and self._resolve_workspace_creds
+            else None
+        )
 
         def _try_backend(name: str) -> "BackendAdapter | None":
             try:
@@ -273,7 +277,14 @@ class RunSetup:
                     self._mgrs.workspace_mcp_tool_overrides,
                     self._mcp_registry,
                     declared_tools=adapter.declared_tools(),
-                    project_server_names=[s.name for s in SystemService().get_project_mcp_servers()],
+                    project_server_names=[
+                        s.name
+                        for s in (
+                            self._project_mcp_servers()
+                            if self._project_mcp_servers
+                            else []
+                        )
+                    ],
                 )
                 if ws_id
                 else []

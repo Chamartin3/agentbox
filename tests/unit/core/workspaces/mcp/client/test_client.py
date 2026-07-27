@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from agentbox.core.workspaces.tooling.mcp.transport import McpClient, McpError
+from agentbox.core.mcp.transport import McpClient, McpError
 
 
 @pytest.mark.asyncio

@@ -118,7 +118,7 @@ from agentbox.core.service.engines import EngineService
 from agentbox.core.tools import SharedToolRegistry, ToolSpec
 from agentbox.core.workspaces import workdir as ws
 from agentbox.core.workspaces.tooling.catalog import resolve_workspace_callables
-from agentbox.core.workspaces.tooling.mcp.registry import McpRegistry
+from agentbox.core.mcp.registry import McpRegistry
 from collections.abc import Callable
 from pathlib import Path
 from sqlalchemy import func, select
