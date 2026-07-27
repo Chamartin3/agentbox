@@ -25,9 +25,13 @@ def test_list_runner_providers(client: Any) -> None:
 
 def test_list_runner_providers_filters_by_backend(client: Any) -> None:
     """Provider list can be filtered to the selected backend."""
+    # codex is a harness, not a provider — it runs OpenAI models, so filtering
+    # providers by the codex backend yields the openai vendor (not a 'codex' row).
     codex_resp = client.get("/api/runner-providers", params={"backend": "codex"})
     assert codex_resp.status_code == 200
-    assert {p["id"] for p in codex_resp.json()} == {"codex"}
+    codex_ids = {p["id"] for p in codex_resp.json()}
+    assert codex_ids == {"openai"}
+    assert "codex" not in codex_ids
 
     opencode_resp = client.get("/api/runner-providers", params={"backend": "opencode"})
     assert opencode_resp.status_code == 200

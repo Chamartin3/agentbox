@@ -42,7 +42,9 @@ class TestProviderRegistry:
         assert "openrouter" in provider_ids
         assert "xai" in provider_ids
         assert "ollama" in provider_ids
-        assert "codex" in provider_ids
+        # codex is a harness, not a provider — its models list under the openai
+        # vendor via the codex backend, so it must NOT appear as a provider.
+        assert "codex" not in provider_ids
         # opencode CLI providers are dynamically discovered; only assert
         # they get registered if discovery succeeded at import time.
 
@@ -74,9 +76,10 @@ class TestProviderRegistry:
         """Provider descriptors declare their owning backend family."""
         by_id = {p.id: p for p in list_providers()}
         assert by_id["openai"].backend == "token"
+        # openai is runnable by the codex harness (Codex CLI runs OpenAI models).
+        assert "codex" in by_id["openai"].compatible_backends
         assert by_id["ollama"].compatible_backends == ["token", "opencode"]
-        assert by_id["codex"].backend == "codex"
-        assert by_id["codex"].compatible_backends == ["codex"]
+        assert "codex" not in by_id
 
     def test_openai_descriptor_fields(self) -> None:
         """OpenAI descriptor has correct values."""

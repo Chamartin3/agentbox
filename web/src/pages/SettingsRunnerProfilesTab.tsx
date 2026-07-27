@@ -185,6 +185,9 @@ function ProvidersSection({
 }) {
   const [providers, setProviders] = useState<RunnerProvider[]>([]);
   const [creds, setCreds] = useState<CredentialInventoryEntry[]>([]);
+  // Keyed by `${providerId}::${backend}` — a vendor's catalog differs per harness
+  // (token = its HTTP API, opencode/codex = each CLI's own list). undefined = not
+  // fetched yet, [] = fetched-and-empty.
   const [models, setModels] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -205,36 +208,34 @@ function ProvidersSection({
     return { kind: 'missing' as const, env };
   };
 
-  // Fetches models for all model-listing providers on mount (uses backend cache).
-  useEffect(() => {
-    if (providers.length === 0) return;
-    const fetchAllModels = async () => {
-      const listing = providers.filter((p) => p.supports_model_listing);
-      const results = await Promise.allSettled(
-        listing.map((p) =>
-          api.listProviderModels(p.id).then((rows) => ({ id: p.id, models: rows.map((r) => (r as any).name || r.id) }))
-        ),
-      );
-      const batch: Record<string, string[]> = {};
-      for (const r of results) {
-        if (r.status === 'fulfilled') batch[r.value.id] = r.value.models;
-      }
-      setModels((prev) => ({ ...batch, ...prev }));
-    };
-    fetchAllModels();
-  }, [providers]);
-
-  const fetchModels = async (id: string) => {
-    setBusy(id);
+  const fetchFor = async (id: string, backend: string, refresh = false) => {
+    const key = `${id}::${backend}`;
+    setBusy(key);
     try {
-      const rows = await api.listProviderModels(id, { refresh: true });
-      setModels((p) => ({ ...p, [id]: rows.map((r) => r.name || r.id) }));
-      onToast({ kind: 'ok', msg: `${id}: ${rows.length} model(s)` });
+      const rows = await api.listProviderModels(id, { backend, refresh });
+      setModels((m) => ({ ...m, [key]: rows.map((r) => r.name || r.id) }));
     } catch (e) {
-      onToast({ kind: 'error', msg: `fetch models: ${(e as Error).message}` });
+      onToast({ kind: 'error', msg: `${id} via ${backend}: ${(e as Error).message}` });
+      setModels((m) => ({ ...m, [key]: [] }));
     } finally {
       setBusy(null);
     }
+  };
+
+  // Expand a vendor row and lazily fetch each harness's model list once.
+  const toggle = (p: RunnerProvider) => {
+    const open = !expanded[p.id];
+    setExpanded((e) => ({ ...e, [p.id]: open }));
+    if (open) {
+      for (const b of p.compatible_backends) {
+        if (models[`${p.id}::${b}`] === undefined) void fetchFor(p.id, b);
+      }
+    }
+  };
+
+  const copyModel = (m: string) => {
+    void navigator.clipboard.writeText(m);
+    onToast({ kind: 'ok', msg: `copied ${m}` });
   };
 
   return (
@@ -243,20 +244,21 @@ function ProvidersSection({
         <tr>
           <th style={{ textAlign: 'left' }}>Provider</th>
           <th style={{ textAlign: 'left' }}>Auth</th>
-          <th style={{ textAlign: 'left' }}>Harnesses</th>
-          <th style={{ textAlign: 'left' }}>Models</th>
-          <th></th>
+          <th style={{ textAlign: 'left' }}>Models by harness</th>
         </tr>
       </thead>
       <tbody>
         {providers.length === 0 ? (
-          <tr><td colSpan={5} className="dim">no providers</td></tr>
+          <tr><td colSpan={3} className="dim">no providers</td></tr>
         ) : (
           providers.map((p) => {
             const auth = authFor(p);
             return (
             <tr key={p.id}>
-              <td><ProviderBadge provider={p.id} /> <span className="dim">{p.label}</span></td>
+              <td>
+                <ProviderBadge provider={p.id} /> <span className="dim">{p.label}</span>
+                {p.discovered && <span className="dim" title="reported by the opencode CLI at runtime" style={{ fontSize: 10 }}> · discovered</span>}
+              </td>
               <td style={{ fontSize: 11 }}>
                 {auth.kind === 'none' ? (
                   <span className="dim">— none needed</span>
@@ -283,66 +285,61 @@ function ProvidersSection({
                 )}
               </td>
               <td>
-                <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
-                  {p.compatible_backends.map((b) => <HarnessBadge key={b} backend={b} />)}
-                </div>
-              </td>
-              <td>
-                {models[p.id] ? (
-                  <div>
+                {!p.supports_model_listing ? (
+                  <span className="dim">—</span>
+                ) : (
+                  <>
                     <button
                       className="link"
                       style={{ fontSize: 12, padding: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--link)' }}
-                      onClick={() => setExpanded((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
+                      onClick={() => toggle(p)}
                     >
-                      {models[p.id].length} model(s)
+                      {expanded[p.id] ? '▾' : '▸'} {p.compatible_backends.length} harness(es)
                     </button>
                     {expanded[p.id] && (
-                      <ul style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 11, color: 'var(--dim)' }}>
-                        {models[p.id].map((m) => (
-                          <li key={m}>
-                            <button
-                              title="Click to copy model name"
-                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}
-                              onClick={() => {
-                                void navigator.clipboard.writeText(m);
-                                onToast({ kind: 'ok', msg: `copied ${m}` });
-                              }}
-                            >
-                              <code>{m}</code> ⧉
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                      <div style={{ marginTop: 4 }}>
+                        {p.compatible_backends.map((b) => {
+                          const key = `${p.id}::${b}`;
+                          const list = models[key];
+                          return (
+                            <div key={b} style={{ marginBottom: 6 }}>
+                              <div style={{ fontSize: 11 }}>
+                                <HarnessBadge backend={b} />{' '}
+                                <span className="dim">
+                                  {busy === key ? '…' : list ? `${list.length} model(s)` : ''}
+                                </span>{' '}
+                                <button
+                                  title="refresh this harness's list"
+                                  onClick={() => fetchFor(p.id, b, true)}
+                                  style={{ fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)' }}
+                                >
+                                  ↻
+                                </button>
+                              </div>
+                              {list && list.length > 0 && (
+                                <ul style={{ margin: '2px 0 0', paddingLeft: 18, fontSize: 11, color: 'var(--dim)' }}>
+                                  {list.map((m) => (
+                                    <li key={m}>
+                                      <button
+                                        title="Click to copy model name"
+                                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', font: 'inherit' }}
+                                        onClick={() => copyModel(m)}
+                                      >
+                                        <code>{m}</code> ⧉
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {list && list.length === 0 && busy !== key && (
+                                <span className="dim" style={{ fontSize: 11, paddingLeft: 18 }}>no models</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
-                  </div>
-                ) : (
-                  p.supports_model_listing ? (
-                    <button
-                      className="dim"
-                      style={{ fontSize: 11, padding: 0, background: 'none', border: 'none', cursor: 'pointer' }}
-                      onClick={() => fetchModels(p.id)}
-                    >
-                      — click to fetch
-                    </button>
-                  ) : (
-                    <span className="dim">—</span>
-                  )
-                )}
-              </td>
-              <td style={{ textAlign: 'right' }}>
-                {p.supports_model_listing ? (
-                  <button
-                    onClick={() => fetchModels(p.id)}
-                    disabled={busy === p.id}
-                    title="Update models"
-                    aria-label="Update models"
-                    style={{ fontSize: 13, lineHeight: 1, padding: '2px 6px', background: 'none', border: '1px solid var(--border)', borderRadius: 4, cursor: busy === p.id ? 'default' : 'pointer' }}
-                  >
-                    {busy === p.id ? '…' : '↻'}
-                  </button>
-                ) : (
-                  <span className="dim" style={{ fontSize: 11 }}>static</span>
+                  </>
                 )}
               </td>
             </tr>
@@ -369,7 +366,7 @@ export default function SettingsRunnerProfilesTab() {
       <Section title="Harnesses" hint="Agentic runners: authentication, compatible providers, and default model (consulted on every run).">
         <HarnessesSection onToast={setToast} onAddCredential={setCredPrefill} />
       </Section>
-      <Section title="Providers" hint="Discovered provider adapters. Providers are registered via plugins/opencode discovery — add a new one via a runner profile.">
+      <Section title="Providers" hint="Preconfigured adapters ship with agentbox; discovered ones are reported by the opencode CLI at runtime.">
         <ProvidersSection onToast={setToast} onAddCredential={setCredPrefill} />
       </Section>
       <Section title="Credentials">

@@ -382,6 +382,7 @@ export interface RunnerProvider {
   supports_model_listing: boolean;
   default_base_url: string | null;
   default_api_key_env: string | null;
+  discovered: boolean;
 }
 
 export interface RunnerBackend {
