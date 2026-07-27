@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from jsonschema import Draft202012Validator
+from sqlalchemy.exc import IntegrityError
 
 from agentbox.core.agents import render_for_type
 from agentbox.core.data.constants import ResourceType
@@ -663,6 +664,13 @@ class ResourceService(Service):
         """Atomically replace all prompt bindings for an agent."""
         try:
             return {"items": self._prompt_bindings.replace_for_agent(agent_id, bindings, reason=reason, actor=actor)}
+        except IntegrityError as exc:
+            # A binding points at a resource_id that doesn't exist — the FK
+            # rejects the insert. Surface a clean 400, not a 500 (the whole
+            # replace is one transaction, so nothing was applied).
+            raise BindingError(
+                "one or more bindings reference an unknown resource_id"
+            ) from exc
         except ValueError as exc:
             raise BindingError(str(exc)) from exc
 

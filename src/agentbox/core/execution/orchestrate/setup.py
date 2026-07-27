@@ -205,6 +205,8 @@ class RunSetup:
     ) -> tuple["BackendAdapter", RenderedConfig]:
         # Resolve cross-domain values before render so backends don't
         # import from agents / workspaces / resources domains directly.
+        from agentbox.core.service.system import SystemService  # noqa: PLC0415
+
         agent_config_json = _read_agent_config_json(agent)
         runtime_config_view = RuntimeConfigView(
             allowed_tools=tuple(
@@ -271,7 +273,7 @@ class RunSetup:
                     self._mgrs.workspace_mcp_tool_overrides,
                     self._mcp_registry,
                     declared_tools=adapter.declared_tools(),
-                    project_server_names=[s.name for s in self._mgrs.settings.get_project_mcp_servers()],
+                    project_server_names=[s.name for s in SystemService().get_project_mcp_servers()],
                 )
                 if ws_id
                 else []

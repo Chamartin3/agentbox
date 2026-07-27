@@ -135,6 +135,10 @@ class McpClient:
         self._session_id: str | None = None
         # stdio state — set by _ensure_proc(), cleared by close()
         self._proc: asyncio.subprocess.Process | None = None
+        # Background task draining the child's stderr. Without it a child that
+        # logs to stderr fills the 64K pipe buffer and blocks, while we block
+        # reading stdout → deadlock (a hung introspection with no response).
+        self._stderr_drain: asyncio.Task[None] | None = None
 
     async def _ensure_proc(self) -> asyncio.subprocess.Process:
         """Lazily spawn the stdio subprocess; return existing proc if alive."""
@@ -150,7 +154,20 @@ class McpClient:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        # Continuously drain stderr so a chatty child can't deadlock on a full
+        # pipe while we read stdout. Runs until the proc exits or close() cancels.
+        if self._proc.stderr is not None:
+            self._stderr_drain = asyncio.create_task(
+                self._drain_stderr(self._proc.stderr)
+            )
         return self._proc
+
+    async def _drain_stderr(self, stderr: asyncio.StreamReader) -> None:
+        """Silently consume the child's stderr to prevent a pipe-buffer deadlock."""
+        with contextlib.suppress(Exception):
+            while True:
+                if not await stderr.readline():
+                    break
 
     async def initialize(self) -> RawJson:
         if self._transport in ("http", "sse") and self._url:
@@ -373,6 +390,14 @@ class McpClient:
 
     async def close(self) -> None:
         await self._http.aclose()
+        if self._stderr_drain is not None:
+            self._stderr_drain.cancel()
+            # Awaiting a cancelled task re-raises CancelledError, which is a
+            # BaseException (not Exception) — suppress BaseException so cleanup
+            # never surfaces as a 500.
+            with contextlib.suppress(BaseException):
+                await self._stderr_drain
+            self._stderr_drain = None
         if self._proc is not None:
             with contextlib.suppress(Exception):
                 self._proc.terminate()

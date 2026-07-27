@@ -19,6 +19,7 @@ from agentbox.core.service import (
     RunnerProfileStats,
 )
 from agentbox.core.service.engines import InvalidProfile
+from agentbox.core.service.engines import ProfileInUse
 from agentbox.core.service.engines import ProfileNotFound
 
 router = APIRouter(prefix="/api/runner-profiles", tags=["runner-profiles"])
@@ -111,6 +112,8 @@ def delete_runner_profile(
         ctx.engines.delete_profile(profile_id)
     except ProfileNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
+    except ProfileInUse as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 @router.get("/{profile_id}/stats")

@@ -97,6 +97,19 @@ class ProfileNotFound(LookupError):
         self.profile_id = profile_id
 
 
+class ProfileInUse(ValueError):
+    """A runner profile cannot be deleted because it is still referenced."""
+
+    def __init__(self, profile_id: str, agents: int, runs: int) -> None:
+        super().__init__(
+            f"runner profile {profile_id!r} is in use "
+            f"({agents} agent binding(s), {runs} run(s)); unbind before deleting"
+        )
+        self.profile_id = profile_id
+        self.agents = agents
+        self.runs = runs
+
+
 class EngineService(Service):
     """Public API for the engines domain.
 
@@ -229,9 +242,17 @@ class EngineService(Service):
         return row
 
     def delete_profile(self, profile_id: str) -> None:
-        """Delete a runner profile. Raises ``ProfileNotFound`` if missing."""
+        """Delete a runner profile.
+
+        Raises ``ProfileNotFound`` if missing, ``ProfileInUse`` if any agent
+        binding or run still references it (a raw delete would otherwise hit
+        the FK constraint and surface as a 500).
+        """
         if self._db.runner_profiles.get_by_id(profile_id) is None:
             raise ProfileNotFound(profile_id)
+        agents, runs = self._db.runner_profiles.count_refs(profile_id)
+        if agents or runs:
+            raise ProfileInUse(profile_id, agents, runs)
         self._db.runner_profiles.delete_one(profile_id)
 
     # ------------------------------------------------------------------

@@ -28,7 +28,7 @@ from agentbox.core.data.profiles import RunnerProfile as RunnerProfileView, Runn
 from agentbox.core.db.base.manager import Manager
 from agentbox.core.db.base.model import Entity
 from agentbox.core.db.base.tablename import tableargs, tablename
-from agentbox.core.db.agents.agent import AgentRunnerProfile
+from agentbox.core.db.agents.agent import AgentMeta, AgentRunnerProfile
 from agentbox.core.db.runs.run import Run
 from agentbox.core.db.runs.usage import Usage
 
@@ -66,6 +66,7 @@ class RunnerProfile(Entity, table=True):
 # Table aliases sourced from SQLModel entities (instead of core.db.schema)
 runner_profiles = RunnerProfile.__table__
 agent_runner_profiles = AgentRunnerProfile.__table__
+agent_meta = AgentMeta.__table__
 runs = Run.__table__
 usage = Usage.__table__
 
@@ -176,11 +177,49 @@ class RunnerProfileManager(Manager[RunnerProfile]):
         return self.get_by_id(profile_id)
 
     def delete_one(self, profile_id: str) -> None:
-        """Delete a runner profile by ID. Silent if the profile does not exist."""
+        """Delete a runner profile by ID. Silent if the profile does not exist.
+
+        Also clears this profile's ``agent_runner_profiles`` rows in the same
+        transaction. The only caller (``EngineService.delete_profile``) has
+        already refused the delete if a *live* agent still references it, so any
+        remaining binding belongs to a soft-deleted agent — an orphan whose FK
+        would otherwise raise IntegrityError → 500.
+        """
         with self._engine.begin() as conn:
+            conn.execute(
+                sa_delete(agent_runner_profiles).where(
+                    agent_runner_profiles.c.runner_profile_id == profile_id
+                )
+            )
             conn.execute(
                 sa_delete(runner_profiles).where(runner_profiles.c.id == profile_id)
             )
+
+    def count_refs(self, profile_id: str) -> tuple[int, int]:
+        """Return (live_agent_bindings, run_refs) referencing this profile.
+
+        Both tables carry a FK to ``runner_profiles.id`` (agent_runner_profiles
+        NOT NULL, runs nullable). A caller uses this to refuse a delete with a
+        clean 409 instead of letting the FK raise an IntegrityError → 500.
+        Bindings of *soft-deleted* agents are excluded — the agent no longer
+        exists, so it is not a live reference (its orphan row is cleared on
+        delete).
+        """
+        deleted_agents = (
+            select(agent_meta.c.agent_id)
+            .where(agent_meta.c.deleted_at.isnot(None))
+        )
+        with self._engine.connect() as conn:
+            agents = int(conn.execute(
+                select(func.count()).select_from(agent_runner_profiles)
+                .where(agent_runner_profiles.c.runner_profile_id == profile_id)
+                .where(agent_runner_profiles.c.agent_id.notin_(deleted_agents))
+            ).scalar() or 0)
+            run_refs = int(conn.execute(
+                select(func.count()).select_from(runs)
+                .where(runs.c.runner_profile_id == profile_id)
+            ).scalar() or 0)
+        return agents, run_refs
 
     # ------------------------------------------------------------------
     # Compound atomic operations (invariant: only one system_default)
