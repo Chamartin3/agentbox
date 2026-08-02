@@ -123,7 +123,7 @@ class ClaudeMcpConfig(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# user-config.json (seeded into the agentbox-claude volume)
+# user-config.json (seeded into creds/claude in the agentbox-creds volume)
 # ---------------------------------------------------------------------------
 
 

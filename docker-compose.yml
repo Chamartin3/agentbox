@@ -23,16 +23,22 @@
 #
 # Named volumes (persisted across recreations, owned by this stack):
 #   agentbox-data           SQLite DB and run artefacts (/data)  [always mounted]
-#   agentbox-claude         Claude OAuth credentials (/agentbox/creds/claude)  [always mounted]
+#   agentbox-creds          all backend credentials (/agentbox/creds)  [always mounted]
+#
+# Both are relocatable — set the source to a host path to bind-mount instead
+# of using the named volume (leave unset to keep the named volume):
+#   AGENTBOX_DATA_VOLUME=./data       →  /data
+#   AGENTBOX_CREDS_VOLUME=./creds      →  /agentbox/creds
 #
 # Optional named volumes — declare in an override file for persistence:
 #   agentbox-workspaces     per-agent workspace trees (/agentbox/workspaces)
 #   agentbox-opencode       opencode internal data (/home/appuser/.local/share/opencode)
 #   agentbox-npm            npm global cache (internal)
 #
-# Auth: Claude OAuth credentials live in the agentbox-claude named volume.
-# Authenticate once with `claude /login` inside the container — tokens
-# persist across recreations.
+# Auth: every backend stores its credentials under /agentbox/creds (the shared
+# agentbox-creds volume) — Claude OAuth in creds/claude, others in their own
+# subdir. Authenticate Claude once with `claude /login` inside the container;
+# tokens persist across recreations.
 
 services:
   agentbox:
@@ -50,9 +56,10 @@ services:
     tmpfs:
       - /run/agentbox:size=256m,mode=0700
     volumes:
-      # Named volumes — persisted, container-owned
-      - agentbox-data:/data
-      - agentbox-claude:/agentbox/creds/claude
+      # Persisted stores — source defaults to the named volume; set the env var
+      # to a host path (e.g. ./data) to bind-mount and relocate instead.
+      - ${AGENTBOX_DATA_VOLUME:-agentbox-data}:/data
+      - ${AGENTBOX_CREDS_VOLUME:-agentbox-creds}:/agentbox/creds
     env_file:
       # Local secrets (LLM provider API keys etc). Lives next to this
       # compose file so it travels with the agentbox lib. Top-level
@@ -95,7 +102,7 @@ services:
     ports:
       - "${AGENTBOX_MCP_PORT:-8766}:8766"
     volumes:
-      - agentbox-data:/data
+      - ${AGENTBOX_DATA_VOLUME:-agentbox-data}:/data
     environment:
       - AGENTBOX_DATA_DIR=/data
       - AGENTBOX_MCP_TRANSPORT=http
@@ -178,7 +185,7 @@ services:
 
 volumes:
   agentbox-data:
-  agentbox-claude:
+  agentbox-creds:
   agentbox-web-node-modules:
   ollama-data:
   # Optional — declare these in an override file for persistence across recreations:
