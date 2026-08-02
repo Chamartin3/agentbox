@@ -59,6 +59,9 @@ dev = [
   "pytest-timeout>=2.3.0",
   "respx>=0.21",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+]
 
 [build-system]
 requires = ["hatchling"]

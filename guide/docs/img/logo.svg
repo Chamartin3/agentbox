@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 540" role="img" aria-labelledby="title desc">
+  <title id="title">Green box and stars logo</title>
+  <desc id="desc">Transparent isometric box outlined in green with two green sparkle stars.</desc>
+
+  <g fill="none" stroke="#39E680" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 22 574 188 300 378 26 188Z"/>
+    <path d="M26 188v146l274 184 274-184V188"/>
+    <path d="M300 378v140"/>
+  </g>
+
+  <g fill="#39E680" transform="translate(-18 0)">
+    <path d="M258 118C267 172 278 184 333 194 278 204 267 216 258 270 249 216 238 204 183 194 238 184 249 172 258 118Z"/>
+    <path d="M398 92C403 123 410 130 442 136 410 142 403 149 398 180 393 149 386 142 354 136 386 130 393 123 398 92Z"/>
+  </g>
+</svg>

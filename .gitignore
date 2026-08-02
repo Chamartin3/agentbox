@@ -31,8 +31,8 @@ src/agentbox/ui/static/dist-old/
 /workdir/
 /web/workdir/
 
-# Planning docs (local only)
-docs/
+# Planning docs (local only) — root only, not guide/docs
+/docs/
 
 # Playwright MCP scratch
 .playwright-mcp/
@@ -42,3 +42,11 @@ docs/
 
 # Local screenshots / scratch images
 *.png
+
+# MkDocs build output
+/site/
+
+# The published docs site under guide/ is tracked (overrides *.png above);
+# only its build output is ignored.
+!guide/**
+guide/site/

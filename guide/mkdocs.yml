@@ -1,0 +1,63 @@
+site_name: AgentBox
+site_description: Run reusable agents in isolated, fully captured environments.
+docs_dir: docs
+
+# Internal notes, not a published page.
+exclude_docs: |
+  img/README.md
+
+theme:
+  name: material
+  logo: img/logo.svg
+  favicon: img/logo.svg
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+    - toc.integrate
+  palette:
+    - scheme: default
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+
+nav:
+  - Overview: index.md
+  - Setup & configuration:
+      - Setup: 01-setup-system.md
+      - Configuring a provider: 02-setup-providers.md
+  - Usage:
+      - Managing Agents: 03-first-agent.md
+      - Structured output: 04-structured-output.md
+      - Workspaces: 05-workspaces.md
+      - Work interactively: 09-interactive.md
+      - Automate with webhooks: 06-webhooks.md
+      - Evaluate & improve: 07-evaluate.md
+      - Swap harnesses & compare: 08-compare.md
+  - Reference:
+      - REST & WebSocket API: reference-api.md
+      - CLI: reference-cli.md
+      - MCP: reference-mcp.md
