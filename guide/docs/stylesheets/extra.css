@@ -1,6 +1,58 @@
+/* Brand accent: replace Material's default indigo/blue with the logo green.
+   Bright green for dark mode; a deeper green keeps links readable on white. */
+[data-md-color-scheme="slate"] {
+  --md-accent-fg-color: #39e680;
+  --md-typeset-a-color: #39e680;
+}
+[data-md-color-scheme="default"] {
+  --md-accent-fg-color: #1f9d57;
+  --md-typeset-a-color: #1f9d57;
+}
+
 /* Push the search box to the far right of the header.
    The header inner is a flexbox; everything else defaults to order 0. */
 .md-header__inner > .md-search {
   order: 100;
   margin-left: auto;
+}
+
+/* Minimal landing splash: centered logo, title, tagline, and CTA buttons. */
+.md-typeset .splash {
+  text-align: center;
+  padding: 5vh 0 6vh;
+}
+.md-typeset .splash-logo {
+  margin-bottom: 1rem;
+}
+.md-typeset .splash-title {
+  margin: 0 0 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.md-typeset .splash p {
+  color: var(--md-default-fg-color--light);
+  font-size: 1.15rem;
+  max-width: 34rem;
+  margin: 0 auto 2rem;
+}
+.md-typeset .splash .md-button {
+  margin: 0.3rem;
+}
+.md-typeset .splash .md-button:not(.md-button--primary) {
+  color: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+}
+
+/* Primary CTA highlighted in the logo green. */
+.md-typeset .splash .md-button--primary {
+  --agentbox-green: #39e680;
+  background-color: var(--agentbox-green);
+  border-color: var(--agentbox-green);
+  color: #06231a;
+}
+.md-typeset .splash .md-button--primary:hover,
+.md-typeset .splash .md-button--primary:focus {
+  background-color: #2fce72;
+  border-color: #2fce72;
+  color: #06231a;
 }

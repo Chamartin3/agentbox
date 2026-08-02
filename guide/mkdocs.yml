@@ -52,7 +52,8 @@ plugins:
           name: Español
           build: true
           nav_translations:
-            Overview: Introducción
+            Home: Inicio
+            Introduction: Introducción
             Setup & configuration: Instalación y configuración
             Setup: Instalación
             Configuring a provider: Configurar un proveedor
@@ -84,7 +85,8 @@ markdown_extensions:
   - pymdownx.details
 
 nav:
-  - Overview: index.md
+  - Home: index.md
+  - Introduction: introduction.md
   - Setup & configuration:
       - Setup: 01-setup-system.md
       - Configuring a provider: 02-setup-providers.md
