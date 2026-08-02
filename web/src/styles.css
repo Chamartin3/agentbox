@@ -36,6 +36,8 @@ a:hover { text-decoration: underline; }
   top: 0;
   z-index: 10;
 }
+.app-header .brand { display: inline-flex; align-items: center; gap: 8px; }
+.app-header .brand-logo { height: 24px; width: 26px; display: block; }
 .app-header strong { color: var(--fg); margin-right: 8px; }
 .app-header nav a { color: var(--fg-muted); }
 .app-header nav a.active, .app-header nav a:hover { color: var(--accent); }

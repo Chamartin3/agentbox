@@ -1,13 +1,17 @@
-# agentbox
+<p align="center">
+  <img src="src/agentbox/ui/assets/logo.svg" alt="AgentBox" width="120" />
+</p>
 
-**Run reusable agents in isolated, fully-captured environments, with tight control over the tools and resources each one gets.**
+<h1 align="center">AgentBox</h1>
+
+<p align="center"><strong>Run reusable agents in isolated, fully-captured environments, with tight control over the tools and resources each one gets.</strong></p>
 
 Running agents is usually ad hoc. Every setup has its own config, credentials,
 and tools. There is nowhere shared to keep an agent with the resources it needs.
 Nothing keeps one agent out of another's environment. And there is no record to
 tell whether a change made an agent better or worse.
 
-agentbox fixes that. You define an agent once and run it in a sandbox scoped to
+AgentBox fixes that. You define an agent once and run it in a sandbox scoped to
 exactly the tools you allow. Every run comes back captured in full: transcript,
 tokens, cost, timing, and tool calls. The same agent runs on many backends
 through one API.
@@ -20,7 +24,7 @@ It is built on three ideas:
 
 ## Quick start
 
-agentbox runs as a Docker image and serves its API and dashboard on port `8765`.
+AgentBox runs as a Docker image and serves its API and dashboard on port `8765`.
 
 ```bash
 git clone <your-agentbox-remote> agentbox
@@ -68,7 +72,7 @@ curl -X POST http://localhost:8765/api/runs \
   -d '{"agent": "research-analyst", "input": "Summarize this abstract: ..."}'
 ```
 
-**5. Get structured output.** Attach a JSON schema and agentbox validates the
+**5. Get structured output.** Attach a JSON schema and AgentBox validates the
 result. If it does not match, the run retries up to a limit you set. Downstream
 code gets a shape it can rely on.
 
@@ -93,5 +97,5 @@ side.
 
 A run is scoped to its workspace and the tools you allow. This is
 filesystem-level scoping, not an OS-level sandbox. A backend with shell access
-can reach the host. Grant tool access only to agents you trust, and run agentbox
+can reach the host. Grant tool access only to agents you trust, and run AgentBox
 on infrastructure you control.

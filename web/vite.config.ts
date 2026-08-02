@@ -18,6 +18,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    // Allow importing shared assets from the package (e.g. src/agentbox/ui/assets/logo.svg).
+    fs: { allow: [path.resolve(__dirname, '..')] },
     watch: {
       // Polling is more reliable across docker bind mounts on Linux.
       usePolling: true,

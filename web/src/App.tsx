@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
+import logoUrl from '../../src/agentbox/ui/assets/logo.svg';
 
 const ActivityPage = lazy(() => import('./pages/ActivityPage'));
 const RunsPage = lazy(() => import('./pages/RunsPage'));
@@ -15,10 +16,25 @@ const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 export default function App() {
+  // The backend only serves /assets/*, so point the favicon at the bundled logo URL.
+  useEffect(() => {
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.type = 'image/svg+xml';
+    link.href = logoUrl;
+  }, []);
+
   return (
     <>
       <header className="app-header">
-        <strong>agentbox</strong>
+        <span className="brand">
+          <img src={logoUrl} alt="" className="brand-logo" />
+          <strong>AgentBox</strong>
+        </span>
         <nav className="row" style={{ gap: 16 }}>
           <NavLink to="/" end>activity</NavLink>
           <NavLink to="/agents">agents</NavLink>
