@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install MkDocs
-        run: pip install mkdocs-material
+        run: pip install mkdocs-material mkdocs-static-i18n
       - name: Build site
         working-directory: guide
         run: mkdocs build --strict -d ../site

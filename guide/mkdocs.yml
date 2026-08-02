@@ -1,5 +1,7 @@
 site_name: AgentBox
 site_description: Run reusable agents in isolated, fully captured environments.
+repo_url: https://github.com/Chamartin3/agentbox
+repo_name: Chamartin3/agentbox
 docs_dir: docs
 
 # Internal notes, not a published page.
@@ -12,7 +14,6 @@ theme:
   favicon: img/logo.svg
   language: en
   features:
-    - navigation.instant
     - navigation.tracking
     - content.code.copy
     - content.code.annotate
