@@ -14,7 +14,7 @@ in seconds.
 
 These tests are a starting scaffold — additional scenarios (streaming
 deltas, tool round-trip, structured output, timeout, WS-vs-transcript)
-land alongside Phase 1.4's ``scripts/verify_ollama.py`` driver.
+land here and run via ``-m live_ollama`` as shown above.
 """
 
 from __future__ import annotations
