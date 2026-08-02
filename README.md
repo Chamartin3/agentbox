@@ -6,6 +6,8 @@
 
 <p align="center"><strong>Run reusable agents in isolated, fully-captured environments, with tight control over the tools and resources each one gets.</strong></p>
 
+<p align="center"><a href="https://chamartin3.github.io/agentbox/"><strong>📖 Documentation</strong></a></p>
+
 Running agents is usually ad hoc. Every setup has its own config, credentials,
 and tools. There is nowhere shared to keep an agent with the resources it needs.
 Nothing keeps one agent out of another's environment. And there is no record to
