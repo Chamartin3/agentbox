@@ -27,7 +27,7 @@ It is built on three ideas:
 AgentBox runs as a Docker image and serves its API and dashboard on port `8765`.
 
 ```bash
-git clone <your-agentbox-remote> agentbox
+git clone https://github.com/Chamartin3/agentbox.git
 cd agentbox
 docker compose build agentbox
 docker compose up -d agentbox

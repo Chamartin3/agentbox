@@ -13,7 +13,7 @@ AgentBox ships as a Docker image containing the FastAPI service, the CLI, and
 the prebuilt dashboard.
 
 ```bash
-git clone <your-agentbox-remote> agentbox
+git clone https://github.com/Chamartin3/agentbox.git
 cd agentbox
 docker compose build agentbox
 ```
