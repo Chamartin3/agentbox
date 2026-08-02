@@ -10,6 +10,7 @@ theme:
   name: material
   logo: img/logo.svg
   favicon: img/logo.svg
+  language: en
   features:
     - navigation.instant
     - navigation.tracking
@@ -17,18 +18,50 @@ theme:
     - content.code.annotate
     - toc.integrate
   palette:
-    - scheme: default
-      primary: black
-      accent: indigo
-      toggle:
-        icon: material/weather-night
-        name: Dark mode
     - scheme: slate
       primary: black
       accent: indigo
       toggle:
         icon: material/weather-sunny
         name: Light mode
+    - scheme: default
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+
+# Language switcher (the flag button in the header) comes from this plugin.
+# English pages are foo.md; Spanish pages are foo.es.md alongside them.
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: es
+          name: Español
+          build: true
+          nav_translations:
+            Overview: Introducción
+            Setup & configuration: Instalación y configuración
+            Setup: Instalación
+            Configuring a provider: Configurar un proveedor
+            Usage: Uso
+            Managing Agents: Gestionar agentes
+            Structured output: Salida estructurada
+            Workspaces: Espacios de trabajo
+            Work interactively: Trabajar de forma interactiva
+            Automate with webhooks: Automatizar con webhooks
+            Evaluate & improve: Evaluar y mejorar
+            Swap harnesses & compare: Cambiar de harness y comparar
+            Reference: Referencia
+            REST & WebSocket API: API REST y WebSocket
+            CLI: CLI
+            MCP: MCP
 
 markdown_extensions:
   - admonition
