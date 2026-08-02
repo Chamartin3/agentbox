@@ -1,5 +1,10 @@
 site_name: AgentBox
 site_description: Run reusable agents in isolated, fully captured environments.
+# Needed so the i18n language switcher builds correct /agentbox/ and /agentbox/es/ links.
+site_url: https://chamartin3.github.io/agentbox/
+
+extra_css:
+  - stylesheets/extra.css
 repo_url: https://github.com/Chamartin3/agentbox
 repo_name: Chamartin3/agentbox
 docs_dir: docs

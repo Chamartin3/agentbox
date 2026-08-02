@@ -1,0 +1,6 @@
+/* Push the search box to the far right of the header.
+   The header inner is a flexbox; everything else defaults to order 0. */
+.md-header__inner > .md-search {
+  order: 100;
+  margin-left: auto;
+}
